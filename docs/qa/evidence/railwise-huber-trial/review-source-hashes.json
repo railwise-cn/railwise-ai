@@ -1,0 +1,11 @@
+{
+  "reviewedAtUtc": "2026-09-19T23:25:56.265518+00:00",
+  "sourceHashes": {
+    "huber": {
+      "kun/src/contracts/survey-huber-trial.ts": "e70edcacd816500ceed124cc339301db1ac63a787b7a91009ddd8081060f879a",
+      "kun/src/engineering/survey-huber-trial.ts": "18e9dcebc1111e1a3acde8c0e549e16f4caf201fe55d464b91184bee077060bc",
+      "kun/src/engineering/survey-huber-trial-qr.ts": "462062e25b7bd8a2cb1d69a6f8a5d7efef999a889a03205e6a3c6ac9c30aa0ac"
+    }
+  },
+  "scope": "Independent synthetic pure-kernel numerical review, no human signoff or packaged test"
+}

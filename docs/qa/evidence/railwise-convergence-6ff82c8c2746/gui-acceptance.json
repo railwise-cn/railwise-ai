@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "status": "partial-not-release-approval",
+  "sourceHead": "6ff82c8c27466ee42f2604b053397fd132d5a0a7",
+  "candidateVersion": "0.5.0",
+  "packageAsarSha256": "ba7edf57c3afe50473a633700a96898c773a4ab42b255eb42c9da91e2e3ebe4d",
+  "packageEvidence": "package.json",
+  "originalGuiEvidence": "gui-acceptance.source.json",
+  "privateUpdater": {
+    "status": "passed",
+    "evidence": "private-updater.json",
+    "nativeEvidence": "native-updater.redacted.json",
+    "sameZipAndAsar": true,
+    "baseline": "same-source-0.0.0-not-historical-user-migration",
+    "publicFeedPromoted": false
+  },
+  "syntheticInstalledGui": {
+    "totalDistinctRecords": 13,
+    "advancedRecords": 9,
+    "qualityRecords": 4,
+    "reference": "independent-reference.json",
+    "static": "independent-static.json",
+    "huberAndFamily": "independent-huber-family.json",
+    "quality": "independent-quality.json",
+    "qualityRestored": "independent-quality-restored.json",
+    "nativeExport": "native-export-verification.json",
+    "nativeSaveCancellationAndSuccess": true,
+    "restartOriginalRecords": true
+  },
+  "corruption": {
+    "preparation": "quality-corruption-preparation.json",
+    "execution": "quality-corruption-execution.json",
+    "originalDeclaration": "quality-corruption-original-declaration.bin",
+    "fullBackup": "quality-corruption-backup.json",
+    "fixedSyntheticTargetOnly": true,
+    "originalBytesAndTriggersRestored": true
+  },
+  "realP0": {
+    "status": "passed-selected-real-data-workflows-and-restart",
+    "evidence": "p0-summary.json",
+    "projects": 3,
+    "networks": 2,
+    "draftManifests": 2,
+    "sourceHashesChecked": 2,
+    "outputHashesAndSizesChecked": 6,
+    "storedSuccessfulVerificationAttempts": 4,
+    "checksPerAttempt": 5,
+    "gsiReferenceConversionProvenance": "unresolved-seven-of-fourteen-route-heights",
+    "realSourceOrCoordinateDataArchived": false
+  },
+  "screenshots": {
+    "regularImagePixels": {
+      "width": 1171,
+      "height": 768
+    },
+    "nearMinimumImagePixels": {
+      "width": 963,
+      "height": 641
+    },
+    "finalImagePixels": {
+      "width": 1490,
+      "height": 768
+    },
+    "nativeWindowBoundsMeasured": false,
+    "cssViewportMeasured": false,
+    "preciseMinimumAcceptance": "not-established",
+    "themes": [
+      "zh-light",
+      "en-dark"
+    ],
+    "finalContext": "39-final-reference-context-zh-light.jpg",
+    "finalResult": "38-final-reference-zh-light.jpg",
+    "finalAx": "39-final-reference-context-zh-light.ax.txt",
+    "content": "synthetic; generic local acceptance project names only"
+  },
+  "limitations": {
+    "personalUserAcceptance": "not-performed",
+    "professionalSignoff": "not-performed",
+    "successfulRealModelSession": "not-performed",
+    "liveV41OfficialSearch": "not-performed",
+    "realOldUserMigration": "not-completed",
+    "completeKeyboardAccessibilityAndLocale": "not-completed",
+    "representativeProductionMetrics": "not-established",
+    "laterQualityAssessmentCommit7a01de3": "not-in-this-package"
+  },
+  "publicReleaseAuthorizedByThisEvidence": false
+}

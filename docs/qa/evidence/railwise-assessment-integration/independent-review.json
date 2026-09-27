@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-20",
+  "reviewer": "independent-ai-technical-review-not-professional-signoff",
+  "repository": "/Users/wangjiawei/Documents/WorkWise",
+  "commit": "7a01de38784806d586d65142af1d8ca05efde222",
+  "scope": "Read-only integrated-source review and archived portable replay only; no production edits or GUI operation.",
+  "result": "passed-with-explicit-product-and-acceptance-gaps",
+  "worktreeCleanBefore": true,
+  "worktreeCleanAfter": true,
+  "replay": {
+    "command": "node docs/qa/evidence/railwise-quality-assessment/independent-review/replay-independent.mjs /Users/wangjiawei/Documents/WorkWise",
+    "exitCode": 0,
+    "scratchDirectory": "/private/tmp/railwise-assessment-replay-GhTEXN",
+    "writeReview": "Read script before execution. Its mkdir/copy/write/report/build destinations are the new /private/tmp scratch directory; npm runs from scratch copies. Dependencies are linked read dependencies; no install, package migration or production database command is executed. Main worktree remained clean.",
+    "runtime": {
+      "passed": 25,
+      "failed": 0,
+      "report": "/private/tmp/railwise-assessment-replay-GhTEXN/independent-runtime.json"
+    },
+    "ui": {
+      "passed": 10,
+      "failed": 0,
+      "report": "/private/tmp/railwise-assessment-replay-GhTEXN/independent-ui.json",
+      "environment": "happy-dom; PDF and native-save fixture limits retained"
+    },
+    "build": {
+      "command": "npm run build",
+      "cwd": "scratch/kun",
+      "exitCode": 0
+    },
+    "compiled": {
+      "passed": true,
+      "checkGroups": 5,
+      "report": "/private/tmp/railwise-assessment-replay-GhTEXN/compiled-smoke.json"
+    },
+    "integratedServiceSha256": "2c2fd3ac642675ee34797dd6fd808b299ccf8af7dae402eae78fe004af024316",
+    "matchesIndependentlyReviewedService": true
+  },
+  "readOnlyIntegrationChecks": [
+    {
+      "area": "Registration",
+      "result": "pass",
+      "evidence": "kun/src/server/runtime-factory.ts:385 creates one project-scoped assessment service; :644 exposes it; kun/src/server/routes/server-runtime.ts:84 declares optional service; routes/index.ts:105 registers with existing authorize."
+    },
+    {
+      "area": "Read-only capabilities",
+      "result": "pass",
+      "evidence": "Factory injects frozen getProject/getManifest/retentionSnapshot/population/run/sample/score reads only. Does not inject verifyDeliverable, finalize, approval, quality append or score creation."
+    },
+    {
+      "area": "Shutdown",
+      "result": "pass-by-source-inspection",
+      "evidence": "runtime-factory.ts:718 closes assessment before retention/scoring/sampling sources; shutdown remains guarded by existing outer lifecycle. Existing actual factory test covers closed service and restart. That test was read, not newly run by this turn's portable script."
+    },
+    {
+      "area": "Old deliverable contracts",
+      "result": "unchanged-in-integration-commit",
+      "evidence": "git diff 7a01de3^ 7a01de3 has no engineering.ts, engineering-service.ts, survey-service.ts or survey-quality-workspace contract changes."
+    },
+    {
+      "area": "Old retention reader",
+      "result": "compatible",
+      "evidence": "Only additive getAssessmentSnapshot read transaction and optional default artifact cache argument added to private readRecord. Existing getRecord signature and database schema unchanged."
+    },
+    {
+      "area": "Formal outputs and audit",
+      "result": "pass-by-replay",
+      "evidence": "Real service source fixtures and compiled smoke preserve draft manifest, artifact bytes and engineering_verification_attempts; ordinary head append invalidates old current assessment without removing old records."
+    },
+    {
+      "area": "Storage compatibility",
+      "result": "additive-sidecar",
+      "evidence": "Independent survey-quality-assessment.sqlite3; no migration or deletion of prior quality, score, sampling, manifest or project objects."
+    }
+  ],
+  "actualCredentialsAndDataStillNeeded": [
+    {
+      "item": "Successful real model and official search session",
+      "need": "Usable configured provider account/API credential with model/search access, then actual V4.1 ordinary question, modification proposal, typed execution and evidence follow-up sessions. Prior 401s and mocked provider responses are not success evidence.",
+      "alreadyAvailable": "V4.1 ID/official origin wiring and synthetic network tests implemented."
+    },
+    {
+      "item": "Real old-user migration corpus",
+      "need": "Consented copy/backup of real historical projects, threads, plugins, MCP/Skill configuration and credential references from supported old versions; verify non-destructive migration/restart/updater preservation. Do not copy secret values into evidence.",
+      "alreadyAvailable": "Legacy reader and synthetic/isolated old candidate replay tests exist."
+    },
+    {
+      "item": "Real engineering/quality evidence",
+      "need": "Original field files, unit population definition and all selected unit materials, datum/instrument/precision context, applicable project specification and approved design, correction/recheck evidence, independent reference outputs and actual personnel/organization records. Existing synthetic/declared association cannot authenticate these.",
+      "alreadyAvailable": "Two real P0 GSI/IN2 samples and official GB/T 24356 full text have been acquired; do not call all source material missing."
+    },
+    {
+      "item": "Standards trust and applicability evidence",
+      "need": "Applicable versions/grades/jurisdictions and project basis for additional executable rules; independent exact rule review/source custody and rendered-page/transcription evidence for production registration. Source hashes alone do not establish scope or approval.",
+      "alreadyAvailable": "Versioned registry/scanned-source kernel and official table/clause research exist."
+    },
+    {
+      "item": "Second-wave formats/converters",
+      "need": "Per-format redistributable or user-supplied fixtures, exact protocol/semantics, license/provenance evidence and gold/negative outputs; concrete local approved converter binaries and real output comparisons where applicable. Do not infer manufacturer authorization is mandatory for every local user-supplied converter.",
+      "alreadyAvailable": "Detection/archive/blocking and local converter admission exist."
+    },
+    {
+      "item": "GeoCOM future device integration",
+      "need": "Exact instrument model/firmware/options/interface license, physical serial/network connection settings, real frame captures, field conditions/datum/instrument and prism heights and independent manufacturer/reference output.",
+      "alreadyAvailable": "TPS1200 GeoCOM 1.10/firmware4.0 documentation studied; no physical device connection performed."
+    },
+    {
+      "item": "Production KPI observations",
+      "need": "Representative production cohort/time window and medium-network definition; all first import attempts including failures, actual timestamps/interruptions, real approved deliveries, source/rule coverage, numerical replay evidence, license audit inventory, one-click and locale observations. Candidate 2-project timing cannot be extrapolated.",
+      "alreadyAvailable": "Read-only metrics tools and verification-attempt auditing exist; signing/notarization credentials and private HTTPS updater infrastructure already work and are not missing credentials."
+    }
+  ],
+  "p1SoftwareStillUnimplemented": [
+    "Production trusted standards registration, source/rendering storage and GUI workflow, complete applicable versioned rule mapping and conflict handling beyond the existing pure registry.",
+    "Complete GB/T 24356 workflow: authentic inspection evidence, personnel/stage independence and order, defect correction and reinspection/re-sampling, independently retained final checkpoint, formal delivery gate. New declared linkage supports one whole first-round sample of 1-8 units, two profiles, and does not close these tasks.",
+    "Digital signing and verified identity/authority, human review/recheck/approval workflow and nonforgeable binding to exact final artifact.",
+    "Monitoring calculation replay beyond existing strict Survey deliverable checks.",
+    "Other free-network strategies and actual quasi-stable datum determination; current 1D free trial and declared two-epoch GLS/equal reference are limited models.",
+    "General VCE covariance models and connection to formally validated production models; current independent disjoint-group trial is intentionally bounded.",
+    "General Baarda/t/robust production integration and justified model/scale/classification handling; current generalized-w, declared statistical families and fixed-external-scale Huber are explicit trials.",
+    "Incremental update/delete, changed parameters/datum, correlated or nonlinear models and dynamic filtering; current independent-observation append is static and bounded.",
+    "Second-wave parser/admission coverage with exact semantics and actual project acceptance, not only recognizing vendor names/extensions."
+  ],
+  "remainingP0AcceptanceAndPublication": [
+    "Exact final integrated package signing/notarization/install/updater, new features GUI/native save/restart/tamper and supported themes/window sizes/full keyboard/a11y/locale validation; old package evidence cannot cover new code.",
+    "Successful real model session and real old-user migration verification, beyond personal/professional confirmation.",
+    "Current complete locale/status review, including remaining diagnostics and historical display.",
+    "README/brand/site source exists but main landing/deployment and current exact-package screenshot refresh remain tracked separately; this turn did not verify current live site or publish it.",
+    "Personal exact-version UI/function approval and professional interpretation/signoff remain separate gates; tests are not approval."
+  ],
+  "p2StillOpen": "GeoCOM physical collection, coordinate/engineering expansion, DXF/point cloud/3D workflows, outward MCP host auth/third-party integration, concrete proprietary converter validation, and Survey/Write/Design/Flow domain collaboration. Original plan gates external acquisition/point clouds/long-tail expansion on P0 acceptance.",
+  "documentationCaveat": "The convergence ledger contains historical paragraphs saying scoring/material linkage are unimplemented and old candidate is latest. Treat timestamps and exact commit evidence separately: scoring and bounded declared linkage are now implemented at 7a01de3; full quality workflow is still not implemented. Do not claim all tasks complete.",
+  "limitations": [
+    "No GUI/packaged visual acceptance in this turn",
+    "No fresh real model/device/production metric collection",
+    "Read-only lifecycle review plus portable service replay is not the complete main-tree CI suite"
+  ]
+}

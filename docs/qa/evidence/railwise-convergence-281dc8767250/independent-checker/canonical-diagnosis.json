@@ -1,0 +1,297 @@
+{
+  "scope": "read-only synthetic GUI record canonicalization diagnosis",
+  "expected": "e17adbea183f93b0afd8a2395e6d6706d7c03254e570f4018714339c9fe2c13d",
+  "pythonHash": "55cd0af2d3637f75577ecff204c1539c6eac62a5de6126362256b6aaaa2121e2",
+  "nodeHash": "e17adbea183f93b0afd8a2395e6d6706d7c03254e570f4018714339c9fe2c13d",
+  "nodeMatchesSaved": true,
+  "firstMismatchOffset": 163,
+  "pythonAtMismatch": "07},\"closureUnits\":{\"angular\":\"rad\",\"hor",
+  "nodeAtMismatch": "7},\"closureUnits\":{\"angular\":\"rad\",\"hori",
+  "floatingPointFields": [
+    {
+      "path": "/adjustments/0/closure/horizontal",
+      "python": "1.3726709029343796e-07",
+      "value": 1.3726709029343796e-07
+    },
+    {
+      "path": "/adjustments/0/closure/angular",
+      "python": "3.111529177070756e-10",
+      "value": 3.111529177070756e-10
+    },
+    {
+      "path": "/adjustments/0/parameters/orientation:S1",
+      "python": "1.5707963269606606",
+      "value": 1.5707963269606606
+    },
+    {
+      "path": "/adjustments/0/unitWeightStdDev",
+      "python": "0.00010671165867325277",
+      "value": 0.00010671165867325277
+    },
+    {
+      "path": "/adjustments/0/varianceFactor",
+      "python": "1.1387378096796804e-08",
+      "value": 1.1387378096796804e-08
+    },
+    {
+      "path": "/adjustments/0/points/2/x",
+      "python": "120.710678",
+      "value": 120.710678
+    },
+    {
+      "path": "/adjustments/0/points/2/y",
+      "python": "120.710678",
+      "value": 120.710678
+    },
+    {
+      "path": "/adjustments/0/points/3/x",
+      "python": "49.99999999284098",
+      "value": 49.99999999284098
+    },
+    {
+      "path": "/adjustments/0/points/3/y",
+      "python": "49.999999963710295",
+      "value": 49.999999963710295
+    },
+    {
+      "path": "/adjustments/0/points/3/correctionX",
+      "python": "-1.9446147803137137e-08",
+      "value": -1.9446147803137137e-08
+    },
+    {
+      "path": "/adjustments/0/points/3/correctionY",
+      "python": "1.95930319080162e-07",
+      "value": 1.95930319080162e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/standardError",
+      "python": "1.3592152495710963e-07",
+      "value": 1.3592152495710963e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/covariance/0",
+      "python": "6.872084438073081e-07",
+      "value": 6.872084438073081e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/covariance/1",
+      "python": "-6.262705982801717e-07",
+      "value": -6.262705982801717e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/covariance/2",
+      "python": "7.474163269919943e-09",
+      "value": 7.474163269919943e-09
+    },
+    {
+      "path": "/adjustments/0/points/3/covariance/3",
+      "python": "-6.262705982801717e-07",
+      "value": -6.262705982801717e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/covariance/4",
+      "python": "9.351721243643048e-07",
+      "value": 9.351721243643048e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/covariance/5",
+      "python": "-8.88516487243097e-09",
+      "value": -8.88516487243097e-09
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/covarianceXY/0",
+      "python": "7.825502380945158e-15",
+      "value": 7.825502380945158e-15
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/covarianceXY/1",
+      "python": "-7.131580093523458e-15",
+      "value": -7.131580093523458e-15
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/covarianceXY/2",
+      "python": "-7.131580093523458e-15",
+      "value": -7.131580093523458e-15
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/covarianceXY/3",
+      "python": "1.064915856572102e-14",
+      "value": 1.064915856572102e-14
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/semiMajor",
+      "python": "1.284808010949112e-07",
+      "value": 1.284808010949112e-07
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/semiMinor",
+      "python": "4.435475957184348e-08",
+      "value": 4.435475957184348e-08
+    },
+    {
+      "path": "/adjustments/0/points/3/xyErrorEllipse/orientationRad",
+      "python": "2.2584737816163187",
+      "value": 2.2584737816163187
+    },
+    {
+      "path": "/adjustments/0/observations/0/correction",
+      "python": "-2.3735413634540237e-10",
+      "value": -2.3735413634540237e-10
+    },
+    {
+      "path": "/adjustments/0/observations/0/residual",
+      "python": "-2.3735413634540237e-10",
+      "value": -2.3735413634540237e-10
+    },
+    {
+      "path": "/adjustments/0/observations/0/standardizedResidual",
+      "python": "4.895780494523131e-05",
+      "value": 4.895780494523131e-05
+    },
+    {
+      "path": "/adjustments/0/observations/1/correction",
+      "python": "1.971329766092822e-10",
+      "value": 1.971329766092822e-10
+    },
+    {
+      "path": "/adjustments/0/observations/1/residual",
+      "python": "1.971329766092822e-10",
+      "value": 1.971329766092822e-10
+    },
+    {
+      "path": "/adjustments/0/observations/1/standardizedResidual",
+      "python": "4.066159522522697e-05",
+      "value": 4.066159522522697e-05
+    },
+    {
+      "path": "/adjustments/0/observations/2/correction",
+      "python": "7.159016490732029e-09",
+      "value": 7.159016490732029e-09
+    },
+    {
+      "path": "/adjustments/0/observations/2/residual",
+      "python": "7.159016490732029e-09",
+      "value": 7.159016490732029e-09
+    },
+    {
+      "path": "/adjustments/0/observations/2/standardizedResidual",
+      "python": "7.123487653604974e-06",
+      "value": 7.123487653604974e-06
+    },
+    {
+      "path": "/adjustments/0/observations/3/correction",
+      "python": "4.022115973612017e-11",
+      "value": 4.022115973612017e-11
+    },
+    {
+      "path": "/adjustments/0/observations/3/residual",
+      "python": "4.022115973612017e-11",
+      "value": 4.022115973612017e-11
+    },
+    {
+      "path": "/adjustments/0/observations/3/standardizedResidual",
+      "python": "8.296209720004341e-06",
+      "value": 8.296209720004341e-06
+    },
+    {
+      "path": "/adjustments/0/observations/4/correction",
+      "python": "-1.3708027779557597e-07",
+      "value": -1.3708027779557597e-07
+    },
+    {
+      "path": "/adjustments/0/observations/4/residual",
+      "python": "-1.3708027779557597e-07",
+      "value": -1.3708027779557597e-07
+    },
+    {
+      "path": "/adjustments/0/observations/4/standardizedResidual",
+      "python": "0.00013639997445091467",
+      "value": 0.00013639997445091467
+    },
+    {
+      "path": "/adjustments/0/displacements/3/dX",
+      "python": "-1.9446147803137137e-08",
+      "value": -1.9446147803137137e-08
+    },
+    {
+      "path": "/adjustments/0/displacements/3/dY",
+      "python": "1.95930319080162e-07",
+      "value": 1.95930319080162e-07
+    },
+    {
+      "path": "/adjustments/0/displacements/3/magnitude",
+      "python": "1.9689297244755981e-07",
+      "value": 1.9689297244755981e-07
+    },
+    {
+      "path": "/adjustments/0/covariance/0/0",
+      "python": "6.872084438073081e-07",
+      "value": 6.872084438073081e-07
+    },
+    {
+      "path": "/adjustments/0/covariance/0/1",
+      "python": "-6.262705982801717e-07",
+      "value": -6.262705982801717e-07
+    },
+    {
+      "path": "/adjustments/0/covariance/0/2",
+      "python": "7.474163269919943e-09",
+      "value": 7.474163269919943e-09
+    },
+    {
+      "path": "/adjustments/0/covariance/1/0",
+      "python": "-6.262705982801717e-07",
+      "value": -6.262705982801717e-07
+    },
+    {
+      "path": "/adjustments/0/covariance/1/1",
+      "python": "9.351721243643048e-07",
+      "value": 9.351721243643048e-07
+    },
+    {
+      "path": "/adjustments/0/covariance/1/2",
+      "python": "-8.88516487243097e-09",
+      "value": -8.88516487243097e-09
+    },
+    {
+      "path": "/adjustments/0/covariance/2/0",
+      "python": "7.474163269919945e-09",
+      "value": 7.474163269919945e-09
+    },
+    {
+      "path": "/adjustments/0/covariance/2/1",
+      "python": "-8.88516487243097e-09",
+      "value": -8.88516487243097e-09
+    },
+    {
+      "path": "/adjustments/0/covariance/2/2",
+      "python": "1.0092521025674865e-10",
+      "value": 1.0092521025674865e-10
+    },
+    {
+      "path": "/adjustments/0/precision/maxPointStdDev",
+      "python": "1.3592152495710963e-07",
+      "value": 1.3592152495710963e-07
+    },
+    {
+      "path": "/adjustments/0/solverDiagnostics/conditionEstimate",
+      "python": "116.49152888654937",
+      "value": 116.49152888654937
+    },
+    {
+      "path": "/surveySources/0/source/detectionConfidence",
+      "python": "0.98",
+      "value": 0.98
+    },
+    {
+      "path": "/surveySources/0/source/detection/confidence",
+      "python": "0.98",
+      "value": 0.98
+    },
+    {
+      "path": "/surveySources/0/source/preservedRawFields/point:COSA.in2:5:initialCoordinateDistanceRmsMetres",
+      "python": "1.2287124206979806e-08",
+      "value": 1.2287124206979806e-08
+    }
+  ]
+}

@@ -47,6 +47,7 @@ export type TaskControllerDeps = {
   nowIso: () => string
   ownerId?: string
   spans?: RuntimeSpanService
+  completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string } | null
 }
 
 export class TaskController {
@@ -56,6 +57,7 @@ export class TaskController {
   private readonly nowIso: () => string
   private readonly ownerId: string
   private readonly spans?: RuntimeSpanService
+  private readonly completionGuard?: TaskControllerDeps['completionGuard']
 
   constructor(deps: TaskControllerDeps) {
     this.repository = deps.repository
@@ -64,6 +66,7 @@ export class TaskController {
     this.nowIso = deps.nowIso
     this.ownerId = deps.ownerId ?? `runtime-${process.pid}-${randomUUID()}`
     this.spans = deps.spans
+    this.completionGuard = deps.completionGuard
   }
 
   ensureTask(input: {
@@ -71,15 +74,23 @@ export class TaskController {
     turnId: string
     request: StartTurnRequest
     engineeringExecution?: boolean
+    engineeringPlanId?: string
+    continuationTaskId?: string
   }): TaskRun {
     const active = this.repository.findActiveByThread(input.thread.id)
     const now = this.nowIso()
     const consultation = input.thread.domain === 'engineering' && !input.engineeringExecution
-    if (active && !consultation && shouldContinueActiveTask(input.request.prompt)) {
+    if (input.continuationTaskId && active?.id !== input.continuationTaskId) {
+      throw Object.assign(new Error('the task to resume is no longer active for this thread'), { code: 'invalid_state' })
+    }
+    if (active && (input.continuationTaskId || (!consultation && shouldContinueActiveTask(input.request.prompt)))) {
       return this.repository.update(active.id, active.revision, (current) => ({
         ...current,
         activeTurnId: input.turnId,
         model: input.request.model ?? current.model,
+        providerId: input.request.providerId ?? current.providerId,
+        reasoningEffort: input.request.reasoningEffort ?? current.reasoningEffort,
+        engineeringPlanId: input.engineeringPlanId ?? current.engineeringPlanId,
         updatedAt: now
       }), {
         key: `turn-attached:${input.turnId}`,
@@ -109,6 +120,9 @@ export class TaskController {
       acceptance,
       agentId: input.thread.agentId,
       model: selectedModel,
+      providerId: input.request.providerId,
+      engineeringPlanId: input.engineeringPlanId,
+      reasoningEffort: input.request.reasoningEffort,
       budget: {
         maxAttempts: profile?.budget.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         maxDurationMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS,
@@ -138,9 +152,19 @@ export class TaskController {
     return created
   }
 
+  continuationSelection(thread: ThreadRecord, request: StartTurnRequest, engineeringExecution?: boolean, continuationTaskId?: string): Pick<StartTurnRequest, 'model' | 'providerId' | 'reasoningEffort'> & { engineeringPlanId?: string } {
+    if (!continuationTaskId && thread.domain === 'engineering' && !engineeringExecution) return {}
+    if (!continuationTaskId && !shouldContinueActiveTask(request.prompt)) return {}
+    const task = this.repository.findActiveByThread(thread.id)
+    if (continuationTaskId && task?.id !== continuationTaskId) throw Object.assign(new Error('the task to resume is no longer active for this thread'), { code: 'invalid_state' })
+    return task ? { model: task.model, providerId: task.providerId, reasoningEffort: task.reasoningEffort, engineeringPlanId: task.engineeringPlanId } : {}
+  }
+
   activeTask(threadId: string): TaskRun | null {
     return this.repository.findActiveByThread(threadId)
   }
+
+  getTask(taskId: string): TaskRun | null { return this.repository.get(taskId) }
 
   beginAttempt(threadId: string, turnId: string): TaskRun | null {
     const task = this.repository.findActiveByThread(threadId)
@@ -198,6 +222,8 @@ export class TaskController {
     const turnItems = items.filter((item) => item.turnId === turnId)
     const pendingReason = pendingWorkReason(turnItems)
     if (pendingReason) return this.retry(task, pendingReason, fingerprint(turnItems), turnId)
+    const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
+    if (blocked) return this.retry(task, blocked.reason, blocked.fingerprint, turnId)
 
     const finalResponse = latestAssistantText(turn, turnItems)
     if (task.acceptance.requireFinalResponse && !finalResponse.trim()) {
@@ -249,6 +275,8 @@ export class TaskController {
     const completed = this.repository.update(task.id, task.revision, (current) => ({
       ...current,
       status: 'completed',
+      waitingReason: undefined,
+      stalledReason: undefined,
       finalResponse,
       artifacts,
       noProgressCount: 0,
@@ -330,6 +358,25 @@ export class TaskController {
       key: `task-resumed:${expectedRevision}`,
       kind: 'task_resumed',
       payload: { model: model ?? task.model },
+      createdAt: now
+    })
+  }
+
+  restorePreparedResume(previous: TaskRun, preparedRevision: number): TaskRun | null {
+    const current = this.repository.get(previous.id)
+    if (!current || current.revision !== preparedRevision || current.status !== 'retrying' || current.activeTurnId !== previous.activeTurnId) return null
+    const now = this.nowIso()
+    return this.repository.update(previous.id, preparedRevision, (prepared) => ({
+      ...previous,
+      nodes: previous.nodes.map((node) => {
+        const updated = prepared.nodes.find((item) => item.id === node.id)
+        return updated && updated.revision !== node.revision ? { ...node, revision: updated.revision + 1 } : node
+      }),
+      updatedAt: now
+    }), {
+      key: `task-resume-start-failed:${preparedRevision}`,
+      kind: 'task_resume_start_failed',
+      payload: { restoredStatus: previous.status },
       createdAt: now
     })
   }

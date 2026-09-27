@@ -1,3 +1,4 @@
+import brand from '@shared/product-brand.json'
 import '@xyflow/react/dist/style.css'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import {
@@ -138,7 +139,7 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
   return <div className="ds-opaque-work-surface flex h-full min-h-0 flex-col bg-[#f8fafc] text-[#1e293b] dark:bg-ds-main dark:text-white">
     <header className="ds-drag flex h-14 shrink-0 items-center gap-3 border-b border-[#e2e8f0] bg-white px-4 dark:border-ds-border dark:bg-ds-card">
       {leftSidebarCollapsed ? <SidebarTitlebarToggleButton onClick={onToggleLeftSidebar} title="展开侧边栏" ariaLabel="展开侧边栏" /> : null}
-      <Workflow className="h-5 w-5 text-blue-600" /><h1 className="text-[16px] font-semibold">WorkWise Flow</h1><span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-400/10 dark:text-blue-300">Preview</span>
+      <Workflow className="h-5 w-5 text-blue-600" /><h1 className="text-[16px] font-semibold">{brand.platform} Flow</h1><span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-400/10 dark:text-blue-300">Preview</span>
       {filter === 'scheduled' ? <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">定时流程</span> : null}<select className="ds-no-drag ml-3 rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[13px] dark:border-ds-border dark:bg-ds-main" value={activeId ?? ''} onChange={(event) => { const flow = visibleFlows.find((item) => item.id === event.target.value) ?? null; activeIdRef.current = flow?.id ?? null; setActiveId(flow?.id ?? null); setDraft(flow) }}><option value="">选择流程</option>{visibleFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select>
       <button className="ds-no-drag rounded-lg border border-[#e2e8f0] px-3 py-1.5 text-[13px] hover:bg-slate-50 dark:border-ds-border" onClick={() => void createFlow()}>新建</button>
       <div className="ml-auto flex gap-2">{busy ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : null}<Action icon={<Save />} label="保存" onClick={() => void save()} /><Action icon={<CheckCircle2 />} label="校验" onClick={() => void validate()} /><Action icon={<Download />} label="脱敏导出" onClick={() => void exportRedacted()} /><Action icon={<Send />} label="发布" primary onClick={() => void publish()} /><Action icon={<Play />} label="运行" primary onClick={() => void run()} />{runs.some((item) => ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)) ? <Action icon={<Square />} label="取消" onClick={() => void cancelRun()} /> : null}</div>

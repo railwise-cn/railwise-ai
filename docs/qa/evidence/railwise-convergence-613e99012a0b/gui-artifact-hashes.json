@@ -1,0 +1,65 @@
+[
+  {
+    "manifestId": "manifest_46b39f03-18a2-419a-9cae-266c2e20ef34",
+    "reviewStatus": "draft",
+    "outputs": [
+      {
+        "name": "report.docx",
+        "sha256Matches": true,
+        "size": 10068
+      },
+      {
+        "name": "report.pdf",
+        "sha256Matches": true,
+        "size": 38093
+      },
+      {
+        "name": "evidence.xlsx",
+        "sha256Matches": true,
+        "size": 154302
+      }
+    ]
+  },
+  {
+    "manifestId": "manifest_83428b04-73fc-4dd5-9f21-49886d875fda",
+    "reviewStatus": "draft",
+    "outputs": [
+      {
+        "name": "report.docx",
+        "sha256Matches": true,
+        "size": 5041
+      },
+      {
+        "name": "report.pdf",
+        "sha256Matches": true,
+        "size": 36444
+      },
+      {
+        "name": "evidence.xlsx",
+        "sha256Matches": true,
+        "size": 36795
+      }
+    ]
+  },
+  {
+    "manifestId": "manifest_def5173c-eb5b-4b6c-bb46-3087cb48d59a",
+    "reviewStatus": "draft",
+    "outputs": [
+      {
+        "name": "report.docx",
+        "sha256Matches": true,
+        "size": 13634
+      },
+      {
+        "name": "report.pdf",
+        "sha256Matches": true,
+        "size": 41095
+      },
+      {
+        "name": "evidence.xlsx",
+        "sha256Matches": true,
+        "size": 263139
+      }
+    ]
+  }
+]

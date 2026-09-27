@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "localTransportOnly": false,
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-20T04:22:44.832Z",
+  "defaultTrustRejected": true,
+  "wrongPinRejected": true,
+  "wrongPortRejected": true,
+  "outsidePathRejected": true,
+  "providerManifestVerified": true,
+  "executorZipVerified": true,
+  "updaterSessionMatched": true
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/04-standard-pdf60.ax.txt",
+  "sourceSha256": "51766e391dd2ea1ece7ef4ff2a957828780d35dc93f60d6669f5a92925f58b7f",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 2,
+      "text": "The focused UI element is 20 HTML 内容 chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html"
+    }
+  ]
+}

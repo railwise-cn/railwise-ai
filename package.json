@@ -1,7 +1,7 @@
 {
   "name": "workwise",
-  "productName": "WorkWise",
-  "version": "0.5.0",
+  "productName": "RailWise AI",
+  "version": "0.5.1",
   "description": "AI workbench for engineering, infrastructure, and operations workflows",
   "license": "MIT",
   "engines": {
@@ -57,7 +57,7 @@
     "preview": "npm run prepare:electron && electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "mac:unquarantine": "bash ./scripts/mac-unquarantine.sh",
-    "generate:icons": "npm run prepare:electron && electron ./scripts/generate-icons.mjs"
+    "generate:icons": "node ./scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1049.0",
@@ -108,6 +108,7 @@
     "@electron/rebuild": "4.0.3",
     "@eslint/js": "^10.0.1",
     "@fission-ai/openspec": "1.6.0",
+    "@resvg/resvg-js": "2.6.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/markdown-it": "^14.1.2",
     "@types/react": "^19.0.10",
@@ -148,9 +149,9 @@
     }
   },
   "author": "WorkWise Contributors",
-  "homepage": "https://github.com/wangjiawei508/WorkWise",
+  "homepage": "https://github.com/railwise-cn/railwise-ai",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wangjiawei508/WorkWise.git"
+    "url": "https://github.com/railwise-cn/railwise-ai.git"
   }
 }

@@ -1,0 +1,26 @@
+{
+  "checkout": "/Users/wangjiawei/Documents/WorkWise",
+  "files": {
+    "kun/src/contracts/survey-advanced-trials-workspace.ts": "dc903ca4fb6c4a7df188f5e598707b0171f188ae051149597f94373166a03edd",
+    "kun/src/engineering/survey-advanced-trials-workspace.ts": "ec157d56a8818bd9bb3f47dff81db210050e87f7f9b9f07f838234cd2dbdef1a",
+    "src/main/ipc/app-ipc-schemas.ts": "75add984e99db62af3f36653410019c5447ad878390b3243a22a9d9e480cb670",
+    "src/shared/survey-advanced-trials.ts": "980f77b29e6926bb4a999d550e75fa9f7af958ead097a10d19f4b662d759ec63",
+    "src/renderer/src/agent/survey-advanced-trials-client.ts": "308c64dfbc88926bfc5c1ef97ec0cbe77438eef261986ab1962a668249dac4a6",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.tsx": "c9cc378508b960d0b15015a82642f6876f01a902e1e4b2ef0e0847b69402ef12",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelResult.tsx": "5f5688783d3724b6b2357c573dd44a9c194b29c506af55bbe877a1ccdaf25d54",
+    "src/renderer/src/components/engineering/SurveyReferenceDatumResult.tsx": "d015eef74e7386173884703a89b6b6ef7b44d16450cbcbaf884e0e12a62ab02d",
+    "src/renderer/src/locales/en/common.json": "de952219e4ec1d348c8ac816335abc30b8458912826b7cb9c4cdc608d3c5698f",
+    "src/renderer/src/locales/zh/common.json": "3363961a0d9bed418d50f7522959a3c3553ad0acf28eedcb1b8d327f2497e63c",
+    "kun/src/contracts/survey-reference-datum.ts": "bf1cc1bd8f106cac5a597af7cc8bf42ca404a0578f326ceb102c6eb7ccdd02d5",
+    "kun/src/engineering/survey-reference-datum.ts": "f1a97a2c5b9e96db0206fee9ea979cb38ec89818dc06545a6946533ad3e2d1e4"
+  },
+  "evidence": {
+    "replay.sh": "0b08f8b6d8d8fd1b03bb69b179acab90464c7b3c695fcae254b894ab2849ed08",
+    "fixtures.ts": "ef9bd38cf0dda636622fcbcd6273f6c76cc22367e7dc1fe2723a8ca049d1cbba",
+    "gui.test.ts": "d314e6b993bf2b550a9b4b5303498f29480d8453ead8c93e440836a4d0e7f1c3",
+    "client-service.test.ts": "0a98f4acf6b4a548784acbd4edd9b251e0a4f634f71cd44f2b74ada6f6e81f8c",
+    "vitest.config.mjs": "ff76108f93ca751ab3ab50bac6484b434455ab84ccc41f3f8927212adfe32078",
+    "REVIEW.md": "7bfb47d214e21dc7703ddcb5ea97809cbb6323a6552f239d1bd22f149bfeb455"
+  },
+  "numericalCoreUnchangedFromIndependentReview": true
+}

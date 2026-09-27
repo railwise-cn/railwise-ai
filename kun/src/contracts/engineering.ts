@@ -3,6 +3,21 @@ import { AdjustmentResultV1, DeformationComparisonV1, SurveySourceFileV1 } from 
 
 export const ENGINEERING_SCHEMA_VERSION = 1 as const
 export const ENGINEERING_MAX_OBSERVATIONS = 500_000
+export const ENGINEERING_TREND_RENDERER_VERSION = 'engineering-trend-2' as const
+export const ENGINEERING_ANALYSIS_ALGORITHM_VERSION = 'workwise-engineering-2' as const
+
+export const EngineeringTaskTypeV1 = z.enum(['control-network', 'leveling-network', 'traverse-network', 'resection', 'deformation', 'gnss'])
+export type EngineeringTaskTypeV1 = z.infer<typeof EngineeringTaskTypeV1>
+
+/** Unknown legacy classifications remain readable without inventing a task type. */
+export function inferEngineeringTaskType(monitoringType: string): EngineeringTaskTypeV1 | undefined {
+  const aliases: Record<string, EngineeringTaskTypeV1> = {
+    leveling: 'leveling-network', traverse: 'traverse-network', 'plane-control': 'control-network',
+    'cpiii-free-station': 'resection', 'cpiii-resection': 'resection'
+  }
+  const parsed = EngineeringTaskTypeV1.safeParse(monitoringType)
+  return parsed.success ? parsed.data : aliases[monitoringType]
+}
 
 export const RevisionMutationV1 = z.object({
   expectedRevision: z.number().int().nonnegative(),
@@ -10,10 +25,23 @@ export const RevisionMutationV1 = z.object({
 }).strict()
 export type RevisionMutationV1 = z.infer<typeof RevisionMutationV1>
 
+export const EngineeringTaskContextV1 = z.object({
+  networkType: z.string().max(100).optional(),
+  coordinateSystem: z.string().max(200).optional(),
+  verticalDatum: z.string().max(200).optional(),
+  measurementGrade: z.string().max(100).optional(),
+  standard: z.string().max(200).optional(),
+  standardVersion: z.string().max(100).optional(),
+  standardClause: z.string().max(200).optional()
+}).strict()
+
 export const RailwiseProjectV1 = z.object({
   schemaVersion: z.literal(ENGINEERING_SCHEMA_VERSION),
   id: z.string().min(1),
   name: z.string().min(1).max(200),
+  /** No default on reads: infer from legacy classification without rewriting storage. */
+  taskType: EngineeringTaskTypeV1.optional(),
+  taskContext: EngineeringTaskContextV1.optional(),
   monitoringType: z.string().min(1).default('deformation'),
   unit: z.string().min(1).default('mm'),
   signConvention: z.string().min(1).default('positive'),
@@ -78,6 +106,8 @@ export type MonitoringAnalysisV1 = z.infer<typeof MonitoringAnalysisV1>
 
 export const ChartArtifactV1 = z.object({
   schemaVersion: z.literal(ENGINEERING_SCHEMA_VERSION), id: z.string().min(1), analysisId: z.string().min(1), chartType: z.string().min(1),
+  /** Missing on legacy artifacts; their historical bytes remain readable. */
+  rendererVersion: z.string().min(1).optional(),
   inputHash: z.string().min(1), dataRange: z.object({ min: z.number().finite(), max: z.number().finite() }).strict().optional(),
   relativePath: z.string().min(1), sha256: z.string().min(1), validation: z.enum(['pending', 'valid', 'invalid']), createdAt: z.string()
 }).strict()
@@ -110,12 +140,56 @@ export const DeliverableManifestV1 = z.object({
 }).strict()
 export type DeliverableManifestV1 = z.infer<typeof DeliverableManifestV1>
 
+/** A point-in-time read-only check; never a human review or signature. */
+export const DeliverableVerificationV1 = z.object({
+  schemaVersion: z.literal(1), projectId: z.string(), manifestId: z.string(), checkedAt: z.string(),
+  valid: z.boolean(), reviewStatus: z.enum(['draft', 'approved', 'archived']),
+  checks: z.array(z.object({
+    id: z.enum(['manifest', 'outputs', 'inputs', 'surveyReplay', 'sources']),
+    status: z.enum(['passed', 'failed', 'not-applicable']), detail: z.string().optional()
+  }).strict())
+}).strict()
+export type DeliverableVerificationV1 = z.infer<typeof DeliverableVerificationV1>
+
+export const MonitoringReplayStatusV1 = z.enum(['passed', 'failed', 'not-evaluated', 'not-applicable'])
+export const MonitoringReplayReasonV1 = z.enum(['matched', 'no-monitoring-analysis', 'unsupported-algorithm', 'prerequisite-failed', 'input-invalid', 'result-mismatch', 'resource-limit', 'source-unavailable', 'source-mismatch', 'ambiguous-tie-order'])
+const replayHash = z.string().regex(/^[a-f0-9]{64}$/)
+const replayIdentifier = z.string().min(1).max(240)
+const replayEnvironment = z.string().min(1).max(160)
+const replayEvidence = z.object({
+  analysisId: replayIdentifier, datasetId: replayIdentifier, algorithmVersion: replayIdentifier, inputHash: replayHash,
+  storedResultsHash: replayHash, recomputedResultsHash: replayHash.optional(), sourceFileHash: replayHash.optional(), sourceContextHash: replayHash.optional(),
+  status: MonitoringReplayStatusV1, reasonCode: MonitoringReplayReasonV1
+}).strict()
+/** Independent numerical replay; existing five-check verification and historical records stay unchanged. */
+export const MonitoringReplayVerificationV1 = z.object({
+  schemaVersion: z.literal(1), attemptId: replayIdentifier, projectId: replayIdentifier, manifestId: replayIdentifier, checkedAt: z.string().max(40).datetime({ offset: true }),
+  status: MonitoringReplayStatusV1, reasonCode: MonitoringReplayReasonV1, detail: z.string().max(240).optional(),
+  comparisonVersion: z.literal('monitoring-results-exact-1'),
+  execution: z.object({ runtimeVersion: replayEnvironment, node: replayEnvironment, v8: replayEnvironment, icu: replayEnvironment, platform: replayEnvironment, arch: replayEnvironment, timezone: replayEnvironment, locale: replayEnvironment, timeBasis: z.literal('ISO-unzoned-UTC') }).strict(),
+  analyses: z.array(replayEvidence).max(1)
+}).strict().superRefine((value, context) => {
+  const statusForReason = (reason: z.infer<typeof MonitoringReplayReasonV1>): z.infer<typeof MonitoringReplayStatusV1> =>
+    reason === 'matched' ? 'passed' : reason === 'no-monitoring-analysis' ? 'not-applicable' : ['unsupported-algorithm', 'resource-limit', 'source-unavailable', 'ambiguous-tie-order'].includes(reason) ? 'not-evaluated' : 'failed'
+  if (value.status !== statusForReason(value.reasonCode)) context.addIssue({ code: 'custom', message: 'replay status does not match reason' })
+  if (value.status === 'passed' && !value.analyses.length) context.addIssue({ code: 'custom', message: 'passed replay requires analysis evidence' })
+  if (value.status === 'not-applicable' && value.analyses.length) context.addIssue({ code: 'custom', message: 'non-applicable replay cannot include analysis evidence' })
+  for (const item of value.analyses) {
+    if (item.status !== statusForReason(item.reasonCode) || item.status === 'not-applicable'
+      || (item.status === 'passed' && (!item.sourceFileHash || !item.sourceContextHash || !item.recomputedResultsHash || item.storedResultsHash !== item.recomputedResultsHash))
+      || (item.reasonCode === 'result-mismatch' && (!item.recomputedResultsHash || item.storedResultsHash === item.recomputedResultsHash))
+      || (value.status === 'passed' && item.status !== 'passed')
+      || item.status !== value.status || item.reasonCode !== value.reasonCode) context.addIssue({ code: 'custom', message: 'inconsistent replay analysis evidence' })
+  }
+})
+export type MonitoringReplayVerificationV1 = z.infer<typeof MonitoringReplayVerificationV1>
+
 export const EngineeringProjectCreateRequest = RevisionMutationV1.extend({
-  name: z.string().min(1).max(200), monitoringType: z.string().optional(), unit: z.string().optional(), signConvention: z.string().optional(),
+  name: z.string().min(1).max(200), taskType: EngineeringTaskTypeV1.optional(), taskContext: EngineeringTaskContextV1.optional(), monitoringType: z.string().optional(), unit: z.string().optional(), signConvention: z.string().optional(),
   thresholds: z.record(z.string(), z.number().finite()).optional(), reportPeriod: z.object({ start: z.string().optional(), end: z.string().optional() }).strict().optional(), workspace: z.string().min(1)
 }).strict()
 export const EngineeringProjectUpdateRequest = RevisionMutationV1.extend({
-  name: z.string().min(1).max(200).optional(), monitoringType: z.string().min(1).optional(), unit: z.string().min(1).optional(), signConvention: z.string().min(1).optional(),
+  name: z.string().min(1).max(200).optional(), taskType: EngineeringTaskTypeV1.optional(), taskContext: EngineeringTaskContextV1.optional(), monitoringType: z.string().min(1).optional(), unit: z.string().min(1).optional(), signConvention: z.string().min(1).optional(),
   thresholds: z.record(z.string(), z.number().finite()).optional(), reportPeriod: z.object({ start: z.string().optional(), end: z.string().optional() }).strict().optional()
 }).strict()
 export const DatasetImportRequest = RevisionMutationV1.extend({ projectId: z.string().min(1), attachmentId: z.string().optional(), name: z.string().min(1).optional(), dataBase64: z.string().min(1).optional(), fieldMapping: FieldMappingV1.optional() }).strict().refine((v) => Boolean(v.attachmentId || (v.name && v.dataBase64)), { message: 'attachmentId or name/dataBase64 is required' })

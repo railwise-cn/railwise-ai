@@ -1,0 +1,77 @@
+{
+  "expectation": "reject",
+  "syntheticOnly": true,
+  "realModelUsed": false,
+  "checkedAt": "2026-09-20T07:45:03.361Z",
+  "sourceHead": "9cf70d71919e997e815a9e55ec4264e01572979c",
+  "packageVersion": "0.5.0",
+  "asarSha256": "a42089f63f154c294243cc020e7ead866a5c73a69da0c74c336a3e2448f9642d",
+  "sourceSha256": "3988e8c52489e897e675f3b1681dfee29f598e25851af51e2d2440c02dc34c1b",
+  "signatureVerifiedBeforeImports": true,
+  "fixture": "/private/tmp/railwise-survey-9cf70d7/completion-probe-wCtOnp",
+  "projectId": "project_903157bf-5f18-4c18-ba42-38c8eed584a2",
+  "networkId": "network_3394d7b1-266f-4fe5-a29c-d116ea194115",
+  "threadId": "thr_6t6p1bgs",
+  "planId": "eplan_f2336e4d-a1c7-4cab-93bb-b36ade537560",
+  "steps": [
+    {
+      "id": "inspect-survey-network",
+      "tool": "survey_network_validate",
+      "receipt": null
+    },
+    {
+      "id": "adjust-survey-network",
+      "tool": "survey_calculator",
+      "receipt": null
+    },
+    {
+      "id": "review-survey-quality",
+      "tool": "survey_adjustment_read",
+      "receipt": null
+    },
+    {
+      "id": "prepare-survey-report",
+      "tool": "report_export",
+      "receipt": null
+    }
+  ],
+  "modelCalls": 7,
+  "unexpectedRequests": 0,
+  "taskStatus": "stalled",
+  "turnStatus": "failed",
+  "taskAcceptance": {
+    "kind": "answer",
+    "requiredNodeKinds": [
+      "deliver"
+    ],
+    "requireFinalResponse": true,
+    "requireActionableArtifactCard": false
+  },
+  "taskError": null,
+  "stalledReason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+  "waitingReason": null,
+  "rawPlanStatus": "started",
+  "projectedPlanStatus": "started",
+  "execution": {
+    "complete": false,
+    "completedStepIds": [],
+    "pendingStepIds": [
+      "inspect-survey-network",
+      "adjust-survey-network",
+      "review-survey-quality",
+      "prepare-survey-report"
+    ]
+  },
+  "toolCalls": 0,
+  "adjustmentCount": 0,
+  "finalResponse": null,
+  "assistantAnswers": [
+    "The approved survey work is complete. All observations have been processed and the results are ready.",
+    "The approved survey work is complete. All observations have been processed and the results are ready.",
+    "The approved survey work is complete. All observations have been processed and the results are ready.",
+    "The approved survey work is complete. All observations have been processed and the results are ready.",
+    "The approved survey work is complete. All observations have been processed and the results are ready.",
+    "The approved survey work is complete. All observations have been processed and the results are ready.",
+    "The approved survey work is complete. All observations have been processed and the results are ready."
+  ]
+}

@@ -8,13 +8,17 @@ import { atomicWriteFile, drainAtomicWrites } from '../adapters/file/atomic-writ
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import type { SurveySourceEligibility } from './survey-service.js'
 import { makeReportPdf } from './engineering-report-pdf.js'
+import { monitoringTrendInstant, renderMonitoringTrendChart } from './engineering-trend-chart.js'
+import { EngineeringVerificationAudit, EngineeringVerificationAuditError } from './engineering-verification-audit.js'
+import { calculateMonitoringAnalysisV2 } from './monitoring-analysis.js'
+import { MonitoringReplayAudit } from './monitoring-replay-audit.js'
 import {
-  AnalysisRequest, ChartArtifactV1, ChartRequest, DatasetImportRequest, DatasetValidateRequest,
-  DeliverableManifestV1, EngineeringProjectCreateRequest, EngineeringProjectUpdateRequest, AcceptQualityFindingRequest, FieldMappingV1, FinalizeDeliverableRequest,
-  KnowledgeCitationV1, MonitoringAnalysisV1, MonitoringDatasetV1, MonitoringObservationV1,
-  QualityFindingV1, RailwiseProjectV1, ReportPreviewRequest, RunMutationRequest, SurveySourceEvidenceV1
+  AnalysisRequest, ChartArtifactV1, ChartRequest, DatasetImportRequest, DatasetValidateRequest, ENGINEERING_TREND_RENDERER_VERSION, ENGINEERING_ANALYSIS_ALGORITHM_VERSION,
+  DeliverableManifestV1, DeliverableVerificationV1, EngineeringProjectCreateRequest, EngineeringProjectUpdateRequest, AcceptQualityFindingRequest, FieldMappingV1, FinalizeDeliverableRequest,
+  KnowledgeCitationV1, MonitoringAnalysisV1, MonitoringDatasetV1, MonitoringObservationV1, MonitoringReplayVerificationV1,
+  QualityFindingV1, RailwiseProjectV1, inferEngineeringTaskType, ReportPreviewRequest, RunMutationRequest, SurveySourceEvidenceV1
 } from '../contracts/engineering.js'
-import { AdjustmentResultV1, DeformationComparisonV1, type AdjustmentRunV1, type SurveyObservationV1, type SurveyPointV1, type SurveySourceFileV1 } from '../contracts/survey.js'
+import { AdjustmentResultV1, DeformationComparisonV1, type AdjustmentRunV1, type SurveyNetworkV1, type SurveyObservationV1, type SurveyPointV1, type SurveySourceFileV1 } from '../contracts/survey.js'
 
 type Row = Record<string, string>
 type StoredDataset = MonitoringDatasetV1 & { observations: MonitoringObservationV1[]; findings: QualityFindingV1[] }
@@ -168,6 +172,47 @@ function deliveryInputSnapshotHash(project: RailwiseProjectV1, dataset?: StoredD
   })).digest('hex')
 }
 
+/** Portable JSON-value digest: length-prefixed UTF-8 strings and IEEE-754
+ * doubles avoid JS/Python decimal formatting differences. Object order is UTF-8
+ * byte order; -0 equals 0, as in the persisted JSON representation. */
+export function verificationSnapshotHash(value: unknown): string {
+  const digest = createHash('sha256')
+  const visit = (item: unknown): void => {
+    if (item === null) { digest.update('n'); return }
+    if (typeof item === 'boolean') { digest.update(item ? 't' : 'f'); return }
+    if (typeof item === 'number') {
+      if (!Number.isFinite(item)) throw new Error('non-finite verification snapshot')
+      const bytes = Buffer.alloc(8); bytes.writeDoubleBE(item === 0 ? 0 : item)
+      digest.update(`d${bytes.toString('hex')}`); return
+    }
+    if (typeof item === 'string') {
+      const bytes = Buffer.from(item, 'utf8')
+      if (bytes.toString('utf8') !== item) throw new Error('invalid Unicode verification snapshot')
+      digest.update(`s${bytes.length}:`); digest.update(bytes); return
+    }
+    if (Array.isArray(item)) {
+      digest.update(`a${item.length}:[`); item.forEach(visit); digest.update(']'); return
+    }
+    if (typeof item === 'object') {
+      const object = item as Record<string, unknown>
+      const keys = Object.keys(object).filter(key => object[key] !== undefined)
+        .sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)))
+      digest.update(`o${keys.length}:{`); keys.forEach(key => { visit(key); visit(object[key]) }); digest.update('}'); return
+    }
+    throw new Error('unsupported verification snapshot value')
+  }
+  visit(value)
+  return digest.digest('hex')
+}
+
+type VerificationBindings = {
+  algorithm: 'typed-json-sha256-v1'; complete: boolean
+  engineeringRows: Array<{ table: string; id: string; hash: string }>
+  surveyNetworks: Array<{ id: string; hash: string }>
+  surveyResults: Array<{ id: string; runId: string; networkId: string; inputHash: string; algorithmVersion: string; hash: string }>
+  surveyDeformations: Array<{ id: string; hash: string }>
+}
+
 /** Keep analysis freshness checks byte-for-byte aligned with createAnalysis. */
 function analysisInputHash(project: RailwiseProjectV1, dataset: Pick<StoredDataset, 'observations'>): string {
   return createHash('sha256').update(JSON.stringify({ project, observations: dataset.observations })).digest('hex')
@@ -175,10 +220,12 @@ function analysisInputHash(project: RailwiseProjectV1, dataset: Pick<StoredDatas
 
 export class EngineeringService {
   private readonly db: Database.Database
+  private readonly verificationAudit: EngineeringVerificationAudit
+  private readonly monitoringReplayAudit: MonitoringReplayAudit
   private readonly nowIso: () => string
   private readonly idempotencyLocks = new Map<string, Promise<void>>()
   private readonly pendingMetadataWrites = new Set<Promise<void>>()
-  constructor(private readonly options: { rootDir: string; attachmentStore?: AttachmentStore; runtimeVersion?: string; nowIso?: () => string; getAdjustments?: SurveyAdjustmentLookup; getAdjustmentEvidence?: SurveyAdjustmentEvidenceLookup; getDeformations?: SurveyDeformationLookup; getSurveySources?: SurveySourceLookup }) {
+  constructor(private readonly options: { rootDir: string; attachmentStore?: AttachmentStore; runtimeVersion?: string; nowIso?: () => string; getAdjustments?: SurveyAdjustmentLookup; getAdjustmentEvidence?: SurveyAdjustmentEvidenceLookup; getDeformations?: SurveyDeformationLookup; getSurveySources?: SurveySourceLookup; getSurveyNetworkSnapshot?: (projectId: string, networkId: string) => SurveyNetworkV1 | null }) {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString())
     mkdirSync(resolve(options.rootDir), { recursive: true })
     this.db = new Database(resolve(options.rootDir, 'engineering.sqlite3'))
@@ -189,6 +236,19 @@ export class EngineeringService {
       CREATE TABLE IF NOT EXISTS engineering_charts (id TEXT PRIMARY KEY, analysis_id TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS engineering_runs (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, data_json TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS engineering_manifests (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS engineering_verification_attempts (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL,
+        project_id TEXT NOT NULL, manifest_id TEXT NOT NULL, started_at TEXT NOT NULL,
+        completed_at TEXT NOT NULL, outcome TEXT NOT NULL, record_hash TEXT NOT NULL, data_json TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS engineering_verification_manifest ON engineering_verification_attempts(project_id, manifest_id, sequence);
+      CREATE TRIGGER IF NOT EXISTS engineering_verification_no_update BEFORE UPDATE ON engineering_verification_attempts
+        BEGIN SELECT RAISE(ABORT, 'verification attempts are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS engineering_verification_no_delete BEFORE DELETE ON engineering_verification_attempts
+        BEGIN SELECT RAISE(ABORT, 'verification attempts are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS engineering_verification_no_replace BEFORE INSERT ON engineering_verification_attempts
+        WHEN EXISTS (SELECT 1 FROM engineering_verification_attempts WHERE id = NEW.id OR sequence = NEW.sequence)
+        BEGIN SELECT RAISE(ABORT, 'verification attempts are append-only'); END;
       CREATE TABLE IF NOT EXISTS engineering_idempotency (key TEXT PRIMARY KEY, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS engineering_delivery_idempotency (
         key TEXT PRIMARY KEY,
@@ -197,6 +257,15 @@ export class EngineeringService {
         result_json TEXT NOT NULL,
         created_at TEXT NOT NULL
       );`)
+    this.verificationAudit = new EngineeringVerificationAudit(this.db, this.nowIso)
+    this.monitoringReplayAudit = new MonitoringReplayAudit(this.db, this.nowIso)
+    this.db.exec(`CREATE TABLE IF NOT EXISTS engineering_monitoring_sources (
+      dataset_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, source_hash TEXT NOT NULL, source_bytes BLOB NOT NULL,
+      context_json TEXT NOT NULL, context_hash TEXT NOT NULL);
+      CREATE TRIGGER IF NOT EXISTS monitoring_sources_no_update BEFORE UPDATE ON engineering_monitoring_sources BEGIN SELECT RAISE(ABORT, 'monitoring source is append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS monitoring_sources_no_delete BEFORE DELETE ON engineering_monitoring_sources BEGIN SELECT RAISE(ABORT, 'monitoring source is append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS monitoring_sources_no_replace BEFORE INSERT ON engineering_monitoring_sources
+      WHEN EXISTS(SELECT 1 FROM engineering_monitoring_sources WHERE dataset_id=NEW.dataset_id) BEGIN SELECT RAISE(ABORT, 'monitoring source is append-only'); END;`)
   }
   close(): void { this.db.close() }
 
@@ -208,12 +277,26 @@ export class EngineeringService {
     await drainAtomicWrites()
   }
 
+  private readProject(json: string): RailwiseProjectV1 {
+    const project = RailwiseProjectV1.parse(JSON.parse(json))
+    const taskType = project.taskType ?? inferEngineeringTaskType(project.monitoringType)
+    return taskType ? { ...project, taskType } : project
+  }
+
   listProjects(): RailwiseProjectV1[] {
-    return (this.db.prepare('SELECT data_json FROM engineering_projects ORDER BY updated_at DESC').all() as Array<{ data_json: string }>).map((r) => RailwiseProjectV1.parse(JSON.parse(r.data_json)))
+    return (this.db.prepare('SELECT data_json FROM engineering_projects ORDER BY updated_at DESC').all() as Array<{ data_json: string }>).map((r) => this.readProject(r.data_json))
   }
   getProject(id: string): RailwiseProjectV1 | null {
     const row = this.db.prepare('SELECT data_json FROM engineering_projects WHERE id = ?').get(id) as { data_json: string } | undefined
-    return row ? RailwiseProjectV1.parse(JSON.parse(row.data_json)) : null
+    return row ? this.readProject(row.data_json) : null
+  }
+  /** Project-scoped metadata only; callers must separately verify retained bytes. */
+  getManifestForProject(projectId: string, manifestId: string): DeliverableManifestV1 | null {
+    const row = this.db.prepare('SELECT data_json FROM engineering_manifests WHERE id = ? AND project_id = ?').get(manifestId, projectId) as { data_json: string } | undefined
+    if (!row) return null
+    const manifest = DeliverableManifestV1.parse(JSON.parse(row.data_json))
+    if (manifest.id !== manifestId || manifest.projectId !== projectId) throw new Error('deliverable manifest identity mismatch')
+    return manifest
   }
   updateProject(id: string, input: unknown): RailwiseProjectV1 {
     const req = EngineeringProjectUpdateRequest.parse(input)
@@ -245,7 +328,7 @@ export class EngineeringService {
     const replay = this.replay(parsed.idempotencyKey)
     if (replay) return replay as RailwiseProjectV1
     const now = this.nowIso(); const id = `project_${randomUUID()}`
-    const project = RailwiseProjectV1.parse({ schemaVersion: 1, id, name: parsed.name, monitoringType: parsed.monitoringType ?? 'deformation', unit: parsed.unit ?? 'mm', signConvention: parsed.signConvention ?? 'positive', thresholds: parsed.thresholds ?? {}, reportPeriod: parsed.reportPeriod ?? {}, workspace: resolve(parsed.workspace), revision: 1, createdAt: now, updatedAt: now })
+    const project = RailwiseProjectV1.parse({ schemaVersion: 1, id, name: parsed.name, ...(parsed.taskContext ? { taskContext: parsed.taskContext } : {}), taskType: parsed.taskType ?? (parsed.monitoringType ? inferEngineeringTaskType(parsed.monitoringType) : 'control-network'), monitoringType: parsed.monitoringType ?? parsed.taskType ?? 'control-network', unit: parsed.unit ?? 'mm', signConvention: parsed.signConvention ?? 'positive', thresholds: parsed.thresholds ?? {}, reportPeriod: parsed.reportPeriod ?? {}, workspace: resolve(parsed.workspace), revision: 1, createdAt: now, updatedAt: now })
     this.db.prepare('INSERT INTO engineering_projects(id, revision, data_json, updated_at) VALUES (?, ?, ?, ?)').run(id, 1, JSON.stringify(project), now)
     this.trackMetadataPersistence(project.workspace, 'projects', project.id, project)
     this.remember(parsed.idempotencyKey, project)
@@ -264,6 +347,7 @@ export class EngineeringService {
         const content = await this.options.attachmentStore.resolveContent(req.attachmentId, { workspace: project.workspace })
         bytes = content.data; name = content.name
       } else bytes = Buffer.from(req.dataBase64!, 'base64')
+      if (bytes.length > 32 * 1024 * 1024) throw new Error('monitoring source exceeds 32 MiB limit')
       const sourceFileHash = createHash('sha256').update(bytes).digest('hex')
       const rows = await parseTabular(name, bytes, req.fieldMapping)
       const mapping = FieldMappingV1.parse({ ...inferMapping(rows[0] ?? {}), ...(req.fieldMapping ?? {}) })
@@ -271,7 +355,13 @@ export class EngineeringService {
       const now = this.nowIso(); const id = `dataset_${randomUUID()}`
       const dataset = { schemaVersion: 1 as const, id, projectId: project.id, sourceAttachmentId: req.attachmentId, sourceFileName: name, sourceFileHash, fieldMapping: mapping, unknownColumns: normalized.unknownColumns, rowCount: rows.length, columnCount: normalized.columnCount, observationCount: normalized.observations.length, timeRange: normalized.timeRange, status: 'imported' as const, revision: 1, createdAt: now, updatedAt: now, observations: normalized.observations.map((observation) => ({ ...observation, datasetId: id })), findings: normalized.findings.map((finding) => ({ ...finding, datasetId: id })) }
       const parsed = validateStoredDataset(dataset)
-      this.db.prepare('INSERT INTO engineering_datasets(id, project_id, revision, data_json, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, project.id, 1, JSON.stringify(parsed), now)
+      const sourceContext = JSON.stringify({ datasetId: id, project, requestedMapping: req.fieldMapping ?? null, fieldMapping: mapping, sourceFileName: name, sourceFileHash })
+      if (Buffer.byteLength(sourceContext) > 256 * 1024) throw new Error('monitoring source context exceeds 256 KiB limit')
+      this.db.transaction(() => {
+        this.db.prepare('INSERT INTO engineering_datasets(id, project_id, revision, data_json, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, project.id, 1, JSON.stringify(parsed), now)
+        this.db.prepare('INSERT INTO engineering_monitoring_sources(dataset_id,project_id,source_hash,source_bytes,context_json,context_hash) VALUES(?,?,?,?,?,?)')
+          .run(id, project.id, sourceFileHash, bytes, sourceContext, createHash('sha256').update(sourceContext).digest('hex'))
+      }).immediate()
       await this.persistMetadata(project.workspace, 'datasets', parsed.id, parsed)
       this.remember(req.idempotencyKey, parsed)
       return parsed
@@ -319,26 +409,21 @@ export class EngineeringService {
       }
       return durable
     }
-    const existing = this.db.prepare('SELECT data_json FROM engineering_analyses WHERE dataset_id = ? AND project_id = ? AND json_extract(data_json, \'$.inputHash\') = ? ORDER BY created_at DESC LIMIT 1').get(dataset.id, project.id, inputHash) as { data_json: string } | undefined
-    if (existing) return MonitoringAnalysisV1.parse(JSON.parse(existing.data_json))
-    const grouped = new Map<string, MonitoringObservationV1[]>()
-    for (const observation of dataset.observations) { const key = `${observation.monitoringItem}|${observation.point}`; const list = grouped.get(key) ?? []; list.push(observation); grouped.set(key, list) }
-    const results = [...grouped.values()].map((items) => {
-      items.sort((a, b) => a.timestamp.localeCompare(b.timestamp)); const current = items.at(-1); const previous = items.at(-2); const first = items[0]
-      const change = current && first && current !== first ? (current.cumulative ?? current.value) - (first.cumulative ?? first.value) : undefined; const intervalDays = current && previous ? (Date.parse(current.timestamp) - Date.parse(previous.timestamp)) / 86_400_000 : undefined; const rate = current && previous && Number.isFinite(intervalDays) && intervalDays! > 0 ? (current.value - previous.value) / intervalDays! : undefined
-      const trend = change === undefined ? 'unknown' : Math.abs(change) < 1e-9 ? 'stable' : change > 0 ? 'rising' : 'falling'
-      const threshold = project.thresholds[current?.monitoringItem ?? ''] ?? project.thresholds.default
-      const magnitude = Math.abs(current?.value ?? 0)
-      const thresholdStatus = threshold === undefined ? 'unresolved' : magnitude >= threshold ? 'alarm' : magnitude >= threshold * 0.8 ? 'warning' : 'normal'
-      return { monitoringItem: current?.monitoringItem ?? items[0].monitoringItem, point: current?.point ?? items[0].point, currentValue: current?.value, previousValue: previous?.value, cumulativeChange: change, changeRate: rate, trend, anomaly: Math.abs(change ?? 0) > (threshold ?? Number.POSITIVE_INFINITY), thresholdStatus }
-    })
-    const analysis = MonitoringAnalysisV1.parse({ schemaVersion: 1, id: `analysis_${randomUUID()}`, projectId: project.id, datasetId: dataset.id, inputHash, algorithmVersion: 'workwise-engineering-1', results, createdAt: this.nowIso() })
+    const existing = this.db.prepare('SELECT data_json FROM engineering_analyses WHERE dataset_id = ? AND project_id = ? AND json_extract(data_json, \'$.inputHash\') = ? AND json_extract(data_json, \'$.algorithmVersion\') = ? ORDER BY created_at DESC LIMIT 1').get(dataset.id, project.id, inputHash, ENGINEERING_ANALYSIS_ALGORITHM_VERSION) as { data_json: string } | undefined
+    if (existing) {
+      const cached = MonitoringAnalysisV1.parse(JSON.parse(existing.data_json))
+      this.remember(req.idempotencyKey, cached)
+      return cached
+    }
+    const results = calculateMonitoringAnalysisV2(project, dataset.observations)
+    const analysis = MonitoringAnalysisV1.parse({ schemaVersion: 1, id: `analysis_${randomUUID()}`, projectId: project.id, datasetId: dataset.id, inputHash, algorithmVersion: ENGINEERING_ANALYSIS_ALGORITHM_VERSION, results, createdAt: this.nowIso() })
     this.db.prepare('INSERT INTO engineering_analyses(id, project_id, dataset_id, data_json, created_at) VALUES (?, ?, ?, ?, ?)').run(analysis.id, project.id, dataset.id, JSON.stringify(analysis), analysis.createdAt)
     this.remember(req.idempotencyKey, analysis); return analysis
   }
 
   async createChart(input: unknown): Promise<ChartArtifactV1> {
     const req = ChartRequest.parse(input); const analysis = this.getAnalysis(req.analysisId); if (!analysis) throw new Error('analysis not found')
+    if (req.chartType !== 'trend') throw new Error('unsupported monitoring chart type; only trend is implemented')
     return this.withIdempotencyLock(req.idempotencyKey, async () => {
       const project = this.mustProject(analysis.projectId)
       const dataset = this.mustDataset(analysis.datasetId)
@@ -346,7 +431,7 @@ export class EngineeringService {
       const replay = this.replay(req.idempotencyKey)
       if (replay) {
         const replayed = ChartArtifactV1.parse(replay)
-        if (replayed.analysisId !== analysis.id || replayed.inputHash !== analysis.inputHash) {
+        if (replayed.analysisId !== analysis.id || replayed.inputHash !== analysis.inputHash || replayed.chartType !== req.chartType) {
           throw new EngineeringIdempotencyError(replayed, 'chart idempotency key is bound to stale or different analysis input')
         }
         const durable = this.getChart(replayed.id)
@@ -355,11 +440,10 @@ export class EngineeringService {
         }
         return durable
       }
+      const { svg, dataRange } = renderMonitoringTrendChart(dataset.observations, project)
       const runId = `chart_${randomUUID()}`; const outDir = this.outputDir(project, runId); await mkdir(outDir, { recursive: true })
-      const values = analysis.results.map((r) => r.currentValue).filter((v): v is number => typeof v === 'number'); const min = Math.min(...values, 0); const max = Math.max(...values, 0)
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360"><rect width="100%" height="100%" fill="#fff"/><polyline fill="none" stroke="#2878d0" stroke-width="3" points="${values.map((v, i) => `${40 + i * (880 / Math.max(1, values.length - 1))},${320 - ((v - min) / Math.max(1e-9, max - min)) * 280}`).join(' ')}"/></svg>`
       const path = join(outDir, `${req.chartType}.svg`); await atomicWriteFile(path, svg); const sha256 = createHash('sha256').update(svg).digest('hex')
-      const chart = ChartArtifactV1.parse({ schemaVersion: 1, id: runId, analysisId: analysis.id, chartType: req.chartType, inputHash: analysis.inputHash, dataRange: { min, max }, relativePath: relative(project.workspace, path), sha256, validation: 'valid', createdAt: this.nowIso() })
+      const chart = ChartArtifactV1.parse({ schemaVersion: 1, id: runId, analysisId: analysis.id, chartType: req.chartType, rendererVersion: ENGINEERING_TREND_RENDERER_VERSION, inputHash: analysis.inputHash, dataRange, relativePath: relative(project.workspace, path), sha256, validation: 'valid', createdAt: this.nowIso() })
       this.db.prepare('INSERT INTO engineering_charts(id, analysis_id, data_json, created_at) VALUES (?, ?, ?, ?)').run(chart.id, chart.analysisId, JSON.stringify(chart), chart.createdAt); this.remember(req.idempotencyKey, chart); return chart
     })
   }
@@ -370,7 +454,18 @@ export class EngineeringService {
       const project = this.mustProject(req.projectId)
       const dataset = req.datasetId ? this.mustDataset(req.datasetId) : undefined
       this.assertDeliveryRevision(project, dataset, req.expectedRevision)
-      const analysis = dataset ? (req.analysisId ? this.getAnalysis(req.analysisId) ?? undefined : this.createAnalysis({ expectedRevision: dataset.revision, idempotencyKey: `preview-analysis-${dataset.id}-${analysisInputHash(project, dataset)}`, projectId: project.id, datasetId: dataset.id })) : undefined
+      const replay = this.replayDelivery<{
+        run: StoredRun
+        files: Array<{ path: string; mediaType: string; sha256: string; sizeBytes: number }>
+        charts: ChartArtifactV1[]
+        citations: KnowledgeCitationV1[]
+        adjustments?: AdjustmentResultV1[]
+        deformations?: DeformationComparisonV1[]
+        surveySources?: SurveySourceEvidenceV1[]
+      }>('report-preview', req)
+      // A bound replay keeps its original analysis; a new automatic request uses the current algorithm.
+      const analysisId = req.analysisId ?? replay?.run.analysisId
+      const analysis = dataset ? (analysisId ? this.getAnalysis(analysisId) ?? undefined : this.createAnalysis({ expectedRevision: dataset.revision, idempotencyKey: `preview-analysis-${ENGINEERING_ANALYSIS_ALGORITHM_VERSION}-${dataset.id}-${analysisInputHash(project, dataset)}`, projectId: project.id, datasetId: dataset.id })) : undefined
       if (dataset) {
         if (!analysis) throw new Error('analysis not found')
         this.assertAnalysisCurrent(project, dataset, analysis)
@@ -381,17 +476,8 @@ export class EngineeringService {
       this.assertDeformationEpochEvidence(project.id, deformations)
       // A preview is a newly generated computational artifact, not merely a
       // read of its historical inputs. Check current source admission before
-      // looking up an idempotent result or allocating an output directory.
+      // returning an idempotent result or allocating an output directory.
       this.assertSurveySourcesAdmissible(project.id, adjustments, deformations)
-      const replay = this.replayDelivery<{
-        run: StoredRun
-        files: Array<{ path: string; mediaType: string; sha256: string; sizeBytes: number }>
-        charts: ChartArtifactV1[]
-        citations: KnowledgeCitationV1[]
-        adjustments?: AdjustmentResultV1[]
-        deformations?: DeformationComparisonV1[]
-        surveySources?: SurveySourceEvidenceV1[]
-      }>('report-preview', req)
       if (replay) {
         if (replay.run.projectId !== project.id || replay.run.datasetId !== dataset?.id || replay.run.analysisId !== analysis?.id) {
           throw new EngineeringIdempotencyError(replay, 'stored preview does not match its bound delivery request')
@@ -434,7 +520,9 @@ export class EngineeringService {
       await mkdir(stagingDir, { recursive: true })
       let published = false
       try {
-        const chart = analysis ? this.latestChart(analysis.id) ?? await this.createChart({ expectedRevision: 0, idempotencyKey: `preview-chart-${analysis.id}`, analysisId: analysis.id, chartType: 'trend' }) : undefined
+        const previousChart = analysis ? this.latestChart(analysis.id) : undefined
+        const chart = analysis ? (previousChart?.rendererVersion === ENGINEERING_TREND_RENDERER_VERSION && previousChart.chartType === 'trend'
+          ? previousChart : await this.createChart({ expectedRevision: 0, idempotencyKey: `preview-chart-${ENGINEERING_TREND_RENDERER_VERSION}-${analysis.id}`, analysisId: analysis.id, chartType: 'trend' })) : undefined
         const outputs: Array<{ path: string; mediaType: string; sha256: string; sizeBytes: number }> = []
         const stageOutput = async (name: string, mediaType: string, contents: string | Uint8Array): Promise<void> => {
           const stagedPath = join(stagingDir, name)
@@ -496,6 +584,300 @@ export class EngineeringService {
         throw error
       }
     })
+  }
+
+  /** A separate numerical audit; never writes old verification or analysis records. */
+  async replayMonitoringDeliverable(projectId: string, manifestId: string): Promise<MonitoringReplayVerificationV1> {
+    const attempt = this.monitoringReplayAudit.begin(projectId, manifestId)
+    const execution = { runtimeVersion: this.options.runtimeVersion ?? 'unknown', node: process.versions.node, v8: process.versions.v8,
+      icu: process.versions.icu ?? 'unknown', platform: process.platform, arch: process.arch,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: Intl.DateTimeFormat().resolvedOptions().locale, timeBasis: 'ISO-unzoned-UTC' as const }
+    const analyses: MonitoringReplayVerificationV1['analyses'] = []
+    let status: MonitoringReplayVerificationV1['status'] = 'failed'
+    let reasonCode: MonitoringReplayVerificationV1['reasonCode'] = 'prerequisite-failed'
+    try {
+      const before = this.monitoringReplayBindings(projectId, manifestId)
+      if (!before.complete || !this.checkDeliverable(projectId, manifestId).valid) throw new Error('prerequisite failed')
+      const manifestRow = this.db.prepare('SELECT data_json FROM engineering_manifests WHERE id=? AND project_id=?').get(manifestId, projectId) as { data_json: string }
+      const manifest = DeliverableManifestV1.parse(JSON.parse(manifestRow.data_json))
+      if (!manifest.analyses.length) { status = 'not-applicable'; reasonCode = 'no-monitoring-analysis' }
+      else {
+        if (manifest.analyses.length !== 1 || manifest.inputDatasets.length !== 1) throw new Error('invalid monitoring bindings')
+        const project = this.mustProject(projectId), analysis = this.getAnalysis(manifest.analyses[0]!)!
+        const dataset = this.mustDataset(manifest.inputDatasets[0]!.id)
+        this.assertAnalysisCurrent(project, dataset, analysis)
+        const digest = (value: unknown): string => createHash('sha256').update(canonicalDeliveryJson(value)).digest('hex')
+        const evidence: MonitoringReplayVerificationV1['analyses'][number] = { analysisId: analysis.id, datasetId: dataset.id,
+          algorithmVersion: analysis.algorithmVersion, inputHash: analysis.inputHash, storedResultsHash: digest(analysis.results), status: 'failed', reasonCode: 'prerequisite-failed' }
+        analyses.push(evidence)
+        const setOutcome = (nextStatus: MonitoringReplayVerificationV1['status'], nextReason: MonitoringReplayVerificationV1['reasonCode']): void => {
+          status = nextStatus; reasonCode = nextReason; evidence.status = nextStatus; evidence.reasonCode = nextReason
+        }
+        if (analysis.algorithmVersion !== ENGINEERING_ANALYSIS_ALGORITHM_VERSION) setOutcome('not-evaluated', 'unsupported-algorithm')
+        else if (dataset.observations.length > 20000) setOutcome('not-evaluated', 'resource-limit')
+        else {
+          const sourceSize = this.db.prepare('SELECT length(source_bytes) AS bytes, length(CAST(context_json AS BLOB)) AS contextBytes FROM engineering_monitoring_sources WHERE dataset_id=? AND project_id=?').get(dataset.id, projectId) as { bytes: number; contextBytes: number } | undefined
+          if (!sourceSize) setOutcome('not-evaluated', 'source-unavailable')
+          else if (sourceSize.bytes > 32 * 1024 * 1024 || sourceSize.contextBytes > 256 * 1024) setOutcome('not-evaluated', 'resource-limit')
+          else {
+            const readSource = (): { dataset_id: string; project_id: string; source_hash: string; source_bytes: Buffer; context_json: string; context_hash: string } => {
+              const size = this.db.prepare('SELECT length(source_bytes) AS bytes, length(CAST(context_json AS BLOB)) AS contextBytes FROM engineering_monitoring_sources WHERE dataset_id=? AND project_id=?').get(dataset.id, projectId) as { bytes: number; contextBytes: number } | undefined
+              if (!size || size.bytes > 32 * 1024 * 1024 || size.contextBytes > 256 * 1024) throw new Error('source size changed')
+              const row = this.db.prepare('SELECT * FROM engineering_monitoring_sources WHERE dataset_id=? AND project_id=?').get(dataset.id, projectId) as { dataset_id: string; project_id: string; source_hash: string; source_bytes: Buffer; context_json: string; context_hash: string } | undefined
+              if (!row || row.dataset_id !== dataset.id || row.project_id !== projectId || row.source_hash !== dataset.sourceFileHash
+                || createHash('sha256').update(row.source_bytes).digest('hex') !== row.source_hash
+                || createHash('sha256').update(row.context_json).digest('hex') !== row.context_hash) throw new Error('source mismatch')
+              return row
+            }
+            try {
+              const source = readSource()
+              const context = JSON.parse(source.context_json) as { datasetId: string; project: unknown; requestedMapping: unknown; fieldMapping: unknown; sourceFileName: string; sourceFileHash: string }
+              const importProject = RailwiseProjectV1.parse(context.project), mapping = FieldMappingV1.parse(context.fieldMapping)
+              const requestedMapping = context.requestedMapping === null ? undefined : FieldMappingV1.parse(context.requestedMapping)
+              if (context.datasetId !== dataset.id || importProject.id !== projectId || context.sourceFileName !== dataset.sourceFileName
+                || context.sourceFileHash !== dataset.sourceFileHash || canonicalDeliveryJson(mapping) !== canonicalDeliveryJson(dataset.fieldMapping)) throw new Error('source context mismatch')
+              evidence.sourceFileHash = source.source_hash; evidence.sourceContextHash = source.context_hash
+              const rows = await parseTabular(context.sourceFileName, source.source_bytes, requestedMapping)
+              const normalized = normalizeRows(rows, mapping, importProject, source.source_hash)
+              const original = normalized.observations.map(observation => ({ ...observation, datasetId: dataset.id }))
+              if (rows.length !== dataset.rowCount || original.length !== dataset.observationCount
+                || canonicalDeliveryJson(original) !== canonicalDeliveryJson(dataset.observations)) throw new Error('source observations mismatch')
+              // Historical analyses did not record collator options. Even ASCII
+              // IDs can sort differently with numeric collation, so do not guess ties.
+              const ties = new Set<string>()
+              let ambiguous = false
+              for (const observation of original) {
+                const key = JSON.stringify([observation.monitoringItem, observation.point, monitoringTrendInstant(observation.timestamp).instant])
+                if (ties.has(key)) ambiguous = true
+                ties.add(key)
+              }
+              if (ambiguous) setOutcome('not-evaluated', 'ambiguous-tie-order')
+              else {
+                try {
+                  const recomputed = MonitoringAnalysisV1.shape.results.parse(calculateMonitoringAnalysisV2(project, original))
+                  evidence.recomputedResultsHash = digest(recomputed)
+                  const matches = canonicalDeliveryJson(recomputed) === canonicalDeliveryJson(analysis.results)
+                  setOutcome(matches ? 'passed' : 'failed', matches ? 'matched' : 'result-mismatch')
+                } catch { setOutcome('failed', 'input-invalid') }
+              }
+              const latestSource = readSource()
+              if (latestSource.context_hash !== source.context_hash || latestSource.source_hash !== source.source_hash) throw new Error('source changed during replay')
+            } catch (error) {
+              if (error instanceof MonitoringSourceResourceLimitError) setOutcome('not-evaluated', 'resource-limit')
+              else setOutcome('failed', 'source-mismatch')
+            }
+          }
+        }
+      }
+      // Parsing can yield; verify all current bindings and actual output bytes again.
+      const after = this.monitoringReplayBindings(projectId, manifestId)
+      if (!after.complete || verificationSnapshotHash(before) !== verificationSnapshotHash(after) || !this.checkDeliverable(projectId, manifestId).valid) throw new Error('prerequisites changed during replay')
+    } catch {
+      status = 'failed'; reasonCode = 'prerequisite-failed'
+      for (const evidence of analyses) { evidence.status = 'failed'; evidence.reasonCode = 'prerequisite-failed' }
+    }
+    const result = MonitoringReplayVerificationV1.parse({ schemaVersion: 1, attemptId: attempt.id, projectId, manifestId,
+      checkedAt: this.nowIso(), status, reasonCode, comparisonVersion: 'monitoring-results-exact-1', execution, analyses })
+    this.monitoringReplayAudit.finish(attempt, result)
+    return result
+  }
+
+  readMonitoringDatasetEvidence(projectId: string, datasetId: string): StoredDataset | null {
+    const row = this.db.prepare('SELECT id, project_id, revision, data_json FROM engineering_datasets WHERE id = ? AND project_id = ?').get(datasetId, projectId) as { id: string; project_id: string; revision: number; data_json: string } | undefined
+    if (!row) return null
+    const value = validateStoredDataset(JSON.parse(row.data_json))
+    if (value.id !== row.id || value.projectId !== row.project_id || value.revision !== row.revision) throw new Error('monitoring dataset identity mismatch')
+    return value
+  }
+
+  readMonitoringAnalysisEvidence(projectId: string, analysisId: string): MonitoringAnalysisV1 | null {
+    const row = this.db.prepare('SELECT id, project_id, dataset_id, data_json FROM engineering_analyses WHERE id = ? AND project_id = ?').get(analysisId, projectId) as { id: string; project_id: string; dataset_id: string; data_json: string } | undefined
+    if (!row) return null
+    const value = MonitoringAnalysisV1.parse(JSON.parse(row.data_json))
+    if (value.id !== row.id || value.projectId !== row.project_id || value.datasetId !== row.dataset_id) throw new Error('monitoring analysis identity mismatch')
+    const dataset = this.readMonitoringDatasetEvidence(projectId, value.datasetId)
+    if (!dataset) throw new Error('monitoring dataset unavailable')
+    this.assertAnalysisCurrent(this.mustProject(projectId), dataset, value)
+    return value
+  }
+
+  /** Read an existing receipt only; these paths never start a verification. */
+  readDeliverableVerificationEvidence(projectId: string, manifestId: string, checkedAt: string): DeliverableVerificationV1 | null {
+    const rows = this.db.prepare("SELECT id, record_hash, data_json FROM engineering_verification_attempts WHERE project_id = ? AND manifest_id = ? AND json_extract(data_json, '$.verification.checkedAt') = ? LIMIT 2").all(projectId, manifestId, checkedAt) as Array<{ id: string; record_hash: string; data_json: string }>
+    if (!rows.length) return null
+    if (rows.length !== 1) throw new Error('ambiguous verification receipt')
+    const row = rows[0]!
+    if (createHash('sha256').update(row.data_json).digest('hex') !== row.record_hash) throw new Error('verification receipt integrity mismatch')
+    const event = JSON.parse(row.data_json)
+    if (event.id !== row.id || event.projectId !== projectId || event.manifestId !== manifestId) throw new Error('verification receipt identity mismatch')
+    const lifecycle = this.db.prepare('SELECT phase, occurred_at, record_hash, data_json FROM engineering_verification_events WHERE attempt_id = ?').all(row.id) as Array<{ phase: string; occurred_at: string; record_hash: string; data_json: string }>
+    if (lifecycle.length) {
+      const start = lifecycle.find(item => item.phase === 'started'), finish = lifecycle.find(item => item.phase === 'finished')
+      if (lifecycle.length !== 2 || !start || !finish || lifecycle.some(item => createHash('sha256').update(item.data_json).digest('hex') !== item.record_hash)) throw new Error('verification lifecycle integrity mismatch')
+      const began = JSON.parse(start.data_json), ended = JSON.parse(finish.data_json)
+      if (began.attemptId !== row.id || began.phase !== 'started' || began.previousHash !== null || began.projectId !== projectId || began.manifestId !== manifestId
+        || began.occurredAt !== start.occurred_at || began.occurredAt !== event.startedAt || ended.attemptId !== row.id || ended.phase !== 'finished'
+        || ended.occurredAt !== finish.occurred_at || ended.occurredAt !== event.completedAt || ended.previousHash !== start.record_hash
+        || ended.terminalId !== row.id || ended.terminalRecordHash !== row.record_hash || ended.outcome !== event.outcome) throw new Error('verification lifecycle identity mismatch')
+    }
+    const value = DeliverableVerificationV1.parse(event.verification)
+    if (value.projectId !== projectId || value.manifestId !== manifestId || value.checkedAt !== checkedAt) throw new Error('verification receipt scope mismatch')
+    return value
+  }
+
+  readMonitoringReplayEvidence(projectId: string, manifestId: string, attemptId: string, checkedAt: string): MonitoringReplayVerificationV1 | null {
+    const rows = this.db.prepare('SELECT phase, occurred_at, record_hash, data_json FROM engineering_monitoring_replay_events WHERE project_id = ? AND manifest_id = ? AND attempt_id = ?').all(projectId, manifestId, attemptId) as Array<{ phase: string; occurred_at: string; record_hash: string; data_json: string }>
+    const start = rows.find(row => row.phase === 'started'), finish = rows.find(row => row.phase === 'finished')
+    if (!finish) return null
+    if (!start || rows.length !== 2 || rows.some(row => createHash('sha256').update(row.data_json).digest('hex') !== row.record_hash)) throw new Error('monitoring replay receipt integrity mismatch')
+    const began = JSON.parse(start.data_json), event = JSON.parse(finish.data_json)
+    const value = MonitoringReplayVerificationV1.parse(event.result)
+    if (began.id !== attemptId || began.projectId !== projectId || began.manifestId !== manifestId || began.phase !== 'started' || began.startedAt !== start.occurred_at
+      || event.phase !== 'finished' || event.startedAt !== began.startedAt || finish.occurred_at !== checkedAt
+      || event.previousHash !== start.record_hash || event.resultHash !== createHash('sha256').update(JSON.stringify(value)).digest('hex')
+      || event.id !== attemptId || event.projectId !== projectId || event.manifestId !== manifestId
+      || value.attemptId !== attemptId || value.projectId !== projectId || value.manifestId !== manifestId || value.checkedAt !== checkedAt) throw new Error('monitoring replay receipt identity mismatch')
+    return value
+  }
+
+  private monitoringReplayBindings(projectId: string, manifestId: string): VerificationBindings & { sqlRows: unknown[] } {
+    const binding = this.verificationBindings(projectId, manifestId)
+    const sqlRows = binding.engineeringRows.map(({ table, id }) => {
+      const row = this.db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id) as Record<string, unknown>
+      const value = JSON.parse(row.data_json as string) as Record<string, unknown>
+      if (row.id !== value.id || ('project_id' in row && row.project_id !== value.projectId)
+        || ('revision' in row && row.revision !== value.revision)
+        || ('dataset_id' in row && row.dataset_id !== value.datasetId)) throw new Error('monitoring replay SQL identity mismatch')
+      return row
+    })
+    return { ...binding, sqlRows }
+  }
+
+  /** Re-read bytes and recompute evidence without changing checked objects.
+   * A durable start survives interruption; terminal and finish commit together. */
+  verifyDeliverable(projectId: string, manifestId: string): DeliverableVerificationV1 {
+    const attempt = this.verificationAudit.begin(projectId, manifestId)
+    let failure: unknown
+    let result: DeliverableVerificationV1 | undefined
+    this.db.transaction(() => {
+      const startedAt = attempt.startedAt
+      const before = this.verificationBindings(projectId, manifestId)
+      try { result = this.checkDeliverable(projectId, manifestId) }
+      catch (error) { failure = error }
+      const after = this.verificationBindings(projectId, manifestId)
+      const bindingStable = before.complete && after.complete && verificationSnapshotHash(before) === verificationSnapshotHash(after)
+      const completedAt = this.nowIso()
+      const timeValid = Number.isFinite(Date.parse(startedAt)) && Number.isFinite(Date.parse(completedAt)) && Date.parse(completedAt) >= Date.parse(startedAt)
+      const event = {
+        schemaVersion: 1, id: attempt.id, projectId, manifestId,
+        startedAt, completedAt, runtimeVersion: this.options.runtimeVersion ?? 'unknown',
+        outcome: failure ? 'error' : result?.valid ? 'passed' : 'failed',
+        bindingStable: bindingStable && timeValid, bindings: before,
+        verification: result ?? null,
+        error: failure ? (failure instanceof Error ? failure.message : String(failure)) : null
+      }
+      const serialized = JSON.stringify(event)
+      const terminalHash = createHash('sha256').update(serialized).digest('hex')
+      try {
+        this.db.prepare('INSERT INTO engineering_verification_attempts (id, project_id, manifest_id, started_at, completed_at, outcome, record_hash, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(event.id, projectId, manifestId, startedAt, completedAt, event.outcome, terminalHash, serialized)
+        this.verificationAudit.finish(attempt, completedAt, terminalHash)
+      } catch {
+        throw new EngineeringVerificationAuditError()
+      }
+    }).immediate()
+    if (failure) throw failure
+    return result!
+  }
+
+  private verificationBindings(projectId: string, manifestId: string): VerificationBindings {
+    const binding: VerificationBindings = { algorithm: 'typed-json-sha256-v1', complete: false, engineeringRows: [], surveyNetworks: [], surveyResults: [], surveyDeformations: [] }
+    try {
+      const read = (table: string, id: string, projectScoped = true): Record<string, unknown> => {
+        // All table names and scoping choices are internal constants below.
+        const row = this.db.prepare(`SELECT data_json FROM ${table} WHERE id = ?${projectScoped ? ' AND project_id = ?' : ''}`)
+          .get(...(projectScoped ? [id, projectId] : [id])) as { data_json: string } | undefined
+        if (!row) throw new Error('verification snapshot record unavailable')
+        const value = JSON.parse(row.data_json) as Record<string, unknown>
+        if (value.id !== id || (projectScoped && value.projectId !== projectId)) throw new Error('verification snapshot identity mismatch')
+        binding.engineeringRows.push({ table, id, hash: verificationSnapshotHash(value) })
+        return value
+      }
+      const manifest = DeliverableManifestV1.parse(read('engineering_manifests', manifestId))
+      read('engineering_projects', projectId, false)
+      read('engineering_runs', manifest.runId)
+      for (const item of manifest.inputDatasets) read('engineering_datasets', item.id)
+      for (const id of manifest.analyses) read('engineering_analyses', id)
+      const results = new Map(manifest.adjustments.map(item => [item.id, item]))
+      for (const epoch of manifest.deformations.flatMap(item => item.epochs)) {
+        const matches = this.options.getAdjustmentEvidence?.(projectId, [epoch.adjustmentId])
+        if (matches?.length !== 1 || matches[0]!.run.projectId !== projectId || matches[0]!.result.id !== epoch.resultId) throw new Error('verification epoch snapshot unavailable')
+        results.set(epoch.resultId, matches[0]!.result)
+      }
+      binding.surveyResults = [...results.values()].map(item => ({ id: item.id, runId: item.runId, networkId: item.networkId, inputHash: item.inputHash, algorithmVersion: item.algorithmVersion, hash: verificationSnapshotHash(item) }))
+      binding.surveyDeformations = manifest.deformations.map(item => ({ id: item.id, hash: verificationSnapshotHash(item) }))
+      for (const id of this.requiredSurveyNetworkIds(manifest.adjustments, manifest.deformations)) {
+        const network = this.options.getSurveyNetworkSnapshot?.(projectId, id)
+        if (!network || network.id !== id || network.projectId !== projectId) throw new Error('verification network snapshot unavailable')
+        binding.surveyNetworks.push({ id, hash: verificationSnapshotHash(network) })
+      }
+      binding.complete = true
+    } catch {
+      // Missing providers or malformed objects do not suppress the attempt.
+      // They make the event ineligible for binding-aware metric numerators.
+    }
+    return binding
+  }
+
+  private checkDeliverable(projectId: string, manifestId: string): DeliverableVerificationV1 {
+    const row = this.db.prepare('SELECT data_json FROM engineering_manifests WHERE id = ? AND project_id = ?').get(manifestId, projectId) as { data_json: string } | undefined
+    if (!row) throw new Error('deliverable manifest not found in project')
+    const manifest = DeliverableManifestV1.parse(JSON.parse(row.data_json))
+    if (manifest.id !== manifestId || manifest.projectId !== projectId) throw new Error('deliverable manifest identity mismatch')
+    const project = this.mustProject(projectId)
+    const checks: DeliverableVerificationV1['checks'] = []
+    const check = (id: DeliverableVerificationV1['checks'][number]['id'], action: () => void): void => {
+      try { action(); checks.push({ id, status: 'passed' }) }
+      catch (error) { checks.push({ id, status: 'failed', detail: error instanceof Error ? error.message : String(error) }) }
+    }
+    check('manifest', () => this.assertPublishedManifestCurrent(project, manifest))
+    check('outputs', () => {
+      if (!manifest.outputs.length) throw new Error('deliverable manifest has no output files')
+      this.assertDeliveryOutputsCurrent(project, manifest.outputs)
+    })
+    check('inputs', () => {
+      const run = this.getRun(manifest.runId)
+      if (!run || run.projectId !== projectId || !run.deliveryInputHash) throw new Error('deliverable run has no bound input snapshot')
+      if (manifest.inputDatasets.length !== (run.datasetId ? 1 : 0)
+        || manifest.inputDatasets[0]?.id !== run.datasetId
+        || manifest.analyses.length !== (run.analysisId ? 1 : 0)
+        || manifest.analyses[0] !== run.analysisId) throw new Error('deliverable input bindings do not match the completed run')
+      const dataset = run.datasetId ? this.mustDataset(run.datasetId) : undefined
+      const analysis = run.analysisId ? this.getAnalysis(run.analysisId) ?? undefined : undefined
+      if (dataset && (dataset.projectId !== projectId || dataset.sourceFileHash !== manifest.inputDatasets[0]?.hash)) throw new Error('deliverable dataset source hash mismatch')
+      this.assertCompletedRunCurrent(run)
+      this.assertDeliveryInputsCurrent(project, dataset, analysis, run.deliveryInputHash)
+    })
+    if (manifest.adjustments.length || manifest.deformations.length) {
+      check('surveyReplay', () => {
+        // Production providers call SurveyService's project-scoped strict reader,
+        // which recomputes with the recorded algorithm and checks its exact hash.
+        const adjustments = this.lookupAdjustments(projectId, manifest.adjustments.map(item => item.id))
+        const deformations = this.lookupDeformations(projectId, manifest.deformations.map(item => item.id))
+        this.assertReplayAdjustmentsMatchLive('deliverable verification', adjustments, manifest.adjustments)
+        this.assertReplayDeformationsMatchLive('deliverable verification', deformations, manifest.deformations)
+        this.assertDeformationEpochEvidence(projectId, deformations)
+      })
+      check('sources', () => {
+        this.assertSurveySourcesAdmissible(projectId, manifest.adjustments, manifest.deformations)
+        const sources = this.lookupSurveySources(projectId, this.requiredSurveyNetworkIds(manifest.adjustments, manifest.deformations))
+        if (canonicalDeliveryJson(sources) !== canonicalDeliveryJson(manifest.surveySources)) throw new Error('deliverable source provenance no longer matches its recorded evidence')
+      })
+    } else {
+      checks.push({ id: 'surveyReplay', status: 'not-applicable' }, { id: 'sources', status: 'not-applicable' })
+    }
+    return DeliverableVerificationV1.parse({ schemaVersion: 1, projectId, manifestId, checkedAt: this.nowIso(),
+      valid: checks.every(item => item.status !== 'failed'), reviewStatus: manifest.reviewStatus, checks })
   }
 
   async finalize(input: unknown): Promise<DeliverableManifestV1> {
@@ -642,6 +1024,16 @@ export class EngineeringService {
     })
   }
   getRun(id: string): StoredRun | null { const row = this.db.prepare('SELECT data_json FROM engineering_runs WHERE id = ?').get(id) as { data_json: string } | undefined; return row ? JSON.parse(row.data_json) as StoredRun : null }
+  /** Historical descriptors only: this read does not reissue or approve artifacts. */
+  getPreviewEvidence(projectId: string, runId: string): { run: StoredRun; files: DeliverableManifestV1['outputs'] } | null {
+    const run = this.getRun(runId)
+    if (!run || run.projectId !== projectId) return null
+    const row = this.db.prepare('SELECT result_json FROM engineering_delivery_idempotency WHERE key = ? AND operation = ?').get(run.idempotencyKey, 'report-preview') as { result_json: string } | undefined
+    if (!row) return null
+    const stored = JSON.parse(row.result_json) as { run?: StoredRun; files?: unknown }
+    if (stored.run?.id !== run.id || stored.run.projectId !== projectId) throw new Error('preview evidence does not match its project/run')
+    return { run, files: DeliverableManifestV1.shape.outputs.parse(stored.files) }
+  }
   cancelRun(id: string, input?: unknown): StoredRun { const mutation = input ? RunMutationRequest.parse(input) : undefined; const replay = mutation ? this.replay(mutation.idempotencyKey) : null; if (replay) return replay as StoredRun; const run = this.getRun(id); if (!run) throw new Error('run not found'); if (mutation && mutation.expectedRevision !== 0 && mutation.expectedRevision !== run.revision) throw new EngineeringRevisionConflictError(`run revision conflict: expected ${mutation.expectedRevision}, actual ${run.revision}`); const next = { ...run, status: 'cancelled' as const, revision: run.revision + 1, updatedAt: this.nowIso() }; this.saveRun(next); if (mutation) this.remember(mutation.idempotencyKey, next); return next }
   resumeRun(id: string, input?: unknown): StoredRun { const mutation = input ? RunMutationRequest.parse(input) : undefined; const replay = mutation ? this.replay(mutation.idempotencyKey) : null; if (replay) return replay as StoredRun; const run = this.getRun(id); if (!run) throw new Error('run not found'); if (mutation && mutation.expectedRevision !== 0 && mutation.expectedRevision !== run.revision) throw new EngineeringRevisionConflictError(`run revision conflict: expected ${mutation.expectedRevision}, actual ${run.revision}`); if (run.status === 'completed') return run; const next = { ...run, status: 'queued' as const, revision: run.revision + 1, updatedAt: this.nowIso(), error: undefined }; this.saveRun(next); if (mutation) this.remember(mutation.idempotencyKey, next); return next }
   private saveRun(run: StoredRun): void { this.db.prepare('UPDATE engineering_runs SET data_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(run), run.updatedAt, run.id) }
@@ -1076,16 +1468,29 @@ const ALIASES: Record<keyof zInferMapping, string[]> = {
 }
 type zInferMapping = { project?: string; period?: string; monitoringItem?: string; point?: string; timestamp?: string; value?: string; unit?: string; cumulative?: string; rate?: string; warningThreshold?: string; alarmThreshold?: string; controlThreshold?: string; valid?: string; note?: string }
 function inferMapping(row: Row): FieldMappingV1 { const keys = Object.keys(row); const out: Record<string, string> = {}; for (const [canonical, aliases] of Object.entries(ALIASES)) { const found = keys.find((key) => aliases.some((alias) => key.trim().toLowerCase() === alias.toLowerCase())); if (found) out[canonical] = found } return FieldMappingV1.parse(out) }
+function parseMonitoringNumber(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === '') return undefined
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : undefined
+}
 function normalizeRows(rows: Row[], mapping: FieldMappingV1, project: RailwiseProjectV1, sourceHash: string): { observations: MonitoringObservationV1[]; findings: QualityFindingV1[]; unknownColumns: string[]; columnCount: number; timeRange: { start?: string; end?: string } } {
-  const known = new Set(Object.values(mapping).filter(Boolean)); const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))]; const unknownColumns = columns.filter((key) => !known.has(key) && !key.startsWith('__')); const observations: MonitoringObservationV1[] = []; const findings: QualityFindingV1[] = []; let start: string | undefined; let end: string | undefined; const seen = new Set<string>();
+  const known = new Set(Object.values(mapping).filter(Boolean)); const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))]; const unknownColumns = columns.filter((key) => !known.has(key) && !key.startsWith('__')); const observations: MonitoringObservationV1[] = []; const findings: QualityFindingV1[] = []; let start: string | undefined; let end: string | undefined; let firstInstant = Infinity; let lastInstant = -Infinity; const seen = new Set<string>();
   for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i]; const point = mapping.point ? row[mapping.point] : ''; const item = mapping.monitoringItem ? row[mapping.monitoringItem] : project.monitoringType; const timestamp = mapping.timestamp ? row[mapping.timestamp] : ''; const rawValue = mapping.value ? row[mapping.value] : ''; const value = Number(rawValue);
+    const row = rows[i]; const point = mapping.point ? row[mapping.point] : ''; const item = mapping.monitoringItem ? row[mapping.monitoringItem] : project.monitoringType; const timestamp = mapping.timestamp ? row[mapping.timestamp] : ''; const rawValue = mapping.value ? row[mapping.value] : ''; const value = parseMonitoringNumber(rawValue);
     if (!point || !timestamp) findings.push(finding(`missing-${i}`, 'missing_identifier', 'blocking', i + 2, '缺少测点或时间', '补齐测点编号和时间'));
-    if (!rawValue) findings.push(finding(`missing-value-${i}`, 'missing_value', 'blocking', i + 2, '缺少观测数值', '补齐数值字段'));
-    else if (!Number.isFinite(value)) findings.push(finding(`number-${i}`, 'invalid_number', 'blocking', i + 2, '数值无效', '修正数值字段'));
-    if (timestamp && Number.isNaN(Date.parse(timestamp))) findings.push(finding(`time-invalid-${i}`, 'time_order', 'blocking', i + 2, '时间格式无效', '使用 ISO 8601 或可识别日期'));
-    const key = `${item}|${point}|${timestamp}`; if (seen.has(key)) findings.push(finding(`duplicate-${i}`, 'duplicate_observation', 'warning', i + 2, '存在重复观测', '确认是否保留其中一条')); seen.add(key);
-    if (Number.isFinite(value) && point && timestamp) { const obs = MonitoringObservationV1.parse({ schemaVersion: 1, id: `obs_${sourceHash.slice(0, 12)}_${i}`, projectId: project.id, datasetId: 'pending', monitoringItem: item || project.monitoringType, point, timestamp, value, unit: mapping.unit ? row[mapping.unit] : project.unit, cumulative: mapping.cumulative && Number.isFinite(Number(row[mapping.cumulative])) ? Number(row[mapping.cumulative]) : undefined, rate: mapping.rate && Number.isFinite(Number(row[mapping.rate])) ? Number(row[mapping.rate]) : undefined, sourceRow: i + 2, sourceFields: row }); observations.push(obs); start = !start || timestamp < start ? timestamp : start; end = !end || timestamp > end ? timestamp : end }
+    if (!rawValue?.trim()) findings.push(finding(`missing-value-${i}`, 'missing_value', 'blocking', i + 2, '缺少观测数值', '补齐数值字段'));
+    else if (value === undefined) findings.push(finding(`number-${i}`, 'invalid_number', 'blocking', i + 2, '数值无效', '修正数值字段'));
+    let instant: number | undefined
+    if (timestamp) {
+      try { instant = monitoringTrendInstant(timestamp).instant }
+      catch { findings.push(finding(`time-invalid-${i}`, 'time_order', 'blocking', i + 2, '时间格式无效', '使用 ISO 8601 日期或时间；未标时区按 UTC')) }
+    }
+    const key = JSON.stringify([item, point, instant ?? timestamp]); if (seen.has(key)) findings.push(finding(`duplicate-${i}`, 'duplicate_observation', 'warning', i + 2, '存在重复观测', '确认是否保留其中一条')); seen.add(key);
+    if (value !== undefined && point && timestamp) {
+      const obs = MonitoringObservationV1.parse({ schemaVersion: 1, id: `obs_${sourceHash.slice(0, 12)}_${i}`, projectId: project.id, datasetId: 'pending', monitoringItem: item || project.monitoringType, point, timestamp, value, unit: mapping.unit ? row[mapping.unit] : project.unit, cumulative: mapping.cumulative ? parseMonitoringNumber(row[mapping.cumulative]) : undefined, rate: mapping.rate ? parseMonitoringNumber(row[mapping.rate]) : undefined, sourceRow: i + 2, sourceFields: row }); observations.push(obs)
+      if (instant !== undefined && instant < firstInstant) { start = timestamp; firstInstant = instant }
+      if (instant !== undefined && instant > lastInstant) { end = timestamp; lastInstant = instant }
+    }
   }
   if (rows.length > 500_000) findings.push(finding('row-limit', 'row_limit', 'blocking', 1, '观测记录超过 500,000 条运行上限', '拆分文件或缩小运行范围'))
   if (Object.keys(project.thresholds).length === 0) findings.push(finding('threshold-missing', 'missing_threshold', 'warning', 1, '项目未配置阈值', '在项目设置中补充阈值'))
@@ -1105,16 +1510,25 @@ function finding(id: string, code: QualityFindingV1['code'], severity: QualityFi
 function runQualityChecks(observations: MonitoringObservationV1[], project: RailwiseProjectV1, nowIso: () => string): QualityFindingV1[] {
   const findings: QualityFindingV1[] = []
   const byPoint = new Map<string, MonitoringObservationV1[]>()
+  const instants = new Map<string, number>(), seen = new Set<string>()
   for (const obs of observations) {
-    const key = `${obs.monitoringItem}|${obs.point}`
+    const key = JSON.stringify([obs.monitoringItem, obs.point])
     const list = byPoint.get(key) ?? []
     list.push(obs)
     byPoint.set(key, list)
+    try {
+      const instant = monitoringTrendInstant(obs.timestamp).instant
+      instants.set(obs.id, instant)
+      const identity = JSON.stringify([obs.monitoringItem, obs.point, instant])
+      if (seen.has(identity)) findings.push(finding(`duplicate-${obs.id}`, 'duplicate_observation', 'warning', obs.sourceRow, '存在重复观测', '确认是否保留其中一条', nowIso()))
+      seen.add(identity)
+    } catch { findings.push(finding(`time-invalid-${obs.id}`, 'time_order', 'blocking', obs.sourceRow, '时间格式无效', '使用 ISO 8601 日期或时间；未标时区按 UTC', nowIso())) }
     if (obs.unit && obs.unit !== project.unit) findings.push(finding(`unit-${obs.id}`, 'unit_conflict', 'warning', obs.sourceRow, `单位 ${obs.unit} 与项目单位 ${project.unit} 不一致`, '统一单位后重新校核', nowIso()))
   }
   for (const list of byPoint.values()) {
     for (let i = 1; i < list.length; i += 1) {
-      if (list[i].timestamp < list[i - 1].timestamp) findings.push(finding(`time-${list[i].id}`, 'time_order', 'warning', list[i].sourceRow, '时间顺序异常', '按时间升序整理', nowIso()))
+      const current = instants.get(list[i].id), previous = instants.get(list[i - 1].id)
+      if (current !== undefined && previous !== undefined && current < previous) findings.push(finding(`time-${list[i].id}`, 'time_order', 'warning', list[i].sourceRow, '时间顺序异常', '按时间升序整理', nowIso()))
     }
   }
   if (Object.keys(project.thresholds).length === 0) findings.push(finding('threshold-missing', 'missing_threshold', 'warning', 1, '项目未配置阈值', '在项目设置中补充阈值', nowIso()))
@@ -1162,9 +1576,35 @@ function parseJsonRows(bytes: Buffer): Row[] {
 function parseCsv(bytes: Buffer): Row[] { const text = decodeText(bytes).replace(/^\uFEFF/, ''); const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0); if (!lines.length) return []; const rows = lines.map(parseCsvLine); const headers = rows[0].map((h) => h.trim()); return rows.slice(1).map((cells) => Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? '']))) }
 function parseCsvLine(line: string): string[] { const out: string[] = []; let current = ''; let quoted = false; for (let i = 0; i < line.length; i += 1) { const c = line[i]; if (c === '"' && line[i + 1] === '"') { current += '"'; i += 1 } else if (c === '"') quoted = !quoted; else if (c === ',' && !quoted) { out.push(current); current = '' } else current += c } out.push(current); return out }
 function decodeText(bytes: Buffer): string { const utf8 = bytes.toString('utf8').replace(/^\uFEFF/, ''); if (!utf8.includes('\uFFFD')) return utf8; try { return new TextDecoder('gb18030').decode(bytes) } catch { return utf8 } }
+class MonitoringSourceResourceLimitError extends Error {
+  constructor() { super('monitoring XLSX exceeds the resource limit (32 MiB expanded, 200:1 compression, 2048 entries, 16384 columns)') }
+}
 async function parseXlsx(bytes: Buffer, requestedMapping?: FieldMappingV1): Promise<Row[]> {
-  const zip = await JSZip.loadAsync(bytes)
-  const sharedText = zip.file('xl/sharedStrings.xml') ? await zip.file('xl/sharedStrings.xml')!.async('text') : ''
+  const zip = await JSZip.loadAsync(bytes, { createFolders: false })
+  if (Object.keys(zip.files).length > 2048) throw new MonitoringSourceResourceLimitError()
+  let expandedBytes = 0
+  const readText = async (entry: JSZip.JSZipObject): Promise<string> => {
+    const chunks: Buffer[] = []
+    // Count actual output from the public stream API, never archive-declared sizes.
+    const stream = entry.nodeStream('nodebuffer') as import('node:stream').Readable
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', (raw: Buffer) => {
+        expandedBytes += raw.length
+        if (expandedBytes > 32 * 1024 * 1024 || expandedBytes > bytes.length * 200) {
+          // JSZip's legacy adapter must pause via backpressure: destroying it
+          // during a data callback can push the remaining inflate chunk after EOF.
+          stream.pause(); chunks.length = 0
+          reject(new MonitoringSourceResourceLimitError())
+          return
+        }
+        chunks.push(raw)
+      })
+      stream.once('error', reject)
+      stream.once('end', resolve)
+    })
+    return Buffer.concat(chunks).toString('utf8')
+  }
+  const sharedText = zip.file('xl/sharedStrings.xml') ? await readText(zip.file('xl/sharedStrings.xml')!) : ''
   const shared = [...sharedText.matchAll(/<si[^>]*>([\s\S]*?)<\/si>/g)].map((item) =>
     [...item[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((text) => decodeXml(text[1])).join('')
   )
@@ -1175,14 +1615,17 @@ async function parseXlsx(bytes: Buffer, requestedMapping?: FieldMappingV1): Prom
   for (const sheetName of sheetNames) {
     const sheet = zip.file(sheetName)
     if (!sheet) continue
-    const xml = await sheet.async('text')
+    const xml = await readText(sheet)
     const rows: string[][] = []
     for (const rowMatch of xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
       const cells: string[] = []
       for (const cell of rowMatch[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
         const reference = cell[1].match(/\br="([A-Z]+)\d+"/)?.[1]
         if (!reference) continue
-        const col = lettersToIndex(reference); const type = cell[1].match(/\bt="([^"]+)"/)?.[1]; const body = cell[2]
+        if (reference.length > 3) throw new MonitoringSourceResourceLimitError()
+        const col = lettersToIndex(reference)
+        if (col >= 16384) throw new MonitoringSourceResourceLimitError()
+        const type = cell[1].match(/\bt="([^"]+)"/)?.[1]; const body = cell[2]
         const value = decodeXml(body.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? body.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] ?? '')
         cells[col] = type === 's' ? (shared[Number(value)] ?? value) : value
       }
@@ -1227,12 +1670,18 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
   const thresholdLines = Object.entries(project.thresholds).map(([name, value]) => `${name}: ${value} ${project.unit}`)
   const measurement = (value: number | undefined, unit: string): string => value === undefined ? '-' : `${value} ${unit}`
   const statisticalUnit = (unit: 'dimensionless' | 'sigma'): string => unit === 'dimensionless' ? '无量纲' : 'sigma'
+  const taskLabels = { 'control-network': '控制网', 'leveling-network': '水准网', 'traverse-network': '导线网', resection: '任意设站', deformation: '变形监测', gnss: 'GNSS' }
+  const taskType = project.taskType ?? inferEngineeringTaskType(project.monitoringType)
+  const signLabels: Record<string, string> = { positive: '正值为正向变形', negative: '负值为正向变形', custom: '自定义（以项目约定为准）' }
+  const trendLabels = { rising: '上升', falling: '下降', stable: '稳定', unknown: '待确认' }
+  const thresholdLabels = { normal: '正常', warning: '提示', alarm: '报警', control: '控制', unresolved: '待确认' }
   return [
     `项目：${project.name}`,
     ...(dataset ? [
-    `监测类型：${project.monitoringType}`,
+    '监测分析报告（待审查）',
+    `任务类型：${taskType ? taskLabels[taskType] : project.monitoringType}`,
     `报告周期：${period}`,
-    `单位：${project.unit}；符号约定：${project.signConvention}`,
+    `单位：${project.unit}；符号约定：${signLabels[project.signConvention] ?? project.signConvention}`,
     `数据来源：${dataset.sourceFileName}`,
     `源文件 SHA-256：${dataset.sourceFileHash}`,
     `字段映射：${JSON.stringify(dataset.fieldMapping)}`,
@@ -1246,7 +1695,7 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
     ...(thresholdLines.length ? thresholdLines : ['待确认']),
     '',
     '分析结果',
-    ...analysis.results.map((r) => `${r.monitoringItem} / ${r.point}: 当前=${r.currentValue ?? '-'} 上期=${r.previousValue ?? '-'} 累计=${r.cumulativeChange ?? '-'} 速率=${r.changeRate ?? '-'} 趋势=${r.trend} 异常=${r.anomaly ? '是' : '否'} 阈值=${r.thresholdStatus}`),
+    ...analysis.results.map((r) => `${r.monitoringItem} / ${r.point}: 当前=${measurement(r.currentValue, project.unit)} 上期=${measurement(r.previousValue, project.unit)} 累计=${measurement(r.cumulativeChange, project.unit)} 速率=${measurement(r.changeRate, `${project.unit}/d`)} 趋势=${trendLabels[r.trend]} 异常=${r.anomaly ? '是' : '否'} 阈值=${thresholdLabels[r.thresholdStatus]}`),
     `分析输入 SHA-256：${analysis.inputHash}`,
     `算法版本：${analysis.algorithmVersion}`,
     ] : []),
@@ -1258,6 +1707,7 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
       `闭合量=${Object.entries(adjustment.closure).map(([key, value]) => `${key}:${value} ${adjustment.closureUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       `解算参数=${Object.entries(adjustment.parameters).map(([key, value]) => `${key}:${value} ${adjustment.parameterUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       ...(adjustment.points.length ? adjustment.points.map((point) => `点位 ${point.id}: X=${measurement(point.x, adjustment.linearUnit)} Y=${measurement(point.y, adjustment.linearUnit)} H=${measurement(point.height, adjustment.linearUnit)}${point.latitude === undefined ? '' : ` B=${point.latitude}°`}${point.longitude === undefined ? '' : ` L=${point.longitude}°`}`) : ['点位成果：无']),
+      ...adjustment.points.flatMap((point) => point.xyErrorEllipse ? [`点位 ${point.id} XY 标准误差椭圆：长半轴=${point.xyErrorEllipse.semiMajor} m；短半轴=${point.xyErrorEllipse.semiMinor} m；轴向=${point.xyErrorEllipse.orientationRad === null ? '无唯一轴向' : `${point.xyErrorEllipse.orientationRad} rad`}（+X 转向 +Y，模 π）；${point.xyErrorEllipse.varianceBasis === 'a-posteriori' ? '后验方差' : '先验方差'}；单位马氏半径，非置信百分比；解算 XY 平面，GNSS 不代表当地东/北；算法=${point.xyErrorEllipse.algorithmVersion}`] : []),
       ...(adjustment.displacements.length ? adjustment.displacements.map((item) => `位移 ${item.pointId}: dX=${measurement(item.dX, adjustment.linearUnit)} dY=${measurement(item.dY, adjustment.linearUnit)} dH=${measurement(item.dH, adjustment.linearUnit)} 模长=${measurement(item.magnitude, adjustment.linearUnit)}`) : ['位移结果：无可用初始坐标/高程'])
     ]) : ['本报告未关联测量平差运行']),
     '',
@@ -1277,7 +1727,7 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
     '来源引用',
     ...(citations.length ? citations.map((citation) => `${citation.id}: ${citation.sourceType} ${citation.source}${citation.page ? ` 第 ${citation.page} 页` : ''}${citation.worksheet ? ` 工作表 ${citation.worksheet}` : ''}${citation.row ? ` 第 ${citation.row} 行` : ''}${citation.locator ? ` (${citation.locator})` : ''}`) : ['无']),
     '',
-    '审查记录：本报告由 WorkWise 确定性工程分析生成，最终归档前需人工确认阻断项、警告项和来源引用。'
+    '审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签名。'
   ].join('\n')
 }
 async function fileOutput(path: string, mediaType: string, workspace: string): Promise<{ path: string; mediaType: string; sha256: string; sizeBytes: number }> { const data = await readFile(path); return { path: relative(workspace, path), mediaType, sha256: createHash('sha256').update(data).digest('hex'), sizeBytes: data.byteLength } }
@@ -1291,7 +1741,7 @@ async function makeXlsx(project: RailwiseProjectV1, dataset: StoredDataset | und
     { name: 'quality_findings', rows: [['id', 'severity', 'code', 'row', 'status', 'message', 'suggestion'], ...dataset.findings.map((f) => [f.id, f.severity, f.code, String(f.row ?? ''), f.status, f.message, f.suggestion])] },
     { name: 'analysis_results', rows: [['monitoringItem', 'point', 'currentValue', 'previousValue', 'cumulativeChange', 'changeRate', 'trend', 'anomaly', 'thresholdStatus', 'inputHash'], ...analysis.results.map((r) => [r.monitoringItem, r.point, String(r.currentValue ?? ''), String(r.previousValue ?? ''), String(r.cumulativeChange ?? ''), String(r.changeRate ?? ''), r.trend, String(r.anomaly), r.thresholdStatus, analysis.inputHash])] },
     { name: 'threshold_status', rows: [['monitoringItem', 'point', 'thresholdStatus', 'configuredThreshold', 'unit'], ...analysis.results.map((r) => [r.monitoringItem, r.point, r.thresholdStatus, String(project.thresholds[r.monitoringItem] ?? project.thresholds.default ?? ''), project.unit])] },
-    { name: 'chart_data', rows: [['monitoringItem', 'point', 'currentValue'], ...analysis.results.map((r) => [r.monitoringItem, r.point, String(r.currentValue ?? '')])] },
+    { name: 'chart_data', rows: [['monitoringItem', 'point', 'observationTimestamp', 'observationValue', 'unit', 'timestampUtc', 'timestampBasis', 'observationId', 'sourceRow', 'sourceFileHash'], ...dataset.observations.map(observation => ({ observation, time: monitoringTrendInstant(observation.timestamp) })).sort((a, b) => JSON.stringify([a.observation.monitoringItem, a.observation.unit || project.unit, a.observation.point]).localeCompare(JSON.stringify([b.observation.monitoringItem, b.observation.unit || project.unit, b.observation.point])) || a.time.instant - b.time.instant || a.observation.id.localeCompare(b.observation.id)).map(({ observation: o, time }) => [o.monitoringItem, o.point, o.timestamp, String(o.value), o.unit?.trim() ? o.unit : project.unit, new Date(time.instant).toISOString(), time.assumedUtc ? 'unzoned-as-UTC' : 'explicit-offset-to-UTC', o.id, String(o.sourceRow), dataset.sourceFileHash])] },
     ] : []),
     { name: 'survey_adjustments', rows: [['runId', 'networkId', 'resultId', 'strategyId', 'transformType', 'algorithmVersion', 'observationCount', 'unknownCount', 'redundancy', 'unitWeightStdDev', 'unitWeightStdDevUnit', 'varianceFactor', 'varianceFactorUnit', 'varianceFactorEstimated', 'maxPointStdDev', 'maxPointStdDevUnit', 'validation', 'inputHash'], ...adjustments.map((a) => [a.runId, a.networkId, a.id, a.strategyId ?? '', a.transformType ?? '', a.algorithmVersion, String(a.observationCount), String(a.unknownCount), String(a.redundancy), String(a.unitWeightStdDev), a.unitWeightStdDevUnit, String(a.varianceFactor), a.varianceFactorUnit, String(a.varianceFactorEstimated), String(a.precision.maxPointStdDev), a.linearUnit, a.validation, a.inputHash])] },
     { name: 'survey_sources', rows: [['networkId', 'sourceName', 'sha256', 'vendor', 'format', 'version', 'confidence', 'disposition', 'parserId', 'parserVersion', 'recordCount', 'originalPreserved', 'extension', 'extensionConflict', 'matchedSignatures', 'converterId', 'converterVersion', 'converterLicense', 'converterExecutableHash', 'converterInputHash', 'converterOutputHash', 'converterNetworkAccess', 'converterStatus'], ...surveySources.map(({ networkId, source }) => [networkId, source.name, source.sha256, source.detection.vendor, source.detection.format, source.detection.version ?? '', String(source.detection.confidence), source.disposition, source.parserId, source.parserVersion, String(source.recordCount), String(source.originalPreserved), source.detection.extension ?? '', String(source.detection.extensionConflict), source.detection.matchedSignatures.join(';'), source.converter?.id ?? '', source.converter?.version ?? '', source.converter?.origin === 'workwise-bundled' ? source.converter.license : '', source.converter?.executableHash ?? '', source.converter?.inputHash ?? '', source.converter?.outputHash ?? '', source.converter?.networkAccess ?? '', source.converter?.status ?? ''])] },
@@ -1300,6 +1750,7 @@ async function makeXlsx(project: RailwiseProjectV1, dataset: StoredDataset | und
     { name: 'survey_closures', rows: [['runId', 'closureKey', 'value', 'unit'], ...adjustments.flatMap((a) => Object.entries(a.closure).map(([key, value]) => [a.runId, key, String(value), a.closureUnits[key] ?? '']))] },
     { name: 'survey_parameters', rows: [['runId', 'parameterKey', 'value', 'unit'], ...adjustments.flatMap((a) => Object.entries(a.parameters).map(([key, value]) => [a.runId, key, String(value), a.parameterUnits[key] ?? '']))] },
     { name: 'survey_points', rows: [['runId', 'pointId', 'x', 'y', 'height', 'latitudeDeg', 'longitudeDeg', 'correctionX', 'correctionY', 'correctionHeight', 'standardError', 'linearUnit'], ...adjustments.flatMap((a) => a.points.map((point) => [a.runId, point.id, String(point.x ?? ''), String(point.y ?? ''), String(point.height ?? ''), String(point.latitude ?? ''), String(point.longitude ?? ''), String(point.correctionX ?? ''), String(point.correctionY ?? ''), String(point.correctionHeight ?? ''), String(point.standardError ?? ''), a.linearUnit]))] },
+    { name: 'survey_error_ellipses', rows: [['runId', 'pointId', 'algorithmVersion', 'coordinatePlane', 'semiMajor_m', 'semiMinor_m', 'orientation_rad', 'orientationConvention', 'varianceBasis', 'scale', 'Cxx_m2', 'Cxy_m2', 'Cyx_m2', 'Cyy_m2'], ...adjustments.flatMap((a) => a.points.flatMap((point) => point.xyErrorEllipse ? [[a.runId, point.id, point.xyErrorEllipse.algorithmVersion, point.xyErrorEllipse.coordinatePlane, String(point.xyErrorEllipse.semiMajor), String(point.xyErrorEllipse.semiMinor), point.xyErrorEllipse.orientationRad === null ? '' : String(point.xyErrorEllipse.orientationRad), point.xyErrorEllipse.orientationConvention, point.xyErrorEllipse.varianceBasis, point.xyErrorEllipse.scale, ...point.xyErrorEllipse.covarianceXY.map(String)]] : []))] },
     { name: 'survey_residuals', rows: [['runId', 'observationId', 'correction', 'residual', 'unit', 'standardizedResidual', 'standardizedResidualUnit', 'outlier', 'sourceRow', 'sourceRecordId'], ...adjustments.flatMap((a) => a.observations.map((o) => [a.runId, o.observationId, String(o.correction), String(o.residual), o.unit ?? '', String(o.standardizedResidual ?? ''), o.standardizedResidualUnit, String(o.outlier), String(o.sourceRow ?? ''), o.sourceRecordId ?? '']))] },
     { name: 'survey_displacements', rows: [['runId', 'pointId', 'dX', 'dY', 'dH', 'magnitude', 'unit', 'kind'], ...adjustments.flatMap((a) => a.displacements.map((d) => [a.runId, d.pointId, String(d.dX ?? ''), String(d.dY ?? ''), String(d.dH ?? ''), String(d.magnitude), a.linearUnit, d.kind]))] },
     { name: 'deformation_epochs', rows: [['comparisonId', 'adjustmentId', 'resultId', 'networkId', 'observationEpoch', 'inputHash', 'resultHash'], ...deformations.flatMap((comparison) => comparison.epochs.map((epoch) => [comparison.id, epoch.adjustmentId, epoch.resultId, epoch.networkId, epoch.observationEpoch, epoch.inputHash, epoch.resultHash]))] },

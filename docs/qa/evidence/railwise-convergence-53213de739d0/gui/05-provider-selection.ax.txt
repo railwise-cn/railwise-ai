@@ -1,0 +1,5 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 53213de739d0.
+0 菜单 Description: 合成验收专用, Secondary Actions: Cancel
+	1 文本 模型
+	2 deepseek-flash, Value: 1
+	3 deepseek-v4-pro, Value: 0

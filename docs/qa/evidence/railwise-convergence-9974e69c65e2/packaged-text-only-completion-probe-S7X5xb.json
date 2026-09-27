@@ -1,0 +1,62 @@
+{
+  "expectation": "reproduce",
+  "syntheticOnly": true,
+  "realModelUsed": false,
+  "checkedAt": "2026-09-20T07:03:31.778Z",
+  "sourceHead": "9974e69c65e2f76bf3318e713191b4125cb0e75e",
+  "packageVersion": "0.5.0",
+  "asarSha256": "ab3b385b6d6f422c609694ca36adb0512a6486b1ce005f3976acce4a7c97a0a5",
+  "sourceSha256": "3988e8c52489e897e675f3b1681dfee29f598e25851af51e2d2440c02dc34c1b",
+  "signatureVerifiedBeforeImports": true,
+  "fixture": "/private/tmp/railwise-survey-9974e69/completion-probe-S7X5xb",
+  "projectId": "project_42bbde42-eb6b-485d-ba1d-0322137dc875",
+  "networkId": "network_f13ffb62-69cf-47df-9d41-0928ecdd8ee6",
+  "threadId": "thr_74os2c6d",
+  "planId": "eplan_32a41a1b-906d-4a3d-b04a-6870d2170c09",
+  "steps": [
+    {
+      "id": "inspect-survey-network",
+      "tool": "survey_network_validate",
+      "receipt": null
+    },
+    {
+      "id": "adjust-survey-network",
+      "tool": "survey_calculator",
+      "receipt": null
+    },
+    {
+      "id": "review-survey-quality",
+      "tool": "survey_adjustment_read",
+      "receipt": null
+    },
+    {
+      "id": "prepare-survey-report",
+      "tool": "report_export",
+      "receipt": null
+    }
+  ],
+  "modelCalls": 1,
+  "unexpectedRequests": 0,
+  "taskStatus": "completed",
+  "turnStatus": "completed",
+  "taskAcceptance": {
+    "kind": "answer",
+    "requiredNodeKinds": [
+      "deliver"
+    ],
+    "requireFinalResponse": true,
+    "requireActionableArtifactCard": false
+  },
+  "taskError": null,
+  "stalledReason": null,
+  "waitingReason": null,
+  "rawPlanStatus": "started",
+  "projectedPlanStatus": "started",
+  "execution": null,
+  "toolCalls": 0,
+  "adjustmentCount": 0,
+  "finalResponse": "The approved survey work is complete. All observations have been processed and the results are ready.",
+  "assistantAnswers": [
+    "The approved survey work is complete. All observations have been processed and the results are ready."
+  ]
+}

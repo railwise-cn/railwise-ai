@@ -1,0 +1,277 @@
+{
+  "historicalSubnormalFinding": {
+    "provenance": "Pre-fix values transcribed from the original independent probe tool output; this is not a new execution of old code.",
+    "input": {
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "variance": "3 * Number.MIN_VALUE",
+      "C": "variance * I_2",
+      "y": [
+        "0",
+        "sqrt(variance)"
+      ],
+      "c": [
+        1,
+        0
+      ]
+    },
+    "preFixReturnedStatus": "resolved",
+    "preFixCovarianceDividedByVariance": [
+      [
+        0.3333333333333333,
+        -0.6666666666666666
+      ],
+      [
+        -0.6666666666666666,
+        0.6666666666666666
+      ]
+    ],
+    "exactCovarianceDividedByVariance": [
+      [
+        0.5,
+        -0.5
+      ],
+      [
+        -0.5,
+        0.5
+      ]
+    ],
+    "preFixScaledDeterminant": "-2/9",
+    "impact": "Returned covariance was indefinite although exact residual covariance is positive semidefinite. The w value itself was approximately correct.",
+    "fix": "Nonzero subnormal residual covariance entries or residual energy return numeric-range-or-backward-error, along with complete-underflow checks."
+  },
+  "finiteModelRefusedByBudget": {
+    "id": 60,
+    "request": {
+      "schemaVersion": 1,
+      "model": "fixed-linear-full-column-rank",
+      "purpose": "declared-model-readonly-diagnostic",
+      "residualConvention": "observed-minus-adjusted",
+      "observationUnit": "synthetic",
+      "observationIds": [
+        "o0",
+        "o1",
+        "o2",
+        "o3",
+        "o4"
+      ],
+      "parameterIds": [
+        "p0",
+        "p1",
+        "p2"
+      ],
+      "parameterUnits": [
+        "synthetic",
+        "synthetic",
+        "synthetic"
+      ],
+      "designMatrix": [
+        [
+          3,
+          -3,
+          1
+        ],
+        [
+          3,
+          -4,
+          0
+        ],
+        [
+          -4,
+          1,
+          -2
+        ],
+        [
+          2,
+          4,
+          1
+        ],
+        [
+          -1,
+          -1,
+          -1
+        ]
+      ],
+      "observations": [
+        -7,
+        18,
+        14,
+        10,
+        14
+      ],
+      "covariance": {
+        "kind": "known-apriori-absolute-observation-covariance",
+        "basisStatement": "Independent seed-20260920 exact integer SPD synthetic review only.",
+        "matrix": [
+          [
+            29,
+            9,
+            5,
+            -8,
+            8
+          ],
+          [
+            9,
+            19,
+            3,
+            6,
+            -18
+          ],
+          [
+            5,
+            3,
+            11,
+            7,
+            2
+          ],
+          [
+            -8,
+            6,
+            7,
+            32,
+            -11
+          ],
+          [
+            8,
+            -18,
+            2,
+            -11,
+            38
+          ]
+        ]
+      },
+      "family": {
+        "id": "case-60",
+        "alpha": 0.05,
+        "tail": "two-sided",
+        "declaration": "caller-declared-before-evaluation"
+      },
+      "biasDirections": [
+        {
+          "id": "c0",
+          "coefficients": [
+            4,
+            3,
+            -3,
+            -3,
+            0
+          ]
+        },
+        {
+          "id": "c1",
+          "coefficients": [
+            0,
+            -2,
+            1,
+            0,
+            5
+          ]
+        },
+        {
+          "id": "c2",
+          "coefficients": [
+            1,
+            4,
+            4,
+            5,
+            -4
+          ]
+        },
+        {
+          "id": "c3",
+          "coefficients": [
+            0,
+            -1,
+            -5,
+            -2,
+            3
+          ]
+        },
+        {
+          "id": "column-space",
+          "coefficients": [
+            3,
+            3,
+            -4,
+            2,
+            -1
+          ]
+        }
+      ]
+    },
+    "independentExactParameters": [
+      [
+        "15044622/1279097"
+      ],
+      [
+        "5138085/1279097"
+      ],
+      [
+        "-2175666/75241"
+      ]
+    ],
+    "independentDirections": {
+      "c0": {
+        "status": "available",
+        "w": "-0.07804813380200192645742574737399194945338766136671783163429133821941210"
+      },
+      "c1": {
+        "status": "available",
+        "w": "0.1586324795818111905305168924264150322102644911314593958782040304364059"
+      },
+      "c2": {
+        "status": "available",
+        "w": "-0.3571335488636823221918197032454441874430837105035428325782602648299901"
+      },
+      "c3": {
+        "status": "available",
+        "w": "0.3644347297087406369862018035391389838229028394325576536256436279890903"
+      },
+      "column-space": {
+        "status": "undetectable",
+        "w": null
+      }
+    },
+    "expectedSoftwareOutcome": "unavailable: numeric-range-or-backward-error",
+    "interpretation": "The exact model is nonsingular and has finite statistics. This is a conservative numerical policy refusal, not proof of mathematical non-identifiability."
+  },
+  "extremeMeanGrid": {
+    "shifts": [
+      1000000000000.0,
+      100000000000000.0,
+      1e+16
+    ],
+    "covarianceScales": [
+      1,
+      1e-20,
+      1e-32
+    ],
+    "baseObservations": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        11,
+        2
+      ]
+    ],
+    "otherInputs": "golden correlated-C model in fraction_oracle.py",
+    "expectedOutcome": "unavailable: numeric-range-or-backward-error",
+    "caseCount": 18
+  },
+  "trustBoundaries": [
+    "known full absolute a-priori C is a caller declaration",
+    "Gaussian distribution is a separate assumption, not implied by covariance alone",
+    "no tail probabilities, multiple comparisons, power/MDB, complete Baarda, observation deletion or engineering approval",
+    "result schema is not a replacement for source binding and strict recomputation in future persistence/API integration"
+  ]
+}

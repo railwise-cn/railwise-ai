@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "9cf70d71919e997e815a9e55ec4264e01572979c",
+  "workflowRunId": 35496644961,
+  "workflowUrl": "https://github.com/wangjiawei508/WorkWise/actions/runs/35496644961",
+  "conclusion": "success",
+  "provenance": "Fetched directly with explicit-repository gh run view --log, scanned before storage and copied without whitespace changes.",
+  "rawLog": {
+    "file": "CloudQuality.log",
+    "source": "/private/tmp/railwise-9cf70d7-quality.log",
+    "bytes": 1491887,
+    "sha256": "b64ac2c2a039eec510ec05fb739c3bd354df0b764aef6331641a3e2dddcfc566",
+    "originalBytesPreserved": true
+  },
+  "tests": {
+    "desktopPassed": 2786,
+    "desktopSkipped": 6,
+    "runtimePassed": 2807,
+    "runtimeSkipped": 22,
+    "windowsCoreSecurityPassed": 128,
+    "windowsPluginSecurityPassed": 104,
+    "windowsPersistencePassed": 58,
+    "windowsPersistenceSkipped": 2
+  }
+}

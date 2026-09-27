@@ -1,0 +1,59 @@
+import { it, expect, vi } from '<repository>/kun/node_modules/vitest/dist/index.js'
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { createKunServeRuntime } from '<repository>/kun/src/server/runtime-factory.ts'
+import { KunCapabilitiesConfig } from '<repository>/kun/src/contracts/capabilities.ts'
+import { AgentLoop } from '<repository>/kun/src/loop/agent-loop.ts'
+import { EngineeringAiRepository } from '<repository>/kun/src/engineering/engineering-ai-repository.ts'
+import { startLocalCompletionFixture, MOCK_ANSWER } from '/private/tmp/railwise-local-completion-fixture.mjs'
+
+it('real Runtime auto-retries mock text to incomplete-step stalled status without a guard rejection', async () => {
+  const root = await mkdtemp('/private/tmp/railwise-survey-mock-runtime-')
+  const workspace = join(root, 'workspace'), dataDir = join(root, 'home/.workwise/runtime')
+  await mkdir(workspace); await mkdir(join(root, 'evidence'))
+  const options = { host: '127.0.0.1', port: 0, dataDir, runtimeToken: 'synthetic-only', apiKey: '', baseUrl: 'http://127.0.0.1:1/v1', model: 'deepseek-flash', approvalPolicy: 'auto' as const, sandboxMode: 'workspace-write' as const, tokenEconomyMode: false, insecure: false, capabilities: KunCapabilitiesConfig.parse({}) }
+  let runtime = await createKunServeRuntime(options)
+  let fixture, repository
+  const runs = new Map()
+  const actual = AgentLoop.prototype.runTurn
+  const spy = vi.spyOn(AgentLoop.prototype, 'runTurn').mockImplementation(function (threadId, turnId) { const pending = actual.call(this, threadId, turnId); runs.set(turnId, pending); return pending })
+  try {
+    const project = runtime.engineeringService!.createProject({ name: '审批卡停止守卫自检（合成数据）', workspace, expectedRevision: 0, idempotencyKey: 'mock-project' })
+    const bytes = await readFile('<repository>/kun/src/engineering/fixtures/survey-formats/cosa-in2/golden-plane-control-e2e.in2')
+    const network = await runtime.surveyService!.importNetwork({ projectId: project.id, expectedRevision: 1, idempotencyKey: 'mock-network', networkType: 'plane-control', name: 'golden-plane-control-e2e.in2', dataBase64: bytes.toString('base64') })
+    const thread = await runtime.threadService.create({ workspace, model: 'deepseek-flash', mode: 'agent', domain: 'engineering', projectId: project.id })
+    await runtime.shutdown?.()
+    fixture = await startLocalCompletionFixture({ candidateRoot: root, projectId: project.id, networkId: network.id, threadId: thread.id })
+    runtime = await createKunServeRuntime({ ...options, apiKey: await readFile(fixture.tokenPath, 'utf8'), baseUrl: fixture.baseUrl })
+    const created = await runtime.engineeringAi!.createPlan({ threadId: thread.id, projectId: project.id, goal: 'RAILWISE-SYNTHETIC-ACCEPTANCE: 执行平面控制网校核、平差、精度检查和成果导出', idempotencyKey: 'mock-plan' })
+    const approved = runtime.engineeringAi!.approvePlan(created.plan.id, { expectedRevision: created.plan.revision, contextHash: created.plan.contextHash, stepIds: created.approval.stepIds, token: created.approval.token, idempotencyKey: 'mock-approval' })
+    const started = await runtime.engineeringAi!.startPlan(approved.id, { expectedRevision: approved.revision, contextHash: approved.contextHash, model: 'deepseek-flash', idempotencyKey: 'mock-start' })
+    expect(runs.has(started.turn.turnId)).toBe(true)
+    await runs.get(started.turn.turnId)
+    const task = runtime.taskRepository!.get(started.plan.taskId!)!
+    const turn = (await runtime.turnService.getTurn(thread.id, started.turn.turnId))!
+    expect(task.status).toBe('stalled')
+    expect(task.stalledReason).toContain('engineering_plan_steps_incomplete')
+    const texts = turn.items.filter(item => item.kind === 'assistant_text')
+    expect(texts.length).toBeGreaterThan(1)
+    expect(texts.every(item => item.text === MOCK_ANSWER)).toBe(true)
+    expect(turn.items.filter(item => item.kind === 'tool_call' || item.kind === 'tool_result')).toHaveLength(0)
+    expect(runtime.surveyService!.listAdjustments(project.id)).toHaveLength(0)
+    expect(runtime.engineeringAi!.getPlan(approved.id)?.execution.completedStepIds).toEqual([])
+    repository = new EngineeringAiRepository({ rootDir: join(dataDir, 'engineering') })
+    expect(started.plan.steps.every(step => repository.stepEvidence(approved.id, step.id) === null)).toBe(true)
+    const report = await fixture.stop('runtime-selfcheck-complete')
+    expect(report.events.every(event => event.accepted && !event.rejected)).toBe(true)
+    expect(report.requestCount).toBeGreaterThan(1)
+    expect(report.requestCount).toBeLessThanOrEqual(7)
+    expect(report.tokenRemoved).toBe(true)
+    await writeFile('/private/tmp/railwise-mock-runtime-selfcheck.json', JSON.stringify({ status: 'passed', checkedAt: new Date().toISOString(), syntheticOnly: true, modelRequestsToRealProvider: 0, credentialsRead: 'local synthetic mock token only', taskStatus: task.status, turnStatus: turn.status, stalledReason: task.stalledReason, taskAttempts: task.attempts, exactPersistedMockAssistantTexts: texts.length, actualMockRequests: report.requestCount, allGuardRequestsAccepted: true, toolCallCount: 0, toolResultCount: 0, successfulStepReceiptCount: 0, adjustmentCount: 0, tokenRemoved: report.tokenRemoved }, null, 2))
+  } finally {
+    await Promise.allSettled(runs.values())
+    repository?.close()
+    await runtime.shutdown?.()
+    await fixture?.stop('test-cleanup')
+    spy.mockRestore()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)

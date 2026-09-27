@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "scope": "source-discrepancy-audit-not-professional-acceptance",
+  "numpyVersion": "2.4.6",
+  "sourceCoverage": "GSI8-WI41-unit8-BFFB-331-332-336-335-final-WI83..08",
+  "hashes": {
+    "checkerSha256": "7fcc7c6f88ba563e80711b90690d7f1d8a6a3e6ddd9e274c44c02195db720dad",
+    "numericalCheckerSha256": "1728c87266881ff04ca97c3582b23451a7311578bc098847def399d705b371c0",
+    "sourceSha256": "05b5ecc571cb85152a4e36c4c362118b3c71e582e05cf68b5cf8feac877fdf40",
+    "referenceIn1Sha256": "f84252fc2990157ae7c1b01bfcce09035addaeac9ad24e56459c51017ad6b21b",
+    "knownPointsSha256": "dfef93712de67cef4bf48016c337d12169eb430ba9a2e8e8e1fe550479cc6750",
+    "actualEvidenceSha256": "158136d2639e300ed1edcca26d3fa04389beb442f8ce2d94ae92b6f1ae1e71ea",
+    "packageAsarSha256": "b8f0b7dfecadc9e1b4fa0077e3182fb3a02f01fd38b2c08337650f41fc4510ce"
+  },
+  "rawSourceToPackaged": {
+    "observationCount": 28,
+    "maximumHeightDifferenceMetres": 1e-16,
+    "maximumDistanceDifferenceMetres": 4e-14
+  },
+  "referenceConversion": {
+    "routeCount": 14,
+    "heightBeyondHalfPrintedUnitCount": 7,
+    "rawMeanBeyondHalfPrintedUnitCount": 2,
+    "distanceRoundedToPrintedUnitMatchCount": 14,
+    "maximumDistanceDifferenceMetres": 0.48629,
+    "heightConversionProvenance": "unresolved",
+    "routes": [
+      {
+        "referenceLine": 1,
+        "sourceFinalLines": [
+          7,
+          12
+        ],
+        "cumulativeHeightMinusReferenceMm": -0.01,
+        "rawReadingsMeanMinusReferenceMm": 0,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": -0.18402,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 2,
+        "sourceFinalLines": [
+          17,
+          22
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": 0,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": -0.19392,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 3,
+        "sourceFinalLines": [
+          29,
+          34
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": 0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.28589,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 4,
+        "sourceFinalLines": [
+          39,
+          44
+        ],
+        "cumulativeHeightMinusReferenceMm": -0.01,
+        "rawReadingsMeanMinusReferenceMm": -0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.28243,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 5,
+        "sourceFinalLines": [
+          51,
+          56
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": 0,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.06253,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 6,
+        "sourceFinalLines": [
+          61,
+          66
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": 0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.08638,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 7,
+        "sourceFinalLines": [
+          73,
+          78
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": 0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": -0.03533,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 8,
+        "sourceFinalLines": [
+          83,
+          88
+        ],
+        "cumulativeHeightMinusReferenceMm": 0.01,
+        "rawReadingsMeanMinusReferenceMm": 0,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": -0.06691,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 9,
+        "sourceFinalLines": [
+          95,
+          100
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": -0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.48629,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 10,
+        "sourceFinalLines": [
+          105,
+          110
+        ],
+        "cumulativeHeightMinusReferenceMm": 0.01,
+        "rawReadingsMeanMinusReferenceMm": 0.01,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.02159,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": true,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 11,
+        "sourceFinalLines": [
+          117,
+          122
+        ],
+        "cumulativeHeightMinusReferenceMm": -0.01,
+        "rawReadingsMeanMinusReferenceMm": -0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.01213,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 12,
+        "sourceFinalLines": [
+          129,
+          134
+        ],
+        "cumulativeHeightMinusReferenceMm": 0.02,
+        "rawReadingsMeanMinusReferenceMm": 0.01,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": -0.22721,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": true,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 13,
+        "sourceFinalLines": [
+          141,
+          146
+        ],
+        "cumulativeHeightMinusReferenceMm": 0,
+        "rawReadingsMeanMinusReferenceMm": 0,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.03945,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": false,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      },
+      {
+        "referenceLine": 14,
+        "sourceFinalLines": [
+          151,
+          156
+        ],
+        "cumulativeHeightMinusReferenceMm": -0.01,
+        "rawReadingsMeanMinusReferenceMm": -0.005,
+        "heightHalfPrintedUnitMm": 0.005,
+        "distanceMinusReferenceMetres": 0.39999,
+        "distanceHalfPrintedUnitMetres": 0.5,
+        "heightBeyondHalfPrintedUnit": true,
+        "rawMeanBeyondHalfPrintedUnit": false,
+        "distanceRoundedToPrintedUnitMatches": true
+      }
+    ]
+  },
+  "sameSourceIndependentAdjustment": {
+    "unknownPointCount": 21,
+    "degreesOfFreedom": 7,
+    "maximumVsPackagedMm": 1.7053025658242404e-10
+  },
+  "referenceInputVariants": {
+    "sameSourceReduced": {
+      "maximumVsPackagedMm": 1.0658141036401503e-11,
+      "maximumVsSameSourceReferenceMm": 0
+    },
+    "referenceBoth": {
+      "maximumVsPackagedMm": 0.02031550931747006,
+      "maximumVsSameSourceReferenceMm": 0.02031550931747006
+    },
+    "referenceHeightOnly": {
+      "maximumVsPackagedMm": 0.02017777466178927,
+      "maximumVsSameSourceReferenceMm": 0.02017777466178927
+    },
+    "referenceDistanceOnly": {
+      "maximumVsPackagedMm": 0.0007124150336323964,
+      "maximumVsSameSourceReferenceMm": 0.0007124150371851101
+    }
+  },
+  "selfCheck": "passed",
+  "interpretationBoundary": "Printed-unit comparisons are representation checks, not normative accuracy limits. No source/converter identity, correction policy, evidence authenticity or professional sign-off is inferred."
+}

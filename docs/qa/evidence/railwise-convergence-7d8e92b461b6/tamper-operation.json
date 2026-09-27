@@ -1,0 +1,8 @@
+{
+  "trialId": "advanced_trial_7b98cb57-c9cf-4040-a450-0b03e8479f7d",
+  "change": "append one ASCII space to declaration_bytes only",
+  "originalSha256": "154ba666bfb32e85bbae70b40335ab113fc1f6835903150c49e5227eb5414c81",
+  "tamperedSha256": "1f7b8ac4b3347aa075cae8ae6712d06300ace8ee3465312a559d323c293868a8",
+  "triggerRestored": true,
+  "candidateOnly": true
+}

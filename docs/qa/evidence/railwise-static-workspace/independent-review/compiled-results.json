@@ -1,0 +1,308 @@
+{
+  "node": "v26.8.2",
+  "passed": 2,
+  "results": [
+    {
+      "name": "calculated",
+      "outcome": "calculated",
+      "baseCount": 2,
+      "appendCount": 1,
+      "total": 3,
+      "result": {
+        "algorithmVersion": "declared-static-linear-append-1",
+        "status": "trial-only",
+        "modelAssumptions": "not-verified",
+        "sourceRecordsVerified": false,
+        "priorRuntimeStateVerified": false,
+        "formalResultsModified": false,
+        "originalObservationsModified": false,
+        "engineeringDecision": "not-evaluated",
+        "persistenceAndCrossRequestIdempotency": "not-implemented-pure-replay-only",
+        "computation": "replay-base-then-givens-append-with-householder-batch-check",
+        "request": {
+          "schemaVersion": 1,
+          "operation": "append-independent-observations-only",
+          "base": {
+            "schemaVersion": 1,
+            "model": "fixed-datum-full-column-rank-independent-linear-observations",
+            "covarianceBasis": "caller-declared-known-apriori-independent-absolute-variances",
+            "errorModel": "caller-declared-zero-mean-independent-errors-no-normality-claim",
+            "coefficientMeaning": "dimensionless-all-parameters-share-observation-unit",
+            "networkId": "independent-network",
+            "revision": 11,
+            "unit": "m",
+            "parameterIds": [
+              "parameter-0"
+            ],
+            "sourceAnchor": "independent-base",
+            "sourceSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "observations": [
+              {
+                "id": "obs-0",
+                "value": 0,
+                "coefficients": [
+                  1
+                ],
+                "aprioriVariance": 1,
+                "sourceAnchor": "independent-synthetic-row"
+              },
+              {
+                "id": "obs-1",
+                "value": 2,
+                "coefficients": [
+                  1
+                ],
+                "aprioriVariance": 1,
+                "sourceAnchor": "independent-synthetic-row"
+              }
+            ]
+          },
+          "expectedBaseFingerprint": "ba921feb7f583fbe699270f5c4c731e35f7ae24825e34403e7353656e0305e7f",
+          "append": {
+            "batchId": "independent-append",
+            "nextRevision": 12,
+            "sourceAnchor": "independent-append-source",
+            "observations": [
+              {
+                "id": "obs-2",
+                "value": 10,
+                "coefficients": [
+                  1
+                ],
+                "aprioriVariance": 1,
+                "sourceAnchor": "independent-synthetic-row"
+              }
+            ]
+          }
+        },
+        "requestSha256": "052aedad6a737878f5efe3862909e8e8bd2a6d606d60203b10a75dff6c33651c",
+        "computedBaseFingerprint": "ba921feb7f583fbe699270f5c4c731e35f7ae24825e34403e7353656e0305e7f",
+        "outcome": "calculated",
+        "finalFingerprint": "7237b14b046e2dfd09a2b58bf4247e6582d65507d5e3dc3e8855f5b0bbbe31f9",
+        "observationIds": [
+          "obs-0",
+          "obs-1",
+          "obs-2"
+        ],
+        "appendedObservationIds": [
+          "obs-2"
+        ],
+        "parameterIds": [
+          "parameter-0"
+        ],
+        "unit": "m",
+        "squaredUnit": "m2",
+        "residualConvention": "observed-minus-adjusted",
+        "baseFit": {
+          "parameters": [
+            0.9999999999999999
+          ],
+          "aprioriParameterCovariance": [
+            [
+              0.4999999999999999
+            ]
+          ],
+          "adjustedObservations": [
+            0.9999999999999999,
+            0.9999999999999999
+          ],
+          "residuals": [
+            -0.9999999999999999,
+            1
+          ],
+          "weightedResidualSumSquares": 1.9999999999999996,
+          "degreesOfFreedom": 1,
+          "posteriorVarianceFactorEstimate": 1.9999999999999996,
+          "posteriorEstimateUse": "diagnostic-only-not-applied-to-prior-covariance-or-weights"
+        },
+        "updatedFit": {
+          "parameters": [
+            4
+          ],
+          "aprioriParameterCovariance": [
+            [
+              0.3333333333333334
+            ]
+          ],
+          "adjustedObservations": [
+            4,
+            4,
+            4
+          ],
+          "residuals": [
+            -4,
+            -2,
+            6
+          ],
+          "weightedResidualSumSquares": 56.000000000000014,
+          "degreesOfFreedom": 2,
+          "posteriorVarianceFactorEstimate": 28.000000000000007,
+          "posteriorEstimateUse": "diagnostic-only-not-applied-to-prior-covariance-or-weights"
+        },
+        "baseQrState": {
+          "upper": [
+            [
+              1
+            ]
+          ],
+          "transformedRightHandSide": [
+            1.414213562373095
+          ],
+          "residualNorm": 1.414213562373095,
+          "columnScales": [
+            1.4142135623730951
+          ],
+          "stateSha256": "31a04900138d8d979978ab7031ec4124d190a9ed1c58532d892e16fcf8b07dd2"
+        },
+        "updatedQrState": {
+          "upper": [
+            [
+              1.224744871391589
+            ]
+          ],
+          "transformedRightHandSide": [
+            6.928203230275509
+          ],
+          "residualNorm": 7.4833147735478835,
+          "columnScales": [
+            1.4142135623730951
+          ],
+          "stateSha256": "28f651dc8fd7b815054374723f3f9eeb054a3dddd1078d2a552405c605925c2e"
+        },
+        "steps": [
+          {
+            "observationId": "obs-2",
+            "totalObservationCount": 3,
+            "rotationCosines": [
+              0.8164965809277261
+            ],
+            "rotationSines": [
+              0.5773502691896257
+            ],
+            "transformedResidual": 7.3484692283495345,
+            "accumulatedResidualNorm": 7.4833147735478835,
+            "stateSha256": "28f651dc8fd7b815054374723f3f9eeb054a3dddd1078d2a552405c605925c2e"
+          }
+        ],
+        "batchCheck": {
+          "method": "independent-from-scratch-householder-qr-same-declared-model",
+          "referenceFit": {
+            "parameters": [
+              3.9999999999999987
+            ],
+            "aprioriParameterCovariance": [
+              [
+                0.3333333333333334
+              ]
+            ],
+            "adjustedObservations": [
+              3.9999999999999987,
+              3.9999999999999987,
+              3.9999999999999987
+            ],
+            "residuals": [
+              -3.9999999999999987,
+              -1.9999999999999987,
+              6.000000000000002
+            ],
+            "weightedResidualSumSquares": 56.000000000000014,
+            "degreesOfFreedom": 2,
+            "posteriorVarianceFactorEstimate": 28.000000000000007,
+            "posteriorEstimateUse": "diagnostic-only-not-applied-to-prior-covariance-or-weights"
+          },
+          "maximumScaledParameterDifference": 2.262744060410906e-16,
+          "scaledSseDifference": 0,
+          "maximumScaledCovarianceDifference": 0,
+          "relativeTolerance": 1e-8,
+          "meaning": "software-consistency-check-not-certified-error-bound"
+        },
+        "numerical": {
+          "baseTriangularConditionInfinity": 1,
+          "updatedTriangularConditionInfinity": 1,
+          "weightedResidualBackwardDifference": 1.0372134252780275e-16,
+          "maximumWeightedObservationNorm": 10.19803902718557
+        }
+      }
+    },
+    {
+      "name": "stale",
+      "outcome": "unavailable",
+      "baseCount": 2,
+      "appendCount": 1,
+      "total": 3,
+      "result": {
+        "algorithmVersion": "declared-static-linear-append-1",
+        "status": "trial-only",
+        "modelAssumptions": "not-verified",
+        "sourceRecordsVerified": false,
+        "priorRuntimeStateVerified": false,
+        "formalResultsModified": false,
+        "originalObservationsModified": false,
+        "engineeringDecision": "not-evaluated",
+        "persistenceAndCrossRequestIdempotency": "not-implemented-pure-replay-only",
+        "computation": "replay-base-then-givens-append-with-householder-batch-check",
+        "request": {
+          "schemaVersion": 1,
+          "operation": "append-independent-observations-only",
+          "base": {
+            "schemaVersion": 1,
+            "model": "fixed-datum-full-column-rank-independent-linear-observations",
+            "covarianceBasis": "caller-declared-known-apriori-independent-absolute-variances",
+            "errorModel": "caller-declared-zero-mean-independent-errors-no-normality-claim",
+            "coefficientMeaning": "dimensionless-all-parameters-share-observation-unit",
+            "networkId": "independent-network",
+            "revision": 11,
+            "unit": "m",
+            "parameterIds": [
+              "parameter-0"
+            ],
+            "sourceAnchor": "independent-base",
+            "sourceSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "observations": [
+              {
+                "id": "obs-0",
+                "value": 1,
+                "coefficients": [
+                  1
+                ],
+                "aprioriVariance": 1,
+                "sourceAnchor": "independent-synthetic-row"
+              },
+              {
+                "id": "obs-1",
+                "value": 2,
+                "coefficients": [
+                  1
+                ],
+                "aprioriVariance": 1,
+                "sourceAnchor": "independent-synthetic-row"
+              }
+            ]
+          },
+          "expectedBaseFingerprint": "ba921feb7f583fbe699270f5c4c731e35f7ae24825e34403e7353656e0305e7f",
+          "append": {
+            "batchId": "independent-append",
+            "nextRevision": 12,
+            "sourceAnchor": "independent-append-source",
+            "observations": [
+              {
+                "id": "obs-2",
+                "value": 10,
+                "coefficients": [
+                  1
+                ],
+                "aprioriVariance": 1,
+                "sourceAnchor": "independent-synthetic-row"
+              }
+            ]
+          }
+        },
+        "requestSha256": "e928d5d49c8d1933f2b0b9588a24b7be7ac9c0f43a2dccc0165bc97006aed3ff",
+        "computedBaseFingerprint": "6b51b86c468437cfc09067ab7d07c2d9bca8fda452bbcc04e952bf2e980baeaf",
+        "outcome": "unavailable",
+        "code": "base-fingerprint-mismatch",
+        "message": "Existing model, observations, weights, identity or revision differ from the declared base fingerprint"
+      }
+    }
+  ]
+}

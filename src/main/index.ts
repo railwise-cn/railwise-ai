@@ -1,3 +1,4 @@
+import brand from '../shared/product-brand.json'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, shell, Tray, type MessageBoxOptions } from 'electron'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, openAsBlob } from 'node:fs'
@@ -11,7 +12,10 @@ import {
 import { applySettingsApplicationTransaction } from './settings-application-transaction'
 import workwiseLogoPng from '../asset/img/workwise.png?url'
 import workwiseDockPng from '../asset/img/workwise_dock.png?url'
+import workwiseDockDarkPng from '../asset/img/workwise_dock_dark.png?url'
+import workwiseLightPng from '../asset/img/workwise-light.png?url'
 import workwiseTrayPng from '../asset/img/workwise_tray.png?url'
+import workwiseSymbolPng from '../asset/img/workwise-symbol.png?url'
 import { createAppIcon, pickTrayIcon } from './app-icon'
 import { configureChromiumUserDataPath, configureLinuxWaylandImeSwitches } from './app-command-line'
 import { configureAppIdentity } from './app-identity'
@@ -392,6 +396,7 @@ function refreshWindowAppearance(): void {
   if (!appearanceChanged && dark === currentWindowDark) return
   currentWindowAppearance = next
   currentWindowDark = dark
+  refreshDockIcon()
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     try {
@@ -521,7 +526,17 @@ function installDevPreviewWebviewGuards(): void {
 
 const appIcon = createAppIcon(workwiseLogoPng)
 const dockIcon = createAppIcon(workwiseDockPng)
+const dockDarkIcon = createAppIcon(workwiseDockDarkPng)
+const lightIcon = createAppIcon(workwiseLightPng)
 const trayIcon = createAppIcon(workwiseTrayPng)
+const splashIcon = createAppIcon(workwiseSymbolPng)
+function refreshDockIcon(): void {
+  if (process.platform !== 'darwin') return
+  const selected = nativeTheme.shouldUseDarkColors ? dockDarkIcon : dockIcon
+  const fallback = nativeTheme.shouldUseDarkColors ? appIcon : lightIcon
+  const icon = selected.isEmpty() ? fallback : selected
+  if (!icon.isEmpty()) app.dock?.setIcon(icon)
+}
 traceStartup('app icon loaded', { source: workwiseLogoPng.startsWith('data:') ? 'data-url' : 'path' })
 const guiUpdaterAcceptanceLaunch = isGuiUpdaterAcceptanceLaunch(process.argv, app.getPath('userData'))
 const gotSingleInstanceLock = runningClawScheduleMcpServer ||
@@ -540,15 +555,15 @@ if (!gotSingleInstanceLock) app.quit()
 function trayLabels(locale: AppSettingsV1['locale']): { show: string; quit: string; tooltip: string } {
   if (locale === 'zh') {
     return {
-      show: '显示 WorkWise Runtime',
+      show: `显示 ${brand.platform}`,
       quit: '退出',
-      tooltip: 'WorkWise Runtime'
+      tooltip: brand.platform
     }
   }
   return {
-    show: 'Show WorkWise Runtime',
+    show: `Show ${brand.platform}`,
     quit: 'Quit',
-    tooltip: 'WorkWise Runtime'
+    tooltip: brand.platform
   }
 }
 
@@ -601,7 +616,7 @@ function showAboutDialog(): void {
   const options: MessageBoxOptions = {
     type: 'info',
     title: labels.app.about,
-    message: 'WorkWise',
+    message: brand.platform,
     detail: currentLocale === 'zh'
       ? `智能工作台\n版本 ${app.getVersion()}`
       : `AI workbench\nVersion ${app.getVersion()}`,
@@ -626,7 +641,7 @@ function checkForUpdatesFromMenu(): void {
 function showGuiUpdateAvailableNotification(info: Extract<GuiUpdateState, { status: 'available' }>['info']): void {
   if (!Notification.isSupported()) return
   const notification = new Notification({
-    title: currentLocale === 'zh' ? 'WorkWise 有新版本' : 'A WorkWise update is available',
+    title: currentLocale === 'zh' ? `${brand.platform} 有新版本` : `A ${brand.platform} update is available`,
     body: currentLocale === 'zh'
       ? `版本 ${info.latestVersion} 已发布，点击查看更新。`
       : `Version ${info.latestVersion} is available. Click to view the update.`,
@@ -718,8 +733,8 @@ async function showTurnCompleteNotification(
     return { ok: true, shown: false, reason: 'unsupported' }
   }
 
-  const title = normalizeNotificationText(payload.title, 'WorkWise Runtime', 80)
-  const body = normalizeNotificationText(payload.body, 'Conversation complete.', 180)
+  const title = normalizeNotificationText(payload.title, `${brand.platform} Runtime`, 80)
+  const body = normalizeNotificationText(payload.body, settings.locale === 'zh' ? '会话已完成。' : 'Conversation complete.', 180)
 
   try {
     const notification = new Notification({
@@ -935,7 +950,9 @@ async function ensureManagedRuntime(settings: AppSettingsV1): Promise<void> {
   if (!runtime.autoStart) {
     throw runtimeJsonError(
       'runtime_offline',
-      'WorkWise Runtime is offline. Enable automatic startup in Settings, or start the bundled runtime manually.'
+      settings.locale === 'zh'
+        ? `${brand.platform} Runtime 未连接。请在设置中启用自动启动，或手动启动内置 Runtime。`
+        : `${brand.platform} Runtime is offline. Enable automatic startup in Settings, or start the bundled runtime manually.`
     )
   }
 
@@ -1078,6 +1095,7 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
  * structurally while still surviving future field additions.
  */
 function managedRuntimeConfigChanged(prev: AppSettingsV1, next: AppSettingsV1): boolean {
+  if (!stableSettingsValueEqual(prev.provider, next.provider)) return true
   const a = resolveManagedRuntimeSettings(prev)
   const b = resolveManagedRuntimeSettings(next)
   const keys = new Set([...Object.keys(a), ...Object.keys(b)] as Array<keyof typeof a>)
@@ -1235,10 +1253,7 @@ app.whenReady().then(async () => {
   installDevPreviewWebviewGuards()
   traceStartup('install webview guards:done')
 
-  if (process.platform === 'darwin') {
-    const dockSource = dockIcon.isEmpty() ? appIcon : dockIcon
-    if (!dockSource.isEmpty()) app.dock?.setIcon(dockSource)
-  }
+  refreshDockIcon()
 
   store = new JsonSettingsStore(app.getPath('userData'), {
     workwiseHome: candidateRuntimePaths?.workwiseHome
@@ -1277,7 +1292,7 @@ app.whenReady().then(async () => {
       dark: currentWindowDark,
       version: app.getVersion(),
       locale: initial.locale,
-      logoDataUrl: appIcon.isEmpty() ? undefined : appIcon.toDataURL()
+      logoDataUrl: splashIcon.isEmpty() ? undefined : splashIcon.toDataURL()
     })
   }
   nativeTheme.on('updated', refreshWindowAppearance)

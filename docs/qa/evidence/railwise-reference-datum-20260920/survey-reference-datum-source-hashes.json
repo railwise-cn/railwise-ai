@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "sourceHashes": {
+    "kun/src/contracts/survey-reference-datum.ts": "bf1cc1bd8f106cac5a597af7cc8bf42ca404a0578f326ceb102c6eb7ccdd02d5",
+    "kun/src/engineering/survey-reference-datum.ts": "f1a97a2c5b9e96db0206fee9ea979cb38ec89818dc06545a6946533ad3e2d1e4",
+    "kun/src/engineering/survey-reference-datum.test.ts": "2e2916d44610c29bf9f454f45174a37de9d21bcfd462d370552e8219b76edf48"
+  }
+}

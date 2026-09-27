@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "status": "independent-oracle-generated",
+  "syntheticOnly": true,
+  "sourceFileSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+  "sourceFileBytes": 141,
+  "numpyVersion": "2.4.6",
+  "method": "Independently parsed CSV and Decimal compact D.MMSS; two-distance circle intersection for initial geometry; analytical direction/distance derivatives; NumPy LAPACK least squares for weighted Gauss-Newton corrections. No product parser or solver imported.",
+  "coordinateConvention": "X north, Y east; azimuth=atan2(deltaY,deltaX) clockwise from north; predicted direction=azimuth-station orientation modulo 2pi.",
+  "fixedControls": {
+    "A": [
+      50.0,
+      150.0
+    ],
+    "B": [
+      150.0,
+      50.0
+    ],
+    "C": [
+      120.710678,
+      120.710678
+    ]
+  },
+  "stationId": "S1",
+  "header": {
+    "directionSigmaArcsec": 1.0,
+    "distanceConstantSigmaMm": 1.0,
+    "distanceScaleSigmaPpm": 1.0
+  },
+  "weightModels": {
+    "rss": "Independent diagonal observations; angle sigma=header arcsec*pi/648000; distance sigma=sqrt((constant_mm/1000)^2+(ppm*observed_m/1e6)^2). Treat the backsight zero as one observed direction, with a shared unknown station orientation.",
+    "additive": "Alternative declared instrument-spec combination, same angle model; distance sigma=constant_mm/1000+ppm*observed_m/1e6. Provided because the fixture header description does not prescribe how constant and ppm components combine."
+  },
+  "tolerancesDeclaredBeforeProductComparison": {
+    "stationCoordinateAbsoluteM": 2e-06,
+    "linearResidualAbsoluteM": 2e-06,
+    "angularResidualAbsoluteRad": 2e-08,
+    "countAndDegreesOfFreedom": "exact",
+    "precisionAndCovariance": "not an acceptance comparison unless product weighting semantics are independently established identical"
+  },
+  "analyticInitialCandidates": [
+    {
+      "mixedResidualNormForSelectionOnly": 2.9064361662512297e-09,
+      "parameters": [
+        50.000000000000014,
+        49.9999997626905,
+        1.5707963267948968
+      ]
+    },
+    {
+      "mixedResidualNormForSelectionOnly": 2.700717767644653,
+      "parameters": [
+        220.71067800000003,
+        120.71067823730951,
+        2.9716741994220763
+      ]
+    }
+  ],
+  "selfchecks": {
+    "compactDmsChecksPassed": true,
+    "invalidDmsRejected": 4,
+    "analyticalJacobianMaxDifferenceFromCentralDifference": 3.78578279836006e-11,
+    "idealUnroundedGeometryRecovers50_50": true,
+    "independentInitializations": 4,
+    "solutionSpread": [
+      7.815970093361102e-14,
+      1.1368683772161603e-13,
+      6.661338147750939e-16
+    ]
+  },
+  "solutions": {
+    "rss": {
+      "station": {
+        "id": "S1",
+        "xNorthM": 49.99999999284108,
+        "yEastM": 49.99999996371023,
+        "orientationRad": 1.5707963269606615
+      },
+      "observations": [
+        {
+          "line": 6,
+          "target": "A",
+          "kind": "L",
+          "sourceToken": "0",
+          "observed": 0.0,
+          "unit": "rad",
+          "sigma": 4.84813681109536e-06,
+          "adjustedMinusObserved": -2.3735413634540237e-10,
+          "observedMinusAdjusted": 2.3735413634540237e-10,
+          "adjusted": 6.283185306942232
+        },
+        {
+          "line": 7,
+          "target": "B",
+          "kind": "L",
+          "sourceToken": "270.00000",
+          "observed": 4.71238898038469,
+          "unit": "rad",
+          "sigma": 4.84813681109536e-06,
+          "adjustedMinusObserved": 1.9713322153864204e-10,
+          "observedMinusAdjusted": -1.9713322153864204e-10,
+          "adjusted": 4.712388980581823
+        },
+        {
+          "line": 8,
+          "target": "B",
+          "kind": "S",
+          "sourceToken": "100.000",
+          "observed": 100.0,
+          "unit": "m",
+          "sigma": 0.001004987562112089,
+          "adjustedMinusObserved": 7.158917014749022e-09,
+          "observedMinusAdjusted": -7.158917014749022e-09,
+          "adjusted": 100.00000000715892
+        },
+        {
+          "line": 9,
+          "target": "C",
+          "kind": "L",
+          "sourceToken": "315.00000",
+          "observed": 5.497787143782138,
+          "unit": "rad",
+          "sigma": 4.84813681109536e-06,
+          "adjustedMinusObserved": 4.022140466548e-11,
+          "observedMinusAdjusted": -4.022140466548e-11,
+          "adjusted": 5.497787143822359
+        },
+        {
+          "line": 10,
+          "target": "C",
+          "kind": "S",
+          "sourceToken": "100.000",
+          "observed": 100.0,
+          "unit": "m",
+          "sigma": 0.001004987562112089,
+          "adjustedMinusObserved": -1.3708029200643068e-07,
+          "observedMinusAdjusted": 1.3708029200643068e-07,
+          "adjusted": 99.99999986291971
+        }
+      ],
+      "observationCount": 5,
+      "unknownParameterCount": 3,
+      "rank": 3,
+      "degreesOfFreedom": 2,
+      "weightedSumSquares": 2.2774763587619407e-08,
+      "unitWeightStdDev": 0.00010671167599569273,
+      "aprioriCovariance": [
+        [
+          6.87208443807309e-07,
+          -6.262705982801707e-07,
+          7.474163269919943e-09
+        ],
+        [
+          -6.262705982801707e-07,
+          9.35172124364301e-07,
+          -8.885164872430941e-09
+        ],
+        [
+          7.474163269919945e-09,
+          -8.885164872430943e-09,
+          1.0092521025674851e-10
+        ]
+      ],
+      "covarianceParameterUnits": [
+        "m",
+        "m",
+        "rad"
+      ],
+      "posteriorCovariance": [
+        [
+          7.82550492156365e-15,
+          -7.131582408853926e-15,
+          8.511115074384756e-17
+        ],
+        [
+          -7.131582408853926e-15,
+          1.0649162023064386e-14,
+          -1.0117876470331762e-16
+        ],
+        [
+          8.511115074384758e-17,
+          -1.0117876470331763e-16,
+          1.1492739018141144e-18
+        ]
+      ],
+      "iterations": [
+        {
+          "iteration": 0,
+          "weightedSumSquares": 3.5939484575206704e-07,
+          "coordinateStepM": 2.0101982354093705e-07,
+          "orientationStepRad": 1.6576384282119944e-10
+        },
+        {
+          "iteration": 1,
+          "weightedSumSquares": 2.2774758302068585e-08,
+          "coordinateStepM": 1.0341686644990614e-13,
+          "orientationStepRad": 9.803750144505354e-16
+        }
+      ]
+    },
+    "additive": {
+      "station": {
+        "id": "S1",
+        "xNorthM": 49.99999999305661,
+        "yEastM": 49.99999996947311,
+        "orientationRad": 1.5707963269290952
+      },
+      "observations": [
+        {
+          "line": 6,
+          "target": "A",
+          "kind": "L",
+          "sourceToken": "0",
+          "observed": 0.0,
+          "unit": "rad",
+          "sigma": 4.84813681109536e-06,
+          "adjustedMinusObserved": -2.0363244424004279e-10,
+          "observedMinusAdjusted": 2.0363244424004279e-10,
+          "adjusted": 6.283185306975954
+        },
+        {
+          "line": 7,
+          "target": "B",
+          "kind": "L",
+          "sourceToken": "270.00000",
+          "observed": 4.71238898038469,
+          "unit": "rad",
+          "sigma": 4.84813681109536e-06,
+          "adjustedMinusObserved": 1.7107051399096156e-10,
+          "observedMinusAdjusted": -1.7107051399096156e-10,
+          "adjusted": 4.71238898055576
+        },
+        {
+          "line": 8,
+          "target": "B",
+          "kind": "S",
+          "sourceToken": "100.000",
+          "observed": 100.0,
+          "unit": "m",
+          "sigma": 0.0011,
+          "adjustedMinusObserved": 6.943395192138269e-09,
+          "observedMinusAdjusted": -6.943395192138269e-09,
+          "adjusted": 100.0000000069434
+        },
+        {
+          "line": 9,
+          "target": "C",
+          "kind": "L",
+          "sourceToken": "315.00000",
+          "observed": 5.497787143782138,
+          "unit": "rad",
+          "sigma": 4.84813681109536e-06,
+          "adjustedMinusObserved": 3.256175397398612e-11,
+          "observedMinusAdjusted": -3.256175397398612e-11,
+          "adjusted": 5.4977871438146995
+        },
+        {
+          "line": 10,
+          "target": "C",
+          "kind": "S",
+          "sourceToken": "100.000",
+          "observed": 100.0,
+          "unit": "m",
+          "sigma": 0.0011,
+          "adjustedMinusObserved": -1.413076660128354e-07,
+          "observedMinusAdjusted": 1.413076660128354e-07,
+          "adjusted": 99.99999985869233
+        }
+      ],
+      "observationCount": 5,
+      "unknownParameterCount": 3,
+      "rank": 3,
+      "degreesOfFreedom": 2,
+      "weightedSumSquares": 1.9596588491867808e-08,
+      "unitWeightStdDev": 9.89863336321429e-05,
+      "aprioriCovariance": [
+        [
+          7.746853626704369e-07,
+          -7.038790720558964e-07,
+          8.413557914761011e-09
+        ],
+        [
+          -7.038790720558965e-07,
+          1.01518189867874e-06,
+          -9.78206880698399e-09
+        ],
+        [
+          8.41355791476101e-09,
+          -9.782068806983992e-09,
+          1.1137440278853151e-10
+        ]
+      ],
+      "covarianceParameterUnits": [
+        "m",
+        "m",
+        "rad"
+      ],
+      "posteriorCovariance": [
+        [
+          7.59059513146296e-15,
+          -6.896814261558586e-15,
+          8.243851610403448e-17
+        ],
+        [
+          -6.8968142615585866e-15,
+          9.947050956400154e-15,
+          -9.584758850480077e-17
+        ],
+        [
+          8.243851610403446e-17,
+          -9.584758850480078e-17,
+          1.0912791699871933e-18
+        ]
+      ],
+      "iterations": [
+        {
+          "iteration": 0,
+          "weightedSumSquares": 3.5939484575206694e-07,
+          "coordinateStepM": 2.0678265747537348e-07,
+          "orientationStepRad": 1.3419798215236661e-10
+        },
+        {
+          "iteration": 1,
+          "weightedSumSquares": 1.959658967246986e-08,
+          "coordinateStepM": 6.26290636545738e-14,
+          "orientationStepRad": 4.873107402827023e-16
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Synthetic parser fixture only, not real field-data validation or professional approval.",
+    "Control coordinates are treated as exact. Their printed rounding creates small nonzero misclosures.",
+    "The independent direction model treats three directions as independent observations; correlated direction-difference interpretation would require a different declared covariance.",
+    "Two distance-weight alternatives are explicit and not inferred from product output.",
+    "Tolerance gates validate geometry/residual consistency for this near-exact fixture; they do not establish precision equivalence, robust statistics, production performance, or release readiness."
+  ]
+}

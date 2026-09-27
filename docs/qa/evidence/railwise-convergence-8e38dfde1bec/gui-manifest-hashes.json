@@ -1,0 +1,57 @@
+{
+  "sourceHead": "8e38dfde1bec35433f06ff5f7d690554011a0ba5",
+  "guiManifests": [
+    {
+      "projectId": "project_49b8c337-c1cf-4a9b-9271-2842495108c6",
+      "manifestId": "manifest_24fa8147-40bc-44b4-a784-5e4925e8bdce",
+      "reviewStatus": "draft",
+      "adjustments": 1,
+      "outputs": [
+        {
+          "format": ".docx",
+          "sha256": "678302f8dfcf4c3a5b57fa52e8fc46d34ea0943c164b6b507423e3b09c5cf307",
+          "sizeBytes": 24833,
+          "matches": true
+        },
+        {
+          "format": ".pdf",
+          "sha256": "8df8d8cf08fd815dca0308d600aba3c53b45aaacad32536346af7166b5d1335b",
+          "sizeBytes": 49005,
+          "matches": true
+        },
+        {
+          "format": ".xlsx",
+          "sha256": "cf5c7de2b5b072316e02ac82a9fc66a55bb8282ae2c4fbb39b6e147f5d92424f",
+          "sizeBytes": 293803,
+          "matches": true
+        }
+      ]
+    },
+    {
+      "projectId": "project_e64faedb-ec63-4515-9c60-134adb1f6c04",
+      "manifestId": "manifest_985a521c-9ecf-4acf-b9ba-8252cc9ec251",
+      "reviewStatus": "draft",
+      "adjustments": 1,
+      "outputs": [
+        {
+          "format": ".docx",
+          "sha256": "98461ff572225d456852b20f91f1f96d722da6fdc088ee8c3a4d0c34d2027fe2",
+          "sizeBytes": 10078,
+          "matches": true
+        },
+        {
+          "format": ".pdf",
+          "sha256": "e2ec05b985f22c6eaf3e2be57533054baea1d6882cc5e0b0b79e32888d331117",
+          "sizeBytes": 37698,
+          "matches": true
+        },
+        {
+          "format": ".xlsx",
+          "sha256": "c52ffd173fe0b824cf6920438a2437d04b80c1bf1f5b13393dffa6de077f7128",
+          "sizeBytes": 155659,
+          "matches": true
+        }
+      ]
+    }
+  ]
+}

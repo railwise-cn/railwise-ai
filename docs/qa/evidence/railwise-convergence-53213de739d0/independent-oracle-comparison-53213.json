@@ -1,0 +1,148 @@
+{
+  "status": "passed",
+  "countsExact": {
+    "observations": 5,
+    "unknownParameters": 3,
+    "rank": 3,
+    "degreesOfFreedom": 2
+  },
+  "fixedControlsUnchanged": true,
+  "declaredWeightModelsComparedSeparately": {
+    "rss": {
+      "coordinateAbsoluteDifferenceM": [
+        9.947598300641403e-14,
+        6.394884621840902e-14
+      ],
+      "orientationDifferenceRad": 8.881784197001252e-16,
+      "residuals": [
+        {
+          "sourceRow": 6,
+          "unit": "rad",
+          "actualResidual": -2.3735413634540237e-10,
+          "oracleAdjustedMinusObserved": -2.3735413634540237e-10,
+          "absoluteDifference": 0.0,
+          "declaredTolerance": 2e-08
+        },
+        {
+          "sourceRow": 7,
+          "unit": "rad",
+          "actualResidual": 1.971329766092822e-10,
+          "oracleAdjustedMinusObserved": 1.9713322153864204e-10,
+          "absoluteDifference": 2.449293598412338e-16,
+          "declaredTolerance": 2e-08
+        },
+        {
+          "sourceRow": 8,
+          "unit": "m",
+          "actualResidual": 7.159016490732029e-09,
+          "oracleAdjustedMinusObserved": 7.158917014749022e-09,
+          "absoluteDifference": 9.947598300641403e-14,
+          "declaredTolerance": 2e-06
+        },
+        {
+          "sourceRow": 9,
+          "unit": "rad",
+          "actualResidual": 4.022115973612017e-11,
+          "oracleAdjustedMinusObserved": 4.022140466548e-11,
+          "absoluteDifference": 2.449293598283091e-16,
+          "declaredTolerance": 2e-08
+        },
+        {
+          "sourceRow": 10,
+          "unit": "m",
+          "actualResidual": -1.3708027779557597e-07,
+          "oracleAdjustedMinusObserved": -1.3708029200643068e-07,
+          "absoluteDifference": 1.4210854715202004e-14,
+          "declaredTolerance": 2e-06
+        }
+      ]
+    },
+    "additive": {
+      "coordinateAbsoluteDifferenceM": [
+        2.156284040211176e-10,
+        5.762814225818147e-09
+      ],
+      "orientationDifferenceRad": 3.15654169469326e-11,
+      "residuals": [
+        {
+          "sourceRow": 6,
+          "unit": "rad",
+          "actualResidual": -2.3735413634540237e-10,
+          "oracleAdjustedMinusObserved": -2.0363244424004279e-10,
+          "absoluteDifference": 3.372169210535958e-11,
+          "declaredTolerance": 2e-08
+        },
+        {
+          "sourceRow": 7,
+          "unit": "rad",
+          "actualResidual": 1.971329766092822e-10,
+          "oracleAdjustedMinusObserved": 1.7107051399096156e-10,
+          "absoluteDifference": 2.6062462618320634e-11,
+          "declaredTolerance": 2e-08
+        },
+        {
+          "sourceRow": 8,
+          "unit": "m",
+          "actualResidual": 7.159016490732029e-09,
+          "oracleAdjustedMinusObserved": 6.943395192138269e-09,
+          "absoluteDifference": 2.1562129859376e-10,
+          "declaredTolerance": 2e-06
+        },
+        {
+          "sourceRow": 9,
+          "unit": "rad",
+          "actualResidual": 4.022115973612017e-11,
+          "oracleAdjustedMinusObserved": 3.256175397398612e-11,
+          "absoluteDifference": 7.659405762134052e-12,
+          "declaredTolerance": 2e-08
+        },
+        {
+          "sourceRow": 10,
+          "unit": "m",
+          "actualResidual": -1.3708027779557597e-07,
+          "oracleAdjustedMinusObserved": -1.413076660128354e-07,
+          "absoluteDifference": 4.227388217259431e-09,
+          "declaredTolerance": 2e-06
+        }
+      ]
+    }
+  },
+  "residualReconstruction": [
+    {
+      "sourceRow": 6,
+      "unit": "rad",
+      "absoluteDifference": 0.0,
+      "floatingPointConsistencyTolerance": 1e-13
+    },
+    {
+      "sourceRow": 7,
+      "unit": "rad",
+      "absoluteDifference": 2.449293598412338e-16,
+      "floatingPointConsistencyTolerance": 1e-13
+    },
+    {
+      "sourceRow": 8,
+      "unit": "m",
+      "absoluteDifference": 0.0,
+      "floatingPointConsistencyTolerance": 1e-10
+    },
+    {
+      "sourceRow": 9,
+      "unit": "rad",
+      "absoluteDifference": 2.449293598283091e-16,
+      "floatingPointConsistencyTolerance": 1e-13
+    },
+    {
+      "sourceRow": 10,
+      "unit": "m",
+      "absoluteDifference": 0.0,
+      "floatingPointConsistencyTolerance": 1e-10
+    }
+  ],
+  "precisionOrCovarianceEquivalenceClaimed": false,
+  "oracleSha256": "3c012ae8e25133b2dce1c89851a329f52378c0798b31e32508151993c5f9cfa3",
+  "selectedResultSha256": "d3d2fd37a56eb5ef1b646c2b06f69c1ee5e2e377df511f1231fc521a2ad9fcc5",
+  "syntheticOnly": true,
+  "modelRequests": 0,
+  "professionalAcceptance": false
+}

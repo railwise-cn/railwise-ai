@@ -1,0 +1,9 @@
+{
+  "method": "NumPy eigh on exported XY covariance; checks eigendecomposition only, not independent network adjustment",
+  "compiledSource": "8e38dfde1bec35433f06ff5f7d690554011a0ba5",
+  "scope": "compiled Runtime copy; not packaged acceptance",
+  "pointCount": 31,
+  "maximumRelativeAxisDifference": 1.7763568394002505e-15,
+  "maximumAxisDirectionDifference": 1.1102230246251565e-16,
+  "passed": true
+}

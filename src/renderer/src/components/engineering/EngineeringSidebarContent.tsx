@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { Bot, Database, FolderKanban, HardHat, MessageSquareText, Plus, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { engineeringTaskLabel } from './engineering-task-types'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
 import type { NormalizedThread } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
@@ -15,6 +16,7 @@ import {
 type EngineeringProject = {
   id: string
   name: string
+  taskType?: string
   monitoringType: string
   unit: string
   workspace: string
@@ -214,7 +216,7 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] font-medium">{project.name}</span>
                   <span className="mt-0.5 block truncate text-[10.5px] text-ds-faint">
-                    {project.monitoringType} · {project.unit} · {formatUpdatedAt(project.updatedAt, i18n.language, t('engineeringNotSynced'))}
+                    {engineeringTaskLabel(project.taskType ?? project.monitoringType, t)} · {project.unit} · {formatUpdatedAt(project.updatedAt, i18n.language, t('engineeringNotSynced'))}
                   </span>
                 </span>
               </button>

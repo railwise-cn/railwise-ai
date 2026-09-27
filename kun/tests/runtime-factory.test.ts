@@ -212,3 +212,66 @@ function png(width: number, height: number): Buffer {
   buffer.writeUInt32BE(height, 20)
   return buffer
 }
+
+
+describe('runtime factory official Responses search wiring', () => {
+  it.each(['deepseek-v4-flash', 'deepseek-v4-pro'])('registers and executes legacy official search for %s with the unchanged model ID', async model => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'kun-runtime-search-'))
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ output: [{ type: 'message', status: 'completed', content: [{
+      type: 'output_text', text: 'Synthetic cited search result', annotations: [{ type: 'url_citation', url: 'https://example.com/source', title: 'Source' }]
+    }] }] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchImpl)
+    let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined
+    try {
+      runtime = await createKunServeRuntime({
+        host: '127.0.0.1', port: 0, dataDir, runtimeToken: 'test-token', apiKey: 'synthetic-search-key', baseUrl: 'https://api.deepseek.com/v1', model,
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
+        capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false } })
+      })
+      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({ searchAvailable: true, provider: 'deepseek-responses' })])
+      expect((await runtime.toolHost!.listTools()).some(tool => tool.name === 'web_search')).toBe(true)
+      const result = await runtime.toolHost!.execute({ callId: 'search-default-model', toolName: 'web_search', arguments: { query: '工程测量规范', limit: 1 } }, {
+        threadId: 'search-thread', turnId: 'search-turn', workspace: dataDir, approvalPolicy: 'on-request', sandboxMode: 'workspace-write',
+        abortSignal: new AbortController().signal, awaitApproval: async () => 'allow'
+      })
+      expect(result.item).toMatchObject({ kind: 'tool_result', isError: false })
+      expect(JSON.stringify(result.item)).toContain('https://example.com/source')
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+      expect(url).toBe('https://api.deepseek.com/v1/responses')
+      expect(JSON.parse(String(init.body))).toMatchObject({ model, input: '工程测量规范', tools: [{ type: 'web_search' }], tool_choice: { type: 'web_search' } })
+      expect(init.headers).toMatchObject({ authorization: 'Bearer synthetic-search-key' })
+    } finally {
+      await runtime?.shutdown?.(); vi.unstubAllGlobals(); await rm(dataDir, { recursive: true, force: true })
+    }
+  })
+  it.each([
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-flash' },
+    { baseUrl: 'https://third-party.example/v1', apiKey: 'synthetic-key', model: 'deepseek-flash' },
+    { baseUrl: 'http://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-flash' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: ' ', model: 'deepseek-flash' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-pro' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'synthetic-key', model: 'deepseek-chat' }
+  ])('keeps official search unavailable for unsupported factory settings: $baseUrl / $model', async config => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'kun-runtime-search-rejected-'))
+    const fetchImpl = vi.fn(); vi.stubGlobal('fetch', fetchImpl)
+    let runtime: Awaited<ReturnType<typeof createKunServeRuntime>> | undefined
+    try {
+      runtime = await createKunServeRuntime({
+        host: '127.0.0.1', port: 0, dataDir, runtimeToken: 'test-token', ...config,
+        approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false, insecure: false, storage: { backend: 'file' },
+        capabilities: KunCapabilitiesConfig.parse({ web: { enabled: true, searchEnabled: true, fetchEnabled: false } })
+      })
+      expect((await runtime.toolDiagnostics?.())?.webProviders).toEqual([expect.objectContaining({ searchAvailable: false })])
+      const result = await runtime.toolHost!.execute({ callId: 'unsupported-search', toolName: 'web_search', arguments: { query: 'synthetic query' } }, {
+        threadId: 'search-thread', turnId: 'search-turn', workspace: dataDir, approvalPolicy: 'on-request', sandboxMode: 'workspace-write',
+        abortSignal: new AbortController().signal, awaitApproval: async () => 'allow'
+      })
+      expect(result.item).toMatchObject({ kind: 'tool_result', isError: true })
+      expect(JSON.stringify(result.item)).toContain('provider_unavailable')
+      expect(fetchImpl).not.toHaveBeenCalled()
+    } finally {
+      await runtime?.shutdown?.(); vi.unstubAllGlobals(); await rm(dataDir, { recursive: true, force: true })
+    }
+  })
+})

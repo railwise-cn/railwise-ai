@@ -1,0 +1,153 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 7d4f454feecb.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-7d4f454/Applications/RAILWISE%20AI%20Candidate%207d4f454feecb.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 2
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 监测XLSX（合成验收） 变形监测 · mm · 9/20
+							26 文本 监测XLSX（合成验收）
+							27 文本 变形监测
+							28 文本  ·
+							29 文本 mm
+							30 文本  ·
+							31 文本 9/20
+						32 按钮 监测CSV（合成验收） 变形监测 · mm · 9/20
+							33 文本 监测CSV（合成验收）
+							34 文本 变形监测
+							35 文本  ·
+							36 文本 mm
+							37 文本  ·
+							38 文本 9/20
+						39 text Survey AI 会话 2
+						40 按钮 Survey AI · 新建内业任务 监测XLSX（合成验收） · 0 条消息
+							41 文本 Survey AI · 新建内业任务
+							42 文本 监测XLSX（合成验收）
+							43 文本  ·
+							44 文本 0
+							45 文本 条消息
+						46 按钮 Survey AI · 新建内业任务 监测CSV（合成验收） · 0 条消息
+							47 文本 Survey AI · 新建内业任务
+							48 文本 监测CSV（合成验收）
+							49 文本  ·
+							50 文本 0
+							51 文本 条消息
+						52 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					53 container
+						54 切换按钮 连接手机, Value: 0
+						55 按钮 设置
+					56 container
+						57 按钮 收起侧边栏
+						58 标题 RAILWISE Survey, Value: 1
+							59 文本 RAILWISE Survey
+						60 text 工程测量内业 当前内业任务
+						61 弹出式按钮 当前内业任务, Value: 监测XLSX（合成验收）
+							62 (selected) 新建内业任务
+						63 文本 工作视图
+						64 弹出式按钮 工作视图, Value: 分析与精度
+							65 (selected) 分析与精度
+						66 按钮 新建工程测量项目
+					67 文本 已完成 1 个测点/监测项的确定性分析。
+					68 按钮 关闭提示
+					69 container
+						70 text 任务 监测XLSX（合成验收） 阶段 分析与精度 数据源 / 格式 synthetic-monitoring-roundtrip.xlsx  ·  XLSX 处置状态 候选成果 基准 待确认  ·  待确认 点数 — 测站数 — 观测 2 闭合差 — 精度 已计算 成果 — 网型 — 审查 —
+					71 container Survey AI 会话
+						72 container
+							73 标题 Survey AI 会话, Value: 2
+								74 文本 Survey AI 会话
+							75 文本 监测XLSX（合成验收）
+							76 按钮 数据资产
+							77 按钮 测量平差
+							78 按钮 刷新上下文
+						79 标题 Survey AI, Value: 2
+							80 文本 Survey AI
+						81 container
+							82 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							83 按钮 更多操作
+							84 弹出式按钮 模型与推理设置
+							85 按钮 (disabled) 发送
+					86 container
+						87 container 工作视图
+							88 按钮 平差结果与精度
+							89 按钮 趋势分析
+						90 标题 趋势、异常与阈值分析, Value: 2
+							91 文本 趋势、异常与阈值分析
+						92 文本 所有数值由 Runtime 确定性计算。模型不会改写当前值、累计变化、速率或阈值状态。
+						93 按钮 趋势图
+						94 按钮 运行分析
+						95 文本 正常
+						96 文本 1
+						97 文本 低于提示阈值
+						98 文本 提示
+						99 文本 0
+						100 文本 达到关注区间
+						101 文本 报警
+						102 文本 0
+						103 文本 达到或超过阈值
+						104 文本 控制
+						105 文本 0
+						106 文本 控制状态
+						107 文本 待确认
+						108 文本 0
+						109 文本 项目未配置阈值
+						110 表格
+							111 row
+								112 列标题
+									113 文本 监测项 / 测点
+								114 列标题
+									115 文本 当前值
+								116 列标题
+									117 文本 累计变化
+								118 列标题
+									119 文本 变化速率
+								120 列标题
+									121 文本 趋势
+								122 列标题
+									123 文本 阈值状态
+							124 row
+								125 单元格
+									126 文本 S01
+									127 文本 沉降
+								128 单元格
+									129 text 4 mm
+								130 单元格
+									131 文本 0
+								132 单元格
+									133 文本 2
+								134 单元格
+									135 文本 稳定
+								136 单元格
+									137 文本 正常
+						138 container
+							139 text 算法版本：workwise-engineering-1 · 输入哈希： 57154b02b86996954107f49899f1a4826ed76b0005711c8f2ec869cd53cc70da
+	140 关闭按钮
+	141 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	142 最小化按钮
+143 menu bar
+	144 RAILWISE AI Candidate 7d4f454feecb
+	145 文件
+	146 编辑
+	147 显示
+	148 窗口
+	149 帮助
+
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-7d4f454/Applications/RAILWISE%20AI%20Candidate%207d4f454feecb.app/Contents/Resources/app.asar/out/renderer/index.html

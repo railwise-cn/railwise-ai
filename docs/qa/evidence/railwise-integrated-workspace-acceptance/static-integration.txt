@@ -1,0 +1,32 @@
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-static-workspace/independent-review
+
+ ✓ client-service.test.ts > restores real raw Unicode generalized-w without Buffer with new count fields isolated 19ms
+ ✓ client-service.test.ts > restores real raw Unicode vce without Buffer with new count fields isolated 11ms
+ ✓ client-service.test.ts > restores real raw Unicode huber without Buffer with new count fields isolated 10ms
+ ✓ client-service.test.ts > restores real raw Unicode statistical-family without Buffer with new count fields isolated 8ms
+ ✓ client-service.test.ts > restores real raw Unicode reference-datum without Buffer with new count fields isolated 10ms
+ ✓ client-service.test.ts > restores real raw Unicode static-incremental without Buffer with new count fields isolated 11ms
+ ✓ client-service.test.ts > persists and restores stale honestly with frozen-model fingerprint 19ms
+ ✓ client-service.test.ts > persists and restores zero-sse honestly with frozen-model fingerprint 13ms
+ ✓ client-service.test.ts > preserves known prior covariance despite posterior factor 28 11ms
+ ✓ client-service.test.ts > summary cannot mix old/new counts or expand legacy observation limits 66ms
+ ✓ client-service.test.ts > maximum 256/16/128 ten-item page costs 191 with two further reads before rate limit 964ms
+ ✓ client-service.test.ts > recomputes and rejects coherent-hash forged updatedFit at Runtime 5ms
+ ✓ client-service.test.ts > recomputes and rejects coherent-hash forged baseQrState at Runtime 5ms
+ ✓ client-service.test.ts > renderer independently binds QR hash and final base fingerprint after outer hashes are restamped 16ms
+ ✓ gui.test.ts > renders maximum 256/16/128 static append with complete covariance and visible model limits in en 212ms
+ ✓ gui.test.ts > renders maximum 256/16/128 static append with complete covariance and visible model limits in zh 239ms
+ ✓ gui.test.ts > shows prior covariance independently from posterior estimate and append/batch parameters 26ms
+ ✓ gui.test.ts > stale old model remains unavailable with counts and no accepted table 24ms
+ ✓ gui.test.ts > static Unicode export requires fresh server export and is suppressed after scope switch 77ms
+ ✓ gui.test.ts > drops late static restore after workspace changes 46ms
+ ✓ gui.test.ts > drops late static restore after revision changes 51ms
+ ✓ gui.test.ts > drops late static restore after runtime changes 48ms
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  08:44:57
+   Duration  2.63s (transform 279ms, setup 0ms, import 435ms, tests 1.89s, environment 90ms)
+
+{"compiledCases":2}

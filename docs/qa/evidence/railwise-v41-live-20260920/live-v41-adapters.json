@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-09-20T03:20:14.825Z",
+  "model": "deepseek-flash",
+  "origin": "https://api.deepseek.com",
+  "credentialSource": "existing production provider, read in memory only",
+  "settingsChanged": false,
+  "candidateCredentialCopied": false,
+  "scope": "compiled production adapters; not packaged GUI acceptance",
+  "requests": [
+    {
+      "path": "/v1/chat/completions",
+      "status": 200,
+      "elapsedMs": 173
+    },
+    {
+      "path": "/v1/responses",
+      "status": 200,
+      "elapsedMs": 88
+    }
+  ],
+  "chat": {
+    "status": "completed",
+    "expectedResponseMatched": true,
+    "answerCharacters": 15,
+    "stopReason": "stop",
+    "elapsedMs": 412
+  },
+  "search": {
+    "status": "failed",
+    "elapsedMs": 13433
+  }
+}

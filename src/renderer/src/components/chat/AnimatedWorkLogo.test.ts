@@ -5,13 +5,14 @@ import { AnimatedWorkLogo } from './AnimatedWorkLogo'
 import { WorkMetaRow } from './message-timeline-cards'
 
 describe('AnimatedWorkLogo', () => {
-  it('uses the WorkWise logo asset for the default work mark', async () => {
+  it('uses the RAILWISE mark at the compatible resource path', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
     const logoSvg = await readFile(new URL('../../../../asset/img/workwise.svg', import.meta.url), 'utf8')
 
-    expect(logoSvg).toContain('WorkWise')
-    expect(logoSvg).toContain('id="bg"')
+    expect(logoSvg).toContain('RailWise AI')
+    expect(logoSvg).not.toContain('WorkWise')
+    expect(logoSvg).toContain('viewBox="0 0 1024 1024"')
     expect(logoSvg).not.toContain('Layer_2')
   })
 

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "status": "passed-historical-pre-gui-baseline",
+  "fixtureOnly": true,
+  "productionKpi": false,
+  "checkedAt": "2026-09-20T21:03:43.474703+00:00",
+  "projectId": "project_9b98b139-6794-4830-95d1-0ac55449a399",
+  "manifestId": "manifest_220c5caa-5177-4e66-8928-6bf9d05b1b44",
+  "sourcePackageHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "sourcePackageAsarSha256": "11a060ec6a7c42385eed433a336967a91647251f51a07f0781302420b2f9e20c",
+  "closedOriginalDatabaseSha256": "3e9f5826c2e6fa35e5cc205e9f8549455fa80e77cf2e1ba76e19b9365258dec5",
+  "seedClosedDatabaseSha256Matched": true,
+  "sourceAndReplayTablesAbsent": true,
+  "businessRowHashes": {
+    "engineering_projects": "d93893ff1a13235ea5dd232e063613a6af4a3fa805eb38107c6e73769f80b27e",
+    "engineering_manifests": "d9a847fce3b18b6675c2bfea56419bc70d43acda98032647c6b2d7917d5d2832",
+    "engineering_datasets": "983950d4de0232ec1a9afab2125b457a8e9cb106a57d2601417ee9298006ece5",
+    "engineering_analyses": "eac9e9bb4e8cbdc0ae29c5fbc5a3e876b6ec369d6af8607248556f3a6a085cdb",
+    "engineering_runs": "a196a64b94b34462b81375fd77d4455f82afd003c10eaed7803f3e397d1dd810",
+    "engineering_charts": "3070c25868cb3a26dbc3b3956a1178880ab6a3cad35809e4b9db78d60679f92a"
+  },
+  "outputs": [
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/report.docx",
+      "sha256": "d5341323fd2c2cfcdefd9e4e56c607cb14f51be1121abf422b5a4b91c0ac907d",
+      "sizeBytes": 4349,
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/report.pdf",
+      "sha256": "052be06dc2652f68619e99502a6ad4581da21ce5cf01bed38fd785c0d6882923",
+      "sizeBytes": 29300,
+      "mediaType": "application/pdf"
+    },
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/evidence.xlsx",
+      "sha256": "9a4773262be183bed45186c3f933bf7eb5579d7d0e79f2fbebcc17ba301e9337",
+      "sizeBytes": 31592,
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/chart_14b18607-5fbc-429e-a1d9-d6a9a4ef7112/trend.svg",
+      "sha256": "8bcb3dadb3313467263913d06277c64c294af1a9718eefef5caa2a9374b03381",
+      "sizeBytes": 4511,
+      "mediaType": "image/svg+xml"
+    }
+  ],
+  "publishedManifestSha256": "aa2b2269351c724db49a9db6cce6ae1a7132ddac0b9093a487cc180c89095bd8",
+  "oldFiveCheckVerification": {
+    "attempts": [],
+    "incompleteStarts": [],
+    "allSelectedRowsHash": "df28124040eadf2908b03ee0d7e2b241d4f98db893ade4bd3687f31d73e5638c"
+  },
+  "originalFilesAndClosedStateUnchanged": true
+}

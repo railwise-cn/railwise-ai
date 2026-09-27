@@ -1,0 +1,16 @@
+{
+  "fixtureOnly": true,
+  "modelCalled": false,
+  "transcriptWritten": false,
+  "sourceHead": "fbb88ea715571e9689cbc1c0802da08762e4318d",
+  "asarSha256": "15c19b63ea39fe5618e9d02ca8d977b348e6a12a8db5a8e64f56274a244ed96e",
+  "mode": "suggestion",
+  "runKey": "stale",
+  "projectId": "project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83",
+  "threadId": "thr_inslys6a",
+  "projectRevision": 2,
+  "contextHash": "sha256-5cb5b40fb4d2d9cb44dfb1d5c0183bab24340b059bab3eb48a3a9565a78a6500",
+  "suggestionId": "esuggestion_ed3bead8-a0ac-4023-a59b-dd2192906666",
+  "suggestionStatus": "pending",
+  "proposedName": "审批卡已确认（合成数据）"
+}

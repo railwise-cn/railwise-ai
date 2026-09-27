@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "scope": "lineage-and-evidence-preservation-only",
+  "checkedAt": "2026-09-20T09:03:13.512Z",
+  "candidateRoot": "/private/tmp/railwise-survey-53213de",
+  "secondScenario": {
+    "sameTaskAsBeforeResume": true,
+    "taskId": "task_05adc31c-0268-4cf7-80b5-7c9b5733faee",
+    "planId": "eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3",
+    "mockTurnId": "turn_80tnsgof",
+    "resumedTurnId": "turn_hcl2310o"
+  },
+  "firstScenario": {
+    "status": "failed",
+    "taskId": "task_a3258fff-f184-49a0-bb97-9ce06e1d1360",
+    "failedResumeTurnId": "turn_zlnflprn",
+    "taskAndBothTurnRecordsUnchanged": true,
+    "upstreamHttp503Failures": 1,
+    "consultationLocalToolCatalogRejections": 7,
+    "rejectedConsultationSentUpstream": false,
+    "cleanup": {
+      "tokenRemoved": true,
+      "tokenPathAbsent": true,
+      "tokenRelativePath": "evidence/relay-local-token-d6fabac586b96a85.txt",
+      "tokenContentsRead": false
+    }
+  },
+  "providerTransport": {
+    "mode": "typed",
+    "model": "deepseek-flash",
+    "selectedReasoningEffort": "off",
+    "chatRequests": 5,
+    "actualThinkingType": "disabled",
+    "actualReasoningEffort": null
+  },
+  "ordinaryConsultationAcceptance": "not passed; no successful GUI ordinary consultation is claimed",
+  "artifactSha256": {
+    "second-before-resume-zero-receipts-53213.json": "28ea21eff9c90f8c8ac2284617d22e0075f989fbb87b52faa60d0c7f49c43865",
+    "failed-real-resume-53213.json": "bf31945127a2bb7cd3920324cdab51f22e4d36615df030bb67e405c64a6f0756",
+    "strict-before-restart-audit-53213.json": "b1a0c15560fa201431594072c070699a8a25586d37c0a18708ef1a478e2407e5",
+    "independent-oracle-comparison-53213.json": "d8bfb6a8793c81b1770a7f1ad2a5eed9c469f8d434401d3b718119f663142c77",
+    "relay-report-d6fabac586b96a85.json": "017c3080057c2ca3fe8f2bc6e29bab08f82754922e6150b988bd2136c0016ff4",
+    "relay-report-43151fd88b293414.json": "b8684521902756d43bee91f2421b733827e2c95e1ba80847bcc9d1c2a5ba9dd5"
+  },
+  "sourceThreadHashes": {
+    "metadata": "c662a8c4ef3ffd958ea57f8d21ababc97b8c4980c51bff269de74a3fd6890d87",
+    "messages": "83541eab7fb7153d301d9957ed8c862b278d57d26498b28f25424d819a4f7660"
+  },
+  "limitations": [
+    "GUI credential-field clearing is separate visual evidence; this audit never reads settings or key values.",
+    "Synthetic numerical checks do not establish professional acceptance or covariance equivalence."
+  ]
+}

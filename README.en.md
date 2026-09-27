@@ -1,31 +1,31 @@
-# RAILWISE AI
+# RailWise AI
 
 [简体中文](./README.md) | English
 
 > Engineering survey processing and coding collaboration.
 
-RAILWISE AI is a local-first desktop platform. Its candidate interface has Code and Survey as the primary workspaces. RAILWISE Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
+RailWise AI is a local-first desktop platform. Its candidate interface has Code and Survey as the primary workspaces. RailWise Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
 
-**Version boundary:** the naming migration, four-stage Survey interface and subsequent professional features are undergoing isolated candidate acceptance. This documentation does not replace the public 0.5.0 installers or change their update channel. WorkWise repository, package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
+**Version boundary:** the naming migration, four-stage Survey interface and subsequent professional features are undergoing isolated candidate acceptance. This documentation does not replace the public 0.5.0 installers or change their update channel. The repository is now `railwise-cn/railwise-ai`; WorkWise package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
 
 - Product page: [www.railwise.cn/products/workwise](https://www.railwise.cn/products/workwise/)
 - Direct mirror downloads: [Download and installation](https://www.railwise.cn/products/workwise/#download)
 - Documentation: [kb.railwise.cn/products/workwise](https://kb.railwise.cn/products/workwise/)
-- Public releases: [GitHub Releases](https://github.com/wangjiawei508/WorkWise/releases)
+- Public releases: [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases)
 
 ## Current release
 
-The current stable release is **[v0.5.0](https://github.com/wangjiawei508/WorkWise/releases/tag/v0.5.0)**. It adds the engineering survey workbench, unified plugin market, verifiable installation, Codex plugin compatibility, cross-platform glass window chrome, and structured attachment vision handling. Installed 0.4.2 clients can update in the application. Public releases have three user-facing installers:
+The current stable release is **[v0.5.0](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.0)**. It adds the engineering survey workbench, unified plugin market, verifiable installation, Codex plugin compatibility, cross-platform glass window chrome, and structured attachment vision handling. Installed 0.4.2 clients can update in the application. Public releases have three user-facing installers:
 
 | Platform | Installer | Download |
 | --- | --- | --- |
-| macOS Apple Silicon | `WorkWise-<version>-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/wangjiawei508/WorkWise/releases) |
-| macOS Intel | `WorkWise-<version>-mac-Intel.dmg` | [Release assets](https://github.com/wangjiawei508/WorkWise/releases) |
-| Windows x64 | `WorkWise-<version>-win-x64.exe` | [Release assets](https://github.com/wangjiawei508/WorkWise/releases) |
+| macOS Apple Silicon | `WorkWise-<version>-mac-Apple-Silicon.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| macOS Intel | `WorkWise-<version>-mac-Intel.dmg` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
+| Windows x64 | `WorkWise-<version>-win-x64.exe` | [Release assets](https://github.com/railwise-cn/railwise-ai/releases) |
 
 GitHub Releases remains the public release log and manual installer source. Signed updater metadata and platform update artifacts are published through the official `railwise.cn` Stable channel. There is currently no Linux client, portable edition, or activation-code flow.
 
-## RAILWISE Survey
+## RailWise Survey
 
 **Original files → Content detection and preflight → Network and datum confirmation → Deterministic adjustment → Precision review → Deliverables → Human review.**
 
@@ -38,23 +38,23 @@ GitHub Releases remains the public release log and manual installer source. Sign
 
 AI conversation continues across stages. Calculations, project changes and exports show concrete parameters for confirmation; AI explanations do not replace deterministic computation. File generation, integrity verification and human approval remain separate states. Candidate deliverables are still review drafts.
 
-COSA IN1/IN2 and Leica GSI leveling inputs must pass the applicable unit, datum and topology checks. Column mappings require explicit confirmation. OU1/OU2 currently remain archival review material, not an accepted automatic comparison workflow. Some formats, including RW5, support inspection or archiving only; receiver observations and RTKLIB-related sources require post-processing and cannot directly substitute for baseline-adjustment inputs. See the [current format matrix](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md).
+COSA IN1/IN2 and Leica GSI leveling inputs must pass the applicable unit, datum and topology checks. Column mappings require explicit confirmation. OU1/OU2 currently remain archival review material, not an accepted automatic comparison workflow. Some formats, including RW5, support inspection or archiving only; receiver observations and RTKLIB-related sources require post-processing and cannot directly substitute for baseline-adjustment inputs. See the [current format matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md).
 
 Candidate workspaces include free leveling, generalized w, grouped VCE, fixed external-scale Huber, statistical families, explicit-reference two-epoch comparison and static independent-observation additions. They retain model declarations, history and strict replay without automatically deleting observations, changing formal weights or declaring reference points stable.
 
-Quality workspaces provide material retention, complete first-round sampling, limited declared-record scoring and linked assessments for up to eight sample units. Missing evidence and vetoes remain separate; these features do not authenticate evidence, resampling, professional signatures or full standards conformity. See the [implementation and acceptance ledger](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md) and [advanced-trial contracts](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md). These candidate capabilities are not all part of the published 0.5.0 release.
+Quality workspaces provide material retention, complete first-round sampling, limited declared-record scoring and linked assessments for up to eight sample units. Missing evidence and vetoes remain separate; these features do not authenticate evidence, resampling, professional signatures or full standards conformity. See the [implementation and acceptance ledger](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md) and [advanced-trial contracts](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md). These candidate capabilities are not all part of the published 0.5.0 release.
 
 ## Candidate interface
 
-All three images are actual Chinese light-theme captures from installed candidate `281dc87`, using a synthetic planar network with four points, one station and five observations. The [screenshot manifest](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json) records their provenance and hashes.
+All three images are actual Chinese light-theme captures from installed candidate `281dc87`, using a synthetic planar network with four points, one station and five observations. The [screenshot manifest](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json) records their provenance and hashes.
 
-![RAILWISE Survey candidate adjustment results in Chinese light mode](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
+![RailWise Survey candidate adjustment results in Chinese light mode](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
 
-![RAILWISE Survey candidate deliverables in Chinese light mode](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
+![RailWise Survey candidate deliverables in Chinese light mode](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
 
-![RAILWISE AI candidate model settings in Chinese light mode](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
+![RailWise AI candidate model settings in Chinese light mode](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
 
-This package completed signing, notarization, a real private updater round trip and limited linked-quality GUI checks. Its [exact-package report](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md) remains partial: full interface coverage, packaged AI workflows, professional review and personal user confirmation are outstanding. Subsequent source fixes are not implicitly included in this package.
+This package completed signing, notarization, a real private updater round trip and limited linked-quality GUI checks. Its [exact-package report](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md) remains partial: full interface coverage, packaged AI workflows, professional review and personal user confirmation are outstanding. Subsequent source fixes are not implicitly included in this package.
 
 ## DeepSeek V4.1
 
@@ -62,11 +62,11 @@ The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`
 
 On September 20, 2026, real official-service calls through the product adapter passed conversation, JSON output, declared function-name/argument return and synthetic-image recognition checks. The function check did not execute a tool. These checks do not replace acceptance of the complete packaged AI conversation, approval, tool and vision workflows.
 
-The official V4.1 Responses API ignores built-in `web_search`. HTTP 200 does not establish a successful search; use separately configured browser or MCP search tools. See the [real-service evidence and correction](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-v41-live-20260920/README.md).
+The official V4.1 Responses API ignores built-in `web_search`. HTTP 200 does not establish a successful search; use separately configured browser or MCP search tools. See the [real-service evidence and correction](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-v41-live-20260920/README.md).
 
 The model catalog configures a 1M-token context and up to 384K output, with reasoning, tool-call, compression, cache-usage, JSON and Responses adapter paths. Actual access, limits and billing depend on the service and account. Provider vision capability determines structured `text`/`image` messages; text-only providers use the configured loopback visual-evidence analyzer. Failures remain explicit rather than inserting image Base64 into the model prompt. [Official model documentation](https://api-docs.deepseek.com/updates) remains the source for provider capabilities.
 
-## Why RAILWISE AI
+## Why RailWise AI
 
 AI should do more than answer a one-off prompt. Real work needs project material, files, sessions, methods, and delivery standards to persist together.
 
@@ -134,7 +134,7 @@ Read more: [Local data and security](https://kb.railwise.cn/products/workwise/se
 | Status | Scope |
 | --- | --- |
 | Available now | Code, Write, Design, DeepSeek Harness structured attachment handling, reliable task runs, Agents, MCP V2, general document attachments, indexed retrieval, validated document delivery, and in-app updates |
-| Isolated candidate | RAILWISE naming, four-stage Survey and subsequent advanced/quality workspaces; accepted by exact package, without replacing 0.5.0 downloads |
+| Isolated candidate | RailWise AI naming, four-stage Survey and subsequent advanced/quality workspaces; accepted by exact package, without replacing 0.5.0 downloads |
 | Preview | Flow canvas, typed nodes, mock and single-node tests, publish validation, run history, approval, and failure recovery |
 | Optional | Local MinerU parsing, online Skill updates, mobile connection, and companion command-line tools |
 | Direction | More multimodal generation nodes, industry nodes, and enterprise integrations |
@@ -168,8 +168,8 @@ Version 0.3.2 and earlier did not include the trusted production update channel,
 ## Development
 
 ```bash
-git clone https://github.com/wangjiawei508/WorkWise.git
-cd WorkWise
+git clone https://github.com/railwise-cn/railwise-ai.git
+cd railwise-ai
 npm install
 npm run dev
 ```
@@ -193,12 +193,12 @@ The local agent is provided by WorkWise Agent Runtime through a stable HTTP/SSE 
   and Windows x64 EXE. ZIP, blockmap, signed update metadata, and checksums are
   published through the official `railwise.cn` update channel.
 - Intermediate build artifacts are not published, and unverified roadmap items are not presented as released capabilities.
-- [GitHub Releases](https://github.com/wangjiawei508/WorkWise/releases) is the public release log. Stable promotion requires the exact version's release approval after packaged acceptance, including signing, notarization and a real updater round trip; passing CI alone is not approval.
+- [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) is the public release log. Stable promotion requires the exact version's release approval after packaged acceptance, including signing, notarization and a real updater round trip; passing CI alone is not approval.
 - The historical 0.2.5 public behavior baseline is tracked in the [public behavior gap table](docs/PUBLIC_BEHAVIOR_GAP_0.2.5.zh-CN.md).
 
 ## Feedback
 
-Please report issues or ideas through [GitHub Issues](https://github.com/wangjiawei508/WorkWise/issues). Include where possible:
+Please report issues or ideas through [GitHub Issues](https://github.com/railwise-cn/railwise-ai/issues). Include where possible:
 
 - WorkWise version, operating system, and chip architecture.
 - Reproducible steps, screenshots, or error logs.

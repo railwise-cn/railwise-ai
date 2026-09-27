@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run src/engineering/survey-statistical-family.test.ts src/engineering/survey-generalized-w.test.ts src/engineering/survey-statistical-diagnostics.test.ts src/engineering/survey-statistical-service.test.ts --reporter=dot
+
+
+ RUN  v4.1.8 /private/tmp/railwise-statistical-family/kun
+
+·········································································································································································································································································································
+
+ Test Files  4 passed (4)
+      Tests  297 passed (297)
+   Start at  07:26:46
+   Duration  616ms (transform 377ms, setup 0ms, import 539ms, tests 370ms, environment 0ms)

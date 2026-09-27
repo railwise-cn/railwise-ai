@@ -1,0 +1,9 @@
+{
+  "exactPartitionCases": 60,
+  "stationaryCases": 60,
+  "maxTrueNormalizedScoreInfinity": 4.7684816685091396e-11,
+  "maxScoreDifferenceVs180DigitEvaluation": 2.2226045125193818e-15,
+  "allScoreErrorsWithinReportedBudget": true,
+  "allObjectivesWithinReportedBudget": true,
+  "falseUniquenessFindings": 0
+}

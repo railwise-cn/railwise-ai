@@ -1,0 +1,21 @@
+import {readFileSync,writeFileSync} from 'node:fs'
+const {runSurveyHuberTrial:run}=await import(`${process.argv[2]??process.cwd()}/kun/src/engineering/survey-huber-trial.ts`)
+const exact=JSON.parse(readFileSync(`${import.meta.dir}/huber-exact-cases.json`,'utf8'))
+const num=(x:any):number=>typeof x==='number'?x:x.includes('/')?x.split('/').map(Number).reduce((a:number,b:number)=>a/b):Number(x)
+function input(c:any){const m=c.input,p=m.A[0].length;return{schemaVersion:1,model:'fixed-linear-full-column-rank',independenceDeclaration:'caller-declared-independent-observations',residualConvention:'observed-minus-fitted',observationUnit:'m',parameterIds:Array.from({length:p},(_,i)=>`p${i}`),parameterUnits:Array(p).fill('m'),initialParameters:Array(p).fill(0),scale:{kind:'fixed-external',value:num(m.scale??1),unit:'m',basisStatement:'Synthetic transformation oracle.'},loss:{kind:'huber',k:num(m.k??1)},observations:m.y.map((v:any,i:number)=>({id:`o${i}`,value:num(v),coefficients:m.A[i].map(num),relativeSigma:num(m.sigma?.[i]??1),sourceAnchor:'synthetic'})),stopping:{maxIterations:200,standardizedPredictionStepTolerance:1e-10,relativeObjectiveTolerance:1e-10,normalizedScoreTolerance:1e-10}}}
+const results:any[]=[]
+for(const c of exact.filter((c:any)=>!c.multipleExactMinimizersFound))for(const mode of ['reverse','column-rescale','negative-rescale','modest-offset','large-offset','unit-mm']){
+ const request=input(c),expected=c.candidateMinima[0].parameters.map(num),originalExpected=[...expected],p=expected.length
+ if(mode==='reverse')request.observations.reverse()
+ if(mode.includes('rescale')){const factors=Array.from({length:p},(_,j)=>(mode==='negative-rescale'&&j===0?-1:1)*(j%2?1e100:1e-100));request.observations.forEach((o:any)=>o.coefficients=o.coefficients.map((x:number,j:number)=>x*factors[j]!));expected.forEach((_:any,j:number)=>expected[j]/=factors[j]!)}
+ if(mode.includes('offset')){const offset=expected.map((_:any,j:number)=>(j%2?-4:10)*(mode==='large-offset'?1e5:1));request.observations.forEach((o:any)=>o.value+=o.coefficients.reduce((a:number,v:number,j:number)=>a+v*offset[j]!,0));request.initialParameters=[...offset];expected.forEach((_:any,j:number)=>expected[j]+=offset[j]!)}
+ if(mode==='unit-mm'){request.observationUnit='mm';request.scale.unit='mm';request.scale.value*=1000;request.observations.forEach((o:any)=>o.value*=1000);expected.forEach((_:any,j:number)=>expected[j]*=1000)}
+ const output=run(request),last=output.states.at(-1)
+ const error=output.acceptedParameters?Math.max(...output.acceptedParameters.map((x:number,j:number)=>Math.abs(x-expected[j])/Math.max(1e-150,Math.abs(expected[j])))):null
+ results.push({id:c.id,mode,outcome:output.outcome,reason:output.reason,error,expected,accepted:output.acceptedParameters,objective:last?.objective,score:last?.normalizedScoreInfinity,scoreError:last?.scoreRoundoffEstimate,uniqueness:output.uniquenessAssessment})
+}
+for(const factor of [1e-12,1e12]){const c=exact[0],request=input(c);request.scale.value*=factor;request.observations.forEach((o:any)=>o.value*=factor);const output=run(request);results.push({id:'scale-extreme-equivalence',factor,outcome:output.outcome,reason:output.reason,accepted:output.acceptedParameters,relativeParameter:output.acceptedParameters?.[0]/factor,last:output.states.at(-1)})}
+writeFileSync(`${import.meta.dir}/huber-transform-results.json`,JSON.stringify(results,null,2)+'\n')
+console.log(JSON.stringify({cases:results.length,outcomes:results.reduce((a:any,x:any)=>(a[x.outcome]=(a[x.outcome]??0)+1,a),{}),maxRelativeParameterError:Math.max(...results.filter(x=>x.error!==null&&x.error!==undefined&&x.outcome==='stationary').map(x=>x.error)),conservativeStops:results.filter(x=>x.outcome!=='stationary').map(({last,...rest})=>rest),unexpected:results.filter(x=>x.outcome==='stationary'&&x.error>1e-7||x.outcome!=='stationary'&&x.mode!=='large-offset'&&!(x.id==='high-leverage'&&x.mode==='modest-offset'&&x.reason==='score-resolution'))},null,2))
+
+if (results.some(x=>x.outcome==='stationary'&&x.error>1e-7||x.outcome!=='stationary'&&x.mode!=='large-offset'&&!(x.id==='high-leverage'&&x.mode==='modest-offset'&&x.reason==='score-resolution'))) throw new Error('Independent Huber transformation regression')

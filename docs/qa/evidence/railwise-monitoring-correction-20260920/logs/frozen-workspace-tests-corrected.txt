@@ -1,0 +1,9 @@
+
+ RUN  v4.1.7 <REPOSITORY>
+
+
+ Test Files  1 passed (1)
+      Tests  38 passed (38)
+   Start at  18:44:22
+   Duration  1.90s (transform 447ms, setup 0ms, import 697ms, tests 773ms, environment 163ms)
+

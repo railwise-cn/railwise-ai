@@ -1,0 +1,4382 @@
+{
+  "results": [
+    {
+      "id": "position-outlier",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 8,
+      "parameters": [
+        0.33333333333284215
+      ],
+      "lastState": {
+        "iteration": 8,
+        "parameters": [
+          0.33333333333284215
+        ],
+        "fittedObservations": [
+          0.33333333333284215,
+          0.33333333333284215,
+          0.33333333333284215,
+          0.33333333333284215
+        ],
+        "residuals": [
+          -0.33333333333284215,
+          -0.33333333333284215,
+          -0.33333333333284215,
+          9.666666666667158
+        ],
+        "standardizedResiduals": [
+          -0.33333333333284215,
+          -0.33333333333284215,
+          -0.33333333333284215,
+          9.666666666667158
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          0.1034482758620637
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          1,
+          0.1034482758620637
+        ],
+        "objective": 9.333333333333334,
+        "objectiveRoundoffEstimate": 8.526512829120644e-13,
+        "normalizedScore": [
+          7.367439991412539e-13
+        ],
+        "normalizedScoreInfinity": 7.367439991412539e-13,
+        "scoreRoundoffEstimate": 7.10542735759472e-14,
+        "standardizedPredictionStep": 1.4242107493345202e-11,
+        "relativeObjectiveChange": 1.9032394707859825e-16,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 9.333333333333334,
+      "objectiveError": 0,
+      "score": 7.367439991412539e-13,
+      "scoreError": 7.10542735759472e-14,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.911626660941693e-13
+    },
+    {
+      "id": "position-flat",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 11,
+      "parameters": [
+        0.9999999999910002
+      ],
+      "lastState": {
+        "iteration": 11,
+        "parameters": [
+          0.9999999999910002
+        ],
+        "fittedObservations": [
+          0.9999999999910002,
+          0.9999999999910002,
+          0.9999999999910002,
+          0.9999999999910002
+        ],
+        "residuals": [
+          -0.9999999999910002,
+          -0.9999999999910002,
+          9.000000000008999,
+          9.000000000008999
+        ],
+        "standardizedResiduals": [
+          -0.9999999999910002,
+          -0.9999999999910002,
+          9.000000000008999,
+          9.000000000008999
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.11111111111100001,
+          0.11111111111100001
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          0.11111111111100001,
+          0.11111111111100001
+        ],
+        "objective": 18,
+        "objectiveRoundoffEstimate": 1.7053025658232174e-12,
+        "normalizedScore": [
+          8.999800904518906e-12
+        ],
+        "normalizedScoreInfinity": 8.999800904518906e-12,
+        "scoreRoundoffEstimate": 1.4210854715125268e-13,
+        "standardizedPredictionStep": 8.100031756441695e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 18,
+      "objectiveError": 0,
+      "score": 8.999800904518906e-12,
+      "scoreError": 1.4210854715125268e-13,
+      "uniqueness": "not-established",
+      "exactMultiple": true
+    },
+    {
+      "id": "position-nonunit-sigma",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 9,
+      "parameters": [
+        0.44444444444415715
+      ],
+      "lastState": {
+        "iteration": 9,
+        "parameters": [
+          0.44444444444415715
+        ],
+        "fittedObservations": [
+          0.44444444444415715,
+          0.44444444444415715,
+          0.44444444444415715,
+          0.44444444444415715
+        ],
+        "residuals": [
+          -0.44444444444415715,
+          -0.44444444444415715,
+          -0.44444444444415715,
+          9.555555555555843
+        ],
+        "standardizedResiduals": [
+          -0.44444444444415715,
+          -0.44444444444415715,
+          -0.22222222222207857,
+          9.555555555555843
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          0.10465116279069453
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          0.25,
+          0.10465116279069453
+        ],
+        "objective": 9.277777777777779,
+        "objectiveRoundoffEstimate": 8.55809250626581e-13,
+        "normalizedScore": [
+          3.5860203695392556e-13
+        ],
+        "normalizedScoreInfinity": 3.5860203695392556e-13,
+        "scoreRoundoffEstimate": 7.882763899047717e-14,
+        "standardizedPredictionStep": 6.178169087434071e-12,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 9.277777777777779,
+      "objectiveError": 0,
+      "score": 3.5860203695392556e-13,
+      "scoreError": 7.882763899047717e-14,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 2.8727020762175925e-13
+    },
+    {
+      "id": "clean-line",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        0.9999999999999969,
+        2.000000000000001
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          0.9999999999999969,
+          2.000000000000001
+        ],
+        "fittedObservations": [
+          0.9999999999999969,
+          2.999999999999998,
+          4.999999999999998,
+          7
+        ],
+        "residuals": [
+          3.1086244689504383e-15,
+          2.220446049250313e-15,
+          1.7763568394002505e-15,
+          0
+        ],
+        "standardizedResiduals": [
+          3.1086244689504383e-15,
+          2.220446049250313e-15,
+          1.7763568394002505e-15,
+          0
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "objective": 8.874685183736383e-30,
+        "objectiveRoundoffEstimate": 1.364242052659392e-12,
+        "normalizedScore": [
+          3.552713678800501e-15,
+          1.5429418386776548e-15
+        ],
+        "normalizedScoreInfinity": 3.552713678800501e-15,
+        "scoreRoundoffEstimate": 7.747941786836717e-13,
+        "standardizedPredictionStep": 3.552713678800501e-15,
+        "relativeObjectiveChange": 8.67746995743113e-30,
+        "irlsDesignConditionEstimate": 4.2191302606380985
+      },
+      "objective": 8.874685183736383e-30,
+      "objectiveError": 8.874685183736383e-30,
+      "score": 3.552713678800501e-15,
+      "scoreError": 7.747941786836717e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.1086244689504383e-15
+    },
+    {
+      "id": "line-one-outlier",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 13,
+      "parameters": [
+        0.5999999999996463,
+        2.3000000000002663
+      ],
+      "lastState": {
+        "iteration": 13,
+        "parameters": [
+          0.5999999999996463,
+          2.3000000000002663
+        ],
+        "fittedObservations": [
+          0.5999999999996463,
+          2.8999999999999124,
+          5.200000000000179,
+          7.500000000000445,
+          9.800000000000711,
+          12.100000000000978
+        ],
+        "residuals": [
+          0.40000000000035374,
+          0.10000000000008757,
+          -0.2000000000001787,
+          -0.500000000000445,
+          -0.8000000000007113,
+          17.89999999999902
+        ],
+        "standardizedResiduals": [
+          0.40000000000035374,
+          0.10000000000008757,
+          -0.2000000000001787,
+          -0.500000000000445,
+          -0.8000000000007113,
+          17.89999999999902
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          0.055865921787712554
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          0.055865921787712554
+        ],
+        "objective": 17.95,
+        "objectiveRoundoffEstimate": 5.499600774783255e-12,
+        "normalizedScore": [
+          -3.6481928589182644e-13,
+          -6.000755448098971e-13
+        ],
+        "normalizedScoreInfinity": 6.000755448098971e-13,
+        "scoreRoundoffEstimate": 9.920662715405517e-13,
+        "standardizedPredictionStep": 1.58665303118255e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.378097247911536
+      },
+      "objective": 17.95,
+      "objectiveError": 0,
+      "score": 6.000755448098971e-13,
+      "scoreError": 9.920662715405517e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.5371705564557487e-13
+    },
+    {
+      "id": "line-two-outliers",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 11,
+      "parameters": [
+        1.3684210526315608,
+        1.8684210526315697
+      ],
+      "lastState": {
+        "iteration": 11,
+        "parameters": [
+          1.3684210526315608,
+          1.8684210526315697
+        ],
+        "fittedObservations": [
+          1.3684210526315608,
+          3.2368421052631304,
+          5.1052631578947,
+          6.97368421052627,
+          8.842105263157839,
+          10.710526315789409,
+          12.578947368420978
+        ],
+        "residuals": [
+          -0.3684210526315608,
+          -0.23684210526313043,
+          14.8947368421053,
+          0.026315789473730256,
+          0.15789473684216127,
+          -18.71052631578941,
+          0.4210526315790215
+        ],
+        "standardizedResiduals": [
+          -0.3684210526315608,
+          -0.23684210526313043,
+          14.8947368421053,
+          0.026315789473730256,
+          0.15789473684216127,
+          -18.71052631578941,
+          0.4210526315790215
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.06713780918727899,
+          1,
+          1,
+          0.053445850914205534,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          0.06713780918727899,
+          1,
+          1,
+          0.053445850914205534,
+          1
+        ],
+        "objective": 32.80263157894737,
+        "objectiveRoundoffEstimate": 7.944802710450222e-12,
+        "normalizedScore": [
+          8.384959393481495e-14,
+          8.743006318923108e-14
+        ],
+        "normalizedScoreInfinity": 8.743006318923108e-14,
+        "scoreRoundoffEstimate": 1.32928492984208e-12,
+        "standardizedPredictionStep": 2.7275959268990846e-12,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.178807960454071
+      },
+      "objective": 32.80263157894737,
+      "objectiveError": 0,
+      "score": 8.743006318923108e-14,
+      "scoreError": 1.32928492984208e-12,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.3305595941276875e-14
+    },
+    {
+      "id": "line-nonunit-scales",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 12,
+      "parameters": [
+        0.3768545994014522,
+        2.5459940652863473
+      ],
+      "lastState": {
+        "iteration": 12,
+        "parameters": [
+          0.3768545994014522,
+          2.5459940652863473
+        ],
+        "fittedObservations": [
+          0.3768545994014522,
+          2.9228486646877996,
+          5.468842729974146,
+          8.014836795260495,
+          10.560830860546842,
+          13.10682492583319
+        ],
+        "residuals": [
+          0.6231454005985477,
+          0.07715133531220042,
+          -0.46884272997414644,
+          -1.0148367952604946,
+          -1.560830860546842,
+          16.893175074166813
+        ],
+        "standardizedResiduals": [
+          0.31157270029927386,
+          0.019287833828050105,
+          -0.23442136498707322,
+          -0.1691394658767491,
+          -0.780415430273421,
+          4.223293768541703
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          0.3551730194979895
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.0625,
+          0.25,
+          0.027777777777777776,
+          0.25,
+          0.022198313718624345
+        ],
+        "objective": 5.6049703264094966,
+        "objectiveRoundoffEstimate": 2.4259921470326724e-12,
+        "normalizedScore": [
+          -2.1441182163073336e-12,
+          -3.884337296256035e-12
+        ],
+        "normalizedScoreInfinity": 3.884337296256035e-12,
+        "scoreRoundoffEstimate": 3.6785267009925075e-13,
+        "standardizedPredictionStep": 5.098976796347188e-11,
+        "relativeObjectiveChange": 1.5846264439888408e-16,
+        "irlsDesignConditionEstimate": 4.007846435747709
+      },
+      "objective": 5.6049703264094966,
+      "objectiveError": 1.584626443988841e-16,
+      "score": 3.884337296256035e-12,
+      "scoreError": 3.6785267009925075e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 5.075995179737447e-12
+    },
+    {
+      "id": "two-dimensional-flat",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 11,
+      "parameters": [
+        0.9999999999910002,
+        0.999999999991
+      ],
+      "lastState": {
+        "iteration": 11,
+        "parameters": [
+          0.9999999999910002,
+          0.999999999991
+        ],
+        "fittedObservations": [
+          0.9999999999910002,
+          0.9999999999910002,
+          0.9999999999910002,
+          0.9999999999910002,
+          0.999999999991,
+          0.999999999991,
+          0.999999999991,
+          0.999999999991
+        ],
+        "residuals": [
+          -0.9999999999910002,
+          -0.9999999999910002,
+          9.000000000008999,
+          9.000000000008999,
+          -0.999999999991,
+          -0.999999999991,
+          9.000000000009,
+          9.000000000009
+        ],
+        "standardizedResiduals": [
+          -0.9999999999910002,
+          -0.9999999999910002,
+          9.000000000008999,
+          9.000000000008999,
+          -0.999999999991,
+          -0.999999999991,
+          9.000000000009,
+          9.000000000009
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.11111111111100001,
+          0.11111111111100001,
+          1,
+          1,
+          0.11111111111099999,
+          0.11111111111099999
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          0.11111111111100001,
+          0.11111111111100001,
+          1,
+          1,
+          0.11111111111099999,
+          0.11111111111099999
+        ],
+        "objective": 36.00000000000001,
+        "objectiveRoundoffEstimate": 6.139089236964197e-12,
+        "normalizedScore": [
+          8.999800904518906e-12,
+          9.000022949123831e-12
+        ],
+        "normalizedScoreInfinity": 9.000022949123831e-12,
+        "scoreRoundoffEstimate": 2.700062395874312e-13,
+        "standardizedPredictionStep": 8.100031756441695e-11,
+        "relativeObjectiveChange": 1.9737298215558335e-16,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 36.00000000000001,
+      "objectiveError": 1.9737298215558337e-16,
+      "score": 9.000022949123831e-12,
+      "scoreError": 2.700062395874312e-13,
+      "uniqueness": "not-established",
+      "exactMultiple": true
+    },
+    {
+      "id": "high-leverage",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 4,
+      "parameters": [
+        0.9998000399920016
+      ],
+      "lastState": {
+        "iteration": 4,
+        "parameters": [
+          0.9998000399920016
+        ],
+        "fittedObservations": [
+          0.9998000399920016,
+          0.9998000399920016,
+          99.98000399920016
+        ],
+        "residuals": [
+          -0.9998000399920016,
+          -0.9998000399920016,
+          0.019996000799835656
+        ],
+        "standardizedResiduals": [
+          -0.9998000399920016,
+          -0.9998000399920016,
+          0.019996000799835656
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          1
+        ],
+        "objective": 0.9998000399920015,
+        "objectiveRoundoffEstimate": 5.783229657344355e-12,
+        "normalizedScore": [
+          -4.378442053365461e-15
+        ],
+        "normalizedScoreInfinity": 4.378442053365461e-15,
+        "scoreRoundoffEstimate": 5.685478328246035e-12,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 0.9998000399920015,
+      "objectiveError": 1.1102230246251565e-16,
+      "score": 4.378442053365461e-15,
+      "scoreError": 5.685478328246035e-12,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 0
+    },
+    {
+      "id": "unique-on-breakpoint",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 33,
+      "parameters": [
+        0.9999999999417928
+      ],
+      "lastState": {
+        "iteration": 33,
+        "parameters": [
+          0.9999999999417928
+        ],
+        "fittedObservations": [
+          0.9999999999417928,
+          0.9999999999417928
+        ],
+        "residuals": [
+          -0.9999999999417928,
+          1.0000000000582072
+        ],
+        "standardizedResiduals": [
+          -0.9999999999417928,
+          1.0000000000582072
+        ],
+        "robustMultipliers": [
+          1,
+          0.9999999999417928
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.9999999999417928
+        ],
+        "objective": 1,
+        "objectiveRoundoffEstimate": 1.4210854714871134e-13,
+        "normalizedScore": [
+          4.1158743080416116e-11
+        ],
+        "normalizedScoreInfinity": 4.1158743080416116e-11,
+        "scoreRoundoffEstimate": 6.029155041111735e-14,
+        "standardizedPredictionStep": 5.820788295807233e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 1,
+      "objectiveError": 0,
+      "score": 4.1158743080416116e-11,
+      "scoreError": 6.029155041111735e-14,
+      "uniqueness": "not-established",
+      "exactMultiple": false,
+      "parameterError": 5.820721682425756e-11
+    },
+    {
+      "id": "tiny-flat-interval",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 33,
+      "parameters": [
+        0.9999999999417926
+      ],
+      "lastState": {
+        "iteration": 33,
+        "parameters": [
+          0.9999999999417926
+        ],
+        "fittedObservations": [
+          0.9999999999417926,
+          0.9999999999417926
+        ],
+        "residuals": [
+          -0.9999999999417926,
+          1.0000000000592075
+        ],
+        "standardizedResiduals": [
+          -0.9999999999417926,
+          1.0000000000592075
+        ],
+        "robustMultipliers": [
+          1,
+          0.9999999999407925
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.9999999999407925
+        ],
+        "objective": 1.000000000001,
+        "objectiveRoundoffEstimate": 1.4210854714876816e-13,
+        "normalizedScore": [
+          4.115885410271858e-11
+        ],
+        "normalizedScoreInfinity": 4.115885410271858e-11,
+        "scoreRoundoffEstimate": 6.029155041111735e-14,
+        "standardizedPredictionStep": 5.820766091346741e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 1.000000000001,
+      "objectiveError": 0,
+      "score": 4.115885410271858e-11,
+      "scoreError": 6.029155041111735e-14,
+      "uniqueness": "not-established",
+      "exactMultiple": true
+    },
+    {
+      "id": "near-breakpoint-unique",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 33,
+      "parameters": [
+        0.9999999999417928
+      ],
+      "lastState": {
+        "iteration": 33,
+        "parameters": [
+          0.9999999999417928
+        ],
+        "fittedObservations": [
+          0.9999999999417928,
+          0.9999999999417928
+        ],
+        "residuals": [
+          -0.9999999999417928,
+          1.0000000000572071
+        ],
+        "standardizedResiduals": [
+          -0.9999999999417928,
+          1.0000000000572071
+        ],
+        "robustMultipliers": [
+          1,
+          0.9999999999427929
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.9999999999427929
+        ],
+        "objective": 0.9999999999989999,
+        "objectiveRoundoffEstimate": 1.421085471486545e-13,
+        "normalizedScore": [
+          4.1158743080416116e-11
+        ],
+        "normalizedScoreInfinity": 4.1158743080416116e-11,
+        "scoreRoundoffEstimate": 6.029155041111735e-14,
+        "standardizedPredictionStep": 5.820788295807233e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 0.9999999999989999,
+      "objectiveError": 2.220446049250313e-16,
+      "score": 4.1158743080416116e-11,
+      "scoreError": 6.029155041111735e-14,
+      "uniqueness": "not-established",
+      "exactMultiple": false,
+      "parameterError": 5.7707172373966387e-11
+    },
+    {
+      "id": "random-0",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        -0.0510204081632647
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          -0.0510204081632647
+        ],
+        "fittedObservations": [
+          -0.0510204081632647,
+          -0.0510204081632647,
+          -0.0510204081632647,
+          -0.0510204081632647,
+          -0.0510204081632647,
+          -0.0510204081632647
+        ],
+        "residuals": [
+          -7.948979591836736,
+          2.051020408163265,
+          1.0510204081632648,
+          -0.9489795918367353,
+          -4.948979591836736,
+          2.051020408163265
+        ],
+        "standardizedResiduals": [
+          -1.987244897959184,
+          1.0255102040816324,
+          0.5255102040816324,
+          -0.15816326530612254,
+          -1.237244897959184,
+          0.3418367346938775
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.25,
+          0.25,
+          0.027777777777777776,
+          0.0625,
+          0.027777777777777776
+        ],
+        "objective": 3.474808673469388,
+        "objectiveRoundoffEstimate": 6.000249428080945e-13,
+        "normalizedScore": [
+          -2.0816681711721685e-16
+        ],
+        "normalizedScoreInfinity": 2.0816681711721685e-16,
+        "scoreRoundoffEstimate": 1.1499241203331105e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 3.474808673469388,
+      "objectiveError": 1.2780249262088615e-16,
+      "score": 2.0816681711721685e-16,
+      "scoreError": 1.1499241203331105e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 6.106226635438361e-16
+    },
+    {
+      "id": "random-1",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 49,
+      "parameters": [
+        -6.999999999893705
+      ],
+      "lastState": {
+        "iteration": 49,
+        "parameters": [
+          -6.999999999893705
+        ],
+        "fittedObservations": [
+          -6.999999999893705,
+          -6.999999999893705,
+          -6.999999999893705,
+          -6.999999999893705
+        ],
+        "residuals": [
+          -3.0000000001062954,
+          0.9999999998937046,
+          2.9999999998937046,
+          7.999999999893705
+        ],
+        "standardizedResiduals": [
+          -3.0000000001062954,
+          0.4999999999468523,
+          1.4999999999468523,
+          3.9999999999468523
+        ],
+        "robustMultipliers": [
+          0.6666666666430454,
+          1,
+          1,
+          0.5000000000066435
+        ],
+        "derivedIrlsWeights": [
+          0.6666666666430454,
+          0.25,
+          0.25,
+          0.12500000000166087
+        ],
+        "objective": 11.25,
+        "objectiveRoundoffEstimate": 2.515321284575649e-12,
+        "normalizedScore": [
+          -2.0087931318357732e-11
+        ],
+        "normalizedScoreInfinity": 2.0087931318357732e-11,
+        "scoreRoundoffEstimate": 1.503935499746637e-13,
+        "standardizedPredictionStep": 6.713474220987337e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 11.25,
+      "objectiveError": 0,
+      "score": 2.0087931318357732e-11,
+      "scoreError": 1.503935499746637e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.5185059558981654e-11
+    },
+    {
+      "id": "random-2",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        0.4313725490196078
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          0.4313725490196078
+        ],
+        "fittedObservations": [
+          0.4313725490196078,
+          0.4313725490196078,
+          0.4313725490196078,
+          0.4313725490196078,
+          0.4313725490196078,
+          0.4313725490196078,
+          0.4313725490196078
+        ],
+        "residuals": [
+          -1.4313725490196079,
+          1.5686274509803921,
+          -5.431372549019608,
+          4.568627450980392,
+          0.5686274509803921,
+          6.568627450980392,
+          -6.431372549019608
+        ],
+        "standardizedResiduals": [
+          -1.4313725490196079,
+          1.5686274509803921,
+          -2.715686274509804,
+          2.284313725490196,
+          0.1895424836601307,
+          2.1895424836601305,
+          -2.1437908496732025
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          0.25,
+          0.25,
+          0.1111111111111111,
+          0.1111111111111111,
+          0.1111111111111111
+        ],
+        "objective": 13.264161220043572,
+        "objectiveRoundoffEstimate": 2.5466145774085985e-12,
+        "normalizedScore": [
+          0
+        ],
+        "normalizedScoreInfinity": 0,
+        "scoreRoundoffEstimate": 1.8463459603721825e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 13.264161220043572,
+      "objectiveError": 0,
+      "score": 0,
+      "scoreError": 1.8463459603721825e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 5.551115123125783e-17
+    },
+    {
+      "id": "random-3",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        -5.833333333333331
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          -5.833333333333331
+        ],
+        "fittedObservations": [
+          -5.833333333333331,
+          -5.833333333333331,
+          -5.833333333333331,
+          -5.833333333333331,
+          -5.833333333333331,
+          -5.833333333333331
+        ],
+        "residuals": [
+          1.8333333333333313,
+          -1.1666666666666687,
+          -0.16666666666666874,
+          0.8333333333333313,
+          2.8333333333333313,
+          -0.16666666666666874
+        ],
+        "standardizedResiduals": [
+          0.3055555555555552,
+          -0.5833333333333344,
+          -0.08333333333333437,
+          0.41666666666666563,
+          0.4722222222222219,
+          -0.027777777777778123
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.027777777777777776,
+          0.25,
+          0.25,
+          0.25,
+          0.027777777777777776,
+          0.027777777777777776
+        ],
+        "objective": 0.41898148148148157,
+        "objectiveRoundoffEstimate": 6.846868750977186e-13,
+        "normalizedScore": [
+          -1.833602714107485e-15
+        ],
+        "normalizedScoreInfinity": 1.833602714107485e-15,
+        "scoreRoundoffEstimate": 3.658294673804052e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 0.41898148148148157,
+      "objectiveError": 1.1102230246251565e-16,
+      "score": 1.833602714107485e-15,
+      "scoreError": 3.658294673804052e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.0451831532575723e-16
+    },
+    {
+      "id": "random-4",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        -3.6724137931034497
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          -3.6724137931034497
+        ],
+        "fittedObservations": [
+          -3.6724137931034497,
+          -3.6724137931034497,
+          -3.6724137931034497,
+          -3.6724137931034497
+        ],
+        "residuals": [
+          6.67241379310345,
+          -8.32758620689655,
+          6.67241379310345,
+          -0.32758620689655027
+        ],
+        "standardizedResiduals": [
+          1.6681034482758625,
+          -2.0818965517241375,
+          1.1120689655172418,
+          -0.16379310344827513
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.0625,
+          0.027777777777777776,
+          0.25
+        ],
+        "objective": 4.190193965517242,
+        "objectiveRoundoffEstimate": 1.1364089745852812e-12,
+        "normalizedScore": [
+          3.608224830031759e-16
+        ],
+        "normalizedScoreInfinity": 3.608224830031759e-16,
+        "scoreRoundoffEstimate": 8.821565428212533e-14,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 4.190193965517242,
+      "objectiveError": 2.1196594406113316e-16,
+      "score": 3.608224830031759e-16,
+      "scoreError": 8.821565428212533e-14,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.627771010042765e-16
+    },
+    {
+      "id": "random-5",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 37,
+      "parameters": [
+        -2.1698113205841487
+      ],
+      "lastState": {
+        "iteration": 37,
+        "parameters": [
+          -2.1698113205841487
+        ],
+        "fittedObservations": [
+          -2.1698113205841487,
+          -2.1698113205841487,
+          -2.1698113205841487,
+          -2.1698113205841487,
+          -2.1698113205841487,
+          -2.1698113205841487,
+          -2.1698113205841487
+        ],
+        "residuals": [
+          -0.8301886794158513,
+          10.169811320584149,
+          8.169811320584149,
+          -3.8301886794158513,
+          5.169811320584149,
+          12.169811320584149,
+          -7.830188679415851
+        ],
+        "standardizedResiduals": [
+          -0.20754716985396282,
+          1.6949685534306915,
+          1.361635220097358,
+          -1.9150943397079256,
+          2.5849056602920744,
+          3.042452830146037,
+          -3.9150943397079256
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          0.7737226277627538,
+          0.6573643410944847,
+          0.510843373482848
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.027777777777777776,
+          0.027777777777777776,
+          0.25,
+          0.19343065694068845,
+          0.041085271318405295,
+          0.127710843370712
+        ],
+        "objective": 17.303721174004195,
+        "objectiveRoundoffEstimate": 2.866485060008227e-12,
+        "normalizedScore": [
+          -3.253941560643625e-11
+        ],
+        "normalizedScoreInfinity": 3.253941560643625e-11,
+        "scoreRoundoffEstimate": 2.495680905098075e-13,
+        "standardizedPredictionStep": 8.665779205330182e-11,
+        "relativeObjectiveChange": 2.0531500959099074e-16,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 17.303721174004195,
+      "objectiveError": 2.053150095909908e-16,
+      "score": 3.253941560643625e-11,
+      "scoreError": 2.495680905098075e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 7.860980658684321e-11
+    },
+    {
+      "id": "random-6",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 88,
+      "parameters": [
+        -4.863636363023059
+      ],
+      "lastState": {
+        "iteration": 88,
+        "parameters": [
+          -4.863636363023059
+        ],
+        "fittedObservations": [
+          -4.863636363023059,
+          -4.863636363023059,
+          -4.863636363023059,
+          -4.863636363023059,
+          -4.863636363023059,
+          -4.863636363023059,
+          -4.863636363023059
+        ],
+        "residuals": [
+          -5.136363636976941,
+          11.863636363023058,
+          1.8636363630230592,
+          7.863636363023059,
+          -6.136363636976941,
+          0.8636363630230592,
+          12.863636363023058
+        ],
+        "standardizedResiduals": [
+          -2.5681818184884704,
+          1.9772727271705097,
+          0.4659090907557648,
+          3.9318181815115296,
+          -3.0681818184884704,
+          0.2159090907557648,
+          3.2159090907557646
+        ],
+        "robustMultipliers": [
+          0.7787610618539151,
+          1,
+          1,
+          0.5086705202708863,
+          0.6518518517867019,
+          1,
+          0.6219081272381316
+        ],
+        "derivedIrlsWeights": [
+          0.19469026546347878,
+          0.027777777777777776,
+          0.0625,
+          0.12716763006772158,
+          0.16296296294667548,
+          0.0625,
+          0.038869257952383225
+        ],
+        "objective": 19.654829545454543,
+        "objectiveRoundoffEstimate": 3.58491014643038e-12,
+        "normalizedScore": [
+          -4.768480055261648e-11
+        ],
+        "normalizedScoreInfinity": 4.768480055261648e-11,
+        "scoreRoundoffEstimate": 2.2238688404977294e-13,
+        "standardizedPredictionStep": 8.945999496745571e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 19.654829545454543,
+      "objectiveError": 1.807552525746587e-16,
+      "score": 4.768480055261648e-11,
+      "scoreError": 2.2238688404977294e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.2609990310508447e-10
+    },
+    {
+      "id": "random-7",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 75,
+      "parameters": [
+        -5.999999999589571
+      ],
+      "lastState": {
+        "iteration": 75,
+        "parameters": [
+          -5.999999999589571
+        ],
+        "fittedObservations": [
+          -5.999999999589571,
+          -5.999999999589571,
+          -5.999999999589571,
+          -5.999999999589571
+        ],
+        "residuals": [
+          9.999999999589571,
+          -4.000000000410429,
+          -4.1042902410026727e-10,
+          10.999999999589571
+        ],
+        "standardizedResiduals": [
+          2.4999999998973927,
+          -2.0000000002052145,
+          -1.0260725602506682e-10,
+          2.7499999998973927
+        ],
+        "robustMultipliers": [
+          0.40000000001641717,
+          0.49999999994869637,
+          1,
+          0.3636363636499315
+        ],
+        "derivedIrlsWeights": [
+          0.025000000001026073,
+          0.12499999998717409,
+          0.0625,
+          0.02272727272812072
+        ],
+        "objective": 5.75,
+        "objectiveRoundoffEstimate": 7.887024366791298e-13,
+        "normalizedScore": [
+          -3.878192211814735e-11
+        ],
+        "normalizedScoreInfinity": 3.878192211814735e-11,
+        "scoreRoundoffEstimate": 1.181663606968266e-13,
+        "standardizedPredictionStep": 7.425615677902897e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 5.75,
+      "objectiveError": 0,
+      "score": 3.878192211814735e-11,
+      "scoreError": 1.181663606968266e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 6.840483735004455e-11
+    },
+    {
+      "id": "random-8",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        -2.8793103448275876
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          -2.8793103448275876
+        ],
+        "fittedObservations": [
+          -2.8793103448275876,
+          -2.8793103448275876,
+          -2.8793103448275876,
+          -2.8793103448275876
+        ],
+        "residuals": [
+          3.8793103448275876,
+          -2.1206896551724124,
+          0.8793103448275876,
+          5.879310344827587
+        ],
+        "standardizedResiduals": [
+          1.2931034482758625,
+          -2.1206896551724124,
+          0.4396551724137938,
+          2.9396551724137936
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.1111111111111111,
+          1,
+          0.25,
+          0.25
+        ],
+        "objective": 7.502155172413793,
+        "objectiveRoundoffEstimate": 1.6672027743033112e-12,
+        "normalizedScore": [
+          5.551115123125783e-16
+        ],
+        "normalizedScoreInfinity": 5.551115123125783e-16,
+        "scoreRoundoffEstimate": 1.4541748991801835e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 7.502155172413793,
+      "objectiveError": 0,
+      "score": 5.551115123125783e-16,
+      "scoreError": 1.4541748991801835e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.62703727628209e-16
+    },
+    {
+      "id": "random-9",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 28,
+      "parameters": [
+        -1.6666666665492447
+      ],
+      "lastState": {
+        "iteration": 28,
+        "parameters": [
+          -1.6666666665492447
+        ],
+        "fittedObservations": [
+          -1.6666666665492447,
+          -1.6666666665492447,
+          -1.6666666665492447,
+          -1.6666666665492447,
+          -1.6666666665492447,
+          -1.6666666665492447
+        ],
+        "residuals": [
+          -9.333333333450755,
+          10.666666666549245,
+          -8.333333333450755,
+          9.666666666549245,
+          0.6666666665492447,
+          11.666666666549245
+        ],
+        "standardizedResiduals": [
+          -4.666666666725377,
+          5.333333333274623,
+          -4.166666666725377,
+          1.6111111110915408,
+          0.33333333327462233,
+          1.9444444444248743
+        ],
+        "robustMultipliers": [
+          0.21428571428301837,
+          0.18750000000206404,
+          0.23999999999661825,
+          0.6206896551799533,
+          1,
+          0.5142857142908904
+        ],
+        "derivedIrlsWeights": [
+          0.053571428570754594,
+          0.04687500000051601,
+          0.05999999999915456,
+          0.01724137931055426,
+          0.25,
+          0.014285714285858066
+        ],
+        "objective": 15.277777777777777,
+        "objectiveRoundoffEstimate": 1.9389921766886642e-12,
+        "normalizedScore": [
+          -2.8572588739450566e-11
+        ],
+        "normalizedScoreInfinity": 2.8572588739450566e-11,
+        "scoreRoundoffEstimate": 1.8442440378738103e-13,
+        "standardizedPredictionStep": 7.64563967692311e-11,
+        "relativeObjectiveChange": 1.1627062948801638e-16,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 15.277777777777777,
+      "objectiveError": 1.1627062948801638e-16,
+      "score": 2.8572588739450566e-11,
+      "scoreError": 1.8442440378738103e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 7.045324323939895e-11
+    },
+    {
+      "id": "random-10",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 13,
+      "parameters": [
+        -0.3999999999978316
+      ],
+      "lastState": {
+        "iteration": 13,
+        "parameters": [
+          -0.3999999999978316
+        ],
+        "fittedObservations": [
+          -0.3999999999978316,
+          -0.3999999999978316,
+          -0.3999999999978316,
+          -0.3999999999978316,
+          -0.3999999999978316,
+          -0.3999999999978316
+        ],
+        "residuals": [
+          -1.6000000000021684,
+          11.399999999997831,
+          0.3999999999978316,
+          -9.600000000002169,
+          -5.600000000002169,
+          11.399999999997831
+        ],
+        "standardizedResiduals": [
+          -0.8000000000010842,
+          3.7999999999992773,
+          0.3999999999978316,
+          -3.2000000000007227,
+          -2.8000000000010843,
+          5.699999999998916
+        ],
+        "robustMultipliers": [
+          1,
+          0.26315789473689216,
+          1,
+          0.31249999999992945,
+          0.3571428571427188,
+          0.17543859649126145
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.02923976608187691,
+          1,
+          0.03472222222221438,
+          0.0892857142856797,
+          0.04385964912281536
+        ],
+        "objective": 13.9,
+        "objectiveRoundoffEstimate": 1.6901443207944966e-12,
+        "normalizedScore": [
+          -1.9300672171596034e-12
+        ],
+        "normalizedScoreInfinity": 1.9300672171596034e-12,
+        "scoreRoundoffEstimate": 1.7000103177030087e-13,
+        "standardizedPredictionStep": 1.3750112159982564e-11,
+        "relativeObjectiveChange": 1.2779545607196046e-16,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 13.9,
+      "objectiveError": 0,
+      "score": 1.9300672171596034e-12,
+      "scoreError": 1.7000103177030087e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 2.1684321005466245e-12
+    },
+    {
+      "id": "random-11",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 14,
+      "parameters": [
+        6.705882352912385
+      ],
+      "lastState": {
+        "iteration": 14,
+        "parameters": [
+          6.705882352912385
+        ],
+        "fittedObservations": [
+          6.705882352912385,
+          6.705882352912385,
+          6.705882352912385,
+          6.705882352912385
+        ],
+        "residuals": [
+          3.2941176470876146,
+          -2.7058823529123854,
+          -9.705882352912386,
+          1.2941176470876146
+        ],
+        "standardizedResiduals": [
+          1.6470588235438073,
+          -0.9019607843041285,
+          -3.235294117637462,
+          0.43137254902920485
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.6181818181836519,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.1111111111111111,
+          0.06868686868707244,
+          0.1111111111111111
+        ],
+        "objective": 6.326797385620916,
+        "objectiveRoundoffEstimate": 1.4998489015732443e-12,
+        "normalizedScore": [
+          8.900560843905225e-12
+        ],
+        "normalizedScoreInfinity": 8.900560843905225e-12,
+        "scoreRoundoffEstimate": 2.022379344043222e-13,
+        "standardizedPredictionStep": 9.897771491296226e-11,
+        "relativeObjectiveChange": 1.4038357253524704e-16,
+        "irlsDesignConditionEstimate": 1
+      },
+      "objective": 6.326797385620916,
+      "objectiveError": 1.4038357253524707e-16,
+      "score": 8.900560843905225e-12,
+      "scoreError": 2.022379344043222e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.293423316675328e-12
+    },
+    {
+      "id": "random-12",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 15,
+      "parameters": [
+        8.418831168829527,
+        -0.6655844155843067
+      ],
+      "lastState": {
+        "iteration": 15,
+        "parameters": [
+          8.418831168829527,
+          -0.6655844155843067
+        ],
+        "fittedObservations": [
+          8.418831168829527,
+          7.753246753245221,
+          7.087662337660914,
+          6.422077922076607,
+          5.7564935064923
+        ],
+        "residuals": [
+          0.5811688311704728,
+          -13.753246753245222,
+          -4.087662337660914,
+          1.5779220779233931,
+          0.2435064935076996
+        ],
+        "standardizedResiduals": [
+          0.5811688311704728,
+          -6.876623376622611,
+          -2.043831168830457,
+          0.5259740259744644,
+          0.2435064935076996
+        ],
+        "robustMultipliers": [
+          1,
+          0.1454202077431701,
+          0.48927720413043246,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.036355051935792526,
+          0.12231930103260812,
+          0.1111111111111111,
+          1
+        ],
+        "objective": 8.257305194805195,
+        "objectiveRoundoffEstimate": 2.912567733889876e-12,
+        "normalizedScore": [
+          1.8527956946456925e-12,
+          1.2319312236996893e-12
+        ],
+        "normalizedScoreInfinity": 1.8527956946456925e-12,
+        "scoreRoundoffEstimate": 1.0521522409011227e-12,
+        "standardizedPredictionStep": 2.134470378223341e-11,
+        "relativeObjectiveChange": 2.1512549160927048e-16,
+        "irlsDesignConditionEstimate": 3.5899277336061455
+      },
+      "objective": 8.257305194805195,
+      "objectiveError": 0,
+      "score": 1.8527956946456925e-12,
+      "scoreError": 1.0521522409011227e-12,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.949621849743911e-13
+    },
+    {
+      "id": "random-13",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 16,
+      "parameters": [
+        8.615307150045185,
+        -1.5508559919397915
+      ],
+      "lastState": {
+        "iteration": 16,
+        "parameters": [
+          8.615307150045185,
+          -1.5508559919397915
+        ],
+        "fittedObservations": [
+          8.615307150045185,
+          7.064451158105394,
+          5.513595166165602,
+          3.96273917422581,
+          2.4118831822860187,
+          0.8610271903462277
+        ],
+        "residuals": [
+          2.3846928499548152,
+          -0.0644511581053937,
+          -1.5135951661656017,
+          -14.96273917422581,
+          -0.4118831822860187,
+          7.138972809653772
+        ],
+        "standardizedResiduals": [
+          1.1923464249774076,
+          -0.03222557905269685,
+          -0.5045317220552006,
+          -7.481369587112905,
+          -0.4118831822860187,
+          3.569486404826886
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          0.26733073091925796,
+          1,
+          0.5603046974196269
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.25,
+          0.1111111111111111,
+          0.06683268272981449,
+          1,
+          0.1400761743549067
+        ],
+        "objective": 19.02517623363545,
+        "objectiveRoundoffEstimate": 7.144568029949098e-12,
+        "normalizedScore": [
+          -3.004319015786905e-12,
+          -4.039990564308482e-12
+        ],
+        "normalizedScoreInfinity": 4.039990564308482e-12,
+        "scoreRoundoffEstimate": 5.009387700703069e-13,
+        "standardizedPredictionStep": 3.7205794001238246e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 5.2409797034058645
+      },
+      "objective": 19.02517623363545,
+      "objectiveError": 0,
+      "score": 4.039990564308482e-12,
+      "scoreError": 5.009387700703069e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 2.459039465558637e-12
+    },
+    {
+      "id": "random-14",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 17,
+      "parameters": [
+        1.9268292682932349,
+        -3.1544715447093337
+      ],
+      "lastState": {
+        "iteration": 17,
+        "parameters": [
+          1.9268292682932349,
+          -3.1544715447093337
+        ],
+        "fittedObservations": [
+          1.9268292682932349,
+          -1.2276422764160988,
+          -4.382113821125433,
+          -7.536585365834766,
+          -10.6910569105441
+        ],
+        "residuals": [
+          1.0731707317067651,
+          -7.772357723583902,
+          8.382113821125433,
+          -2.4634146341652343,
+          17.6910569105441
+        ],
+        "standardizedResiduals": [
+          0.5365853658533826,
+          -1.9430894308959754,
+          2.0955284552813582,
+          -1.2317073170826172,
+          2.9485094850906832
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.9544131910780796,
+          1,
+          0.6783088235303706
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.0625,
+          0.05965082444237998,
+          0.25,
+          0.018841911764732516
+        ],
+        "objective": 8.87838753387534,
+        "objectiveRoundoffEstimate": 2.6199626629579935e-12,
+        "normalizedScore": [
+          -3.2661928717203637e-12,
+          -4.2058578841874805e-12
+        ],
+        "normalizedScoreInfinity": 4.2058578841874805e-12,
+        "scoreRoundoffEstimate": 3.036373828872384e-13,
+        "standardizedPredictionStep": 4.0419001479108374e-11,
+        "relativeObjectiveChange": 2.0007651531571362e-16,
+        "irlsDesignConditionEstimate": 3.692520143627738
+      },
+      "objective": 8.87838753387534,
+      "objectiveError": 2.0007651531571367e-16,
+      "score": 4.2058578841874805e-12,
+      "scoreError": 3.036373828872384e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.9379892879482046e-12
+    },
+    {
+      "id": "random-15",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        2.1735218508997463,
+        -0.7149100257069421
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          2.1735218508997463,
+          -0.7149100257069421
+        ],
+        "fittedObservations": [
+          2.1735218508997463,
+          1.4586118251928042,
+          0.7437017994858621,
+          0.02879177377892006,
+          -0.686118251928022,
+          -1.401028277634964
+        ],
+        "residuals": [
+          -3.1735218508997463,
+          9.541388174807196,
+          -2.743701799485862,
+          2.97120822622108,
+          2.686118251928022,
+          -5.598971722365036
+        ],
+        "standardizedResiduals": [
+          -0.7933804627249366,
+          1.590231362467866,
+          -0.6859254498714655,
+          0.74280205655527,
+          0.447686375321337,
+          -0.933161953727506
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.027777777777777776,
+          0.0625,
+          0.0625,
+          0.027777777777777776,
+          0.027777777777777776
+        ],
+        "objective": 2.6258756426735217,
+        "objectiveRoundoffEstimate": 1.0454583785369311e-12,
+        "normalizedScore": [
+          -2.220446049250313e-16,
+          1.1102230246251565e-16
+        ],
+        "normalizedScoreInfinity": 2.220446049250313e-16,
+        "scoreRoundoffEstimate": 1.6558617903215495e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.267851236022194
+      },
+      "objective": 2.6258756426735217,
+      "objectiveError": 0,
+      "score": 2.220446049250313e-16,
+      "scoreError": 1.6558617903215495e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.4302246226158728e-15
+    },
+    {
+      "id": "random-16",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        8.351428571428578,
+        -3.3914285714285732
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          8.351428571428578,
+          -3.3914285714285732
+        ],
+        "fittedObservations": [
+          8.351428571428578,
+          4.960000000000004,
+          1.5685714285714312,
+          -1.822857142857142,
+          -5.214285714285715
+        ],
+        "residuals": [
+          -3.3514285714285776,
+          5.039999999999996,
+          2.431428571428569,
+          1.822857142857142,
+          -0.7857142857142847
+        ],
+        "standardizedResiduals": [
+          -1.6757142857142888,
+          1.6799999999999986,
+          1.2157142857142844,
+          0.911428571428571,
+          -0.7857142857142847
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.1111111111111111,
+          0.25,
+          0.25,
+          1
+        ],
+        "objective": 4.278214285714286,
+        "objectiveRoundoffEstimate": 5.4770613441438166e-12,
+        "normalizedScore": [
+          -7.771561172376096e-16,
+          2.220446049250313e-16
+        ],
+        "normalizedScoreInfinity": 7.771561172376096e-16,
+        "scoreRoundoffEstimate": 7.577869932993072e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 5.6516245636521605
+      },
+      "objective": 4.278214285714286,
+      "objectiveError": 2.0760493990820192e-16,
+      "score": 7.771561172376096e-16,
+      "scoreError": 7.577869932993072e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 6.381028673863369e-16
+    },
+    {
+      "id": "random-17",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        -1.3994824804057078e-15,
+        3.5769230769230775
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          -1.3994824804057078e-15,
+          3.5769230769230775
+        ],
+        "fittedObservations": [
+          -1.3994824804057078e-15,
+          3.576923076923076,
+          7.153846153846153,
+          10.730769230769232
+        ],
+        "residuals": [
+          2.0000000000000013,
+          2.423076923076924,
+          -8.153846153846153,
+          1.2692307692307683
+        ],
+        "standardizedResiduals": [
+          0.5000000000000003,
+          0.40384615384615397,
+          -2.0384615384615383,
+          0.6346153846153841
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.027777777777777776,
+          0.0625,
+          0.25
+        ],
+        "objective": 2.485576923076923,
+        "objectiveRoundoffEstimate": 2.1237029229199e-12,
+        "normalizedScore": [
+          -2.7755575615628914e-17,
+          -1.3877787807814457e-16
+        ],
+        "normalizedScoreInfinity": 1.3877787807814457e-16,
+        "scoreRoundoffEstimate": 1.881608662408376e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 5.6899509213783075
+      },
+      "objective": 2.485576923076923,
+      "objectiveError": 0,
+      "score": 1.3877787807814457e-16,
+      "scoreError": 1.881608662408376e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.3994824804057078e-15
+    },
+    {
+      "id": "random-18",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        -7.781818181818182,
+        2.9454545454545453
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          -7.781818181818182,
+          2.9454545454545453
+        ],
+        "fittedObservations": [
+          -7.781818181818182,
+          -4.836363636363637,
+          -1.8909090909090915,
+          1.0545454545454538,
+          3.999999999999999
+        ],
+        "residuals": [
+          -0.2181818181818178,
+          2.836363636363637,
+          -4.1090909090909085,
+          -10.054545454545455,
+          8
+        ],
+        "standardizedResiduals": [
+          -0.0363636363636363,
+          0.7090909090909092,
+          -0.6848484848484847,
+          -1.6757575757575758,
+          1.3333333333333333
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.027777777777777776,
+          0.0625,
+          0.027777777777777776,
+          0.027777777777777776,
+          0.027777777777777776
+        ],
+        "objective": 2.7795454545454543,
+        "objectiveRoundoffEstimate": 1.7852386235972515e-12,
+        "normalizedScore": [
+          5.551115123125783e-17,
+          0
+        ],
+        "normalizedScoreInfinity": 5.551115123125783e-17,
+        "scoreRoundoffEstimate": 2.5359522699605404e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.253989299690313
+      },
+      "objective": 2.7795454545454543,
+      "objectiveError": 1.5977044344564802e-16,
+      "score": 5.551115123125783e-17,
+      "scoreError": 2.5359522699605404e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 0
+    },
+    {
+      "id": "random-19",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 11,
+      "parameters": [
+        -2.8684210526296745,
+        2.447368421053478
+      ],
+      "lastState": {
+        "iteration": 11,
+        "parameters": [
+          -2.8684210526296745,
+          2.447368421053478
+        ],
+        "fittedObservations": [
+          -2.8684210526296745,
+          -0.42105263157619666,
+          2.026315789477281,
+          4.4736842105307595
+        ],
+        "residuals": [
+          -2.1315789473703255,
+          0.42105263157619666,
+          9.97368421052272,
+          -1.4736842105307595
+        ],
+        "standardizedResiduals": [
+          -0.7105263157901085,
+          0.21052631578809833,
+          4.98684210526136,
+          -0.7368421052653797
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.20052770448556043,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.1111111111111111,
+          0.25,
+          0.05013192612139011,
+          0.25
+        ],
+        "objective": 5.032894736842106,
+        "objectiveRoundoffEstimate": 1.2140931534974147e-12,
+        "normalizedScore": [
+          -2.1662671656486054e-12,
+          -2.149169731069378e-12
+        ],
+        "normalizedScoreInfinity": 2.1662671656486054e-12,
+        "scoreRoundoffEstimate": 3.271031430263045e-13,
+        "standardizedPredictionStep": 2.4768187500967542e-11,
+        "relativeObjectiveChange": 1.7647466639793334e-16,
+        "irlsDesignConditionEstimate": 4.46875165982269
+      },
+      "objective": 5.032894736842106,
+      "objectiveError": 1.7647466639793337e-16,
+      "score": 2.1662671656486054e-12,
+      "scoreError": 3.271031430263045e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 6.638685523835652e-13
+    },
+    {
+      "id": "random-20",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 30,
+      "parameters": [
+        3.9805249789839237,
+        -1.8348856900992707
+      ],
+      "lastState": {
+        "iteration": 30,
+        "parameters": [
+          3.9805249789839237,
+          -1.8348856900992707
+        ],
+        "fittedObservations": [
+          3.9805249789839237,
+          2.145639288884653,
+          0.3107535987853822,
+          -1.5241320913138883,
+          -3.359017781413159,
+          -5.19390347151243,
+          -7.0287891616117
+        ],
+        "residuals": [
+          -1.9805249789839237,
+          6.854360711115347,
+          -9.310753598785382,
+          -10.475867908686112,
+          10.35901778141316,
+          -2.8060965284875703,
+          10.0287891616117
+        ],
+        "standardizedResiduals": [
+          -0.9902624894919618,
+          3.4271803555576734,
+          -2.3276883996963456,
+          -5.237933954343056,
+          5.17950889070658,
+          -1.4030482642437851,
+          1.6714648602686166
+        ],
+        "robustMultipliers": [
+          1,
+          0.8753551575233156,
+          1,
+          0.5727449078491218,
+          0.5792054928958226,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.2188387893808289,
+          0.0625,
+          0.14318622696228045,
+          0.14480137322395564,
+          0.25,
+          0.027777777777777776
+        ],
+        "objective": 33.61441574936495,
+        "objectiveRoundoffEstimate": 9.487897907419979e-12,
+        "normalizedScore": [
+          -2.318487068997399e-11,
+          -1.6839168948123984e-11
+        ],
+        "normalizedScoreInfinity": 2.318487068997399e-11,
+        "scoreRoundoffEstimate": 2.89988641985333e-13,
+        "standardizedPredictionStep": 8.801315232176421e-11,
+        "relativeObjectiveChange": 2.1138036164544192e-16,
+        "irlsDesignConditionEstimate": 4.053348320918707
+      },
+      "objective": 33.61441574936495,
+      "objectiveError": 2.1138036164544195e-16,
+      "score": 2.318487068997399e-11,
+      "scoreError": 2.89988641985333e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.8292622281592106e-11
+    },
+    {
+      "id": "random-21",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 25,
+      "parameters": [
+        11.83333333334237,
+        -7.055555555556604
+      ],
+      "lastState": {
+        "iteration": 25,
+        "parameters": [
+          11.83333333334237,
+          -7.055555555556604
+        ],
+        "fittedObservations": [
+          11.83333333334237,
+          4.777777777785766,
+          -2.2777777777708383,
+          -9.333333333327442
+        ],
+        "residuals": [
+          -0.8333333333423703,
+          2.222222222214234,
+          4.277777777770838,
+          -0.6666666666725583
+        ],
+        "standardizedResiduals": [
+          -0.8333333333423703,
+          2.222222222214234,
+          2.138888888885419,
+          -0.6666666666725583
+        ],
+        "robustMultipliers": [
+          1,
+          0.4500000000016176,
+          0.46753246753322597,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.4500000000016176,
+          0.11688311688330649,
+          1
+        ],
+        "objective": 3.9305555555555562,
+        "objectiveRoundoffEstimate": 4.729451398413662e-12,
+        "normalizedScore": [
+          -8.280875984922886e-12,
+          -5.329181540503214e-12
+        ],
+        "normalizedScoreInfinity": 8.280875984922886e-12,
+        "scoreRoundoffEstimate": 1.7267477668510353e-12,
+        "standardizedPredictionStep": 3.0606628342866316e-11,
+        "relativeObjectiveChange": 1.1298382724100532e-16,
+        "irlsDesignConditionEstimate": 3.578648562425777
+      },
+      "objective": 3.9305555555555562,
+      "objectiveError": 2.259676544820107e-16,
+      "score": 8.280875984922886e-12,
+      "scoreError": 1.7267477668510353e-12,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 7.63633288058795e-13
+    },
+    {
+      "id": "random-22",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 2,
+      "parameters": [
+        -4.965517241379309,
+        7.1172413793103475
+      ],
+      "lastState": {
+        "iteration": 2,
+        "parameters": [
+          -4.965517241379309,
+          7.1172413793103475
+        ],
+        "fittedObservations": [
+          -4.965517241379309,
+          2.151724137931039,
+          9.268965517241387,
+          16.386206896551734
+        ],
+        "residuals": [
+          -5.034482758620691,
+          3.848275862068961,
+          2.731034482758613,
+          -4.386206896551734
+        ],
+        "standardizedResiduals": [
+          -5.034482758620691,
+          3.848275862068961,
+          2.731034482758613,
+          -4.386206896551734
+        ],
+        "robustMultipliers": [
+          0.3972602739726026,
+          0.5197132616487461,
+          0.7323232323232345,
+          0.4559748427672946
+        ],
+        "derivedIrlsWeights": [
+          0.3972602739726026,
+          0.5197132616487461,
+          0.7323232323232345,
+          0.4559748427672946
+        ],
+        "objective": 24,
+        "objectiveRoundoffEstimate": 1.0109504038500119e-11,
+        "normalizedScore": [
+          0,
+          -1.1102230246251565e-16
+        ],
+        "normalizedScoreInfinity": 1.1102230246251565e-16,
+        "scoreRoundoffEstimate": 1.1368683772161603e-13,
+        "standardizedPredictionStep": 2.6645352591003757e-15,
+        "relativeObjectiveChange": 2.96059473233375e-16,
+        "irlsDesignConditionEstimate": 4.698242341891192
+      },
+      "objective": 24,
+      "objectiveError": 0,
+      "score": 1.1102230246251565e-16,
+      "scoreError": 1.1368683772161603e-13,
+      "uniqueness": "not-established",
+      "exactMultiple": true
+    },
+    {
+      "id": "random-23",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 31,
+      "parameters": [
+        3.248299319698406,
+        -1.9761904762113691
+      ],
+      "lastState": {
+        "iteration": 31,
+        "parameters": [
+          3.248299319698406,
+          -1.9761904762113691
+        ],
+        "fittedObservations": [
+          3.248299319698406,
+          1.2721088434870367,
+          -0.7040816327243324,
+          -2.680272108935702,
+          -4.656462585147071
+        ],
+        "residuals": [
+          1.7517006803015942,
+          -3.272108843487037,
+          -5.295918367275668,
+          0.6802721089357018,
+          15.656462585147072
+        ],
+        "standardizedResiduals": [
+          1.7517006803015942,
+          -3.272108843487037,
+          -1.7653061224252227,
+          0.3401360544678509,
+          5.218820861715691
+        ],
+        "robustMultipliers": [
+          1,
+          0.6112266112360218,
+          1,
+          1,
+          0.38322832934765627
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.6112266112360218,
+          0.1111111111111111,
+          0.25,
+          0.042580925483072914
+        ],
+        "objective": 16.132086167800455,
+        "objectiveRoundoffEstimate": 3.946855440105124e-12,
+        "normalizedScore": [
+          1.9221596536667107e-11,
+          1.815969596918876e-11
+        ],
+        "normalizedScoreInfinity": 1.9221596536667107e-11,
+        "scoreRoundoffEstimate": 2.865621339251819e-13,
+        "standardizedPredictionStep": 8.551959140845611e-11,
+        "relativeObjectiveChange": 2.2022654986133757e-16,
+        "irlsDesignConditionEstimate": 2.8937793124183404
+      },
+      "objective": 16.132086167800455,
+      "objectiveError": 2.2022654986133762e-16,
+      "score": 1.9221596536667107e-11,
+      "scoreError": 2.865621339251819e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.057228200567302e-11
+    },
+    {
+      "id": "random-24",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 13,
+      "parameters": [
+        7.333333333328469,
+        -3.2222222222141146
+      ],
+      "lastState": {
+        "iteration": 13,
+        "parameters": [
+          7.333333333328469,
+          -3.2222222222141146
+        ],
+        "fittedObservations": [
+          7.333333333328469,
+          4.111111111114354,
+          0.8888888889002402,
+          -2.333333333313875
+        ],
+        "residuals": [
+          4.666666666671531,
+          -1.1111111111143543,
+          10.11111111109976,
+          -0.6666666666861252
+        ],
+        "standardizedResiduals": [
+          0.7777777777785885,
+          -0.5555555555571772,
+          1.6851851851832933,
+          -0.11111111111435419
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.5934065934072597,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.027777777777777776,
+          0.25,
+          0.01648351648353499,
+          0.027777777777777776
+        ],
+        "objective": 1.6481481481481481,
+        "objectiveRoundoffEstimate": 8.381772642200425e-13,
+        "normalizedScore": [
+          -2.1065163502420603e-12,
+          -3.1114694154510403e-12
+        ],
+        "normalizedScoreInfinity": 3.1114694154510403e-12,
+        "scoreRoundoffEstimate": 3.892646243960595e-13,
+        "standardizedPredictionStep": 2.1070034605941146e-11,
+        "relativeObjectiveChange": 1.3472369287586168e-16,
+        "irlsDesignConditionEstimate": 4.962017964471373
+      },
+      "objective": 1.6481481481481481,
+      "objectiveError": 0,
+      "score": 3.1114694154510403e-12,
+      "scoreError": 3.892646243960595e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 2.5161941495894256e-12
+    },
+    {
+      "id": "random-25",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 16,
+      "parameters": [
+        -1.977715877468148,
+        -0.7214484679488163
+      ],
+      "lastState": {
+        "iteration": 16,
+        "parameters": [
+          -1.977715877468148,
+          -0.7214484679488163
+        ],
+        "fittedObservations": [
+          -1.977715877468148,
+          -2.6991643454169645,
+          -3.4206128133657807,
+          -4.142061281314597,
+          -4.863509749263414
+        ],
+        "residuals": [
+          -5.022284122531852,
+          7.699164345416964,
+          -7.57938718663422,
+          -1.8579387186854026,
+          12.863509749263415
+        ],
+        "standardizedResiduals": [
+          -0.8370473537553087,
+          1.924791086354241,
+          -1.26323119777237,
+          -0.9289693593427013,
+          2.1439182915439026
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          0.9328713728916121
+        ],
+        "derivedIrlsWeights": [
+          0.027777777777777776,
+          0.0625,
+          0.027777777777777776,
+          0.25,
+          0.025913093691433672
+        ],
+        "objective": 5.71993964716806,
+        "objectiveRoundoffEstimate": 1.5182375113625834e-12,
+        "normalizedScore": [
+          -3.2346347822453936e-12,
+          -4.807043652022003e-12
+        ],
+        "normalizedScoreInfinity": 4.807043652022003e-12,
+        "scoreRoundoffEstimate": 2.162202915551702e-13,
+        "standardizedPredictionStep": 4.3856140941045396e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 6.38965254419791
+      },
+      "objective": 5.71993964716806,
+      "objectiveError": 0,
+      "score": 4.807043652022003e-12,
+      "scoreError": 2.162202915551702e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.7757462167367066e-11
+    },
+    {
+      "id": "random-26",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 18,
+      "parameters": [
+        8.589321028228676,
+        -1.7354427598199589
+      ],
+      "lastState": {
+        "iteration": 18,
+        "parameters": [
+          8.589321028228676,
+          -1.7354427598199589
+        ],
+        "fittedObservations": [
+          8.589321028228676,
+          6.853878268408717,
+          5.1184355085887585,
+          3.3829927487687996,
+          1.6475499889488407,
+          -0.08789277087111813,
+          -1.823335530691077
+        ],
+        "residuals": [
+          -4.589321028228676,
+          5.146121731591283,
+          -16.11843550858876,
+          -7.3829927487688,
+          10.35245001105116,
+          -0.9121072291288819,
+          -4.176664469308923
+        ],
+        "standardizedResiduals": [
+          -0.7648868380381127,
+          1.2865304328978207,
+          -4.02960887714719,
+          -1.2304987914614667,
+          5.17622500552558,
+          -0.45605361456444093,
+          -1.0441661173272307
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.4963260854775375,
+          1,
+          0.38638196714111456,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.027777777777777776,
+          0.0625,
+          0.031020380342346093,
+          0.027777777777777776,
+          0.09659549178527864,
+          0.25,
+          0.0625
+        ],
+        "objective": 16.937971508093458,
+        "objectiveRoundoffEstimate": 5.569576067354104e-12,
+        "normalizedScore": [
+          1.5756118632026528e-11,
+          1.2696205198281518e-11
+        ],
+        "normalizedScoreInfinity": 1.5756118632026528e-11,
+        "scoreRoundoffEstimate": 3.5946096043211856e-13,
+        "standardizedPredictionStep": 9.691358826557916e-11,
+        "relativeObjectiveChange": 2.0974847413711319e-16,
+        "irlsDesignConditionEstimate": 6.340318516027625
+      },
+      "objective": 16.937971508093458,
+      "objectiveError": 0,
+      "score": 1.5756118632026528e-11,
+      "scoreError": 3.5946096043211856e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.359154828421552e-11
+    },
+    {
+      "id": "random-27",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 26,
+      "parameters": [
+        -7.896551724089068,
+        0.13793103447114707
+      ],
+      "lastState": {
+        "iteration": 26,
+        "parameters": [
+          -7.896551724089068,
+          0.13793103447114707
+        ],
+        "fittedObservations": [
+          -7.896551724089068,
+          -7.7586206896179215,
+          -7.620689655146775,
+          -7.482758620675627,
+          -7.34482758620448,
+          -7.206896551733333
+        ],
+        "residuals": [
+          13.896551724089068,
+          -1.2413793103820785,
+          -3.3793103448532253,
+          -1.517241379324373,
+          11.344827586204481,
+          0.2068965517333332
+        ],
+        "standardizedResiduals": [
+          6.948275862044534,
+          -0.6206896551910392,
+          -1.1264367816177419,
+          -0.7586206896621865,
+          5.6724137931022405,
+          0.0689655172444444
+        ],
+        "robustMultipliers": [
+          0.1439205955340048,
+          1,
+          0.8877551020340808,
+          1,
+          0.17629179331310746,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0359801488835012,
+          0.25,
+          0.09863945578156454,
+          0.25,
+          0.044072948328276865,
+          0.1111111111111111
+        ],
+        "objective": 12.729885057471265,
+        "objectiveRoundoffEstimate": 2.8730427998268047e-12,
+        "normalizedScore": [
+          -1.0671741268453161e-11,
+          -4.722590374317548e-12
+        ],
+        "normalizedScoreInfinity": 1.0671741268453161e-11,
+        "scoreRoundoffEstimate": 5.556856636531802e-13,
+        "standardizedPredictionStep": 6.56030785251005e-11,
+        "relativeObjectiveChange": 1.3954225284679167e-16,
+        "irlsDesignConditionEstimate": 4.987323125046948
+      },
+      "objective": 12.729885057471265,
+      "objectiveError": 0,
+      "score": 1.0671741268453161e-11,
+      "scoreError": 5.556856636531802e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.1611545058798356e-11
+    },
+    {
+      "id": "random-28",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 16,
+      "parameters": [
+        -9.735294117616844,
+        4.323529411752716
+      ],
+      "lastState": {
+        "iteration": 16,
+        "parameters": [
+          -9.735294117616844,
+          4.323529411752716
+        ],
+        "fittedObservations": [
+          -9.735294117616844,
+          -5.411764705864128,
+          -1.0882352941114117,
+          3.2352941176413044
+        ],
+        "residuals": [
+          -0.26470588238315607,
+          13.411764705864128,
+          -1.9117647058885883,
+          3.7647058823586956
+        ],
+        "standardizedResiduals": [
+          -0.044117647063859344,
+          3.352941176466032,
+          -0.9558823529442941,
+          0.9411764705896739
+        ],
+        "robustMultipliers": [
+          1,
+          0.298245614035493,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.027777777777777776,
+          0.018640350877218312,
+          0.25,
+          0.0625
+        ],
+        "objective": 3.7536764705882355,
+        "objectiveRoundoffEstimate": 1.36110730529322e-12,
+        "normalizedScore": [
+          -3.211930721391809e-12,
+          -1.5993872892750005e-12
+        ],
+        "normalizedScoreInfinity": 3.211930721391809e-12,
+        "scoreRoundoffEstimate": 6.290782918333595e-13,
+        "standardizedPredictionStep": 3.021138894609976e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 7.150517869641067
+      },
+      "objective": 3.7536764705882355,
+      "objectiveError": 0,
+      "score": 3.211930721391809e-12,
+      "scoreError": 6.290782918333595e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.1035583636441128e-12
+    },
+    {
+      "id": "random-29",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 19,
+      "parameters": [
+        6.417704011092711,
+        -2.7178423236530165
+      ],
+      "lastState": {
+        "iteration": 19,
+        "parameters": [
+          6.417704011092711,
+          -2.7178423236530165
+        ],
+        "fittedObservations": [
+          6.417704011092711,
+          3.699861687439695,
+          0.9820193637866783,
+          -1.7358229598663382,
+          -4.453665283519355,
+          -7.171507607172371
+        ],
+        "residuals": [
+          1.5822959889072887,
+          -1.6998616874396948,
+          3.0179806362133217,
+          0.7358229598663382,
+          -1.5463347164806454,
+          16.171507607172373
+        ],
+        "standardizedResiduals": [
+          0.3955739972268222,
+          -0.8499308437198474,
+          1.5089903181066608,
+          0.18395573996658454,
+          -0.7731673582403227,
+          2.695251267862062
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.6626947754407768,
+          1,
+          1,
+          0.3710229216562892
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.25,
+          0.1656736938601942,
+          0.0625,
+          0.25,
+          0.010306192268230254
+        ],
+        "objective": 3.9594859382203786,
+        "objectiveRoundoffEstimate": 1.9350791140074847e-12,
+        "normalizedScore": [
+          -1.585725994956988e-11,
+          -1.2661260928581441e-11
+        ],
+        "normalizedScoreInfinity": 1.585725994956988e-11,
+        "scoreRoundoffEstimate": 6.163359666946452e-13,
+        "standardizedPredictionStep": 4.604161496502002e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.827549014647019
+      },
+      "objective": 3.9594859382203786,
+      "objectiveError": 1.1215829953159576e-16,
+      "score": 1.585725994956988e-11,
+      "scoreError": 6.163359666946452e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.3168181672948275e-12
+    },
+    {
+      "id": "random-30",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        8.8,
+        -4.346153846153846
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          8.8,
+          -4.346153846153846
+        ],
+        "fittedObservations": [
+          8.8,
+          4.453846153846155,
+          0.10769230769230909,
+          -4.238461538461536
+        ],
+        "residuals": [
+          0.1999999999999993,
+          -10.453846153846154,
+          6.892307692307691,
+          -0.7615384615384642
+        ],
+        "standardizedResiduals": [
+          0.09999999999999964,
+          -1.7423076923076923,
+          1.7230769230769227,
+          -0.3807692307692321
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.027777777777777776,
+          0.0625,
+          0.25
+        ],
+        "objective": 3.0798076923076922,
+        "objectiveRoundoffEstimate": 2.872287023609925e-12,
+        "normalizedScore": [
+          -6.106226635438361e-16,
+          -6.661338147750939e-16
+        ],
+        "normalizedScoreInfinity": 6.661338147750939e-16,
+        "scoreRoundoffEstimate": 4.0241969009687046e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 3.6470548913381178
+      },
+      "objective": 3.0798076923076922,
+      "objectiveError": 0,
+      "score": 6.661338147750939e-16,
+      "scoreError": 4.0241969009687046e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 0
+    },
+    {
+      "id": "random-31",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 10,
+      "parameters": [
+        -11.58974358974412,
+        7.602564102563968
+      ],
+      "lastState": {
+        "iteration": 10,
+        "parameters": [
+          -11.58974358974412,
+          7.602564102563968
+        ],
+        "fittedObservations": [
+          -11.58974358974412,
+          -3.9871794871801525,
+          3.6153846153838156,
+          11.217948717947785
+        ],
+        "residuals": [
+          3.5897435897441206,
+          -1.0128205128198475,
+          -8.615384615383816,
+          0.7820512820522154
+        ],
+        "standardizedResiduals": [
+          0.8974358974360301,
+          -0.5064102564099238,
+          -1.4358974358973027,
+          0.3910256410261077
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.696428571428636,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.25,
+          0.01934523809523989,
+          0.25
+        ],
+        "objective": 1.5432692307692306,
+        "objectiveRoundoffEstimate": 2.0271419870345713e-12,
+        "normalizedScore": [
+          5.633826738460357e-13,
+          5.361266985914881e-13
+        ],
+        "normalizedScoreInfinity": 5.633826738460357e-13,
+        "scoreRoundoffEstimate": 1.1189216470694511e-12,
+        "standardizedPredictionStep": 1.3057110948011541e-11,
+        "relativeObjectiveChange": 1.4387937016949068e-16,
+        "irlsDesignConditionEstimate": 4.807674431746452
+      },
+      "objective": 1.5432692307692306,
+      "objectiveError": 1.4387937016949068e-16,
+      "score": 5.633826738460357e-13,
+      "scoreError": 1.1189216470694511e-12,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.582764846072195e-14
+    },
+    {
+      "id": "random-32",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 13,
+      "parameters": [
+        -1.0528634361202338,
+        0.9207048458124006
+      ],
+      "lastState": {
+        "iteration": 13,
+        "parameters": [
+          -1.0528634361202338,
+          0.9207048458124006
+        ],
+        "fittedObservations": [
+          -1.0528634361202338,
+          -0.13215859030783317,
+          0.7885462555045675,
+          1.709251101316968,
+          2.6299559471293685,
+          3.5506607929417697
+        ],
+        "residuals": [
+          0.05286343612023381,
+          -11.867841409692167,
+          1.2114537444954325,
+          -5.709251101316968,
+          1.3700440528706315,
+          -9.55066079294177
+        ],
+        "standardizedResiduals": [
+          0.05286343612023381,
+          -3.9559471365640557,
+          1.2114537444954325,
+          -1.9030837004389893,
+          1.3700440528706315,
+          -3.1835535976472564
+        ],
+        "robustMultipliers": [
+          1,
+          0.758351893095734,
+          1,
+          1,
+          1,
+          0.9423431734326986
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.08426132145508157,
+          1,
+          0.1111111111111111,
+          1,
+          0.10470479704807761
+        ],
+        "objective": 15.90308370044053,
+        "objectiveRoundoffEstimate": 4.787618172681732e-12,
+        "normalizedScore": [
+          1.211308831017277e-12,
+          2.346178806789112e-12
+        ],
+        "normalizedScoreInfinity": 2.346178806789112e-12,
+        "scoreRoundoffEstimate": 2.29544390808522e-13,
+        "standardizedPredictionStep": 4.881317572369426e-11,
+        "relativeObjectiveChange": 1.116988926714285e-16,
+        "irlsDesignConditionEstimate": 4.045226150404827
+      },
+      "objective": 15.90308370044053,
+      "objectiveError": 0,
+      "score": 2.346178806789112e-12,
+      "scoreError": 2.29544390808522e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 2.9578153037016697e-12
+    },
+    {
+      "id": "random-33",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 13,
+      "parameters": [
+        -4.173428444049679,
+        0.8510922871172701
+      ],
+      "lastState": {
+        "iteration": 13,
+        "parameters": [
+          -4.173428444049679,
+          0.8510922871172701
+        ],
+        "fittedObservations": [
+          -4.173428444049679,
+          -3.3223361569324092,
+          -2.471243869815139,
+          -1.6201515826978685,
+          -0.7690592955805986,
+          0.08203299153667132,
+          0.9331252786539421
+        ],
+        "residuals": [
+          -2.826571555950321,
+          -1.6776638430675908,
+          4.471243869815138,
+          1.6201515826978685,
+          -5.230940704419401,
+          2.9179670084633287,
+          -4.933125278653942
+        ],
+        "standardizedResiduals": [
+          -1.4132857779751604,
+          -0.5592212810225302,
+          1.4904146232717128,
+          1.6201515826978685,
+          -2.6154703522097007,
+          0.9726556694877763,
+          -1.6443750928846474
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          0.764680814795046,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.1111111111111111,
+          0.1111111111111111,
+          1,
+          0.1911702036987615,
+          0.1111111111111111,
+          0.1111111111111111
+        ],
+        "objective": 8.634120968940406,
+        "objectiveRoundoffEstimate": 3.69867007515805e-12,
+        "normalizedScore": [
+          -2.0109192089279304e-12,
+          -2.4871216197652757e-12
+        ],
+        "normalizedScoreInfinity": 2.4871216197652757e-12,
+        "scoreRoundoffEstimate": 3.9205101317550355e-13,
+        "standardizedPredictionStep": 2.0013990464917697e-11,
+        "relativeObjectiveChange": 2.0573684869488775e-16,
+        "irlsDesignConditionEstimate": 5.359418427929049
+      },
+      "objective": 8.634120968940406,
+      "objectiveError": 0,
+      "score": 2.4871216197652757e-12,
+      "scoreError": 3.9205101317550355e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.7997825452198413e-12
+    },
+    {
+      "id": "random-34",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 17,
+      "parameters": [
+        -7.33663366335087,
+        1.7227722772364717
+      ],
+      "lastState": {
+        "iteration": 17,
+        "parameters": [
+          -7.33663366335087,
+          1.7227722772364717
+        ],
+        "fittedObservations": [
+          -7.33663366335087,
+          -5.613861386114398,
+          -3.8910891088779267,
+          -2.168316831641455
+        ],
+        "residuals": [
+          -1.6633663366491298,
+          -3.386138613885602,
+          13.891089108877926,
+          -4.831683168358545
+        ],
+        "standardizedResiduals": [
+          -0.41584158416228245,
+          -0.5643564356476003,
+          3.4727722772194816,
+          -1.2079207920896362
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.5759087669293781,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.027777777777777776,
+          0.03599429793308613,
+          0.0625
+        ],
+        "objective": 5.920792079207921,
+        "objectiveRoundoffEstimate": 1.8002057490459076e-12,
+        "normalizedScore": [
+          -4.576061751748739e-12,
+          -4.633071704063241e-12
+        ],
+        "normalizedScoreInfinity": 4.633071704063241e-12,
+        "scoreRoundoffEstimate": 1.8721828559234067e-13,
+        "standardizedPredictionStep": 3.732592013250269e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 3.9205574774013163
+      },
+      "objective": 5.920792079207921,
+      "objectiveError": 0,
+      "score": 4.633071704063241e-12,
+      "scoreError": 1.8721828559234067e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 5.078443412924509e-12
+    },
+    {
+      "id": "random-35",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        -0.052631578947367266,
+        -2.7368421052631584
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          -0.052631578947367266,
+          -2.7368421052631584
+        ],
+        "fittedObservations": [
+          -0.052631578947367266,
+          -2.7894736842105257,
+          -5.526315789473684,
+          -8.263157894736844,
+          -11.000000000000002
+        ],
+        "residuals": [
+          1.0526315789473673,
+          -0.21052631578947434,
+          -1.473684210526316,
+          1.2631578947368443,
+          1.7763568394002505e-15
+        ],
+        "standardizedResiduals": [
+          0.2631578947368418,
+          -0.10526315789473717,
+          -0.368421052631579,
+          0.31578947368421106,
+          8.881784197001252e-16
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.25,
+          0.0625,
+          0.0625,
+          0.25
+        ],
+        "objective": 0.15789473684210542,
+        "objectiveRoundoffEstimate": 9.109905812166336e-13,
+        "normalizedScore": [
+          3.968138610193315e-16,
+          8.866364432770347e-16
+        ],
+        "normalizedScoreInfinity": 8.866364432770347e-16,
+        "scoreRoundoffEstimate": 5.43128894685396e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.654188657689772
+      },
+      "objective": 0.15789473684210542,
+      "objectiveError": 1.6653345369377348e-16,
+      "score": 8.866364432770347e-16,
+      "scoreError": 5.43128894685396e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.1518563880486e-15
+    },
+    {
+      "id": "random-36",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 16,
+      "parameters": [
+        -7.516853932566079,
+        2.477528089877077
+      ],
+      "lastState": {
+        "iteration": 16,
+        "parameters": [
+          -7.516853932566079,
+          2.477528089877077
+        ],
+        "fittedObservations": [
+          -7.516853932566079,
+          -5.039325842689002,
+          -2.561797752811925,
+          -0.08426966293484828,
+          2.3932584269422286,
+          4.8707865168193045
+        ],
+        "residuals": [
+          -3.483146067433921,
+          1.039325842689002,
+          -7.438202247188075,
+          1.0842696629348483,
+          3.6067415730577714,
+          -15.870786516819305
+        ],
+        "standardizedResiduals": [
+          -0.8707865168584803,
+          0.519662921344501,
+          -1.8595505617970187,
+          0.5421348314674241,
+          1.8033707865288857,
+          -3.967696629204826
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          0.7561061946919152
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.25,
+          0.0625,
+          0.25,
+          0.25,
+          0.0472566371682447
+        ],
+        "objective": 11.419241573033707,
+        "objectiveRoundoffEstimate": 6.6854087808650886e-12,
+        "normalizedScore": [
+          2.2482571360171733e-12,
+          3.774702772574301e-12
+        ],
+        "normalizedScoreInfinity": 3.774702772574301e-12,
+        "scoreRoundoffEstimate": 3.1753242313967974e-13,
+        "standardizedPredictionStep": 4.801137265530997e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 5.226836640606318
+      },
+      "objective": 11.419241573033707,
+      "objectiveError": 0,
+      "score": 3.774702772574301e-12,
+      "scoreError": 3.1753242313967974e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.2637458189959466e-12
+    },
+    {
+      "id": "random-37",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 3,
+      "parameters": [
+        -7.085561497326205,
+        3.5882352941176467
+      ],
+      "lastState": {
+        "iteration": 3,
+        "parameters": [
+          -7.085561497326205,
+          3.5882352941176467
+        ],
+        "fittedObservations": [
+          -7.085561497326205,
+          -3.4973262032085586,
+          0.09090909090908816,
+          3.679144385026735,
+          7.267379679144382
+        ],
+        "residuals": [
+          -0.9144385026737947,
+          -0.5026737967914414,
+          10.909090909090912,
+          -5.679144385026735,
+          -0.26737967914438165
+        ],
+        "standardizedResiduals": [
+          -0.45721925133689734,
+          -0.12566844919786035,
+          2.727272727272728,
+          -1.4197860962566837,
+          -0.13368983957219083
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.0625,
+          0.0625,
+          0.0625,
+          0.25
+        ],
+        "objective": 4.848262032085562,
+        "objectiveRoundoffEstimate": 5.0394293610341585e-12,
+        "normalizedScore": [
+          7.598088824778415e-16,
+          6.661338147750939e-16
+        ],
+        "normalizedScoreInfinity": 7.598088824778415e-16,
+        "scoreRoundoffEstimate": 2.894830387917652e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 3.7430697353065323
+      },
+      "objective": 4.848262032085562,
+      "objectiveError": 0,
+      "score": 7.598088824778415e-16,
+      "scoreError": 2.894830387917652e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 2.5070092752290324e-16
+    },
+    {
+      "id": "random-38",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 32,
+      "parameters": [
+        9.175438596433233,
+        -1.7777777777749564
+      ],
+      "lastState": {
+        "iteration": 32,
+        "parameters": [
+          9.175438596433233,
+          -1.7777777777749564
+        ],
+        "fittedObservations": [
+          9.175438596433233,
+          7.397660818658277,
+          5.6198830408833205,
+          3.8421052631083636,
+          2.0643274853334077,
+          0.28654970755845177,
+          -1.491228070216506
+        ],
+        "residuals": [
+          1.8245614035667668,
+          -8.397660818658277,
+          -2.6198830408833205,
+          -2.8421052631083636,
+          8.935672514666592,
+          -7.286549707558452,
+          0.49122807021650594
+        ],
+        "standardizedResiduals": [
+          0.9122807017833834,
+          -2.0994152046645693,
+          -1.3099415204416602,
+          -0.4736842105180606,
+          4.467836257333296,
+          -1.821637426889613,
+          0.24561403510825297
+        ],
+        "robustMultipliers": [
+          1,
+          0.47632311978028824,
+          0.7633928571581117,
+          1,
+          0.22382198952762583,
+          0.5489566613195183,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.029770194986268015,
+          0.19084821428952792,
+          0.027777777777777776,
+          0.05595549738190646,
+          0.03430979133246989,
+          0.25
+        ],
+        "objective": 8.257309941520468,
+        "objectiveRoundoffEstimate": 3.1174543128814222e-12,
+        "normalizedScore": [
+          2.4347579508088302e-11,
+          1.6496776167329585e-11
+        ],
+        "normalizedScoreInfinity": 2.4347579508088302e-11,
+        "scoreRoundoffEstimate": 6.2420714761909e-13,
+        "standardizedPredictionStep": 4.8124171314611885e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 3.817354617495988
+      },
+      "objective": 8.257309941520468,
+      "objectiveError": 0,
+      "score": 2.4347579508088302e-11,
+      "scoreError": 6.2420714761909e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 6.320624075116912e-12
+    },
+    {
+      "id": "random-39",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 13,
+      "parameters": [
+        0.020397208817648293,
+        1.3741277509351952
+      ],
+      "lastState": {
+        "iteration": 13,
+        "parameters": [
+          0.020397208817648293,
+          1.3741277509351952
+        ],
+        "fittedObservations": [
+          0.020397208817648293,
+          1.3945249597528435,
+          2.768652710688039,
+          4.142780461623234,
+          5.5169082125584294,
+          6.891035963493625,
+          8.26516371442882
+        ],
+        "residuals": [
+          -2.0203972088176485,
+          8.605475040247157,
+          0.23134728931196102,
+          -7.142780461623234,
+          -1.5169082125584294,
+          1.108964036506375,
+          -14.26516371442882
+        ],
+        "standardizedResiduals": [
+          -1.0101986044088243,
+          2.8684916800823856,
+          0.23134728931196102,
+          -2.380926820541078,
+          -0.5056360708528098,
+          1.108964036506375,
+          -4.755054571476273
+        ],
+        "robustMultipliers": [
+          1,
+          0.6972305389230058,
+          1,
+          0.8400090178099173,
+          1,
+          1,
+          0.42060505719476365
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.07747005988033398,
+          1,
+          0.09333433531221304,
+          0.1111111111111111,
+          1,
+          0.04673389524386263
+        ],
+        "objective": 15.288692073716229,
+        "objectiveRoundoffEstimate": 4.571332438051218e-12,
+        "normalizedScore": [
+          -1.1207423877834799e-12,
+          1.5621948179500578e-12
+        ],
+        "normalizedScoreInfinity": 1.5621948179500578e-12,
+        "scoreRoundoffEstimate": 4.3185413933416475e-13,
+        "standardizedPredictionStep": 6.774992546143555e-11,
+        "relativeObjectiveChange": 1.1618762617726466e-16,
+        "irlsDesignConditionEstimate": 5.191603530036575
+      },
+      "objective": 15.288692073716229,
+      "objectiveError": 0,
+      "score": 1.5621948179500578e-12,
+      "scoreError": 4.3185413933416475e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.4642387996532946e-11
+    },
+    {
+      "id": "random-40",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 105,
+      "parameters": [
+        1.6666666659274332,
+        -0.666666666539203
+      ],
+      "lastState": {
+        "iteration": 105,
+        "parameters": [
+          1.6666666659274332,
+          -0.666666666539203
+        ],
+        "fittedObservations": [
+          1.6666666659274332,
+          0.9999999993882301,
+          0.3333333328490271,
+          -0.3333333336901758,
+          -1.000000000229379,
+          -1.666666666768582,
+          -2.3333333333077846
+        ],
+        "residuals": [
+          5.333333334072567,
+          -8.99999999938823,
+          -1.333333332849027,
+          -8.666666666309824,
+          -10.99999999977062,
+          13.666666666768583,
+          1.3333333333077846
+        ],
+        "standardizedResiduals": [
+          2.6666666670362833,
+          -1.4999999998980382,
+          -0.3333333332122568,
+          -4.333333333154912,
+          -2.749999999942655,
+          2.2777777777947636,
+          0.6666666666538923
+        ],
+        "robustMultipliers": [
+          0.3749999999480227,
+          0.666666666711983,
+          1,
+          0.2307692307787325,
+          0.3636363636439464,
+          0.43902439024062856,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.09374999998700567,
+          0.018518518519777306,
+          0.0625,
+          0.05769230769468312,
+          0.02272727272774665,
+          0.01219512195112857,
+          0.25
+        ],
+        "objective": 11.305555555555555,
+        "objectiveRoundoffEstimate": 2.1324176990973482e-12,
+        "normalizedScore": [
+          2.475708527072129e-11,
+          6.109446282209774e-12
+        ],
+        "normalizedScoreInfinity": 2.475708527072129e-11,
+        "scoreRoundoffEstimate": 2.9094851590584856e-13,
+        "standardizedPredictionStep": 8.197742484838955e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.779832604697357
+      },
+      "objective": 11.305555555555555,
+      "objectiveError": 0,
+      "score": 2.475708527072129e-11,
+      "scoreError": 2.9094851590584856e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 4.43540137951004e-10
+    },
+    {
+      "id": "random-41",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 10,
+      "parameters": [
+        8.310782241008434,
+        -2.4707540521480236
+      ],
+      "lastState": {
+        "iteration": 10,
+        "parameters": [
+          8.310782241008434,
+          -2.4707540521480236
+        ],
+        "fittedObservations": [
+          8.310782241008434,
+          5.84002818886041,
+          3.369274136712387,
+          0.8985200845643639,
+          -1.57223396758366
+        ],
+        "residuals": [
+          2.689217758991566,
+          -0.8400281888604102,
+          -7.369274136712387,
+          0.10147991543563606,
+          0.5722339675836601
+        ],
+        "standardizedResiduals": [
+          0.8964059196638553,
+          -0.4200140944302051,
+          -2.4564247122374625,
+          0.10147991543563606,
+          0.28611698379183004
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.4070957253516386,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.1111111111111111,
+          0.25,
+          0.04523285837240429,
+          1,
+          0.25
+        ],
+        "objective": 2.4924829692271553,
+        "objectiveRoundoffEstimate": 2.155184443196016e-12,
+        "normalizedScore": [
+          3.3530261900338587e-12,
+          2.377736896264082e-12
+        ],
+        "normalizedScoreInfinity": 3.3530261900338587e-12,
+        "scoreRoundoffEstimate": 9.558582256325198e-13,
+        "standardizedPredictionStep": 6.716205369627914e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 6.4360535393083635
+      },
+      "objective": 2.4924829692271553,
+      "objectiveError": 0,
+      "score": 3.3530261900338587e-12,
+      "scoreError": 9.558582256325198e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 7.658348361193409e-13
+    },
+    {
+      "id": "random-42",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 11,
+      "parameters": [
+        1.1757197175459113,
+        -1.326181423139173
+      ],
+      "lastState": {
+        "iteration": 11,
+        "parameters": [
+          1.1757197175459113,
+          -1.326181423139173
+        ],
+        "fittedObservations": [
+          1.1757197175459113,
+          -0.15046170559326177,
+          -1.4766431287324349,
+          -2.802824551871608,
+          -4.129005975010781,
+          -5.455187398149954,
+          -6.781368821289127
+        ],
+        "residuals": [
+          0.8242802824540887,
+          -9.849538294406738,
+          0.47664312873243486,
+          2.802824551871608,
+          12.12900597501078,
+          -3.5448126018500457,
+          -0.218631178710873
+        ],
+        "standardizedResiduals": [
+          0.20607007061352217,
+          -2.4623845736016845,
+          0.07944052145540581,
+          1.401412275935804,
+          3.032251493752695,
+          -1.7724063009250228,
+          -0.05465779467771825
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          0.9893638460335027,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.0625,
+          0.027777777777777776,
+          0.25,
+          0.06183524037709392,
+          0.25,
+          0.0625
+        ],
+        "objective": 10.206995179250407,
+        "objectiveRoundoffEstimate": 4.002765286827815e-12,
+        "normalizedScore": [
+          -6.973857255565541e-13,
+          -7.124491968601987e-13
+        ],
+        "normalizedScoreInfinity": 7.124491968601987e-13,
+        "scoreRoundoffEstimate": 2.3662253074644916e-13,
+        "standardizedPredictionStep": 1.7187140599617123e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 5.84026758031985
+      },
+      "objective": 10.206995179250407,
+      "objectiveError": 0,
+      "score": 7.124491968601987e-13,
+      "scoreError": 2.3662253074644916e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 9.34471616639515e-13
+    },
+    {
+      "id": "random-43",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 14,
+      "parameters": [
+        0.8607594936530335,
+        0.6139240506357372
+      ],
+      "lastState": {
+        "iteration": 14,
+        "parameters": [
+          0.8607594936530335,
+          0.6139240506357372
+        ],
+        "fittedObservations": [
+          0.8607594936530335,
+          1.4746835442887707,
+          2.088607594924508,
+          2.702531645560245,
+          3.316455696195982,
+          3.9303797468317194,
+          4.544303797467457
+        ],
+        "residuals": [
+          3.1392405063469666,
+          3.5253164557112293,
+          -8.088607594924508,
+          -9.702531645560246,
+          -0.31645569619598213,
+          -0.9303797468317194,
+          1.4556962025325433
+        ],
+        "standardizedResiduals": [
+          0.7848101265867417,
+          0.5875527426185382,
+          -1.3481012658207512,
+          -2.4256329113900614,
+          -0.05274261603266369,
+          -0.4651898734158597,
+          0.7278481012662716
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.7417840375598045,
+          0.4122635355516051,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.0625,
+          0.027777777777777776,
+          0.020605112154439015,
+          0.02576647097197532,
+          0.027777777777777776,
+          0.25,
+          0.25
+        ],
+        "objective": 3.6287798874824193,
+        "objectiveRoundoffEstimate": 1.0370488652844796e-12,
+        "normalizedScore": [
+          3.4105496204972496e-12,
+          1.7649215422466114e-12
+        ],
+        "normalizedScoreInfinity": 3.4105496204972496e-12,
+        "scoreRoundoffEstimate": 4.1023928325405427e-13,
+        "standardizedPredictionStep": 2.5990126717445605e-11,
+        "relativeObjectiveChange": 1.2237975948388632e-16,
+        "irlsDesignConditionEstimate": 6.47422705116183
+      },
+      "objective": 3.6287798874824193,
+      "objectiveError": 0,
+      "score": 3.4105496204972496e-12,
+      "scoreError": 4.1023928325405427e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 1.7852608280577442e-11
+    },
+    {
+      "id": "random-44",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 17,
+      "parameters": [
+        -7.604651162789782,
+        -0.2325581395345333
+      ],
+      "lastState": {
+        "iteration": 17,
+        "parameters": [
+          -7.604651162789782,
+          -0.2325581395345333
+        ],
+        "fittedObservations": [
+          -7.604651162789782,
+          -7.8372093023243155,
+          -8.069767441858849,
+          -8.302325581393383
+        ],
+        "residuals": [
+          -0.39534883721021785,
+          0.8372093023243155,
+          11.069767441858849,
+          -0.697674418606617
+        ],
+        "standardizedResiduals": [
+          -0.39534883721021785,
+          0.27906976744143847,
+          11.069767441858849,
+          -0.697674418606617
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.09033613445379471,
+          1
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.1111111111111111,
+          0.09033613445379471,
+          1
+        ],
+        "objective": 10.930232558139535,
+        "objectiveRoundoffEstimate": 2.7070025807490837e-12,
+        "normalizedScore": [
+          -1.7133516827527728e-12,
+          -1.6675549829869851e-12
+        ],
+        "normalizedScoreInfinity": 1.7133516827527728e-12,
+        "scoreRoundoffEstimate": 9.056714568967908e-13,
+        "standardizedPredictionStep": 4.072064907489903e-11,
+        "relativeObjectiveChange": 1.6251775339193782e-16,
+        "irlsDesignConditionEstimate": 3.510632460612027
+      },
+      "objective": 10.930232558139535,
+      "objectiveError": 0,
+      "score": 1.7133516827527728e-12,
+      "scoreError": 9.056714568967908e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 3.5041414214731503e-13
+    },
+    {
+      "id": "random-45",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 48,
+      "parameters": [
+        -5.69902912603983,
+        1.0922330096302466
+      ],
+      "lastState": {
+        "iteration": 48,
+        "parameters": [
+          -5.69902912603983,
+          1.0922330096302466
+        ],
+        "fittedObservations": [
+          -5.69902912603983,
+          -4.606796116409583,
+          -3.5145631067793364,
+          -2.4223300971490898,
+          -1.3300970875188431,
+          -0.2378640778885961
+        ],
+        "residuals": [
+          4.69902912603983,
+          -1.3932038835904166,
+          -2.4854368932206636,
+          -1.5776699028509102,
+          5.330097087518843,
+          5.237864077888596
+        ],
+        "standardizedResiduals": [
+          2.349514563019915,
+          -0.6966019417952083,
+          -0.6213592233051659,
+          -0.7888349514254551,
+          0.8883495145864738,
+          1.309466019472149
+        ],
+        "robustMultipliers": [
+          0.42561983472648257,
+          1,
+          1,
+          1,
+          1,
+          0.7636700648429992
+        ],
+        "derivedIrlsWeights": [
+          0.10640495868162064,
+          0.25,
+          0.0625,
+          0.25,
+          0.027777777777777776,
+          0.04772937905268745
+        ],
+        "objective": 3.8003640776699026,
+        "objectiveRoundoffEstimate": 1.436262112447353e-12,
+        "normalizedScore": [
+          -5.835110172824898e-12,
+          1.6481038755955524e-11
+        ],
+        "normalizedScoreInfinity": 1.6481038755955524e-11,
+        "scoreRoundoffEstimate": 5.066874993844558e-13,
+        "standardizedPredictionStep": 5.983746831361714e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.379678084458074
+      },
+      "objective": 3.8003640776699026,
+      "objectiveError": 1.1685438573094413e-16,
+      "score": 1.6481038755955524e-11,
+      "scoreError": 5.066874993844558e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 7.186306660855736e-11
+    },
+    {
+      "id": "random-46",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 10,
+      "parameters": [
+        10.575528700913777,
+        -3.2401812688826572
+      ],
+      "lastState": {
+        "iteration": 10,
+        "parameters": [
+          10.575528700913777,
+          -3.2401812688826572
+        ],
+        "fittedObservations": [
+          10.575528700913777,
+          7.33534743203112,
+          4.095166163148463,
+          0.8549848942658063,
+          -2.385196374616852,
+          -5.62537764349951
+        ],
+        "residuals": [
+          -1.575528700913777,
+          -0.33534743203111983,
+          -0.0951661631484626,
+          11.145015105734194,
+          -5.614803625383148,
+          -0.37462235650049003
+        ],
+        "standardizedResiduals": [
+          -0.7877643504568885,
+          -0.16767371601555991,
+          -0.0475830815742313,
+          5.572507552867097,
+          -1.8716012084610494,
+          -0.37462235650049003
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          0.5383572783955183,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.25,
+          0.25,
+          0.25,
+          0.13458931959887957,
+          0.1111111111111111,
+          1
+        ],
+        "objective": 14.364614803625376,
+        "objectiveRoundoffEstimate": 1.2756072130106712e-11,
+        "normalizedScore": [
+          -2.488287353941132e-12,
+          -1.9704377018925356e-12
+        ],
+        "normalizedScoreInfinity": 2.488287353941132e-12,
+        "scoreRoundoffEstimate": 5.637746527250069e-13,
+        "standardizedPredictionStep": 6.762235216228873e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 5.058627728253683
+      },
+      "objective": 14.364614803625376,
+      "objectiveError": 1.2366198910895467e-16,
+      "score": 2.488287353941132e-12,
+      "scoreError": 5.637746527250069e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 7.027806577096885e-13
+    },
+    {
+      "id": "random-47",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "iterations": 4,
+      "parameters": [
+        -7.106567850753904,
+        1.9890109890109906
+      ],
+      "lastState": {
+        "iteration": 4,
+        "parameters": [
+          -7.106567850753904,
+          1.9890109890109906
+        ],
+        "fittedObservations": [
+          -7.106567850753904,
+          -5.117556861742913,
+          -3.1285458727319226,
+          -1.1395348837209323,
+          0.8494761052900586,
+          2.8384870943010485,
+          4.827498083312039
+        ],
+        "residuals": [
+          4.106567850753904,
+          0.11755686174291302,
+          -0.8714541272680774,
+          -3.8604651162790677,
+          -0.8494761052900586,
+          -4.8384870943010485,
+          3.1725019166879607
+        ],
+        "standardizedResiduals": [
+          1.3688559502513014,
+          0.05877843087145651,
+          -0.4357270636340387,
+          -1.286821705426356,
+          -0.28315870176335284,
+          -1.6128290314336828,
+          1.5862509583439803
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "derivedIrlsWeights": [
+          0.1111111111111111,
+          0.25,
+          0.25,
+          0.1111111111111111,
+          0.1111111111111111,
+          0.1111111111111111,
+          0.25
+        ],
+        "objective": 4.460289064940228,
+        "objectiveRoundoffEstimate": 4.611042035050992e-12,
+        "normalizedScore": [
+          1.1102230246251565e-15,
+          -1.1102230246251565e-16
+        ],
+        "normalizedScoreInfinity": 1.1102230246251565e-15,
+        "scoreRoundoffEstimate": 5.255319979071936e-13,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 4.485509709090253
+      },
+      "objective": 4.460289064940228,
+      "objectiveError": 0,
+      "score": 1.1102230246251565e-15,
+      "scoreError": 5.255319979071936e-13,
+      "uniqueness": "strict-inlier-full-rank-sufficient-condition",
+      "exactMultiple": false,
+      "parameterError": 8.748595761653527e-16
+    }
+  ],
+  "extraResults": [
+    {
+      "id": "quadratic-energy-underflow",
+      "outcome": "numerical-boundary",
+      "reason": "arithmetic-range",
+      "uniqueness": "not-evaluated",
+      "parameters": null
+    },
+    {
+      "id": "giant-constant-loss",
+      "outcome": "stationary",
+      "reason": "score-step-objective",
+      "uniqueness": "not-established",
+      "parameters": [
+        0.9999999999417928
+      ],
+      "last": {
+        "iteration": 33,
+        "parameters": [
+          0.9999999999417928
+        ],
+        "fittedObservations": [
+          0.9999999999417928,
+          0.9999999999417928,
+          0
+        ],
+        "residuals": [
+          -0.9999999999417928,
+          1.0000000000582072,
+          1e+150
+        ],
+        "standardizedResiduals": [
+          -0.9999999999417928,
+          1.0000000000582072,
+          1e+150
+        ],
+        "robustMultipliers": [
+          1,
+          0.9999999999417928,
+          1e-150
+        ],
+        "derivedIrlsWeights": [
+          1,
+          0.9999999999417928,
+          1e-150
+        ],
+        "objective": 1e+150,
+        "objectiveRoundoffEstimate": 7.105427357601001e+136,
+        "normalizedScore": [
+          4.1158743080416116e-11
+        ],
+        "normalizedScoreInfinity": 4.1158743080416116e-11,
+        "scoreRoundoffEstimate": 8.038873388168476e-14,
+        "standardizedPredictionStep": 5.820788295807233e-11,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      }
+    },
+    {
+      "id": "huge-offset",
+      "outcome": "numerical-boundary",
+      "reason": "stagnation-before-score",
+      "uniqueness": "not-evaluated",
+      "parameters": null,
+      "last": {
+        "iteration": 5,
+        "parameters": [
+          10000000000000000
+        ],
+        "fittedObservations": [
+          10000000000000000,
+          10000000000000000,
+          10000000000000000,
+          10000000000000000
+        ],
+        "residuals": [
+          0,
+          0,
+          4,
+          100
+        ],
+        "standardizedResiduals": [
+          0,
+          0,
+          4,
+          100
+        ],
+        "robustMultipliers": [
+          1,
+          1,
+          0.25,
+          0.01
+        ],
+        "derivedIrlsWeights": [
+          1,
+          1,
+          0.25,
+          0.01
+        ],
+        "objective": 103,
+        "objectiveRoundoffEstimate": 2273.7367544323292,
+        "normalizedScore": [
+          1
+        ],
+        "normalizedScoreInfinity": 1,
+        "scoreRoundoffEstimate": 4.000000000000057,
+        "standardizedPredictionStep": 0,
+        "relativeObjectiveChange": 0,
+        "irlsDesignConditionEstimate": 1
+      }
+    },
+    {
+      "id": "flat-interior-initial",
+      "outcome": "stationary",
+      "reason": "initial-score",
+      "uniqueness": "not-established",
+      "parameters": [
+        5
+      ],
+      "last": {
+        "iteration": 0,
+        "parameters": [
+          5
+        ],
+        "fittedObservations": [
+          5,
+          5,
+          5,
+          5
+        ],
+        "residuals": [
+          -5,
+          -5,
+          5,
+          5
+        ],
+        "standardizedResiduals": [
+          -5,
+          -5,
+          5,
+          5
+        ],
+        "robustMultipliers": [
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "derivedIrlsWeights": [
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "objective": 18,
+        "objectiveRoundoffEstimate": 2.1600499167107046e-12,
+        "normalizedScore": [
+          0
+        ],
+        "normalizedScoreInfinity": 0,
+        "scoreRoundoffEstimate": 1.1368683772161603e-13,
+        "standardizedPredictionStep": null,
+        "relativeObjectiveChange": null,
+        "irlsDesignConditionEstimate": null
+      }
+    },
+    {
+      "id": "extreme-product",
+      "outcome": "numerical-boundary",
+      "reason": "arithmetic-range",
+      "uniqueness": "not-evaluated",
+      "parameters": null
+    }
+  ]
+}

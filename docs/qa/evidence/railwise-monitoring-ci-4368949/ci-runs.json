@@ -1,0 +1,859 @@
+{
+  "schemaVersion": 1,
+  "repository": "wangjiawei508/WorkWise",
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "retrievedAt": "2026-09-20T10:54:39.174273+00:00",
+  "method": "gh run view with explicit --repo; structured metadata and strict allowlisted summary lines only",
+  "packageGuiAcceptance": "not-run-by-this-task",
+  "releaseApproval": false,
+  "runs": [
+    {
+      "conclusion": "success",
+      "createdAt": "2026-09-20T10:44:54Z",
+      "databaseId": 35505927334,
+      "event": "pull_request",
+      "headBranch": "codex/railwise-survey-convergence",
+      "headSha": "43689493ab586c8d65bae729cfd291f3c813f679",
+      "jobs": [
+        {
+          "completedAt": "2026-09-20T10:46:32Z",
+          "conclusion": "success",
+          "databaseId": 106065623603,
+          "name": "Electron production smoke",
+          "startedAt": "2026-09-20T10:44:57Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-20T10:44:58Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-20T10:44:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:02Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "startedAt": "2026-09-20T10:44:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:08Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 3,
+              "startedAt": "2026-09-20T10:45:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:34Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 4,
+              "startedAt": "2026-09-20T10:45:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:36Z",
+              "conclusion": "success",
+              "name": "Prepare checksummed Electron runtime",
+              "number": 5,
+              "startedAt": "2026-09-20T10:45:34Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:05Z",
+              "conclusion": "success",
+              "name": "Run npm run build",
+              "number": 6,
+              "startedAt": "2026-09-20T10:45:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:31Z",
+              "conclusion": "success",
+              "name": "Launch packaged production preview",
+              "number": 7,
+              "startedAt": "2026-09-20T10:46:05Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:31Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 13,
+              "startedAt": "2026-09-20T10:46:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:31Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 14,
+              "startedAt": "2026-09-20T10:46:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:31Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "startedAt": "2026-09-20T10:46:31Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505927334/job/106065623603",
+          "checkoutSha": "477248e6960a4d64c16e9e4d930953651f3955f1"
+        },
+        {
+          "completedAt": "2026-09-20T10:50:02Z",
+          "conclusion": "success",
+          "databaseId": 106065623792,
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "startedAt": "2026-09-20T10:44:57Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-20T10:44:58Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-20T10:44:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:02Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "startedAt": "2026-09-20T10:44:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:08Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 3,
+              "startedAt": "2026-09-20T10:45:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:34Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 4,
+              "startedAt": "2026-09-20T10:45:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:34Z",
+              "conclusion": "success",
+              "name": "Run npm run openspec:validate",
+              "number": 5,
+              "startedAt": "2026-09-20T10:45:34Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:35Z",
+              "conclusion": "success",
+              "name": "Run npm run verify:brand-boundary",
+              "number": 6,
+              "startedAt": "2026-09-20T10:45:34Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:35Z",
+              "conclusion": "success",
+              "name": "Run npm run verify:document-licenses",
+              "number": 7,
+              "startedAt": "2026-09-20T10:45:35Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:05Z",
+              "conclusion": "success",
+              "name": "Run npm run lint",
+              "number": 8,
+              "startedAt": "2026-09-20T10:45:35Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:41Z",
+              "conclusion": "success",
+              "name": "Run npm run typecheck",
+              "number": 9,
+              "startedAt": "2026-09-20T10:46:05Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:48:04Z",
+              "conclusion": "success",
+              "name": "Run npm test",
+              "number": 10,
+              "startedAt": "2026-09-20T10:46:41Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:48:18Z",
+              "conclusion": "success",
+              "name": "Run npm --prefix kun run typecheck",
+              "number": 11,
+              "startedAt": "2026-09-20T10:48:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:49:30Z",
+              "conclusion": "success",
+              "name": "Run npm --prefix kun test",
+              "number": 12,
+              "startedAt": "2026-09-20T10:48:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:50:00Z",
+              "conclusion": "success",
+              "name": "Run npm run build",
+              "number": 13,
+              "startedAt": "2026-09-20T10:49:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:50:00Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 25,
+              "startedAt": "2026-09-20T10:50:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:50:00Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 26,
+              "startedAt": "2026-09-20T10:50:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:50:00Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 27,
+              "startedAt": "2026-09-20T10:50:00Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505927334/job/106065623792",
+          "checkoutSha": "477248e6960a4d64c16e9e4d930953651f3955f1"
+        },
+        {
+          "completedAt": "2026-09-20T10:47:32Z",
+          "conclusion": "success",
+          "databaseId": 106065623795,
+          "name": "Windows path, spawn, persistence",
+          "startedAt": "2026-09-20T10:44:57Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-20T10:44:59Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-20T10:44:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:11Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "startedAt": "2026-09-20T10:44:59Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:38Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 3,
+              "startedAt": "2026-09-20T10:45:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:07Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 4,
+              "startedAt": "2026-09-20T10:45:38Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:31Z",
+              "conclusion": "success",
+              "name": "Run npm run typecheck",
+              "number": 5,
+              "startedAt": "2026-09-20T10:46:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:50Z",
+              "conclusion": "success",
+              "name": "Run core Windows security tests",
+              "number": 6,
+              "startedAt": "2026-09-20T10:46:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:06Z",
+              "conclusion": "success",
+              "name": "Run plugin Windows security tests",
+              "number": 7,
+              "startedAt": "2026-09-20T10:46:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:29Z",
+              "conclusion": "success",
+              "name": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+              "number": 8,
+              "startedAt": "2026-09-20T10:47:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:29Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 15,
+              "startedAt": "2026-09-20T10:47:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:30Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 16,
+              "startedAt": "2026-09-20T10:47:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:30Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 17,
+              "startedAt": "2026-09-20T10:47:30Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505927334/job/106065623795",
+          "checkoutSha": "477248e6960a4d64c16e9e4d930953651f3955f1"
+        }
+      ],
+      "name": "Quality",
+      "startedAt": "2026-09-20T10:44:54Z",
+      "status": "completed",
+      "updatedAt": "2026-09-20T10:50:02Z",
+      "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505927334",
+      "workflowName": "Quality",
+      "logSummary": [
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm run openspec:validate",
+          "timestamp": "2026-09-20T10:45:34.8529681Z",
+          "summary": "Totals: 11 passed, 0 failed (11 items)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm run verify:brand-boundary",
+          "timestamp": "2026-09-20T10:45:35.2862217Z",
+          "summary": "WorkWise brand boundary passed (2204 files scanned)."
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm test",
+          "timestamp": "2026-09-20T10:48:03.8931815Z",
+          "summary": "Test Files  328 passed | 3 skipped (331)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm test",
+          "timestamp": "2026-09-20T10:48:03.8958667Z",
+          "summary": "Tests  2814 passed | 6 skipped (2820)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm --prefix kun test",
+          "timestamp": "2026-09-20T10:49:30.2252514Z",
+          "summary": "Test Files  188 passed | 2 skipped (190)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm --prefix kun test",
+          "timestamp": "2026-09-20T10:49:30.2286047Z",
+          "summary": "Tests  2853 passed | 22 skipped (2875)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run core Windows security tests",
+          "timestamp": "2026-09-20T10:46:50.5873786Z",
+          "summary": "Test Files  14 passed (14)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run core Windows security tests",
+          "timestamp": "2026-09-20T10:46:50.5874411Z",
+          "summary": "Tests  128 passed (128)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run plugin Windows security tests",
+          "timestamp": "2026-09-20T10:47:05.9384216Z",
+          "summary": "Test Files  9 passed (9)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run plugin Windows security tests",
+          "timestamp": "2026-09-20T10:47:05.9384642Z",
+          "summary": "Tests  104 passed (104)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+          "timestamp": "2026-09-20T10:47:28.8879345Z",
+          "summary": "Test Files  6 passed (6)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+          "timestamp": "2026-09-20T10:47:28.8880047Z",
+          "summary": "Tests  60 passed | 2 skipped (62)"
+        }
+      ],
+      "retrievedLogSha256": "08018bd1f4d95062fdb6ecb84511b94818a40e8db03fb0b8e8eac7f383aa6bd5",
+      "rawLogsArchived": false
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-09-20T10:44:50Z",
+      "databaseId": 35505923747,
+      "event": "push",
+      "headBranch": "codex/railwise-survey-convergence",
+      "headSha": "43689493ab586c8d65bae729cfd291f3c813f679",
+      "jobs": [
+        {
+          "completedAt": "2026-09-20T10:47:35Z",
+          "conclusion": "success",
+          "databaseId": 106065614176,
+          "name": "Windows path, spawn, persistence",
+          "startedAt": "2026-09-20T10:44:53Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-20T10:44:54Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-20T10:44:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:04Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "startedAt": "2026-09-20T10:44:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:22Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 3,
+              "startedAt": "2026-09-20T10:45:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:06Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 4,
+              "startedAt": "2026-09-20T10:45:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:45Z",
+              "conclusion": "success",
+              "name": "Run npm run typecheck",
+              "number": 5,
+              "startedAt": "2026-09-20T10:46:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:00Z",
+              "conclusion": "success",
+              "name": "Run core Windows security tests",
+              "number": 6,
+              "startedAt": "2026-09-20T10:46:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:12Z",
+              "conclusion": "success",
+              "name": "Run plugin Windows security tests",
+              "number": 7,
+              "startedAt": "2026-09-20T10:47:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:31Z",
+              "conclusion": "success",
+              "name": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+              "number": 8,
+              "startedAt": "2026-09-20T10:47:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:32Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 15,
+              "startedAt": "2026-09-20T10:47:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:33Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 16,
+              "startedAt": "2026-09-20T10:47:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:33Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 17,
+              "startedAt": "2026-09-20T10:47:33Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505923747/job/106065614176",
+          "checkoutSha": "43689493ab586c8d65bae729cfd291f3c813f679"
+        },
+        {
+          "completedAt": "2026-09-20T10:49:56Z",
+          "conclusion": "success",
+          "databaseId": 106065614295,
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "startedAt": "2026-09-20T10:44:52Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-20T10:44:54Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-20T10:44:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:44:57Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "startedAt": "2026-09-20T10:44:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:03Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 3,
+              "startedAt": "2026-09-20T10:44:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:29Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 4,
+              "startedAt": "2026-09-20T10:45:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:30Z",
+              "conclusion": "success",
+              "name": "Run npm run openspec:validate",
+              "number": 5,
+              "startedAt": "2026-09-20T10:45:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:30Z",
+              "conclusion": "success",
+              "name": "Run npm run verify:brand-boundary",
+              "number": 6,
+              "startedAt": "2026-09-20T10:45:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:30Z",
+              "conclusion": "success",
+              "name": "Run npm run verify:document-licenses",
+              "number": 7,
+              "startedAt": "2026-09-20T10:45:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:00Z",
+              "conclusion": "success",
+              "name": "Run npm run lint",
+              "number": 8,
+              "startedAt": "2026-09-20T10:45:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:36Z",
+              "conclusion": "success",
+              "name": "Run npm run typecheck",
+              "number": 9,
+              "startedAt": "2026-09-20T10:46:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:47:58Z",
+              "conclusion": "success",
+              "name": "Run npm test",
+              "number": 10,
+              "startedAt": "2026-09-20T10:46:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:48:13Z",
+              "conclusion": "success",
+              "name": "Run npm --prefix kun run typecheck",
+              "number": 11,
+              "startedAt": "2026-09-20T10:47:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:49:25Z",
+              "conclusion": "success",
+              "name": "Run npm --prefix kun test",
+              "number": 12,
+              "startedAt": "2026-09-20T10:48:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:49:55Z",
+              "conclusion": "success",
+              "name": "Run npm run build",
+              "number": 13,
+              "startedAt": "2026-09-20T10:49:25Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:49:55Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 25,
+              "startedAt": "2026-09-20T10:49:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:49:55Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 26,
+              "startedAt": "2026-09-20T10:49:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:49:55Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 27,
+              "startedAt": "2026-09-20T10:49:55Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505923747/job/106065614295",
+          "checkoutSha": "43689493ab586c8d65bae729cfd291f3c813f679"
+        },
+        {
+          "completedAt": "2026-09-20T10:46:29Z",
+          "conclusion": "success",
+          "databaseId": 106065614423,
+          "name": "Electron production smoke",
+          "startedAt": "2026-09-20T10:44:52Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-09-20T10:44:54Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-09-20T10:44:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:44:58Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "startedAt": "2026-09-20T10:44:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:05Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 3,
+              "startedAt": "2026-09-20T10:44:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:31Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 4,
+              "startedAt": "2026-09-20T10:45:05Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:45:33Z",
+              "conclusion": "success",
+              "name": "Prepare checksummed Electron runtime",
+              "number": 5,
+              "startedAt": "2026-09-20T10:45:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:02Z",
+              "conclusion": "success",
+              "name": "Run npm run build",
+              "number": 6,
+              "startedAt": "2026-09-20T10:45:33Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:27Z",
+              "conclusion": "success",
+              "name": "Launch packaged production preview",
+              "number": 7,
+              "startedAt": "2026-09-20T10:46:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:27Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 13,
+              "startedAt": "2026-09-20T10:46:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:27Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 14,
+              "startedAt": "2026-09-20T10:46:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-09-20T10:46:27Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "startedAt": "2026-09-20T10:46:27Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505923747/job/106065614423",
+          "checkoutSha": "43689493ab586c8d65bae729cfd291f3c813f679"
+        }
+      ],
+      "name": "Quality",
+      "startedAt": "2026-09-20T10:44:50Z",
+      "status": "completed",
+      "updatedAt": "2026-09-20T10:49:57Z",
+      "url": "https://github.com/wangjiawei508/WorkWise/actions/runs/35505923747",
+      "workflowName": "Quality",
+      "logSummary": [
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run core Windows security tests",
+          "timestamp": "2026-09-20T10:46:59.9433344Z",
+          "summary": "Test Files  14 passed (14)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run core Windows security tests",
+          "timestamp": "2026-09-20T10:46:59.9434417Z",
+          "summary": "Tests  128 passed (128)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run plugin Windows security tests",
+          "timestamp": "2026-09-20T10:47:12.2576065Z",
+          "summary": "Test Files  9 passed (9)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run plugin Windows security tests",
+          "timestamp": "2026-09-20T10:47:12.2577032Z",
+          "summary": "Tests  104 passed (104)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+          "timestamp": "2026-09-20T10:47:31.7391942Z",
+          "summary": "Test Files  6 passed (6)"
+        },
+        {
+          "job": "Windows path, spawn, persistence",
+          "step": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+          "timestamp": "2026-09-20T10:47:31.7393214Z",
+          "summary": "Tests  60 passed | 2 skipped (62)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm run openspec:validate",
+          "timestamp": "2026-09-20T10:45:30.1397081Z",
+          "summary": "Totals: 11 passed, 0 failed (11 items)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm run verify:brand-boundary",
+          "timestamp": "2026-09-20T10:45:30.5669352Z",
+          "summary": "WorkWise brand boundary passed (2204 files scanned)."
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm test",
+          "timestamp": "2026-09-20T10:47:58.6333932Z",
+          "summary": "Test Files  328 passed | 3 skipped (331)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm test",
+          "timestamp": "2026-09-20T10:47:58.6353309Z",
+          "summary": "Tests  2814 passed | 6 skipped (2820)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm --prefix kun test",
+          "timestamp": "2026-09-20T10:49:25.1382013Z",
+          "summary": "Test Files  188 passed | 2 skipped (190)"
+        },
+        {
+          "job": "OpenSpec, brand, lint, type, test, build",
+          "step": "Run npm --prefix kun test",
+          "timestamp": "2026-09-20T10:49:25.1409590Z",
+          "summary": "Tests  2853 passed | 22 skipped (2875)"
+        }
+      ],
+      "retrievedLogSha256": "38c38f9cf23e77dfd6f666dcddcd1ad60b223910d3310bfc2b7eb96f4c2a27c4",
+      "rawLogsArchived": false
+    }
+  ]
+}

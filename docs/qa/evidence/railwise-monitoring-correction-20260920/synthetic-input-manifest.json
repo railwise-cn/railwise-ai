@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "status": "prepared-not-executed",
+  "candidateHead": null,
+  "copiedCount": 14,
+  "generatedCount": 2,
+  "databaseCopies": 0,
+  "realP0InputCopies": 0,
+  "files": [
+    {
+      "name": "huber-unique.json",
+      "fingerprint": {
+        "sizeBytes": 1398,
+        "sha256": "31ee0fa26c4d2ce34472ba857554660dc73f91c9a47896d8c4fbcf9f7795a404"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "huber-flat.json",
+      "fingerprint": {
+        "sizeBytes": 1399,
+        "sha256": "f8ea21310f9027b037cf93bde68a47d22b9f21173539c6297b6b4b8bfae9aae8"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "statistical-reversed.json",
+      "fingerprint": {
+        "sizeBytes": 1965,
+        "sha256": "0284950f8077ed3cdce00d68c5c8a8c4e2af2aecddd5b7e5ceaae0edcf02a790"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "reference-gls.json",
+      "fingerprint": {
+        "sizeBytes": 2011,
+        "sha256": "434077cc961b5a79897f679d6616269f6d1cbee7bc043d6bc1cbc6ffa6411aa0"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "reference-singular-gls.json",
+      "fingerprint": {
+        "sizeBytes": 2015,
+        "sha256": "0d41cf692f6059b26945703e5c661f7c6572d31bc60a43e2389ddcab444bbb09"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "reference-equal.json",
+      "fingerprint": {
+        "sizeBytes": 2017,
+        "sha256": "953621efa9fdf15e3249dad81ad3bd129422cb20a6bbb220a10dd91ca654c107"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "static-sample-declaration.json",
+      "fingerprint": {
+        "sizeBytes": 2006,
+        "sha256": "d565611911a46f613b1a3058ae806e0d0174aacd51b3111e263063ac06f98532"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "static-stale-base-declaration.json",
+      "fingerprint": {
+        "sizeBytes": 2006,
+        "sha256": "7e68d50e5f8c663bf69c3df53bcbc6d61d4abb16367cb46e087f72680e2afb51"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "static-maximum-declaration.json",
+      "fingerprint": {
+        "sizeBytes": 213358,
+        "sha256": "79ac796e3c057bedd3ab47370981ae32425d936c3bc4237489ce31c9f7b491ba"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "score-full-link01.json",
+      "fingerprint": {
+        "sizeBytes": 4155,
+        "sha256": "8126cd92daba608d612962f44926108a0d78de50f5b1f01ced34c4f7ed8dc208"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "score-full-link02.json",
+      "fingerprint": {
+        "sizeBytes": 4155,
+        "sha256": "21f27b16faa3169513364a20a2760a72cc1713c5d011c2df27dc26d946b9b091"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "score-veto-link01.json",
+      "fingerprint": {
+        "sizeBytes": 4155,
+        "sha256": "677871ea02ba46f5a7fbf9025db567b2bcfb7eba66ffa6792b0223d4728eaa95"
+      },
+      "fixtureClass": "synthetic-declaration",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "synthetic-monitoring-roundtrip.xlsx",
+      "fingerprint": {
+        "sizeBytes": 27537,
+        "sha256": "42bd4072a015c3e5a5d60aa5dff0606162b50182f9f99541145d0f02fe573c74"
+      },
+      "fixtureClass": "synthetic-monitoring-test-output",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "synthetic-monitoring.csv",
+      "fingerprint": {
+        "sizeBytes": 112,
+        "sha256": "97fb256febf931b1a7740f95a6687988c29eb313554d4fb79c1dcdb528fe04ae"
+      },
+      "fixtureClass": "materialized-test-fixture",
+      "copiedByteIdentical": true
+    },
+    {
+      "name": "synthetic-monitoring-two-points-irregular.csv",
+      "fingerprint": {
+        "sizeBytes": 261,
+        "sha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c"
+      },
+      "fixtureClass": "new-synthetic-monitoring-input",
+      "generatorSha256": "2d5e29459bcc07c64fb2455f2d259dd55fdce80a51efaed31cdc00615941d07b"
+    },
+    {
+      "name": "synthetic-monitoring-zero-blank.xlsx",
+      "fingerprint": {
+        "sizeBytes": 1731,
+        "sha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36"
+      },
+      "fixtureClass": "new-synthetic-monitoring-input",
+      "generatorSha256": "2d5e29459bcc07c64fb2455f2d259dd55fdce80a51efaed31cdc00615941d07b"
+    }
+  ],
+  "knownIndependentExpectations": {
+    "intervalDays": [
+      1,
+      3
+    ],
+    "S01": {
+      "currentValue": 8,
+      "previousValue": 2,
+      "cumulativeChange": 8,
+      "changeRate": 2,
+      "trend": "rising"
+    },
+    "S02": {
+      "currentValue": -1,
+      "previousValue": 5,
+      "cumulativeChange": -9,
+      "changeRate": -2,
+      "trend": "falling"
+    },
+    "observations": 6,
+    "series": 2
+  },
+  "limit": "Synthetic preparation only. Final candidate head/package identity not frozen; no GUI or audit pass claimed.",
+  "archiveContent": "16 input fingerprints; only two new monitoring inputs are included, plus one separately listed optional offset input. The 14 historical fixture bytes remain outside this archive.",
+  "optionalOffset": {
+    "name": "monitoring-offset-counterexample.csv",
+    "sha256": "9357f178cbc0f9e6ce7fa22365eab888d1ac80a815cf8097ac8d36ba5a8ffff3",
+    "notInDefaultSixteen": true
+  }
+}

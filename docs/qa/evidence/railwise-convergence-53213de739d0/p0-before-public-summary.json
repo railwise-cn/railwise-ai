@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+  "packageAsarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+  "candidateVersion": "0.5.0",
+  "phase": "before",
+  "mode": "current-package-read-only-audit",
+  "checkedAt": "2026-09-20T09:22:37.055428+00:00",
+  "status": "passed-selected-evidence-checks",
+  "guiExecutionVerified": false,
+  "restartVerifiedByScript": false,
+  "networks": [
+    {
+      "format": "IN2",
+      "ids": {
+        "project": "project_25d73e00-fffb-4f3c-9318-eff2fea36a8b",
+        "network": "network_abf7bdd9-95e5-47c1-ae07-fb4ce0ae3093",
+        "adjustment": "adjustment_4d9b6e0c-c905-4635-8241-637159373973",
+        "manifest": "manifest_5f6bdd9f-f065-4e3c-b32c-df32a43d7006"
+      },
+      "sourceSha256": "3a01828c195bc6a7cee89d4293f21c1957b51ad150d16066980d1066a2b40500",
+      "sourceSizeBytes": 5238,
+      "points": 33,
+      "observations": 160,
+      "rawAnchors": 174,
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "inputHash": "8293965d1b5b424a22fdaab3214c93b29d6a33cf3c673c7a3c4c2eea8031c0fb",
+      "degreesOfFreedom": 87,
+      "reviewStatus": "draft",
+      "outputs": [
+        {
+          "sha256": "070124690bc00f0243da6b4c6a672126e42ce2c0a678e06c3aab2110d4554ec1",
+          "sizeBytes": 24809,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "sha256": "298a6c77dbe07bb407a0ca73f7266c835a1db1c8b7e84719710c6a47f2060797",
+          "sizeBytes": 49351,
+          "mediaType": "application/pdf"
+        },
+        {
+          "sha256": "30f2dfcecf1daf073e321a93f78c8a87bbc8b26a69c197a919c4da43f45fff25",
+          "sizeBytes": 291311,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      ],
+      "verification": {
+        "lifecycleStatus": "start-finish-bindings-verified",
+        "startedCount": 1,
+        "finishedCount": 1,
+        "incompleteCount": 0,
+        "attempts": [
+          {
+            "id": "verification_7928fbe6-ede5-4601-9b58-43924c45bc0a",
+            "startedAt": "2026-09-20T09:10:09.097Z",
+            "completedAt": "2026-09-20T09:10:09.295Z",
+            "outcome": "passed",
+            "recordHash": "5133d4f279dc200ae08a46541073f45b4c04cb0b3078236b2bdd696995e1ddfe"
+          }
+        ]
+      },
+      "independentReference": {
+        "method": "independent COSA OU2 parser",
+        "sourceSha256": "5c72252c90038bb3713c3d4bb0834cdd53cc693c3c99810f1b2d8ea6268934b7",
+        "comparedPoints": 33,
+        "fixedPoints": 2,
+        "strictPublishedRoundingMismatches": 0,
+        "precisionEnvelopeMismatches": 0,
+        "maximumPlanarDifferenceMm": 0.06341583922171747,
+        "maximumCombinedNormalizedDifferenceSigma": 0.08899925199598996
+      }
+    },
+    {
+      "format": "GSI",
+      "ids": {
+        "project": "project_13d819c4-b4cc-46fe-90ce-81f60347ae95",
+        "network": "network_2cc763d8-67ab-42ff-b8bc-45d92e2d34eb",
+        "adjustment": "adjustment_09656e88-3721-4a5c-bf07-10c8a149a235",
+        "manifest": "manifest_88d269bf-c12e-4764-bc85-5c060df29930"
+      },
+      "sourceSha256": "05b5ecc571cb85152a4e36c4c362118b3c71e582e05cf68b5cf8feac877fdf40",
+      "sourceSizeBytes": 8767,
+      "points": 27,
+      "observations": 28,
+      "rawAnchors": 156,
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "inputHash": "a704013885bd03b2090a6e2e7cd090f10116d1b970aa341199303410f472ef98",
+      "degreesOfFreedom": 7,
+      "reviewStatus": "draft",
+      "outputs": [
+        {
+          "sha256": "1976ae7259c8e2a8674a9397d2a5e5109b6172ecb32f5314bb3b39b76405669c",
+          "sizeBytes": 10057,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "sha256": "1391dd406d87844214cf1c3aad17d871c9476dea962e221f595ff92363aa8360",
+          "sizeBytes": 37446,
+          "mediaType": "application/pdf"
+        },
+        {
+          "sha256": "b6a5510fa60979b470ad371211ab49f813d1c1a5b234a643fe4c0e7507f3b266",
+          "sizeBytes": 153899,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      ],
+      "verification": {
+        "lifecycleStatus": "start-finish-bindings-verified",
+        "startedCount": 1,
+        "finishedCount": 1,
+        "incompleteCount": 0,
+        "attempts": [
+          {
+            "id": "verification_2fbe4c53-0779-4836-8f91-d451d09942b2",
+            "startedAt": "2026-09-20T09:14:46.946Z",
+            "completedAt": "2026-09-20T09:14:47.009Z",
+            "outcome": "passed",
+            "recordHash": "fd7fbe009ffca43bad21ade04edd53f563d67e456eb85abf2c4dd6418e281adb"
+          }
+        ]
+      },
+      "independentReference": {
+        "method": "numpy.linalg.lstsq; inverse-route-length weights; residual-scaled covariance",
+        "numpyVersion": "2.4.6",
+        "referenceObservations": 14,
+        "comparedUnknownPoints": 7,
+        "comparedFixedPoints": 6,
+        "numericalComparison": {
+          "maximumHeightDifferenceMm": 0.02031550931747006,
+          "maximumReferenceStandardErrorMm": 0.26658109269216607,
+          "rule": "each unknown within one reference standard error; fixed heights within 1e-9 m",
+          "mismatches": 0,
+          "passed": true
+        },
+        "sourceConversionComparison": {
+          "routesWithMatchingEndpoints": 14,
+          "maximumHeightDifferenceMm": 0.020000000000020002,
+          "strictHalfPrintedUnitMismatches": 7,
+          "maximumDistanceDifferenceMetres": 0.4862899999999968,
+          "maximumClosureDifferenceMm": 0.010000000000065512,
+          "sourceDifferencesRequireReview": true
+        }
+      },
+      "independentSourceDiscrepancies": {
+        "sameSourceIndependentAdjustment": {
+          "unknownPointCount": 21,
+          "degreesOfFreedom": 7,
+          "maximumVsPackagedMm": 1.7053025658242404e-10
+        },
+        "referenceConversion": {
+          "routeCount": 14,
+          "heightBeyondHalfPrintedUnitCount": 7,
+          "rawMeanBeyondHalfPrintedUnitCount": 2,
+          "distanceRoundedToPrintedUnitMatchCount": 14,
+          "maximumDistanceDifferenceMetres": 0.48629,
+          "heightConversionProvenance": "unresolved"
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Read-only record/file audit does not certify GUI operation, actual restart, professional sign-off, production KPIs or release approval.",
+    "GSI historical reference-conversion height discrepancies remain unresolved."
+  ],
+  "databaseInput": {
+    "mode": "explicit-consistent-copy-backup",
+    "provenanceSha256": "2215c412995a612cf3031a7b34a9b86482d8ab23bffa506028822116a3bff9c5",
+    "sourceFilesUnchanged": true,
+    "sourceFileCount": 6,
+    "sourceSidecarsRetained": true,
+    "snapshotDatabases": [
+      {
+        "name": "engineering.sqlite3",
+        "sizeBytes": 2809856,
+        "sha256": "c4ec74c6b8b92a98273f8e9a9a741c18821f5dee663065341e84487348947f01",
+        "copyIntegrityCheck": "ok",
+        "backupIntegrityCheck": "ok",
+        "immutableIntegrityCheck": "ok"
+      },
+      {
+        "name": "survey.sqlite3",
+        "sizeBytes": 2183168,
+        "sha256": "9bd2bc8e477c944672b47f9d07c3f7dd18ae99099c5535a0ea0c491ac1f752ae",
+        "copyIntegrityCheck": "ok",
+        "backupIntegrityCheck": "ok",
+        "immutableIntegrityCheck": "ok"
+      }
+    ]
+  },
+  "inputFilesUnchanged": true,
+  "sqliteSidecarsAbsent": true,
+  "sqliteSidecarsScope": "selected-audit-databases; source sidecars may be preserved by explicit snapshot provenance"
+}

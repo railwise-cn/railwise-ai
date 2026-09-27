@@ -1,0 +1,26 @@
+{
+  "fixtureOnly": true,
+  "workspace": "<isolated-tmp>/service-audit-002/workspace",
+  "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+  "originalManifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+  "correctedManifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+  "originalPlanId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+  "originalRecordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+  "correctedPlanId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+  "correctedRecordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+  "suggestedCheckId": "synthetic-check-1",
+  "suggestedIssueId": "synthetic-issue-1",
+  "suggestedCorrectionId": "synthetic-correction-1",
+  "evidenceMember": "output-1",
+  "workflowCreatedByScript": true,
+  "stages": [
+    "Open original manifest and its retained plan/record",
+    "Expand declared quality workflow",
+    "Create workflow explicitly",
+    "Record failed declaration",
+    "Open issue",
+    "Select corrected plan and record, record correction",
+    "Select same corrected plan and record, record resolved recheck",
+    "Restart and restore exact workflow"
+  ]
+}

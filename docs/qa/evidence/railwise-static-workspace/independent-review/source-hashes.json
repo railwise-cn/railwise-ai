@@ -1,0 +1,21 @@
+{
+  "files": {
+    "kun/src/contracts/survey-advanced-trials-workspace.ts": "3719ba0180bb1f3b3dc92b2bfc0afb2f446522c34bf5c1580d61ca86912f6c32",
+    "kun/src/engineering/survey-advanced-trials-workspace.ts": "c9843b4a5f86766bcd0ab84584ed55ade34a47b702ca782d4b8ffa95f72f3dec",
+    "src/main/ipc/app-ipc-schemas.ts": "3cd21a621f6084d69591e3a32fa869f429666f7940ee58d3c27b93a335bc3ab2",
+    "src/renderer/src/agent/survey-advanced-trials-client.ts": "85f383cb17aba17892bbf7da917eeffbde3c77301987841d367bf4a2c99a2b5b",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.tsx": "c585c7b51b575d4e6ee94ed58e2989a201d4721976d35b90d5b45d2c179e2168",
+    "src/renderer/src/components/engineering/SurveyStaticIncrementalResult.tsx": "810b6f08ebe2d7ea0eb597a49cb3e755fb10556ad6775b5afa917748e8e55906",
+    "src/shared/survey-advanced-trials.ts": "ad42c38ff45ea8af77044a3e71b15f2c849ab292d380f2269d1fe107e89ff4df",
+    "src/shared/survey-static-incremental-example.ts": "0acd84182541e66d42046b388fcbcabbfd4da41ea561dc8cfc12283e4c975524",
+    "src/renderer/src/locales/en/common.json": "7cf21dbaff2d0a398585e96948ed2564a69b94f68f2a5c2c7adc4f272083e8d6",
+    "src/renderer/src/locales/zh/common.json": "bf9727f68fea13328582ce7b7724530e7de1c215d32b37c9ff7db0309b11fd40",
+    "kun/dist/engineering/survey-advanced-trials-workspace.js": "ff771144d2e20030a1a14cd02d9f4bcf07b39a220d8aaf00755975917e6f350c"
+  },
+  "pureKernelUnchanged": {
+    "kun/src/contracts/survey-static-incremental.ts": "2510cd1f7a4772f0cf13583a569d7db6d7de71d2028ed66a1c18fe119175b9c5",
+    "kun/src/engineering/survey-static-incremental.ts": "8a1bc11068eaeb8a95b88ab95d481e1ac22543e7c7b792e9e2c88f5c86c84919",
+    "kun/dist/contracts/survey-static-incremental.js": "12ea950d3e41f1b0c4303b7a1e52fedb5e3085e3cbc035e34a30cde1439b7500",
+    "kun/dist/engineering/survey-static-incremental.js": "abc4ee9ea219a801328964ae128b8ff86d0369b9ec3acb2f098e6b893cf55cdc"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "sourceHead": "d11f9225f69cf1da66880eacd96d4b5f21868a57",
+  "version": "0.5.0",
+  "dmgSha256": "b9d6c801ce63ab4b32d4ed09a8a8a5835a798d4da9cf349430e9b570344e0ce3",
+  "asarSha256": "81926d44063d7220980cf07b9c428f35477fea4b5e6325bf31f754ecf06a7448",
+  "signatureVerified": true,
+  "notarizationPassed": false,
+  "gatekeeperOverride": "security disabled; not acceptance evidence",
+  "updaterRoundTripPassed": false,
+  "runtime": {
+    "gsi": {
+      "status": "completed",
+      "points": 27,
+      "observations": 28,
+      "validation": "valid",
+      "outputCount": 3,
+      "reviewStatus": "draft"
+    },
+    "in2": {
+      "status": "completed",
+      "points": 33,
+      "observations": 160,
+      "validation": "valid",
+      "outputCount": 3,
+      "reviewStatus": "draft"
+    }
+  },
+  "numericalReference": {
+    "gsi": {
+      "maximumHeightDifferenceMm": 0.02031550931747006,
+      "maximumReferenceStandardErrorMm": 0.26658109269216607,
+      "rule": "each unknown within one reference standard error; fixed heights within 1e-9 m",
+      "mismatches": 0,
+      "passed": true
+    },
+    "gsiSourceDifferencesRequireReview": true,
+    "in2": {
+      "status": "matched",
+      "comparedPointCount": 33,
+      "mismatchCount": 0,
+      "maxPlanarCoordinateDifferenceMetres": 6.341583922171748e-05
+    }
+  },
+  "gui": {
+    "syntheticIn2Import": true,
+    "englishImportDiagnostics": true,
+    "preValidationAdjustmentDisabled": true,
+    "postValidationAdjustmentEnabled": true,
+    "adjustmentCompleted": true,
+    "residualAnchor": {
+      "id": "cosa-in2-record-6",
+      "offset": 83,
+      "length": 5,
+      "excerpt": "A,L,0"
+    },
+    "chineseLightResultInspected": true,
+    "realFormatsGuiReplayedInThisPackage": false,
+    "knownDefects": [
+      "tiny nonzero summary rounds to zero",
+      "no project tolerance still says Within project precision",
+      "COSA Chinese vendor in English provenance",
+      "OS-localized native file input accessibility label"
+    ]
+  },
+  "screenshots": [
+    {
+      "name": "gui-en-import.jpg",
+      "sha256": "1a1aedf21ce8cd3ea0f3fa1d5a0384c345658d19d450af842148d1ce70fca149",
+      "privateEvidencePath": "/private/tmp/railwise-survey-d11f922/evidence/gui-en-import.jpg",
+      "syntheticDataOnly": true
+    },
+    {
+      "name": "gui-zh-light-result.jpg",
+      "sha256": "3ced3176dc44f0d5ebdfe92a9ee51ab87375b4c10b7301c527e83d90ef8fd9c4",
+      "privateEvidencePath": "/private/tmp/railwise-survey-d11f922/evidence/gui-zh-light-result.jpg",
+      "syntheticDataOnly": true
+    }
+  ]
+}

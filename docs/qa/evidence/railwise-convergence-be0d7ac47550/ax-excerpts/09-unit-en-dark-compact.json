@@ -1,0 +1,184 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/09-unit-en-dark-compact.ax.txt",
+  "sourceSha256": "179d3f619387da68ad9bd545e3a743c4dde67a52ba43ff62d2b5b768036adb77",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 5,
+      "text": "\t\t\t3 HTML 内容 RAILWISE AI, URL: <local-app-url>"
+    },
+    {
+      "originalLine": 7,
+      "text": "\t\t\t\t\t5 按钮 RAILWISE AI"
+    },
+    {
+      "originalLine": 57,
+      "text": "\t\t\t\t\t\t55 text Task 新建内业任务 Stage Import and preflight Source / format —  ·  — Disposition Not started Datum Unconfirmed  ·  Unconfirmed Points — Stations — Observations — Closure — Precision — Deliverable — Network — Review —"
+    },
+    {
+      "originalLine": 78,
+      "text": "\t\t\t\t\t\t\t76 按钮 Survey sources and preflight"
+    },
+    {
+      "originalLine": 82,
+      "text": "\t\t\t\t\t\t\t80 文本 Score explicitly declared inspection records with exact arithmetic under the reviewed GB/T 24356—2023 clauses. Select a product and inspection stage, then supply its basis and declaration."
+    },
+    {
+      "originalLine": 84,
+      "text": "\t\t\t\t\t\t\t82 文本 Project project_e53c6744-12ba-45bf-95f4-860f31b6a49c · Revision 2"
+    },
+    {
+      "originalLine": 94,
+      "text": "\t\t\t\t\t\t\t\t92 text quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802  ·  2026-09-20T04:51:01.009Z"
+    },
+    {
+      "originalLine": 96,
+      "text": "\t\t\t\t\t\t\t\t94 text Planar control · Point (tables 43/44)  ·  Hierarchical unit-product scoring  ·  GB/T 24356-2023"
+    },
+    {
+      "originalLine": 100,
+      "text": "\t\t\t\t\t\t\t98 标题 Inspection basis and evidence statement, Value: 5"
+    },
+    {
+      "originalLine": 102,
+      "text": "\t\t\t\t\t\t\t100 文本 合成 GUI 验收，平面控制点表43/44，完整七子元素声明；仅核对目录关联和精确评分，不代表现场检查或专业批准。"
+    },
+    {
+      "originalLine": 104,
+      "text": "\t\t\t\t\t\t\t\t102 标题 Declared scoring result, Value: 5"
+    },
+    {
+      "originalLine": 110,
+      "text": "\t\t\t\t\t\t\t\t108 定义列表"
+    },
+    {
+      "originalLine": 113,
+      "text": "\t\t\t\t\t\t\t\t\t111 文本 9141/100"
+    },
+    {
+      "originalLine": 126,
+      "text": "\t\t\t\t\t\t\t\t\t124 开合三角标记 View standard basis"
+    },
+    {
+      "originalLine": 127,
+      "text": "\t\t\t\t\t\t\t\t\t\t125 文本 View standard basis"
+    },
+    {
+      "originalLine": 128,
+      "text": "\t\t\t\t\t\t\t\t\t126 container Standard basis for this result"
+    },
+    {
+      "originalLine": 129,
+      "text": "\t\t\t\t\t\t\t\t\t\t127 标题 Standard basis for this result, Value: 6"
+    },
+    {
+      "originalLine": 130,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t128 文本 Standard basis for this result"
+    },
+    {
+      "originalLine": 131,
+      "text": "\t\t\t\t\t\t\t\t\t\t129 文本 Read-only catalog reviewed by agents. Project applicability, standards conformity and human signatures remain unevaluated."
+    },
+    {
+      "originalLine": 132,
+      "text": "\t\t\t\t\t\t\t\t\t\t130 文本 This explanation is matched to the result's retained source, algorithm and input contract. It does not add a rule reference or approval to the original record."
+    },
+    {
+      "originalLine": 135,
+      "text": "\t\t\t\t\t\t\t\t\t\t133 定义列表"
+    },
+    {
+      "originalLine": 138,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t136 文本 GB/T 24356-2023"
+    },
+    {
+      "originalLine": 142,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t140 container Catalog rule and version"
+    },
+    {
+      "originalLine": 143,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t141 文本 Catalog rule and version"
+    },
+    {
+      "originalLine": 145,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t143 text gbt24356-2023.scoring.unit  ·  1"
+    },
+    {
+      "originalLine": 148,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t146 文本 gbt24356-declared-exact-quality-scoring-1"
+    },
+    {
+      "originalLine": 149,
+      "text": "\t\t\t\t\t\t\t\t\t\t147 container Clauses and official source pages"
+    },
+    {
+      "originalLine": 151,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t149 text Clause 6.2.1.2, 6.2.2, 6.2.3, 6.2.4.4, 6.2.4.5, 6.2.5  · Table 2, 3"
+    },
+    {
+      "originalLine": 152,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t150 文本 Formula (6) belongs to 6.2.4.5; 6.2.5 covers grades and Table 3. The old 6.2.5/formula-6 trace label is preserved; this catalog corrects its location. Partial scope is not full acceptance."
+    },
+    {
+      "originalLine": 153,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t151 link Description: Printed page 6 · PDF page 9, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=9"
+    },
+    {
+      "originalLine": 154,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t152 link Description: Printed page 7 · PDF page 10, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=10"
+    },
+    {
+      "originalLine": 155,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t153 link Description: Printed page 8 · PDF page 11, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=11"
+    },
+    {
+      "originalLine": 157,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t155 text Clause 7.5.1  · Table 43, 44"
+    },
+    {
+      "originalLine": 159,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t157 link Description: Printed page 57 · PDF page 60, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=60"
+    },
+    {
+      "originalLine": 160,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t158 link Description: Printed page 58 · PDF page 61, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=61"
+    },
+    {
+      "originalLine": 161,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t159 link Description: Printed page 59 · PDF page 62, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=62"
+    },
+    {
+      "originalLine": 162,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t160 link Description: Printed page 60 · PDF page 63, Help: Open the official PDF in the browser, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=63"
+    },
+    {
+      "originalLine": 164,
+      "text": "\t\t\t\t\t\t\t\t\t\t162 内容列表"
+    },
+    {
+      "originalLine": 170,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t168 文本 The catalog describes existing trial contracts; resolving a basis does not execute calculations, alter scores or upgrade historical records."
+    },
+    {
+      "originalLine": 172,
+      "text": "\t\t\t\t\t\t\t\t\t\t170 内容列表"
+    },
+    {
+      "originalLine": 185,
+      "text": "\t\t\t\t\t\t\t\t\t\t183 开合三角标记 Source and catalog identity"
+    },
+    {
+      "originalLine": 186,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t184 文本 Source and catalog identity"
+    },
+    {
+      "originalLine": 195,
+      "text": "\t\t\t\t\t\t193 文本 Blocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list."
+    },
+    {
+      "originalLine": 211,
+      "text": "The focused UI element is 124 开合三角标记 View standard basis"
+    }
+  ]
+}

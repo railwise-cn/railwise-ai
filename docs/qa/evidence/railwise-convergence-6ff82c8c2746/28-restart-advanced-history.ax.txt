@@ -1,0 +1,161 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 6ff82c8c2746.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-6ff82c8/Applications/RAILWISE%20AI%20Candidate%206ff82c8c2746.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container Code / Survey
+							8 按钮 Code
+							9 按钮 Survey
+						10 切换 Description: Focus mode, Value: off
+						11 container Workspace tools
+							12 按钮 Write
+							13 按钮 Plugins
+							14 按钮 Scheduled tasks
+							15 按钮 Flow
+							16 按钮 Design
+						17 按钮 New Survey project
+					18 container
+						19 text Survey projects 1
+						20 按钮 New Survey project
+						21 切换按钮 Description: Refresh Survey projects, Value: 0
+						22 按钮 Survey AI desk Goals, plans, evidence, delivery
+							23 文本 Survey AI desk
+							24 文本 Goals, plans, evidence, delivery
+						25 按钮 合成验收·参考与评分与静态追加·6ff82c8 Control network · m · 9/20
+							26 文本 合成验收·参考与评分与静态追加·6ff82c8
+							27 文本 Control network
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI sessions 1
+						33 按钮 Survey AI · 新建内业任务 合成验收·参考与评分与静态追加·6ff82c8 · 0 messages
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成验收·参考与评分与静态追加·6ff82c8
+							36 文本  · 
+							37 文本 0
+							38 文本 messages
+						39 文本 Survey jobs, datasets, runs, and deliverables stay separate from Code and Design sessions.
+					40 container
+						41 切换按钮 Connect phone, Value: 0
+						42 按钮 Settings
+					43 container
+						44 按钮 Collapse sidebar
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text Engineering Survey Processing Current Survey job
+						48 弹出式按钮 Current Survey job, Value: 合成验收·参考与评分与静态追加·6ff82c8
+							49 (selected) 合成验收·参考与评分与静态追加·6ff82c8
+						50 文本 Work view
+						51 弹出式按钮 Work view, Value: Network and adjustment
+						52 按钮 New Survey project
+					53 container
+						54 text Task 合成验收·参考与评分与静态追加·6ff82c8 Stage Network and adjustment Source / format —  ·  — Disposition Not started Datum Unconfirmed  ·  Unconfirmed Points — Stations — Observations — Closure — Precision — Deliverable — Network — Review —
+					55 container Survey AI session
+						56 container
+							57 标题 Survey AI session, Value: 2
+								58 文本 Survey AI session
+							59 文本 合成验收·参考与评分与静态追加·6ff82c8
+							60 按钮 Data assets
+							61 按钮 Survey adjustment
+							62 按钮 Refresh context
+						63 标题 Survey AI, Value: 2
+							64 文本 Survey AI
+						65 container
+							66 文本输入区 (settable) Ask the agent…
+							67 按钮 More actions
+							68 弹出式按钮 Model and reasoning settings
+							69 按钮 (disabled) Send
+					70 container
+						71 container Work view
+							72 按钮 Survey adjustment
+							73 按钮 Advanced model trials
+						74 container Advanced model trials
+							75 标题 Advanced model trials, Value: 3
+								76 文本 Advanced model trials
+							77 文本 Declare an independent experimental model and preserve its original input and trial evidence. No delivery manifest is required. Supply the model, units and basis explicitly.
+							78 文本 Declared-model trials only. Model assumptions and source authenticity are unverified. Results are not engineering acceptance, standards conformity or a professional signature. Formal adjustment weights, observations and approvals are unchanged.
+							79 文本 Project project_9d966747-63bc-4658-9ba6-a8635423a7e0 · Revision 2
+							80 container
+								81 文本 Trial method
+								82 弹出式按钮 Trial method, Value: Choose a trial method
+									83 (selected) Choose a trial method
+							84 按钮 (disabled) Confirm and save trial
+							85 按钮 Trial history
+							86 container Trial history
+								87 标题 Trial history, Value: 4
+									88 文本 Trial history
+								89 按钮 Strictly verify and restore · Static linear observation append trial · Calculated advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401 · 2026-09-20T01:29:22.737Z Existing 128 · Appended 128 · Total observations 256
+									90 文本 Strictly verify and restore
+									91 文本  · 
+									92 文本 Static linear observation append trial
+									93 文本  · 
+									94 文本 Calculated
+									95 文本 advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401
+									96 文本  · 
+									97 文本 2026-09-20T01:29:22.737Z
+									98 文本 Existing 128 · Appended 128 · Total observations 256
+								99 按钮 Strictly verify and restore · Static linear observation append trial · Numerically unresolved advanced_trial_84c3454b-9201-44ab-b3d1-593adaaaf767 · 2026-09-20T01:28:59.808Z Existing 3 · Appended 2 · Total observations 5
+									100 文本 Strictly verify and restore
+									101 文本  · 
+									102 文本 Static linear observation append trial
+									103 文本  · 
+									104 文本 Numerically unresolved
+									105 文本 advanced_trial_84c3454b-9201-44ab-b3d1-593adaaaf767
+									106 文本  · 
+									107 文本 2026-09-20T01:28:59.808Z
+									108 文本 Existing 3 · Appended 2 · Total observations 5
+								109 按钮 Strictly verify and restore · Static linear observation append trial · Calculated advanced_trial_70b02952-0dfb-4390-8161-3e70f8fbf80e · 2026-09-20T01:28:39.492Z Existing 3 · Appended 2 · Total observations 5
+									110 文本 Strictly verify and restore
+									111 文本  · 
+									112 文本 Static linear observation append trial
+									113 文本  · 
+									114 文本 Calculated
+									115 文本 advanced_trial_70b02952-0dfb-4390-8161-3e70f8fbf80e
+									116 文本  · 
+									117 文本 2026-09-20T01:28:39.492Z
+									118 文本 Existing 3 · Appended 2 · Total observations 5
+								119 按钮 Strictly verify and restore · Two-epoch declared reference trial · Calculated advanced_trial_d61ae2e2-7226-4756-af19-8090e8bb5299 · 2026-09-20T01:27:48.992Z
+									120 文本 Strictly verify and restore
+									121 文本  · 
+									122 文本 Two-epoch declared reference trial
+									123 文本  · 
+									124 文本 Calculated
+									125 文本 advanced_trial_d61ae2e2-7226-4756-af19-8090e8bb5299
+									126 文本  · 
+									127 文本 2026-09-20T01:27:48.992Z
+								128 按钮 Strictly verify and restore · Two-epoch declared reference trial · Numerically unresolved advanced_trial_0f8e9837-50d1-471a-92bf-ceed3514d7cb · 2026-09-20T01:27:37.076Z
+									129 文本 Strictly verify and restore
+									130 文本  · 
+									131 文本 Two-epoch declared reference trial
+									132 文本  · 
+									133 文本 Numerically unresolved
+									134 文本 advanced_trial_0f8e9837-50d1-471a-92bf-ceed3514d7cb
+									135 文本  · 
+									136 文本 2026-09-20T01:27:37.076Z
+								137 按钮 Strictly verify and restore · Two-epoch declared reference trial · Calculated advanced_trial_032a81b5-45e4-4c23-94f1-755dfb0dbf48 · 2026-09-20T01:26:51.977Z
+									138 文本 Strictly verify and restore
+									139 文本  · 
+									140 文本 Two-epoch declared reference trial
+									141 文本  · 
+									142 文本 Calculated
+									143 文本 advanced_trial_032a81b5-45e4-4c23-94f1-755dfb0dbf48
+									144 文本  · 
+									145 文本 2026-09-20T01:26:51.977Z
+								146 按钮 (disabled) Previous page
+								147 按钮 (disabled) Next page
+	148 关闭按钮
+	149 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	150 最小化按钮
+151 menu bar
+	152 RAILWISE AI Candidate 6ff82c8c2746
+	153 File
+	154 Edit
+	155 View
+	156 Window
+	157 Help
+
+The focused UI element is 75 标题 Advanced model trials, Value: 3

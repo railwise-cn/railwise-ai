@@ -1,0 +1,18 @@
+{
+  "package": "RailWise AI CLEAN ASSET PACK v2",
+  "source": "a_clean_modern_brand_guideline_board_mockup_on_a_w.png",
+  "sizes": [
+    1024,
+    512,
+    256,
+    128,
+    64,
+    48,
+    32,
+    24,
+    16
+  ],
+  "background_cleanup": "white decontamination + transparent alpha",
+  "edge_cleanup": "un-premultiplied from white before resizing",
+  "svg_mode": "visual-lock; geometry preserved"
+}

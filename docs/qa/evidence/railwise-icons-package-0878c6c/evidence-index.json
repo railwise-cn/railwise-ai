@@ -1,0 +1,55 @@
+{
+  "sourceHead": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+  "run": "https://github.com/wangjiawei508/WorkWise/actions/runs/35956601831",
+  "entries": [
+    {
+      "source": "<isolated-tmp>/installation-icon-report.json",
+      "target": "installation-icon-report.json",
+      "sourceSha256": "570ef48f38d654482b30e1514ac0433263fd658e611392b46d3c1f0008da8cbb",
+      "archivedSha256": "1898bff4b0189c790506c59a8c746a12a115bc11fc1d386d2bd4a620fea09aff",
+      "transformation": "private feed and repository-path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/updater-evidence/private-updater.json",
+      "target": "private-updater.json",
+      "sourceSha256": "b8da6ba1d46ff6a9c7a1639d6c071cba0c396c34c3d51b7b1a6abe6940d633be",
+      "archivedSha256": "b8da6ba1d46ff6a9c7a1639d6c071cba0c396c34c3d51b7b1a6abe6940d633be",
+      "transformation": "private feed and repository-path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/updater-evidence/native-updater.json",
+      "target": "native-updater.json",
+      "sourceSha256": "a60b4e3fe77f284e412cca5d961f945d190fc14eaa51a30361567d89eca36767",
+      "archivedSha256": "a95249dc2d4c4f77517179d6cdb5ce97e472e0ead472f8a920813480680017f1",
+      "transformation": "private feed and repository-path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/updater-evidence/tls-preflight.json",
+      "target": "tls-preflight.json",
+      "sourceSha256": "da6066f7106e606ea09cbfec1c5f0773abdec16624c469ca3126c3e261a77173",
+      "archivedSha256": "da6066f7106e606ea09cbfec1c5f0773abdec16624c469ca3126c3e261a77173",
+      "transformation": "private feed and repository-path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/artifacts/private-updater-target-arm64-0878c6cc932c6f7e85855b2ad5be199d7aee67d7/range-download-receipt.json",
+      "target": "range-download-receipt.json",
+      "sourceSha256": "9d27205c53fb997850c3d72de28ce98f5c474fa49039716391369ad4be3ac240",
+      "archivedSha256": "2c1a0c0391432bca22cb94e5545c8d438a741c828137ac5631e1eb9eed0f1ee5",
+      "transformation": "private feed and repository-path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/install-and-audit-icons.mjs",
+      "target": "install-and-audit-icons.mjs",
+      "sourceSha256": "4cd08f866b48ef9a4957f6b3b26ad7a0510eb0f56f66ae1f5cb7e2bd66d6a983",
+      "archivedSha256": "381f6f333aeff4e97fd8bea0eee224cb187fca189cc3d5b3e1e5c0c6ed1c1d15",
+      "transformation": "none"
+    },
+    {
+      "source": "<isolated-tmp>/download-target-range.mjs",
+      "target": "download-target-range.mjs",
+      "sourceSha256": "78d59f08795ae60bd36dd8bf7458c038c92c537de78ee50e583f20acc38ff6c9",
+      "archivedSha256": "c9078d39f24b9f64eb49d291488945e5b1d15cece2eb904c0012f98dd912d17c",
+      "transformation": "none"
+    }
+  ]
+}

@@ -401,7 +401,7 @@ export function createNavigationActions(
         if (needsInitialSetup) return
         const initialPick = get().composerPickList
         const fromStorage = readStoredComposerModel(initialPick)
-        if (fromStorage) {
+        if (fromStorage && !get().composerProviderId) {
           set({ composerModel: fromStorage })
         }
         scheduleStartupRuntimeProbe(get)

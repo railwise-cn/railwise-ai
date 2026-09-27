@@ -1,0 +1,166 @@
+{
+  "status": "compared",
+  "unchanged": true,
+  "changes": [],
+  "beforeSha256": "adc32186545edb404208446a1c46bdf3b147e4bc46f517b35f0cca823a022d89",
+  "afterSha256": "adc32186545edb404208446a1c46bdf3b147e4bc46f517b35f0cca823a022d89",
+  "guiExecutionVerified": false,
+  "professionalApproval": false,
+  "releaseApproval": false,
+  "current": {
+    "projectId": "project_e53c6744-12ba-45bf-95f4-860f31b6a49c",
+    "logicalRecordsSha256": "adc32186545edb404208446a1c46bdf3b147e4bc46f517b35f0cca823a022d89",
+    "rows": {
+      "sampling_populations": [
+        {
+          "id": "sampling_population_3a984371-a66e-4921-aac3-2a2a5be29547",
+          "logicalRowSha256": "5efb72bdeea0224d4a5f5519d9fbf8751aee1805a4e752c7ed74c1f1973d3e19",
+          "rawColumns": {
+            "id": {
+              "bytes": 56,
+              "sha256": "16b06bf914d7f18d39ea2bb816f2fe44550b9c66d8b435e00901aa128bc7af43"
+            },
+            "project_id": {
+              "bytes": 44,
+              "sha256": "90e706e9834d06014495248eeee737f5748d43f6fc3bb7e3fdf07d209cd5c632"
+            },
+            "idempotency_key": {
+              "bytes": 36,
+              "sha256": "b406634ffde46bcb2fd41e6dd89c0bb61153bb21568f72252df5f25418044c79"
+            },
+            "request_hash": {
+              "bytes": 64,
+              "sha256": "bea8ac1d491876d5a46601a7025b45ebf12f3f58700c630b837f4f8fd0efec80"
+            },
+            "record_hash": {
+              "bytes": 64,
+              "sha256": "f6feb14e27ef1e1759636bcf478d1bf6beb8c54ba1559b586867007fb248d596"
+            },
+            "created_at": {
+              "bytes": 24,
+              "sha256": "1e13b08803e3c313864c80fe9954f7b5afebaf9d0b4c76d4af648fb31e66c95c"
+            },
+            "data_json": {
+              "bytes": 907,
+              "sha256": "4b9d4f4e54da602683b3df2c0f2b3d9df6eb50d5e8792a71e95406fcad07099a"
+            },
+            "definition_bytes": {
+              "bytes": 134,
+              "sha256": "0c1f829238a660b8bea75f091bfb57324cc88cca8221f61a9103e98f48e147e3"
+            }
+          },
+          "storedRecordHash": "5d2b385b3ee17f6e158d9e0fb93fc862ddf2ad7cae37b7baa8cdc45121aaf964"
+        }
+      ],
+      "sampling_runs": [
+        {
+          "id": "sampling_run_d8581927-2b66-4058-bb09-174e4eedda81",
+          "logicalRowSha256": "657268c3ebc80b27a7b2bc31f78fa942ba45594b4d84d56531c24c72e395295f",
+          "rawColumns": {
+            "id": {
+              "bytes": 49,
+              "sha256": "ddd450c36cf70668ff272e782ee51b074138d21047ac9c39cc9dac522b69896f"
+            },
+            "project_id": {
+              "bytes": 44,
+              "sha256": "90e706e9834d06014495248eeee737f5748d43f6fc3bb7e3fdf07d209cd5c632"
+            },
+            "population_id": {
+              "bytes": 56,
+              "sha256": "16b06bf914d7f18d39ea2bb816f2fe44550b9c66d8b435e00901aa128bc7af43"
+            },
+            "stage": {
+              "bytes": 12,
+              "sha256": "731a68e6e4e494f61021f4ceb7b25bc1cc2590a587bf6ad9fbafdb68333a2b5e"
+            },
+            "idempotency_key": {
+              "bytes": 36,
+              "sha256": "9504c146cf97ce163149517914875e903caa73aa9dfb9447693584a8e7f8229e"
+            },
+            "request_hash": {
+              "bytes": 64,
+              "sha256": "caf830bec971573f116594e9fd5941717b77544e2b7e57258f1e9a22363b7f95"
+            },
+            "record_hash": {
+              "bytes": 64,
+              "sha256": "56a39a4cb0236069af9c604dcc0c12f4074b4a53edc0963e1f16218f23dee11d"
+            },
+            "created_at": {
+              "bytes": 24,
+              "sha256": "9a7d9d157b0e28f76f9153f6043215dc10abe26643d5f4fc73ec3bd198f5972f"
+            },
+            "data_json": {
+              "bytes": 4659,
+              "sha256": "09409b751e2c720f0bf1a0fd10d6ddb05fa02ff454fd59497048c7cb73fec608"
+            }
+          },
+          "storedRecordHash": "c194faee456f1178798aabf323b02f48e1bdf8cc82fa416cad1b38b1229dc5e1"
+        }
+      ],
+      "quality_scoring_records": [
+        {
+          "id": "quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802",
+          "logicalRowSha256": "29b07ad034d374d4454dd603fbe955fc3ec952bc6a97e08feb85eead6bcb11df",
+          "rawColumns": {
+            "id": {
+              "bytes": 52,
+              "sha256": "12ed19cba8e5672bc0453a307ec15d873a427eaf3d0dd2bf08efe503f1ed9d9f"
+            },
+            "project_id": {
+              "bytes": 44,
+              "sha256": "90e706e9834d06014495248eeee737f5748d43f6fc3bb7e3fdf07d209cd5c632"
+            },
+            "kind": {
+              "bytes": 4,
+              "sha256": "385cfdbc00ec32031699460779c15099b2bba3cad0e440fffb08e10df0acb9e1"
+            },
+            "project_revision": {
+              "bytes": 1,
+              "sha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+            },
+            "project_binding_hash": {
+              "bytes": 64,
+              "sha256": "159da9b8c737cefdc5ff62895022f685721929474538f7c0026b65d8d9378cdd"
+            },
+            "idempotency_key": {
+              "bytes": 36,
+              "sha256": "088c8ee614834a78c1aa2dd1ea56c05dca2c352de586c25e3806957365a9290b"
+            },
+            "request_hash": {
+              "bytes": 64,
+              "sha256": "ecfd25565e4234c36d83e67b83dcb2b09f21df50923ca51705cff39462fae76d"
+            },
+            "record_hash": {
+              "bytes": 64,
+              "sha256": "ede4b37ca1f209f707a085bf6a01099db667853a382e9111417989dec4582ccc"
+            },
+            "created_at": {
+              "bytes": 24,
+              "sha256": "c09f61f65bda69002c1895032d2f26fcfa5b62a1a549226032aa801201dae371"
+            },
+            "data_json": {
+              "bytes": 24258,
+              "sha256": "c9ffe04a5d115a7305b4e290f0d12343702d91ae8fec03c02f402926a0edd4c6"
+            },
+            "request_bytes": {
+              "bytes": 4984,
+              "sha256": "8fba35a6995154cc05dc19c567d680aeba727e19e9bae58fa143e00744d44690"
+            },
+            "declaration_bytes": {
+              "bytes": 4155,
+              "sha256": "8126cd92daba608d612962f44926108a0d78de50f5b1f01ced34c4f7ed8dc208"
+            },
+            "storage_hash": {
+              "bytes": 64,
+              "sha256": "7d0ee781c683654bff36a4ee48a095881961dd6edadebb0f1e06c53665b909a0"
+            }
+          },
+          "storedRecordHash": "1cb560ea85a07b4751c0e1e558e064a6c1b07ed04d0e851b60ceb30bdbfc622e"
+        }
+      ]
+    },
+    "guiExecutionVerified": false,
+    "professionalApproval": false,
+    "releaseApproval": false
+  }
+}

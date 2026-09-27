@@ -1,0 +1,40 @@
+{
+  "reviewedAt": "2026-09-20T10:33:53.019567+00:00",
+  "scope": "Synthetic SVG renderer review; not packaged-application acceptance or professional signoff",
+  "rendererVersion": "engineering-trend-2",
+  "sourceSha256": {
+    "kun/src/engineering/engineering-trend-chart.ts": "b830c82f902b1a2bb5ea75d3b30751169be8b82feac00111d36b72773eff969f",
+    "kun/src/engineering/engineering-trend-chart.test.ts": "4e7ff8eb10c148ed1d432bb6bdc405723a1f93e0f92f83f9d186bf97b2df03fd",
+    "kun/src/engineering/engineering-service.trend-chart.test.ts": "9c0a14b74cb3e7c4a06cb56a03cf843614785fe41ab187af476aaf62ecd50dae",
+    "kun/src/contracts/engineering.ts": "8d38f575ed8912ddbdc099d9690e22b51029c3f08da07a642388ba766e29d884",
+    "src/shared/engineering-chart.ts": "dc833ae71b4626aa6a7070268154c71960c0b986814be08b5b6228b65fcd1414"
+  },
+  "artifacts": {
+    "single-series.svg": "c657cbd0c83713378d06bdd1b93280fa3a6396b238f1ab1ede5196a357a3874e",
+    "multiple-panels.png": "ce9059bbb11fa82686a44ecb877d8b1d4b65d1f166174a73bd0f9f4db4113b27",
+    "multiple-panels.svg": "11c5f85a60097f522df90e01f842defe9eefebdd5786a492f4591807a0d8e9b7",
+    "single-series.png": "991fe601f8ea9c77d570486da90758d21e25f003563ea345fbefcfe785f5590a",
+    "single-zero.png": "043016bf102a8446761735ae59219d2e8b54d41526262d112c3d237e14edb07d",
+    "single-zero.svg": "3834e77e9411eb9b5dc88f3e3509d7faebae75a8e899671bac17b2f6d39fcac3"
+  },
+  "visualChecks": {
+    "single-series": "Two observation markers and rising line visible; actual dates, unit and legend readable",
+    "single-zero": "Single zero marker visible",
+    "multiple-panels": "Different points have independent lines; mm and m on separate panels; no clipping observed"
+  },
+  "validation": {
+    "focusedVitest": "6 files / 36 tests passed",
+    "runtimeTypecheck": "passed",
+    "webTypecheck": "passed",
+    "targetedEslint": "passed",
+    "gitDiffCheck": "passed"
+  },
+  "boundaries": [
+    "Historical chart bytes and explicit idempotency replay remain unchanged.",
+    "New chart and preview requests use renderer version engineering-trend-2.",
+    "Only trend chart semantics supported.",
+    "Unzoned ISO dates are interpreted as UTC with visible disclosure.",
+    "Unsupported dates and oversized datasets fail explicitly.",
+    "Packaged application UI acceptance remains with parent task."
+  ]
+}

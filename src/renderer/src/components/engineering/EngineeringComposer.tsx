@@ -11,20 +11,22 @@ import { composerReasoningEffortRequestValue, type ComposerReasoningEffort } fro
 import { EMPTY_ENGINEERING_DRAFT, useEngineeringConversationDrafts } from './engineering-conversation-drafts'
 import { isSurveyInstrumentFile, SURVEY_FILE_ACCEPT } from './survey-file-selection'
 
-export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId, onSurveyFiles }: {
-  workspaceRoot: string; projectId: string; ready: boolean; threadId: string | null; onSurveyFiles: (files: File[]) => void
+export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId, unavailableReason, onSurveyFiles }: {
+  workspaceRoot: string; projectId: string; ready: boolean; threadId: string | null; unavailableReason?: string; onSurveyFiles: (files: File[]) => void
 }): ReactElement {
   const { t } = useTranslation('common')
   const scope = JSON.stringify([workspaceRoot, projectId])
   const draft = useEngineeringConversationDrafts((state) => state.drafts[scope] ?? EMPTY_ENGINEERING_DRAFT)
   const update = useEngineeringConversationDrafts((state) => state.update)
-  const { busy, queuedMessages, composerModel, composerPickList, composerModelGroups, setComposerModel, sendMessage, interrupt, removeQueuedMessage } = useChatStore(useShallow((state) => ({
+  const { busy, queuedMessages, composerModel, composerProviderId, composerPickList, composerModelGroups, setComposerModel, sendMessage, interrupt, removeQueuedMessage } = useChatStore(useShallow((state) => ({
     busy: state.busy, queuedMessages: state.queuedMessages,
     composerModel: state.composerModel, composerPickList: state.composerPickList, composerModelGroups: state.composerModelGroups,
+    composerProviderId: state.composerProviderId,
     setComposerModel: state.setComposerModel, sendMessage: state.sendMessage, interrupt: state.interrupt, removeQueuedMessage: state.removeQueuedMessage
   })))
   const [runtimeInfo, setRuntimeInfo] = useState<CoreRuntimeInfoJson | null>(null)
-  const [effort, setEffort] = useState<ComposerReasoningEffort>('max')
+  const effort = draft.reasoningEffort ?? 'max'
+  const setEffort = (reasoningEffort: ComposerReasoningEffort): void => update(scope, value => ({ ...value, reasoningEffort }))
   const isCurrentThread = (): boolean => {
     const state = useChatStore.getState()
     const thread = state.threads.find((item) => item.id === threadId)
@@ -95,21 +97,39 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
     }
     if (!draft.input.trim() && !draft.attachments.length) return
     const text = draft.input.trim() || t('engineeringAttachmentOnlyPrompt')
-    const prompt = draft.viewContext ? `${text}\n\nCurrent Survey view (reference IDs only, not execution approval): ${JSON.stringify(draft.viewContext)}` : text
+    const context = draft.evidenceContext ?? draft.viewContext
+    const prompt = context?.typedEvidence
+      ? `${text}\n\nSelected Survey evidence (reference only, not execution approval): ${JSON.stringify(context)}\nRead this exact typedEvidence using survey_read_evidence before answering. Do not substitute another record or execute a calculation. If unavailable or stale, report that limitation.`
+      : context ? `${text}\n\nSelected Survey evidence (reference IDs only, not execution approval; resolve current records before answering): ${JSON.stringify(context)}\nRead these exact legacy selectors using survey_read_context before answering. This selection has no typedEvidence; do not invent a typed reference or pass it to survey_read_evidence. Preserve every supplied ID, revision, hash and row selector. Do not substitute another record or execute a calculation. If unavailable or stale, report that limitation.` : text
     const sent = await sendMessage(prompt, 'agent', {
       displayText: text,
       attachments: draft.attachments, attachmentIds: draft.attachments.map((item) => item.id),
       reasoningEffort: composerReasoningEffortRequestValue(effort)
     })
-    if (sent) update(scope, (value) => ({ ...value, input: value.input === draft.input ? '' : value.input, attachments: value.attachments.filter((item) => !draft.attachments.some((sentItem) => sentItem.id === item.id)), error: null }))
+    if (sent) update(scope, (value) => ({ ...value, input: value.input === draft.input ? '' : value.input, evidenceContext: value.evidenceContext === draft.evidenceContext ? undefined : value.evidenceContext, viewContext: draft.evidenceContext && value.viewContext === draft.evidenceContext ? undefined : value.viewContext, attachments: value.attachments.filter((item) => !draft.attachments.some((sentItem) => sentItem.id === item.id)), error: null }))
   }
 
-  return <FloatingComposer
+  const selected = draft.evidenceContext
+  const typed = selected?.typedEvidence
+  const typedIdentity = typed?.selector?.identity
+  const typedLabel = typedIdentity ? Object.values(typedIdentity).join(' / ') : typed ? Object.entries(typed).find(([key]) => ['trialId', 'recordId', 'comparisonId', 'analysisId', 'datasetId', 'populationId', 'runId', 'planId', 'attemptId', 'manifestId', 'networkId'].includes(key))?.[1] : undefined
+  const evidenceLabel = (typeof typedLabel === 'string' ? typedLabel : undefined) ?? selected?.observationId ?? selected?.pointId ?? selected?.diagnosticCode
+    ?? selected?.outputPath?.split(/[\\/]/).pop() ?? selected?.manifestId
+    ?? (selected?.metric === 'closure' ? t('surveyClosureReview') : selected?.metric === 'precision' ? t('surveyMaxPointError') : selected?.sourceRecordId)
+
+  return <div className="min-w-0 w-full">
+    {selected ? <div role="status" className="mb-1 flex items-center gap-2 px-2 text-[11px] text-ds-muted">
+      <span className="min-w-0 flex-1 truncate" title={evidenceLabel}>{t('surveySelectedEvidence', { label: evidenceLabel ?? selected.section })}</span>
+      <button type="button" aria-label={t('surveyClearEvidence')} className="shrink-0 text-accent" onClick={() => update(scope, value => ({ ...value, viewContext: value.viewContext === value.evidenceContext ? undefined : value.viewContext, evidenceContext: undefined }))}>{t('surveyClearEvidence')}</button>
+    </div> : null}
+    <FloatingComposer
     variant="compact" forceToolbarRow workspaceRootOverride={workspaceRoot}
     input={draft.input} setInput={(input) => update(scope, (value) => ({ ...value, input }))}
     mode="agent" setMode={() => undefined} busy={Boolean(threadId) && busy}
     runtimeReady={ready && Boolean(threadId)} hasActiveThread={Boolean(threadId)}
+    unavailableReason={!ready ? unavailableReason : !projectId ? t('engineeringCreateProjectBind') : !threadId ? t('engineeringConversationPreparing') : undefined}
     composerModel={composerModel} composerPickList={composerPickList} composerModelGroups={composerModelGroups}
+    composerProviderId={composerProviderId}
     composerReasoningEffort={effort} onComposerModelChange={setComposerModel} onComposerReasoningEffortChange={setEffort}
     queuedMessages={threadId ? queuedMessages : []} onRemoveQueuedMessage={removeQueuedMessage}
     attachments={draft.attachments} attachmentUploadEnabled={runtimeInfo?.capabilities.attachments.available === true}
@@ -124,5 +144,5 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
     }}
     onRetryAttachment={(id) => void retryAttachment(id)}
     onSend={() => void send()} onInterrupt={(options) => { if (isCurrentThread()) void interrupt(options) }}
-  />
+  /></div>
 }

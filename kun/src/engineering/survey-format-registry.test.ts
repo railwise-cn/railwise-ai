@@ -291,6 +291,11 @@ describe('SurveyFormatRegistry', () => {
       requiresManualConfirmation: false,
       summary: { observationCount, recordCount, skippedRecordCount }
     })
+    expect(result.sourceFile.dispositionReasonEn).toContain(catalog.registryVersion)
+    expect(result.sourceFile.dispositionReasonEn).not.toMatch(/[\u3400-\u9fff]/u)
+    const policy = result.sourceFile.diagnostics.find((item) => item.code === 'format_detected' && item.severity === 'warning')!
+    expect(policy.localized?.en.message).toContain(catalog.formatId)
+    expect(policy.localized?.en.suggestedAction).toContain('closure')
     expect(result.sourceFile.records).toHaveLength(recordCount)
     expect(result.sourceFile.records).toEqual(result.sourceFile.rawRecordAnchors)
     expect(result.sourceFile.records[0]).toMatchObject({

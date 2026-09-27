@@ -1,0 +1,81 @@
+{
+  "node": "v26.8.2",
+  "passed": 4,
+  "results": [
+    {
+      "name": "full",
+      "outcome": "calculated",
+      "scope": "complete-declared-product-profile",
+      "result": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "9141",
+          "denominator": "100"
+        },
+        "rawScore": null,
+        "fixedADeduction": null,
+        "diagnosticScoreUpperBound": null,
+        "grade": "excellent",
+        "qualified": true,
+        "count": null,
+        "excellentRate": null,
+        "excellentGoodRate": null
+      }
+    },
+    {
+      "name": "pending",
+      "outcome": "unavailable",
+      "scope": "unresolved-declared-product-profile",
+      "result": {
+        "state": "unavailable",
+        "reason": "pending_subelement",
+        "score": null,
+        "rawScore": null,
+        "fixedADeduction": null,
+        "diagnosticScoreUpperBound": null,
+        "grade": null,
+        "qualified": null,
+        "count": null,
+        "excellentRate": null,
+        "excellentGoodRate": null
+      }
+    },
+    {
+      "name": "child-veto",
+      "outcome": "nonconforming",
+      "scope": "complete-declared-product-profile",
+      "result": {
+        "state": "nonconforming",
+        "reason": "child_below_60_or_a_veto",
+        "score": null,
+        "rawScore": null,
+        "fixedADeduction": null,
+        "diagnosticScoreUpperBound": null,
+        "grade": null,
+        "qualified": false,
+        "count": null,
+        "excellentRate": null,
+        "excellentGoodRate": null
+      }
+    },
+    {
+      "name": "multiple-sixty",
+      "outcome": "unavailable",
+      "scope": "declared-component-only",
+      "result": {
+        "state": "unavailable",
+        "reason": "multiple_accuracy_equality_60",
+        "score": null,
+        "rawScore": null,
+        "fixedADeduction": null,
+        "diagnosticScoreUpperBound": null,
+        "grade": null,
+        "qualified": null,
+        "count": null,
+        "excellentRate": null,
+        "excellentGoodRate": null
+      }
+    }
+  ]
+}

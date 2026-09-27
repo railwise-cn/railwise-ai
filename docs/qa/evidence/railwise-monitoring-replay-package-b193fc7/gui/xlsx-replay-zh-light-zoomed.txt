@@ -1,0 +1,2 @@
+There has been no change in the accessibility tree for Window: "RAILWISE AI".
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-b193fc7/Applications/RAILWISE%20AI%20Candidate%20b193fc70d636.app/Contents/Resources/app.asar/out/renderer/index.html

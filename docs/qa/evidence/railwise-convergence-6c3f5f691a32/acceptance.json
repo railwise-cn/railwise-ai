@@ -1,0 +1,84 @@
+{
+  "sourceHead": "6c3f5f691a327928c24086f58d99daf722341e9e",
+  "version": "0.5.0",
+  "dmgSha256": "daf654d89686b25546a92003fa3d74a8552ba9b72175d39bc3bded287a127139",
+  "asarSha256": "cd6335daffb672c2d0f11a5a4a3b4a3bbab64f14b06e135d43071b0bc4c08ef6",
+  "signature": 0,
+  "notarization": 65,
+  "gatekeeperNote": "Unnotarized Developer ID; existing system security-disabled override is not notarization",
+  "project": {
+    "id": "project_a8f50eab-c373-4bcf-8417-74e15c9a9d06",
+    "name": "审批卡已确认（合成数据）",
+    "revision": 3,
+    "reportPeriod": {
+      "start": "2024-02-29",
+      "end": "2024-03-01"
+    }
+  },
+  "fixtureOnly": true,
+  "modelCalled": false,
+  "plans": [
+    {
+      "id": "eplan_3ef527cf-ace6-4d09-8bb4-5fd58412e45f",
+      "status": "stale",
+      "operations": [
+        "survey_network_validate",
+        "control_network",
+        "survey_adjustment_read",
+        "report_export"
+      ]
+    },
+    {
+      "id": "eplan_23cfb073-2979-4f17-98b5-02fce6eb39aa",
+      "status": "awaiting_approval",
+      "operations": [
+        "survey_network_validate",
+        "control_network",
+        "survey_adjustment_read",
+        "report_export"
+      ]
+    }
+  ],
+  "manifest": {
+    "id": "manifest_a147e46e-3caf-4c03-b1ed-bc0c075a833d",
+    "reviewStatus": "draft",
+    "outputs": [
+      {
+        "path": ".workwise/deliverables/project_a8f50eab-c373-4bcf-8417-74e15c9a9d06/run_a0106a9d-1b14-40db-97cb-b2ab6cc010fc/report.docx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "sha256": "1f5f234c5b086e8c5c6a92e42ee2ba194d431c06c06ad29b50c4fd203d3f3d2f",
+        "sizeBytes": 5046,
+        "diskSha256": "1f5f234c5b086e8c5c6a92e42ee2ba194d431c06c06ad29b50c4fd203d3f3d2f",
+        "hashMatches": true
+      },
+      {
+        "path": ".workwise/deliverables/project_a8f50eab-c373-4bcf-8417-74e15c9a9d06/run_a0106a9d-1b14-40db-97cb-b2ab6cc010fc/report.pdf",
+        "mediaType": "application/pdf",
+        "sha256": "fef16e53a2d353cad178cc95c51ad9f9015a16b68429d1d19e6e8d7ae1025383",
+        "sizeBytes": 36057,
+        "diskSha256": "fef16e53a2d353cad178cc95c51ad9f9015a16b68429d1d19e6e8d7ae1025383",
+        "hashMatches": true
+      },
+      {
+        "path": ".workwise/deliverables/project_a8f50eab-c373-4bcf-8417-74e15c9a9d06/run_a0106a9d-1b14-40db-97cb-b2ab6cc010fc/evidence.xlsx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "sha256": "736f2a31c3d83d583d5b9235cbed8a0d1eda88798de60c05e70118cb8fd09ad7",
+        "sizeBytes": 36795,
+        "diskSha256": "736f2a31c3d83d583d5b9235cbed8a0d1eda88798de60c05e70118cb8fd09ad7",
+        "hashMatches": true
+      }
+    ]
+  },
+  "gui": {
+    "invalidCalendarDateRejected": true,
+    "validLeapDaySaved": true,
+    "suggestionRenameRefreshedAllSurfaces": true,
+    "stalePlanRejected": true,
+    "englishReceiptDisplayed": true,
+    "narrowStackedLayout": true,
+    "keyboardTabSpaceAdjustment": true,
+    "syntheticDelivery": true,
+    "realFormatGuiRuns": false,
+    "fullAccessibilityAudit": false
+  }
+}

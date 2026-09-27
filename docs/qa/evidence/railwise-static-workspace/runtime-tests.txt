@@ -1,0 +1,26 @@
+
+> kun@0.4.2 test
+> vitest run src/engineering/survey-advanced-trials-workspace.test.ts tests/survey-advanced-trials-workspace-http.test.ts tests/runtime-advanced-trials-wiring.test.ts --reporter=dot
+
+
+ RUN  v4.1.8 /private/tmp/railwise-static-workspace/kun
+
+····················································stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension generalized-w model within the explicit response bound
+advanced-trial-size generalized-w: 121066 bytes; 0 iterations
+
+··········stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension vce model within the explicit response bound
+advanced-trial-size vce: 333063 bytes; 55 iterations
+
+····stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size huber result within the response bound
+advanced-new-size huber: 2925050 bytes
+
+·stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size statistical-family result within the response bound
+advanced-new-size statistical-family: 482156 bytes
+
+·······
+
+ Test Files  3 passed (3)
+      Tests  74 passed (74)
+   Start at  08:34:46
+   Duration  7.63s (transform 1.39s, setup 0ms, import 2.15s, tests 13.70s, environment 0ms)
+

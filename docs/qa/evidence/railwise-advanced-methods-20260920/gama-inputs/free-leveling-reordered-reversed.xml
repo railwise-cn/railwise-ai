@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gama-local xmlns="http://www.gnu.org/software/gama/gama-local">
+  <network axes-xy="en" angles="left-handed">
+    <description>Same benchmark with points and observations reordered, and AB reversed to BA.</description>
+    <parameters sigma-apr="1" sigma-act="apriori" conf-pr="0.95" tol-abs="10000" />
+    <points-observations>
+      <point id="C" z="0" adj="Z" />
+      <point id="A" z="0" adj="Z" />
+      <point id="B" z="0" adj="Z" />
+      <height-differences>
+        <dh from="C" to="A" val="-2.7" stdev="1000" />
+        <dh from="B" to="A" val="-1" stdev="1000" />
+        <dh from="B" to="C" val="2" stdev="1000" />
+      </height-differences>
+    </points-observations>
+  </network>
+</gama-local>

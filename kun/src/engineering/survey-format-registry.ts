@@ -34,7 +34,7 @@ import { findP0SurveyFormatEntry, isAcceptedOpenSurveyInputFormat, isMappingRequ
 import { lexLeicaGsi, type LeicaGsiLexAnchor, type LeicaGsiLexRecord, type LeicaGsiStandardWord } from './survey-leica-gsi-lexer.js'
 import { toMetres, toRadians } from './survey-units.js'
 
-const REGISTRY_VERSION = 'workwise-survey-formats-22'
+const REGISTRY_VERSION = 'workwise-survey-formats-23'
 const COSA_IN2_PARSER_ID = 'cosa-in2-parser'
 const COSA_IN2_PARSER_VERSION = '0.3.0'
 const SURVEY_CLOUD_SUC_PARSER_ID = 'survey-cloud-suc-archive-adapter'
@@ -170,6 +170,8 @@ export type SurveyFormatInput = {
   networkType?: SurveyNetworkTypeV1
   /** Explicit low-level mapping; no default or GUI confirmation is inferred. */
   cosaIn1Mapping?: CosaIn1Mapping
+  /** Optional local cancellation; never persisted as source provenance. */
+  signal?: AbortSignal
 }
 
 type Detection = {
@@ -304,8 +306,8 @@ function anchor(line: number, recordType?: string, section?: string, id = `recor
   })
 }
 
-function diagnostic(code: SurveyImportDiagnosticV1['code'], severity: SurveyImportDiagnosticV1['severity'], message: string, sourceRecord?: number): SurveyImportDiagnosticV1 {
-  return { code, severity, message, ...(sourceRecord ? { sourceRecord, recordAnchor: `record-${sourceRecord}` } : {}) }
+function diagnostic(code: SurveyImportDiagnosticV1['code'], severity: SurveyImportDiagnosticV1['severity'], message: string, sourceRecord?: number, english?: string): SurveyImportDiagnosticV1 {
+  return { code, severity, message, ...(english ? { localized: { en: { message: english } } } : {}), ...(sourceRecord ? { sourceRecord, recordAnchor: `record-${sourceRecord}` } : {}) }
 }
 
 function rawFields(record: Record<string, unknown>): Record<string, RawField> {
@@ -1096,12 +1098,18 @@ function p0CatalogRuntimePolicy(
   dispositionReason?: string
   requiresManualConfirmation: boolean
   diagnostic: SurveyImportDiagnosticV1
+  dispositionReasonEn?: string
 }> | undefined {
   const catalogEntry = findP0SurveyFormatEntry(format)
   if (!catalogEntry) return undefined
 
   const catalogDisposition: SurveyImportDispositionV1 = catalogEntry.currentDisposition
   const disposition: SurveyImportDispositionV1 = options.safetyBlocked || options.parserCapabilityRestricted ? 'archive-only' : catalogDisposition
+  const englishPolicy = catalogEntry.currentDispositionReasonEn ?? catalogEntry.currentDispositionReason
+  const englishAction = disposition === 'adjustment-ready'
+    ? 'Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment.'
+    : 'Inspect raw records, explicit mappings and parser diagnostics; correct the input and repeat detection/import.'
+  const englishReason = `${disposition}: ${disposition !== catalogDisposition ? 'Parser capability restrictions take precedence; ' : ''}P0 format catalog ${catalogEntry.registryVersion} — ${englishPolicy}`
   const retained = options.hasAuditableParse ? '已保留可审计的解析对象' : '已保留原始源文件'
   return {
     disposition,
@@ -1110,10 +1118,12 @@ function p0CatalogRuntimePolicy(
     ...(options.safetyBlocked ? {} : {
       dispositionReason: `${disposition}: ${disposition !== catalogDisposition ? '解析器能力限制优先；' : ''}P0 格式目录 ${catalogEntry.registryVersion} — ${catalogEntry.currentDispositionReason}`
     }),
+    ...(!options.safetyBlocked ? { dispositionReasonEn: englishReason } : {}),
     requiresManualConfirmation: disposition !== 'adjustment-ready',
     diagnostic: {
       code: 'format_detected',
       severity: 'warning',
+      localized: { en: { message: `${catalogEntry.formatId}: ${options.hasAuditableParse ? 'auditable parsed objects retained' : 'original source retained'}; P0 format catalog ${catalogEntry.registryVersion} permits ${catalogDisposition}: ${englishPolicy}`, suggestedAction: englishAction } },
       message: `${catalogEntry.vendor} / ${catalogEntry.formatId} ${retained}；P0 格式目录 ${catalogEntry.registryVersion} 当前能力策略为 ${catalogDisposition}：${catalogEntry.currentDispositionReason}`,
       suggestedAction: disposition === 'adjustment-ready'
         ? '继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。'
@@ -1449,6 +1459,7 @@ function parseLeicaGsiLevelingBlocks(
     if (!current) {
       diagnostics.push({
         ...diagnostic('invalid_record', 'blocking', 'Leica GSI 在首个 WI41 测量块前出现数据记录，无法确定设站边界。', physical.line),
+        localized: { en: { message: `Leica GSI has data before the first WI41 block; the setup boundary is unknown.`, suggestedAction: 'Keep the complete original GSI and reimport an export containing the WI41 block header.' } },
         suggestedAction: '保留完整原始 GSI，并从包含 WI41 块起始记录的原始导出重新导入。'
       })
       continue
@@ -1459,6 +1470,7 @@ function parseLeicaGsiLevelingBlocks(
   if (!blocks.length) {
     diagnostics.push({
       ...diagnostic('invalid_record', 'blocking', 'Leica GSI 未找到可解释的 WI41 测量块。', 1),
+      localized: { en: { message: `No interpretable WI41 measurement block was found in Leica GSI.`, suggestedAction: 'Confirm this is a Leica height GSI export with WI41 setup blocks; use the compatible parser path for ordinary GSI observations.' } },
       suggestedAction: '确认该附件是包含 WI41 设站块的 Leica 高程 GSI 导出；普通 GSI 观测应使用兼容解析路径。'
     })
   }
@@ -1489,6 +1501,7 @@ function parseLeicaGsiLevelingBlocks(
     if (!stationRecord?.point) {
       diagnostics.push({
         ...diagnostic('invalid_record', 'blocking', `Leica GSI WI41 块 ${blockIndex + 1} 缺少首个 WI11 设站点号。`, block.marker.line),
+        localized: { en: { message: `Leica GSI WI41 block ${blockIndex + 1} has no initial WI11 station ID.`, suggestedAction: 'Ensure every WI41 is followed by a WI11 station record; do not infer station IDs from auxiliary fields.' } },
         suggestedAction: '确认每个 WI41 之后紧跟包含设站点号的 WI11 记录；不要用辅助字段推断点号。'
       })
       continue
@@ -1498,6 +1511,7 @@ function parseLeicaGsiLevelingBlocks(
     if (!initialHeight || !['..18', '..58'].includes(initialHeight.word.information)) {
       diagnostics.push({
         ...diagnostic('invalid_record', 'blocking', `Leica GSI WI41 块 ${blockIndex + 1} 缺少首个 WI83 初始化高程，无法确定累计高程起点。`, stationRecord.physical.line),
+        localized: { en: { message: `Leica GSI WI41 block ${blockIndex + 1} has no initial WI83 height; the cumulative-height origin is unknown.`, suggestedAction: 'Re-export the complete section including its initial height; never assume cumulative heights start at zero.' } },
         suggestedAction: '从仪器重新导出包含初始高程记录的完整测段；不能假定累计高程从零开始。'
       })
       continue
@@ -1528,6 +1542,7 @@ function parseLeicaGsiLevelingBlocks(
       if (finalHeightWords.length > 1) {
         diagnostics.push({
           ...diagnostic('invalid_record', 'blocking', `Leica GSI 第 ${physical.line} 行含重复的最终 WI83..08/..28 高差字段。`, physical.line),
+          localized: { en: { message: `Leica GSI line ${physical.line} has duplicate final WI83..08/..28 height fields.`, suggestedAction: 'Preserve the original and re-export with exactly one WI83..08 or WI83..28 field per final-height record.' } },
           suggestedAction: '保留原始记录并重新导出，确保每条最终高差记录只包含一个 WI83..08 或 WI83..28。'
         })
         continue
@@ -1537,6 +1552,7 @@ function parseLeicaGsiLevelingBlocks(
       if (!parsed.point) {
         diagnostics.push({
           ...diagnostic('invalid_record', 'blocking', `Leica GSI 第 ${physical.line} 行含最终 WI83..08/..28，但缺少同记录 WI11 目标点号。`, physical.line),
+          localized: { en: { message: `Leica GSI line ${physical.line} has final WI83..08/..28 but no WI11 target on the same record.`, suggestedAction: 'Include WI11 target ID in the final-height record; do not infer targets from adjacent physical lines.' } },
           suggestedAction: '确保最终高差记录同时携带目标点 WI11；不得从相邻物理行猜测目标。'
         })
         continue
@@ -1548,6 +1564,7 @@ function parseLeicaGsiLevelingBlocks(
       if (!height) {
         diagnostics.push({
           ...diagnostic('invalid_record', 'blocking', `Leica GSI 第 ${physical.line} 行的最终 WI83..08/..28 无法解码。`, physical.line),
+          localized: { en: { message: `Leica GSI line ${physical.line} has an undecodable final WI83..08/..28 field.`, suggestedAction: 'Check WI83 unit codes and numeric fields, retaining the original GSI record.' } },
           suggestedAction: '核对 WI83 的单位码和数值字段，并保留原始 GSI 记录。'
         })
         continue
@@ -1561,6 +1578,7 @@ function parseLeicaGsiLevelingBlocks(
       if (cumulativeDistance && previousCumulativeDistance && routeLengthDelta !== undefined && routeLengthDelta <= 0) {
         diagnostics.push({
           ...diagnostic('invalid_record', 'blocking', `Leica GSI 第 ${physical.line} 行的 WI57 信息码 4 累计距离未严格递增（当前 ${cumulativeDistance.value}，前值 ${previousCumulativeDistance.value}）。`, physical.line),
+          localized: { en: { message: `Leica GSI line ${physical.line}: WI57 information code 4 cumulative distance is not strictly increasing (current ${cumulativeDistance.value}, previous ${previousCumulativeDistance.value}).`, suggestedAction: 'Check WI57 information code 4 cumulative distances within the setup; correct or re-export non-increasing records before adjustment.' } },
           suggestedAction: '核对设站块内 WI57 信息码 4 的累计距离顺序；修正或重新导出非递增记录后再平差。'
         })
         continue
@@ -1590,6 +1608,7 @@ function parseLeicaGsiLevelingBlocks(
         previousCumulativeHeight = { ...height, line: physical.line }
         diagnostics.push({
           ...diagnostic('record_ignored', 'warning', `Leica GSI 第 ${physical.line} 行是 ${station} 到自身的闭合检查记录，未作为生产网络边发布。`, physical.line),
+          localized: { en: { message: `Leica GSI line ${physical.line} is a self-closure check at ${station}; it was excluded from production network edges.`, suggestedAction: 'Inspect the original closure-check record separately before adjustment; do not add self-edges to the production network.' } },
           suggestedAction: '如需检查闭合量，请在平差前单独查看该原始记录；不要将自闭合边加入生产网络。'
         })
         continue
@@ -1656,6 +1675,7 @@ function parseLeicaGsiLevelingBlocks(
   if (!observations.length && !diagnostics.some((item) => item.severity === 'blocking')) {
     diagnostics.push({
       ...diagnostic('invalid_record', 'blocking', 'Leica GSI WI41 文件未产生可识别的最终 WI83..08/..28 高差观测。', blocks[0]?.marker.line ?? 1),
+      localized: { en: { message: `Leica GSI WI41 input produced no recognizable final WI83..08/..28 height-difference observations.`, suggestedAction: 'Export final-height records with WI83..08 or WI83..28; intermediate WI32/WI33 cannot replace final heights.' } },
       suggestedAction: '确认原始导出包含带 WI83..08 或 WI83..28 的最终高差记录；中间 WI32/WI33 不能替代最终高差。'
     })
   }
@@ -4042,8 +4062,8 @@ export class SurveyFormatRegistry {
     const contentWinsExtensionConflict = detection.extensionConflict && highConfidenceContentEvidence
     const baseDiagnostics = [
       ...unpacked.diagnostics,
-      ...(text ? [diagnostic('encoding_detected', 'info', `文本编码 ${text.encoding}`)] : []),
-      diagnostic('format_detected', 'info', `识别为 ${detection.vendor} / ${detection.format}${detection.version ? ` ${detection.version}` : ''}，置信度 ${Math.round(detection.confidence * 100)}%`),
+      ...(text ? [diagnostic('encoding_detected', 'info', `文本编码 ${text.encoding}`, undefined, `Text encoding: ${text.encoding}`)] : []),
+      diagnostic('format_detected', 'info', `识别为 ${detection.vendor} / ${detection.format}${detection.version ? ` ${detection.version}` : ''}，置信度 ${Math.round(detection.confidence * 100)}%`, undefined, `Detected ${detection.format}${detection.version ? ` ${detection.version}` : ''}; confidence ${Math.round(detection.confidence * 100)}%`),
       ...(detection.extensionConflict ? [diagnostic(
         'format_conflict',
         contentWinsExtensionConflict ? 'warning' : 'blocking',
@@ -4099,6 +4119,7 @@ export class SurveyFormatRegistry {
       requiresManualConfirmation: detection.method === 'extension-fallback' || parsed.requiresManualConfirmation === true || p0Policy?.requiresManualConfirmation === true || nonP0Policy?.requiresManualConfirmation === true,
       detection,
       disposition: resolvedDisposition,
+      ...(p0Policy?.dispositionReasonEn ? { dispositionReasonEn: p0Policy.dispositionReasonEn } : {}),
       dispositionReason: p0Policy?.dispositionReason ?? nonP0Policy?.dispositionReason ?? parsed.dispositionReason ?? dispositionReason(resolvedDisposition, detection, diagnostics),
       parserId: parsed.parserId ?? 'survey-format-registry',
       parserVersion: parsed.parserVersion ?? REGISTRY_VERSION,
@@ -4118,7 +4139,7 @@ export class SurveyFormatRegistry {
       preservedRawFields: retainedRawFields.fields
     })
     if (allowConverter && originalHash === sha256(unpacked.bytes) && resolvedDisposition === 'converter-required' && !unwrapBlocked && !parseBlocked && (!detection.extensionConflict || contentWinsExtensionConflict) && this.converters.has(detection.format)) {
-      const conversion = await this.converters.convert(detection.format, unpacked.name, unpacked.bytes)
+      const conversion = await this.converters.convert(detection.format, unpacked.name, unpacked.bytes, input.signal)
       if (conversion) {
         if (!conversion.ok || !conversion.outputBytes || !conversion.outputName || !conversion.outputFormat) {
           sourceFile = SurveySourceFileCreateV1.parse({

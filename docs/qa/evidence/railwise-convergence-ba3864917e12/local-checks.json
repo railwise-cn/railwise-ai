@@ -1,0 +1,38 @@
+{
+  "sourceHead": "ba3864917e128f7318b88895441b2b632291d564",
+  "desktop": {
+    "passed": 2584,
+    "skipped": 2
+  },
+  "runtime": {
+    "passed": 1825,
+    "skipped": 3
+  },
+  "desktopTypecheck": "passed",
+  "runtimeTypecheck": "passed",
+  "build": "passed",
+  "openspecStrict": {
+    "passed": 11
+  },
+  "lint": {
+    "errors": 0,
+    "existingWarnings": 1
+  },
+  "limitations": [
+    "candidate GUI not yet tested",
+    "production metrics not evaluated",
+    "human professional acceptance not performed"
+  ],
+  "githubQuality": [
+    {
+      "runId": "35467209182",
+      "kind": "push",
+      "conclusion": "success"
+    },
+    {
+      "runId": "35467211991",
+      "kind": "pull_request",
+      "conclusion": "success"
+    }
+  ]
+}

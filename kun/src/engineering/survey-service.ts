@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import Database from 'better-sqlite3'
+import { SurveyImportAudit, SurveyImportAuditError, type SurveyImportAttempt, type ImportRejection } from './survey-import-audit.js'
 import JSZip from 'jszip'
 import { atomicWriteFile, drainAtomicWrites } from '../adapters/file/atomic-write.js'
 import {
@@ -35,6 +36,11 @@ import { compareAdjustedEpochs, DEFORMATION_ALGORITHM_VERSION } from './survey-d
 import { isGnssSurveyFormat, SurveyFormatRegistry, type SurveySourceEnvelope } from './survey-format-registry.js'
 import type { CosaIn1Mapping } from './survey-cosa-in1.js'
 import { levelingNetworkClosures } from './survey-leveling-closure.js'
+import { surveyErrorEllipse } from './survey-error-ellipse.js'
+import { SurveyStatisticalDiagnosticsV1 } from '../contracts/survey-statistics.js'
+import { diagnoseDeletedResiduals } from './survey-statistical-diagnostics.js'
+import { SurveyFreeLevelingTrialRequestV1, SurveyFreeLevelingTrialV1, SurveyFreeLevelingTrialSummaryV1, type SurveyFreeLevelingTrialListV1 } from '../contracts/survey-free-leveling.js'
+import { solveFreeLevelingTrial, FREE_LEVELING_VERSION } from './survey-free-leveling.js'
 import {
   rawAnchorDigest,
   recordRawSource,
@@ -50,6 +56,12 @@ import {
 } from './survey-derived-correction-ledger.js'
 
 type SurveyProjectLookup = (id: string) => { id: string; workspace: string; revision: number } | null
+export class SurveyFreeLevelingServiceError extends Error {
+  constructor(readonly reason: 'source-ineligible' | 'stale' | 'unsupported-network' | 'unsupported-observations' | 'mixed-weights' | 'dimension-limit' | 'idempotency-conflict') {
+    super(`free_leveling_${reason}`)
+    this.name = 'SurveyFreeLevelingServiceError'
+  }
+}
 type StoredAdjustment = { run: AdjustmentRunV1; result?: AdjustmentResultV1 }
 /**
  * An immutable admission record binds the mutable network projection to the
@@ -238,7 +250,14 @@ export type RecordTrustedSurveyDerivedObservationValueCorrection = Readonly<{
   expectedCorrectionHeadHash: string
 }>
 
-const ALGORITHM_VERSION = 'workwise-survey-adjustment-6'
+const ALGORITHM_VERSION = 'workwise-survey-adjustment-7'
+const LEGACY_ELLIPSE_FREE_ALGORITHM = 'workwise-survey-adjustment-6'
+
+function pointErrorEllipse(run: AdjustmentRunV1, solved: { covariance: Matrix; varianceFactor: number; varianceFactorEstimated: boolean }, x: number, y: number) {
+  return run.algorithmVersion === LEGACY_ELLIPSE_FREE_ALGORITHM ? {} : {
+    xyErrorEllipse: surveyErrorEllipse(solved.covariance, x, y, solved.varianceFactor, solved.varianceFactorEstimated)
+  }
+}
 const MAX_POINTS = 10_000
 const MAX_OBSERVATIONS = 100_000
 const MAX_UNKNOWN_PARAMETERS = 20_000
@@ -612,7 +631,7 @@ function sourceImportFindingsFromSourceFile(
   if (!sourceFile) return []
   const diagnostics = sourceFile.diagnostics
     .filter((item) => item.severity !== 'info')
-    .map((item) => finding(
+    .map((item) => ({ ...finding(
       networkId,
       item.code === 'format_detected' ? 'format_detected'
         : item.code === 'format_conflict' ? 'format_conflict'
@@ -633,7 +652,7 @@ function sourceImportFindingsFromSourceFile(
             : '检查文件格式、扩展名和原始记录后重试'),
       item.sourceRecord,
       nowIso
-    ))
+    ), ...(item.localized ? { localized: item.localized } : {}) }))
   const disposition = sourceFile.disposition === 'adjustment-ready'
     ? []
     : [finding(
@@ -1407,9 +1426,7 @@ function gnssStrategyFindings(network: SurveyNetworkV1, nowIso: () => string): S
   return mergeFindings(findings)
 }
 
-function buildLevelingResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso: () => string): AdjustmentResultV1 {
-  const baseFindings = mergeFindings(network.findings.filter((item) => item.status === 'open'), levelingStrategyFindings(network, nowIso))
-  if (baseFindings.some((item) => item.severity === 'blocking')) return invalidAdjustmentResult(network, run, baseFindings, nowIso)
+function levelingEquations(network: SurveyNetworkV1) {
   const points = pointMap(network); const unknown = network.unknownPoints.filter((point) => !point.known)
   const unknownIds = unknown.map((point) => point.id); const index = new Map(unknownIds.map((id, i) => [id, i]))
   const rows: Array<{ coefficients: number[]; misclosure: number; weight: number; observation: SurveyObservationV1 }> = []
@@ -1427,9 +1444,16 @@ function buildLevelingResult(network: SurveyNetworkV1, run: AdjustmentRunV1, now
       : 1 / normalizeLengthUncertainty(observation.sigma, observation.sigmaUnit ?? observation.unit) ** 2
     rows.push({ coefficients, misclosure: normalizeObservationValue(observation) - (toApprox - fromApprox), weight, observation })
   }
+  return { points, unknownIds, index, rows }
+}
+
+function buildLevelingResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso: () => string): AdjustmentResultV1 {
+  const baseFindings = mergeFindings(network.findings.filter((item) => item.status === 'open'), levelingStrategyFindings(network, nowIso))
+  if (baseFindings.some((item) => item.severity === 'blocking')) return invalidAdjustmentResult(network, run, baseFindings, nowIso)
+  const { points, unknownIds, index, rows } = levelingEquations(network)
   const solved = weightedLeastSquares(rows)
   if (!solved) return invalidAdjustmentResult(network, run, baseFindings.concat(finding(network.id, 'rank_deficient', 'blocking', '水准网法方程秩亏或网形不连通', '补充已知点或观测，检查点号和网形')), nowIso)
-  const pointResults = [...network.knownPoints, ...network.unknownPoints].map((point) => {
+  const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const i = index.get(point.id); const correction = i === undefined ? 0 : solved.corrections[i]!
     const q = i === undefined ? undefined : solved.covariance[i]?.[i]
     return { id: point.id, ...(point.height === undefined ? {} : { height: point.height }), ...(i === undefined ? {} : { correctionHeight: correction, height: (point.height ?? 0) + correction, standardError: Math.sqrt(Math.max(0, (q ?? 0) * solved.varianceFactor)), covariance: solved.covariance[i] }) }
@@ -1490,7 +1514,7 @@ function buildGnssResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso:
   }
   const solved = weightedLeastSquares(rows)
   if (!solved) return invalidAdjustmentResult(network, run, baseFindings.concat(finding(network.id, 'rank_deficient', 'blocking', 'GNSS 基线法方程秩亏或基准不完整', '补充独立基线或检查固定点约束', undefined, nowIso)), nowIso)
-  const pointResults = [...network.knownPoints, ...network.unknownPoints].map((point) => {
+  const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const ix = index.get(`${point.id}:x`); const iy = index.get(`${point.id}:y`); const ih = index.get(`${point.id}:h`)
     if (ix === undefined || iy === undefined || ih === undefined) return { id: point.id, x: point.x, y: point.y, height: point.height }
     const correctionX = solved.corrections[ix]!
@@ -1499,7 +1523,7 @@ function buildGnssResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso:
     const parameterIndices = [ix, iy, ih]
     const covariance = parameterIndices.flatMap((row) => parameterIndices.map((column) => (solved.covariance[row]?.[column] ?? 0) * solved.varianceFactor))
     const variance = parameterIndices.reduce((sum, parameterIndex) => sum + (solved.covariance[parameterIndex]?.[parameterIndex] ?? 0) * solved.varianceFactor, 0)
-    return { id: point.id, x: (point.x ?? 0) + correctionX, y: (point.y ?? 0) + correctionY, height: (point.height ?? 0) + correctionHeight, correctionX, correctionY, correctionHeight, standardError: Math.sqrt(Math.max(0, variance)), covariance }
+    return { id: point.id, x: (point.x ?? 0) + correctionX, y: (point.y ?? 0) + correctionY, height: (point.height ?? 0) + correctionHeight, correctionX, correctionY, correctionHeight, standardError: Math.sqrt(Math.max(0, variance)), covariance, ...pointErrorEllipse(run, solved, ix, iy) }
   })
   const observationResults = blocks.flatMap((block) => {
     const physicalResiduals = block.design.map((coefficients, component) => coefficients.reduce((sum, coefficient, parameterIndex) => sum + coefficient * solved.corrections[parameterIndex]!, 0) - block.misclosures[component]!)
@@ -1656,14 +1680,14 @@ function buildPlaneControlResult(network: SurveyNetworkV1, run: AdjustmentRunV1,
   const solved = iterativeWeightedLeastSquares(initialParameters, buildEquations, { maxIterations: 15, convergence: 1e-7, objective })
   if (!solved) return invalidAdjustmentResult(network, run, mergeFindings(baseFindings, [finding(network.id, 'rank_deficient', 'blocking', '平面控制网法方程秩亏或观测几何不足', '增加独立方向、测站角或距离观测，并检查固定控制点', undefined, nowIso)]), nowIso)
   const adjusted = coordinates(solved.parameters)
-  const pointResults = [...network.knownPoints, ...network.unknownPoints].map((point) => {
+  const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const coordinate = adjusted.get(point.id)!
     const index = coordinateIndexes.get(point.id)
     if (!index) return { id: point.id, x: coordinate.x, y: coordinate.y }
     const qx = solved.covariance[index.x]?.[index.x] ?? 0
     const qy = solved.covariance[index.y]?.[index.y] ?? 0
     const original = points.get(point.id)!
-    return { id: point.id, x: coordinate.x, y: coordinate.y, correctionX: coordinate.x - original.x!, correctionY: coordinate.y - original.y!, standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: [...(solved.covariance[index.x] ?? []), ...(solved.covariance[index.y] ?? [])] }
+    return { id: point.id, x: coordinate.x, y: coordinate.y, correctionX: coordinate.x - original.x!, correctionY: coordinate.y - original.y!, standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: [...(solved.covariance[index.x] ?? []), ...(solved.covariance[index.y] ?? [])], ...pointErrorEllipse(run, solved, index.x, index.y) }
   })
   const equations = buildEquations(solved.parameters)
   const observationResults = observations.map((observation, index) => {
@@ -1743,12 +1767,12 @@ function buildTraverseResult(network: SurveyNetworkV1, run: AdjustmentRunV1, now
   if (!solved) return invalidAdjustmentResult(network, run, [finding(network.id, 'rank_deficient', 'blocking', '导线法方程秩亏，边长与方向/角度不足以确定全部坐标', '增加独立方向、角度或边长观测并检查固定端点', undefined, nowIso)], nowIso)
 
   const adjustedCoordinates = coordinates(solved.parameters)
-  const pointResults = [...network.knownPoints, ...network.unknownPoints].map((point) => {
+  const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const adjusted = adjustedCoordinates.get(point.id)
     const index = unknownIds.indexOf(point.id)
     if (!adjusted || index < 0) return { id: point.id, x: point.x, y: point.y }
     const qx = solved.covariance[index * 2]?.[index * 2] ?? 0; const qy = solved.covariance[index * 2 + 1]?.[index * 2 + 1] ?? 0
-    return { id: point.id, x: adjusted.x, y: adjusted.y, correctionX: adjusted.x - (point.x ?? 0), correctionY: adjusted.y - (point.y ?? 0), standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: [...(solved.covariance[index * 2] ?? []), ...(solved.covariance[index * 2 + 1] ?? [])] }
+    return { id: point.id, x: adjusted.x, y: adjusted.y, correctionX: adjusted.x - (point.x ?? 0), correctionY: adjusted.y - (point.y ?? 0), standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: [...(solved.covariance[index * 2] ?? []), ...(solved.covariance[index * 2 + 1] ?? [])], ...pointErrorEllipse(run, solved, index * 2, index * 2 + 1) }
   })
   const equations = buildEquations(solved.parameters)
   const observationResults = usedObservations.map((observation, index) => {
@@ -1816,13 +1840,13 @@ function buildTriangulationResult(network: SurveyNetworkV1, run: AdjustmentRunV1
   const solved = iterativeWeightedLeastSquares(initialParameters, buildEquations, { maxIterations: 15, convergence: 1e-7 })
   if (!solved) return invalidAdjustmentResult(network, run, mergeFindings(baseFindings, [finding(network.id, 'rank_deficient', 'blocking', '三角网角度方程秩亏或交会几何不足', '增加独立测站角并检查已知基线、点号和近似坐标', undefined, nowIso)]), nowIso)
   const adjusted = coordinates(solved.parameters)
-  const pointResults = [...network.knownPoints, ...network.unknownPoints].map((point) => {
+  const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const coordinate = adjusted.get(point.id)!
     const index = unknownIds.indexOf(point.id)
     if (index < 0) return { id: point.id, x: coordinate.x, y: coordinate.y }
     const qx = solved.covariance[index * 2]?.[index * 2] ?? 0
     const qy = solved.covariance[index * 2 + 1]?.[index * 2 + 1] ?? 0
-    return { id: point.id, x: coordinate.x, y: coordinate.y, correctionX: coordinate.x - point.x!, correctionY: coordinate.y - point.y!, standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: [...(solved.covariance[index * 2] ?? []), ...(solved.covariance[index * 2 + 1] ?? [])] }
+    return { id: point.id, x: coordinate.x, y: coordinate.y, correctionX: coordinate.x - point.x!, correctionY: coordinate.y - point.y!, standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: [...(solved.covariance[index * 2] ?? []), ...(solved.covariance[index * 2 + 1] ?? [])], ...pointErrorEllipse(run, solved, index * 2, index * 2 + 1) }
   })
   const equations = buildEquations(solved.parameters)
   const observationResults = observations.map((observation, index) => {
@@ -1905,14 +1929,14 @@ function buildCpiiiResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso
   })
   const solved = iterativeWeightedLeastSquares(initialParameters, buildEquations, { maxIterations: 20, convergence: 1e-7 })
   if (!solved) return invalidAdjustmentResult(network, run, mergeFindings(baseFindings, [finding(network.id, 'rank_deficient', 'blocking', 'CPIII 自由测站法方程秩亏或目标几何不足', '增加分布合理的固定目标方向/距离，检查测站近似坐标', undefined, nowIso)]), nowIso)
-  const pointResults = [...network.knownPoints, ...network.unknownPoints].map((point) => {
+  const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const index = stationIndexes.get(point.id)
     if (!index) return { id: point.id, x: point.x, y: point.y, height: point.height }
     const state = stationState(point.id, solved.parameters)
     const qx = solved.covariance[index.x]?.[index.x] ?? 0
     const qy = solved.covariance[index.y]?.[index.y] ?? 0
     const covarianceRows = [index.x, index.y, ...(index.height === undefined ? [] : [index.height])].flatMap((row) => solved.covariance[row] ?? [])
-    return { id: point.id, x: state.x, y: state.y, ...(index.height === undefined ? {} : { height: state.height, correctionHeight: state.height! - point.height! }), correctionX: state.x - point.x!, correctionY: state.y - point.y!, standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: covarianceRows }
+    return { id: point.id, x: state.x, y: state.y, ...(index.height === undefined ? {} : { height: state.height, correctionHeight: state.height! - point.height! }), correctionX: state.x - point.x!, correctionY: state.y - point.y!, standardError: Math.sqrt(Math.max(0, (qx + qy) * solved.varianceFactor)), covariance: covarianceRows, ...pointErrorEllipse(run, solved, index.x, index.y) }
   })
   const equations = buildEquations(solved.parameters)
   const observationResults = observations.map((observation, index) => {
@@ -2158,6 +2182,7 @@ export class SurveyRevisionConflictError extends Error { readonly code = 'survey
 
 export class SurveyService {
   private readonly db: Database.Database
+  private readonly importAudit: SurveyImportAudit
   private readonly nowIso: () => string
   private readonly pendingPersistence = new Set<Promise<void>>()
   private readonly formatRegistry: SurveyFormatRegistry
@@ -2172,6 +2197,7 @@ export class SurveyService {
     // client uses the default recursive_triggers=OFF.
     this.db.pragma('recursive_triggers = ON')
     this.db.pragma('busy_timeout = 5000')
+    this.importAudit = new SurveyImportAudit(this.db, this.nowIso)
    this.db.exec(`CREATE TABLE IF NOT EXISTS survey_projects (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, revision INTEGER NOT NULL, data_json TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS survey_networks (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, revision INTEGER NOT NULL, data_json TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS survey_raw_source_ledger (id TEXT PRIMARY KEY, network_id TEXT NOT NULL, sequence INTEGER NOT NULL, source_sha256 TEXT NOT NULL, data_json TEXT NOT NULL, recorded_at TEXT NOT NULL, UNIQUE(network_id, sequence));
@@ -2186,6 +2212,11 @@ export class SurveyService {
       CREATE INDEX IF NOT EXISTS survey_deformations_project_created_idx ON survey_deformations(project_id, created_at DESC);
       CREATE UNIQUE INDEX IF NOT EXISTS survey_deformations_project_input_idx ON survey_deformations(project_id, input_hash);
       CREATE TABLE IF NOT EXISTS survey_idempotency (key TEXT PRIMARY KEY, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS survey_free_leveling_trials (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, network_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_hash TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(project_id, network_id, idempotency_key));
+      CREATE INDEX IF NOT EXISTS survey_free_leveling_trials_scope_idx ON survey_free_leveling_trials(project_id, network_id, created_at DESC, id DESC);
+      CREATE TRIGGER IF NOT EXISTS survey_free_leveling_trials_no_update BEFORE UPDATE ON survey_free_leveling_trials BEGIN SELECT RAISE(ABORT, 'survey_free_leveling_trials is append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS survey_free_leveling_trials_no_delete BEFORE DELETE ON survey_free_leveling_trials BEGIN SELECT RAISE(ABORT, 'survey_free_leveling_trials is append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS survey_free_leveling_trials_no_replace BEFORE INSERT ON survey_free_leveling_trials WHEN EXISTS (SELECT 1 FROM survey_free_leveling_trials WHERE id = NEW.id OR (project_id = NEW.project_id AND network_id = NEW.network_id AND idempotency_key = NEW.idempotency_key)) BEGIN SELECT RAISE(ABORT, 'survey_free_leveling_trials is append-only'); END;
      CREATE TRIGGER IF NOT EXISTS survey_raw_source_ledger_no_update BEFORE UPDATE ON survey_raw_source_ledger BEGIN SELECT RAISE(ABORT, 'survey_raw_source_ledger is append-only'); END;
      CREATE TRIGGER IF NOT EXISTS survey_raw_source_ledger_no_delete BEFORE DELETE ON survey_raw_source_ledger BEGIN SELECT RAISE(ABORT, 'survey_raw_source_ledger is append-only'); END;
      CREATE TRIGGER IF NOT EXISTS survey_raw_source_ledger_no_replace_id BEFORE INSERT ON survey_raw_source_ledger WHEN EXISTS (SELECT 1 FROM survey_raw_source_ledger WHERE id = NEW.id) BEGIN SELECT RAISE(ABORT, 'survey_raw_source_ledger is append-only'); END;
@@ -2824,11 +2855,34 @@ export class SurveyService {
       .run(key, record.networkId, requestHash, record.id, JSON.stringify(record), record.occurredAt)
   }
 
- async importNetwork(input: unknown): Promise<SurveyNetworkV1> {
+  recordRejectedImport(input: unknown, reason: Extract<ImportRejection, 'invalid-json' | 'body-too-large' | 'body-read' | 'structured-http'>): void {
+    const attempt = this.importAudit.begin(input)
+    this.importAudit.finish(attempt, reason)
+  }
+
+  async importNetwork(input: unknown): Promise<SurveyNetworkV1> {
+    const attempt = this.importAudit.begin(input)
+    let network: SurveyNetworkV1
+    try {
+      network = await this.importNetworkTracked(input, attempt)
+    } catch (error) {
+      // A failed audit write leaves explicit incomplete evidence. Never claim
+      // success, or fabricate a terminal receipt after persistence failed.
+      if (!(error instanceof SurveyImportAuditError)) this.importAudit.finish(attempt, attempt.stage)
+      throw error
+    }
+    this.importAudit.finish(attempt, null)
+    return network
+  }
+
+  private async importNetworkTracked(input: unknown, attempt: SurveyImportAttempt): Promise<SurveyNetworkV1> {
     const req = SurveyNetworkImportRequest.parse(input)
+    attempt.stage = 'preparation'
     const prepared = prepareImportRequest(req)
+    attempt.stage = 'replay'
     const replay = this.replayImportNetwork(req, prepared)
     if (replay) {
+      this.importAudit.committed(attempt, true, replay.sourceFile?.disposition)
       // The SQLite record is authoritative. Replaying a request also gives a
       // previously failed sidecar projection an opportunity to recover, but
       // a secondary file or project-lookup error must never turn a durable
@@ -2842,10 +2896,12 @@ export class SurveyService {
       }
       return replay
     }
+    attempt.stage = 'project'
     const project = this.options.getProject?.(req.projectId)
     if (project && req.expectedRevision !== 0 && req.expectedRevision !== project.revision) throw new SurveyRevisionConflictError(`project revision conflict: expected ${req.expectedRevision}, actual ${project.revision}`)
     let network: SurveyNetworkV1
     let persistedRawOriginal = false
+    attempt.stage = 'parse'
     if (req.network) {
       // This read-only compatibility path keeps migrated records accessible.
       // It deliberately creates no original-byte ledger, so validation and
@@ -2886,12 +2942,16 @@ export class SurveyService {
     // projection. Never backfill it for legacy structured data: without the
     // original import evidence, that would silently promote a history row.
     const initialAdmission = persistedRawOriginal ? this.createSourceAdmissionRecord(parsed, parsed.createdAt) : null
+    attempt.stage = 'commit'
     const committed = this.db.transaction(() => {
       // Parsing and preserving the content-addressed source can happen before
       // this lock.  The durable state must not: another service may have
       // committed the same key while this request was parsing.
       const existing = this.replayImportNetwork(req, prepared)
-      if (existing) return existing
+      if (existing) {
+        this.importAudit.committed(attempt, true, existing.sourceFile?.disposition)
+        return existing
+      }
 
       // Recheck mutable project state only after acquiring the writer lock.
       // A successful earlier request remains replayable regardless of later
@@ -2912,6 +2972,7 @@ export class SurveyService {
       // IMMEDIATE transaction plus strict insert instead commits one complete
       // network/ledger/idempotency unit or rolls all of it back.
       this.rememberImportNetwork(req.idempotencyKey, prepared, parsed)
+      this.importAudit.committed(attempt, false, parsed.sourceFile?.disposition)
       return parsed
     }).immediate()
 
@@ -2919,6 +2980,7 @@ export class SurveyService {
     // it fails, this method rejects but the retry above replays the durable
     // result (and attempts the projection again) rather than creating a
     // second network or source ledger.
+    attempt.stage = 'projection'
     await this.persist(committed, 'networks', project?.workspace)
     return committed
   }
@@ -3045,7 +3107,7 @@ export class SurveyService {
     } else {
       result = invalidAdjustmentResult(solverNetwork, run, [finding(solverNetwork.id, 'invalid_observation', 'blocking', `暂不支持网型 ${solverNetwork.networkType} 的确定性平差`, '选择受支持的测量网型或补充适配策略', undefined, this.nowIso)], this.nowIso)
     }
-    return retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, strategyId: solverNetwork.networkType }))
+    return retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType }))
   }
 
   createAdjustment(input: unknown): { run: AdjustmentRunV1; result: AdjustmentResultV1 } {
@@ -3175,8 +3237,8 @@ export class SurveyService {
       || stored.result.networkId !== network.id
       || stored.run.inputHash !== inputHash
       || stored.result.inputHash !== inputHash
-      || stored.run.algorithmVersion !== ALGORITHM_VERSION
-      || stored.result.algorithmVersion !== ALGORITHM_VERSION
+      || ![ALGORITHM_VERSION, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
+      || stored.result.algorithmVersion !== stored.run.algorithmVersion
       || stored.run.status !== 'completed'
       || stored.result.validation !== 'valid') {
       throw new Error(`adjustment ${id} no longer matches its current deterministic execution`)
@@ -3216,6 +3278,165 @@ export class SurveyService {
   /** Project-scoped strict lookup for delivery providers; never probe another project's evidence. */
   getAdjustmentForProjectNewUse(projectId: string, id: string): SurveyAdjustmentRead | null {
     return this.getAdjustmentForNewUseScoped(id, projectId)
+  }
+
+  /** Recomputable diagnostic supplement. Never mutates historical results,
+   * their hashes, or the existing outlier/quality classification. */
+  private freeLevelingContext(projectId: string, networkId: string) {
+    const row = this.db.prepare('SELECT project_id, revision, data_json FROM survey_networks WHERE id = ? AND project_id = ?').get(networkId, projectId) as { project_id: string; revision: number; data_json: string } | undefined
+    if (!row) return null
+    const network = SurveyNetworkV1.parse(JSON.parse(row.data_json))
+    if (network.id !== networkId || network.projectId !== projectId || network.revision !== row.revision) throw new SurveyFreeLevelingServiceError('stale')
+    if (!this.sourceEligibility(network).eligible) throw new SurveyFreeLevelingServiceError('source-ineligible')
+    const admission = this.verifySourceAdmission(network)
+    if (!admission.valid || !admission.record || !network.sourceFile) throw new SurveyFreeLevelingServiceError('source-ineligible')
+    return { network, sourceSha256: network.sourceFile.sha256, sourceAdmissionHash: admission.record.thisHash, inputHash: surveySolverInputHash(network) }
+  }
+
+  private calculateFreeLeveling(network: SurveyNetworkV1) {
+    if (network.networkType !== 'leveling' && network.networkType !== 'height-control') throw new SurveyFreeLevelingServiceError('unsupported-network')
+    if (network.knownPoints.length + network.unknownPoints.length > 64 || network.observations.length > 256) throw new SurveyFreeLevelingServiceError('dimension-limit')
+    // sourceEligibility already verifies sourceRecordId uniqueness, existence
+    // and raw byte anchors; no observation is filtered by this trial adapter.
+    if (network.observations.some(o => o.type !== 'height-difference' || !o.from || !o.to || !o.sourceRecordId || o.covariance !== undefined)) throw new SurveyFreeLevelingServiceError('unsupported-observations')
+    const sigmaCount = network.observations.filter(o => o.sigma !== undefined).length
+    if (sigmaCount !== 0 && sigmaCount !== network.observations.length) throw new SurveyFreeLevelingServiceError('mixed-weights')
+    const routeCount = network.observations.filter(o => o.routeLength !== undefined).length
+    if (sigmaCount === 0 && routeCount !== 0 && routeCount !== network.observations.length) throw new SurveyFreeLevelingServiceError('mixed-weights')
+    const weightBasis = sigmaCount ? 'inverse-declared-sigma-squared' as const : 'inverse-route-length-with-unit-default' as const
+    const originalPointRoles = (['knownPoints', 'unknownPoints'] as const).flatMap(collection => network[collection].map(point => ({
+      id: point.id, known: point.known, collection, originalPoint: point,
+      referenceHeightBasis: point.height === undefined ? 'zero-initial-approximation' as const : 'declared-height' as const
+    })))
+    const defaultWeightObservationIds = network.observations.filter(o => o.sigma === undefined && o.routeLength === undefined).map(o => o.id)
+    const output = solveFreeLevelingTrial({
+      model: 'independent-linear-height-differences', unit: 'm', constraint: 'sum-height-corrections-zero',
+      points: originalPointRoles.map(p => ({ id: p.id, referenceHeight: p.originalPoint.height ?? 0 })),
+      observations: network.observations.map(o => ({
+        id: o.id, from: o.from!, to: o.to!, heightDifference: normalizeObservationValue(o),
+        weight: o.sigma === undefined ? 1 / (o.routeLength ?? 1) : 1 / normalizeLengthUncertainty(o.sigma, o.sigmaUnit ?? o.unit) ** 2,
+        weightSource: o.sigma !== undefined ? 'inverse-declared-sigma-squared' : o.routeLength !== undefined ? 'inverse-declared-route-length' : 'explicit-unit-weight-fallback',
+        sourceAnchor: o.sourceRecordId!
+      }))
+    })
+    return { weightBasis, originalPointRoles, defaultWeightObservationIds, output }
+  }
+
+  createFreeLevelingTrial(projectId: string, networkId: string, input: unknown): SurveyFreeLevelingTrialV1 | null {
+    const request = SurveyFreeLevelingTrialRequestV1.parse(input)
+    return this.db.transaction(() => {
+      const context = this.freeLevelingContext(projectId, networkId)
+      if (!context) return null
+      const { network } = context
+      if (request.expectedRevision !== network.revision) throw new SurveyFreeLevelingServiceError('stale')
+      const requestHash = sha256CanonicalSurveyValue({ projectId, networkId, inputHash: context.inputHash, algorithmVersion: FREE_LEVELING_VERSION, ...request })
+      const existing = this.db.prepare('SELECT id, request_hash FROM survey_free_leveling_trials WHERE project_id = ? AND network_id = ? AND idempotency_key = ?').get(projectId, networkId, request.idempotencyKey) as { id: string; request_hash: string } | undefined
+      if (existing) {
+        if (existing.request_hash !== requestHash) throw new SurveyFreeLevelingServiceError('idempotency-conflict')
+        return this.getFreeLevelingTrial(projectId, networkId, existing.id)
+      }
+      const calculated = this.calculateFreeLeveling(network)
+      const payload = {
+        schemaVersion: 1 as const, id: `free_leveling_trial_${randomUUID()}`, projectId, networkId,
+        networkRevision: network.revision, inputHash: context.inputHash, sourceSha256: context.sourceSha256, sourceAdmissionHash: context.sourceAdmissionHash,
+        algorithmVersion: FREE_LEVELING_VERSION, constraint: request.constraint, acknowledgeDatumRelease: request.acknowledgeDatumRelease, weightPolicy: request.weightPolicy,
+        ...calculated, pointCount: calculated.output.points.length, observationCount: calculated.output.observations.length, degreesOfFreedom: calculated.output.degreesOfFreedom,
+        createdAt: this.nowIso(), requestHash, outputHash: sha256CanonicalSurveyValue(calculated)
+      }
+      const record = SurveyFreeLevelingTrialV1.parse({ ...payload, recordHash: sha256CanonicalSurveyValue(payload) })
+      this.db.prepare('INSERT INTO survey_free_leveling_trials(id, project_id, network_id, idempotency_key, request_hash, record_hash, data_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(record.id, projectId, networkId, request.idempotencyKey, requestHash, record.recordHash, JSON.stringify(record), record.createdAt)
+      return record
+    })()
+  }
+
+  getFreeLevelingTrial(projectId: string, networkId: string, trialId: string): SurveyFreeLevelingTrialV1 | null {
+    const row = this.db.prepare('SELECT * FROM survey_free_leveling_trials WHERE id = ? AND project_id = ? AND network_id = ?').get(trialId, projectId, networkId) as { id: string; project_id: string; network_id: string; idempotency_key: string; request_hash: string; record_hash: string; data_json: string; created_at: string } | undefined
+    if (!row) return null
+    const context = this.freeLevelingContext(projectId, networkId)
+    if (!context) throw new Error('free trial network unavailable')
+    const record = SurveyFreeLevelingTrialV1.parse(JSON.parse(row.data_json))
+    const { recordHash, ...payload } = record
+    if (record.id !== row.id || record.projectId !== projectId || record.networkId !== networkId || record.createdAt !== row.created_at || recordHash !== row.record_hash
+      || recordHash !== sha256CanonicalSurveyValue(payload) || record.requestHash !== row.request_hash
+      || record.networkRevision !== context.network.revision || record.inputHash !== context.inputHash || record.sourceSha256 !== context.sourceSha256 || record.sourceAdmissionHash !== context.sourceAdmissionHash) throw new Error('free trial evidence stale or altered')
+    const requestHash = sha256CanonicalSurveyValue({ projectId, networkId, inputHash: context.inputHash, algorithmVersion: FREE_LEVELING_VERSION,
+      expectedRevision: record.networkRevision, idempotencyKey: row.idempotency_key, constraint: record.constraint, acknowledgeDatumRelease: record.acknowledgeDatumRelease, weightPolicy: record.weightPolicy })
+    const calculated = this.calculateFreeLeveling(context.network)
+    if (requestHash !== record.requestHash || record.outputHash !== sha256CanonicalSurveyValue(calculated)
+      || record.outputHash !== sha256CanonicalSurveyValue({ weightBasis: record.weightBasis, originalPointRoles: record.originalPointRoles, defaultWeightObservationIds: record.defaultWeightObservationIds, output: record.output })
+      || record.pointCount !== record.output.points.length || record.observationCount !== record.output.observations.length || record.degreesOfFreedom !== record.output.degreesOfFreedom) throw new Error('free trial replay mismatch')
+    return record
+  }
+
+  listFreeLevelingTrials(projectId: string, networkId: string, limit = 20, offset = 0): SurveyFreeLevelingTrialListV1 | null {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50 || !Number.isInteger(offset) || offset < 0 || offset > 100_000) throw new Error('invalid free trial pagination')
+    if (!this.freeLevelingContext(projectId, networkId)) return null
+    const rows = this.db.prepare('SELECT id FROM survey_free_leveling_trials WHERE project_id = ? AND network_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?').all(projectId, networkId, limit + 1, offset) as { id: string }[]
+    return { trials: rows.slice(0, limit).map(row => {
+      const record = this.getFreeLevelingTrial(projectId, networkId, row.id)
+      if (!record) throw new Error('free trial disappeared')
+      const { output: _output, originalPointRoles: _roles, ...summary } = record
+      return SurveyFreeLevelingTrialSummaryV1.parse(summary)
+    }), nextOffset: rows.length > limit ? offset + limit : null }
+  }
+
+  getAdjustmentStatisticalDiagnostics(projectId: string, id: string): SurveyStatisticalDiagnosticsV1 | null {
+    const stored = this.getAdjustmentForProjectNewUse(projectId, id)
+    if (!stored?.result) return null
+    const network = this.getNetwork(stored.run.networkId)
+    if (!network?.sourceFile) throw new Error('statistical diagnostic source evidence is unavailable')
+    const binding = {
+      schemaVersion: 1, diagnosticsVersion: 'leveling-deleted-t-1',
+      projectId, networkId: network.id, runId: stored.run.id, resultId: stored.result.id,
+      inputHash: stored.run.inputHash, algorithmVersion: stored.run.algorithmVersion,
+      sourceSha256: network.sourceFile.sha256, calculationHash: adjustmentCalculationHash(stored.result),
+      decision: 'not-evaluated'
+    } as const
+    const unavailable = (reason: Extract<SurveyStatisticalDiagnosticsV1, { status: 'unavailable' }>['reason'], detailCode?: string) =>
+      SurveyStatisticalDiagnosticsV1.parse({ ...binding, status: 'unavailable', reason, ...(detailCode ? { detailCode } : {}) })
+    if (network.networkType !== 'leveling' && network.networkType !== 'height-control') return unavailable('unsupported-network-type')
+    const { rows } = levelingEquations(network)
+    if (rows.length > 256) return unavailable('dimension-limit')
+    if (rows.some(row => row.observation.covariance !== undefined)) return unavailable('correlated-observations')
+    const declaredSigmas = rows.filter(row => row.observation.sigma !== undefined).length
+    if (declaredSigmas !== 0 && declaredSigmas !== rows.length) return unavailable('inconsistent-weight-basis')
+    const solved = weightedLeastSquares(rows)
+    if (!solved) return unavailable('unresolved-residual-model')
+    if (solved.dof <= 1) return unavailable('insufficient-redundancy')
+    const design = rows.map(row => row.coefficients)
+    const propagated = surveyMatrix.multiply(surveyMatrix.multiply(design, solved.covariance), surveyMatrix.transpose(design))
+    const cofactor = propagated.map((row, i) => row.map((value, j) => (i === j ? 1 / rows[i]!.weight : 0) - value))
+    try {
+      const diagnostic = diagnoseDeletedResiduals({
+        model: 'linear-independent-observations', residuals: solved.residuals,
+        observationWeights: rows.map(row => row.weight), residualCofactor: cofactor,
+        weightedResidualSum: solved.residuals.reduce((sum, value, i) => sum + value * rows[i]!.weight * value, 0),
+        degreesOfFreedom: solved.dof
+      })
+      return SurveyStatisticalDiagnosticsV1.parse({
+        ...binding, status: 'available', statistic: diagnostic.statistic, model: diagnostic.model,
+        varianceBasis: 'deleted-observation-posterior',
+        weightBasis: declaredSigmas ? 'inverse-declared-sigma-squared' : 'inverse-route-length-with-unit-default',
+        assumptions: ['fixed-linear-model', 'independent-gaussian-errors', 'weights-proportional-to-inverse-variance', 'fixed-known-datum'],
+        assumptionsVerified: false, residualUnit: 'm', statisticUnit: 'dimensionless',
+        fullModelDegreesOfFreedom: diagnostic.fullModelDegreesOfFreedom, degreesOfFreedom: diagnostic.degreesOfFreedom,
+        observations: diagnostic.observations.map((observation, i) => ({
+          observationId: rows[i]!.observation.id, sourceRow: rows[i]!.observation.sourceRow,
+          sourceRecordId: rows[i]!.observation.sourceRecordId,
+          residual: observation.residual, observationWeight: rows[i]!.weight,
+          residualCofactor: observation.residualCofactor, redundancy: observation.redundancy,
+          leverage: observation.leverage, deletedWeightedResidualSum: observation.deletedWeightedResidualSum,
+          deletedVarianceFactor: observation.deletedVarianceFactor,
+          externallyStudentizedResidual: observation.externallyStudentizedResidual
+        }))
+      })
+    } catch (error) {
+      const code = error instanceof Error ? error.message : ''
+      if (!code.startsWith('statistical_diagnostics_')) throw error
+      return unavailable(code.includes('deleted_variance') || code.includes('invalid_weighted_residual_sum')
+        ? 'zero-or-unresolved-deleted-variance' : 'unresolved-residual-model', code)
+    }
   }
   listAdjustments(projectId?: string): SurveyAdjustmentSummary[] {
     const rows = projectId

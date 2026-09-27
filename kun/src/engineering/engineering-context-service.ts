@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { atomicWriteFile } from '../adapters/file/atomic-write.js'
-import { EngineeringEvidenceCardV1, EngineeringWatchRuleV1, type EngineeringContextSnapshotV1, type EngineeringEvidenceCardV1 as EngineeringEvidenceCard, type EngineeringSurveyAdjustmentAdmissionV1, type EngineeringWatchRuleV1 as EngineeringWatchRule } from '../contracts/engineering-ai.js'
+import { EngineeringEvidenceCardV1, EngineeringWatchRuleV1, type EngineeringContextSnapshotV1, type EngineeringEvidenceSelectionV1, type EngineeringEvidenceCardV1 as EngineeringEvidenceCard, type EngineeringSurveyAdjustmentAdmissionV1, type EngineeringWatchRuleV1 as EngineeringWatchRule } from '../contracts/engineering-ai.js'
 import type { EngineeringService } from './engineering-service.js'
 import type { SurveyRawSourceIntegrity, SurveyService, SurveySourceEligibility } from './survey-service.js'
 
@@ -115,6 +115,8 @@ export class EngineeringContextService {
       generatedAt: this.nowIso(),
       project: {
         name: overview.project.name,
+        ...(overview.project.taskType ? { taskType: overview.project.taskType } : {}),
+        ...(overview.project.taskContext ? { taskContext: overview.project.taskContext } : {}),
         monitoringType: overview.project.monitoringType,
         unit: overview.project.unit,
         reportPeriod: overview.project.reportPeriod,
@@ -195,18 +197,53 @@ export class EngineeringContextService {
     return this.engineering.getProjectOverview(projectId).project.workspace
   }
 
-  conversationEvidence(projectId: string, selection?: { networkId?: string; adjustmentId?: string }): unknown {
+  conversationEvidence(projectId: string, selection?: EngineeringEvidenceSelectionV1): unknown {
     const networks = this.survey?.listNetworks(projectId) ?? []
     const adjustments = this.survey?.listAdjustments(projectId) ?? []
-    const network = selection?.networkId ? networks.find((item) => item.id === selection.networkId) : undefined
     const selectedAdjustment = selection?.adjustmentId ? adjustments.find((item) => item.run.id === selection.adjustmentId) : undefined
-    if (selection?.networkId && !network) throw new Error('network is not in the current Survey project')
+    const networkId = selection?.networkId ?? selectedAdjustment?.run.networkId
+    const network = networkId ? networks.find((item) => item.id === networkId) : undefined
+    if (networkId && !network) throw new Error('network is not in the current Survey project')
     if (selection?.adjustmentId && (!selectedAdjustment || (network && selectedAdjustment.run.networkId !== network.id))) throw new Error('adjustment is not in the current Survey project/network')
+    const needsNetwork = selection?.networkRevision !== undefined || selection?.sourceSha256 !== undefined || selection?.observationId !== undefined || selection?.sourceRecordId !== undefined || selection?.pointId !== undefined || selection?.diagnosticIndex !== undefined
+    if (needsNetwork && !network) throw new Error('exact record selection requires a project-scoped network or adjustment')
+    if (selection?.networkRevision !== undefined && network?.revision !== selection.networkRevision) throw new Error('selected network revision is stale; refresh the evidence')
+    if (selection?.sourceSha256 !== undefined && network?.sourceFile?.sha256 !== selection.sourceSha256) throw new Error('selected source hash does not match the network')
+    const observation = selection?.observationId ? network?.observations.find(item => item.id === selection.observationId) : undefined
+    if (selection?.observationId && !observation) throw new Error('observation is not in the selected network')
+    if (selection?.sourceRecordId && observation && observation.sourceRecordId !== selection.sourceRecordId) throw new Error('raw-record anchor does not match the selected observation')
+    if (selection?.observationId && selectedAdjustment?.result && !selectedAdjustment.result.observations.some(item => item.observationId === selection.observationId)) throw new Error('observation is not in the selected adjustment result')
+    const sourceRecordId = selection?.sourceRecordId ?? observation?.sourceRecordId
+    const anchors = sourceRecordId ? (network?.sourceFile?.records ?? network?.sourceFile?.rawRecordAnchors ?? []).filter(item => item.id === sourceRecordId) : []
+    if (sourceRecordId && anchors.length !== 1) throw new Error('raw-record anchor is missing or ambiguous in the selected source')
+    const point = selection?.pointId ? [...(network?.knownPoints ?? []), ...(network?.unknownPoints ?? [])].find(item => item.id === selection.pointId) : undefined
+    if (selection?.pointId && !point) throw new Error('point is not in the selected network')
+    const diagnostic = selection?.diagnosticIndex !== undefined ? network?.sourceFile?.diagnostics[selection.diagnosticIndex] : undefined
+    if (selection?.diagnosticIndex !== undefined && !diagnostic) throw new Error('diagnostic is not in the selected source')
+    const overview = this.engineering.getProjectOverview(projectId)
+    const manifest = selection?.manifestId ? overview.manifests.find(item => item.id === selection.manifestId) : undefined
+    if (selection?.manifestId && !manifest) throw new Error('manifest is not in the current Survey project')
+    if (manifest && selection?.runId && manifest.runId !== selection.runId) throw new Error('manifest does not match the selected run')
+    const preview = selection?.runId && !manifest ? this.engineering.getPreviewEvidence(projectId, selection.runId) : undefined
+    if (selection?.runId && !manifest && !preview) throw new Error('preview is not in the current Survey project')
+    const outputs = manifest?.outputs ?? preview?.files
+    const selectedOutputs = selection?.outputSha256 ? outputs?.filter(item => item.sha256 === selection.outputSha256).slice(0, 20) : outputs?.slice(0, 20)
+    if (selection?.outputSha256 && !selectedOutputs?.length) throw new Error('output hash is not in the selected manifest or preview')
     return {
       context: this.snapshot(projectId),
+      ...(observation ? { selectedObservation: observation } : {}),
+      ...(anchors[0] ? { selectedRawRecord: { ...anchors[0], rawSnippet: anchors[0].rawSnippet?.slice(0, 2000), snippetTruncated: (anchors[0].rawSnippet?.length ?? 0) > 2000 } } : {}),
+      ...(point ? { selectedPoint: point } : {}),
+      ...(diagnostic ? { selectedDiagnostic: diagnostic } : {}),
+      ...(outputs ? { selectedDelivery: {
+        manifestId: manifest?.id, runId: manifest?.runId ?? preview?.run.id,
+        reviewStatus: manifest?.reviewStatus ?? 'draft', verification: 'recorded-metadata-only',
+        outputCount: outputs.length, outputs: selectedOutputs
+      } } : {}),
       evidence: this.evidence(projectId).slice(0, 20),
       ...(network ? { selectedNetwork: {
         id: network.id, networkType: network.networkType, revision: network.revision,
+        source: network.sourceFile ? { sha256: network.sourceFile.sha256, parserId: network.sourceFile.parserId, parserVersion: network.sourceFile.parserVersion, parserSourceHash: network.sourceFile.parserSourceHash } : undefined,
         observationCount: network.observations.length, observations: network.observations.slice(0, 20),
         pointCount: network.knownPoints.length + network.unknownPoints.length,
         points: [...network.knownPoints, ...network.unknownPoints].slice(0, 20)
@@ -222,7 +259,8 @@ export class EngineeringContextService {
           varianceFactor: result.varianceFactor, varianceFactorUnit: result.varianceFactorUnit,
           degreesOfFreedom: result.degreesOfFreedom,
           qualityFindings: result.qualityFindings.slice(0, 20),
-          residuals: result.observations.slice(0, 20),
+          residuals: selection?.observationId ? result.observations.filter(item => item.observationId === selection.observationId).slice(0, 20) : result.observations.slice(0, 20),
+          ...(selection?.pointId ? { selectedAdjustedPoint: result.points.find(item => item.id === selection.pointId) } : {}),
           residualCount: result.observations.length
         } : {})
       }))

@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "checkedAt": "2026-09-20T05:56:27.711Z",
+  "package": {
+    "sourceHead": "fbb88ea715571e9689cbc1c0802da08762e4318d",
+    "packageVersion": "0.5.0",
+    "asarSha256": "15c19b63ea39fe5618e9d02ca8d977b348e6a12a8db5a8e64f56274a244ed96e",
+    "electronVersion": "43.1.1",
+    "nodeAbi": "148",
+    "runtimeModuleHashes": {
+      "engineering-service": "c69740fbe796ba8ebd53afc5fe90147090db4e969ff0f71f5ebd131e92d2b84c",
+      "engineering-verification-audit": "98c033b89cf8345e1fd18cba0c34dd024fa5df27e4eb7705d5bec946e154d2bd",
+      "survey-service": "9e5e6aee28432b5cabb35b377fbe39d7d6dd9a1c26adbeabfe61e46c80b58140"
+    },
+    "cloudAsarSha256Matched": true
+  },
+  "fixture": {
+    "kind": "synthetic-workwise-json-leveling",
+    "isolated": true,
+    "sourceSha256": "8903310a232d65996977deb7174f0ec2fc4c1bc0ab0092d5f9637c7006232997"
+  },
+  "currentLedger": {
+    "terminalCount": 2,
+    "lifecycleCount": 4,
+    "outcomes": [
+      "passed",
+      "error"
+    ]
+  },
+  "legacyLedger": {
+    "terminalCount": 3,
+    "lifecycleCount": 2,
+    "outcomes": [
+      "passed"
+    ]
+  },
+  "checks": {
+    "realPackagedService": true,
+    "fiveStrictChecksPassed": true,
+    "successAndLookupErrorBound": true,
+    "originalRecordsUnchanged": true,
+    "originalWorkspaceFileBytesUnchanged": true,
+    "reviewStatusStayedDraft": true,
+    "legacyTerminalBytesPreserved": true,
+    "legacyStartsNotBackfilled": true
+  },
+  "baselineHashes": {
+    "engineering": {
+      "engineering_analyses": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "engineering_charts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "engineering_datasets": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "engineering_delivery_idempotency": "997ae80d011eeb9648170c8ddfe6684af5423706097ee73872f0195aaaa789f7",
+      "engineering_idempotency": "e2699e13b84b01d2cc938df2c7d0830157a2b18220169e07909751f28b31c54c",
+      "engineering_manifests": "4b06dd9f96776f2804b809b2a2cb9966f702f7608798dd13feba699c31e38dea",
+      "engineering_projects": "c4ce5e910ad2f8f381f47a3428fb5eb965e98fe35253c0fb86ef32312e819ab8",
+      "engineering_runs": "4047903c2aa7fa2faadcfb44429d373e7e22f18b27766fb7201a88b4d71888b4"
+    },
+    "survey": {
+      "survey_adjustment_evidence": "99baad0f7e0c0c7ae2432de0f8182138c054b7361a78aaa4b5eb8161e852778a",
+      "survey_adjustments": "eb150cc2d17f3b7a042edb6469bfda3c2ed6ee152e8e4d8eef65161c34a7f050",
+      "survey_deformations": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "survey_derived_correction_idempotency": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "survey_derived_corrections": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "survey_free_leveling_trials": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "survey_idempotency": "e64ce6bea1cdbd4fbc3606748e882d4395fe41b0d274aa93fdfdcf3f25e1b190",
+      "survey_import_attempt_events": "b338c4952f98de9bb35248a72e5b1b8eba3fc6e64e6404dde98760e4249c8d24",
+      "survey_networks": "1450a889a8a5ce4a9c28d89252167e039cd17b9e17cdf7b652668dfefdbee464",
+      "survey_projects": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "survey_raw_source_ledger": "c679846b4eab40b2d2968c31fb84ae04c746fc4a22ca4838254703669324d552",
+      "survey_source_admissions": "d29a37216113665ad2f5c0ff56e1dfbfca66d4508d5891536ab9302a62d6468d"
+    },
+    "workspace": {
+      ".workwise/deliverables/project_ef7c0806-27f8-4608-9d86-9cc4905e8e7a/run_7763e174-8978-49fe-8d93-9f0181cfa5a2/evidence.xlsx": "5cd4c978e08de59e3a217c59b5035c79ef8b03ff2dc848d7a4b8d98afc7e6ef5",
+      ".workwise/deliverables/project_ef7c0806-27f8-4608-9d86-9cc4905e8e7a/run_7763e174-8978-49fe-8d93-9f0181cfa5a2/manifest.json": "63ec8576a22380759d634c570a6d0e6f9df6ae26b84e167137ea16c28f8f8aad",
+      ".workwise/deliverables/project_ef7c0806-27f8-4608-9d86-9cc4905e8e7a/run_7763e174-8978-49fe-8d93-9f0181cfa5a2/report.docx": "7849bd19ae994022d902eda0b0aae838b9d2fd67982cc5ff904cb411b36781bc",
+      ".workwise/deliverables/project_ef7c0806-27f8-4608-9d86-9cc4905e8e7a/run_7763e174-8978-49fe-8d93-9f0181cfa5a2/report.pdf": "bca8975b49e266c85a1ba6b35b0cd3bb9abc322b01645ed4b40c708132ecbf63",
+      ".workwise/engineering/adjustments/adjustment_20b3fb46-1dfc-4e05-8e49-f474d2dffdf6.json": "64cc4447800ce6ec19fab249d748dc59aea522ec606581213816a0ac80325abc",
+      ".workwise/engineering/networks/network_67fed1bc-3902-4f78-a3e2-8aa76765f091.json": "59cdf66dd2f915d4d404be9205df40c5cb0384d23fd9511dd8635952452db3f1",
+      ".workwise/engineering/projects/project_ef7c0806-27f8-4608-9d86-9cc4905e8e7a.json": "190e7231446005de19f6c049c15d1903412d94b785703f63353c566c009164c1"
+    }
+  },
+  "limitations": [
+    "Packaged Electron service integration, not GUI automation.",
+    "Synthetic isolated fixtures; no running GUI or user database read or changed.",
+    "No production KPI, professional signoff, new signature/notarization validation or release approval."
+  ]
+}

@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { verifyRelayCleanup } from './verify-relay-cleanup.mjs';
+
+async function fixture(t) {
+  const candidateRoot = await mkdtemp('/private/tmp/railwise-cleanup-selfcheck-');
+  t.after(() => rm(candidateRoot, { recursive: true, force: true }));
+  const evidence = join(candidateRoot, 'evidence');
+  await mkdir(evidence);
+  const reportPath = join(evidence, 'relay-report-0123456789abcdef.json');
+  const tokenPath = join(evidence, 'relay-local-token-0123456789abcdef.txt');
+  await writeFile(reportPath, '{}', { flag: 'wx', mode: 0o600 });
+  return { candidateRoot, reportPath, tokenPath };
+}
+
+test('stopped session confirms cleanup and its exact scoped token path is absent', async t => {
+  const input = await fixture(t);
+  const result = await verifyRelayCleanup({ ...input, report: { tokenRemoved: true } });
+  assert.deepEqual(result, { tokenRemoved: true, tokenPathAbsent: true, tokenRelativePath: 'evidence/relay-local-token-0123456789abcdef.txt', tokenContentsRead: false });
+  assert.deepEqual(await verifyRelayCleanup({ ...input, report: { tokenRemoved: true, tokenPath: input.tokenPath } }), result);
+});
+
+test('cleanup claims cannot bypass residual token entries, cleanup failures or session path scope', async t => {
+  const input = await fixture(t);
+  await writeFile(input.tokenPath, '', { flag: 'wx', mode: 0o600 });
+  await assert.rejects(verifyRelayCleanup({ ...input, report: { tokenRemoved: true } }), /still exists/);
+  await rm(input.tokenPath);
+  await symlink(join(input.candidateRoot, 'absent-target'), input.tokenPath);
+  await assert.rejects(verifyRelayCleanup({ ...input, report: { tokenRemoved: true } }), /still exists/);
+  await rm(input.tokenPath);
+  await assert.rejects(verifyRelayCleanup({ ...input, report: { tokenRemoved: false } }), /does not confirm/);
+  await assert.rejects(verifyRelayCleanup({ ...input, report: { tokenRemoved: true, cleanupError: 'token_cleanup_failed' } }), /cleanup error/);
+  await assert.rejects(verifyRelayCleanup({ ...input, report: { tokenRemoved: true, tokenPath: join(input.candidateRoot, 'other-token.txt') } }), /differs from scoped/);
+});

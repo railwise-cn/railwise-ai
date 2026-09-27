@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "purpose": "private UI baseline only; not the final acceptance candidate",
+  "sourceHead": "9974e69c65e2f76bf3318e713191b4125cb0e75e",
+  "evidenceArtifact": {
+    "id": 10600099265,
+    "node_id": "MDg6QXJ0aWZhY3QxMDYwMDA5OTI2NQ==",
+    "name": "private-updater-arm64-9974e69c65e2f76bf3318e713191b4125cb0e75e",
+    "size_in_bytes": 4164,
+    "url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600099265",
+    "archive_download_url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600099265/zip",
+    "expired": false,
+    "digest": "sha256:880ea4d27cb7f2141c2117cbc9972bb5bc796f6c63250c7d70657fbd87bb75a3",
+    "created_at": "2026-09-20T06:57:17Z",
+    "updated_at": "2026-09-20T06:57:17Z",
+    "expires_at": "2026-09-27T06:57:16Z",
+    "workflow_run": {
+      "id": 35494784734,
+      "repository_id": 1268259206,
+      "head_repository_id": 1268259206,
+      "head_branch": "codex/railwise-survey-convergence",
+      "head_sha": "9974e69c65e2f76bf3318e713191b4125cb0e75e"
+    }
+  },
+  "targetArtifact": {
+    "id": 10600373805,
+    "node_id": "MDg6QXJ0aWZhY3QxMDYwMDM3MzgwNQ==",
+    "name": "private-updater-target-arm64-9974e69c65e2f76bf3318e713191b4125cb0e75e",
+    "size_in_bytes": 589370267,
+    "url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600373805",
+    "archive_download_url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600373805/zip",
+    "expired": false,
+    "digest": "sha256:ae6b08ef9a4e3cf4b9be23244d46b68c7114e95a30ce967f3a251e0804332998",
+    "created_at": "2026-09-20T06:57:32Z",
+    "updated_at": "2026-09-20T06:57:32Z",
+    "expires_at": "2026-09-27T06:57:17Z",
+    "workflow_run": {
+      "id": 35494784734,
+      "repository_id": 1268259206,
+      "head_repository_id": 1268259206,
+      "head_branch": "codex/railwise-survey-convergence",
+      "head_sha": "9974e69c65e2f76bf3318e713191b4125cb0e75e"
+    }
+  },
+  "download": {
+    "status": "passed",
+    "artifactId": 10600373805,
+    "download": "HTTP range extraction of application ZIP only; outer artifact digest not rehashed",
+    "targetZipSha256": "236a70cccccffb4f37c471eec560fd3b240f3fd207d1474a07b3e52fb502784b",
+    "matchesPrivateUpdaterTargetZip": true,
+    "zipPath": "WorkWise-Candidate-9974e69c65e2-0.5.0-mac-arm64.zip"
+  },
+  "checks": {
+    "evidenceArtifactFullDigestVerified": "sha256:880ea4d27cb7f2141c2117cbc9972bb5bc796f6c63250c7d70657fbd87bb75a3",
+    "innerApplicationZipFullyHashed": true,
+    "outerTargetArtifactDigestRehashed": false,
+    "installedAsarMatchesCloudUpdater": true,
+    "embeddedSourceProvenanceVerified": true,
+    "privateUpdaterHost": true
+  },
+  "sourceReports": {
+    "downloadSha256": "09ce5433295d151401bae987c106e243c491065ae0e3156fda14a7edb5c41f40",
+    "installationContextSha256": "a6d0c9987340196ded9888027ed49a65f9bbb8f8e39401fb7ee94d2bbac2d89a"
+  }
+}

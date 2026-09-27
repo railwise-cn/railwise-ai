@@ -1,0 +1,141 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 7d4f454feecb.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-7d4f454/Applications/RAILWISE%20AI%20Candidate%207d4f454feecb.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 监测CSV（合成验收） 变形监测 · mm · 9/20
+							26 文本 监测CSV（合成验收）
+							27 文本 变形监测
+							28 文本  ·
+							29 文本 mm
+							30 文本  ·
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 监测CSV（合成验收） · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 监测CSV（合成验收）
+							36 文本  ·
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 监测CSV（合成验收）
+							49 (selected) 新建内业任务
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 分析与精度
+							52 (selected) 分析与精度
+						53 按钮 新建工程测量项目
+					54 文本 趋势图已生成，并会随下一次报告预览进入成果包。
+					55 按钮 关闭提示
+					56 container
+						57 text 任务 监测CSV（合成验收） 阶段 分析与精度 数据源 / 格式 synthetic-monitoring.csv  ·  CSV 处置状态 候选成果 基准 待确认  ·  待确认 点数 — 测站数 — 观测 2 闭合差 — 精度 已计算 成果 — 网型 — 审查 —
+					58 container Survey AI 会话
+						59 container
+							60 标题 Survey AI 会话, Value: 2
+								61 文本 Survey AI 会话
+							62 文本 监测CSV（合成验收）
+							63 按钮 数据资产
+							64 按钮 测量平差
+							65 按钮 刷新上下文
+						66 标题 Survey AI, Value: 2
+							67 文本 Survey AI
+						68 container
+							69 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							70 按钮 更多操作
+							71 弹出式按钮 模型与推理设置
+							72 按钮 (disabled) 发送
+					73 container
+						74 container 工作视图
+							75 按钮 平差结果与精度
+							76 按钮 趋势分析
+						77 标题 趋势、异常与阈值分析, Value: 2
+							78 文本 趋势、异常与阈值分析
+						79 文本 所有数值由 Runtime 确定性计算。模型不会改写当前值、累计变化、速率或阈值状态。
+						80 按钮 趋势图
+						81 按钮 运行分析
+						82 文本 正常
+						83 文本 1
+						84 文本 低于提示阈值
+						85 文本 提示
+						86 文本 0
+						87 文本 达到关注区间
+						88 文本 报警
+						89 文本 0
+						90 文本 达到或超过阈值
+						91 文本 控制
+						92 文本 0
+						93 文本 控制状态
+						94 文本 待确认
+						95 文本 0
+						96 文本 项目未配置阈值
+						97 text 已生成趋势图： .workwise/deliverables/project_3cf48e4d-fefe-4580-b0a0-854c93e39c44/chart_439e8ce8-1354-487d-9311-66d7c123597e/trend.svg valid
+						98 表格
+							99 row
+								100 列标题
+									101 文本 监测项 / 测点
+								102 列标题
+									103 文本 当前值
+								104 列标题
+									105 文本 累计变化
+								106 列标题
+									107 文本 变化速率
+								108 列标题
+									109 文本 趋势
+								110 列标题
+									111 文本 阈值状态
+							112 row
+								113 单元格
+									114 文本 S01
+									115 文本 沉降
+								116 单元格
+									117 text 4 mm
+								118 单元格
+									119 文本 2
+								120 单元格
+									121 文本 2
+								122 单元格
+									123 文本 上升
+								124 单元格
+									125 文本 正常
+						126 container
+							127 text 算法版本：workwise-engineering-1 · 输入哈希： 8a72e26262d393c9690cc89d20aaf63cca93f1b506b6302c826f7e47370a81d9
+	128 关闭按钮
+	129 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	130 最小化按钮
+131 menu bar
+	132 RAILWISE AI Candidate 7d4f454feecb
+	133 文件
+	134 编辑
+	135 显示
+	136 窗口
+	137 帮助
+
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-7d4f454/Applications/RAILWISE%20AI%20Candidate%207d4f454feecb.app/Contents/Resources/app.asar/out/renderer/index.html

@@ -1,0 +1,20 @@
+{
+  "sourceHead": "f404608d8e0d38a21f72a85618f0fd77e6755a74",
+  "version": "0.5.0",
+  "dmgSha256": "e81c74f30d3a0af84435c47136d1c9404eb1ce30ff4dbd695ddbccc4b5342dad",
+  "asarSha256": "f9eae882ea86cd405a8baae492a9bfd88609cf7f9f5a6e18af908e6d8d9973d7",
+  "signatureExitCode": 0,
+  "notarizationExitCode": 65,
+  "gatekeeperNote": "Unnotarized Developer ID; existing security-disabled override is not notarization",
+  "acceptance": "failed",
+  "realGsiPackagedRuntime": "passed",
+  "realIn2PackagedRuntime": "failed",
+  "failure": "XY cofactor is not symmetric positive semidefinite",
+  "diagnosis": {
+    "parameterCount": 73,
+    "maximumRelativeAsymmetry": 1.0689104434033479e-13,
+    "previousEllipseTolerance": 1.4210854715202004e-14,
+    "canonicalCovarianceTolerance": 1e-12
+  },
+  "publicReleaseOperations": false
+}

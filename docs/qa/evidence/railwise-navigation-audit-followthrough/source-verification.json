@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-20T05:20:50.382Z",
+  "gitHead": "612c4783740bfd83b4023b4a9dcd85e5880338ed",
+  "workingTreeUncommitted": true,
+  "scope": "Source verification of navigation, verification lifecycle audit and precise standard-table links; not packaged acceptance.",
+  "codeFileHashes": {
+    "docs/qa/RAILWISE_SURVEY_PRODUCTION_METRICS.md": "a96bd0a938b0f521e05d577937b02dc1357e01c4f0cf7de5d1444e691d371f01",
+    "docs/qa/SURVEY_STANDARD_BASIS_METHOD.md": "470ff02919de7790d2b64b5a9d22d17d7070c4b6d231151ca92854563e2f2be8",
+    "docs/qa/evidence/railwise-standard-basis-20260920/page-review.json": "1033fb3134662894da90e1d433eb7b4d7b37003e6a15f2c7e48af753ba9a2cd2",
+    "kun/src/engineering/engineering-service.ts": "ac97fbb55cde3b0346aec25bda3e0bdcc0f97672248f0e726720da985c8e97aa",
+    "kun/src/engineering/engineering-verification-audit.test.ts": "0e51db388bb84aa11c7fff02aa4fb9b70ced0613d8b9098ba40d2e4a2d1cee8c",
+    "kun/src/engineering/engineering-verification-audit.ts": "641767fcfd9b657fe142533057b743fbc420300e6a16de3fd2b68b220d313091",
+    "kun/src/engineering/survey-standard-basis.test.ts": "a8ae6f0ab0b7a56322cff8d4363460887e5f0480b154ea64075daf660aa28330",
+    "kun/src/engineering/survey-standard-basis.ts": "d6d01621c4417f7942064ce5a65dc3eff3f7ce6c03bdab8448cce49e01584d6d",
+    "scripts/measure-survey-workflows.py": "fb398b59018436ba9a366516f3501411009c01bb0d4a4b1539c090cd0e5ef1c1",
+    "scripts/test_measure_survey_workflows.py": "a04215137f1bae984d35c0c4693703ad45ba1d67619eb420a5d8bd4967b8c267",
+    "src/main/application-menu.ts": "2a17e8944f4158617557f055d3997c8cd41539abad3abd664839e503004aec63",
+    "src/main/index.ts": "3721296d9e202b7db38faba37479896eee8016ddde5fc6afdd9a1a26c8056216",
+    "src/main/ipc/register-app-ipc-handlers.ts": "bb692b96fa240de460f3a581ed8cbee9ddf7935031fb4e1265a4aaa4763f2638",
+    "src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts": "46f6ac1a7e130a1ef8d3400f1c406ff8e0a443aae67f0d0b9eeb6279870b5f1d",
+    "src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx": "c649aee76bd99ee78a3896141c607f3736b933d266ccf2db54cb104f98e0cc53",
+    "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts": "386b9af566d06f7690077e05d4e0050ec384d8506a44e58889a0c3de91a8456a",
+    "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx": "9b4ff89f720382fc99d722623bec41a0e99a0eb21d6e9057af5865b71299b8dc",
+    "src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts": "d6ef0ea86cf318fc43478a1bb41c49fe467d860e71eb67243d5b9577ff97e85c",
+    "src/renderer/src/components/engineering/SurveyAdjustmentPanel.tsx": "07f3b0baab00330e05035b60bceb46ac681edb9887d7101efa25c222365e6023",
+    "src/renderer/src/components/engineering/SurveyStandardBasis.dom.test.ts": "528e6b3523191dea6d7b44edcd50dd60d5ce380be346516afad5332f6e680fd8",
+    "src/renderer/src/components/engineering/engineering-evidence-navigation.test.ts": "3edf2a739d3c2652e340af80e3b95b039f8e0d15926f1996d93944cff3107bb6",
+    "src/renderer/src/components/engineering/engineering-evidence-navigation.ts": "6db23f08c29bb60d1b92906e52c67e19c7f95898e0114f2e838c9402a72b7a5f",
+    "src/renderer/src/locales/en/common.json": "f0798fcd0cc6642d6cf71c67bbee12dc1319697ac3c2edb05a5c6c83ba76255f",
+    "src/renderer/src/locales/zh/common.json": "77297f16d93988bb3b2cd5b097192e45bec79c47b89fc73123f83d416d2d29ea"
+  },
+  "checks": [
+    {
+      "id": "desktop-typecheck",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "evidenceKind": "captured-tool-output",
+      "log": "desktop-typecheck.log"
+    },
+    {
+      "id": "runtime-typecheck",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "evidenceKind": "captured-tool-output",
+      "log": "runtime-typecheck.log"
+    },
+    {
+      "id": "openspec-strict",
+      "command": "npm run openspec:validate",
+      "exitCode": 0,
+      "evidenceKind": "captured-tool-output",
+      "log": "openspec-strict.log"
+    },
+    {
+      "id": "related-lint",
+      "command": "npx eslint kun/src/engineering/engineering-service.ts kun/src/engineering/engineering-verification-audit.ts kun/src/engineering/engineering-verification-audit.test.ts kun/src/engineering/survey-standard-basis.ts kun/src/engineering/survey-standard-basis.test.ts src/main/application-menu.ts src/main/index.ts src/main/ipc/register-app-ipc-handlers.ts src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts src/renderer/src/components/engineering/SurveyAdjustmentPanel.tsx src/renderer/src/components/engineering/SurveyStandardBasis.dom.test.ts src/renderer/src/components/engineering/engineering-evidence-navigation.ts src/renderer/src/components/engineering/engineering-evidence-navigation.test.ts",
+      "exitCode": 0,
+      "evidenceKind": "captured-tool-output",
+      "log": "related-lint.log"
+    }
+  ],
+  "results": [
+    {
+      "id": "desktop-full",
+      "command": "npm test -- --maxWorkers=4",
+      "exitCode": 0,
+      "passedFiles": 327,
+      "skippedFiles": 2,
+      "passedTests": 2752,
+      "skippedTests": 2,
+      "startLocal": "2026-09-20T13:09:29+08:00",
+      "durationSeconds": 35.8,
+      "evidenceKind": "retained-original-log-with-path-redaction",
+      "log": "desktop-final-tests.log",
+      "boundary": "Precedes the two new profile-link DOM cases. Do not add the 15-case targeted rerun to this full-suite count."
+    },
+    {
+      "id": "runtime-full",
+      "command": "npm test -- --maxWorkers=4",
+      "cwd": "kun",
+      "exitCode": 0,
+      "passedFiles": 179,
+      "skippedFiles": 2,
+      "passedTests": 2780,
+      "skippedTests": 22,
+      "startLocal": "2026-09-20T12:42:54+08:00",
+      "durationSeconds": 22.25,
+      "evidenceKind": "earlier-tool-session-result-summary-not-raw-log",
+      "boundary": "After verification lifecycle changes; before precise table-link catalog correction. No new full run claimed."
+    },
+    {
+      "id": "runtime-standard-targeted",
+      "command": "npm test -- --maxWorkers=4 src/engineering/survey-standard-basis.test.ts src/server/routes/survey-standard-basis.test.ts src/engineering/survey-quality-scoring.test.ts src/engineering/survey-quality-sampling.test.ts",
+      "cwd": "kun",
+      "exitCode": 0,
+      "passedFiles": 3,
+      "passedTests": 164,
+      "startLocal": "2026-09-20T13:04:31+08:00",
+      "durationSeconds": 0.512,
+      "evidenceKind": "earlier-tool-session-result-summary-not-raw-log",
+      "boundary": "The named server route test path does not exist and did not execute. Three matching test files ran; no separate route suite claimed."
+    },
+    {
+      "id": "standard-profile-dom-targeted",
+      "command": "npm test -- --maxWorkers=4 src/renderer/src/components/engineering/SurveyStandardBasis.dom.test.ts",
+      "exitCode": 0,
+      "passedFiles": 1,
+      "passedTests": 15,
+      "newCasesAfterDesktopFull": 2,
+      "startLocal": "2026-09-20T13:12:41+08:00",
+      "durationSeconds": 0.802,
+      "evidenceKind": "earlier-tool-session-result-summary-not-raw-log",
+      "boundary": "Actual catalog profile link order and desktop openExternal calls for planar and height profiles; synthetic DOM transport, no packaged/browser acceptance."
+    },
+    {
+      "id": "python-metrics",
+      "command": "python3 scripts/test_measure_survey_workflows.py",
+      "exitCode": 0,
+      "passedTests": 37,
+      "durationSeconds": 0.048,
+      "evidenceKind": "earlier-tool-session-result-summary-not-raw-log"
+    },
+    {
+      "id": "independent-navigation",
+      "command": "npx vitest run src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts src/renderer/src/components/engineering/engineering-evidence-navigation.test.ts",
+      "exitCode": 0,
+      "passedFiles": 4,
+      "passedTests": 92,
+      "startLocal": "2026-09-20T13:08:44+08:00",
+      "durationSeconds": 2.03,
+      "evidenceKind": "algorithm_review-reported-tool-session-result-no-raw-log"
+    },
+    {
+      "id": "independent-verification-audit",
+      "passedTests": 14,
+      "evidenceKind": "interface_review-reported-session-summary-no-raw-log",
+      "boundary": "Independent agent reports 14/14 verification audit tests, not 14 production attempts."
+    },
+    {
+      "id": "final-build",
+      "command": "npm run build",
+      "exitCode": 0,
+      "exitEvidence": "Parent retrieved exec session 73777 completion with exit 0.",
+      "evidenceKind": "retained-original-log-with-path-redaction",
+      "log": "final-build.log",
+      "boundary": "Source bundle build, not a newly signed/notarized installable candidate."
+    },
+    {
+      "id": "prior-full-lint",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 1,
+      "evidenceKind": "retained-original-log-with-path-redaction",
+      "log": "lint.log",
+      "boundary": "Existing Workbench useEffect dependency warning; final related-file lint separately passed."
+    }
+  ],
+  "logs": [
+    {
+      "id": "desktop-final-tests",
+      "sourceName": "railwise-followthrough-desktop-final-tests.log",
+      "sourceSha256": "89975a114fb48a6f583dada575759f7f50b71d4ca2fd567b5614c73727bfa465",
+      "redactedSha256": "787ad8bc7fcf3f0c3cfddbe82b7976ff5627226737c14aae785133df5deba28e"
+    },
+    {
+      "id": "final-build",
+      "sourceName": "railwise-followthrough-final-build.log",
+      "sourceSha256": "c353af2bab951a73113523024101898ff7b02587092eca7271b770a7d78720e2",
+      "redactedSha256": "66d0b24c0178fee9bf406b84a1a5ae3de05b54407bcf5b8f5bd40743697bfed5"
+    },
+    {
+      "id": "lint",
+      "sourceName": "railwise-followthrough-lint.log",
+      "sourceSha256": "027a5f1d1a49dd7eaa41ddc95a6b25b05ab4e01e090514ea8cba99bd820fcd77",
+      "redactedSha256": "3f63130160259c10ebd7ffd2426afc72e785201673abbd815f90b4c9c9503c27"
+    }
+  ],
+  "limitations": [
+    "No test-count pooling across full and targeted runs.",
+    "Code hashes identify the current uncommitted snapshot, not necessarily the exact bytes at each earlier run; chronological differences are stated per result.",
+    "Candidate be0d7ac47550 is separate historical packaged evidence. These source changes are absent from that package.",
+    "No new signature, notarization, updater round-trip, professional signoff, production KPI or public release approval is established."
+  ]
+}

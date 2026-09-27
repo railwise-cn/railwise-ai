@@ -1,6 +1,21 @@
 # WorkWise 0.5.0 测量源格式验收矩阵
 
-状态：2026-09-10 当前工作树；Task 36 未完成。
+状态索引更新至源码 `281dc87672509de147357efc3aabbeae0eb4dbcb`（2026-09-20）；Task 36 未完成。下方 26 行保留 2026-09-10 的格式/测试基线，后续实机状态以“截至 281dc87 的当前状态索引”为准；不把历史包证据改写为新包验收。
+
+## 截至 281dc87 的当前状态索引
+
+最新已归档的同包真实 P0 GUI 证据是 [6ff82c8 精确候选](./evidence/railwise-convergence-6ff82c8c2746/README.md)，不是 912e4d30b065。其 [最终 GUI 索引](./evidence/railwise-convergence-6ff82c8c2746/gui-acceptance.json) 与 [P0 聚合核验](./evidence/railwise-convergence-6ff82c8c2746/p0-summary.json) 绑定源码 `6ff82c8c27466ee42f2604b053397fd132d5a0a7`、ASAR `ba7edf57c3afe50473a633700a96898c773a4ab42b255eb42c9da91e2e3ebe4d` 和算法 `workwise-survey-adjustment-7`。
+
+| 记录 | 当前已有证据 | 仍未证明 |
+| --- | --- | --- |
+| `FMT-COSA-IN2` | `PACKAGED_GUI_SELECTED_WORKFLOW`：本包实际 GUI 导入、预检、平差、三格式成果及草稿清单；33 点/160 观测/174 锚点/87 自由度。独立原 OU2 比较 33 点，印刷舍入和精度包络各 0 不匹配；最大平面差 `0.06341583922171747 mm`，最大组合归一化差 `0.08899925199598996 sigma`（比较包络为 1 sigma）。 | 不是全部 IN2 方言或历史左右线样本的通过证明；完整主题/窗口/键盘覆盖、专业签认及个人确认未闭合。 |
+| `FMT-LEICA-GSI` | `PACKAGED_GUI_SELECTED_WORKFLOW`：同包实际 GUI 导入、显式控制高程、预检、平差、三格式成果及草稿清单；27 点/28 观测/156 锚点/7 自由度。独立参考 IN1 比较 7 未知端点和 6 控制点，最大高程差 `0.02031550931747006 mm`；从原 GSI 重建同源 21 未知点解，与包结果最大差 `1.7053025658242404e-10 mm`。 | 只覆盖所用 GSI8 WI41 样本，不推广为所有 GSI8/GSI16。参考 14 路线中 7 条高差超半个印刷单位，`heightConversionProvenance=unresolved`；数值精度包络通过不能替代来源复核。 |
+| `FMT-COSA-OU2` | `READ_ONLY_REFERENCE_COMPARED`：已在上述 IN2 样本完成独立只读比较；“真实 IN2 尚未执行 OU2 比较”不再是当前状态。 | 始终只读参考、`archive-only`，没有成为平差输入，也未做 OU2 独立导入 GUI 验收。 |
+| 其余 23 条记录 | 保留下方历史行的已证范围；本次没有为它们追加新实机证据。 | IN1、M5、South DAT、私有转换器和 GNSS 等均不因两份 P0 样本升级。 |
+
+两份本包草稿共有六个实际 DOCX/PDF/XLSX 文件，哈希/长度与保全源字节、原始锚点及观测关联均核对；退出并重启后两清单再做五项复验，持久记录共 4 次成功，每次 5 项通过。它们不是 20 个独立生产样本，也不是审批后的正式交付。
+
+本包中文浅色/英文深色、常规与近最小截图已有证据，但 `963×641` 是图片像素，未独立确认原生窗口下限；完整 locale/状态/a11y 未完成。签名、公证与真实私有 HTTPS updater 往返见同包索引，均不授予公开发布批准。281 的安装包及其新增关联评估不能沿用 6ff 的 GUI 结论。当前仍没有任何格式行达到下述 `ACCEPTED` 总门禁。
 
 ## 目的与边界
 
@@ -49,13 +64,15 @@
 | `PACKAGED_RUNTIME_OU2_PENDING` | 已有候选 Runtime 闭环，但缺少独立 OU2 坐标/精度比较，且没有 GUI 验收。 |
 | `PARSER_OR_INSPECTION_ONLY` | 只有合成/公开研究/安全边界证据，没有真实候选验收。 |
 | `CONVERTER_NOT_RUN` | 转换器边界及其安全测试存在，但没有真实、已审计的用户转换器运行。 |
+| `PACKAGED_GUI_SELECTED_WORKFLOW` | 精确包中选定样本的真实 GUI 成果链和重启复验已留证；不等于全格式、全界面状态或专业验收完成。 |
+| `READ_ONLY_REFERENCE_COMPARED` | 已对指定输入/成果完成独立只读参考比较；不生成可平差来源，不代表参考格式单独 GUI 验收。 |
 
-## 证据矩阵
+## 2026-09-10 格式与测试基线
 
 测试路径和证据路径是本表的机器定位键。`当前 Runtime 处置`必须与
 `kun/src/engineering/survey-format-catalog.ts` 和
 `kun/src/engineering/survey-format-registry.ts` 一致；候选状态只引用候选包证据，
-不将源码测试提升为 GUI 通过。表内只写 basename 的测试文件均解析到
+不将源码测试提升为 GUI 通过。下表“当前”是该历史基线的时点；IN2/GSI/OU2 的后续状态由上方索引承接，历史测试数未在本次重跑。表内只写 basename 的测试文件均解析到
 `kun/src/engineering/<basename>`。
 
 | Record ID / 格式族（Runtime ID） | Evidence class | Fixture / source type | 当前 Runtime 处置 | 正向 / golden coverage | Negative coverage | Resource-limit coverage | Task 36 candidate status |
@@ -97,7 +114,7 @@
 
 ## 候选包实证索引
 
-最新同一已安装候选的 COSA IN2/GSI 证据见 `docs/qa/evidence/survey-candidate-912e4d30b065/README.md`；其中 GSI 的独立数值比较通过，但既有 IN1 的转换差异与完整 GUI 仍待复核。以下是历史 COSA 候选证据：
+最新归档实机证据见上方 6ff 索引。`docs/qa/evidence/survey-candidate-912e4d30b065/README.md` 是较早的包内 Runtime 证据，当时尚无完整 GUI；GSI 参考转换来源至 6ff 仍未闭合。以下同样是历史 COSA 候选证据：
 
 - `docs/qa/evidence/survey-candidate-f09e74ebcbc5/README.md`
 - `docs/qa/evidence/survey-candidate-f09e74ebcbc5/left-in1.json`
@@ -113,14 +130,14 @@
 ## 仍需关闭的验收缺口
 
 1. 当前候选已有另一份真实 COSA IN2/OU2（160 观测、33 点）同源坐标与精度比较，严格打印精度和精度范围均 0 不匹配；历史左右线两份 IN2 不因此自动获得同源比较通过。
-2. 在身份明确、隔离安装的同一候选中完成 COSA 与 GSI 的可见 GUI 导入、预检、平差和 DOCX/PDF/XLSX/manifest 操作，覆盖深浅主题、窄窗口、键盘和连续工程会话；包内 Runtime 通过不替代此项。
+2. 6ff 已完成选定 IN2/GSI 的同包可见 GUI 导入、预检、平差、DOCX/PDF/XLSX/manifest 和重启复验；后续精确包、完整深浅主题/语言/支持尺寸/键盘状态覆盖及用户本人确认仍待闭合。GSI 的 7/14 历史高差转换来源继续待复核。
 3. 对其余有 native parser 的格式收集可授权使用的真实或脱敏输入及独立数值参考；synthetic/public fixtures 继续只作为解析安全证据。
 4. 对 South DAT 获得经批准的列映射契约；对 COSA `.NET` 完成来源文件组和调用方坐标接入；继续将 OU1/OU2 限制为只读比较，不作为调整输入。当前已有第二个独立 COSA `.in2/.ou2` 工程配对，但它仍属于同一 COSA 格式族，不替代第二厂商格式。
 5. 对 DBX/MDB、Trimble T00/T01/T02/T04/JOB 和 Survey Pro，使用实际用户提供的、允许格式的本地转换器，保留可执行文件哈希、许可证/来源、参数、无网络证明、原件哈希和转换输出哈希。
 6. 对所有 GNSS 输入先完成受审计的后处理，得到固定基准、完整协方差的基线向量后，再执行 GNSS 平差验收；原始接收机流和开放交换文件本身不满足此条件。
 7. 补齐目前机器证据明确暴露的专用回归：COSA `.NET` 的行长/维度上限、OU1 的字符/行/点/比较维度上限，以及 converter executor 的 timeout/超大输出失败；将 T00、T01、T04、JOB、DBX、MDB、Survey Pro 分别跑过转换 harness，而不是只以 T02 代表整个集合。
 
-## 本轮机器复核
+## 2026-09-10 历史机器复核
 
 - 合同覆盖脚本：`SurveyFormatIdV1` 共 53 个 ID，矩阵缺失 `0`；矩阵 26 条记录，
   每条均为固定 8 列。
@@ -131,4 +148,4 @@
   executor 基础设施，不证明任何厂商转换器可用。
 - `git diff --check -- docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md`：通过。
 
-在上述缺口关闭前，Task 36 和打包 GUI 验收任务均保持未完成，且不得以本矩阵作为公开发布、稳定渠道提升或厂商互操作声明的依据。
+截至 281dc87，本次文档核对复算了 6ff 归档目录的 60 个文件哈希，并逐项核对上方数字与 `p0-summary.json` / `gui-acceptance.json`；没有重跑输入或改写任何原始证据。指标分母与候选/生产边界见[生产指标口径](./RAILWISE_SURVEY_PRODUCTION_METRICS.md)。在上述缺口关闭前，Task 36 和完整打包 GUI 验收任务均保持未完成，且不得以本矩阵作为公开发布、稳定渠道提升或厂商互操作声明的依据。

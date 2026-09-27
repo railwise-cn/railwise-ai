@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "purpose": "private Runtime completion guard and historical-state test baseline; not the final GUI acceptance candidate",
+  "sourceHead": "9cf70d71919e997e815a9e55ec4264e01572979c",
+  "version": "0.5.0",
+  "appPath": "/private/tmp/railwise-survey-9cf70d7/Applications/RAILWISE AI Candidate 9cf70d71919e.app",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head9cf70d71919e",
+  "asarSha256": "a42089f63f154c294243cc020e7ead866a5c73a69da0c74c336a3e2448f9642d",
+  "matchesNativeUpdaterInstalledTarget": true,
+  "zipSha256": "6b18db96a217df357d96c38abe5a62b3df9dac2a18c55166616effe63b8e75ee",
+  "installationSource": "same application ZIP used by private native updater",
+  "checks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "/private/tmp/railwise-survey-9cf70d7/Applications/RAILWISE AI Candidate 9cf70d71919e.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "/private/tmp/railwise-survey-9cf70d7/Applications/RAILWISE AI Candidate 9cf70d71919e.app"
+      ],
+      "exitCode": 0,
+      "output": "Processing: /private/tmp/railwise-survey-9cf70d7/Applications/RAILWISE AI Candidate 9cf70d71919e.app\nThe validate action worked!"
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "/private/tmp/railwise-survey-9cf70d7/Applications/RAILWISE AI Candidate 9cf70d71919e.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ],
+  "guiAcceptance": "not-tested",
+  "userAcceptance": "not-performed",
+  "sourceReportSha256": "4dcdb28dacb2a39468b15570aa033c8391805be2dca82c841be9ee8838628d15",
+  "embeddedSourceProvenanceVerified": true,
+  "embeddedUpdaterHost": "127.0.0.1"
+}

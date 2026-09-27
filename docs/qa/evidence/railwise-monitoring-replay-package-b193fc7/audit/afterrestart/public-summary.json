@@ -1,0 +1,865 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "b193fc70d6363dc768e715087ca9c0d9975158c9",
+  "packageAsarSha256": "f50b2c373902aae90cdd60726ac0158925aa91e9babb2a12b51ed173f171119a",
+  "phase": "afterrestart",
+  "checkedAt": "2026-09-20T21:51:36.414648+00:00",
+  "fixtureOnly": true,
+  "productionKpi": false,
+  "status": "passed-selected-package-replay-audit",
+  "projects": [
+    {
+      "format": "historical",
+      "ids": {
+        "project": "project_9b98b139-6794-4830-95d1-0ac55449a399",
+        "manifest": "manifest_220c5caa-5177-4e66-8928-6bf9d05b1b44",
+        "dataset": "dataset_984d1de1-14e2-4f20-a491-16dccc12aaaf",
+        "analysis": "analysis_78dcd6e5-d4ab-47e3-bcff-6b47fb5e8639",
+        "run": "run_a1d4b27f-418c-4577-99c1-29d290321c54"
+      },
+      "source": null,
+      "businessRowHashes": {
+        "engineering_projects": "d93893ff1a13235ea5dd232e063613a6af4a3fa805eb38107c6e73769f80b27e",
+        "engineering_manifests": "d9a847fce3b18b6675c2bfea56419bc70d43acda98032647c6b2d7917d5d2832",
+        "engineering_runs": "a196a64b94b34462b81375fd77d4455f82afd003c10eaed7803f3e397d1dd810",
+        "engineering_datasets": "983950d4de0232ec1a9afab2125b457a8e9cb106a57d2601417ee9298006ece5",
+        "engineering_analyses": "eac9e9bb4e8cbdc0ae29c5fbc5a3e876b6ec369d6af8607248556f3a6a085cdb",
+        "engineering_charts": "3070c25868cb3a26dbc3b3956a1178880ab6a3cad35809e4b9db78d60679f92a"
+      },
+      "expected": [
+        {
+          "monitoringItem": "settlement",
+          "point": "H01",
+          "currentValue": 8,
+          "previousValue": 2,
+          "cumulativeChange": 8,
+          "changeRate": 2.0,
+          "trend": "rising",
+          "anomaly": false,
+          "thresholdStatus": "warning"
+        }
+      ],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/report.docx",
+          "sha256": "d5341323fd2c2cfcdefd9e4e56c607cb14f51be1121abf422b5a4b91c0ac907d",
+          "sizeBytes": 4349,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/report.pdf",
+          "sha256": "052be06dc2652f68619e99502a6ad4581da21ce5cf01bed38fd785c0d6882923",
+          "sizeBytes": 29300,
+          "mediaType": "application/pdf"
+        },
+        {
+          "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/evidence.xlsx",
+          "sha256": "9a4773262be183bed45186c3f933bf7eb5579d7d0e79f2fbebcc17ba301e9337",
+          "sizeBytes": 31592,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        },
+        {
+          "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/chart_14b18607-5fbc-429e-a1d9-d6a9a4ef7112/trend.svg",
+          "sha256": "8bcb3dadb3313467263913d06277c64c294af1a9718eefef5caa2a9374b03381",
+          "sizeBytes": 4511,
+          "mediaType": "image/svg+xml"
+        }
+      ],
+      "chart": {
+        "series": 1,
+        "observations": 3,
+        "timeProportional": true,
+        "pointLinesSeparate": true
+      },
+      "reviewStatus": "draft",
+      "replayAttempts": [
+        {
+          "id": "monitoring_replay_8dfb1481-ccdc-40d8-a5d8-36cae6a2307f",
+          "startedAt": "2026-09-20T21:27:02.184Z",
+          "startSequence": 1,
+          "startHash": "527b765c8f3842ec080fd096c7905d9819ef11457c5b2480e4e0db6c8cee637c",
+          "status": "not-evaluated",
+          "reasonCode": "source-unavailable",
+          "checkedAt": "2026-09-20T21:27:02.186Z",
+          "finishSequence": 2,
+          "finishHash": "9487ffd8e6e70d9f0bb1adaf63b065314dc056c818bbb0ae3b18b1886f73a3f4",
+          "resultHash": "c6f4b57725dab0e8bc5d8150975415ab60d7227f3f726d91a687e4637605ad0c",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_8dfb1481-ccdc-40d8-a5d8-36cae6a2307f",
+            "projectId": "project_9b98b139-6794-4830-95d1-0ac55449a399",
+            "manifestId": "manifest_220c5caa-5177-4e66-8928-6bf9d05b1b44",
+            "checkedAt": "2026-09-20T21:27:02.186Z",
+            "status": "not-evaluated",
+            "reasonCode": "source-unavailable",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_78dcd6e5-d4ab-47e3-bcff-6b47fb5e8639",
+                "datasetId": "dataset_984d1de1-14e2-4f20-a491-16dccc12aaaf",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "17577cefdee65a99598996f6d2f7304fd6c7ce9654112742dc8e61bf52b2f813",
+                "storedResultsHash": "d27a276a62376a23fe84170a2bd4968317fb7255f1b4a4cb0166a621feeda6a5",
+                "status": "not-evaluated",
+                "reasonCode": "source-unavailable"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_f7b62d8c-8c65-4c55-bcb4-ccabdfa74528",
+          "startedAt": "2026-09-20T21:50:04.485Z",
+          "startSequence": 23,
+          "startHash": "6808d5c58743c4c1c4457533a4332a5dfabd03a4ce2338a8b334b8934bf0cf83",
+          "status": "not-evaluated",
+          "reasonCode": "source-unavailable",
+          "checkedAt": "2026-09-20T21:50:04.489Z",
+          "finishSequence": 24,
+          "finishHash": "2a3616eb5d6beb3646646b6b8e93ca6e926d78def10df2e87f57edf1d7d52d68",
+          "resultHash": "455806e9b0bc72d94e63805b7339b133b4a321337bfeabbb12885ce7e37adcf0",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_f7b62d8c-8c65-4c55-bcb4-ccabdfa74528",
+            "projectId": "project_9b98b139-6794-4830-95d1-0ac55449a399",
+            "manifestId": "manifest_220c5caa-5177-4e66-8928-6bf9d05b1b44",
+            "checkedAt": "2026-09-20T21:50:04.489Z",
+            "status": "not-evaluated",
+            "reasonCode": "source-unavailable",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_78dcd6e5-d4ab-47e3-bcff-6b47fb5e8639",
+                "datasetId": "dataset_984d1de1-14e2-4f20-a491-16dccc12aaaf",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "17577cefdee65a99598996f6d2f7304fd6c7ce9654112742dc8e61bf52b2f813",
+                "storedResultsHash": "d27a276a62376a23fe84170a2bd4968317fb7255f1b4a4cb0166a621feeda6a5",
+                "status": "not-evaluated",
+                "reasonCode": "source-unavailable"
+              }
+            ]
+          }
+        }
+      ],
+      "oldFiveCheckVerification": {
+        "attempts": [
+          {
+            "id": "verification_071bc1da-e7d9-4e51-9a95-ee84a6ca8509",
+            "outcome": "passed",
+            "recordHash": "cad8a891d2883ffefff3eae893e183b91b1efb6a9517a530d2c12c5843891fb8",
+            "startedAt": "2026-09-20T21:26:54.733Z",
+            "completedAt": "2026-09-20T21:26:54.738Z"
+          }
+        ],
+        "incompleteStarts": [],
+        "allSelectedRowsHash": "fdc9eafe41f695d7f7079fa9f80736ec9a84c6d5d692d0deff611475b3573f50"
+      },
+      "oldFiveCheckRowsUnchangedSinceBefore": true,
+      "newReplayAttemptIdsAfterBefore": [
+        "monitoring_replay_f7b62d8c-8c65-4c55-bcb4-ccabdfa74528"
+      ]
+    },
+    {
+      "format": "csv",
+      "ids": {
+        "project": "project_ad84b119-0570-4637-a9cf-a629e4b54bc6",
+        "manifest": "manifest_748d98f3-163f-402d-8142-c7055f0267da",
+        "dataset": "dataset_b91b3c87-8592-4968-b9e9-31f47bc6720d",
+        "analysis": "analysis_7eaf009e-5b89-4f3c-b30b-994aef2701f9",
+        "run": "run_a2c19bcd-a528-4cf5-b323-b12192f3bedb"
+      },
+      "source": {
+        "sourceFileHash": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+        "sourceContextHash": "592ceedd2bfc084808ac584f3e71ab8cd7d12efcc23dddcded3517636a9894e8",
+        "sourceSizeBytes": 261,
+        "contextSizeBytes": 812,
+        "completeNormalizedObservationsMatch": true
+      },
+      "businessRowHashes": {
+        "engineering_projects": "a375a91a90ff927a4213423c56b9dcedc73fddbdd594db95447afc2a479cf987",
+        "engineering_manifests": "2fa92b589ee51a2fe07d100f28708252e6ad2564d71f60d11a2ca587c48d35da",
+        "engineering_runs": "0e84606319fc38efc8c1138034d2d975740bec8ba6cf5ea7329ba1f4a41f3c4c",
+        "engineering_datasets": "924534ddc3ea608dedeb820e357f82b5f141462f47466f081926509e8d67f6dc",
+        "engineering_analyses": "9085689aae77e5560cb635db55bcf0d4cdd049377a4fae9169a129359eb49b58",
+        "engineering_charts": "b05aa89ae09ce09ca9b9eca7ae477b03c1aebb373f660f83e036c9411c3dd652"
+      },
+      "expected": [
+        {
+          "monitoringItem": "沉降",
+          "point": "S01",
+          "currentValue": 8,
+          "previousValue": 2,
+          "cumulativeChange": 8,
+          "changeRate": 2.0,
+          "trend": "rising",
+          "anomaly": false,
+          "thresholdStatus": "warning"
+        },
+        {
+          "monitoringItem": "沉降",
+          "point": "S02",
+          "currentValue": -1,
+          "previousValue": 5,
+          "cumulativeChange": -9,
+          "changeRate": -2.0,
+          "trend": "falling",
+          "anomaly": false,
+          "thresholdStatus": "normal"
+        }
+      ],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_ad84b119-0570-4637-a9cf-a629e4b54bc6/run_a2c19bcd-a528-4cf5-b323-b12192f3bedb/report.docx",
+          "sha256": "31d043f41d29b68a1a77942ae7aade69069de6b66db204a2d976c3fdccafd640",
+          "sizeBytes": 4513,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "path": ".workwise/deliverables/project_ad84b119-0570-4637-a9cf-a629e4b54bc6/run_a2c19bcd-a528-4cf5-b323-b12192f3bedb/report.pdf",
+          "sha256": "f7c371bed7393e7d924718c378d21709b532506f2acdfedfc7d8ea2274c963de",
+          "sizeBytes": 30666,
+          "mediaType": "application/pdf"
+        },
+        {
+          "path": ".workwise/deliverables/project_ad84b119-0570-4637-a9cf-a629e4b54bc6/run_a2c19bcd-a528-4cf5-b323-b12192f3bedb/evidence.xlsx",
+          "sha256": "155b148d151ebf68d9065394168d238e0b2f2ad1413e106907a7a5d61a522292",
+          "sizeBytes": 35944,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        },
+        {
+          "path": ".workwise/deliverables/project_ad84b119-0570-4637-a9cf-a629e4b54bc6/chart_b508b6c2-0694-4aaf-ac19-29a943e5faab/trend.svg",
+          "sha256": "fc4d29c5e8050349ad7a9d984ad069bb3968bf572b20c029a6437ed093c4e07d",
+          "sizeBytes": 5402,
+          "mediaType": "image/svg+xml"
+        }
+      ],
+      "chart": {
+        "series": 2,
+        "observations": 6,
+        "timeProportional": true,
+        "pointLinesSeparate": true
+      },
+      "reviewStatus": "draft",
+      "replayAttempts": [
+        {
+          "id": "monitoring_replay_c91ca321-fe67-4370-a884-c75ba5c0ccf8",
+          "startedAt": "2026-09-20T21:30:38.418Z",
+          "startSequence": 3,
+          "startHash": "096ef31682211bbadc51b96c30d1340dfc2cc9d36a35c0929de31af97a46c893",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:30:38.421Z",
+          "finishSequence": 4,
+          "finishHash": "53e3c4de5c2b6caedfc148e43088af8c2a8ff5f45f6f149129759160c41df144",
+          "resultHash": "b122bc60c24d483718b1cbefbb52f2e1d389635276e7af1da2450cce3466daf0",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_c91ca321-fe67-4370-a884-c75ba5c0ccf8",
+            "projectId": "project_ad84b119-0570-4637-a9cf-a629e4b54bc6",
+            "manifestId": "manifest_748d98f3-163f-402d-8142-c7055f0267da",
+            "checkedAt": "2026-09-20T21:30:38.421Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_7eaf009e-5b89-4f3c-b30b-994aef2701f9",
+                "datasetId": "dataset_b91b3c87-8592-4968-b9e9-31f47bc6720d",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "b5825b0c0dcf420e013430b0bbedbd54396fcfc08fec3caf59db4b8de6ec11c3",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+                "sourceContextHash": "592ceedd2bfc084808ac584f3e71ab8cd7d12efcc23dddcded3517636a9894e8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_f7f40070-ef23-423b-ba67-96a94bac0b66",
+          "startedAt": "2026-09-20T21:31:24.086Z",
+          "startSequence": 5,
+          "startHash": "500104d09666cfd05986e483c834c5b63fcef422557f46cf3b50e8b1911fbb5c",
+          "status": "failed",
+          "reasonCode": "prerequisite-failed",
+          "checkedAt": "2026-09-20T21:31:24.088Z",
+          "finishSequence": 6,
+          "finishHash": "de5df1776d06e44ce3a1444e216bd82de76aa3281c3e10fe4b3f80da0b732782",
+          "resultHash": "b8fea8f415d13798c7d070781fbfb72d3e495bafa6dd0fdd05b7474dd7b9aa06",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_f7f40070-ef23-423b-ba67-96a94bac0b66",
+            "projectId": "project_ad84b119-0570-4637-a9cf-a629e4b54bc6",
+            "manifestId": "manifest_748d98f3-163f-402d-8142-c7055f0267da",
+            "checkedAt": "2026-09-20T21:31:24.088Z",
+            "status": "failed",
+            "reasonCode": "prerequisite-failed",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": []
+          }
+        },
+        {
+          "id": "monitoring_replay_47fb1448-3597-4c9e-88f2-4bfbca451fa3",
+          "startedAt": "2026-09-20T21:31:49.784Z",
+          "startSequence": 7,
+          "startHash": "d3eb111f59962be0e3bea1283dc8f9c58b264fa1a7d74807de2082a01d994ece",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:31:49.789Z",
+          "finishSequence": 8,
+          "finishHash": "6c1f4fcbcd1c0727d82caf05f786a3879778310c5bbc28ddb12e6776c947eff1",
+          "resultHash": "8db629a7d1d75d210b1c1a7e0f391a3dc7243d2128b4dc2715dc8610d06e6046",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_47fb1448-3597-4c9e-88f2-4bfbca451fa3",
+            "projectId": "project_ad84b119-0570-4637-a9cf-a629e4b54bc6",
+            "manifestId": "manifest_748d98f3-163f-402d-8142-c7055f0267da",
+            "checkedAt": "2026-09-20T21:31:49.789Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_7eaf009e-5b89-4f3c-b30b-994aef2701f9",
+                "datasetId": "dataset_b91b3c87-8592-4968-b9e9-31f47bc6720d",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "b5825b0c0dcf420e013430b0bbedbd54396fcfc08fec3caf59db4b8de6ec11c3",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+                "sourceContextHash": "592ceedd2bfc084808ac584f3e71ab8cd7d12efcc23dddcded3517636a9894e8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_cb7f1694-285c-44b2-9451-eec6828c79b5",
+          "startedAt": "2026-09-20T21:49:31.185Z",
+          "startSequence": 21,
+          "startHash": "642255b29697e858785abc7e399f5086ec5b84871fff233eeeac52d927c9d350",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:49:31.191Z",
+          "finishSequence": 22,
+          "finishHash": "1bce5c7b7d518ac97f32920853eb962cd3c1bd55f73e25e92262f6146e817e13",
+          "resultHash": "83a01556ea8813bdbe3cc101f6950d56005b05238679501612604f7eedf9899c",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_cb7f1694-285c-44b2-9451-eec6828c79b5",
+            "projectId": "project_ad84b119-0570-4637-a9cf-a629e4b54bc6",
+            "manifestId": "manifest_748d98f3-163f-402d-8142-c7055f0267da",
+            "checkedAt": "2026-09-20T21:49:31.191Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_7eaf009e-5b89-4f3c-b30b-994aef2701f9",
+                "datasetId": "dataset_b91b3c87-8592-4968-b9e9-31f47bc6720d",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "b5825b0c0dcf420e013430b0bbedbd54396fcfc08fec3caf59db4b8de6ec11c3",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+                "sourceContextHash": "592ceedd2bfc084808ac584f3e71ab8cd7d12efcc23dddcded3517636a9894e8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        }
+      ],
+      "oldFiveCheckVerification": {
+        "attempts": [
+          {
+            "id": "verification_a1112f53-9369-4dbd-8707-337fc11a2d3d",
+            "outcome": "passed",
+            "recordHash": "5e07237a1aee710d9acc498892037353ca7721d9ac87a48f8c930fc0b44ac149",
+            "startedAt": "2026-09-20T21:30:28.984Z",
+            "completedAt": "2026-09-20T21:30:28.986Z"
+          }
+        ],
+        "incompleteStarts": [],
+        "allSelectedRowsHash": "25794d724148f6846e26c28c681dce7003d2c4b74c4952bb195d0d746e29b74d"
+      },
+      "oldFiveCheckRowsUnchangedSinceBefore": true,
+      "newReplayAttemptIdsAfterBefore": [
+        "monitoring_replay_cb7f1694-285c-44b2-9451-eec6828c79b5"
+      ]
+    },
+    {
+      "format": "xlsx",
+      "ids": {
+        "project": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+        "manifest": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+        "dataset": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+        "analysis": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+        "run": "run_3a65320b-da89-4596-8c55-e18635e8c51b"
+      },
+      "source": {
+        "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+        "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+        "sourceSizeBytes": 1731,
+        "contextSizeBytes": 848,
+        "completeNormalizedObservationsMatch": true
+      },
+      "businessRowHashes": {
+        "engineering_projects": "28dbd0ea209cdd08bd2d1f3bda87aabff72d8ea93a92d55c984749ba2992c783",
+        "engineering_manifests": "4bb8db7ebb70d8ffec83c7067e25de53366106036b1e7eff117c39c2715008eb",
+        "engineering_runs": "d7fb3eb1a0eb379c379fed299175bb5117f8db623f18a91dbf25fb83ea6cd021",
+        "engineering_datasets": "c21ae1d170f3f6b285d2f7fcb81de98d042097b59588b251f10a90dd49d5b634",
+        "engineering_analyses": "2a926d579234b35758caa9247104adeaf1b1123bf38da0324be407242f9099cd",
+        "engineering_charts": "867f63dbb2777f6cd64d80b2c2ae2add08cc7fc07b3e026e2164b7ca963a5dd6"
+      },
+      "expected": [
+        {
+          "monitoringItem": "沉降",
+          "point": "S01",
+          "currentValue": 8,
+          "previousValue": 2,
+          "cumulativeChange": 8,
+          "changeRate": 2.0,
+          "trend": "rising",
+          "anomaly": false,
+          "thresholdStatus": "warning"
+        },
+        {
+          "monitoringItem": "沉降",
+          "point": "S02",
+          "currentValue": -1,
+          "previousValue": 5,
+          "cumulativeChange": -9,
+          "changeRate": -2.0,
+          "trend": "falling",
+          "anomaly": false,
+          "thresholdStatus": "normal"
+        }
+      ],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc/run_3a65320b-da89-4596-8c55-e18635e8c51b/report.docx",
+          "sha256": "855d1777bc3b061f145e0c5d12679ebc6e550b6206dd0d5886eb3a1bd1ae6f6f",
+          "sizeBytes": 4589,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "path": ".workwise/deliverables/project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc/run_3a65320b-da89-4596-8c55-e18635e8c51b/report.pdf",
+          "sha256": "d99b99cba59759303c9856544aed3d66d127d976d5b57e8d0dd38c3572d0b964",
+          "sizeBytes": 30897,
+          "mediaType": "application/pdf"
+        },
+        {
+          "path": ".workwise/deliverables/project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc/run_3a65320b-da89-4596-8c55-e18635e8c51b/evidence.xlsx",
+          "sha256": "a99babe97dee2808f858104acb308a142832be9964f2e32ae72a1bc20e931bd1",
+          "sizeBytes": 36196,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        },
+        {
+          "path": ".workwise/deliverables/project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc/chart_f93fd95f-deca-43a8-9426-8bae2c497bb1/trend.svg",
+          "sha256": "2ffc958434d28f427af0a4604a0c45e5c5a946ebae0273e3f696cd8bc733b910",
+          "sizeBytes": 5404,
+          "mediaType": "image/svg+xml"
+        }
+      ],
+      "chart": {
+        "series": 2,
+        "observations": 6,
+        "timeProportional": true,
+        "pointLinesSeparate": true
+      },
+      "reviewStatus": "draft",
+      "replayAttempts": [
+        {
+          "id": "monitoring_replay_2f53b69e-3111-49cc-90dd-2dc839bcd5e4",
+          "startedAt": "2026-09-20T21:36:33.650Z",
+          "startSequence": 9,
+          "startHash": "d8ad9b030788fc5360b9e9759fe2b9a6ad171acbeba33a3a6f15f18be4da77e3",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:36:33.655Z",
+          "finishSequence": 10,
+          "finishHash": "fcbfabfbbe2d409d42dea4f6173a330e51bd13b8807a24f21451ae20d503d256",
+          "resultHash": "20e8a1ae7291aa9b2cc91f701cab4946080946a33d3723de17af288aefb63dd3",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_2f53b69e-3111-49cc-90dd-2dc839bcd5e4",
+            "projectId": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+            "manifestId": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+            "checkedAt": "2026-09-20T21:36:33.655Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+                "datasetId": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "acf54911f9d27b8b8d3a29e823a52cd23edf0f349c699e5f5db40233c159e22f",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+                "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_badca188-6220-40dc-ba34-87846852957f",
+          "startedAt": "2026-09-20T21:37:55.716Z",
+          "startSequence": 11,
+          "startHash": "9a2cb7d45fa970dfe54b24d978a23a7c09650d6ae7c86924f2f4117a9f1580fc",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:37:55.722Z",
+          "finishSequence": 12,
+          "finishHash": "fbcdf9346422e84c98982031a0c0c8ec786c242a57b899dba4c964e7ab12dc00",
+          "resultHash": "c759beb6962c03300b8cff1105f46aef344b4b268549892b1171b8e8614a1221",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_badca188-6220-40dc-ba34-87846852957f",
+            "projectId": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+            "manifestId": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+            "checkedAt": "2026-09-20T21:37:55.722Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+                "datasetId": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "acf54911f9d27b8b8d3a29e823a52cd23edf0f349c699e5f5db40233c159e22f",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+                "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_d5c65293-930a-41aa-86bc-27ec04cbbd0d",
+          "startedAt": "2026-09-20T21:40:18.551Z",
+          "startSequence": 13,
+          "startHash": "20a19b2c27e758484f3ecc2dd9f1cfffbf2746b77daf22d8a192959ae5410ffb",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:40:18.557Z",
+          "finishSequence": 14,
+          "finishHash": "088e55e84cb7cbcc1e97efa359ed4e7074a6ee1f36835f1fbad278b80e3e4a48",
+          "resultHash": "dbc475d9919d8a3e7df2c03e04f74768931b15792e78736ab7249462725d07b2",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_d5c65293-930a-41aa-86bc-27ec04cbbd0d",
+            "projectId": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+            "manifestId": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+            "checkedAt": "2026-09-20T21:40:18.557Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+                "datasetId": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "acf54911f9d27b8b8d3a29e823a52cd23edf0f349c699e5f5db40233c159e22f",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+                "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_15992e2b-2143-48c4-bfb5-e206d90c4536",
+          "startedAt": "2026-09-20T21:41:25.249Z",
+          "startSequence": 15,
+          "startHash": "89027153db8e2b65c0452c27d7c2d84f868b254239942d60dc2428db4d522fcc",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:41:25.254Z",
+          "finishSequence": 16,
+          "finishHash": "13bbece12cacf6c61a34fa137bdc49951e67bfc0bfefd421f039d621f075b383",
+          "resultHash": "4cd089ac723d328ee44741888d477be5f1a469ae85ebec500137fd999c381913",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_15992e2b-2143-48c4-bfb5-e206d90c4536",
+            "projectId": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+            "manifestId": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+            "checkedAt": "2026-09-20T21:41:25.254Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+                "datasetId": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "acf54911f9d27b8b8d3a29e823a52cd23edf0f349c699e5f5db40233c159e22f",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+                "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_4b9c3d66-ed7b-4978-a1cb-8dd7b8681f33",
+          "startedAt": "2026-09-20T21:43:09.600Z",
+          "startSequence": 17,
+          "startHash": "3b9a10fb7881a3ea8244ec4461a7dacb131352b292775124e75a9a1674f77867",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:43:09.605Z",
+          "finishSequence": 18,
+          "finishHash": "ba89e8e1b7e6731a4d049c27549c6367a1c9648c92970538c53535f8f8fca0bf",
+          "resultHash": "d63daf5b2eb070bb56c5b3172f3fef3b82294e914218d73a1a657e000f4e20a0",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_4b9c3d66-ed7b-4978-a1cb-8dd7b8681f33",
+            "projectId": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+            "manifestId": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+            "checkedAt": "2026-09-20T21:43:09.605Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+                "datasetId": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "acf54911f9d27b8b8d3a29e823a52cd23edf0f349c699e5f5db40233c159e22f",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+                "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        },
+        {
+          "id": "monitoring_replay_c775ba0d-18ca-429c-a1c2-7162316ee9c6",
+          "startedAt": "2026-09-20T21:49:02.520Z",
+          "startSequence": 19,
+          "startHash": "d2d7069ffbdc52358a86126295ca19501b2bebe676180f5de1dfb4540b6b35e2",
+          "status": "passed",
+          "reasonCode": "matched",
+          "checkedAt": "2026-09-20T21:49:02.531Z",
+          "finishSequence": 20,
+          "finishHash": "8b35af9e1a3f304b9fe34090b89e9b1d85a778bd53e741be5a2f1f77addf96a0",
+          "resultHash": "546ca6034b1ce9821887457c873369e005d539480bcdf4015a85e3efa4819974",
+          "result": {
+            "schemaVersion": 1,
+            "attemptId": "monitoring_replay_c775ba0d-18ca-429c-a1c2-7162316ee9c6",
+            "projectId": "project_8d90b15f-02b3-46cf-a5ed-26c34fff42dc",
+            "manifestId": "manifest_49552e7a-2af1-4193-8db4-d475717d7621",
+            "checkedAt": "2026-09-20T21:49:02.531Z",
+            "status": "passed",
+            "reasonCode": "matched",
+            "comparisonVersion": "monitoring-results-exact-1",
+            "execution": {
+              "runtimeVersion": "0.5.0",
+              "node": "24.18.0",
+              "v8": "15.0.245.15-electron.0",
+              "icu": "78.2",
+              "platform": "darwin",
+              "arch": "arm64",
+              "timezone": "Asia/Shanghai",
+              "locale": "en-US",
+              "timeBasis": "ISO-unzoned-UTC"
+            },
+            "analyses": [
+              {
+                "analysisId": "analysis_0a53ddb8-caac-44fb-b33a-d9d645c9c2ec",
+                "datasetId": "dataset_b4c816a9-3aa6-46ab-baea-2d9b2ff8f767",
+                "algorithmVersion": "workwise-engineering-2",
+                "inputHash": "acf54911f9d27b8b8d3a29e823a52cd23edf0f349c699e5f5db40233c159e22f",
+                "storedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "recomputedResultsHash": "b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d",
+                "sourceFileHash": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+                "sourceContextHash": "178ecd028770b31cb19be039ceb58c076297a66aef7c338400043565db54abe8",
+                "status": "passed",
+                "reasonCode": "matched"
+              }
+            ]
+          }
+        }
+      ],
+      "oldFiveCheckVerification": {
+        "attempts": [
+          {
+            "id": "verification_e853f436-f6f7-448e-a163-16524d18149e",
+            "outcome": "passed",
+            "recordHash": "ddbabe0d413bcfaa31af039686e267cb2f4a51ef8c9d87a0d6f7039654f0d568",
+            "startedAt": "2026-09-20T21:36:26.516Z",
+            "completedAt": "2026-09-20T21:36:26.518Z"
+          }
+        ],
+        "incompleteStarts": [],
+        "allSelectedRowsHash": "84d86a8f5321b2342acb7f7ba1dd2d26b7fbf52261581055fca05bb3dd0acaa3"
+      },
+      "oldFiveCheckRowsUnchangedSinceBefore": true,
+      "newReplayAttemptIdsAfterBefore": [
+        "monitoring_replay_c775ba0d-18ca-429c-a1c2-7162316ee9c6"
+      ]
+    }
+  ],
+  "guiRestartVerifiedByScript": false,
+  "selectedRecordedReplayCounts": {
+    "passed": 9,
+    "failed": 1,
+    "not-evaluated": 2,
+    "not-applicable": 0,
+    "incomplete": 0
+  },
+  "retainedFailureAndSuccessfulRetry": [
+    {
+      "format": "csv",
+      "failedAttemptId": "monitoring_replay_f7f40070-ef23-423b-ba67-96a94bac0b66",
+      "laterPassedAttemptId": "monitoring_replay_47fb1448-3597-4c9e-88f2-4bfbca451fa3"
+    }
+  ],
+  "originalFilesAndClosedStateUnchanged": true,
+  "limitations": [
+    "Selected synthetic fixtures only; not a source authenticity, professional approval or production KPI claim.",
+    "GUI operations and actual restart are separate operator evidence; script checks records observed after those actions.",
+    "Full normalized originals and complete arithmetic results checked; workbook values, document metadata and SVG geometry checked, not pixel rendering.",
+    "Original database is only byte-copied after process/handle guards; SQLite opens only private copies. No full database appears in this public summary."
+  ]
+}

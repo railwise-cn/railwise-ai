@@ -26,7 +26,7 @@ describe('splash window document', () => {
       { progress: 0.42, label: '正在载入扩展' }
     )
 
-    expect(html).toContain('<div class="brand">WorkWise</div>')
+    expect(html).toContain('<div class="brand">RailWise AI</div>')
     expect(html).toContain('<div class="version">0.3.5</div>')
     expect(html).toContain('aria-valuenow="42"')
     expect(html).toContain('正在载入扩展')

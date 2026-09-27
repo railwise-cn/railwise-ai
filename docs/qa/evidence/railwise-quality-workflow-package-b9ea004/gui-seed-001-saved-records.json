@@ -1,0 +1,2118 @@
+{
+  "fixtureOnly": true,
+  "professionalSignoff": false,
+  "productionKpi": false,
+  "project": {
+    "schemaVersion": 1,
+    "id": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+    "name": "合成整改链验收",
+    "taskType": "control-network",
+    "monitoringType": "control-network",
+    "unit": "mm",
+    "signConvention": "positive",
+    "thresholds": {
+      "default": 10
+    },
+    "reportPeriod": {},
+    "workspace": "<isolated-tmp>/workspace/synthetic-quality-workflow",
+    "revision": 1,
+    "createdAt": "2026-09-24T09:00:00.000Z",
+    "updatedAt": "2026-09-24T09:00:00.000Z"
+  },
+  "runtime": "<isolated-tmp>/home/.workwise/runtime/engineering",
+  "workspace": "<isolated-tmp>/workspace/synthetic-quality-workflow",
+  "original": {
+    "label": "original",
+    "source": "monitoringItem,point,time,value,unit\nsettlement,P1,2026-09-01T00:00:00Z,0,mm\nsettlement,P1,2026-09-02T00:00:00Z,5,mm",
+    "network": {
+      "schemaVersion": 1,
+      "id": "network_fef56200-b40f-4f5c-8078-57d8a3d33c74",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "networkType": "leveling",
+      "coordinateSystem": "待确认",
+      "projection": "待确认",
+      "ellipsoid": "待确认",
+      "verticalDatum": "synthetic-local-height",
+      "unit": "m",
+      "knownPoints": [
+        {
+          "id": "A",
+          "pointClass": "known",
+          "height": 100,
+          "known": true,
+          "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+        },
+        {
+          "id": "C",
+          "pointClass": "known",
+          "height": 100.01,
+          "known": true,
+          "sourceLocator": "WorkWise JSON:network.knownPoints[1]"
+        }
+      ],
+      "unknownPoints": [
+        {
+          "id": "B",
+          "pointClass": "unknown",
+          "height": 100,
+          "known": false,
+          "sourceLocator": "WorkWise JSON:network.unknownPoints[0]"
+        }
+      ],
+      "observations": [
+        {
+          "id": "AB-original",
+          "type": "height-difference",
+          "from": "A",
+          "to": "B",
+          "value": 0.005,
+          "unit": "m",
+          "sigma": 0.001,
+          "sigmaUnit": "m",
+          "sourceLocator": "WorkWise JSON:network.observations[0]",
+          "sourceRecordId": "workwise-json-observation-1"
+        },
+        {
+          "id": "BC-original",
+          "type": "height-difference",
+          "from": "B",
+          "to": "C",
+          "value": 0.005,
+          "unit": "m",
+          "sigma": 0.001,
+          "sigmaUnit": "m",
+          "sourceLocator": "WorkWise JSON:network.observations[1]",
+          "sourceRecordId": "workwise-json-observation-2"
+        }
+      ],
+      "instrumentParameters": {},
+      "inputAttachmentHash": "5c6edc3a529886eedacc0ab832c9f1893b5913f28c57307a3b2741a8fd815d76",
+      "sourceFile": {
+        "schemaVersion": 1,
+        "sourcePath": "attachment://sha256/5c6edc3a529886eedacc0ab832c9f1893b5913f28c57307a3b2741a8fd815d76/workwise-survey-network.json",
+        "name": "workwise-survey-network.json",
+        "size": 597,
+        "fileSize": 597,
+        "sha256": "5c6edc3a529886eedacc0ab832c9f1893b5913f28c57307a3b2741a8fd815d76",
+        "importedAt": "2026-09-24T04:46:46.971Z",
+        "importedBy": "workwise:survey-format-registry",
+        "originalPreserved": true,
+        "formatId": "workwise-json",
+        "vendor": "WorkWise/open",
+        "formatVersion": "1",
+        "detectionMethod": "content-signature",
+        "detectionConfidence": 0.99,
+        "extensionClaimed": ".json",
+        "extensionContentConflict": false,
+        "requiresManualConfirmation": false,
+        "detection": {
+          "format": "workwise-json",
+          "vendor": "WorkWise/open",
+          "version": "1",
+          "confidence": 0.99,
+          "extension": ".json",
+          "matchedSignatures": [
+            "workwise-survey-network@1"
+          ],
+          "extensionConflict": false,
+          "method": "content-signature"
+        },
+        "disposition": "adjustment-ready",
+        "dispositionReason": "冻结来源合同 workwise-survey-network@1",
+        "parserId": "workwise-survey-source",
+        "parserVersion": "1",
+        "parserSourceHash": "41953772e9b62f9cd059f0f546362887fd99db327826dad2e3944aa2bddb7cc3",
+        "linearUnitRaw": "m",
+        "angularUnitRaw": "not-declared",
+        "linearUnitCanonical": "m",
+        "angularUnitCanonical": "rad",
+        "datumDeclared": "待确认",
+        "heightSystemDeclared": "synthetic-local-height",
+        "recordCount": 5,
+        "summary": {
+          "pointCount": 3,
+          "stationCount": 0,
+          "observationCount": 2,
+          "recordCount": 5,
+          "skippedRecordCount": 0
+        },
+        "records": [
+          {
+            "id": "workwise-json-known-point-1",
+            "sourceRecord": 1,
+            "byteOffset": 157,
+            "byteLength": 57,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 157,
+            "rawLength": 57,
+            "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+          },
+          {
+            "id": "workwise-json-known-point-2",
+            "sourceRecord": 2,
+            "byteOffset": 215,
+            "byteLength": 60,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 215,
+            "rawLength": 60,
+            "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+          },
+          {
+            "id": "workwise-json-unknown-point-1",
+            "sourceRecord": 3,
+            "byteOffset": 294,
+            "byteLength": 37,
+            "section": "network.unknownPoints",
+            "recordType": "workwise-json-unknown-point",
+            "rawOffset": 294,
+            "rawLength": 37,
+            "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+          },
+          {
+            "id": "workwise-json-observation-1",
+            "sourceRecord": 4,
+            "byteOffset": 349,
+            "byteLength": 122,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 349,
+            "rawLength": 122,
+            "rawSnippet": "{\"id\":\"AB-original\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          },
+          {
+            "id": "workwise-json-observation-2",
+            "sourceRecord": 5,
+            "byteOffset": 472,
+            "byteLength": 122,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 472,
+            "rawLength": 122,
+            "rawSnippet": "{\"id\":\"BC-original\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "encoding_detected",
+            "severity": "info",
+            "message": "文本编码 utf-8",
+            "localized": {
+              "en": {
+                "message": "Text encoding: utf-8"
+              }
+            }
+          },
+          {
+            "code": "format_detected",
+            "severity": "info",
+            "message": "识别为 WorkWise/open / workwise-json 1，置信度 99%",
+            "localized": {
+              "en": {
+                "message": "Detected workwise-json 1; confidence 99%"
+              }
+            }
+          }
+        ],
+        "rawRecordAnchors": [
+          {
+            "id": "workwise-json-known-point-1",
+            "sourceRecord": 1,
+            "byteOffset": 157,
+            "byteLength": 57,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 157,
+            "rawLength": 57,
+            "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+          },
+          {
+            "id": "workwise-json-known-point-2",
+            "sourceRecord": 2,
+            "byteOffset": 215,
+            "byteLength": 60,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 215,
+            "rawLength": 60,
+            "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+          },
+          {
+            "id": "workwise-json-unknown-point-1",
+            "sourceRecord": 3,
+            "byteOffset": 294,
+            "byteLength": 37,
+            "section": "network.unknownPoints",
+            "recordType": "workwise-json-unknown-point",
+            "rawOffset": 294,
+            "rawLength": 37,
+            "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+          },
+          {
+            "id": "workwise-json-observation-1",
+            "sourceRecord": 4,
+            "byteOffset": 349,
+            "byteLength": 122,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 349,
+            "rawLength": 122,
+            "rawSnippet": "{\"id\":\"AB-original\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          },
+          {
+            "id": "workwise-json-observation-2",
+            "sourceRecord": 5,
+            "byteOffset": 472,
+            "byteLength": 122,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 472,
+            "rawLength": 122,
+            "rawSnippet": "{\"id\":\"BC-original\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          }
+        ],
+        "preservedRawFields": {}
+      },
+      "qualityStatus": "imported",
+      "findings": [],
+      "revision": 1,
+      "createdAt": "2026-09-24T09:00:00.000Z",
+      "updatedAt": "2026-09-24T09:00:00.000Z"
+    },
+    "adjustment": {
+      "run": {
+        "schemaVersion": 1,
+        "id": "adjustment_a3df6e19-65b5-4f9c-b159-da1c4c5536f1",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "networkId": "network_fef56200-b40f-4f5c-8078-57d8a3d33c74",
+        "method": "weighted-least-squares",
+        "constraint": "fixed-known-points",
+        "algorithmVersion": "workwise-survey-adjustment-7",
+        "inputHash": "754372485c8b1e7ad0f146123f86a508f6d0f7d788013c336a46eff871cf809b",
+        "status": "completed",
+        "revision": 1,
+        "idempotencyKey": "adjustment-original",
+        "resumeCount": 0,
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "updatedAt": "2026-09-24T09:00:00.000Z",
+        "completedAt": "2026-09-24T09:00:00.000Z"
+      },
+      "result": {
+        "schemaVersion": 1,
+        "id": "adjustment_result_39806c44-362b-4301-9672-ab401e884983",
+        "runId": "adjustment_a3df6e19-65b5-4f9c-b159-da1c4c5536f1",
+        "networkId": "network_fef56200-b40f-4f5c-8078-57d8a3d33c74",
+        "observationCount": 2,
+        "unknownCount": 1,
+        "redundancy": 1,
+        "degreesOfFreedom": 1,
+        "linearUnit": "m",
+        "angularUnit": "rad",
+        "closure": {
+          "heightDifference": -5.115699530655604e-15
+        },
+        "closureUnits": {
+          "heightDifference": "m"
+        },
+        "parameters": {},
+        "parameterUnits": {},
+        "unitWeightStdDev": 3.617346036614102e-12,
+        "unitWeightStdDevUnit": "dimensionless",
+        "varianceFactor": 1.3085192348607753e-23,
+        "varianceFactorUnit": "dimensionless",
+        "varianceFactorEstimated": true,
+        "points": [
+          {
+            "id": "A",
+            "height": 100
+          },
+          {
+            "id": "C",
+            "height": 100.01
+          },
+          {
+            "id": "B",
+            "height": 100.005,
+            "correctionHeight": 0.005000000000002557,
+            "standardError": 2.5578499123881127e-15,
+            "covariance": [
+              5e-7
+            ]
+          }
+        ],
+        "observations": [
+          {
+            "observationId": "AB-original",
+            "correction": 2.5569824035898137e-15,
+            "residual": 2.5569824035898137e-15,
+            "unit": "m",
+            "standardizedResidual": 2.5569824035898137e-12,
+            "standardizedResidualUnit": "sigma",
+            "outlier": false,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "BC-original",
+            "correction": 2.5587171270657905e-15,
+            "residual": 2.5587171270657905e-15,
+            "unit": "m",
+            "standardizedResidual": 2.5587171270657905e-12,
+            "standardizedResidualUnit": "sigma",
+            "outlier": false,
+            "sourceRecordId": "workwise-json-observation-2"
+          }
+        ],
+        "displacements": [
+          {
+            "pointId": "A",
+            "dH": 0,
+            "magnitude": 0,
+            "kind": "vertical"
+          },
+          {
+            "pointId": "C",
+            "dH": 0,
+            "magnitude": 0,
+            "kind": "vertical"
+          },
+          {
+            "pointId": "B",
+            "dH": 0.0049999999999954525,
+            "magnitude": 0.0049999999999954525,
+            "kind": "vertical"
+          }
+        ],
+        "covariance": [
+          [
+            5e-7
+          ]
+        ],
+        "precision": {
+          "maxPointStdDev": 2.5578499123881127e-15,
+          "passed": true
+        },
+        "qualityFindings": [],
+        "inputHash": "754372485c8b1e7ad0f146123f86a508f6d0f7d788013c336a46eff871cf809b",
+        "algorithmVersion": "workwise-survey-adjustment-7",
+        "validation": "valid",
+        "strategyId": "leveling",
+        "solverDiagnostics": {
+          "iterations": 1,
+          "rank": 1,
+          "conditionEstimate": 1
+        },
+        "createdAt": "2026-09-24T09:00:00.000Z"
+      }
+    },
+    "dataset": {
+      "schemaVersion": 1,
+      "id": "dataset_99bf80d9-1dd6-48a9-b04e-eb3a42b1d6a9",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "sourceFileName": "synthetic-original.csv",
+      "sourceFileHash": "45996bf1fa5941d89ff52826a16781a0abaca015eac9148baa20aab055e9898c",
+      "fieldMapping": {
+        "monitoringItem": "monitoringItem",
+        "point": "point",
+        "timestamp": "time",
+        "value": "value",
+        "unit": "unit"
+      },
+      "unknownColumns": [],
+      "rowCount": 2,
+      "columnCount": 5,
+      "observationCount": 2,
+      "timeRange": {
+        "start": "2026-09-01T00:00:00Z",
+        "end": "2026-09-02T00:00:00Z"
+      },
+      "status": "validated",
+      "revision": 2,
+      "createdAt": "2026-09-24T09:00:00.000Z",
+      "updatedAt": "2026-09-24T09:00:00.000Z",
+      "observations": [
+        {
+          "schemaVersion": 1,
+          "id": "obs_45996bf1fa59_0",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "datasetId": "dataset_99bf80d9-1dd6-48a9-b04e-eb3a42b1d6a9",
+          "monitoringItem": "settlement",
+          "point": "P1",
+          "timestamp": "2026-09-01T00:00:00Z",
+          "value": 0,
+          "unit": "mm",
+          "sourceRow": 2,
+          "sourceFields": {
+            "monitoringItem": "settlement",
+            "point": "P1",
+            "time": "2026-09-01T00:00:00Z",
+            "value": "0",
+            "unit": "mm"
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "id": "obs_45996bf1fa59_1",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "datasetId": "dataset_99bf80d9-1dd6-48a9-b04e-eb3a42b1d6a9",
+          "monitoringItem": "settlement",
+          "point": "P1",
+          "timestamp": "2026-09-02T00:00:00Z",
+          "value": 5,
+          "unit": "mm",
+          "sourceRow": 3,
+          "sourceFields": {
+            "monitoringItem": "settlement",
+            "point": "P1",
+            "time": "2026-09-02T00:00:00Z",
+            "value": "5",
+            "unit": "mm"
+          }
+        }
+      ],
+      "findings": []
+    },
+    "analysis": {
+      "schemaVersion": 1,
+      "id": "analysis_0cf2f980-790f-4709-a9bb-497492378464",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "datasetId": "dataset_99bf80d9-1dd6-48a9-b04e-eb3a42b1d6a9",
+      "inputHash": "2f0dff1fd94de8454e823edfc754059c853dc60c1dfb02b5fdc5a68a4e97f8f3",
+      "algorithmVersion": "workwise-engineering-2",
+      "results": [
+        {
+          "monitoringItem": "settlement",
+          "point": "P1",
+          "currentValue": 5,
+          "previousValue": 0,
+          "cumulativeChange": 5,
+          "changeRate": 5,
+          "trend": "rising",
+          "anomaly": false,
+          "thresholdStatus": "normal"
+        }
+      ],
+      "createdAt": "2026-09-24T09:00:00.000Z"
+    },
+    "manifest": {
+      "schemaVersion": 1,
+      "id": "manifest_494f9734-1223-4040-aed5-3d0ac1bf7b11",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "runId": "run_63a8bb85-233a-423d-bdb4-3a2d71a120ed",
+      "inputDatasets": [
+        {
+          "id": "dataset_99bf80d9-1dd6-48a9-b04e-eb3a42b1d6a9",
+          "hash": "45996bf1fa5941d89ff52826a16781a0abaca015eac9148baa20aab055e9898c"
+        }
+      ],
+      "analyses": [
+        "analysis_0cf2f980-790f-4709-a9bb-497492378464"
+      ],
+      "charts": [
+        {
+          "schemaVersion": 1,
+          "id": "chart_480483e2-6c44-4ea8-89af-919416eff50d",
+          "analysisId": "analysis_0cf2f980-790f-4709-a9bb-497492378464",
+          "chartType": "trend",
+          "rendererVersion": "engineering-trend-2",
+          "inputHash": "2f0dff1fd94de8454e823edfc754059c853dc60c1dfb02b5fdc5a68a4e97f8f3",
+          "dataRange": {
+            "min": 0,
+            "max": 5
+          },
+          "relativePath": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/chart_480483e2-6c44-4ea8-89af-919416eff50d/trend.svg",
+          "sha256": "efb64c98b896add81d8a7051bdc3b745f46cc469c3ba3bb076929fda2a50233c",
+          "validation": "valid",
+          "createdAt": "2026-09-24T09:00:00.000Z"
+        }
+      ],
+      "citations": [],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/report.docx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "sha256": "3959cb477676f389e21168070f355d34c1b5e60380b9b9dbb529058520cdbfb1",
+          "sizeBytes": 5688
+        },
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/report.pdf",
+          "mediaType": "application/pdf",
+          "sha256": "c4e7a4cfa296301c8e49515901e128a88f8c998f3f0624f4e372f04a07e2af1a",
+          "sizeBytes": 36571
+        },
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/evidence.xlsx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "sha256": "99ec19a794a257218cb54059ba169a02dc7908a03cb70fca9ea4abe91f404a27",
+          "sizeBytes": 41347
+        },
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/chart_480483e2-6c44-4ea8-89af-919416eff50d/trend.svg",
+          "mediaType": "image/svg+xml",
+          "sha256": "efb64c98b896add81d8a7051bdc3b745f46cc469c3ba3bb076929fda2a50233c",
+          "sizeBytes": 4274
+        }
+      ],
+      "adjustments": [
+        {
+          "schemaVersion": 1,
+          "id": "adjustment_result_39806c44-362b-4301-9672-ab401e884983",
+          "runId": "adjustment_a3df6e19-65b5-4f9c-b159-da1c4c5536f1",
+          "networkId": "network_fef56200-b40f-4f5c-8078-57d8a3d33c74",
+          "observationCount": 2,
+          "unknownCount": 1,
+          "redundancy": 1,
+          "degreesOfFreedom": 1,
+          "linearUnit": "m",
+          "angularUnit": "rad",
+          "closure": {
+            "heightDifference": -5.115699530655604e-15
+          },
+          "closureUnits": {
+            "heightDifference": "m"
+          },
+          "parameters": {},
+          "parameterUnits": {},
+          "unitWeightStdDev": 3.617346036614102e-12,
+          "unitWeightStdDevUnit": "dimensionless",
+          "varianceFactor": 1.3085192348607753e-23,
+          "varianceFactorUnit": "dimensionless",
+          "varianceFactorEstimated": true,
+          "points": [
+            {
+              "id": "A",
+              "height": 100
+            },
+            {
+              "id": "C",
+              "height": 100.01
+            },
+            {
+              "id": "B",
+              "height": 100.005,
+              "correctionHeight": 0.005000000000002557,
+              "standardError": 2.5578499123881127e-15,
+              "covariance": [
+                5e-7
+              ]
+            }
+          ],
+          "observations": [
+            {
+              "observationId": "AB-original",
+              "correction": 2.5569824035898137e-15,
+              "residual": 2.5569824035898137e-15,
+              "unit": "m",
+              "standardizedResidual": 2.5569824035898137e-12,
+              "standardizedResidualUnit": "sigma",
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-1"
+            },
+            {
+              "observationId": "BC-original",
+              "correction": 2.5587171270657905e-15,
+              "residual": 2.5587171270657905e-15,
+              "unit": "m",
+              "standardizedResidual": 2.5587171270657905e-12,
+              "standardizedResidualUnit": "sigma",
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-2"
+            }
+          ],
+          "displacements": [
+            {
+              "pointId": "A",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            },
+            {
+              "pointId": "C",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            },
+            {
+              "pointId": "B",
+              "dH": 0.0049999999999954525,
+              "magnitude": 0.0049999999999954525,
+              "kind": "vertical"
+            }
+          ],
+          "covariance": [
+            [
+              5e-7
+            ]
+          ],
+          "precision": {
+            "maxPointStdDev": 2.5578499123881127e-15,
+            "passed": true
+          },
+          "qualityFindings": [],
+          "inputHash": "754372485c8b1e7ad0f146123f86a508f6d0f7d788013c336a46eff871cf809b",
+          "algorithmVersion": "workwise-survey-adjustment-7",
+          "validation": "valid",
+          "strategyId": "leveling",
+          "solverDiagnostics": {
+            "iterations": 1,
+            "rank": 1,
+            "conditionEstimate": 1
+          },
+          "createdAt": "2026-09-24T09:00:00.000Z"
+        }
+      ],
+      "deformations": [],
+      "surveySources": [
+        {
+          "networkId": "network_fef56200-b40f-4f5c-8078-57d8a3d33c74",
+          "source": {
+            "schemaVersion": 1,
+            "sourcePath": "attachment://sha256/5c6edc3a529886eedacc0ab832c9f1893b5913f28c57307a3b2741a8fd815d76/workwise-survey-network.json",
+            "name": "workwise-survey-network.json",
+            "size": 597,
+            "fileSize": 597,
+            "sha256": "5c6edc3a529886eedacc0ab832c9f1893b5913f28c57307a3b2741a8fd815d76",
+            "importedAt": "2026-09-24T04:46:46.971Z",
+            "importedBy": "workwise:survey-format-registry",
+            "originalPreserved": true,
+            "formatId": "workwise-json",
+            "vendor": "WorkWise/open",
+            "formatVersion": "1",
+            "detectionMethod": "content-signature",
+            "detectionConfidence": 0.99,
+            "extensionClaimed": ".json",
+            "extensionContentConflict": false,
+            "requiresManualConfirmation": false,
+            "detection": {
+              "format": "workwise-json",
+              "vendor": "WorkWise/open",
+              "version": "1",
+              "confidence": 0.99,
+              "extension": ".json",
+              "matchedSignatures": [
+                "workwise-survey-network@1"
+              ],
+              "extensionConflict": false,
+              "method": "content-signature"
+            },
+            "disposition": "adjustment-ready",
+            "dispositionReason": "冻结来源合同 workwise-survey-network@1",
+            "parserId": "workwise-survey-source",
+            "parserVersion": "1",
+            "parserSourceHash": "41953772e9b62f9cd059f0f546362887fd99db327826dad2e3944aa2bddb7cc3",
+            "linearUnitRaw": "m",
+            "angularUnitRaw": "not-declared",
+            "linearUnitCanonical": "m",
+            "angularUnitCanonical": "rad",
+            "datumDeclared": "待确认",
+            "heightSystemDeclared": "synthetic-local-height",
+            "recordCount": 5,
+            "summary": {
+              "pointCount": 3,
+              "stationCount": 0,
+              "observationCount": 2,
+              "recordCount": 5,
+              "skippedRecordCount": 0
+            },
+            "records": [
+              {
+                "id": "workwise-json-known-point-1",
+                "sourceRecord": 1,
+                "byteOffset": 157,
+                "byteLength": 57,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 157,
+                "rawLength": 57,
+                "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+              },
+              {
+                "id": "workwise-json-known-point-2",
+                "sourceRecord": 2,
+                "byteOffset": 215,
+                "byteLength": 60,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 215,
+                "rawLength": 60,
+                "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+              },
+              {
+                "id": "workwise-json-unknown-point-1",
+                "sourceRecord": 3,
+                "byteOffset": 294,
+                "byteLength": 37,
+                "section": "network.unknownPoints",
+                "recordType": "workwise-json-unknown-point",
+                "rawOffset": 294,
+                "rawLength": 37,
+                "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+              },
+              {
+                "id": "workwise-json-observation-1",
+                "sourceRecord": 4,
+                "byteOffset": 349,
+                "byteLength": 122,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 349,
+                "rawLength": 122,
+                "rawSnippet": "{\"id\":\"AB-original\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              },
+              {
+                "id": "workwise-json-observation-2",
+                "sourceRecord": 5,
+                "byteOffset": 472,
+                "byteLength": 122,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 472,
+                "rawLength": 122,
+                "rawSnippet": "{\"id\":\"BC-original\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              }
+            ],
+            "diagnostics": [
+              {
+                "code": "encoding_detected",
+                "severity": "info",
+                "message": "文本编码 utf-8",
+                "localized": {
+                  "en": {
+                    "message": "Text encoding: utf-8"
+                  }
+                }
+              },
+              {
+                "code": "format_detected",
+                "severity": "info",
+                "message": "识别为 WorkWise/open / workwise-json 1，置信度 99%",
+                "localized": {
+                  "en": {
+                    "message": "Detected workwise-json 1; confidence 99%"
+                  }
+                }
+              }
+            ],
+            "rawRecordAnchors": [
+              {
+                "id": "workwise-json-known-point-1",
+                "sourceRecord": 1,
+                "byteOffset": 157,
+                "byteLength": 57,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 157,
+                "rawLength": 57,
+                "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+              },
+              {
+                "id": "workwise-json-known-point-2",
+                "sourceRecord": 2,
+                "byteOffset": 215,
+                "byteLength": 60,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 215,
+                "rawLength": 60,
+                "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+              },
+              {
+                "id": "workwise-json-unknown-point-1",
+                "sourceRecord": 3,
+                "byteOffset": 294,
+                "byteLength": 37,
+                "section": "network.unknownPoints",
+                "recordType": "workwise-json-unknown-point",
+                "rawOffset": 294,
+                "rawLength": 37,
+                "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+              },
+              {
+                "id": "workwise-json-observation-1",
+                "sourceRecord": 4,
+                "byteOffset": 349,
+                "byteLength": 122,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 349,
+                "rawLength": 122,
+                "rawSnippet": "{\"id\":\"AB-original\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              },
+              {
+                "id": "workwise-json-observation-2",
+                "sourceRecord": 5,
+                "byteOffset": 472,
+                "byteLength": 122,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 472,
+                "rawLength": 122,
+                "rawSnippet": "{\"id\":\"BC-original\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.005,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              }
+            ],
+            "preservedRawFields": {}
+          }
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          "尚未完成复核、审核、批准与签名流程；该成果清单仅供待审查使用，不得作为已批准交付。"
+        ]
+      },
+      "reviewStatus": "draft",
+      "runtimeVersion": "0.5.0",
+      "createdAt": "2026-09-24T09:00:00.000Z",
+      "finalizedAt": "2026-09-24T09:00:00.000Z"
+    },
+    "verification": {
+      "schemaVersion": 1,
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "manifestId": "manifest_494f9734-1223-4040-aed5-3d0ac1bf7b11",
+      "checkedAt": "2026-09-24T09:00:00.000Z",
+      "valid": true,
+      "reviewStatus": "draft",
+      "checks": [
+        {
+          "id": "manifest",
+          "status": "passed"
+        },
+        {
+          "id": "outputs",
+          "status": "passed"
+        },
+        {
+          "id": "inputs",
+          "status": "passed"
+        },
+        {
+          "id": "surveyReplay",
+          "status": "passed"
+        },
+        {
+          "id": "sources",
+          "status": "passed"
+        }
+      ]
+    },
+    "plan": {
+      "plan": {
+        "schemaVersion": 1,
+        "id": "quality_plan_c64ff016-f087-40f6-adde-3fe5431606a4",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "projectRevision": 1,
+        "projectBindingHash": "ef4e39035d730456b177b080554d3ba14f69a68f716ac9a986d30969e547e017",
+        "manifestId": "manifest_494f9734-1223-4040-aed5-3d0ac1bf7b11",
+        "manifestHash": "69caf1d0a50f4ffd0896b9f04f413f115406171d6fe24be5f08380ad587850cc",
+        "artifactId": "quality_artifact_fc4e766a-a855-4c81-8832-7cb083503236",
+        "artifactHash": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+        "requiredEvidence": [
+          {
+            "id": "support",
+            "title": "Synthetic retained report bytes",
+            "memberId": "output-1"
+          }
+        ],
+        "requiredCheckIds": [
+          "artifact-bytes",
+          "evidence:support"
+        ],
+        "purpose": "evidence-retention-only",
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "standardConformity": "not-evaluated",
+        "humanSignatureVerification": "not-evaluated"
+      },
+      "artifact": {
+        "schemaVersion": 1,
+        "id": "quality_artifact_fc4e766a-a855-4c81-8832-7cb083503236",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "manifestId": "manifest_494f9734-1223-4040-aed5-3d0ac1bf7b11",
+        "manifestHash": "69caf1d0a50f4ffd0896b9f04f413f115406171d6fe24be5f08380ad587850cc",
+        "bundleHash": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+        "snapshotEvidenceSha256": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+        "members": [
+          {
+            "id": "manifest",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/manifest.json",
+            "mediaType": "application/json",
+            "sha256": "75001f9a788c72c688bfa99188e2c6d84d1da23db118a2bed2a1b90273c8bd4d",
+            "sizeBytes": 13216
+          },
+          {
+            "id": "output-1",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/report.docx",
+            "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "sha256": "3959cb477676f389e21168070f355d34c1b5e60380b9b9dbb529058520cdbfb1",
+            "sizeBytes": 5688
+          },
+          {
+            "id": "output-2",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/report.pdf",
+            "mediaType": "application/pdf",
+            "sha256": "c4e7a4cfa296301c8e49515901e128a88f8c998f3f0624f4e372f04a07e2af1a",
+            "sizeBytes": 36571
+          },
+          {
+            "id": "output-3",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_63a8bb85-233a-423d-bdb4-3a2d71a120ed/evidence.xlsx",
+            "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "sha256": "99ec19a794a257218cb54059ba169a02dc7908a03cb70fca9ea4abe91f404a27",
+            "sizeBytes": 41347
+          },
+          {
+            "id": "output-4",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/chart_480483e2-6c44-4ea8-89af-919416eff50d/trend.svg",
+            "mediaType": "image/svg+xml",
+            "sha256": "efb64c98b896add81d8a7051bdc3b745f46cc469c3ba3bb076929fda2a50233c",
+            "sizeBytes": 4274
+          }
+        ],
+        "createdAt": "2026-09-24T09:00:00.000Z"
+      }
+    },
+    "record": {
+      "record": {
+        "schemaVersion": 1,
+        "id": "quality_record_f13a18f7-f09c-49e5-af04-d28bd98da75d",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "planId": "quality_plan_c64ff016-f087-40f6-adde-3fe5431606a4",
+        "planHash": "e8432eaa001468f7eb8ba243ac50bfddbbfd10dc0c7f67dcb671455fd7a894bc",
+        "artifactId": "quality_artifact_fc4e766a-a855-4c81-8832-7cb083503236",
+        "artifactHash": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+        "createdAt": "2026-09-24T09:00:00.000Z"
+      },
+      "events": [
+        {
+          "schemaVersion": 1,
+          "id": "quality_event_9b7229f1-bab0-40a8-9c55-4bc27082bd9e",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "artifactSha256": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+          "sequence": 1,
+          "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "thisHash": "dc8dd524b77523fed7c31599a05e6aeda7a025bcb13cf77f76c1da5d6ce9026d",
+          "occurredAt": "2026-09-24T09:00:00.000Z",
+          "actor": {
+            "id": "survey-quality-workspace",
+            "kind": "system"
+          },
+          "stage": "workspace-evidence",
+          "event": {
+            "kind": "check",
+            "checkId": "artifact-bytes",
+            "outcome": "passed",
+            "evidenceSha256": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b"
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "id": "quality_event_62c4c8f2-7b74-42b1-ba55-98cbe6e7ff32",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "artifactSha256": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+          "sequence": 2,
+          "previousHash": "dc8dd524b77523fed7c31599a05e6aeda7a025bcb13cf77f76c1da5d6ce9026d",
+          "thisHash": "4aec7604438f560d29de4be5ddcbbeeb28284a25a7f3d51f892608ded1e674ba",
+          "occurredAt": "2026-09-24T09:00:00.000Z",
+          "actor": {
+            "id": "survey-quality-workspace",
+            "kind": "system"
+          },
+          "stage": "workspace-evidence",
+          "event": {
+            "kind": "check",
+            "checkId": "evidence:support",
+            "outcome": "passed",
+            "evidenceSha256": "3959cb477676f389e21168070f355d34c1b5e60380b9b9dbb529058520cdbfb1"
+          }
+        }
+      ],
+      "verification": {
+        "schemaVersion": 1,
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "recordId": "quality_record_f13a18f7-f09c-49e5-af04-d28bd98da75d",
+        "planId": "quality_plan_c64ff016-f087-40f6-adde-3fe5431606a4",
+        "artifactHash": "4f0b8be7b2acf5b46dc37f50e728a18abcdab3037460332fb36d4f87b8dcc98b",
+        "headHash": "4aec7604438f560d29de4be5ddcbbeeb28284a25a7f3d51f892608ded1e674ba",
+        "checkedAt": "2026-09-24T09:00:00.000Z",
+        "localRecordIntegrity": true,
+        "artifactIntegrity": "verified",
+        "checkpointTrust": "local-records-only",
+        "coverageStatus": "not-evaluated",
+        "reason": "independent-checkpoint-unavailable",
+        "assessmentBasis": "recorded-retention-checks-only",
+        "checks": [
+          {
+            "checkId": "artifact-bytes",
+            "status": "passed",
+            "eventId": "quality_event_9b7229f1-bab0-40a8-9c55-4bc27082bd9e"
+          },
+          {
+            "checkId": "evidence:support",
+            "status": "passed",
+            "eventId": "quality_event_62c4c8f2-7b74-42b1-ba55-98cbe6e7ff32"
+          }
+        ],
+        "standardConformity": "not-evaluated",
+        "humanSignatureVerification": "not-evaluated"
+      }
+    },
+    "ref": {
+      "planId": "quality_plan_c64ff016-f087-40f6-adde-3fe5431606a4",
+      "recordId": "quality_record_f13a18f7-f09c-49e5-af04-d28bd98da75d",
+      "expectedRetentionHeadHash": "4aec7604438f560d29de4be5ddcbbeeb28284a25a7f3d51f892608ded1e674ba"
+    },
+    "evidence": {
+      "planId": "quality_plan_c64ff016-f087-40f6-adde-3fe5431606a4",
+      "recordId": "quality_record_f13a18f7-f09c-49e5-af04-d28bd98da75d",
+      "expectedRetentionHeadHash": "4aec7604438f560d29de4be5ddcbbeeb28284a25a7f3d51f892608ded1e674ba",
+      "memberId": "output-1"
+    }
+  },
+  "corrected": {
+    "label": "corrected",
+    "source": "monitoringItem,point,time,value,unit\nsettlement,P1,2026-09-01T00:00:00Z,0,mm\nsettlement,P1,2026-09-02T00:00:00Z,4,mm",
+    "network": {
+      "schemaVersion": 1,
+      "id": "network_f317eee8-b4a2-4292-95c0-b973ec0c0fb5",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "networkType": "leveling",
+      "coordinateSystem": "待确认",
+      "projection": "待确认",
+      "ellipsoid": "待确认",
+      "verticalDatum": "synthetic-local-height",
+      "unit": "m",
+      "knownPoints": [
+        {
+          "id": "A",
+          "pointClass": "known",
+          "height": 100,
+          "known": true,
+          "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+        },
+        {
+          "id": "C",
+          "pointClass": "known",
+          "height": 100.01,
+          "known": true,
+          "sourceLocator": "WorkWise JSON:network.knownPoints[1]"
+        }
+      ],
+      "unknownPoints": [
+        {
+          "id": "B",
+          "pointClass": "unknown",
+          "height": 100,
+          "known": false,
+          "sourceLocator": "WorkWise JSON:network.unknownPoints[0]"
+        }
+      ],
+      "observations": [
+        {
+          "id": "AB-corrected",
+          "type": "height-difference",
+          "from": "A",
+          "to": "B",
+          "value": 0.004,
+          "unit": "m",
+          "sigma": 0.001,
+          "sigmaUnit": "m",
+          "sourceLocator": "WorkWise JSON:network.observations[0]",
+          "sourceRecordId": "workwise-json-observation-1"
+        },
+        {
+          "id": "BC-corrected",
+          "type": "height-difference",
+          "from": "B",
+          "to": "C",
+          "value": 0.006,
+          "unit": "m",
+          "sigma": 0.001,
+          "sigmaUnit": "m",
+          "sourceLocator": "WorkWise JSON:network.observations[1]",
+          "sourceRecordId": "workwise-json-observation-2"
+        }
+      ],
+      "instrumentParameters": {},
+      "inputAttachmentHash": "8f5343f00cc584e4dfe345d874ccf3b3ae962b27b1f073c672ecaece51267140",
+      "sourceFile": {
+        "schemaVersion": 1,
+        "sourcePath": "attachment://sha256/8f5343f00cc584e4dfe345d874ccf3b3ae962b27b1f073c672ecaece51267140/workwise-survey-network.json",
+        "name": "workwise-survey-network.json",
+        "size": 599,
+        "fileSize": 599,
+        "sha256": "8f5343f00cc584e4dfe345d874ccf3b3ae962b27b1f073c672ecaece51267140",
+        "importedAt": "2026-09-24T04:46:47.153Z",
+        "importedBy": "workwise:survey-format-registry",
+        "originalPreserved": true,
+        "formatId": "workwise-json",
+        "vendor": "WorkWise/open",
+        "formatVersion": "1",
+        "detectionMethod": "content-signature",
+        "detectionConfidence": 0.99,
+        "extensionClaimed": ".json",
+        "extensionContentConflict": false,
+        "requiresManualConfirmation": false,
+        "detection": {
+          "format": "workwise-json",
+          "vendor": "WorkWise/open",
+          "version": "1",
+          "confidence": 0.99,
+          "extension": ".json",
+          "matchedSignatures": [
+            "workwise-survey-network@1"
+          ],
+          "extensionConflict": false,
+          "method": "content-signature"
+        },
+        "disposition": "adjustment-ready",
+        "dispositionReason": "冻结来源合同 workwise-survey-network@1",
+        "parserId": "workwise-survey-source",
+        "parserVersion": "1",
+        "parserSourceHash": "41953772e9b62f9cd059f0f546362887fd99db327826dad2e3944aa2bddb7cc3",
+        "linearUnitRaw": "m",
+        "angularUnitRaw": "not-declared",
+        "linearUnitCanonical": "m",
+        "angularUnitCanonical": "rad",
+        "datumDeclared": "待确认",
+        "heightSystemDeclared": "synthetic-local-height",
+        "recordCount": 5,
+        "summary": {
+          "pointCount": 3,
+          "stationCount": 0,
+          "observationCount": 2,
+          "recordCount": 5,
+          "skippedRecordCount": 0
+        },
+        "records": [
+          {
+            "id": "workwise-json-known-point-1",
+            "sourceRecord": 1,
+            "byteOffset": 157,
+            "byteLength": 57,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 157,
+            "rawLength": 57,
+            "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+          },
+          {
+            "id": "workwise-json-known-point-2",
+            "sourceRecord": 2,
+            "byteOffset": 215,
+            "byteLength": 60,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 215,
+            "rawLength": 60,
+            "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+          },
+          {
+            "id": "workwise-json-unknown-point-1",
+            "sourceRecord": 3,
+            "byteOffset": 294,
+            "byteLength": 37,
+            "section": "network.unknownPoints",
+            "recordType": "workwise-json-unknown-point",
+            "rawOffset": 294,
+            "rawLength": 37,
+            "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+          },
+          {
+            "id": "workwise-json-observation-1",
+            "sourceRecord": 4,
+            "byteOffset": 349,
+            "byteLength": 123,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 349,
+            "rawLength": 123,
+            "rawSnippet": "{\"id\":\"AB-corrected\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.004,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          },
+          {
+            "id": "workwise-json-observation-2",
+            "sourceRecord": 5,
+            "byteOffset": 473,
+            "byteLength": 123,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 473,
+            "rawLength": 123,
+            "rawSnippet": "{\"id\":\"BC-corrected\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.006,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "encoding_detected",
+            "severity": "info",
+            "message": "文本编码 utf-8",
+            "localized": {
+              "en": {
+                "message": "Text encoding: utf-8"
+              }
+            }
+          },
+          {
+            "code": "format_detected",
+            "severity": "info",
+            "message": "识别为 WorkWise/open / workwise-json 1，置信度 99%",
+            "localized": {
+              "en": {
+                "message": "Detected workwise-json 1; confidence 99%"
+              }
+            }
+          }
+        ],
+        "rawRecordAnchors": [
+          {
+            "id": "workwise-json-known-point-1",
+            "sourceRecord": 1,
+            "byteOffset": 157,
+            "byteLength": 57,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 157,
+            "rawLength": 57,
+            "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+          },
+          {
+            "id": "workwise-json-known-point-2",
+            "sourceRecord": 2,
+            "byteOffset": 215,
+            "byteLength": 60,
+            "section": "network.knownPoints",
+            "recordType": "workwise-json-known-point",
+            "rawOffset": 215,
+            "rawLength": 60,
+            "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+          },
+          {
+            "id": "workwise-json-unknown-point-1",
+            "sourceRecord": 3,
+            "byteOffset": 294,
+            "byteLength": 37,
+            "section": "network.unknownPoints",
+            "recordType": "workwise-json-unknown-point",
+            "rawOffset": 294,
+            "rawLength": 37,
+            "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+          },
+          {
+            "id": "workwise-json-observation-1",
+            "sourceRecord": 4,
+            "byteOffset": 349,
+            "byteLength": 123,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 349,
+            "rawLength": 123,
+            "rawSnippet": "{\"id\":\"AB-corrected\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.004,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          },
+          {
+            "id": "workwise-json-observation-2",
+            "sourceRecord": 5,
+            "byteOffset": 473,
+            "byteLength": 123,
+            "section": "network.observations",
+            "recordType": "workwise-json-observation",
+            "rawOffset": 473,
+            "rawLength": 123,
+            "rawSnippet": "{\"id\":\"BC-corrected\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.006,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+          }
+        ],
+        "preservedRawFields": {}
+      },
+      "qualityStatus": "imported",
+      "findings": [],
+      "revision": 1,
+      "createdAt": "2026-09-24T09:00:00.000Z",
+      "updatedAt": "2026-09-24T09:00:00.000Z"
+    },
+    "adjustment": {
+      "run": {
+        "schemaVersion": 1,
+        "id": "adjustment_077dadb4-1e16-42a3-8229-253cb875ad19",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "networkId": "network_f317eee8-b4a2-4292-95c0-b973ec0c0fb5",
+        "method": "weighted-least-squares",
+        "constraint": "fixed-known-points",
+        "algorithmVersion": "workwise-survey-adjustment-7",
+        "inputHash": "d0cb02ed03b22261bc989fc0889394d29683d4dc0f84d3b24bb818c68368f9dc",
+        "status": "completed",
+        "revision": 1,
+        "idempotencyKey": "adjustment-corrected",
+        "resumeCount": 0,
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "updatedAt": "2026-09-24T09:00:00.000Z",
+        "completedAt": "2026-09-24T09:00:00.000Z"
+      },
+      "result": {
+        "schemaVersion": 1,
+        "id": "adjustment_result_3ec48385-9e64-42d4-af97-0a14fabe099b",
+        "runId": "adjustment_077dadb4-1e16-42a3-8229-253cb875ad19",
+        "networkId": "network_f317eee8-b4a2-4292-95c0-b973ec0c0fb5",
+        "observationCount": 2,
+        "unknownCount": 1,
+        "redundancy": 1,
+        "degreesOfFreedom": 1,
+        "linearUnit": "m",
+        "angularUnit": "rad",
+        "closure": {
+          "heightDifference": -5.115699530655604e-15
+        },
+        "closureUnits": {
+          "heightDifference": "m"
+        },
+        "parameters": {},
+        "parameterUnits": {},
+        "unitWeightStdDev": 3.6173458286394163e-12,
+        "unitWeightStdDevUnit": "dimensionless",
+        "varianceFactor": 1.3085190843974984e-23,
+        "varianceFactorUnit": "dimensionless",
+        "varianceFactorEstimated": true,
+        "points": [
+          {
+            "id": "A",
+            "height": 100
+          },
+          {
+            "id": "C",
+            "height": 100.01
+          },
+          {
+            "id": "B",
+            "height": 100.004,
+            "correctionHeight": 0.004000000000002558,
+            "standardError": 2.557849765327802e-15,
+            "covariance": [
+              5e-7
+            ]
+          }
+        ],
+        "observations": [
+          {
+            "observationId": "AB-corrected",
+            "correction": 2.557849765327802e-15,
+            "residual": 2.557849765327802e-15,
+            "unit": "m",
+            "standardizedResidual": 2.557849765327802e-12,
+            "standardizedResidualUnit": "sigma",
+            "outlier": false,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "BC-corrected",
+            "correction": 2.557849765327802e-15,
+            "residual": 2.557849765327802e-15,
+            "unit": "m",
+            "standardizedResidual": 2.557849765327802e-12,
+            "standardizedResidualUnit": "sigma",
+            "outlier": false,
+            "sourceRecordId": "workwise-json-observation-2"
+          }
+        ],
+        "displacements": [
+          {
+            "pointId": "A",
+            "dH": 0,
+            "magnitude": 0,
+            "kind": "vertical"
+          },
+          {
+            "pointId": "C",
+            "dH": 0,
+            "magnitude": 0,
+            "kind": "vertical"
+          },
+          {
+            "pointId": "B",
+            "dH": 0.0040000000000048885,
+            "magnitude": 0.0040000000000048885,
+            "kind": "vertical"
+          }
+        ],
+        "covariance": [
+          [
+            5e-7
+          ]
+        ],
+        "precision": {
+          "maxPointStdDev": 2.557849765327802e-15,
+          "passed": true
+        },
+        "qualityFindings": [],
+        "inputHash": "d0cb02ed03b22261bc989fc0889394d29683d4dc0f84d3b24bb818c68368f9dc",
+        "algorithmVersion": "workwise-survey-adjustment-7",
+        "validation": "valid",
+        "strategyId": "leveling",
+        "solverDiagnostics": {
+          "iterations": 1,
+          "rank": 1,
+          "conditionEstimate": 1
+        },
+        "createdAt": "2026-09-24T09:00:00.000Z"
+      }
+    },
+    "dataset": {
+      "schemaVersion": 1,
+      "id": "dataset_092c1115-0cd4-42a7-928c-2ee2ae525925",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "sourceFileName": "synthetic-corrected.csv",
+      "sourceFileHash": "6fc03dd911f891477d01d52dc58c75a67d05626fcc0477a9f726ddc4e05246f6",
+      "fieldMapping": {
+        "monitoringItem": "monitoringItem",
+        "point": "point",
+        "timestamp": "time",
+        "value": "value",
+        "unit": "unit"
+      },
+      "unknownColumns": [],
+      "rowCount": 2,
+      "columnCount": 5,
+      "observationCount": 2,
+      "timeRange": {
+        "start": "2026-09-01T00:00:00Z",
+        "end": "2026-09-02T00:00:00Z"
+      },
+      "status": "validated",
+      "revision": 2,
+      "createdAt": "2026-09-24T09:00:00.000Z",
+      "updatedAt": "2026-09-24T09:00:00.000Z",
+      "observations": [
+        {
+          "schemaVersion": 1,
+          "id": "obs_6fc03dd911f8_0",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "datasetId": "dataset_092c1115-0cd4-42a7-928c-2ee2ae525925",
+          "monitoringItem": "settlement",
+          "point": "P1",
+          "timestamp": "2026-09-01T00:00:00Z",
+          "value": 0,
+          "unit": "mm",
+          "sourceRow": 2,
+          "sourceFields": {
+            "monitoringItem": "settlement",
+            "point": "P1",
+            "time": "2026-09-01T00:00:00Z",
+            "value": "0",
+            "unit": "mm"
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "id": "obs_6fc03dd911f8_1",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "datasetId": "dataset_092c1115-0cd4-42a7-928c-2ee2ae525925",
+          "monitoringItem": "settlement",
+          "point": "P1",
+          "timestamp": "2026-09-02T00:00:00Z",
+          "value": 4,
+          "unit": "mm",
+          "sourceRow": 3,
+          "sourceFields": {
+            "monitoringItem": "settlement",
+            "point": "P1",
+            "time": "2026-09-02T00:00:00Z",
+            "value": "4",
+            "unit": "mm"
+          }
+        }
+      ],
+      "findings": []
+    },
+    "analysis": {
+      "schemaVersion": 1,
+      "id": "analysis_05c20806-babd-4390-aa10-a6e3498126f9",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "datasetId": "dataset_092c1115-0cd4-42a7-928c-2ee2ae525925",
+      "inputHash": "a1bfdf4bca7e1f1bf9f79ee959874138d05763014c5858568f2e0a09701624c7",
+      "algorithmVersion": "workwise-engineering-2",
+      "results": [
+        {
+          "monitoringItem": "settlement",
+          "point": "P1",
+          "currentValue": 4,
+          "previousValue": 0,
+          "cumulativeChange": 4,
+          "changeRate": 4,
+          "trend": "rising",
+          "anomaly": false,
+          "thresholdStatus": "normal"
+        }
+      ],
+      "createdAt": "2026-09-24T09:00:00.000Z"
+    },
+    "manifest": {
+      "schemaVersion": 1,
+      "id": "manifest_913c12be-25d0-4c38-8e24-94266af1c4f7",
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "runId": "run_ad809d13-d098-4d40-8d25-1126f98fa6c2",
+      "inputDatasets": [
+        {
+          "id": "dataset_092c1115-0cd4-42a7-928c-2ee2ae525925",
+          "hash": "6fc03dd911f891477d01d52dc58c75a67d05626fcc0477a9f726ddc4e05246f6"
+        }
+      ],
+      "analyses": [
+        "analysis_05c20806-babd-4390-aa10-a6e3498126f9"
+      ],
+      "charts": [
+        {
+          "schemaVersion": 1,
+          "id": "chart_97bbe5a0-b877-46c3-a692-95d530066bf5",
+          "analysisId": "analysis_05c20806-babd-4390-aa10-a6e3498126f9",
+          "chartType": "trend",
+          "rendererVersion": "engineering-trend-2",
+          "inputHash": "a1bfdf4bca7e1f1bf9f79ee959874138d05763014c5858568f2e0a09701624c7",
+          "dataRange": {
+            "min": 0,
+            "max": 4
+          },
+          "relativePath": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/chart_97bbe5a0-b877-46c3-a692-95d530066bf5/trend.svg",
+          "sha256": "d1251e5420fafb26f4ced4821078b4dfcfbc9241a2e4bbe098abb4e27ccff14f",
+          "validation": "valid",
+          "createdAt": "2026-09-24T09:00:00.000Z"
+        }
+      ],
+      "citations": [],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/report.docx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "sha256": "814f3f9a113b56749a47c2f2b23604d9553d63aa89198198317d620d02aa40d5",
+          "sizeBytes": 5689
+        },
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/report.pdf",
+          "mediaType": "application/pdf",
+          "sha256": "5d0b3011c438c270ffec168221884da27914138b279953d6eaa6ccc0773aba25",
+          "sizeBytes": 36564
+        },
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/evidence.xlsx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "sha256": "2dd10d5cde68e99a33ab92ada66dddcd4303f5a27e81000f755cfc162ea9ebb9",
+          "sizeBytes": 41342
+        },
+        {
+          "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/chart_97bbe5a0-b877-46c3-a692-95d530066bf5/trend.svg",
+          "mediaType": "image/svg+xml",
+          "sha256": "d1251e5420fafb26f4ced4821078b4dfcfbc9241a2e4bbe098abb4e27ccff14f",
+          "sizeBytes": 4276
+        }
+      ],
+      "adjustments": [
+        {
+          "schemaVersion": 1,
+          "id": "adjustment_result_3ec48385-9e64-42d4-af97-0a14fabe099b",
+          "runId": "adjustment_077dadb4-1e16-42a3-8229-253cb875ad19",
+          "networkId": "network_f317eee8-b4a2-4292-95c0-b973ec0c0fb5",
+          "observationCount": 2,
+          "unknownCount": 1,
+          "redundancy": 1,
+          "degreesOfFreedom": 1,
+          "linearUnit": "m",
+          "angularUnit": "rad",
+          "closure": {
+            "heightDifference": -5.115699530655604e-15
+          },
+          "closureUnits": {
+            "heightDifference": "m"
+          },
+          "parameters": {},
+          "parameterUnits": {},
+          "unitWeightStdDev": 3.6173458286394163e-12,
+          "unitWeightStdDevUnit": "dimensionless",
+          "varianceFactor": 1.3085190843974984e-23,
+          "varianceFactorUnit": "dimensionless",
+          "varianceFactorEstimated": true,
+          "points": [
+            {
+              "id": "A",
+              "height": 100
+            },
+            {
+              "id": "C",
+              "height": 100.01
+            },
+            {
+              "id": "B",
+              "height": 100.004,
+              "correctionHeight": 0.004000000000002558,
+              "standardError": 2.557849765327802e-15,
+              "covariance": [
+                5e-7
+              ]
+            }
+          ],
+          "observations": [
+            {
+              "observationId": "AB-corrected",
+              "correction": 2.557849765327802e-15,
+              "residual": 2.557849765327802e-15,
+              "unit": "m",
+              "standardizedResidual": 2.557849765327802e-12,
+              "standardizedResidualUnit": "sigma",
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-1"
+            },
+            {
+              "observationId": "BC-corrected",
+              "correction": 2.557849765327802e-15,
+              "residual": 2.557849765327802e-15,
+              "unit": "m",
+              "standardizedResidual": 2.557849765327802e-12,
+              "standardizedResidualUnit": "sigma",
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-2"
+            }
+          ],
+          "displacements": [
+            {
+              "pointId": "A",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            },
+            {
+              "pointId": "C",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            },
+            {
+              "pointId": "B",
+              "dH": 0.0040000000000048885,
+              "magnitude": 0.0040000000000048885,
+              "kind": "vertical"
+            }
+          ],
+          "covariance": [
+            [
+              5e-7
+            ]
+          ],
+          "precision": {
+            "maxPointStdDev": 2.557849765327802e-15,
+            "passed": true
+          },
+          "qualityFindings": [],
+          "inputHash": "d0cb02ed03b22261bc989fc0889394d29683d4dc0f84d3b24bb818c68368f9dc",
+          "algorithmVersion": "workwise-survey-adjustment-7",
+          "validation": "valid",
+          "strategyId": "leveling",
+          "solverDiagnostics": {
+            "iterations": 1,
+            "rank": 1,
+            "conditionEstimate": 1
+          },
+          "createdAt": "2026-09-24T09:00:00.000Z"
+        }
+      ],
+      "deformations": [],
+      "surveySources": [
+        {
+          "networkId": "network_f317eee8-b4a2-4292-95c0-b973ec0c0fb5",
+          "source": {
+            "schemaVersion": 1,
+            "sourcePath": "attachment://sha256/8f5343f00cc584e4dfe345d874ccf3b3ae962b27b1f073c672ecaece51267140/workwise-survey-network.json",
+            "name": "workwise-survey-network.json",
+            "size": 599,
+            "fileSize": 599,
+            "sha256": "8f5343f00cc584e4dfe345d874ccf3b3ae962b27b1f073c672ecaece51267140",
+            "importedAt": "2026-09-24T04:46:47.153Z",
+            "importedBy": "workwise:survey-format-registry",
+            "originalPreserved": true,
+            "formatId": "workwise-json",
+            "vendor": "WorkWise/open",
+            "formatVersion": "1",
+            "detectionMethod": "content-signature",
+            "detectionConfidence": 0.99,
+            "extensionClaimed": ".json",
+            "extensionContentConflict": false,
+            "requiresManualConfirmation": false,
+            "detection": {
+              "format": "workwise-json",
+              "vendor": "WorkWise/open",
+              "version": "1",
+              "confidence": 0.99,
+              "extension": ".json",
+              "matchedSignatures": [
+                "workwise-survey-network@1"
+              ],
+              "extensionConflict": false,
+              "method": "content-signature"
+            },
+            "disposition": "adjustment-ready",
+            "dispositionReason": "冻结来源合同 workwise-survey-network@1",
+            "parserId": "workwise-survey-source",
+            "parserVersion": "1",
+            "parserSourceHash": "41953772e9b62f9cd059f0f546362887fd99db327826dad2e3944aa2bddb7cc3",
+            "linearUnitRaw": "m",
+            "angularUnitRaw": "not-declared",
+            "linearUnitCanonical": "m",
+            "angularUnitCanonical": "rad",
+            "datumDeclared": "待确认",
+            "heightSystemDeclared": "synthetic-local-height",
+            "recordCount": 5,
+            "summary": {
+              "pointCount": 3,
+              "stationCount": 0,
+              "observationCount": 2,
+              "recordCount": 5,
+              "skippedRecordCount": 0
+            },
+            "records": [
+              {
+                "id": "workwise-json-known-point-1",
+                "sourceRecord": 1,
+                "byteOffset": 157,
+                "byteLength": 57,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 157,
+                "rawLength": 57,
+                "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+              },
+              {
+                "id": "workwise-json-known-point-2",
+                "sourceRecord": 2,
+                "byteOffset": 215,
+                "byteLength": 60,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 215,
+                "rawLength": 60,
+                "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+              },
+              {
+                "id": "workwise-json-unknown-point-1",
+                "sourceRecord": 3,
+                "byteOffset": 294,
+                "byteLength": 37,
+                "section": "network.unknownPoints",
+                "recordType": "workwise-json-unknown-point",
+                "rawOffset": 294,
+                "rawLength": 37,
+                "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+              },
+              {
+                "id": "workwise-json-observation-1",
+                "sourceRecord": 4,
+                "byteOffset": 349,
+                "byteLength": 123,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 349,
+                "rawLength": 123,
+                "rawSnippet": "{\"id\":\"AB-corrected\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.004,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              },
+              {
+                "id": "workwise-json-observation-2",
+                "sourceRecord": 5,
+                "byteOffset": 473,
+                "byteLength": 123,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 473,
+                "rawLength": 123,
+                "rawSnippet": "{\"id\":\"BC-corrected\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.006,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              }
+            ],
+            "diagnostics": [
+              {
+                "code": "encoding_detected",
+                "severity": "info",
+                "message": "文本编码 utf-8",
+                "localized": {
+                  "en": {
+                    "message": "Text encoding: utf-8"
+                  }
+                }
+              },
+              {
+                "code": "format_detected",
+                "severity": "info",
+                "message": "识别为 WorkWise/open / workwise-json 1，置信度 99%",
+                "localized": {
+                  "en": {
+                    "message": "Detected workwise-json 1; confidence 99%"
+                  }
+                }
+              }
+            ],
+            "rawRecordAnchors": [
+              {
+                "id": "workwise-json-known-point-1",
+                "sourceRecord": 1,
+                "byteOffset": 157,
+                "byteLength": 57,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 157,
+                "rawLength": 57,
+                "rawSnippet": "{\"id\":\"A\",\"known\":true,\"pointClass\":\"known\",\"height\":100}"
+              },
+              {
+                "id": "workwise-json-known-point-2",
+                "sourceRecord": 2,
+                "byteOffset": 215,
+                "byteLength": 60,
+                "section": "network.knownPoints",
+                "recordType": "workwise-json-known-point",
+                "rawOffset": 215,
+                "rawLength": 60,
+                "rawSnippet": "{\"id\":\"C\",\"known\":true,\"pointClass\":\"known\",\"height\":100.01}"
+              },
+              {
+                "id": "workwise-json-unknown-point-1",
+                "sourceRecord": 3,
+                "byteOffset": 294,
+                "byteLength": 37,
+                "section": "network.unknownPoints",
+                "recordType": "workwise-json-unknown-point",
+                "rawOffset": 294,
+                "rawLength": 37,
+                "rawSnippet": "{\"id\":\"B\",\"known\":false,\"height\":100}"
+              },
+              {
+                "id": "workwise-json-observation-1",
+                "sourceRecord": 4,
+                "byteOffset": 349,
+                "byteLength": 123,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 349,
+                "rawLength": 123,
+                "rawSnippet": "{\"id\":\"AB-corrected\",\"type\":\"height-difference\",\"from\":\"A\",\"to\":\"B\",\"value\":0.004,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              },
+              {
+                "id": "workwise-json-observation-2",
+                "sourceRecord": 5,
+                "byteOffset": 473,
+                "byteLength": 123,
+                "section": "network.observations",
+                "recordType": "workwise-json-observation",
+                "rawOffset": 473,
+                "rawLength": 123,
+                "rawSnippet": "{\"id\":\"BC-corrected\",\"type\":\"height-difference\",\"from\":\"B\",\"to\":\"C\",\"value\":0.006,\"unit\":\"m\",\"sigma\":0.001,\"sigmaUnit\":\"m\"}"
+              }
+            ],
+            "preservedRawFields": {}
+          }
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "errors": [],
+        "warnings": [
+          "尚未完成复核、审核、批准与签名流程；该成果清单仅供待审查使用，不得作为已批准交付。"
+        ]
+      },
+      "reviewStatus": "draft",
+      "runtimeVersion": "0.5.0",
+      "createdAt": "2026-09-24T09:00:00.000Z",
+      "finalizedAt": "2026-09-24T09:00:00.000Z"
+    },
+    "verification": {
+      "schemaVersion": 1,
+      "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+      "manifestId": "manifest_913c12be-25d0-4c38-8e24-94266af1c4f7",
+      "checkedAt": "2026-09-24T09:00:00.000Z",
+      "valid": true,
+      "reviewStatus": "draft",
+      "checks": [
+        {
+          "id": "manifest",
+          "status": "passed"
+        },
+        {
+          "id": "outputs",
+          "status": "passed"
+        },
+        {
+          "id": "inputs",
+          "status": "passed"
+        },
+        {
+          "id": "surveyReplay",
+          "status": "passed"
+        },
+        {
+          "id": "sources",
+          "status": "passed"
+        }
+      ]
+    },
+    "plan": {
+      "plan": {
+        "schemaVersion": 1,
+        "id": "quality_plan_83ed187e-68f1-45b0-9314-82537bd90a38",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "projectRevision": 1,
+        "projectBindingHash": "ef4e39035d730456b177b080554d3ba14f69a68f716ac9a986d30969e547e017",
+        "manifestId": "manifest_913c12be-25d0-4c38-8e24-94266af1c4f7",
+        "manifestHash": "ea5767b256b3832e432757ddf086e886ca4ca012868dfb73ef886dc4ee6a636d",
+        "artifactId": "quality_artifact_8409c13e-091a-4e22-b91d-deb2983d9235",
+        "artifactHash": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+        "requiredEvidence": [
+          {
+            "id": "support",
+            "title": "Synthetic retained report bytes",
+            "memberId": "output-1"
+          }
+        ],
+        "requiredCheckIds": [
+          "artifact-bytes",
+          "evidence:support"
+        ],
+        "purpose": "evidence-retention-only",
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "standardConformity": "not-evaluated",
+        "humanSignatureVerification": "not-evaluated"
+      },
+      "artifact": {
+        "schemaVersion": 1,
+        "id": "quality_artifact_8409c13e-091a-4e22-b91d-deb2983d9235",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "manifestId": "manifest_913c12be-25d0-4c38-8e24-94266af1c4f7",
+        "manifestHash": "ea5767b256b3832e432757ddf086e886ca4ca012868dfb73ef886dc4ee6a636d",
+        "bundleHash": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+        "snapshotEvidenceSha256": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+        "members": [
+          {
+            "id": "manifest",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/manifest.json",
+            "mediaType": "application/json",
+            "sha256": "f97fed6c15797ccb1b6d4f263561765df8b4e672ecc7732cf4b4ca87340db9ab",
+            "sizeBytes": 13215
+          },
+          {
+            "id": "output-1",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/report.docx",
+            "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "sha256": "814f3f9a113b56749a47c2f2b23604d9553d63aa89198198317d620d02aa40d5",
+            "sizeBytes": 5689
+          },
+          {
+            "id": "output-2",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/report.pdf",
+            "mediaType": "application/pdf",
+            "sha256": "5d0b3011c438c270ffec168221884da27914138b279953d6eaa6ccc0773aba25",
+            "sizeBytes": 36564
+          },
+          {
+            "id": "output-3",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/run_ad809d13-d098-4d40-8d25-1126f98fa6c2/evidence.xlsx",
+            "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "sha256": "2dd10d5cde68e99a33ab92ada66dddcd4303f5a27e81000f755cfc162ea9ebb9",
+            "sizeBytes": 41342
+          },
+          {
+            "id": "output-4",
+            "path": ".workwise/deliverables/project_7bf2907b-7805-4d45-8317-d1c5d285fb12/chart_97bbe5a0-b877-46c3-a692-95d530066bf5/trend.svg",
+            "mediaType": "image/svg+xml",
+            "sha256": "d1251e5420fafb26f4ced4821078b4dfcfbc9241a2e4bbe098abb4e27ccff14f",
+            "sizeBytes": 4276
+          }
+        ],
+        "createdAt": "2026-09-24T09:00:00.000Z"
+      }
+    },
+    "record": {
+      "record": {
+        "schemaVersion": 1,
+        "id": "quality_record_c2d9b8ff-aac1-4b25-b2bc-e9a7d261ca44",
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "planId": "quality_plan_83ed187e-68f1-45b0-9314-82537bd90a38",
+        "planHash": "5a7420364d9ef9b3a11b692f10d783b769e169c2a17caf747ca040017af73084",
+        "artifactId": "quality_artifact_8409c13e-091a-4e22-b91d-deb2983d9235",
+        "artifactHash": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+        "createdAt": "2026-09-24T09:00:00.000Z"
+      },
+      "events": [
+        {
+          "schemaVersion": 1,
+          "id": "quality_event_c1b760c2-ddd1-4917-8feb-de0da23b4889",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "artifactSha256": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+          "sequence": 1,
+          "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "thisHash": "544d71a096182642f8f8d94086ba2de06d255562056313badca1d8e2348b6133",
+          "occurredAt": "2026-09-24T09:00:00.000Z",
+          "actor": {
+            "id": "survey-quality-workspace",
+            "kind": "system"
+          },
+          "stage": "workspace-evidence",
+          "event": {
+            "kind": "check",
+            "checkId": "artifact-bytes",
+            "outcome": "passed",
+            "evidenceSha256": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3"
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "id": "quality_event_a2be1493-01f9-4d1a-8ced-c779e3466ceb",
+          "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+          "artifactSha256": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+          "sequence": 2,
+          "previousHash": "544d71a096182642f8f8d94086ba2de06d255562056313badca1d8e2348b6133",
+          "thisHash": "fe613c3775c9e6afa385ac1312a10b9dcc25aeef34302cb4bda331b2de18b186",
+          "occurredAt": "2026-09-24T09:00:00.000Z",
+          "actor": {
+            "id": "survey-quality-workspace",
+            "kind": "system"
+          },
+          "stage": "workspace-evidence",
+          "event": {
+            "kind": "check",
+            "checkId": "evidence:support",
+            "outcome": "passed",
+            "evidenceSha256": "814f3f9a113b56749a47c2f2b23604d9553d63aa89198198317d620d02aa40d5"
+          }
+        }
+      ],
+      "verification": {
+        "schemaVersion": 1,
+        "projectId": "project_7bf2907b-7805-4d45-8317-d1c5d285fb12",
+        "recordId": "quality_record_c2d9b8ff-aac1-4b25-b2bc-e9a7d261ca44",
+        "planId": "quality_plan_83ed187e-68f1-45b0-9314-82537bd90a38",
+        "artifactHash": "b17451866e8212cf7def49167b991db91ccc2c18aad9545efe4c88dea4750eb3",
+        "headHash": "fe613c3775c9e6afa385ac1312a10b9dcc25aeef34302cb4bda331b2de18b186",
+        "checkedAt": "2026-09-24T09:00:00.000Z",
+        "localRecordIntegrity": true,
+        "artifactIntegrity": "verified",
+        "checkpointTrust": "local-records-only",
+        "coverageStatus": "not-evaluated",
+        "reason": "independent-checkpoint-unavailable",
+        "assessmentBasis": "recorded-retention-checks-only",
+        "checks": [
+          {
+            "checkId": "artifact-bytes",
+            "status": "passed",
+            "eventId": "quality_event_c1b760c2-ddd1-4917-8feb-de0da23b4889"
+          },
+          {
+            "checkId": "evidence:support",
+            "status": "passed",
+            "eventId": "quality_event_a2be1493-01f9-4d1a-8ced-c779e3466ceb"
+          }
+        ],
+        "standardConformity": "not-evaluated",
+        "humanSignatureVerification": "not-evaluated"
+      }
+    },
+    "ref": {
+      "planId": "quality_plan_83ed187e-68f1-45b0-9314-82537bd90a38",
+      "recordId": "quality_record_c2d9b8ff-aac1-4b25-b2bc-e9a7d261ca44",
+      "expectedRetentionHeadHash": "fe613c3775c9e6afa385ac1312a10b9dcc25aeef34302cb4bda331b2de18b186"
+    },
+    "evidence": {
+      "planId": "quality_plan_83ed187e-68f1-45b0-9314-82537bd90a38",
+      "recordId": "quality_record_c2d9b8ff-aac1-4b25-b2bc-e9a7d261ca44",
+      "expectedRetentionHeadHash": "fe613c3775c9e6afa385ac1312a10b9dcc25aeef34302cb4bda331b2de18b186",
+      "memberId": "output-1"
+    }
+  }
+}

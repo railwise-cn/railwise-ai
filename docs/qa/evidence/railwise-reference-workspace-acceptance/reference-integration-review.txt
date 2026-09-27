@@ -1,0 +1,28 @@
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-reference-workspace-acceptance/independent-review
+
+ ✓ gui.test.ts > renders maximum reference full covariance/dependence and honest limits in en without Buffer 150ms
+ ✓ gui.test.ts > renders maximum reference full covariance/dependence and honest limits in zh without Buffer 115ms
+ ✓ gui.test.ts > renders near-PSD without promotion or method fallback 29ms
+ ✓ gui.test.ts > renders singular without promotion or method fallback 25ms
+ ✓ gui.test.ts > renders negative-weights without promotion or method fallback 28ms
+ ✓ gui.test.ts > exports complete Unicode reference record and suppresses late export after project switch 77ms
+ ✓ gui.test.ts > drops late reference restore after workspace changes 48ms
+ ✓ gui.test.ts > drops late reference restore after revision changes 47ms
+ ✓ gui.test.ts > drops late reference restore after runtime changes 50ms
+ ✓ client-service.test.ts > restores real raw Unicode generalized-w without Buffer with new count fields isolated 20ms
+ ✓ client-service.test.ts > restores real raw Unicode vce without Buffer with new count fields isolated 13ms
+ ✓ client-service.test.ts > restores real raw Unicode huber without Buffer with new count fields isolated 11ms
+ ✓ client-service.test.ts > restores real raw Unicode statistical-family without Buffer with new count fields isolated 8ms
+ ✓ client-service.test.ts > restores real raw Unicode reference-datum without Buffer with new count fields isolated 10ms
+ ✓ client-service.test.ts > persists and restores reference outcome near-PSD honestly 6ms
+ ✓ client-service.test.ts > persists and restores reference outcome singular honestly 5ms
+ ✓ client-service.test.ts > persists and restores reference outcome negative-weights honestly 5ms
+ ✓ client-service.test.ts > rejects summary dimension contamination and declaration ambiguity 11ms
+ ✓ client-service.test.ts > ten maximum records re-open and charge 191 then two 21-unit reads before limiting 287ms
+ ✓ client-service.test.ts > rejects full-hash-restamped forged numeric displacement by actual replay 5ms
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  08:18:08
+   Duration  1.74s (transform 265ms, setup 0ms, import 437ms, tests 951ms, environment 188ms)

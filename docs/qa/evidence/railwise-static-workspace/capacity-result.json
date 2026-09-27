@@ -1,0 +1,20 @@
+{
+  "node": "v26.8.2",
+  "status": "pass",
+  "observations": 256,
+  "base": 128,
+  "appended": 128,
+  "parameters": 16,
+  "declarationBytes": 149363,
+  "maximumRequestBytes": 153307,
+  "maximumRecordBytes": 818649,
+  "pageRows": 10,
+  "modelWorkUnits": 16,
+  "pageWorkUnits": 191,
+  "workBudget": 240,
+  "twoSubsequentDetailsPass": true,
+  "thirdDetailRateLimited": true,
+  "observedPageMilliseconds": 320.152834,
+  "timingMeaning": "single local observation; not SLA or benchmark",
+  "declarationTrust": "caller-declared-not-authenticated"
+}

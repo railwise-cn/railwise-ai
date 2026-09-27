@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "Electron HTTPS transport preflight only; not native updater acceptance",
+  "localTransportOnly": false,
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-24T04:41:08.728Z",
+  "steps": [
+    {
+      "operation": "Electron-TLS-transport-probe",
+      "status": "started",
+      "timeoutMs": 60000,
+      "at": "2026-09-24T04:41:06.410Z"
+    },
+    {
+      "operation": "Electron-TLS-transport-probe",
+      "status": "completed",
+      "at": "2026-09-24T04:41:08.721Z"
+    },
+    {
+      "operation": "TLS-preflight",
+      "status": "passed",
+      "at": "2026-09-24T04:41:08.728Z"
+    }
+  ],
+  "defaultTrustRejected": true,
+  "wrongPinRejected": true,
+  "wrongPortRejected": true,
+  "outsidePathRejected": true,
+  "providerManifestVerified": true,
+  "executorZipVerified": true,
+  "updaterSessionMatched": true,
+  "feedRequests": {
+    "manifest": 1,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 55
+  },
+  "certificateSha256": "1b20cbba84d63e54f3d26359d13962d566ddecf2ba614ed128f11db52141f7d6"
+}

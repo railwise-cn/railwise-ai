@@ -1,0 +1,20 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/06-keyboard-collapse.ax.txt",
+  "sourceSha256": "31c74ed08e445495fb3088fd195ec29e83c0be5b9b10887d6a09435100d09b8f",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 3,
+      "text": "+\t\t\t\t\t\t\t\t228 开合三角标记 查看规范依据"
+    },
+    {
+      "originalLine": 4,
+      "text": "+\t\t\t\t\t\t\t\t\t229 文本 查看规范依据"
+    },
+    {
+      "originalLine": 5,
+      "text": "The focused UI element is 228 开合三角标记 查看规范依据"
+    }
+  ]
+}

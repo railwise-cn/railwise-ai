@@ -66,6 +66,8 @@ export const RUNTIME_ENGINEERING_AI_CONTEXT_TEMPLATE = '/v1/engineering/ai/conte
 export const RUNTIME_ENGINEERING_AI_EVIDENCE_TEMPLATE = '/v1/engineering/ai/evidence/{id}'
 export const RUNTIME_ENGINEERING_AI_WATCH_DRAFTS_TEMPLATE = '/v1/engineering/ai/watch-drafts'
 export const RUNTIME_ENGINEERING_AI_PLANS_TEMPLATE = '/v1/engineering/ai/plans'
+export const RUNTIME_ENGINEERING_AI_PROJECT_SUGGESTIONS_TEMPLATE = '/v1/engineering/ai/project-suggestions'
+export const RUNTIME_ENGINEERING_AI_PROJECT_SUGGESTION_DECISION_TEMPLATE = '/v1/engineering/ai/project-suggestions/{id}/decision'
 export const RUNTIME_ENGINEERING_AI_PLAN_TEMPLATE = '/v1/engineering/ai/plans/{id}'
 export const RUNTIME_ENGINEERING_AI_PLAN_VALIDATE_TEMPLATE = '/v1/engineering/ai/plans/{id}/validate'
 export const RUNTIME_ENGINEERING_AI_PLAN_APPROVE_TEMPLATE = '/v1/engineering/ai/plans/{id}/approve'
@@ -86,6 +88,18 @@ export const RUNTIME_ENGINEERING_ADJUSTMENT_TEMPLATE = '/v1/engineering/adjustme
 export const RUNTIME_ENGINEERING_ADJUSTMENT_CANCEL_TEMPLATE = '/v1/engineering/adjustments/{id}/cancel'
 export const RUNTIME_ENGINEERING_ADJUSTMENT_RESUME_TEMPLATE = '/v1/engineering/adjustments/{id}/resume'
 export const RUNTIME_ENGINEERING_ADJUSTMENT_PREVIEW_TEMPLATE = '/v1/engineering/adjustments/{id}/preview'
+export const RUNTIME_ENGINEERING_STATISTICAL_DIAGNOSTICS_TEMPLATE = '/v1/engineering/projects/{id}/adjustments/{adjustmentId}/statistical-diagnostics'
+export const RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE = '/v1/engineering/projects/{id}/networks/{networkId}/free-leveling-trials'
+export const RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE = `${RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE}/{trialId}`
+export function runtimeSurveyFreeLevelingTrialsPath(projectId: string, networkId: string): string {
+  return `/v1/engineering/projects/${encodeURIComponent(projectId)}/networks/${encodeURIComponent(networkId)}/free-leveling-trials`
+}
+export function runtimeSurveyFreeLevelingTrialPath(projectId: string, networkId: string, trialId: string): string {
+  return `${runtimeSurveyFreeLevelingTrialsPath(projectId, networkId)}/${encodeURIComponent(trialId)}`
+}
+export function runtimeSurveyStatisticalDiagnosticsPath(projectId: string, adjustmentId: string, download = false): string {
+  return `/v1/engineering/projects/${encodeURIComponent(projectId)}/adjustments/${encodeURIComponent(adjustmentId)}/statistical-diagnostics${download ? '?download=1' : ''}`
+}
 export const RUNTIME_ENGINEERING_DEFORMATIONS_TEMPLATE = '/v1/engineering/deformations'
 export const RUNTIME_ENGINEERING_DEFORMATION_TEMPLATE = '/v1/engineering/deformations/{id}'
 
@@ -230,3 +244,6 @@ export function isRuntimeThreadMode(value: unknown): value is RuntimeThreadMode 
 export function normalizeThreadMode(value: unknown): RuntimeThreadMode {
   return value === 'plan' ? 'plan' : 'agent'
 }
+
+export const RUNTIME_ENGINEERING_MANIFEST_VERIFY_TEMPLATE = '/v1/engineering/projects/{id}/manifests/{manifestId}/verify'
+export const RUNTIME_ENGINEERING_MONITORING_REPLAY_TEMPLATE = '/v1/engineering/projects/{id}/manifests/{manifestId}/monitoring-replay'

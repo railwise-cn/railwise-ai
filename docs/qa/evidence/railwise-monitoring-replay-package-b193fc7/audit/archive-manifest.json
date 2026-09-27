@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "fixtureOnly": true,
+  "privateDataIncluded": false,
+  "sourceHead": "b193fc70d6363dc768e715087ca9c0d9975158c9",
+  "packageAsarSha256": "f50b2c373902aae90cdd60726ac0158925aa91e9babb2a12b51ed173f171119a",
+  "files": [
+    {
+      "path": "afterrestart/public-summary.json",
+      "sizeBytes": 40568,
+      "sha256": "40f4fb56a69a41bfde078fe816d458895be2a83de60ce8c11025c513fccb0cc9"
+    },
+    {
+      "path": "audit.py",
+      "sizeBytes": 30828,
+      "sha256": "fafeb80f9a7ae741fe6bb7a42a3e0ceae5dca2d1e53ecbc859f19073bed703ff"
+    },
+    {
+      "path": "before-corrected/public-summary.json",
+      "sizeBytes": 33285,
+      "sha256": "0dbc4a85eebe0a939b87b202ac467114c1680ace738dc9af5cad97323db41f4f"
+    },
+    {
+      "path": "before/public-summary.json",
+      "sizeBytes": 1144,
+      "sha256": "8586285dc556fb0b537d86eec0c247f897d1b66df2da8d225469c20928009e38"
+    },
+    {
+      "path": "bool-fix-helper.patch",
+      "sizeBytes": 924,
+      "sha256": "4c4b1e2205588331fb4e5f2ecf8dcaa0d03f3cdcf95f4f7dbdc0013008f5db3e"
+    },
+    {
+      "path": "bool-fix-selftest.patch",
+      "sizeBytes": 2472,
+      "sha256": "fce41173faa95914de0060446288063e04717f736e8e8d9f8a157c8ec7a86bdf"
+    },
+    {
+      "path": "historical-before-gui/public-summary.json",
+      "sizeBytes": 2889,
+      "sha256": "23d8a8fcd41992fd25d47b7b8e07537b1e8e907349b2fbb39acf87874c00d13d"
+    },
+    {
+      "path": "legacy-monitoring-helpers.before-bool-fix.py",
+      "sizeBytes": 29068,
+      "sha256": "eaf971dff1abca89aa7524c17ff7f688777400a675cb5184dedeb31602588937"
+    },
+    {
+      "path": "legacy-monitoring-helpers.py",
+      "sizeBytes": 29385,
+      "sha256": "bdc61f71537f01004771761f271d31a4708b93391dfcb4f1da077cdbcef332a8"
+    },
+    {
+      "path": "pdf-text.mjs",
+      "sizeBytes": 707,
+      "sha256": "405e05a62ea75f51f2aff0903bad3f6470f4a6a16a363f47f190b52b92de4351"
+    },
+    {
+      "path": "README.md",
+      "sizeBytes": 5631,
+      "sha256": "2f16473c43ab7530965a33f4d7c888959bda21a92976a44cc11a11fa5ff92211"
+    },
+    {
+      "path": "replay-event-validator.py",
+      "sizeBytes": 11455,
+      "sha256": "55b0d2864216f0276904ed8a55d2f699bc0ceb42b5be472d07b8da33395d6733"
+    },
+    {
+      "path": "seed-baseline.py",
+      "sizeBytes": 5427,
+      "sha256": "880225eef08109b543a9c79faf642a9f9decb52c42f83f240335ac0759c65ab9"
+    },
+    {
+      "path": "selftest-corrected.log",
+      "sizeBytes": 1311,
+      "sha256": "510c54946ddd9df68743dc3537334cb621aedfd55de54bf04f0e6aab20eb0ef0"
+    },
+    {
+      "path": "selftest.before-bool-fix.py",
+      "sizeBytes": 5187,
+      "sha256": "8aef07e2f30c301f31af60a3e035a1159600d89a6d5a6dfe994d0275d7ef8f07"
+    },
+    {
+      "path": "selftest.log",
+      "sizeBytes": 1003,
+      "sha256": "b0bf6e53cc9c8a102a707e519d9f146f42dd39671ba7d4a665e740c109f2d33e"
+    },
+    {
+      "path": "selftest.py",
+      "sizeBytes": 6376,
+      "sha256": "dac2d5d5f8b6790a08d377a8e8c64ef285ce883a49814cd47f0f94dedac6125b"
+    }
+  ]
+}

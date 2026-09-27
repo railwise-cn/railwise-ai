@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "cloud-private-native-updater-summary",
+  "workflowRun": "https://github.com/wangjiawei508/WorkWise/actions/runs/35491940609",
+  "sourceReports": {
+    "privateUpdaterSha256": "5e1d98ab15079279669e9ce5388ef5f263ed2705159425139ae020dd2c9a6c09",
+    "nativeUpdaterSha256": "92e0ef7ea09af67acea2e027cb8ed733cd5d68b93eceec1d727bb7b29208f3b8"
+  },
+  "status": "passed",
+  "sourceHead": "fbb88ea715571e9689cbc1c0802da08762e4318d",
+  "baseVersion": "0.0.0",
+  "targetVersion": "0.5.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "productionTouched": false,
+  "publicFeedUploaded": false,
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "baselinePurpose": "same-source isolated updater probe; not a historical-data migration",
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-20T05:50:22.233Z",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headfbb88ea71557",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperStatus": "assessments enabled",
+  "gatekeeperStatusExitCode": 0,
+  "baseDmgSha256": "63dde3e35d7125642db47b0eb5c0ef984df6dca54b5f21ddd30a029b846d2aed",
+  "targetZipSha256": "7ea8cd9efd47c2a42ac61ea8de57053a215d0c76bcc51ada7387e8443d632dae",
+  "targetAsarSha256": "15c19b63ea39fe5618e9d02ca8d977b348e6a12a8db5a8e64f56274a244ed96e",
+  "installedAsarSha256": "15c19b63ea39fe5618e9d02ca8d977b348e6a12a8db5a8e64f56274a244ed96e",
+  "userDataSentinelPreserved": true,
+  "feedRequests": {
+    "manifest": 1,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 300724000
+  },
+  "manifestSha256": "f8fac34206192ee784137b74e577834c05e96627c06255fd72fb8af27654533d",
+  "native": {
+    "status": "passed",
+    "isolatedTestChannel": "frontier",
+    "feedUrl": "<redacted-private-loopback-feed>",
+    "startedAt": "2026-09-20T05:49:46.890Z",
+    "completedAt": "2026-09-20T05:50:14.173Z",
+    "browserOpened": false,
+    "userDataPreserved": true,
+    "stages": [
+      {
+        "name": "base_started",
+        "at": "2026-09-20T05:49:46.890Z"
+      },
+      {
+        "name": "update_available",
+        "at": "2026-09-20T05:49:47.593Z",
+        "detail": "0.5.0"
+      },
+      {
+        "name": "download_completed",
+        "at": "2026-09-20T05:49:51.964Z",
+        "detail": "1 artifact(s)"
+      },
+      {
+        "name": "install_requested",
+        "at": "2026-09-20T05:49:51.965Z"
+      },
+      {
+        "name": "target_relaunched",
+        "at": "2026-09-20T05:50:14.172Z",
+        "detail": "0.5.0"
+      },
+      {
+        "name": "user_data_preserved",
+        "at": "2026-09-20T05:50:14.173Z",
+        "detail": "0.0.0"
+      }
+    ]
+  },
+  "completedOperations": [
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:48:59.700Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:05.085Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:05.453Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:09.329Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:09.424Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:09.433Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:13.768Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:14.158Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:17.470Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:17.548Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:17.554Z"
+    },
+    {
+      "operation": "openssl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:49:18.715Z"
+    },
+    {
+      "operation": "native-updater-harness",
+      "status": "completed",
+      "at": "2026-09-20T05:50:15.702Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:50:15.718Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:50:17.812Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:50:18.190Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:50:20.780Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-20T05:50:20.887Z"
+    },
+    {
+      "operation": "cleanup",
+      "status": "completed",
+      "at": "2026-09-20T05:50:22.233Z"
+    }
+  ],
+  "limitations": [
+    "The channel label belongs only to this isolated private probe; no public frontier or stable feed was promoted.",
+    "The baseline is a same-source 0.0.0 probe, not a historical production application or real project migration.",
+    "User-data preservation checks a synthetic sentinel. No production KPI or user acceptance is claimed."
+  ]
+}

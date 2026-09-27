@@ -1,0 +1,49 @@
+{
+  "checkedAt": "2026-09-20T08:55:23.837Z",
+  "scope": {
+    "candidateRoot": "/private/tmp/railwise-survey-53213de",
+    "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+    "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+    "threadId": "thr_wt4kfajs"
+  },
+  "mode": "consultation-only",
+  "purpose": "CLI service health check only; not GUI consultation acceptance",
+  "requestMinimization": "Only the exact fixed arithmetic question and bounded model settings may reach official upstream; all Runtime system/history/catalog data excluded",
+  "exactQuestionCount": 0,
+  "wrappedQuestionCount": 1,
+  "attempts": [
+    {
+      "index": 1,
+      "httpStatus": 400,
+      "responseSha256": "93cf175514dec12c3a50c93d3eb4ed69844b2123b4f9b26cde7836128c12d2fe",
+      "error": "consultation_history_not_persisted",
+      "actualAnswer": null
+    }
+  ],
+  "keyReads": 0,
+  "upstreamCount": 0,
+  "actualAnswer": null,
+  "conclusion": "local_guard_rejected; official service health not assessed",
+  "before": {
+    "task": {
+      "id": "task_05adc31c-0268-4cf7-80b5-7c9b5733faee",
+      "status": "stalled",
+      "revision": 14,
+      "dataJsonSha256": "e08df018916c98d037a444ab6ec634c72cb6f506f5c6e20df3352217728d4851"
+    },
+    "messagesSha256": "acdf77e0ee1c0f3f8a2d921d8e7889cc07fed9471be824d1494eefa0dd0f80f2"
+  },
+  "after": {
+    "task": {
+      "id": "task_05adc31c-0268-4cf7-80b5-7c9b5733faee",
+      "status": "stalled",
+      "revision": 14,
+      "dataJsonSha256": "e08df018916c98d037a444ab6ec634c72cb6f506f5c6e20df3352217728d4851"
+    },
+    "messagesSha256": "acdf77e0ee1c0f3f8a2d921d8e7889cc07fed9471be824d1494eefa0dd0f80f2"
+  },
+  "taskAndMessagesUnchanged": true,
+  "portClosed": true,
+  "tokenRemoved": true,
+  "relayReportPath": "/private/tmp/railwise-survey-53213de/evidence/relay-report-193aa816ded2eb21.json"
+}

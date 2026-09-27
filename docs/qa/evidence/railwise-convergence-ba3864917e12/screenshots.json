@@ -1,0 +1,60 @@
+{
+  "sourceHead": "ba3864917e128f7318b88895441b2b632291d564",
+  "directory": "/private/tmp/railwise-survey-ba38649/evidence",
+  "screenshots": [
+    {
+      "file": "04-survey-candidate-zh-light.jpg",
+      "sha256": "71b016635d006b31cc2734a031bff6169270fd7e5ee9291c02b15fe64039f5f5",
+      "bytes": 145098,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "05-survey-candidate-delivery.jpg",
+      "sha256": "d8e9585a1ebf97476014a2b7cb856dd6ef9edd34c911630935d7538fc21686cd",
+      "bytes": 117028,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "06-candidate-model-settings.jpg",
+      "sha256": "7be93e1ab4df50c4f20ec481a6fe0e07c24f502b495c6df13f01cbf04d1292d1",
+      "bytes": 78365,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "quality-chain-en-dark-960x640.jpg",
+      "sha256": "84ea6df6be692e9b181481a81b60ea0f95c0c423d5990afbd2a3d6bcd155c92f",
+      "bytes": 94393,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "quality-chain-zh-light.jpg",
+      "sha256": "2b4a34c0d4da714c03326829239a6f37be79c404b1234747366a267b6eaacb7f",
+      "bytes": 155310,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "quality-mixed-history-zh-light-960x640.jpg",
+      "sha256": "de335ee459cdd18003ee11fb6dc68bef56ba2b60c862e124c2205d49b5591ad4",
+      "bytes": 99488,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "quality-restored-after-restart-en-dark.jpg",
+      "sha256": "5153819eb906c9b84cc2f901df1ef7a05eceefd4387bc4076d1515a140f89f1f",
+      "bytes": 151349,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "quality-tamper-rejected-zh-light.jpg",
+      "sha256": "fe012e015fcd0163b4002de47bc2a507da3a041143fba7c4645481686bd01ad7",
+      "bytes": 121658,
+      "location": "local-only except three synthetic marketing captures"
+    },
+    {
+      "file": "quality-tamper-visible-zh-light.jpg",
+      "sha256": "f0817d7db52b24606f5be3c84a09fd8f14daf7d2fb6d522197d3b0884b0a9132",
+      "bytes": 129319,
+      "location": "local-only except three synthetic marketing captures"
+    }
+  ]
+}

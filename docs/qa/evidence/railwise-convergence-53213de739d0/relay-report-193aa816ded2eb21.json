@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-09-20T08:55:23.808Z",
+  "stoppedAt": "2026-09-20T08:55:23.830Z",
+  "reason": "bounded_consultation_healthcheck",
+  "model": "deepseek-flash",
+  "mode": "consultation-only",
+  "requestCount": 1,
+  "upstreamCount": 0,
+  "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+  "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+  "threadId": "thr_wt4kfajs",
+  "tokenRemoved": true,
+  "relayScope": "explicit fixed-question health check; persisted synthetic history validated locally; Runtime system/history/tool catalog removed from upstream request; all response tool calls forbidden; original upstream response bytes preserved",
+  "candidateCredentialAccess": "unchanged; require 0",
+  "officialCredentialStoredInCandidate": false,
+  "acceptanceScope": "GUI to Runtime to restricted minimal official-provider question only; not full-context ordinary consultation or direct credential-chain acceptance",
+  "events": [
+    {
+      "at": "2026-09-20T08:55:23.825Z",
+      "requestId": 1,
+      "kind": "failed",
+      "status": 400,
+      "code": "consultation_history_not_persisted",
+      "upstreamRequested": false
+    }
+  ]
+}

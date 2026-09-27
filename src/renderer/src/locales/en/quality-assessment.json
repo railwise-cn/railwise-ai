@@ -1,0 +1,112 @@
+{
+  "title": "Declared inspection linkage assessment",
+  "boundary": "Links caller-declared local records only. Inspection authenticity, organizational duties and signatures are not verified. Drafts remain unchanged; the five deliverable checks and deliverable numerical replay are not performed.",
+  "scopeLimit": "This version supports all 1–8 units of one first-round run and existing planar-control-point or height-control-section unit scores. It produces no sample or batch qualification.",
+  "offline": "Runtime is offline; reading and saving are unavailable.",
+  "savedPlans": "Saved plans",
+  "savedAssessments": "Saved assessments",
+  "newPlan": "New linkage plan",
+  "cancel": "Cancel waiting",
+  "retry": "Retry original request",
+  "cancelled": "Waiting cancelled. A submitted save may still complete; recover it from history.",
+  "unavailableRows": "{{count}} source records are unavailable.",
+  "result": "Linkage assessment result",
+  "materials": "Material linkage scope",
+  "unitCoverage": "Unit result coverage",
+  "declaredVeto": "Declared nonconformity",
+  "originalManifest": "Original manifest status",
+  "counts": "Expected {{expectedUnits}} · Linked scores {{linkedScores}} · Full unit results {{fullProfileUnits}} · Retained mappings {{satisfiedMaterialMappings}}/{{requiredMaterialMappings}} · Unresolved references {{unresolvedReferences}}",
+  "missingScore": "Leave score missing",
+  "existingAssociation": "Existing record linked after calculation; target association is caller-declared",
+  "unresolvedReference": "Unresolved reference",
+  "reverify": "Reverify linkage",
+  "export": "Save freshly verified record as",
+  "exportSaved": "Export saved.",
+  "exportCancelled": "Export cancelled; no file saved.",
+  "exportFailed": "Export failed; saving was not confirmed.",
+  "frozenPlan": "Frozen linkage plan (targets and mappings are immutable)",
+  "scoreSelectionHint": "Explicitly choose an existing unit score for each target. No latest or highest score is selected automatically. Missing scores may be saved as incomplete. Source reads are rate-limited; frequent reads may require waiting before retrying.",
+  "loadScores": "Load existing unit scores",
+  "more": "Next page",
+  "unitScore": "Score record for {{unit}}",
+  "assess": "Save declared linkage assessment",
+  "manifestSelect": "Actual deliverable manifest",
+  "choose": "Choose",
+  "loadRetention": "Load retention plans for this deliverable",
+  "retentionPlan": "Material retention plan",
+  "retentionRecord": "Retention record of this plan",
+  "loadRuns": "Load existing sampling runs",
+  "samplingRun": "Complete first-round sampling run",
+  "selectedCount": "All {{count}} selected units",
+  "profile": "Explicitly declared product profile",
+  "basis": "Association basis (exact text retained)",
+  "reference": "Exact evidence reference in scoring record",
+  "materialSelect": "Fixed material requirement in retention plan",
+  "locator": "Material location and unit association",
+  "addMapping": "Add material mapping",
+  "removeMapping": "Remove this mapping",
+  "acknowledge": "I confirm the complete selected unit set and explicit per-unit mappings. This declaration does not establish exhaustive materials, authentic inspections, stage completion or professional approval.",
+  "freeze": "Freeze complete linkage plan",
+  "savedOnly": "Saved-time result; dependencies are not replayed on this list. Opening rechecks current sources.",
+  "states": {
+    "complete-declared-requirements": "All declared material requirements linked",
+    "incomplete-declared-requirements": "Declared material requirements incomplete",
+    "complete-full-profile-unit-results": "Every target has a full-profile unit result",
+    "incomplete-full-profile-unit-results": "Unit results missing, partial or unavailable",
+    "contains-declared-nonconforming": "Contains declared nonconforming results",
+    "all-declared-unit-results-calculated": "All declared unit results calculated",
+    "unresolved": "Complete unit result summary unresolved",
+    "complete-declared-linkage": "Declared linkage complete (no engineering approval)",
+    "incomplete-declared-linkage": "Declared linkage incomplete"
+  },
+  "profiles": {
+    "planar-control-point": "Planar control point · Tables 43/44",
+    "height-control-section": "Height control section · Tables 45/46"
+  },
+  "stages": {
+    "process": "Process inspection",
+    "final-office": "Final office inspection",
+    "final-field": "Final field inspection",
+    "acceptance": "Acceptance"
+  },
+  "modes": {
+    "census": "Census",
+    "table-1-simple-random": "Table 1 simple random sample"
+  },
+  "manifest": {
+    "draft": "Pending review",
+    "approved": "Original approved string (signature unverified)",
+    "archived": "Originally archived"
+  },
+  "scope": {
+    "complete-declared-product-profile": "Complete declared profile",
+    "partial-declared-product-profile": "Partial declared profile only",
+    "unresolved-declared-product-profile": "Unresolved declared profile",
+    "not-evaluated": "Not evaluated"
+  },
+  "outcome": {
+    "calculated": "Calculated",
+    "nonconforming": "Declared nonconforming",
+    "unavailable": "Unavailable",
+    "invalid": "Invalid"
+  },
+  "material": {
+    "retained-bytes-linked": "Retained bytes linked",
+    "missing-retention-check": "Missing retention check"
+  },
+  "errors": {
+    "validation": "Request violates the exact linkage contract; check full sample order, mappings and score identities.",
+    "not-found": "Source missing or outside this project.",
+    "stale": "Project or deliverable changed; reload sources and create a new plan.",
+    "integrity": "Local records or recomputed results disagree; operation refused.",
+    "conflict": "Request key or plan digest conflict; original record retained.",
+    "source-changed": "Dependencies changed; original assessment retained. Create a new assessment.",
+    "unsupported-scope": "Unsupported scope: preserve all 1–8 first-round units with IDs of at most 160 characters.",
+    "limit": "Local storage or request limit reached.",
+    "rate-limit": "Source read budget exhausted; wait one minute and retry the original request.",
+    "unavailable": "Linkage service unavailable.",
+    "replay-environment": "Replay environment mismatch; old record unchanged.",
+    "invalid-response": "Response binding or digest mismatch; cannot display as verified.",
+    "request-failed": "Operation was not confirmed; retry the original request or inspect history."
+  }
+}

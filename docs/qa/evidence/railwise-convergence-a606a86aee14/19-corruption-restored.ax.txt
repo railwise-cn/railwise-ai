@@ -1,0 +1,95 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 136-165
+~							134 标题 Restored independent trial record, Value: 4
+~								135 文本 Restored independent trial record
++							136 container
++								137 text advanced_trial_75fae9e2-0cb3-41f9-b5e7-1cab6467670c  ·  2026-09-20T00:40:36.388Z
++							138 文本 Saved bytes and hashes have been checked against the Runtime’s strictly replayed result. This establishes local record consistency only, not input authenticity or model assumptions.
++							139 按钮 Reverify and replay
++							140 按钮 Reverify and export JSON
++							141 标题 Model basis statement, Value: 5
++								142 文本 Model basis statement
++							143 文本 合成软件数学验收：四成员预声明族，统计量反序输入；正态双侧、t自由度1双侧、卡方自由度2上尾，另有缺失成员。分母固定4，不代表实测成果检验。
++							144 container Statistical family results
++								145 标题 Statistical family results, Value: 4
++									146 文本 Statistical family results
++								147 文本 Family evaluated; inspect each member
++								148 文本 Family predeclaration and distribution assumptions are unverified. These scalar comparisons do not classify observations, delete points, or establish standards compliance. No upstream statistic uncertainty is propagated.
++								149 文本 Family synthetic-complete-family · full denominator 4 · family alpha 0.05 · member alpha 0.0125
++								150 container All declared statistical family members
++									151 表格
++										152 row
++											153 列标题
++												154 文本 Member and declared source
++											155 列标题
++												156 文本 Status
++											157 列标题
++												158 文本 Declared statistic
++											159 列标题
++												160 文本 p value
++											161 列标题
++												162 文本 Bonferroni-adjusted p
++											163 列标题
++												164 文本 Critical magnitude and resolution interval
++											165 列标题
++												166 文本 Scalar comparison
++										167 row
++											168 行标题
++												169 text a-normal Normal (two-sided)  ·  synthetic-acceptance Declared prior standard deviation 1 m
++											170 单元格
++												171 文本 Calculated
++											172 单元格
++												173 文本 3
++											174 单元格
++												175 文本 0.00269979606326
++											176 单元格
++												177 文本 0.010799184253
++											178 单元格
++												179 text 2.4977054744123723 [ 2.4977054743414655, 2.497705474483279 ]
++											180 单元格
++												181 文本 p is below the adjusted alpha
++										182 row
++											183 行标题
++												184 text b-t Student t (two-sided)  ·  synthetic-acceptance df 1
++											185 单元格
++												186 文本 Calculated
++											187 单元格
++												188 文本 3
++											189 单元格
++												190 文本 0.204832764699
++											191 单元格
++												192 文本 0.819331058797
++											193 单元格
++												194 text 50.92303663648548 [ 50.9230366262982, 50.923036646672756 ]
++											195 单元格
++												196 文本 p is above the adjusted alpha
++										197 row
++											198 行标题
++												199 text c-chi Chi-square (upper tail)  ·  synthetic-acceptance df 2 Declared prior standard deviation 1 m
++											200 单元格
++												201 文本 Calculated
++											202 单元格
++												203 文本 4
++											204 单元格
++												205 文本 0.135335283237
++											206 单元格
++												207 文本 0.541341132946
++											208 单元格
++												209 text 8.764053269347762 [ 8.764053268947762, 8.764053269747777 ]
++											210 单元格
++												211 文本 p is above the adjusted alpha
++										212 row
++											213 行标题
++												214 text d-missing Normal (two-sided)  ·  synthetic-acceptance Declared prior standard deviation 1 m
++											215 单元格
++												216 text Numerically unresolved No statistic supplied; retained in denominator
++											217 单元格 2-6
++												218 文本 Not computed
++								219 文本 The displayed intervals describe a software resolution policy, not certified error bounds. Individual failures and missing statistics remain visible and retain their place in the full family.
++							220 开合三角标记 Original JSON declaration
++								221 文本 Original JSON declaration
++							222 开合三角标记 Normalized model used for computation
++								223 文本 Normalized model used for computation
++							224 开合三角标记 Complete result and provenance hashes
++								225 文本 Complete result and provenance hashes
+The focused UI element is 123 标题 Advanced model trials, Value: 3

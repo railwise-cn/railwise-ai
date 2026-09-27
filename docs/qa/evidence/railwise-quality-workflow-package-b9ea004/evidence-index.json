@@ -1,0 +1,174 @@
+{
+  "sourceHead": "b9ea004b668d68b34a7d82ece6674ef2273a9bc3",
+  "run": "https://github.com/wangjiawei508/WorkWise/actions/runs/35954020211",
+  "newUserProvidedIconIncluded": false,
+  "entries": [
+    {
+      "source": "<isolated-tmp>/installation-report.json",
+      "target": "installation-report.json",
+      "sourceSha256": "961af9d7e7b4717dd8e3b5c1a8e72688d40393cc35c9297dba84614848e33264",
+      "archivedSha256": "be9558bf39cb05ffc3069b8294f4efd9e4b22fadc99de5014dbc69054414c5ed",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/updater-evidence/private-updater.json",
+      "target": "private-updater.json",
+      "sourceSha256": "e2d472381d1f3c66426d61bf9dcb01354b5099f725f2b78975708e717fbde328",
+      "archivedSha256": "e2d472381d1f3c66426d61bf9dcb01354b5099f725f2b78975708e717fbde328",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/updater-evidence/native-updater.json",
+      "target": "native-updater.json",
+      "sourceSha256": "2f82fc9e757f6281264a39678e3adfc055c3a3745f2c6a9547721b7a0840f693",
+      "archivedSha256": "1e2f32c8e7ec7b5b736cda881c9c938bdee9c0af01d607a3ba8ee7d09739717a",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/updater-evidence/tls-preflight.json",
+      "target": "tls-preflight.json",
+      "sourceSha256": "961d8bfc9e2dda30c4695566842a5d51fcf2d1851f605a9a4f9f588023dd0634",
+      "archivedSha256": "961d8bfc9e2dda30c4695566842a5d51fcf2d1851f605a9a4f9f588023dd0634",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/artifacts/private-updater-target-arm64-b9ea004b668d68b34a7d82ece6674ef2273a9bc3/range-download-receipt.json",
+      "target": "range-download-receipt.json",
+      "sourceSha256": "af3a272a1397e85ba96e70845b608d89eea486b065ae7be99ae20d55938bab55",
+      "archivedSha256": "73c0e7578281bd59bd5f34b03e0f0c33bfbc452989d5f8f95c0ce5e774a52d2a",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/run-packaged-audit.mjs",
+      "target": "run-packaged-audit.mjs",
+      "sourceSha256": "e0a09c56a0c766ee21f700ef2e71151d608383f966891bbbf7796f718c39915f",
+      "archivedSha256": "8d582ebf18fec481eb0e4a94eb8f11c871f14301f06b7c67b4416a99a5f8930f",
+      "transformation": "none"
+    },
+    {
+      "source": "<isolated-tmp>/install-private-candidate.mjs",
+      "target": "install-private-candidate.mjs",
+      "sourceSha256": "23ceb76535e177facd9a043c5057ba377537a83217b0208512386f6528a859bd",
+      "archivedSha256": "a900643a599c41c61b36c338261d2db2d38f486995b90c115456e13e84a35af3",
+      "transformation": "none"
+    },
+    {
+      "source": "<isolated-tmp>/download-target-range.mjs",
+      "target": "download-target-range.mjs",
+      "sourceSha256": "78d59f08795ae60bd36dd8bf7458c038c92c537de78ee50e583f20acc38ff6c9",
+      "archivedSha256": "c9078d39f24b9f64eb49d291488945e5b1d15cece2eb904c0012f98dd912d17c",
+      "transformation": "none"
+    },
+    {
+      "source": "<isolated-tmp>/gui-seed-001/audit-report.json",
+      "target": "gui-seed-001-audit-report.json",
+      "sourceSha256": "aea448dbd939b43b22b122e2ff1c2f679b7786a44b4408808a17d0849483c62c",
+      "archivedSha256": "b3b85a91129badd33d482a59282140548d999873340e95d3886d9178f7ef37da",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/gui-seed-001/package-identity.json",
+      "target": "gui-seed-001-package-identity.json",
+      "sourceSha256": "ceb5675cfcca90a79e9a7f60237693e7df818cc69799598b7cab5a146585d89e",
+      "archivedSha256": "31fc23ef678102bb92042777e1c8cbf5e33b5764cc17d94c6871827ba141e73f",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/gui-seed-001/gui-instructions.json",
+      "target": "gui-seed-001-gui-instructions.json",
+      "sourceSha256": "4fdb87761655fc8852830ad2d77f3464f5825377c535c26f75c62f06078b0058",
+      "archivedSha256": "2dd21734a02f4a25b301d8806af3e813338748886e2a45b717f5d2493e476ba3",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/gui-seed-001/saved-records.json",
+      "target": "gui-seed-001-saved-records.json",
+      "sourceSha256": "af18b9ab4524916fdd6798ccef393b70be8b4c3ca2607d7567b0c55a9267aada",
+      "archivedSha256": "a82a19c091147b138a4e9aae2e0fbcfba743c6cb2bc8f10f7be169c7fed759ce",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/gui-seed-001/before-business-snapshot.json",
+      "sourceSha256": "637a4a2cbe7c42e6a0800c24a2898738e38f681d4dc4cd4e80bd5f81289e38ad",
+      "transformation": "not copied; synthetic local full table snapshot retained in isolated temporary storage"
+    },
+    {
+      "source": "<isolated-tmp>/gui-seed-001/after-business-snapshot.json",
+      "sourceSha256": "637a4a2cbe7c42e6a0800c24a2898738e38f681d4dc4cd4e80bd5f81289e38ad",
+      "transformation": "not copied; synthetic local full table snapshot retained in isolated temporary storage"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-001/run-packaged-audit.failed-original.mjs",
+      "target": "service-audit-001-run-packaged-audit.failed-original.mjs",
+      "sourceSha256": "45f531b8b7719542c852f29a54773c0b7988f0ba524c83eb23e1aa2bf74d2e1f",
+      "archivedSha256": "7a3b1c21bb21a76539ee41d7d6ac68795fb8974e5bfc58cbb30546fefa21e767",
+      "transformation": "none; original failed audit script retained"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-001/audit-report.json",
+      "target": "service-audit-001-audit-report.json",
+      "sourceSha256": "1aff2d6d56b261e076ea55520ba39036db5eec32538e677efc2c070c59a41f53",
+      "archivedSha256": "54220977cca51e5e558603c745476c1f45eb2925550b4eb4f746ed86349e3d80",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-001/package-identity.json",
+      "target": "service-audit-001-package-identity.json",
+      "sourceSha256": "e221ef3faa691b25b62b4cb660b477a5cf33c0705817da01da62bf206635e763",
+      "archivedSha256": "21144a07ecd1027d8a1257ecb203427db15c51d29e6b2892b58114c4ee42a807",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/audit-report.json",
+      "target": "service-audit-002-audit-report.json",
+      "sourceSha256": "691a05f984e086bb619b76e00e86a596d9d1f382cbe30de9cf457d262a0c701f",
+      "archivedSha256": "2019eb330b50f264627b4800355f2e458bea09bac403b2329fada79e47e5d496",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/package-identity.json",
+      "target": "service-audit-002-package-identity.json",
+      "sourceSha256": "6633aee35d06bfc77a9ff1d688562d291287bdcc8f9aef1994045a3c15ad4fb8",
+      "archivedSha256": "e3b2939fbe03cbb2e1bfb0be48e714d804ea9b7c2d9645d2b99b8e7bda58ed93",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/gui-instructions.json",
+      "target": "service-audit-002-gui-instructions.json",
+      "sourceSha256": "d2697fbad114bc20a4a581b4360759c3fe4a8d0d10d51e077317c0d8edc2aa55",
+      "archivedSha256": "0f5e6acefd687880fbd171f949ed93f849fef53f20e13fd7397dfe941b6bac15",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/workflow-receipts.json",
+      "target": "service-audit-002-workflow-receipts.json",
+      "sourceSha256": "371126460b7af671e31d59905d22c49eb145e19a9d927f64b5bac8c85a809ef3",
+      "archivedSha256": "371126460b7af671e31d59905d22c49eb145e19a9d927f64b5bac8c85a809ef3",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/reopened-workflow.json",
+      "target": "service-audit-002-reopened-workflow.json",
+      "sourceSha256": "e4daf4853bfdcc444bdd0c86faee29c4ed9a3b2d249fddc59f2ac027596416d7",
+      "archivedSha256": "e4daf4853bfdcc444bdd0c86faee29c4ed9a3b2d249fddc59f2ac027596416d7",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/saved-records.json",
+      "target": "service-audit-002-saved-records.json",
+      "sourceSha256": "3d2c5ab488ff4a1ba04e5c92f192f82cb377e7bd5c929dab86f8164a66f08c58",
+      "archivedSha256": "b2b248f2f06333c3e91950f4dd24527ad4db299861606243f6faf50a72c7cd66",
+      "transformation": "private-loopback-feed and repository path redaction only"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/before-business-snapshot.json",
+      "sourceSha256": "4e55da758a1fe1f3459d7b5df8d37263a794679339f66280ec67ad694b784d80",
+      "transformation": "not copied; synthetic local full table snapshot retained in isolated temporary storage"
+    },
+    {
+      "source": "<isolated-tmp>/service-audit-002/after-business-snapshot.json",
+      "sourceSha256": "4e55da758a1fe1f3459d7b5df8d37263a794679339f66280ec67ad694b784d80",
+      "transformation": "not copied; synthetic local full table snapshot retained in isolated temporary storage"
+    }
+  ]
+}

@@ -349,17 +349,17 @@ export type DesignDocumentV1 = {
 
 /** 生成元素 id */
 export function generateDesignElementId(): string {
-  return `el_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+  return `el_${crypto.randomUUID()}`
 }
 
 /** 生成页面 id */
 export function generateDesignPageId(): string {
-  return `page_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  return `page_${crypto.randomUUID()}`
 }
 
 /** 生成文档 id */
 export function generateDesignDocumentId(): string {
-  return `doc_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  return `doc_${crypto.randomUUID()}`
 }
 
 /**

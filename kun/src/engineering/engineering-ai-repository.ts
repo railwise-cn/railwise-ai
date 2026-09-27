@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import {
+  EngineeringProjectSuggestionV1,
   EngineeringApprovalV1,
   EngineeringRunPlanV1,
   type EngineeringApprovalV1 as EngineeringApproval,
@@ -52,11 +53,54 @@ export class EngineeringAiRepository {
         result_json TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS engineering_ai_step_evidence (
+        plan_id TEXT NOT NULL,
+        step_id TEXT NOT NULL,
+        parameters_json TEXT NOT NULL,
+        handles_json TEXT NOT NULL,
+        PRIMARY KEY(plan_id, step_id)
+      );
+      CREATE TABLE IF NOT EXISTS engineering_ai_project_suggestions (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        request_key TEXT NOT NULL UNIQUE,
+        token TEXT NOT NULL,
+        data_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
     `)
   }
 
   close(): void {
     this.db.close()
+  }
+
+  projectSuggestions(threadId: string, projectId: string): Array<{ suggestion: EngineeringProjectSuggestionV1; token: string }> {
+    const rows = this.db.prepare('SELECT data_json, token FROM engineering_ai_project_suggestions WHERE thread_id = ? AND project_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 20').all(threadId, projectId) as Array<{ data_json: string; token: string }>
+    return rows.map(row => ({ suggestion: EngineeringProjectSuggestionV1.parse(JSON.parse(row.data_json)), token: row.token }))
+  }
+
+  projectSuggestion(id: string, byRequestKey = false): { suggestion: EngineeringProjectSuggestionV1; token: string } | null {
+    const row = this.db.prepare(`SELECT data_json, token FROM engineering_ai_project_suggestions WHERE ${byRequestKey ? 'request_key' : 'id'} = ?`).get(id) as { data_json: string; token: string } | undefined
+    return row ? { suggestion: EngineeringProjectSuggestionV1.parse(JSON.parse(row.data_json)), token: row.token } : null
+  }
+
+  createProjectSuggestion(suggestion: EngineeringProjectSuggestionV1, token: string, requestKey: string): void {
+    this.db.prepare('INSERT INTO engineering_ai_project_suggestions(id, thread_id, project_id, request_key, token, data_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(suggestion.id, suggestion.threadId, suggestion.projectId, requestKey, token, JSON.stringify(suggestion), suggestion.createdAt)
+  }
+
+  saveProjectSuggestion(suggestion: EngineeringProjectSuggestionV1): void {
+    this.db.prepare('UPDATE engineering_ai_project_suggestions SET data_json = ? WHERE id = ?').run(JSON.stringify(suggestion), suggestion.id)
+  }
+
+  stepEvidence(planId: string, stepId: string): { parameters: Record<string, unknown>; handles: Record<string, unknown> } | null {
+    const row = this.db.prepare('SELECT parameters_json, handles_json FROM engineering_ai_step_evidence WHERE plan_id = ? AND step_id = ?').get(planId, stepId) as { parameters_json: string; handles_json: string } | undefined
+    return row ? { parameters: JSON.parse(row.parameters_json), handles: JSON.parse(row.handles_json) } : null
+  }
+
+  recordStepEvidence(planId: string, stepId: string, parameters: Record<string, unknown>, handles: Record<string, unknown>): void {
+    this.db.prepare('INSERT OR IGNORE INTO engineering_ai_step_evidence(plan_id, step_id, parameters_json, handles_json) VALUES (?, ?, ?, ?)').run(planId, stepId, JSON.stringify(parameters), JSON.stringify(handles))
   }
 
   getPlan(id: string): EngineeringRunPlan | null {
@@ -89,6 +133,11 @@ export class EngineeringAiRepository {
       WHERE thread_id = ? AND json_extract(data_json, '$.executionTurnId') = ?
       ORDER BY updated_at DESC LIMIT 1
     `).get(threadId, turnId) as JsonRow | undefined
+    return row ? EngineeringRunPlanV1.parse(JSON.parse(row.data_json)) : null
+  }
+
+  planForTask(threadId: string, taskId: string): EngineeringRunPlan | null {
+    const row = this.db.prepare(`SELECT data_json FROM engineering_ai_plans WHERE thread_id = ? AND json_extract(data_json, '$.taskId') = ? ORDER BY updated_at DESC LIMIT 1`).get(threadId, taskId) as JsonRow | undefined
     return row ? EngineeringRunPlanV1.parse(JSON.parse(row.data_json)) : null
   }
 

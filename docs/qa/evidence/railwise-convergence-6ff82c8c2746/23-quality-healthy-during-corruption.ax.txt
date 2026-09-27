@@ -1,0 +1,143 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 6ff82c8c2746.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-6ff82c8/Applications/RAILWISE%20AI%20Candidate%206ff82c8c2746.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container Code / Survey
+							8 按钮 Code
+							9 按钮 Survey
+						10 切换 Description: Focus mode, Value: off
+						11 container Workspace tools
+							12 按钮 Write
+							13 按钮 Plugins
+							14 按钮 Scheduled tasks
+							15 按钮 Flow
+							16 按钮 Design
+						17 按钮 New Survey project
+					18 container
+						19 text Survey projects 1
+						20 按钮 New Survey project
+						21 切换按钮 Description: Refresh Survey projects, Value: 0
+						22 按钮 Survey AI desk Goals, plans, evidence, delivery
+							23 文本 Survey AI desk
+							24 文本 Goals, plans, evidence, delivery
+						25 按钮 合成验收·参考与评分与静态追加·6ff82c8 Control network · m · 9/20
+							26 文本 合成验收·参考与评分与静态追加·6ff82c8
+							27 文本 Control network
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI sessions 1
+						33 按钮 Survey AI · 新建内业任务 合成验收·参考与评分与静态追加·6ff82c8 · 0 messages
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成验收·参考与评分与静态追加·6ff82c8
+							36 文本  · 
+							37 文本 0
+							38 文本 messages
+						39 文本 Survey jobs, datasets, runs, and deliverables stay separate from Code and Design sessions.
+					40 container
+						41 切换按钮 Connect phone, Value: 0
+						42 按钮 Settings
+					43 container
+						44 按钮 Collapse sidebar
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text Engineering Survey Processing Current Survey job
+						48 弹出式按钮 Current Survey job, Value: 合成验收·参考与评分与静态追加·6ff82c8
+							49 (selected) 合成验收·参考与评分与静态追加·6ff82c8
+						50 文本 Work view
+						51 弹出式按钮 Work view, Value: Import and preflight
+							52 (selected) Import and preflight
+						53 按钮 New Survey project
+					54 container
+						55 text Task 合成验收·参考与评分与静态追加·6ff82c8 Stage Import and preflight Source / format —  ·  — Disposition Not started Datum Unconfirmed  ·  Unconfirmed Points — Stations — Observations — Closure — Precision — Deliverable — Network — Review —
+					56 container Survey AI session
+						57 container
+							58 标题 Survey AI session, Value: 2
+								59 文本 Survey AI session
+							60 文本 合成验收·参考与评分与静态追加·6ff82c8
+							61 按钮 Data assets
+							62 按钮 Survey adjustment
+							63 按钮 Refresh context
+						64 标题 Survey AI, Value: 2
+							65 文本 Survey AI
+						66 container
+							67 文本输入区 (settable) Create a project so AI can bind the evidence boundary.
+							68 按钮 More actions
+							69 弹出式按钮 Model and reasoning settings
+							70 按钮 (disabled) Send
+					71 container
+						72 container Work view
+							73 按钮 Project setup
+							74 按钮 Data assets
+							75 按钮 Quality checks
+							76 按钮 Survey sources and preflight
+						77 container Declared quality scoring
+							78 标题 Declared quality scoring, Value: 3
+								79 文本 Declared quality scoring
+							80 文本 Score explicitly declared inspection records with exact arithmetic under the reviewed GB/T 24356—2023 clauses. Select a product and inspection stage, then supply its basis and declaration.
+							81 文本 Declared inspection trial only. Evidence references, defect classification and prior batch qualification are unverified. The result does not certify standards conformity, engineering acceptance or a professional signature.
+							82 文本 Project project_9d966747-63bc-4658-9ba6-a8635423a7e0 · Revision 2
+							83 container
+								84 文本 Scoring stage
+								85 弹出式按钮 Scoring stage, Value: Choose a scoring stage
+									86 (selected) Choose a scoring stage
+							87 按钮 (disabled) Calculate and save declared record
+							88 按钮 Scoring record history
+							89 标题 Restored declared scoring record, Value: 4
+								90 文本 Restored declared scoring record
+							91 container
+								92 text quality_scoring_08c1e20d-9e61-426a-a7d1-c04fef253b12  ·  2026-09-20T01:33:02.946Z
+							93 container
+								94 text Planar control · Point (tables 43/44)  ·  Hierarchical unit-product scoring  ·  GB/T 24356-2023
+							95 文本 Original bytes and hashes match the Runtime’s strict replay. This shows current local consistency, not authenticity of referenced materials, human classification or prior qualification.
+							96 按钮 Reverify and replay
+							97 按钮 Reverify and export JSON
+							98 标题 Inspection basis and evidence statement, Value: 5
+								99 文本 Inspection basis and evidence statement
+							100 文本 合成否决验收：单位成果含B类4项，子元素分数52低于60；不得以其它高分平均抵消。仅验证声明记录的计算规则，不作工程批准。
+							101 container Declared scoring result
+								102 标题 Declared scoring result, Value: 5
+									103 文本 Declared scoring result
+								104 文本 Full product profile · Unverified declarations
+								105 文本 Declared record nonconforming
+								106 文本 Calculated or declared conditions met describes only this input and stated scope. Partial scope, components, samples and batches are distinct.
+								107 文本 A below-60 or A-class child cannot be offset by weighted averaging.
+								108 定义列表
+									109 container Qualification under declared conditions
+										110 文本 Qualification under declared conditions
+									111 文本 Declared record triggers nonconformance
+								112 文本 Values are exact numerator/denominator fractions. Grades use unrounded values. Rates are ratios, not rounded percentages.
+								113 container
+									114 text Inspection records supplied ： Mathematical accuracy · Observation quality · Calculation quality · Point selection · Point marking · Presentation quality · Material completeness
+								115 开合三角标记 Inspect calculation trace and hierarchical weights
+									116 文本 Inspect calculation trace and hierarchical weights
+							117 开合三角标记 Original JSON declaration
+								118 文本 Original JSON declaration
+							119 开合三角标记 Strictly parsed scoring declaration
+								120 文本 Strictly parsed scoring declaration
+							121 开合三角标记 Complete result and provenance hashes
+								122 文本 Complete result and provenance hashes
+						123 标题 Quality checks and issue handling, Value: 2
+							124 文本 Quality checks and issue handling
+						125 文本 Blocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.
+						126 按钮 (disabled) Run checks again
+						127 标题 Select or import a dataset, Value: 3
+							128 文本 Select or import a dataset
+						129 文本 Checks cover missing values, duplicate points, invalid numbers, time order, unit conflicts, and missing thresholds.
+	130 关闭按钮
+	131 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	132 最小化按钮
+133 menu bar
+	134 RAILWISE AI Candidate 6ff82c8c2746
+	135 File
+	136 Edit
+	137 View
+	138 Window
+	139 Help
+
+The focused UI element is 78 标题 Declared quality scoring, Value: 3

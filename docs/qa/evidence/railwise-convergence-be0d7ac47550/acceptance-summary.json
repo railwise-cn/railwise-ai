@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "status": "partial-not-release-approval",
+  "sourceHead": "be0d7ac47550d4d178674f63ce4406ee7c614e66",
+  "packageVersion": "0.5.0",
+  "syntheticDataOnly": true,
+  "realNativeGuiPerformedBy": "main agent",
+  "archiveReview": "local file inspection and selective redaction; no GUI actions by archive worker",
+  "package": "package-summary.json",
+  "updater": [
+    "private-updater-summary.json",
+    "native-updater-summary.json",
+    "tls-preflight-summary.json"
+  ],
+  "currentRecords": {
+    "projectId": "project_e53c6744-12ba-45bf-95f4-860f31b6a49c",
+    "populationId": "sampling_population_3a984371-a66e-4921-aac3-2a2a5be29547",
+    "runId": "sampling_run_d8581927-2b66-4058-bb09-174e4eedda81",
+    "scoreId": "quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802",
+    "exactDeclaredScore": "9141/100"
+  },
+  "baselineBoundary": "Taken after both synthetic records were created and initial basis viewing had occurred. Comparison covers subsequent theme/size operations; it does not prove no writes during the first basis opening.",
+  "recordReports": [
+    "current-before-basis-report.json",
+    "current-after-themes.json",
+    "current-after-restart.json",
+    "legacy-before-startup-report.json",
+    "legacy-copy-matches-source.json",
+    "legacy-after-restore.json"
+  ],
+  "keyboard": {
+    "locale": "zh",
+    "theme": "light",
+    "collapse": "Space",
+    "expand": "Return",
+    "evidence": [
+      "ax-excerpts/06-keyboard-collapse.json",
+      "ax-excerpts/07-keyboard-expand.json"
+    ],
+    "boundary": "Native focused disclosure evidence; not a full keyboard or accessibility audit."
+  },
+  "pdfLinks": {
+    "officialHost": "zrzy.guizhou.gov.cn",
+    "testedPdfPages": [
+      8,
+      60
+    ],
+    "knownIssue": "be0d7ac planar link groups Tables 43/44 with introductory PDF page 60. That page mostly contains continuation of Table 42 and only introduces 7.5.1 at the bottom. New source split links have not been tested in this package.",
+    "correctedSourceTargetsPendingPackage": {
+      "planarWeights": 61,
+      "planarDefects": [
+        62,
+        63
+      ],
+      "planarIntro": 60,
+      "heightWeights": 64,
+      "heightDefects": [
+        65,
+        66
+      ],
+      "heightIntro": 64
+    }
+  },
+  "liveModel": {
+    "report": "live-model-relay-summary.json",
+    "path": "native GUI -> isolated Runtime -> loopback relay -> official DeepSeek HTTPS",
+    "requestedModel": "deepseek-flash",
+    "httpStatus": 200,
+    "displayedAnswer": "5",
+    "boundary": "Synthetic arithmetic only; not official direct credential-chain, alias mapping, internal model-version attestation or full engineering-model acceptance."
+  },
+  "restart": {
+    "status": "same-records-restored",
+    "operator": "main agent",
+    "shutdown": "Cmd-Q; candidate pgrep returned no match (exit 1)",
+    "launch": "same signed candidate and isolated environment",
+    "projectRestored": true,
+    "priorSyntheticAnswerRestored": "5",
+    "scoreId": "quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802",
+    "exactScore": "9141/100",
+    "runId": "sampling_run_d8581927-2b66-4058-bb09-174e4eedda81",
+    "censusSelected": 2,
+    "censusPopulation": 2,
+    "basisExpandedAfterRestore": true,
+    "byteComparison": "current-after-restart.json",
+    "screenshots": [
+      "screenshots/12-restart-score-and-chat.jpg",
+      "screenshots/13-restart-census.jpg"
+    ]
+  },
+  "candidateProviderCleanup": {
+    "attribution": "main agent GUI operation and read-only presence check; archive worker did not inspect keys",
+    "officialProviderBaseRestored": true,
+    "officialProviderKeyEmpty": true,
+    "addedLocalProviderRetainedWithEmptyKey": true,
+    "providersChecked": 3,
+    "allHasKeyFalse": true,
+    "productionSettingsChanged": false
+  },
+  "legacyGui": {
+    "status": "same-historical-records-restored",
+    "operator": "main agent",
+    "originalWorkspaceBindingPreserved": true,
+    "projectId": "project_9c8894f5-7683-4b0e-a634-466ffca1dbe0",
+    "scoreId": "quality_scoring_29a60f54-f4d6-4d54-ba73-ae70e032ae70",
+    "exactScore": "9141/100",
+    "runId": "sampling_run_de67cfde-0c90-41df-884f-53af2da4cacd",
+    "censusSelected": 2,
+    "censusPopulation": 2,
+    "basisExpanded": true,
+    "byteComparison": "legacy-after-restore.json",
+    "baseline": "legacy-before-startup-report.json",
+    "screenshots": [
+      "screenshots/14-legacy-score-basis.jpg",
+      "screenshots/15-legacy-census-basis.jpg"
+    ]
+  },
+  "readonlyHttpIdentityProbe": "not-executed-on-this-candidate",
+  "nativeGuiIdentityErrorState": "not-executed",
+  "localeThemeMatrix": "partial; not all language/theme/size combinations",
+  "typedModificationAndExecutionApproval": "pending-native-gui-live-model-acceptance",
+  "userUiConfirmation": "not-recorded",
+  "professionalApproval": false,
+  "publicReleasePerformed": false,
+  "mainWorkingTreeChangesIncluded": false,
+  "unresolved": [
+    "New source navigation, async isolation, durable lifecycle, brand/locale changes and revised PDF locators are not in this candidate.",
+    "Local Gatekeeper assessments disabled; cloud assessments enabled is separate evidence.",
+    "Native physical window dimensions were not independently recorded; screenshot dimensions are image pixels only.",
+    "Current raw database baselines remain local and are not published.",
+    "User acceptance and any final release decision remain separate."
+  ]
+}

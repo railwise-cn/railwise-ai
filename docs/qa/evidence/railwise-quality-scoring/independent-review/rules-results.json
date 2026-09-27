@@ -1,0 +1,718 @@
+{
+  "passed": 70,
+  "skipped": "2 generic hierarchical cases replaced by public profile corpus",
+  "outputs": [
+    {
+      "id": "accuracy_zero",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_below_03",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_at_03",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_above_03",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "1749999",
+          "denominator": "17500"
+        }
+      }
+    },
+    {
+      "id": "accuracy_below_limit",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "1050001",
+          "denominator": "17500"
+        }
+      }
+    },
+    {
+      "id": "accuracy_at_limit",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_above_limit",
+      "actual": {
+        "state": "unavailable",
+        "reason": "accuracy_formula_outside_domain"
+      }
+    },
+    {
+      "id": "accuracy_zero_limit",
+      "actual": {
+        "state": "invalid",
+        "reason": "accuracy_domain"
+      }
+    },
+    {
+      "id": "accuracy_negative_limit",
+      "actual": {
+        "state": "invalid",
+        "reason": "accuracy_domain"
+      }
+    },
+    {
+      "id": "accuracy_negative_detection",
+      "actual": {
+        "state": "invalid",
+        "reason": "accuracy_domain"
+      }
+    },
+    {
+      "id": "accuracy_scale_units",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "580",
+          "denominator": "7"
+        }
+      }
+    },
+    {
+      "id": "single_60",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "multi_equal_60",
+      "actual": {
+        "state": "unavailable",
+        "reason": "multiple_accuracy_equality_60"
+      }
+    },
+    {
+      "id": "multi_above_60",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "160000001",
+          "denominator": "2000000"
+        }
+      }
+    },
+    {
+      "id": "multi_weighted",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "95",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "multi_missing",
+      "actual": {
+        "state": "unavailable",
+        "reason": "missing_accuracy_item"
+      }
+    },
+    {
+      "id": "multi_below_60",
+      "actual": {
+        "state": "invalid",
+        "reason": "accuracy_score_outside_formula_range"
+      }
+    },
+    {
+      "id": "invalid_weight_sum",
+      "actual": {
+        "state": "invalid",
+        "reason": "weights_positive_sum_one"
+      }
+    },
+    {
+      "id": "deduct_exact_60",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_below_60",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "subelement_below_60",
+        "qualified": false,
+        "rawScore": {
+          "numerator": "59",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_negative_no_clamp",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "subelement_below_60",
+        "qualified": false,
+        "rawScore": {
+          "numerator": "-8",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_a_veto",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "a_class_veto",
+        "qualified": false,
+        "fixedADeduction": {
+          "numerator": "42",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_t_zero",
+      "actual": {
+        "state": "invalid",
+        "reason": "adjustment_coefficient"
+      }
+    },
+    {
+      "id": "deduct_adjusted_t",
+      "actual": {
+        "state": "unavailable",
+        "reason": "adjusted_t_not_in_minimal_contract"
+      }
+    },
+    {
+      "id": "deduct_negative_count",
+      "actual": {
+        "state": "invalid",
+        "reason": "defect_count"
+      }
+    },
+    {
+      "id": "grade_59999999/1000000",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "score_below_60",
+        "qualified": false,
+        "rawScore": {
+          "numerator": "59999999",
+          "denominator": "1000000"
+        }
+      }
+    },
+    {
+      "id": "grade_60",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        },
+        "grade": "qualified",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_60000001/1000000",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "60000001",
+          "denominator": "1000000"
+        },
+        "grade": "qualified",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_74999999/1000000",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "74999999",
+          "denominator": "1000000"
+        },
+        "grade": "qualified",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_75",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "75",
+          "denominator": "1"
+        },
+        "grade": "good",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_75000001/1000000",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "75000001",
+          "denominator": "1000000"
+        },
+        "grade": "good",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_89999999/1000000",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "89999999",
+          "denominator": "1000000"
+        },
+        "grade": "good",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_90",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "90",
+          "denominator": "1"
+        },
+        "grade": "excellent",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_90000001/1000000",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "90000001",
+          "denominator": "1000000"
+        },
+        "grade": "excellent",
+        "qualified": true
+      }
+    },
+    {
+      "id": "grade_100",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        },
+        "grade": "excellent",
+        "qualified": true
+      }
+    },
+    {
+      "id": "child_59_veto",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "child_below_60",
+        "qualified": false
+      }
+    },
+    {
+      "id": "child_60_allowed",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "498",
+          "denominator": "5"
+        },
+        "grade": "excellent",
+        "qualified": true
+      }
+    },
+    {
+      "id": "a_overrides_high_scores",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "a_class_veto",
+        "qualified": false
+      }
+    },
+    {
+      "id": "missing_child_not_excluded",
+      "actual": {
+        "state": "unavailable",
+        "reason": "incomplete_unit_evidence"
+      }
+    },
+    {
+      "id": "unknown_a_evidence",
+      "actual": {
+        "state": "unavailable",
+        "reason": "incomplete_unit_evidence"
+      }
+    },
+    {
+      "id": "incomplete_evidence",
+      "actual": {
+        "state": "unavailable",
+        "reason": "incomplete_unit_evidence"
+      }
+    },
+    {
+      "id": "known_child_fail_with_missing",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "child_below_60",
+        "qualified": false
+      }
+    },
+    {
+      "id": "sample_one_failure",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "sample_has_failed_unit",
+        "qualified": false
+      }
+    },
+    {
+      "id": "sample_mean",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "score": {
+          "numerator": "80",
+          "denominator": "1"
+        },
+        "grade": "good",
+        "qualified": true
+      }
+    },
+    {
+      "id": "sample_missing",
+      "actual": {
+        "state": "unavailable",
+        "reason": "sample_has_unresolved_unit"
+      }
+    },
+    {
+      "id": "sample_fail_over_missing",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "sample_has_failed_unit",
+        "qualified": false
+      }
+    },
+    {
+      "id": "overview_b3",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "qualified": true
+      }
+    },
+    {
+      "id": "overview_b4",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "overview_defects",
+        "qualified": false
+      }
+    },
+    {
+      "id": "overview_a",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "overview_defects",
+        "qualified": false
+      }
+    },
+    {
+      "id": "overview_unknown",
+      "actual": {
+        "state": "unavailable",
+        "reason": "overview_missing_evidence"
+      }
+    },
+    {
+      "id": "final_excellent_equal",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "excellent",
+        "qualified": true,
+        "count": 10,
+        "excellentRate": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "excellentGoodRate": {
+          "numerator": "9",
+          "denominator": "10"
+        }
+      }
+    },
+    {
+      "id": "final_excellent_below_rate",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "good",
+        "qualified": true,
+        "count": 100,
+        "excellentRate": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "excellentGoodRate": {
+          "numerator": "89",
+          "denominator": "100"
+        }
+      }
+    },
+    {
+      "id": "final_excellent_below_e",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "good",
+        "qualified": true,
+        "count": 100,
+        "excellentRate": {
+          "numerator": "49",
+          "denominator": "100"
+        },
+        "excellentGoodRate": {
+          "numerator": "9",
+          "denominator": "10"
+        }
+      }
+    },
+    {
+      "id": "final_good_equal",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "good",
+        "qualified": true,
+        "count": 10,
+        "excellentRate": {
+          "numerator": "3",
+          "denominator": "10"
+        },
+        "excellentGoodRate": {
+          "numerator": "4",
+          "denominator": "5"
+        }
+      }
+    },
+    {
+      "id": "final_good_below_rate",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "qualified",
+        "qualified": true,
+        "count": 100,
+        "excellentRate": {
+          "numerator": "3",
+          "denominator": "10"
+        },
+        "excellentGoodRate": {
+          "numerator": "79",
+          "denominator": "100"
+        }
+      }
+    },
+    {
+      "id": "final_good_below_e",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "qualified",
+        "qualified": true,
+        "count": 100,
+        "excellentRate": {
+          "numerator": "29",
+          "denominator": "100"
+        },
+        "excellentGoodRate": {
+          "numerator": "4",
+          "denominator": "5"
+        }
+      }
+    },
+    {
+      "id": "final_prerequisite_failed",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "batch_prerequisite_failed",
+        "qualified": false
+      }
+    },
+    {
+      "id": "final_prerequisite_missing",
+      "actual": {
+        "state": "unavailable",
+        "reason": "batch_prerequisite_missing"
+      }
+    },
+    {
+      "id": "final_counts_incomplete",
+      "actual": {
+        "state": "unavailable",
+        "reason": "batch_prerequisite_missing"
+      }
+    },
+    {
+      "id": "final_rounding_not_allowed",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "grade": "good",
+        "qualified": true,
+        "count": 10000,
+        "excellentRate": {
+          "numerator": "4999",
+          "denominator": "10000"
+        },
+        "excellentGoodRate": {
+          "numerator": "9",
+          "denominator": "10"
+        }
+      }
+    },
+    {
+      "id": "accept_both_pass",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "qualified": true
+      }
+    },
+    {
+      "id": "accept_only_detailed",
+      "actual": {
+        "state": "calculated",
+        "reason": "calculated",
+        "qualified": true
+      }
+    },
+    {
+      "id": "accept_overview_pending",
+      "actual": {
+        "state": "unavailable",
+        "reason": "inspection_unresolved"
+      }
+    },
+    {
+      "id": "accept_overview_missing",
+      "actual": {
+        "state": "unavailable",
+        "reason": "inspection_unresolved"
+      }
+    },
+    {
+      "id": "accept_overview_fail",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "inspection_failed",
+        "qualified": false
+      }
+    },
+    {
+      "id": "accept_detailed_pending",
+      "actual": {
+        "state": "unavailable",
+        "reason": "inspection_unresolved"
+      }
+    },
+    {
+      "id": "accept_fabricated",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "batch_fabrication_or_major_route_veto",
+        "qualified": false
+      }
+    },
+    {
+      "id": "accept_major_route",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "batch_fabrication_or_major_route_veto",
+        "qualified": false
+      }
+    },
+    {
+      "id": "accept_veto_with_missing",
+      "actual": {
+        "state": "nonconforming",
+        "reason": "batch_fabrication_or_major_route_veto",
+        "qualified": false
+      }
+    },
+    {
+      "id": "accept_unknown_veto",
+      "actual": {
+        "state": "unavailable",
+        "reason": "batch_veto_evidence_missing"
+      }
+    }
+  ]
+}

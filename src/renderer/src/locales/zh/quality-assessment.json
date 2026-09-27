@@ -1,0 +1,112 @@
+{
+  "title": "声明检查关联评估",
+  "boundary": "仅关联调用方声明的本地记录。未认证真实检查，未完成组织职责与签认核验；不改变待审草稿，不执行成果五项复验或成果数值重放。",
+  "scopeLimit": "本版仅支持一个首轮运行的全部 1–8 个单位、已有平面控制点或高程控制测段单位评分；不生成样本或批合格结论。",
+  "offline": "Runtime 未连接，暂不可读取或保存。",
+  "savedPlans": "已保存计划",
+  "savedAssessments": "已保存评估",
+  "newPlan": "新建关联计划",
+  "cancel": "取消等待",
+  "retry": "重试原请求",
+  "cancelled": "已取消等待；后台已接收的保存可能仍会完成，可在历史中恢复。",
+  "unavailableRows": "有 {{count}} 条来源记录不可读取。",
+  "result": "关联评估结果",
+  "materials": "资料关联范围",
+  "unitCoverage": "单位结果覆盖",
+  "declaredVeto": "声明否决",
+  "originalManifest": "原清单状态",
+  "counts": "目标 {{expectedUnits}} · 已关联评分 {{linkedScores}} · 完整单位结果 {{fullProfileUnits}} · 已保全映射 {{satisfiedMaterialMappings}}/{{requiredMaterialMappings}} · 未解析引用 {{unresolvedReferences}}",
+  "missingScore": "保留缺失评分",
+  "existingAssociation": "计算后关联已有记录；成果关联由调用方声明",
+  "unresolvedReference": "引用未解析",
+  "reverify": "重新核验关联",
+  "export": "另存当前核验记录",
+  "exportSaved": "已保存导出记录。",
+  "exportCancelled": "已取消导出，未保存文件。",
+  "exportFailed": "导出失败，未确认保存。",
+  "frozenPlan": "冻结的关联计划（目标与映射不可编辑）",
+  "scoreSelectionHint": "逐单位明确选择已有单位评分。不会自动选择最新记录或最高分；缺失可以保存为不完整。来源读取受限流约束，频繁读取后可能需要等待重试。",
+  "loadScores": "读取已有单位评分",
+  "more": "下一页",
+  "unitScore": "{{unit}} 的评分记录",
+  "assess": "保存声明关联评估",
+  "manifestSelect": "实际成果清单",
+  "choose": "请选择",
+  "loadRetention": "读取该成果的保全计划",
+  "retentionPlan": "材料保全计划",
+  "retentionRecord": "该计划的保全记录",
+  "loadRuns": "读取已有抽样运行",
+  "samplingRun": "完整首轮抽样运行",
+  "selectedCount": "全部 {{count}} 个选中单位",
+  "profile": "明确声明的产品类型",
+  "basis": "关联依据（原文保存）",
+  "reference": "评分中的精确证据引用",
+  "materialSelect": "该保全计划的固定材料要求",
+  "locator": "资料位置与单位对应说明",
+  "addMapping": "添加材料映射",
+  "removeMapping": "移除此映射",
+  "acknowledge": "我确认完整选中单位及逐单位材料映射。该关联仅是声明，不证明资料穷尽、真实检查、阶段完成或专业批准。",
+  "freeze": "冻结完整关联计划",
+  "savedOnly": "保存时结果；此列表未重放依赖。打开后重新核验当前来源。",
+  "states": {
+    "complete-declared-requirements": "声明材料要求已关联齐全",
+    "incomplete-declared-requirements": "声明材料要求尚有缺项",
+    "complete-full-profile-unit-results": "全部目标有完整产品范围单位结果",
+    "incomplete-full-profile-unit-results": "单位结果缺失、部分或不可用",
+    "contains-declared-nonconforming": "包含已声明不合格结果",
+    "all-declared-unit-results-calculated": "所有声明单位结果已计算",
+    "unresolved": "尚无法汇总完整单位结果",
+    "complete-declared-linkage": "声明关联齐全（非工程批准）",
+    "incomplete-declared-linkage": "声明关联不完整"
+  },
+  "profiles": {
+    "planar-control-point": "平面控制点 · 表 43/44",
+    "height-control-section": "高程控制测段 · 表 45/46"
+  },
+  "stages": {
+    "process": "过程检查",
+    "final-office": "最终检查内业",
+    "final-field": "最终检查外业",
+    "acceptance": "验收"
+  },
+  "modes": {
+    "census": "全数检查",
+    "table-1-simple-random": "表 1 简单随机抽样"
+  },
+  "manifest": {
+    "draft": "待审查",
+    "approved": "原记录已批准字符串（签认未验证）",
+    "archived": "原记录已归档"
+  },
+  "scope": {
+    "complete-declared-product-profile": "完整声明产品范围",
+    "partial-declared-product-profile": "仅部分声明产品范围",
+    "unresolved-declared-product-profile": "声明范围未解决",
+    "not-evaluated": "未评估"
+  },
+  "outcome": {
+    "calculated": "已计算",
+    "nonconforming": "声明不合格",
+    "unavailable": "不可用",
+    "invalid": "无效"
+  },
+  "material": {
+    "retained-bytes-linked": "已关联保全字节",
+    "missing-retention-check": "缺少保全检查"
+  },
+  "errors": {
+    "validation": "请求不符合精确关联合同；检查完整样本顺序、资料映射与评分身份。",
+    "not-found": "来源不存在或不属于当前项目。",
+    "stale": "项目或成果已变化，请读取当前来源并新建计划。",
+    "integrity": "本地记录或重新计算结果不一致，拒绝继续。",
+    "conflict": "请求标识或计划摘要冲突，原记录保留。",
+    "source-changed": "依赖来源已变化，原评估保留；请创建新的评估。",
+    "unsupported-scope": "本版不支持该范围：必须完整保留 1–8 个首轮单位，单位标识不超过 160 字符。",
+    "limit": "已达本地存储或请求限额。",
+    "rate-limit": "来源读取预算不足，请等待一分钟后重试原请求。",
+    "unavailable": "关联服务暂不可用。",
+    "replay-environment": "重放环境不匹配，未修改旧记录。",
+    "invalid-response": "响应绑定或摘要不一致，拒绝展示为已核验。",
+    "request-failed": "操作未确认完成，可重试原请求或查看历史。"
+  }
+}

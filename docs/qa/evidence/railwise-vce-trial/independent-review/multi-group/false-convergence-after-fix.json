@@ -1,0 +1,8 @@
+{
+  "description": "First observation is fully fitted by a dedicated parameter; its variance is exactly unidentifiable independent of y.",
+  "counts": {
+    "stochastic-rank-or-conditioning": 288
+  },
+  "spuriousPositiveCandidateOrConvergence": 0,
+  "failures": []
+}

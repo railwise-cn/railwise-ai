@@ -1,0 +1,217 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 6ff82c8c2746.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-6ff82c8/Applications/RAILWISE%20AI%20Candidate%206ff82c8c2746.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 合成验收·参考与评分与静态追加·6ff82c8 控制网 · m · 9/20
+							26 文本 合成验收·参考与评分与静态追加·6ff82c8
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 合成验收·参考与评分与静态追加·6ff82c8 · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成验收·参考与评分与静态追加·6ff82c8
+							36 文本  · 
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 合成验收·参考与评分与静态追加·6ff82c8
+							49 (selected) 新建内业任务
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 建网与平差
+						52 按钮 新建工程测量项目
+					53 文本 任务配置已保存。后续计算会使用当前任务配置。
+					54 按钮 关闭提示
+					55 container
+						56 text 任务 合成验收·参考与评分与静态追加·6ff82c8 阶段 建网与平差 数据源 / 格式 —  ·  — 处置状态 未开始 基准 待确认  ·  待确认 点数 — 测站数 — 观测 — 闭合差 — 精度 — 成果 — 网型 — 审查 —
+					57 container Survey AI 会话
+						58 container
+							59 标题 Survey AI 会话, Value: 2
+								60 文本 Survey AI 会话
+							61 文本 合成验收·参考与评分与静态追加·6ff82c8
+							62 按钮 数据资产
+							63 按钮 测量平差
+							64 按钮 刷新上下文
+						65 标题 Survey AI, Value: 2
+							66 文本 Survey AI
+						67 container
+							68 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							69 按钮 更多操作
+							70 弹出式按钮 模型与推理设置
+							71 按钮 (disabled) 发送
+					72 container
+						73 container 工作视图
+							74 按钮 测量平差
+							75 按钮 高级模型试算
+						76 container 高级模型试算
+							77 标题 高级模型试算, Value: 3
+								78 文本 高级模型试算
+							79 文本 独立声明实验模型，保存输入原文与试算证据。无需交付清单；请自行提供模型、单位和依据。
+							80 文本 仅供声明模型试算：模型假设和来源真实性未核实，不代表工程合格、规范符合或真人签认；不会替换正式平差权、删除观测或批准成果。
+							81 文本 项目 project_9d966747-63bc-4658-9ba6-a8635423a7e0 · 修订 2
+							82 container
+								83 文本 试算方法
+								84 弹出式按钮 试算方法, Value: 静态线性观测追加试算
+									85 (selected) 静态线性观测追加试算
+							86 文本 固定线性、固定基准、独立零均值误差与已知先验绝对方差；原有模型须满列秩且有正多余观测。最多 16 个同量纲参数、128 条追加观测、256 条总观测；不支持相关、非线性、动态模型或实时外业状态。
+							87 开合三角标记 查看合成输入示例
+								88 文本 查看合成输入示例
+							89 container
+								90 文本 模型依据原文
+								91 文本输入区 (settable) 模型依据原文, Value: 合成验收：独立零均值误差、已知先验绝对方差、固定线性参数与基准。基线三观测0/2/4，追加8/-1；以独立分数解检查参数、SSE与先验协方差，不用于工程批准。
+							92 文本 写明模型适用范围、观测与单位来源、随机模型和分组依据。原文最多 16 KiB；保存不等于专业确认。
+							93 container
+								94 文本 完整试算请求 JSON
+								95 文本输入区 (settable) 完整试算请求 JSON, Value: {
+  "schemaVersion": 1,
+  "operation": "append-independent-observations-only",
+  "base": {
+    "schemaVersion": 1,
+    "model": "fixed-datum-full-column-rank-independent-linear-observations",
+    "covarianceBasis": "caller-declared-known-apriori-independent-absolute-variances",
+    "errorModel": "caller-declared-zero-mean-independent-errors-no-normality-claim",
+    "coefficientMeaning": "dimensionless-all-parameters-share-observation-unit",
+    "networkId": "synthetic:equal-weight-location",
+    "revision": 1,
+    "unit": "mm",
+    "parameterIds": [
+      "x0"
+    ],
+    "sourceAnchor": "original-synthetic-fixed-model:equal-weight-location",
+    "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "observations": [
+      {
+        "id": "b0",
+        "value": 1.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:b0"
+      },
+      {
+        "id": "b1",
+        "value": 2.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:b1"
+      },
+      {
+        "id": "b2",
+        "value": 4.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:b2"
+      }
+    ]
+  },
+  "expectedBaseFingerprint": "5ce1012b2d69f7021925d88c7cb55d5d25865cabdd9d606f267484e4b12dd510",
+  "append": {
+    "batchId": "append:equal-weight-location",
+    "nextRevision": 2,
+    "sourceAnchor": "original-synthetic-append:equal-weight-location",
+    "observations": [
+      {
+        "id": "a0",
+        "value": 8.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:a0"
+      },
+      {
+        "id": "a1",
+        "value": -1.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:a1"
+      }
+    ]
+  }
+}
+
+							96 文本 保留原文，不截断或自动修补。最多 256 KiB UTF-8；当前 2006 字节。
+							97 container
+								98 复选框 我已核对声明模型及依据，确认仅保存独立实验试算；理解假设未核实且结果不构成工程批准。, Value: 0
+								99 文本 我已核对声明模型及依据，确认仅保存独立实验试算；理解假设未核实且结果不构成工程批准。
+							100 按钮 (disabled) 确认并保存试算
+							101 按钮 试算历史
+							102 标题 已读取的独立试算记录, Value: 4
+								103 文本 已读取的独立试算记录
+							104 container
+								105 text advanced_trial_84c3454b-9201-44ab-b3d1-593adaaaf767  ·  2026-09-20T01:28:59.808Z
+							106 文本 已核对保存字节与摘要，并读取运行时严格重算的结果。这仅证明本地记录一致性，不鉴证输入来源或模型假设。
+							107 按钮 重新核验并重放
+							108 按钮 重新核验并导出 JSON
+							109 标题 模型依据原文, Value: 5
+								110 文本 模型依据原文
+							111 文本 合成验收：独立零均值误差、已知先验绝对方差、固定线性参数与基准。基线三观测0/2/4，追加8/-1；以独立分数解检查参数、SSE与先验协方差，不用于工程批准。
+							112 container 静态观测追加结果
+								113 标题 静态观测追加结果, Value: 4
+									114 文本 静态观测追加结果
+								115 文本 拒绝追加：原有模型指纹与声明不一致。
+								116 文本 仅对声明的模型进行试算，不修改原有观测或正式成果。来源、独立性、零均值与先验方差均未验真。指纹只绑定提交的语义快照，不证明原始文件真实性或历史运行状态；不作工程签认。
+								117 文本 原有 3 条 · 追加 2 条 · 总观测 5 条
+								118 文本 网络 synthetic:equal-weight-location · 声明版本 1 → 2
+								119 文本 误差声明为零均值、相互独立，使用已知先验绝对方差；不作正态分布主张。参数与观测使用相同单位，系数无量纲。
+								120 定义列表
+									121 container 已计算的原有模型指纹（声明快照）
+										122 文本 已计算的原有模型指纹（声明快照）
+									123 文本 34debad9fe6874663744ba6947cd912516f508633b972acffe8e8aec70924843
+							124 开合三角标记 原始 JSON 声明
+								125 文本 原始 JSON 声明
+							126 开合三角标记 实际计算的归一化模型
+								127 文本 实际计算的归一化模型
+							128 开合三角标记 完整结果与追溯摘要
+								129 文本 完整结果与追溯摘要
+	130 关闭按钮
+	131 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	132 最小化按钮
+133 menu bar
+	134 RAILWISE AI Candidate 6ff82c8c2746
+	135 文件
+	136 编辑
+	137 显示
+	138 窗口
+	139 帮助
+
+The focused UI element is 77 标题 高级模型试算, Value: 3

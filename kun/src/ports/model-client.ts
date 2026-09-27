@@ -22,6 +22,8 @@ export type ModelStreamChunk =
 export type ModelRequest = {
   threadId: string
   turnId: string
+  /** Configured provider identity inherited from the persisted turn. */
+  providerId?: string
   model: string
   systemPrompt?: string
   /**

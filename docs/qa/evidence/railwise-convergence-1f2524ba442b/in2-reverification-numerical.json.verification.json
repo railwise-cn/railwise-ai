@@ -1,0 +1,35 @@
+{
+  "verification": {
+    "schemaVersion": 1,
+    "projectId": "project_1f501195-c9a9-4394-a4f8-a87640b4d4aa",
+    "manifestId": "manifest_e5c65674-505b-4fdb-a021-a207839c4b2a",
+    "checkedAt": "2026-09-19T08:00:35.709Z",
+    "valid": true,
+    "reviewStatus": "draft",
+    "checks": [
+      {
+        "id": "manifest",
+        "status": "passed"
+      },
+      {
+        "id": "outputs",
+        "status": "passed"
+      },
+      {
+        "id": "inputs",
+        "status": "passed"
+      },
+      {
+        "id": "surveyReplay",
+        "status": "passed"
+      },
+      {
+        "id": "sources",
+        "status": "passed"
+      }
+    ]
+  },
+  "tamperedOutputRejected": true,
+  "crossProjectRejected": true,
+  "restoredPass": true
+}

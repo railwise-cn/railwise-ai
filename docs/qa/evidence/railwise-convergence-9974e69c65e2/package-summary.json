@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "purpose": "private UI baseline only; not the final acceptance candidate",
+  "sourceReportSha256": "a5704f8867e91fded229b0603e609f483be306da1a31696b092c75dbbfbdc1a8",
+  "sourceHead": "9974e69c65e2f76bf3318e713191b4125cb0e75e",
+  "version": "0.5.0",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head9974e69c65e2",
+  "asarSha256": "ab3b385b6d6f422c609694ca36adb0512a6486b1ce005f3976acce4a7c97a0a5",
+  "zipSha256": "236a70cccccffb4f37c471eec560fd3b240f3fd207d1474a07b3e52fb502784b",
+  "matchesNativeUpdaterInstalledTarget": true,
+  "installationSource": "same application ZIP used by private native updater",
+  "checks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "<app>"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "<app>"
+      ],
+      "exitCode": 0,
+      "output": "Processing: <app>\nThe validate action worked!"
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "<app>"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ],
+  "acceptanceStateAtInstallation": {
+    "guiAcceptance": "not-tested",
+    "userAcceptance": "not-performed"
+  },
+  "limitations": [
+    "Local Gatekeeper assessments are disabled; local spctl exit 0 does not demonstrate enabled-Gatekeeper acceptance.",
+    "This candidate predates the typed completion guard fix and is not the final acceptance candidate."
+  ]
+}

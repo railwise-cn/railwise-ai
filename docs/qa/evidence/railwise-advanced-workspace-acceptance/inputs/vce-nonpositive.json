@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "model": "fixed-linear-independent-disjoint-variance-groups",
+  "unit": "mm",
+  "parameterIds": [
+    "x0"
+  ],
+  "groups": [
+    {
+      "id": "g0",
+      "initialVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    },
+    {
+      "id": "g1",
+      "initialVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    }
+  ],
+  "observations": [
+    {
+      "id": "o0",
+      "value": 1.6,
+      "coefficients": [
+        1
+      ],
+      "groupId": "g0",
+      "relativeVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    },
+    {
+      "id": "o1",
+      "value": 0.9,
+      "coefficients": [
+        1
+      ],
+      "groupId": "g0",
+      "relativeVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    },
+    {
+      "id": "o2",
+      "value": -0.9,
+      "coefficients": [
+        1
+      ],
+      "groupId": "g1",
+      "relativeVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    },
+    {
+      "id": "o3",
+      "value": 3.6,
+      "coefficients": [
+        1
+      ],
+      "groupId": "g1",
+      "relativeVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    }
+  ],
+  "maxIterations": 100,
+  "relativeTolerance": 1e-10
+}

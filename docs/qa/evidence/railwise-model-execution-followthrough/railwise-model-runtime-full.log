@@ -1,0 +1,36 @@
+
+> kun@0.4.2 test
+> vitest run --maxWorkers=4
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ❯ tests/model-provider-routing.test.ts (6 tests | 1 failed) 1600ms
+     × rejects invalid private startup configuration without echoing credentials and strips request endpoints 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/model-provider-routing.test.ts > configured provider identity over real HTTP > rejects invalid private startup configuration without echoing credentials and strips request endpoints
+AssertionError: expected { Object (prompt, providerId, ...) } to deeply equal { prompt: '2+3', providerId: 'a' }
+
+- Expected
++ Received
+
+  {
++   "attachmentIds": [],
+    "prompt": "2+3",
+    "providerId": "a",
++   "workspaceReferences": [],
+  }
+
+ ❯ tests/model-provider-routing.test.ts:76:167
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 180 passed | 2 skipped (183)
+      Tests  1 failed | 2794 passed | 22 skipped (2817)
+   Start at  14:20:27
+   Duration  29.20s (transform 4.95s, setup 0ms, import 24.77s, tests 76.70s, environment 10ms)
+

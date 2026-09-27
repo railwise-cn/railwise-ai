@@ -1,0 +1,19 @@
+{
+  "reviewedCheckout": "/private/tmp/railwise-statistical-family",
+  "files": {
+    "kun/src/contracts/survey-reference-datum.ts": "bf1cc1bd8f106cac5a597af7cc8bf42ca404a0578f326ceb102c6eb7ccdd02d5",
+    "kun/src/engineering/survey-reference-datum.ts": "f1a97a2c5b9e96db0206fee9ea979cb38ec89818dc06545a6946533ad3e2d1e4",
+    "kun/src/engineering/survey-reference-datum.test.ts": "2e2916d44610c29bf9f454f45174a37de9d21bcfd462d370552e8219b76edf48",
+    "kun/dist/contracts/survey-reference-datum.js": "791746ed90b72ab5cf9a9dccaee14d44216a0c8fe6d413d202fde05fa106b170",
+    "kun/dist/engineering/survey-reference-datum.js": "e52d2c458b368455d563fa2ac3841179647ff3e885417fb6bd222658771d3e64"
+  },
+  "evidence": {
+    "replay.sh": "84c25293cb96c4a4bb1d8680a6a300ed82ef0a59fbe65af5cb1ea4bd2fa70268",
+    "probe.mjs": "582b83d8e9e02a3e731efdb5c3802423fe1bbe6fef9339f07701e4d454167357",
+    "audit.py": "2ea996ef49d6ea4951defeffb0bcca63cd86d764744ee2a8a9b1c01aa5bb0cf6",
+    "boundaries.py": "050f4f0334371940f4d79d2aecb7230b8d3eee30ff5794e062bb2bb6aa03f7c5",
+    "boundary-probe.mjs": "9721b53e37d2d19589e3dc1e6a3dc330c3045780cc6b42d429770a73d990624c",
+    "oracle.py": "905e0172805ad80095daef74ae5db6a419f07aded3abffe5536a00abd782b9f5",
+    "REVIEW.md": "224095cecd68781e059fbb34e5f5bbd9d50053574f206f4872d0335d5f576b7e"
+  }
+}

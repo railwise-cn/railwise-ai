@@ -1,0 +1,164 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate a3072e25ebc3.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-a3072e2/Applications/RAILWISE%20AI%20Candidate%20a3072e25ebc3.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container Code / Survey
+							8 按钮 Code
+							9 按钮 Survey
+						10 切换 Description: Focus mode, Value: off
+						11 container Workspace tools
+							12 按钮 Write
+							13 按钮 Plugins
+							14 按钮 Scheduled tasks
+							15 按钮 Flow
+							16 按钮 Design
+						17 按钮 New Survey project
+					18 container
+						19 text Survey projects 1
+						20 按钮 New Survey project
+						21 切换按钮 Description: Refresh Survey projects, Value: 0
+						22 按钮 Survey AI desk Goals, plans, evidence, delivery
+							23 文本 Survey AI desk
+							24 文本 Goals, plans, evidence, delivery
+						25 按钮 合成抽样验收 · 1001 单位 Control network · m · 9/20
+							26 文本 合成抽样验收 · 1001 单位
+							27 文本 Control network
+							28 文本  ·
+							29 文本 m
+							30 文本  ·
+							31 文本 9/20
+						32 text Survey AI sessions 1
+						33 按钮 Survey AI · 新建内业任务 合成抽样验收 · 1001 单位 · 0 messages
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成抽样验收 · 1001 单位
+							36 文本  ·
+							37 文本 0
+							38 文本 messages
+						39 文本 Survey jobs, datasets, runs, and deliverables stay separate from Code and Design sessions.
+					40 container
+						41 切换按钮 Connect phone, Value: 0
+						42 按钮 Settings
+					43 container
+						44 按钮 Collapse sidebar
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text Engineering Survey Processing Current Survey job
+						48 弹出式按钮 Current Survey job, Value: 合成抽样验收 · 1001 单位
+							49 (selected) 合成抽样验收 · 1001 单位
+						50 文本 Work view
+						51 弹出式按钮 Work view, Value: Deliverables and review
+							52 (selected) Deliverables and review
+						53 按钮 New Survey project
+					54 container
+						55 text Task 合成抽样验收 · 1001 单位 Stage Deliverables and review Source / format —  ·  — Disposition Not started Datum 合成局部高程基准，仅用于软件验收  ·  Unconfirmed Points — Stations — Observations — Closure — Precision — Deliverable — Network — Review —
+					56 container Survey AI session
+						57 container
+							58 标题 Survey AI session, Value: 2
+								59 文本 Survey AI session
+							60 文本 合成抽样验收 · 1001 单位
+							61 按钮 Data assets
+							62 按钮 Survey adjustment
+							63 按钮 Refresh context
+						64 标题 Survey AI, Value: 2
+							65 文本 Survey AI
+						66 container
+							67 文本输入区 (settable) Ask the agent…
+							68 按钮 More actions
+							69 弹出式按钮 Model and reasoning settings
+							70 按钮 (disabled) Send
+					71 container
+						72 container Work view
+							73 按钮 Delivery overview
+							74 按钮 Deliverables
+							75 按钮 Review and archive
+							76 按钮 Skills and standards
+						77 标题 Review-pending deliverables, Value: 2
+							78 文本 Review-pending deliverables
+						79 文本 After the basic quality gates pass, create an immutable review-pending list. Review, approval, and signing are not implemented, so the system never creates an approved delivery.
+						80 按钮 (disabled) Generate review list
+						81 container
+							82 开合三角标记 Unit product populations and first-round sampling
+								83 文本 Unit product populations and first-round sampling
+							84 container Unit product populations and first-round sampling
+								85 标题 Unit product populations and first-round sampling, Value: 4
+									86 文本 Unit product populations and first-round sampling
+								87 文本 Local population freezing, first-round selection and replay checks do not establish quality approval or standards conformity. Population completeness is caller-declared, without an external witness; creating new populations can still be used to select favorable samples.
+								88 文本 Sample material collection, quality scoring, stage completion, signatures and export are not implemented here. Selected unit products still require their complete and supplementary materials.
+								89 文本 Project project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5 · Revision 3
+								90 文本 Define this population explicitly; observations, survey points and output files are never inferred as unit products. IDs must be unique, with no blank lines or surrounding whitespace. At most 10,000 units; UTF-8 byte limits are validated, and oversized input is rejected without truncation.
+								91 container
+									92 文本 Product type
+									93 文本栏 (settable) Product type
+								94 container
+									95 文本 Unit product type
+									96 文本栏 (settable) Unit product type
+								97 container
+									98 文本 Unit product definition statement
+									99 文本输入区 (settable) Unit product definition statement
+								100 文本 The definition statement is retained as actual UTF-8 bytes. It is local declaration evidence, without proof of unit boundaries or population completeness, and is not an external witness.
+								101 container
+									102 文本 Ordered unit product IDs (one per line)
+									103 文本输入区 (settable) Ordered unit product IDs (one per line)
+								104 container
+									105 复选框 (disabled) I have checked the unit definition and ordered population and confirm freezing this declaration., Value: 0
+									106 文本 I have checked the unit definition and ordered population and confirm freezing this declaration.
+								107 按钮 (disabled) Freeze unit product population
+								108 按钮 Read population history
+								109 按钮 Read sampling history
+								110 标题 First-round selection record, Value: 5
+									111 文本 First-round selection record
+								112 container
+									113 text sampling_run_b939759f-2391-435e-99f9-06483104bdd0  ·  2026-09-19T22:03:53.835Z
+								114 container
+									115 text Process inspection  ·  Census  ·  1001 unit products selected
+								116 文本 sampling_population_e8bdc521-c709-4ea2-a690-b77b0055155c
+								117 文本 Random source: not applicable; census consumes no random draws.
+								118 container Batches and selection counts
+									119 标题 Batches and selection counts, Value: 6
+										120 文本 Batches and selection counts
+									121 内容列表
+										122 container
+											123 text Batch 1: 501 units, 501 selected Census mode: all units in this batch are included.
+										124 container
+											125 text Batch 2: 500 units, 500 selected Census mode: all units in this batch are included.
+								126 文本 Basis: GB/T 24356–2023 Table 1. Source transcription was checked by an agent, without professional sign-off. Software uses the minimum batch count, balanced contiguous input order and extra units assigned to earlier batches.
+								127 文本 Frozen local evidence and algorithm replay were checked. Population completeness, external witnessing, spatial uniformity, standards conformity and human signatures remain unverified.
+								128 按钮 Read selected samples
+								129 按钮 Reverify local sampling record
+						130 文本 Review checklist
+						131 container
+							132 text Source inputs selected and saved ·  Condition not met
+						133 文本 Import a dataset or complete an eligible survey adjustment.
+						134 container
+							135 text Blocking items cleared ·  Condition not met
+						136 文本 No pending blocking items in the current dataset.
+						137 container
+							138 text Warnings confirmed ·  Condition not met
+						139 文本 No warnings require acceptance.
+						140 container
+							141 text Deterministic analysis completed ·  Condition not met
+						142 文本 Run deterministic analysis or an eligible survey adjustment first.
+						143 container
+							144 text Reviewable deliverables generated ·  Condition not met
+						145 文本 Generate DOCX, PDF, and XLSX previews first.
+						146 文本 Review-pending list
+						147 文本 Each list is an independent manifest; historical versions remain read-only. This record is not approval.
+						148 文本 No review-pending list yet.
+						149 container
+							150 text Review status Current project revision 3 Review-list generation conditions are not met The list records output hashes, analysis input hashes, citations, and human disposition. Do not describe it as approved delivery before review, approval, and signing are complete.
+	151 关闭按钮
+	152 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	153 最小化按钮
+154 menu bar
+	155 RAILWISE AI Candidate a3072e25ebc3
+	156 File
+	157 Edit
+	158 View
+	159 Window
+	160 Help
+
+The focused UI element is 85 标题 Unit product populations and first-round sampling, Value: 4

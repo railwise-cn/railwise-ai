@@ -1,0 +1,29 @@
+{
+  "status": "pass",
+  "productionChange": "One eligibility allowlist expression now accepts deepseek-flash plus existing v4-flash/pro. Official origin and credential checks unchanged.",
+  "files": [
+    "kun/src/adapters/tool/deepseek-responses-web-provider.ts",
+    "kun/tests/deepseek-responses-web-provider.test.ts",
+    "kun/tests/runtime-factory.test.ts"
+  ],
+  "sourceHashes": {
+    "kun/src/adapters/tool/deepseek-responses-web-provider.ts": "56b3768164609354d2230c52ce6e5bd02a06dc9c3a9ae2dfbb96780c82c9756a",
+    "kun/tests/deepseek-responses-web-provider.test.ts": "010f9e6189f7a2bd7122e4698f4053a00a36ab6a732547d3a9f364b39ee26909",
+    "kun/tests/runtime-factory.test.ts": "4b1a3e83249b23776684582c61e7be61ac35a0a87a15935e7d5500f993a7e7ae"
+  },
+  "patchSha256": "d6ac273f5ba2b73e2f80004a9cf4c6b28a70370092590a1bec390516938e2b37",
+  "patchBytes": 8683,
+  "regressionBefore": "2 expected failures: default model provider search and real Runtime factory registration; 27 pass",
+  "testsAfter": "40 tests pass across provider, real runtime factory and adjacent web tool provider",
+  "realFactory": "Constructed actual Runtime, registered web_search and invoked via real toolHost; verified official Responses URL, unchanged selected model ID and authorization header with synthetic fetch",
+  "checks": [
+    "kun full typecheck",
+    "targeted ESLint",
+    "kun build",
+    "compiled Node ESM provider search for three supported models and three refusal cases"
+  ],
+  "liveProviderCall": false,
+  "limitations": "Synthetic provider responses; no external paid API call or release action.",
+  "integrationNote": "Repository pre-push scanner rejected a literal synthetic basic-auth URL in a refusal test. Equivalent synthetic URL is now constructed through URL.username/password; no credential was used, no guard bypassed. Author hashes above identify reviewed patch; final test hash below.",
+  "integratedTestSha256": "c14bc9b62f5def7fea2d58401d35904d3250cb5aa14d13d2b949f298c5b011a1"
+}

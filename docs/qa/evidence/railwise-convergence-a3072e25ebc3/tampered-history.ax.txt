@@ -1,0 +1,14 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~								161 container Read sampling history
++									162 container
++										163 文本 These history entries are stale or damaged and cannot be restored.
++										164 内容列表
++											165 container
++												166 text sampling_run_5feb6b65-2b31-4dd6-a63a-746658aa92ae  ·  Local evidence or sampling record verification failed; the record cannot be used.
++									167 按钮 Verify and restore sampling run · sampling_run_b939759f-2391-435e-99f9-06483104bdd0 · 2026-09-19T22:03:53.835Z
++										168 文本 Verify and restore sampling run
++										169 文本  ·
++										170 文本 sampling_run_b939759f-2391-435e-99f9-06483104bdd0
++										171 文本  ·
++										172 文本 2026-09-19T22:03:53.835Z
+The focused UI element is 85 标题 Unit product populations and first-round sampling, Value: 4

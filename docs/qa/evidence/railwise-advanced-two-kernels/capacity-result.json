@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "node": "v26.8.2",
+    "v8": "14.6.202.34-node.28",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "meaning": "Synthetic single-machine capacity replay; timings are not production SLOs or SLA evidence.",
+  "results": [
+    {
+      "kind": "huber",
+      "declaredObservations": 128,
+      "declaredParameters": 16,
+      "outcome": "iteration-limit",
+      "states": 201,
+      "requestBytes": 54825,
+      "recordBytes": 2924991,
+      "createAndInitialReplayMs": 383.530042,
+      "restoreAndReplayMs": 159.26666699999998,
+      "perModelWorkUnits": 20,
+      "maximumTenRecordPageUnits": 231,
+      "workUnitsPerMinute": 240,
+      "recordByteCap": 4194304,
+      "storageByteCap": 67108864
+    },
+    {
+      "kind": "statistical-family",
+      "declaredObservations": 0,
+      "declaredParameters": 0,
+      "declaredFamilyMembers": 256,
+      "outcome": "evaluated",
+      "states": null,
+      "requestBytes": 100662,
+      "recordBytes": 482097,
+      "createAndInitialReplayMs": 48.19550000000004,
+      "restoreAndReplayMs": 25.206916999999976,
+      "perModelWorkUnits": 16,
+      "maximumTenRecordPageUnits": 191,
+      "workUnitsPerMinute": 240,
+      "recordByteCap": 4194304,
+      "storageByteCap": 67108864
+    }
+  ]
+}

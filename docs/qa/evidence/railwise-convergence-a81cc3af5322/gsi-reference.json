@@ -1,0 +1,30 @@
+{
+  "scope": "independent-numerical-comparison-not-packaged-gui-acceptance",
+  "method": "numpy.linalg.lstsq; inverse-route-length weights; residual-scaled covariance",
+  "numpyVersion": "2.4.6",
+  "checkerSha256": "1728c87266881ff04ca97c3582b23451a7311578bc098847def399d705b371c0",
+  "sourceSha256": "05b5ecc571cb85152a4e36c4c362118b3c71e582e05cf68b5cf8feac877fdf40",
+  "referenceIn1Sha256": "f84252fc2990157ae7c1b01bfcce09035addaeac9ad24e56459c51017ad6b21b",
+  "knownPointsSha256": "dfef93712de67cef4bf48016c337d12169eb430ba9a2e8e8e1fe550479cc6750",
+  "packageAsarSha256": "c1678cea4c1600e076a2274cc3eb546333190cbe36926c3537da37c749ee019d",
+  "referenceObservations": 14,
+  "comparedUnknownPoints": 7,
+  "comparedFixedPoints": 6,
+  "degreesOfFreedom": 7,
+  "numericalComparison": {
+    "maximumHeightDifferenceMm": 0.02031550931747006,
+    "maximumReferenceStandardErrorMm": 0.26658109269216607,
+    "rule": "each unknown within one reference standard error; fixed heights within 1e-9 m",
+    "mismatches": 0,
+    "passed": true
+  },
+  "sourceConversionComparison": {
+    "routesWithMatchingEndpoints": 14,
+    "maximumHeightDifferenceMm": 0.020000000000020002,
+    "strictHalfPrintedUnitMismatches": 7,
+    "maximumDistanceDifferenceMetres": 0.4862899999999968,
+    "maximumClosureDifferenceMm": 0.010000000000065512,
+    "sourceDifferencesRequireReview": true
+  },
+  "selfCheck": "closed-form two-route solution and datum-free rejection passed"
+}

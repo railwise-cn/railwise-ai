@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "7d4f454feecb09028007ae9b436a318db6856201",
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 5013,
+      "sha256": "c1037522a00fb056423e3be9768d97fc954bcbdbc640268b7692251a9b265018"
+    },
+    {
+      "file": "gui/01-restored-completed-zh-light.ax.txt",
+      "bytes": 32894,
+      "sha256": "4a051d2aafccc347087b85e9c71830d254fa8457461e6745d94225e0d41f0667"
+    },
+    {
+      "file": "gui/01-restored-completed-zh-light.png",
+      "bytes": 157441,
+      "sha256": "a693e2991b2053b36e21dc785a66bef6efcc9421aa874ee7e5f14e57d87befcb"
+    },
+    {
+      "file": "gui/02-wide-synthetic-results.png",
+      "bytes": 176429,
+      "sha256": "2c253b5ba98b32a6daeba21b8548d6e8461ecd5d895ef892fa1e4e7fab8a3d7f"
+    },
+    {
+      "file": "gui/03-completed-card-bottom.ax.txt",
+      "bytes": 32884,
+      "sha256": "44f191640e86a40657ba71b48afbb392eb77078711f25e96c04bc95d15be863c"
+    },
+    {
+      "file": "gui/03-completed-card-bottom.png",
+      "bytes": 176758,
+      "sha256": "978d12725f48a9442dc40f2f299fbb5215d573d81b25550913675792e6bc0087"
+    },
+    {
+      "file": "gui/04-legacy-zero-receipts.ax.txt",
+      "bytes": 17432,
+      "sha256": "849d37b9ea90ada8b5cd7c781769b414f3c94174d03931bfccd49e8247f478f4"
+    },
+    {
+      "file": "gui/04-legacy-zero-receipts.png",
+      "bytes": 180675,
+      "sha256": "af51ef3255b57bf6218096bb06f0baaea3f64c106d038a09f1b6811bc4795518"
+    },
+    {
+      "file": "gui/05-csv-analysis.ax.txt",
+      "bytes": 5467,
+      "sha256": "70d00f75762bf2e31bf55f67622ad819292d1d3b179dcc369fc85f92f9412c5b"
+    },
+    {
+      "file": "gui/05-csv-analysis.png",
+      "bytes": 99329,
+      "sha256": "5f6e6a7b0861f7741a56310bb2d40e94f3d4c9003aa5f12f9e26110846abcb99"
+    },
+    {
+      "file": "gui/06-csv-manifest.ax.txt",
+      "bytes": 9704,
+      "sha256": "25eaa37feee44c82ec7933d2984d3737b10a010659b1645dfc5eaba9018f36d4"
+    },
+    {
+      "file": "gui/06-csv-manifest.png",
+      "bytes": 132111,
+      "sha256": "3c1227536613e0445b44ac3c053be1699029f15ebafc20bd3e0696b6318d0fe5"
+    },
+    {
+      "file": "gui/07-xlsx-analysis-difference.ax.txt",
+      "bytes": 5800,
+      "sha256": "af2a583844e36681e054a9c69be088c339de7c49d93ff69331b73d50c0a3bcc1"
+    },
+    {
+      "file": "gui/07-xlsx-analysis-difference.png",
+      "bytes": 94160,
+      "sha256": "810969c389671011eae7347a31b3aa926d6ad83a5f78c260762bb6dcd6b406ec"
+    },
+    {
+      "file": "history-preservation.json",
+      "bytes": 1014,
+      "sha256": "2d7c5ee64871d29cfc20851976758d425d82a397d97d53c90eb959b2975eb2f4"
+    },
+    {
+      "file": "installation-context.json",
+      "bytes": 3595,
+      "sha256": "946eabbdebab50c1bb12ee282bc1e112d2957df607b29d853e476b61e94edb4d"
+    },
+    {
+      "file": "monitoring-independent-audit.json",
+      "bytes": 3089,
+      "sha256": "e9b6130516c3368d277499ff91ffed2c2006f106cdc84af20e6c21d322b79980"
+    },
+    {
+      "file": "package.json",
+      "bytes": 1656,
+      "sha256": "626f261b20fb86b3439d2bfb3475f0477698ab58c8d9c38aa9ff3b990fac3241"
+    },
+    {
+      "file": "private-updater.json",
+      "bytes": 6772,
+      "sha256": "c39f4a13d71dfa5592d97e773513741e523ffa10936ef3b27f1a9b03acd2aa1d"
+    },
+    {
+      "file": "verify-archive.mjs",
+      "bytes": 2182,
+      "sha256": "251da841b7e23916eebdc344d5664fdaccdcfe3f736363bcc7930aa69d08dfbe"
+    }
+  ],
+  "fileCount": 20,
+  "excludedSelf": "archive-manifest.json",
+  "acceptance": "partial; XLSX blank numeric cell failure preserved; final package acceptance not passed"
+}

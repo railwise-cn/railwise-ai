@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import JSZip from 'jszip'
 import type { SurveyConverterManifestV1 } from '../contracts/survey.js'
 import { MacOsSandboxedSurveyConverterExecutor, SurveyConverterRegistry, type SandboxedSurveyConverterExecutor } from './survey-converter.js'
@@ -223,7 +223,58 @@ describe('SurveyConverterRegistry', () => {
     }))
   })
 
-  it.skipIf(process.platform !== 'darwin' || process.env.WORKWISE_TEST_MACOS_SURVEY_SANDBOX !== '1')('executes an audited local adapter inside the macOS no-network sandbox', async () => {
+  it('rejects oversized and symbolic outputs even from an executor that reports success', async () => {
+    const { manifest } = await fixtureManifest()
+    for (const output of ['oversized', 'symlink'] as const) {
+      const converter = new SurveyConverterRegistry([{ ...manifest, maxOutputBytes: 4 }], {
+        networkIsolation: 'verified-none',
+        async execute(request) {
+          if (output === 'oversized') await writeFile(request.outputPath, Buffer.alloc(5))
+          else await symlink(request.arguments[1]!, request.outputPath)
+          return { exitCode: 0, stdout: '', stderr: '' }
+        }
+      })
+      expect(await converter.convert('trimble-t02', 'receiver.t02', Buffer.from('input'))).toMatchObject({ ok: false, provenance: { status: 'blocked' } })
+    }
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin' || process.env.WORKWISE_TEST_MACOS_SURVEY_SANDBOX !== '1')('real macOS converter process boundaries', () => {
+  async function executableFixture(body: string): Promise<{ manifest: SurveyConverterManifestV1; marker: string }> {
+    const { manifest } = await fixtureManifest()
+    const executable = Buffer.from(`#!${process.execPath}\n${body}\n`)
+    await writeFile(manifest.executablePath, executable)
+    const marker = join(manifest.executablePath, '..', 'process.json')
+    return {
+      manifest: { ...manifest, executableHash: createHash('sha256').update(executable).digest('hex'), arguments: ['{input}', '{output}', marker], maxOutputBytes: 4096, timeoutMs: 1000 },
+      marker
+    }
+  }
+
+  async function waitForProcesses(marker: string): Promise<{ parent: number; child: number; workspace: string }> {
+    let info: { parent: number; child: number; workspace: string } | undefined
+    await vi.waitFor(async () => { info = JSON.parse(await readFile(marker, 'utf8')) }, { timeout: 3000, interval: 20 })
+    return info!
+  }
+
+  async function expectReaped(info: { parent: number; child: number; workspace: string }): Promise<void> {
+    await vi.waitFor(() => {
+      for (const pid of [info.parent, info.child]) {
+        expect(() => process.kill(pid, 0)).toThrow(/ESRCH/)
+      }
+    }, { timeout: 3000, interval: 20 })
+    await expect(stat(info.workspace)).rejects.toMatchObject({ code: 'ENOENT' })
+  }
+
+  const processTree = `
+const fs = require('node:fs');
+const { spawn } = require('node:child_process');
+const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'inherit' });
+fs.writeFileSync(process.argv[4], JSON.stringify({ parent: process.pid, child: descendant.pid, workspace: process.cwd() }));
+setInterval(() => {}, 1000);
+`
+
+  it.each(['trimble-t00', 'trimble-t01', 'trimble-t02', 'trimble-t04', 'trimble-job', 'leica-dbx', 'leica-mdb', 'spectra-survey-pro', 'hatanaka-rinex'] as const)('executes a hash-pinned synthetic adapter for %s without changing the format allowlist', async (format) => {
     const executablePath = '/bin/cp'
     const executableHash = createHash('sha256').update(await readFile(executablePath)).digest('hex')
     const manifest: SurveyConverterManifestV1 = {
@@ -236,7 +287,7 @@ describe('SurveyConverterRegistry', () => {
       auditReference: 'synthetic:test-only',
       executablePath,
       executableHash,
-      inputFormats: ['trimble-t02'],
+      inputFormats: [format],
       outputFormat: 'unknown',
       outputExtension: '.bin',
       arguments: ['{input}', '{output}'],
@@ -245,8 +296,85 @@ describe('SurveyConverterRegistry', () => {
       networkAccess: 'none'
     }
     const source = Buffer.from('sandboxed converter integration')
-    const result = await new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert('trimble-t02', 'receiver.t02', source)
+    const result = await new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert(format, 'receiver.bin', source)
     expect(result, result?.diagnostic.message).toMatchObject({ ok: true, provenance: { executableHash, networkAccess: 'none', status: 'passed' } })
     expect(result?.outputBytes).toEqual(source)
+  })
+
+  it.each(['timeout', 'cancel'] as const)('terminates the real parent and child and removes the workspace after %s', async (mode) => {
+    const { manifest, marker } = await executableFixture(processTree)
+    manifest.timeoutMs = 3000
+    const controller = new AbortController()
+    const registry = new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor())
+    const conversion = registry.convert('trimble-t02', 'receiver.t02', Buffer.from('source'), controller.signal)
+    const info = await waitForProcesses(marker)
+    if (mode === 'cancel') controller.abort()
+    const result = await conversion
+    expect(result).toMatchObject({ ok: false, provenance: { status: 'blocked', executableHash: manifest.executableHash, inputHash: createHash('sha256').update('source').digest('hex') } })
+    expect(result?.diagnostic.message).toMatch(mode === 'timeout' ? /timed out/ : /cancelled/)
+    await expectReaped(info)
+  }, 10_000)
+
+  it('cleans up a background descendant even when the converter parent exits successfully', async () => {
+    const { manifest, marker } = await executableFixture(processTree.replace('setInterval(() => {}, 1000);\n', "fs.writeFileSync(process.argv[3], 'output'); process.exit(0);\n"))
+    const conversion = new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert('trimble-t02', 'receiver.t02', Buffer.from('source'))
+    const info = await waitForProcesses(marker)
+    expect(await conversion).toMatchObject({ ok: true, outputBytes: Buffer.from('output') })
+    await expectReaped(info)
+  })
+
+  it.each(['stdout', 'stderr'] as const)('fails on oversized UTF-8 %s bytes instead of silently truncating characters', async (stream) => {
+    const { manifest } = await executableFixture(`process.${stream}.write('测'.repeat(400000), () => require('node:fs').writeFileSync(process.argv[3], 'output'));`)
+    const result = await new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert('trimble-t02', 'receiver.t02', Buffer.from('source'))
+    expect(result).toMatchObject({ ok: false, provenance: { status: 'blocked' } })
+    expect(result?.diagnostic.message).toContain(`${stream} exceeds 1048576 bytes`)
+  })
+
+  it('accepts exactly the stdout and output-file byte limits', async () => {
+    const { manifest } = await executableFixture("process.stdout.write(Buffer.alloc(1048576, 'a'), () => require('node:fs').writeFileSync(process.argv[3], Buffer.alloc(4096, 'b')));")
+    const result = await new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert('trimble-t02', 'receiver.t02', Buffer.from('source'))
+    expect(result).toMatchObject({ ok: true, outputBytes: Buffer.alloc(4096, 'b'), provenance: { status: 'passed' } })
+  })
+
+  it.each(['exit', 'keep-running'] as const)('rejects a real oversized output on %s without accepting a prefix', async (mode) => {
+    const { manifest } = await executableFixture(`require('node:fs').writeFileSync(process.argv[3], Buffer.alloc(4097)); ${mode === 'keep-running' ? 'setInterval(() => {}, 1000);' : ''}`)
+    const result = await new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert('trimble-t02', 'receiver.t02', Buffer.from('source'))
+    expect(result).toMatchObject({ ok: false, provenance: { status: 'blocked' } })
+    expect(result?.diagnostic.message).toContain('output exceeds 4096 bytes')
+    expect(result?.outputBytes).toBeUndefined()
+  })
+
+  it('rejects a real symlink output and a pre-cancelled invocation without starting the script', async () => {
+    const { manifest, marker } = await executableFixture("const fs = require('node:fs'); fs.writeFileSync(process.argv[4], 'started'); fs.symlinkSync(process.argv[2], process.argv[3]);")
+    const registry = new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor())
+    const controller = new AbortController()
+    controller.abort()
+    expect(await registry.convert('trimble-t02', 'receiver.t02', Buffer.from('source'), controller.signal)).toMatchObject({ ok: false, provenance: { status: 'blocked' } })
+    await expect(stat(marker)).rejects.toMatchObject({ code: 'ENOENT' })
+    const result = await registry.convert('trimble-t02', 'receiver.t02', Buffer.from('source'))
+    expect(result).toMatchObject({ ok: false, provenance: { status: 'blocked' } })
+    expect(result?.diagnostic.message).toContain('regular file')
+  })
+
+  it('propagates cancellation through format ingestion while retaining the opaque source', async () => {
+    const { manifest, marker } = await executableFixture(processTree)
+    manifest.timeoutMs = 3000
+    const controller = new AbortController()
+    const source = Buffer.from([0, 1, 2, 3])
+    const registry = new SurveyFormatRegistry(new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()))
+    const ingestion = registry.ingest({ name: 'receiver.t02', bytes: source, signal: controller.signal })
+    const info = await waitForProcesses(marker)
+    controller.abort()
+    const result = await ingestion
+    expect(result.sourceFile).toMatchObject({ formatId: 'trimble-t02', originalPreserved: true, disposition: 'converter-required', converter: { status: 'blocked', inputHash: createHash('sha256').update(source).digest('hex') } })
+    expect(result.effectiveBytes).toEqual(source)
+    expect(result.observations).toEqual([])
+    await expectReaped(info)
+  })
+
+  it('still denies network access for the real hash-pinned process', async () => {
+    const { manifest } = await executableFixture("const socket = require('node:net').connect(9, '127.0.0.1'); socket.on('error', error => require('node:fs').writeFileSync(process.argv[3], error.code));")
+    const result = await new SurveyConverterRegistry([manifest], new MacOsSandboxedSurveyConverterExecutor()).convert('trimble-t02', 'receiver.t02', Buffer.from('source'))
+    expect(result).toMatchObject({ ok: true, outputBytes: Buffer.from('EPERM'), provenance: { networkAccess: 'none', status: 'passed' } })
   })
 })

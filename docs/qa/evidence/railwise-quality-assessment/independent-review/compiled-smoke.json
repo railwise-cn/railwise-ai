@@ -1,0 +1,185 @@
+{
+  "scope": "synthetic-cross-service-compiled-not-packaged-acceptance",
+  "node": "26.8.2",
+  "units": 3,
+  "tests": [
+    "exact full sample linked",
+    "restart identical",
+    "new head invalidates historical current verification",
+    "same plan permits new assessment",
+    "draft/output/audit unchanged"
+  ],
+  "result": {
+    "bindingIntegrity": "verified-current-local-records",
+    "retentionCoverage": "complete-declared-requirements",
+    "scoreCoverage": "complete-full-profile-unit-results",
+    "declaredResultSummary": "all-declared-unit-results-calculated",
+    "overallLinkage": "complete-declared-linkage",
+    "originalRetentionChecks": [
+      {
+        "checkId": "artifact-bytes",
+        "status": "passed",
+        "eventId": "quality_event_7be54ebe-44be-4344-a489-d7c87edb20a3"
+      },
+      {
+        "checkId": "evidence:support",
+        "status": "passed",
+        "eventId": "quality_event_8ca4550a-3698-464a-9364-67ef63200698"
+      },
+      {
+        "checkId": "evidence:other",
+        "status": "passed",
+        "eventId": "quality_event_ffa73790-fc9a-4679-a291-ac2273a6ad22"
+      }
+    ],
+    "unitRows": [
+      {
+        "unitId": "unit-1",
+        "materials": [
+          {
+            "reference": "synthetic",
+            "retentionCheckId": "evidence:support",
+            "memberId": "output-1",
+            "locatorStatement": " Explicit synthetic row; shared file. ",
+            "status": "retained-bytes-linked",
+            "eventId": "quality_event_8ca4550a-3698-464a-9364-67ef63200698"
+          }
+        ],
+        "score": {
+          "recordId": "quality_scoring_cb164e3e-5b2f-49dc-93a3-08bb035840c6",
+          "associationTiming": "existing-record-linked-after-calculation",
+          "declaredTargetAssociation": "caller-declared-not-authenticated",
+          "scopeAssessment": "complete-declared-product-profile",
+          "result": {
+            "state": "calculated",
+            "reason": "calculated",
+            "score": {
+              "numerator": "100",
+              "denominator": "1"
+            },
+            "rawScore": null,
+            "fixedADeduction": null,
+            "diagnosticScoreUpperBound": null,
+            "grade": "excellent",
+            "qualified": true,
+            "count": null,
+            "excellentRate": null,
+            "excellentGoodRate": null
+          }
+        },
+        "references": [
+          {
+            "reference": "synthetic",
+            "resolved": true
+          }
+        ],
+        "fullProfileResult": true
+      },
+      {
+        "unitId": "unit-2",
+        "materials": [
+          {
+            "reference": "synthetic",
+            "retentionCheckId": "evidence:support",
+            "memberId": "output-1",
+            "locatorStatement": " Explicit synthetic row; shared file. ",
+            "status": "retained-bytes-linked",
+            "eventId": "quality_event_8ca4550a-3698-464a-9364-67ef63200698"
+          }
+        ],
+        "score": {
+          "recordId": "quality_scoring_a5ff0abd-c59b-4ce6-8837-610b1c3c1cca",
+          "associationTiming": "existing-record-linked-after-calculation",
+          "declaredTargetAssociation": "caller-declared-not-authenticated",
+          "scopeAssessment": "complete-declared-product-profile",
+          "result": {
+            "state": "calculated",
+            "reason": "calculated",
+            "score": {
+              "numerator": "100",
+              "denominator": "1"
+            },
+            "rawScore": null,
+            "fixedADeduction": null,
+            "diagnosticScoreUpperBound": null,
+            "grade": "excellent",
+            "qualified": true,
+            "count": null,
+            "excellentRate": null,
+            "excellentGoodRate": null
+          }
+        },
+        "references": [
+          {
+            "reference": "synthetic",
+            "resolved": true
+          }
+        ],
+        "fullProfileResult": true
+      },
+      {
+        "unitId": "unit-3",
+        "materials": [
+          {
+            "reference": "synthetic",
+            "retentionCheckId": "evidence:support",
+            "memberId": "output-1",
+            "locatorStatement": " Explicit synthetic row; shared file. ",
+            "status": "retained-bytes-linked",
+            "eventId": "quality_event_8ca4550a-3698-464a-9364-67ef63200698"
+          }
+        ],
+        "score": {
+          "recordId": "quality_scoring_7f671777-fc73-4525-a29f-9c9a2dc0fec7",
+          "associationTiming": "existing-record-linked-after-calculation",
+          "declaredTargetAssociation": "caller-declared-not-authenticated",
+          "scopeAssessment": "complete-declared-product-profile",
+          "result": {
+            "state": "calculated",
+            "reason": "calculated",
+            "score": {
+              "numerator": "100",
+              "denominator": "1"
+            },
+            "rawScore": null,
+            "fixedADeduction": null,
+            "diagnosticScoreUpperBound": null,
+            "grade": "excellent",
+            "qualified": true,
+            "count": null,
+            "excellentRate": null,
+            "excellentGoodRate": null
+          }
+        },
+        "references": [
+          {
+            "reference": "synthetic",
+            "resolved": true
+          }
+        ],
+        "fullProfileResult": true
+      }
+    ],
+    "counts": {
+      "expectedUnits": 3,
+      "linkedScores": 3,
+      "fullProfileUnits": 3,
+      "requiredMaterialMappings": 3,
+      "satisfiedMaterialMappings": 3,
+      "unresolvedReferences": 0
+    }
+  },
+  "hashes": [
+    "4342538a9dc210f2a500592ffb53ed146a54f38a71a9e74e4ce60434714c8634",
+    "4223f78ef6f9ce8da9a7575456f2e81c5991380b9b856d4daa5956c7fb38690d",
+    "013be32d72ff0196e187e919dd9833482b6888d79fc5d384576112e124e0113c",
+    "583e88dc88ef113d3d55ac751b531b7454d116ba519fbb8d6dc01ac5aeb24757",
+    "84ca2a7fa3942eda66bd55bf720105eea2bb06ac20facff90819fe85220f595d"
+  ],
+  "verificationAuditCount": 0,
+  "boundaries": {
+    "approvalCapability": "none",
+    "deliverableVerification": "not-performed-by-assessment"
+  },
+  "passed": true
+}

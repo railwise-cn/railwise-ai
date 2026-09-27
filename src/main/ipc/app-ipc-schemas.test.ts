@@ -27,6 +27,43 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('restricts sampling requests to frozen declarations, stage rules and bounded pages', () => {
+    const base = '/v1/engineering/projects/project_1'
+    const population = { idempotencyKey: 'population-create-1', expectedProjectRevision: 1,
+      productType: 'leveling', unitProductType: 'route', definitionStatement: '每条完整水准路线为一个单位成果', orderedUnitProductIds: ['A', 'B'] }
+    const run = { populationId: 'population_1', idempotencyKey: 'run-create-1', stage: 'acceptance', inspectionMode: 'table-1-simple-random' }
+    const accepted = [
+      { path: `${base}/sampling-populations`, method: 'POST', body: JSON.stringify(population) },
+      { path: `${base}/sampling-populations?limit=100&offset=10000` },
+      { path: `${base}/sampling-populations/population_1` },
+      { path: `${base}/sampling-populations/population_1/units?limit=100&offset=0` },
+      { path: `${base}/sampling-runs`, method: 'POST', body: JSON.stringify(run) },
+      { path: `${base}/sampling-runs`, method: 'POST', body: JSON.stringify({ ...run, stage: 'process', inspectionMode: 'census' }) },
+      { path: `${base}/sampling-runs?limit=1&offset=0` },
+      { path: `${base}/sampling-runs/run_1` },
+      { path: `${base}/sampling-runs/run_1/samples?limit=100` },
+      { path: `${base}/sampling-runs/run_1/verify`, method: 'POST', body: '{}' }
+    ]
+    for (const request of accepted) expect(runtimeRequestPayloadSchema.safeParse(request).success, request.path).toBe(true)
+    const rejected = [
+      ...['seed', 'actor', 'planHash', 'decision'].map(field => ({ path: `${base}/sampling-runs`, method: 'POST', body: JSON.stringify({ ...run, [field]: 'caller-controlled' }) })),
+      ...['process', 'final-office'].map(stage => ({ path: `${base}/sampling-runs`, method: 'POST', body: JSON.stringify({ ...run, stage }) })),
+      { path: `${base}/sampling-runs`, method: 'POST', body: JSON.stringify({ ...run, round: 2 }) },
+      { path: `${base}/sampling-populations`, method: 'POST', body: JSON.stringify({ ...population, orderedUnitProductIds: ['A', 'A'] }) },
+      { path: `${base}/sampling-populations`, method: 'POST', body: JSON.stringify({ ...population, definitionStatement: '\ud800' }) },
+      { path: `${base}/sampling-populations`, method: 'POST', body: ' '.repeat(1024 * 1024) + JSON.stringify(population) },
+      { path: `${base}/sampling-runs/run_1`, body: '{}' },
+      { path: `${base}/sampling-runs/run_1?limit=1` },
+      { path: `${base}/sampling-runs/run_1/verify`, method: 'POST', body: '{"decision":"passed"}' },
+      { path: `${base}/sampling-runs/run_1/verify?offset=0`, method: 'POST', body: '{}' },
+      { path: `${base}/sampling-runs?offset=0`, method: 'POST', body: JSON.stringify(run) },
+      { path: `${base}/sampling-runs`, method: 'DELETE' },
+      { path: `${base}/sampling-runs/run_1/units` },
+      ...['limit=0', 'limit=101', 'limit=01', 'offset=-1', 'offset=10001', 'limit=1&limit=2', 'seed=abc'].map(query => ({ path: `${base}/sampling-runs?${query}` }))
+    ]
+    for (const request of rejected) expect(runtimeRequestPayloadSchema.safeParse(request).success, request.path).toBe(false)
+  })
+
   it('accepts only bounded known PDF retry reasons', () => {
     expect(workspacePreviewPayloadSchema.parse({
       workspaceRoot: '/tmp/workspace',
@@ -208,6 +245,8 @@ describe('app-ipc-schemas', () => {
       { path: '/v1/engineering/charts', method: 'POST' },
       { path: '/v1/engineering/reports/preview', method: 'POST' },
       { path: '/v1/engineering/deliverables/finalize', method: 'POST' },
+      { path: '/v1/engineering/projects/project_1/manifests/manifest_1/verify', method: 'POST' },
+      { path: '/v1/engineering/projects/project_1/manifests/manifest_1/monitoring-replay', method: 'POST' },
       { path: '/v1/engineering/runs/run_1', method: 'GET' },
       { path: '/v1/engineering/runs/run_1/cancel', method: 'POST' },
       { path: '/v1/engineering/runs/run_1/resume', method: 'POST' },
@@ -216,6 +255,8 @@ describe('app-ipc-schemas', () => {
       { path: '/v1/engineering/ai/watch-drafts', method: 'POST' },
       { path: '/v1/engineering/ai/plans', method: 'POST' },
       { path: '/v1/engineering/ai/plans?threadId=thread_1&projectId=project_1', method: 'GET' },
+      { path: '/v1/engineering/ai/project-suggestions?threadId=thread_1&projectId=project_1', method: 'GET' },
+      { path: '/v1/engineering/ai/project-suggestions/suggestion_1/decision', method: 'POST' },
       { path: '/v1/engineering/ai/plans/plan_1', method: 'GET' },
       { path: '/v1/engineering/ai/plans/plan_1/validate', method: 'POST' },
       { path: '/v1/engineering/ai/plans/plan_1/approve', method: 'POST' },
@@ -271,12 +312,87 @@ describe('app-ipc-schemas', () => {
     })).toThrow(/runtime request path is not allowed/)
   })
 
+  it('restricts monitoring replay to the manifest-scoped POST without query overrides', () => {
+    const path = '/v1/engineering/projects/project_1/manifests/manifest_1/monitoring-replay'
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST' }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET' }, { path, method: 'DELETE' },
+      { path: `${path}?algorithmVersion=workwise-engineering-2`, method: 'POST' },
+      { path: `${path}?projectId=other`, method: 'POST' },
+      { path: '/v1/engineering/manifests/manifest_1/monitoring-replay', method: 'POST' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
+  })
+
+  it('allows only project-scoped read-only statistical diagnostics and the explicit download flag', () => {
+    const path = '/v1/engineering/projects/project_1/adjustments/adjustment_1/statistical-diagnostics'
+    expect(runtimeRequestPayloadSchema.parse({ path, method: 'GET' }).path).toBe(path)
+    expect(runtimeRequestPayloadSchema.parse({ path: `${path}?download=1`, method: 'GET' }).path).toBe(`${path}?download=1`)
+    for (const request of [
+      { path, method: 'POST' }, { path, method: 'DELETE' },
+      { path: `${path}?download=2`, method: 'GET' },
+      { path: `${path}?download=1&download=1`, method: 'GET' },
+      { path: `${path}?projectId=other`, method: 'GET' },
+      { path: '/v1/engineering/adjustments/adjustment_1/statistical-diagnostics', method: 'GET' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
+  })
+
+  it('allows only scoped, explicit free leveling trial requests and bounded history reads', () => {
+    const path = '/v1/engineering/projects/project_1/networks/network_1/free-leveling-trials'
+    const body = { expectedRevision: 2, idempotencyKey: 'explicit-trial', constraint: 'sum-height-corrections-zero', acknowledgeDatumRelease: true, weightPolicy: 'source-or-unit-fallback' }
+    for (const request of [
+      { path, method: 'GET' }, { path: `${path}?limit=50&offset=20`, method: 'GET' },
+      { path, method: 'POST', body: JSON.stringify(body) },
+      { path: `${path}/trial_1`, method: 'GET' }, { path: `${path}/trial_1?download=1`, method: 'GET' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(true)
+    for (const request of [
+      { path, method: 'DELETE' }, { path, method: 'POST' },
+      { path, method: 'GET', body: '{}' }, { path: `${path}/trial_1`, method: 'GET', body: '{}' },
+      { path: `${path}/trial_1`, method: 'POST', body: JSON.stringify(body) },
+      { path: `${path}?offset=0`, method: 'POST', body: JSON.stringify(body) },
+      ...['limit=0', 'limit=51', 'limit=1.5', 'offset=-1', 'offset=NaN', 'offset=100001', 'offset=9007199254740992', 'limit=1&limit=2', 'projectId=other', 'download=1'].map(query => ({ path: `${path}?${query}`, method: 'GET' })),
+      { path: `${path}/trial_1?download=2`, method: 'GET' },
+      { path: '/v1/engineering/survey/networks/network_1/free-leveling-trials', method: 'GET' },
+      ...[{ acknowledgeDatumRelease: false }, { constraint: 'fixed' }, { weightPolicy: 'auto' }, { expectedRevision: 0 }, { projectId: 'other' }].map(change => ({ path, method: 'POST', body: JSON.stringify({ ...body, ...change }) }))
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: `${path}?limit=50&offset=100000`, method: 'GET' }).success).toBe(true)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/threads?limit=100&offset=100001', method: 'GET' }).success).toBe(true)
+  })
+
   it('accepts the revision-safe thread Agent selection endpoint', () => {
     expect(runtimeRequestPayloadSchema.parse({
       path: '/v1/threads/thr_1/agent',
       method: 'POST',
       body: '{}'
     }).path).toBe('/v1/threads/thr_1/agent')
+  })
+
+  it('allows scoped quality evidence requests but rejects forged outcomes, mutable plans and unbounded reads', () => {
+    const base = '/v1/engineering/projects/project_1'
+    const plan = { manifestId: 'manifest_1', expectedProjectRevision: 2, idempotencyKey: 'freeze-plan-1', requiredEvidence: [{ id: 'report', title: 'Retain report bytes', memberId: 'output-1' }] }
+    const requests = [
+      { path: `${base}/quality-plans`, method: 'POST', body: JSON.stringify(plan) },
+      { path: `${base}/quality-plans?limit=50&offset=10000`, method: 'GET' },
+      { path: `${base}/quality-plans/plan_1`, method: 'GET' },
+      { path: `${base}/quality-evidence`, method: 'POST', body: JSON.stringify({ artifactId: 'artifact_1', memberId: 'member_1', idempotencyKey: 'retain-evidence-1' }) },
+      { path: `${base}/quality-records`, method: 'POST', body: JSON.stringify({ planId: 'plan_1', idempotencyKey: 'create-record-1' }) },
+      { path: `${base}/quality-records?limit=1&offset=0`, method: 'GET' },
+      { path: `${base}/quality-records/record_1`, method: 'GET' },
+      { path: `${base}/quality-records/record_1/checks`, method: 'POST', body: JSON.stringify({ expectedHeadHash: '0'.repeat(64), idempotencyKey: 'check-record-1', checkId: 'artifact-bytes' }) },
+      { path: `${base}/quality-records/record_1/verify`, method: 'POST', body: '{}' }
+    ]
+    for (const request of requests) expect(runtimeRequestPayloadSchema.safeParse(request).success, request.path).toBe(true)
+    for (const request of [
+      { path: `${base}/quality-plans`, method: 'PATCH', body: JSON.stringify(plan) },
+      { path: `${base}/quality-plans`, method: 'POST', body: JSON.stringify({ ...plan, actor: { kind: 'human', id: 'signed' } }) },
+      { path: `${base}/quality-records/record_1/verify`, method: 'POST', body: '{"requiredCheckIds":[]}' },
+      { path: `${base}/quality-records/record_1/checks`, method: 'POST', body: JSON.stringify({ expectedHeadHash: '0'.repeat(64), idempotencyKey: 'check-record-1', checkId: 'artifact-bytes', outcome: 'passed' }) },
+      { path: `${base}/quality-records/record_1`, method: 'GET', body: '{}' },
+      { path: `${base}/quality-records/record_1?limit=1`, method: 'GET' },
+      { path: `${base}/quality-plans?offset=0`, method: 'POST', body: JSON.stringify(plan) },
+      ...['limit=0', 'limit=51', 'limit=1.5', 'offset=-1', 'offset=10001', 'offset=NaN', 'limit=1&limit=2', 'projectId=other'].map(query => ({ path: `${base}/quality-plans?${query}`, method: 'GET' })),
+      { path: '/v1/engineering/quality-plans', method: 'POST', body: JSON.stringify(plan) }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, request.path).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/threads?limit=100&offset=100001', method: 'GET' }).success).toBe(true)
   })
 
   it('accepts the WorkWise Runtime thread review endpoint', () => {

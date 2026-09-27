@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "projectId": "acceptance-smoke",
+  "count": 3,
+  "records": [
+    {
+      "id": "advanced_trial_34edaa49-30c5-4304-984f-0b5b25f995ab",
+      "fixture": "reference-gls",
+      "requestSha256": "d469c41aee07b6375eff3fd837b1f26c829db7b2037dc33827d8af29075e5bc6",
+      "declarationSha256": "434077cc961b5a79897f679d6616269f6d1cbee7bc043d6bc1cbc6ffa6411aa0",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    },
+    {
+      "id": "advanced_trial_74ee48ef-871f-44b7-9925-b90022c3b382",
+      "fixture": "reference-singular-gls",
+      "requestSha256": "d0e90a6f5b42e7a63327aed0a3b8f777643f35dcceaefc1661a2e47ee4fd2c6b",
+      "declarationSha256": "0d41cf692f6059b26945703e5c661f7c6572d31bc60a43e2389ddcab444bbb09",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    },
+    {
+      "id": "advanced_trial_d04905d1-8199-49a5-b269-bba8f4406118",
+      "fixture": "reference-equal",
+      "requestSha256": "4924dd1e7c6a49e2aea1d296625ca0288ae1953d0ff8d9ee243ce7569fcc7b8f",
+      "declarationSha256": "953621efa9fdf15e3249dad81ad3bd129422cb20a6bbb220a10dd91ca654c107",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    }
+  ],
+  "scope": "raw byte and SQL identity bindings plus independent acceptance arithmetic; not canonical hash replay or professional approval",
+  "evidenceKind": "development-service-smoke-not-packaged-gui",
+  "databaseDirectory": "/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-acceptance-smoke-30qBSr"
+}

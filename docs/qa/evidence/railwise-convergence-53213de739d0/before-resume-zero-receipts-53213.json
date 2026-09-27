@@ -1,0 +1,1288 @@
+{
+  "status": "passed",
+  "phase": "before-resume",
+  "checkedAt": "2026-09-20T08:43:32.021Z",
+  "candidateRoot": "/private/tmp/railwise-survey-53213de",
+  "identities": {
+    "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+    "asarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+    "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+    "threadId": "thr_wt4kfajs",
+    "planId": "eplan_fe78dc9f-b541-49a4-a910-32e36364b708",
+    "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+    "providerId": "custom-provider-3",
+    "model": "deepseek-flash",
+    "reasoningEffort": "off",
+    "taskId": "task_a3258fff-f184-49a0-bb97-9ce06e1d1360",
+    "turnId": "turn_ik4hd4zi",
+    "workspace": "/private/tmp/railwise-survey-53213de/home/.workwise/default_workspace"
+  },
+  "verified": {
+    "taskStatus": "stalled",
+    "turnStatus": "failed",
+    "exactMockAssistantTextCount": 7,
+    "toolCalls": 0,
+    "toolResults": 0,
+    "adjustments": 0,
+    "deliveries": 0,
+    "stepReceipts": [
+      {
+        "stepId": "inspect-survey-network",
+        "tool": "survey_network_validate",
+        "receipt": null
+      },
+      {
+        "stepId": "adjust-survey-network",
+        "tool": "control_network",
+        "receipt": null
+      },
+      {
+        "stepId": "review-survey-quality",
+        "tool": "survey_adjustment_read",
+        "receipt": null
+      },
+      {
+        "stepId": "prepare-survey-report",
+        "tool": "report_export",
+        "receipt": null
+      }
+    ],
+    "mockTokenAbsent": true
+  },
+  "mockReport": {
+    "path": "/private/tmp/railwise-survey-53213de/evidence/mock-completion-report-650cec4a29fd3f75.json",
+    "sha256": "5d31993ed6311266fc3b3859efdca995ec2c14f80067fb8940fe10fc36393df1",
+    "requestCount": 11,
+    "chatCount": 7,
+    "tokenRemoved": true
+  },
+  "sourceHashes": {
+    "engineering/engineering-ai.sqlite3": "e021ee3dfaa00ca405516ead4bb08c06e37eb238500addb4f45982102d50cc96",
+    "engineering/engineering-ai.sqlite3-wal": "d526a28c474798682432e528fddcf55022015d9cac7e92ce68ed251fb424cf9d",
+    "engineering/engineering.sqlite3": "bc7c0181a40e1b5658cb43385bdb12d159e9ff48d70d5dcaf5df71dad18913f7",
+    "engineering/engineering.sqlite3-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "engineering/survey.sqlite3": "7518bdd505ecf6210bb7eab841d4c00a48794d0328d2b6434cc7c6529e40b60f",
+    "engineering/survey.sqlite3-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tasks.sqlite3": "df9a0a536323bf8f0f7cf2e0c7cd91e83c48ad17bbf4895ff3499715a75d2c64",
+    "tasks.sqlite3-wal": "67b51ed261d1751aa5a3bfa79a900aff742a0c40e02085ef2e1481068c97c0bc",
+    "threads/thr_wt4kfajs/metadata.jsonl": "476e16206bc4043984f866994e0e64301ed97f49ac729db0c7268cd26eb9300b",
+    "threads/thr_wt4kfajs/messages.jsonl": "83e7bdad9a1ed45b4d450e98bf809648536742ff1319a2b9ca39dcefd31b8932"
+  },
+  "recordHashes": {
+    "project": "23e4e913c6dff342b12c96fb76c8bd032770fd7f4d1c7ad7994a291c1f89e660",
+    "network": "7a242e1032a9647a87e0df0f6ad91ab653e858aa1e144b48364a1aac77135dee",
+    "plan": "5abeb9ae0399c8620c1080cc52c5be38c3c75ccd196fda8a4c8818e809d894c0",
+    "task": "c5e16713cbd066f0d356bec713596009b903202d12dc58472c2231a0db3b158a",
+    "turn": "a10189abd330b8be75b580b7f34c83ad69e27dd40e20d62d4b2729d0c6cfecfc",
+    "messages": "7f0f61dc6497d8859ebfcf14c64d6fae83bad976b7309c030a31addb2ca9cf84",
+    "taskEvents": "0d2a26f01703b6d8b6fc228ff82254a9ec252dbef8e2c8e7492dfa9b0393cd3c",
+    "receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "adjustments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "deliveries": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "records": {
+    "project": {
+      "schemaVersion": 1,
+      "id": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+      "name": "审批卡验收（合成数据）",
+      "taskType": "control-network",
+      "monitoringType": "control-network",
+      "unit": "m",
+      "signConvention": "positive",
+      "thresholds": {},
+      "reportPeriod": {},
+      "workspace": "/private/tmp/railwise-survey-53213de/home/.workwise/default_workspace",
+      "revision": 2,
+      "createdAt": "2026-09-20T08:34:18.450Z",
+      "updatedAt": "2026-09-20T08:34:28.936Z"
+    },
+    "network": {
+      "schemaVersion": 1,
+      "id": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+      "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+      "networkType": "plane-control",
+      "coordinateSystem": "待确认",
+      "projection": "待确认",
+      "ellipsoid": "待确认",
+      "verticalDatum": "待确认",
+      "unit": "m",
+      "knownPoints": [
+        {
+          "id": "A",
+          "pointClass": "known",
+          "x": 50,
+          "y": 150,
+          "known": true,
+          "sourceRow": 2,
+          "sourceLocator": "COSA.in2:2",
+          "rawFields": {
+            "point": "A",
+            "x": "50.000000",
+            "y": "150.000000",
+            "recordType": "known-point"
+          }
+        },
+        {
+          "id": "B",
+          "pointClass": "known",
+          "x": 150,
+          "y": 50,
+          "known": true,
+          "sourceRow": 3,
+          "sourceLocator": "COSA.in2:3",
+          "rawFields": {
+            "point": "B",
+            "x": "150.000000",
+            "y": "50.000000",
+            "recordType": "known-point"
+          }
+        },
+        {
+          "id": "C",
+          "pointClass": "known",
+          "x": 120.710678,
+          "y": 120.710678,
+          "known": true,
+          "sourceRow": 4,
+          "sourceLocator": "COSA.in2:4",
+          "rawFields": {
+            "point": "C",
+            "x": "120.710678",
+            "y": "120.710678",
+            "recordType": "known-point"
+          }
+        }
+      ],
+      "unknownPoints": [
+        {
+          "id": "S1",
+          "pointClass": "station",
+          "x": 50.00000001228713,
+          "y": 49.999999767779975,
+          "known": false,
+          "sourceRow": 5,
+          "sourceLocator": "COSA.in2:5",
+          "rawFields": {
+            "station": "S1",
+            "recordType": "station",
+            "initialCoordinateMethod": "cosa-station-polar-rigid-initialization",
+            "initialCoordinateDistanceRmsMetres": 1.2287124206979806e-8
+          }
+        }
+      ],
+      "observations": [
+        {
+          "id": "cosa-in2-6-backsight-reset",
+          "type": "direction",
+          "from": "S1",
+          "to": "A",
+          "station": "S1",
+          "target": "A",
+          "value": 0,
+          "unit": "rad",
+          "sigma": 0.00000484813681109536,
+          "sigmaUnit": "rad",
+          "correctionState": {
+            "ppmApplied": false,
+            "prismConstantApplied": false,
+            "additiveConstantApplied": false,
+            "meteoApplied": false,
+            "slopeToHorizontalApplied": false,
+            "earthCurvatureRefractionApplied": false,
+            "centeringApplied": false,
+            "projectionReductionApplied": false
+          },
+          "qualityFlags": [
+            "cosa-backsight-reset"
+          ],
+          "sourceRow": 6,
+          "sourceLocator": "COSA.in2:6",
+          "sourceRecordId": "cosa-in2-record-6",
+          "rawFields": {
+            "target": "A",
+            "code": "L",
+            "value": "0",
+            "record": "A,L,0",
+            "rawUnit": "cosa-degree-dot-mmss",
+            "priorDirectionSigmaArcSeconds": "1.000",
+            "priorDistanceConstantMillimetres": "1",
+            "priorDistancePpm": "1",
+            "priorDirectionSigmaUnit": "arcsec",
+            "priorDistanceConstantUnit": "mm",
+            "priorDistancePpmUnit": "ppm",
+            "role": "backsight-reset",
+            "directionReference": "cosa-station-circle",
+            "stationCircleOrientation": true,
+            "coordinateAxisOrder": "north-east"
+          }
+        },
+        {
+          "id": "cosa-in2-7-direction",
+          "type": "direction",
+          "from": "S1",
+          "to": "B",
+          "station": "S1",
+          "target": "B",
+          "value": 4.71238898038469,
+          "unit": "rad",
+          "sigma": 0.00000484813681109536,
+          "sigmaUnit": "rad",
+          "correctionState": {
+            "ppmApplied": false,
+            "prismConstantApplied": false,
+            "additiveConstantApplied": false,
+            "meteoApplied": false,
+            "slopeToHorizontalApplied": false,
+            "earthCurvatureRefractionApplied": false,
+            "centeringApplied": false,
+            "projectionReductionApplied": false
+          },
+          "sourceRow": 7,
+          "sourceLocator": "COSA.in2:7",
+          "sourceRecordId": "cosa-in2-record-7",
+          "rawFields": {
+            "target": "B",
+            "code": "L",
+            "value": "270.00000",
+            "record": "B,L,270.00000",
+            "rawUnit": "cosa-degree-dot-mmss",
+            "priorDirectionSigmaArcSeconds": "1.000",
+            "priorDistanceConstantMillimetres": "1",
+            "priorDistancePpm": "1",
+            "priorDirectionSigmaUnit": "arcsec",
+            "priorDistanceConstantUnit": "mm",
+            "priorDistancePpmUnit": "ppm",
+            "role": "foresight",
+            "directionReference": "cosa-station-circle",
+            "stationCircleOrientation": true,
+            "coordinateAxisOrder": "north-east"
+          }
+        },
+        {
+          "id": "cosa-in2-8-distance",
+          "type": "distance",
+          "from": "S1",
+          "to": "B",
+          "station": "S1",
+          "target": "B",
+          "value": 100,
+          "unit": "m",
+          "sigma": 0.001004987562112089,
+          "sigmaUnit": "m",
+          "correctionState": {
+            "ppmApplied": false,
+            "prismConstantApplied": false,
+            "additiveConstantApplied": false,
+            "meteoApplied": false,
+            "slopeToHorizontalApplied": false,
+            "earthCurvatureRefractionApplied": false,
+            "centeringApplied": false,
+            "projectionReductionApplied": false
+          },
+          "sourceRow": 8,
+          "sourceLocator": "COSA.in2:8",
+          "sourceRecordId": "cosa-in2-record-8",
+          "rawFields": {
+            "target": "B",
+            "code": "S",
+            "value": "100.000",
+            "record": "B,S,100.000",
+            "rawUnit": "m",
+            "priorDirectionSigmaArcSeconds": "1.000",
+            "priorDistanceConstantMillimetres": "1",
+            "priorDistancePpm": "1",
+            "priorDirectionSigmaUnit": "arcsec",
+            "priorDistanceConstantUnit": "mm",
+            "priorDistancePpmUnit": "ppm"
+          }
+        },
+        {
+          "id": "cosa-in2-9-direction",
+          "type": "direction",
+          "from": "S1",
+          "to": "C",
+          "station": "S1",
+          "target": "C",
+          "value": 5.497787143782138,
+          "unit": "rad",
+          "sigma": 0.00000484813681109536,
+          "sigmaUnit": "rad",
+          "correctionState": {
+            "ppmApplied": false,
+            "prismConstantApplied": false,
+            "additiveConstantApplied": false,
+            "meteoApplied": false,
+            "slopeToHorizontalApplied": false,
+            "earthCurvatureRefractionApplied": false,
+            "centeringApplied": false,
+            "projectionReductionApplied": false
+          },
+          "sourceRow": 9,
+          "sourceLocator": "COSA.in2:9",
+          "sourceRecordId": "cosa-in2-record-9",
+          "rawFields": {
+            "target": "C",
+            "code": "L",
+            "value": "315.00000",
+            "record": "C,L,315.00000",
+            "rawUnit": "cosa-degree-dot-mmss",
+            "priorDirectionSigmaArcSeconds": "1.000",
+            "priorDistanceConstantMillimetres": "1",
+            "priorDistancePpm": "1",
+            "priorDirectionSigmaUnit": "arcsec",
+            "priorDistanceConstantUnit": "mm",
+            "priorDistancePpmUnit": "ppm",
+            "role": "foresight",
+            "directionReference": "cosa-station-circle",
+            "stationCircleOrientation": true,
+            "coordinateAxisOrder": "north-east"
+          }
+        },
+        {
+          "id": "cosa-in2-10-distance",
+          "type": "distance",
+          "from": "S1",
+          "to": "C",
+          "station": "S1",
+          "target": "C",
+          "value": 100,
+          "unit": "m",
+          "sigma": 0.001004987562112089,
+          "sigmaUnit": "m",
+          "correctionState": {
+            "ppmApplied": false,
+            "prismConstantApplied": false,
+            "additiveConstantApplied": false,
+            "meteoApplied": false,
+            "slopeToHorizontalApplied": false,
+            "earthCurvatureRefractionApplied": false,
+            "centeringApplied": false,
+            "projectionReductionApplied": false
+          },
+          "sourceRow": 10,
+          "sourceLocator": "COSA.in2:10",
+          "sourceRecordId": "cosa-in2-record-10",
+          "rawFields": {
+            "target": "C",
+            "code": "S",
+            "value": "100.000",
+            "record": "C,S,100.000",
+            "rawUnit": "m",
+            "priorDirectionSigmaArcSeconds": "1.000",
+            "priorDistanceConstantMillimetres": "1",
+            "priorDistancePpm": "1",
+            "priorDirectionSigmaUnit": "arcsec",
+            "priorDistanceConstantUnit": "mm",
+            "priorDistancePpmUnit": "ppm"
+          }
+        }
+      ],
+      "instrumentParameters": {},
+      "inputAttachmentHash": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "sourceFile": {
+        "schemaVersion": 1,
+        "sourcePath": "attachment://sha256/4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0/golden-plane-control-e2e.in2",
+        "name": "golden-plane-control-e2e.in2",
+        "size": 141,
+        "fileSize": 141,
+        "sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+        "importedAt": "2026-09-20T08:35:26.573Z",
+        "importedBy": "workwise:survey-format-registry",
+        "originalPreserved": true,
+        "formatId": "cosa-in2",
+        "vendor": "COSA(科傻)",
+        "formatVersion": null,
+        "detectionMethod": "structural-probe",
+        "detectionConfidence": 0.98,
+        "extensionClaimed": ".in2",
+        "extensionContentConflict": false,
+        "requiresManualConfirmation": false,
+        "detection": {
+          "format": "cosa-in2",
+          "vendor": "COSA(科傻)",
+          "confidence": 0.98,
+          "extension": ".in2",
+          "matchedSignatures": [
+            "COSA .in2 three-value header + L,0 station block"
+          ],
+          "extensionConflict": false,
+          "method": "structural-probe"
+        },
+        "disposition": "adjustment-ready",
+        "dispositionReason": "adjustment-ready: P0 格式目录 workwise-survey-format-catalog-1.7.0 — 严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+        "dispositionReasonEn": "adjustment-ready: P0 format catalog workwise-survey-format-catalog-1.7.0 — Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.",
+        "parserId": "cosa-in2-parser",
+        "parserVersion": "0.3.0",
+        "parserSourceHash": "14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04",
+        "linearUnitRaw": "m",
+        "angularUnitRaw": "cosa-degree-dot-mmss",
+        "linearUnitCanonical": "m",
+        "angularUnitCanonical": "rad",
+        "datumDeclared": null,
+        "heightSystemDeclared": null,
+        "recordCount": 10,
+        "summary": {
+          "pointCount": 3,
+          "stationCount": 1,
+          "observationCount": 5,
+          "recordCount": 10,
+          "skippedRecordCount": 0
+        },
+        "records": [
+          {
+            "id": "cosa-in2-record-1",
+            "sourceRecord": 1,
+            "line": 1,
+            "byteOffset": 0,
+            "byteLength": 9,
+            "section": "cosa-in2",
+            "recordType": "prior-header",
+            "rawOffset": 0,
+            "rawLength": 9,
+            "rawLineNo": 1,
+            "rawSnippet": "1.000,1,1"
+          },
+          {
+            "id": "cosa-in2-record-2",
+            "sourceRecord": 2,
+            "line": 2,
+            "byteOffset": 10,
+            "byteLength": 22,
+            "section": "cosa-in2",
+            "recordType": "known-point",
+            "rawOffset": 10,
+            "rawLength": 22,
+            "rawLineNo": 2,
+            "rawSnippet": "A,50.000000,150.000000"
+          },
+          {
+            "id": "cosa-in2-record-3",
+            "sourceRecord": 3,
+            "line": 3,
+            "byteOffset": 33,
+            "byteLength": 22,
+            "section": "cosa-in2",
+            "recordType": "known-point",
+            "rawOffset": 33,
+            "rawLength": 22,
+            "rawLineNo": 3,
+            "rawSnippet": "B,150.000000,50.000000"
+          },
+          {
+            "id": "cosa-in2-record-4",
+            "sourceRecord": 4,
+            "line": 4,
+            "byteOffset": 56,
+            "byteLength": 23,
+            "section": "cosa-in2",
+            "recordType": "known-point",
+            "rawOffset": 56,
+            "rawLength": 23,
+            "rawLineNo": 4,
+            "rawSnippet": "C,120.710678,120.710678"
+          },
+          {
+            "id": "cosa-in2-record-5",
+            "sourceRecord": 5,
+            "line": 5,
+            "byteOffset": 80,
+            "byteLength": 2,
+            "section": "cosa-in2",
+            "recordType": "station",
+            "rawOffset": 80,
+            "rawLength": 2,
+            "rawLineNo": 5,
+            "rawSnippet": "S1"
+          },
+          {
+            "id": "cosa-in2-record-6",
+            "sourceRecord": 6,
+            "line": 6,
+            "byteOffset": 83,
+            "byteLength": 5,
+            "section": "cosa-in2",
+            "recordType": "backsight-reset",
+            "rawOffset": 83,
+            "rawLength": 5,
+            "rawLineNo": 6,
+            "rawSnippet": "A,L,0"
+          },
+          {
+            "id": "cosa-in2-record-7",
+            "sourceRecord": 7,
+            "line": 7,
+            "byteOffset": 89,
+            "byteLength": 13,
+            "section": "cosa-in2",
+            "recordType": "direction",
+            "rawOffset": 89,
+            "rawLength": 13,
+            "rawLineNo": 7,
+            "rawSnippet": "B,L,270.00000"
+          },
+          {
+            "id": "cosa-in2-record-8",
+            "sourceRecord": 8,
+            "line": 8,
+            "byteOffset": 103,
+            "byteLength": 11,
+            "section": "cosa-in2",
+            "recordType": "distance",
+            "rawOffset": 103,
+            "rawLength": 11,
+            "rawLineNo": 8,
+            "rawSnippet": "B,S,100.000"
+          },
+          {
+            "id": "cosa-in2-record-9",
+            "sourceRecord": 9,
+            "line": 9,
+            "byteOffset": 115,
+            "byteLength": 13,
+            "section": "cosa-in2",
+            "recordType": "direction",
+            "rawOffset": 115,
+            "rawLength": 13,
+            "rawLineNo": 9,
+            "rawSnippet": "C,L,315.00000"
+          },
+          {
+            "id": "cosa-in2-record-10",
+            "sourceRecord": 10,
+            "line": 10,
+            "byteOffset": 129,
+            "byteLength": 11,
+            "section": "cosa-in2",
+            "recordType": "distance",
+            "rawOffset": 129,
+            "rawLength": 11,
+            "rawLineNo": 10,
+            "rawSnippet": "C,S,100.000"
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "encoding_detected",
+            "severity": "info",
+            "message": "文本编码 utf-8",
+            "localized": {
+              "en": {
+                "message": "Text encoding: utf-8"
+              }
+            }
+          },
+          {
+            "code": "format_detected",
+            "severity": "info",
+            "message": "识别为 COSA(科傻) / cosa-in2，置信度 98%",
+            "localized": {
+              "en": {
+                "message": "Detected cosa-in2; confidence 98%"
+              }
+            }
+          },
+          {
+            "code": "format_detected",
+            "severity": "warning",
+            "message": "COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+            "localized": {
+              "en": {
+                "message": "cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.",
+                "suggestedAction": "Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment."
+              }
+            },
+            "suggestedAction": "继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。"
+          }
+        ],
+        "rawRecordAnchors": [
+          {
+            "id": "cosa-in2-record-1",
+            "sourceRecord": 1,
+            "line": 1,
+            "byteOffset": 0,
+            "byteLength": 9,
+            "section": "cosa-in2",
+            "recordType": "prior-header",
+            "rawOffset": 0,
+            "rawLength": 9,
+            "rawLineNo": 1,
+            "rawSnippet": "1.000,1,1"
+          },
+          {
+            "id": "cosa-in2-record-2",
+            "sourceRecord": 2,
+            "line": 2,
+            "byteOffset": 10,
+            "byteLength": 22,
+            "section": "cosa-in2",
+            "recordType": "known-point",
+            "rawOffset": 10,
+            "rawLength": 22,
+            "rawLineNo": 2,
+            "rawSnippet": "A,50.000000,150.000000"
+          },
+          {
+            "id": "cosa-in2-record-3",
+            "sourceRecord": 3,
+            "line": 3,
+            "byteOffset": 33,
+            "byteLength": 22,
+            "section": "cosa-in2",
+            "recordType": "known-point",
+            "rawOffset": 33,
+            "rawLength": 22,
+            "rawLineNo": 3,
+            "rawSnippet": "B,150.000000,50.000000"
+          },
+          {
+            "id": "cosa-in2-record-4",
+            "sourceRecord": 4,
+            "line": 4,
+            "byteOffset": 56,
+            "byteLength": 23,
+            "section": "cosa-in2",
+            "recordType": "known-point",
+            "rawOffset": 56,
+            "rawLength": 23,
+            "rawLineNo": 4,
+            "rawSnippet": "C,120.710678,120.710678"
+          },
+          {
+            "id": "cosa-in2-record-5",
+            "sourceRecord": 5,
+            "line": 5,
+            "byteOffset": 80,
+            "byteLength": 2,
+            "section": "cosa-in2",
+            "recordType": "station",
+            "rawOffset": 80,
+            "rawLength": 2,
+            "rawLineNo": 5,
+            "rawSnippet": "S1"
+          },
+          {
+            "id": "cosa-in2-record-6",
+            "sourceRecord": 6,
+            "line": 6,
+            "byteOffset": 83,
+            "byteLength": 5,
+            "section": "cosa-in2",
+            "recordType": "backsight-reset",
+            "rawOffset": 83,
+            "rawLength": 5,
+            "rawLineNo": 6,
+            "rawSnippet": "A,L,0"
+          },
+          {
+            "id": "cosa-in2-record-7",
+            "sourceRecord": 7,
+            "line": 7,
+            "byteOffset": 89,
+            "byteLength": 13,
+            "section": "cosa-in2",
+            "recordType": "direction",
+            "rawOffset": 89,
+            "rawLength": 13,
+            "rawLineNo": 7,
+            "rawSnippet": "B,L,270.00000"
+          },
+          {
+            "id": "cosa-in2-record-8",
+            "sourceRecord": 8,
+            "line": 8,
+            "byteOffset": 103,
+            "byteLength": 11,
+            "section": "cosa-in2",
+            "recordType": "distance",
+            "rawOffset": 103,
+            "rawLength": 11,
+            "rawLineNo": 8,
+            "rawSnippet": "B,S,100.000"
+          },
+          {
+            "id": "cosa-in2-record-9",
+            "sourceRecord": 9,
+            "line": 9,
+            "byteOffset": 115,
+            "byteLength": 13,
+            "section": "cosa-in2",
+            "recordType": "direction",
+            "rawOffset": 115,
+            "rawLength": 13,
+            "rawLineNo": 9,
+            "rawSnippet": "C,L,315.00000"
+          },
+          {
+            "id": "cosa-in2-record-10",
+            "sourceRecord": 10,
+            "line": 10,
+            "byteOffset": 129,
+            "byteLength": 11,
+            "section": "cosa-in2",
+            "recordType": "distance",
+            "rawOffset": 129,
+            "rawLength": 11,
+            "rawLineNo": 10,
+            "rawSnippet": "C,S,100.000"
+          }
+        ],
+        "preservedRawFields": {
+          "source:cosa-in2:coordinate-axis-order": "north-east",
+          "source:cosa-in2:prior-direction-arc-seconds": "1.000",
+          "source:cosa-in2:prior-distance-constant-millimetres": "1",
+          "source:cosa-in2:prior-distance-ppm": "1",
+          "point:COSA.in2:2:point": "A",
+          "point:COSA.in2:2:x": "50.000000",
+          "point:COSA.in2:2:y": "150.000000",
+          "point:COSA.in2:2:recordType": "known-point",
+          "point:COSA.in2:3:point": "B",
+          "point:COSA.in2:3:x": "150.000000",
+          "point:COSA.in2:3:y": "50.000000",
+          "point:COSA.in2:3:recordType": "known-point",
+          "point:COSA.in2:4:point": "C",
+          "point:COSA.in2:4:x": "120.710678",
+          "point:COSA.in2:4:y": "120.710678",
+          "point:COSA.in2:4:recordType": "known-point",
+          "point:COSA.in2:5:station": "S1",
+          "point:COSA.in2:5:recordType": "station",
+          "point:COSA.in2:5:initialCoordinateMethod": "cosa-station-polar-rigid-initialization",
+          "point:COSA.in2:5:initialCoordinateDistanceRmsMetres": 1.2287124206979806e-8,
+          "observation:cosa-in2-record-6:target": "A",
+          "observation:cosa-in2-record-6:code": "L",
+          "observation:cosa-in2-record-6:value": "0",
+          "observation:cosa-in2-record-6:record": "A,L,0",
+          "observation:cosa-in2-record-6:rawUnit": "cosa-degree-dot-mmss",
+          "observation:cosa-in2-record-6:priorDirectionSigmaArcSeconds": "1.000",
+          "observation:cosa-in2-record-6:priorDistanceConstantMillimetres": "1",
+          "observation:cosa-in2-record-6:priorDistancePpm": "1",
+          "observation:cosa-in2-record-6:priorDirectionSigmaUnit": "arcsec",
+          "observation:cosa-in2-record-6:priorDistanceConstantUnit": "mm",
+          "observation:cosa-in2-record-6:priorDistancePpmUnit": "ppm",
+          "observation:cosa-in2-record-6:role": "backsight-reset",
+          "observation:cosa-in2-record-6:directionReference": "cosa-station-circle",
+          "observation:cosa-in2-record-6:stationCircleOrientation": true,
+          "observation:cosa-in2-record-6:coordinateAxisOrder": "north-east",
+          "observation:cosa-in2-record-7:target": "B",
+          "observation:cosa-in2-record-7:code": "L",
+          "observation:cosa-in2-record-7:value": "270.00000",
+          "observation:cosa-in2-record-7:record": "B,L,270.00000",
+          "observation:cosa-in2-record-7:rawUnit": "cosa-degree-dot-mmss",
+          "observation:cosa-in2-record-7:priorDirectionSigmaArcSeconds": "1.000",
+          "observation:cosa-in2-record-7:priorDistanceConstantMillimetres": "1",
+          "observation:cosa-in2-record-7:priorDistancePpm": "1",
+          "observation:cosa-in2-record-7:priorDirectionSigmaUnit": "arcsec",
+          "observation:cosa-in2-record-7:priorDistanceConstantUnit": "mm",
+          "observation:cosa-in2-record-7:priorDistancePpmUnit": "ppm",
+          "observation:cosa-in2-record-7:role": "foresight",
+          "observation:cosa-in2-record-7:directionReference": "cosa-station-circle",
+          "observation:cosa-in2-record-7:stationCircleOrientation": true,
+          "observation:cosa-in2-record-7:coordinateAxisOrder": "north-east",
+          "observation:cosa-in2-record-8:target": "B",
+          "observation:cosa-in2-record-8:code": "S",
+          "observation:cosa-in2-record-8:value": "100.000",
+          "observation:cosa-in2-record-8:record": "B,S,100.000",
+          "observation:cosa-in2-record-8:rawUnit": "m",
+          "observation:cosa-in2-record-8:priorDirectionSigmaArcSeconds": "1.000",
+          "observation:cosa-in2-record-8:priorDistanceConstantMillimetres": "1",
+          "observation:cosa-in2-record-8:priorDistancePpm": "1",
+          "observation:cosa-in2-record-8:priorDirectionSigmaUnit": "arcsec",
+          "observation:cosa-in2-record-8:priorDistanceConstantUnit": "mm",
+          "observation:cosa-in2-record-8:priorDistancePpmUnit": "ppm",
+          "observation:cosa-in2-record-9:target": "C",
+          "observation:cosa-in2-record-9:code": "L",
+          "observation:cosa-in2-record-9:value": "315.00000",
+          "observation:cosa-in2-record-9:record": "C,L,315.00000",
+          "observation:cosa-in2-record-9:rawUnit": "cosa-degree-dot-mmss",
+          "observation:cosa-in2-record-9:priorDirectionSigmaArcSeconds": "1.000",
+          "observation:cosa-in2-record-9:priorDistanceConstantMillimetres": "1",
+          "observation:cosa-in2-record-9:priorDistancePpm": "1",
+          "observation:cosa-in2-record-9:priorDirectionSigmaUnit": "arcsec",
+          "observation:cosa-in2-record-9:priorDistanceConstantUnit": "mm",
+          "observation:cosa-in2-record-9:priorDistancePpmUnit": "ppm",
+          "observation:cosa-in2-record-9:role": "foresight",
+          "observation:cosa-in2-record-9:directionReference": "cosa-station-circle",
+          "observation:cosa-in2-record-9:stationCircleOrientation": true,
+          "observation:cosa-in2-record-9:coordinateAxisOrder": "north-east",
+          "observation:cosa-in2-record-10:target": "C",
+          "observation:cosa-in2-record-10:code": "S",
+          "observation:cosa-in2-record-10:value": "100.000",
+          "observation:cosa-in2-record-10:record": "C,S,100.000",
+          "observation:cosa-in2-record-10:rawUnit": "m",
+          "observation:cosa-in2-record-10:priorDirectionSigmaArcSeconds": "1.000",
+          "observation:cosa-in2-record-10:priorDistanceConstantMillimetres": "1",
+          "observation:cosa-in2-record-10:priorDistancePpm": "1",
+          "observation:cosa-in2-record-10:priorDirectionSigmaUnit": "arcsec",
+          "observation:cosa-in2-record-10:priorDistanceConstantUnit": "mm",
+          "observation:cosa-in2-record-10:priorDistancePpmUnit": "ppm"
+        }
+      },
+      "qualityStatus": "imported",
+      "findings": [
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_72b64820-c4a8-4f03-a537-70ff1d21e399",
+          "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+          "code": "format_detected",
+          "severity": "warning",
+          "message": "COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+          "localized": {
+            "en": {
+              "message": "cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.",
+              "suggestedAction": "Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment."
+            }
+          },
+          "suggestion": "继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。",
+          "status": "open",
+          "createdAt": "2026-09-20T08:35:26.583Z"
+        }
+      ],
+      "revision": 1,
+      "createdAt": "2026-09-20T08:35:26.584Z",
+      "updatedAt": "2026-09-20T08:35:26.584Z"
+    },
+    "plan": {
+      "schemaVersion": 1,
+      "id": "eplan_fe78dc9f-b541-49a4-a910-32e36364b708",
+      "threadId": "thr_wt4kfajs",
+      "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+      "contextHash": "sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9",
+      "requestHash": "a81555d972fd0df492a1d02dea42e7831a1e96af6caec85e1e8919c3cffb958c",
+      "revision": 3,
+      "goal": "RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）",
+      "steps": [
+        {
+          "id": "inspect-survey-network",
+          "title": "校核测量网络与基准",
+          "tool": "survey_network_validate",
+          "risk": "write",
+          "dependsOn": [],
+          "inputHash": "sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9",
+          "parameters": {
+            "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+            "expectedRevision": 1
+          },
+          "parameterBindings": [],
+          "expectedOutputs": [
+            "network-validation"
+          ],
+          "reversibility": "revisioned-write",
+          "approval": "approved"
+        },
+        {
+          "id": "adjust-survey-network",
+          "title": "执行确定性测量平差",
+          "tool": "control_network",
+          "risk": "write",
+          "dependsOn": [
+            "inspect-survey-network"
+          ],
+          "inputHash": "sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9",
+          "parameters": {
+            "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34"
+          },
+          "parameterBindings": [
+            {
+              "parameter": "expectedRevision",
+              "stepId": "inspect-survey-network",
+              "output": "network.revision"
+            }
+          ],
+          "expectedOutputs": [
+            "adjustment-run",
+            "deterministic-adjustment-evidence"
+          ],
+          "reversibility": "append-only",
+          "approval": "approved"
+        },
+        {
+          "id": "review-survey-quality",
+          "title": "读取闭合差、残差与精度",
+          "tool": "survey_adjustment_read",
+          "risk": "read",
+          "dependsOn": [
+            "adjust-survey-network"
+          ],
+          "inputHash": "sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9",
+          "parameters": {
+            "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34"
+          },
+          "parameterBindings": [
+            {
+              "parameter": "adjustmentId",
+              "stepId": "adjust-survey-network",
+              "output": "run.id"
+            }
+          ],
+          "expectedOutputs": [
+            "existing-adjustment-evidence"
+          ],
+          "reversibility": "read-only",
+          "approval": "approved"
+        },
+        {
+          "id": "prepare-survey-report",
+          "title": "准备测量成果与证据包",
+          "tool": "report_export",
+          "risk": "export",
+          "dependsOn": [
+            "review-survey-quality"
+          ],
+          "inputHash": "sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9",
+          "parameters": {
+            "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+            "expectedRevision": 2
+          },
+          "parameterBindings": [
+            {
+              "parameter": "adjustmentIds",
+              "stepId": "adjust-survey-network",
+              "output": "run.id",
+              "asArray": true
+            }
+          ],
+          "expectedOutputs": [
+            "candidate-docx",
+            "candidate-pdf",
+            "evidence-xlsx"
+          ],
+          "reversibility": "append-only",
+          "approval": "approved"
+        }
+      ],
+      "status": "started",
+      "taskId": "task_a3258fff-f184-49a0-bb97-9ce06e1d1360",
+      "executionTurnId": "turn_ik4hd4zi",
+      "createdAt": "2026-09-20T08:36:34.169Z",
+      "updatedAt": "2026-09-20T08:40:58.225Z"
+    },
+    "task": {
+      "id": "task_a3258fff-f184-49a0-bb97-9ce06e1d1360",
+      "threadId": "thr_wt4kfajs",
+      "activeTurnId": "turn_ik4hd4zi",
+      "childTaskIds": [],
+      "workspaceRoot": "/private/tmp/railwise-survey-53213de/home/.workwise/default_workspace",
+      "goal": "Execute this approved Engineering Run Plan through the allowlisted tools. Use only IDs present in the bounded context. Do not change numeric results or units. unitWeightStdDev and varianceFactor are dimensionless; standardizedResidual is measured in sigma multiples. report_export must receive the adjustmentIds produced or listed by the context.\nPlan:\n{\"schemaVersion\":1,\"id\":\"eplan_fe78dc9f-b541-49a4-a910-32e36364b708\",\"threadId\":\"thr_wt4kfajs\",\"projectId\":\"project_cb802366-c811-4a2b-90c0-37b310447cfe\",\"contextHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"requestHash\":\"a81555d972fd0df492a1d02dea42e7831a1e96af6caec85e1e8919c3cffb958c\",\"revision\":2,\"goal\":\"RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）\",\"steps\":[{\"id\":\"inspect-survey-network\",\"title\":\"校核测量网络与基准\",\"tool\":\"survey_network_validate\",\"risk\":\"write\",\"dependsOn\":[],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"networkId\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\",\"expectedRevision\":1},\"parameterBindings\":[],\"expectedOutputs\":[\"network-validation\"],\"reversibility\":\"revisioned-write\",\"approval\":\"approved\"},{\"id\":\"adjust-survey-network\",\"title\":\"执行确定性测量平差\",\"tool\":\"control_network\",\"risk\":\"write\",\"dependsOn\":[\"inspect-survey-network\"],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"networkId\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\"},\"parameterBindings\":[{\"parameter\":\"expectedRevision\",\"stepId\":\"inspect-survey-network\",\"output\":\"network.revision\"}],\"expectedOutputs\":[\"adjustment-run\",\"deterministic-adjustment-evidence\"],\"reversibility\":\"append-only\",\"approval\":\"approved\"},{\"id\":\"review-survey-quality\",\"title\":\"读取闭合差、残差与精度\",\"tool\":\"survey_adjustment_read\",\"risk\":\"read\",\"dependsOn\":[\"adjust-survey-network\"],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"networkId\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\"},\"parameterBindings\":[{\"parameter\":\"adjustmentId\",\"stepId\":\"adjust-survey-network\",\"output\":\"run.id\"}],\"expectedOutputs\":[\"existing-adjustment-evidence\"],\"reversibility\":\"read-only\",\"approval\":\"approved\"},{\"id\":\"prepare-survey-report\",\"title\":\"准备测量成果与证据包\",\"tool\":\"report_export\",\"risk\":\"export\",\"dependsOn\":[\"review-survey-quality\"],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"projectId\":\"project_cb802366-c811-4a2b-90c0-37b310447cfe\",\"expectedRevision\":2},\"parameterBindings\":[{\"parameter\":\"adjustmentIds\",\"stepId\":\"adjust-survey-network\",\"output\":\"run.id\",\"asArray\":true}],\"expectedOutputs\":[\"candidate-docx\",\"candidate-pdf\",\"evidence-xlsx\"],\"reversibility\":\"append-only\",\"approval\":\"approved\"}],\"status\":\"approved\",\"createdAt\":\"2026-09-20T08:36:34.169Z\",\"updatedAt\":\"2026-09-20T08:40:58.183Z\"}\nBounded context (no raw observations):\n{\"schemaVersion\":1,\"projectId\":\"project_cb802366-c811-4a2b-90c0-37b310447cfe\",\"projectRevision\":2,\"generatedAt\":\"2026-09-20T08:40:58.192Z\",\"project\":{\"name\":\"审批卡验收（合成数据）\",\"taskType\":\"control-network\",\"monitoringType\":\"control-network\",\"unit\":\"m\",\"reportPeriod\":{},\"thresholds\":{}},\"datasets\":[],\"analyses\":[],\"runs\":[],\"surveyNetworks\":[{\"id\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\",\"networkType\":\"plane-control\",\"coordinateSystem\":\"待确认\",\"verticalDatum\":\"待确认\",\"pointCount\":4,\"observationCount\":5,\"qualityStatus\":\"imported\",\"revision\":1,\"inputAttachmentHash\":\"4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0\"}],\"surveyAdjustments\":[],\"citations\":[],\"watchDrafts\":[],\"contextHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\"}",
+      "status": "stalled",
+      "acceptance": {
+        "kind": "answer",
+        "requiredNodeKinds": [
+          "deliver"
+        ],
+        "requireFinalResponse": true,
+        "requireActionableArtifactCard": false
+      },
+      "agentId": "general",
+      "model": "deepseek-flash",
+      "providerId": "custom-provider-3",
+      "engineeringPlanId": "eplan_fe78dc9f-b541-49a4-a910-32e36364b708",
+      "reasoningEffort": "off",
+      "budget": {
+        "maxAttempts": 8,
+        "maxDurationMs": 1800000
+      },
+      "attempts": 7,
+      "replans": 2,
+      "noProgressCount": 0,
+      "nodes": [
+        {
+          "id": "node_task_a3258fff-f184-49a0-bb97-9ce06e1d1360_deliver",
+          "taskId": "task_a3258fff-f184-49a0-bb97-9ce06e1d1360",
+          "kind": "deliver",
+          "title": "交付成果",
+          "status": "failed",
+          "dependsOn": [],
+          "attempt": 7,
+          "maxAttempts": 8,
+          "idempotencyKey": "task_a3258fff-f184-49a0-bb97-9ce06e1d1360:deliver",
+          "progressFingerprint": "engineering-plan:eplan_fe78dc9f-b541-49a4-a910-32e36364b708:",
+          "evidence": [],
+          "errorCode": "task_stalled",
+          "errorMessage": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "startedAt": "2026-09-20T08:40:58.251Z",
+          "revision": 14
+        }
+      ],
+      "artifacts": [],
+      "stalledReason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+      "createdAt": "2026-09-20T08:40:58.221Z",
+      "updatedAt": "2026-09-20T08:40:58.809Z",
+      "revision": 14
+    },
+    "turn": {
+      "id": "turn_ik4hd4zi",
+      "threadId": "thr_wt4kfajs",
+      "status": "failed",
+      "prompt": "",
+      "model": "deepseek-flash",
+      "providerId": "custom-provider-3",
+      "engineeringExecution": true,
+      "engineeringPlanId": "eplan_fe78dc9f-b541-49a4-a910-32e36364b708",
+      "reasoningEffort": "off",
+      "steering": [],
+      "createdAt": "2026-09-20T08:40:58.194Z",
+      "startedAt": "2026-09-20T08:40:58.195Z",
+      "finishedAt": "2026-09-20T08:40:58.810Z",
+      "items": [],
+      "attachmentIds": [],
+      "workspaceReferences": [],
+      "activeSkillIds": [],
+      "injectedMemoryIds": [],
+      "skillInjectionBytes": 0,
+      "toolCatalogFingerprint": "d9128b666193472f",
+      "toolCatalogToolCount": 5,
+      "toolCatalogDrift": false,
+      "mode": "agent",
+      "error": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report"
+    },
+    "messages": [
+      {
+        "id": "item_turn_ik4hd4zi_user",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "user",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.194Z",
+        "finishedAt": "2026-09-20T08:40:58.194Z",
+        "kind": "user_message",
+        "text": "Execute this approved Engineering Run Plan through the allowlisted tools. Use only IDs present in the bounded context. Do not change numeric results or units. unitWeightStdDev and varianceFactor are dimensionless; standardizedResidual is measured in sigma multiples. report_export must receive the adjustmentIds produced or listed by the context.\nPlan:\n{\"schemaVersion\":1,\"id\":\"eplan_fe78dc9f-b541-49a4-a910-32e36364b708\",\"threadId\":\"thr_wt4kfajs\",\"projectId\":\"project_cb802366-c811-4a2b-90c0-37b310447cfe\",\"contextHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"requestHash\":\"a81555d972fd0df492a1d02dea42e7831a1e96af6caec85e1e8919c3cffb958c\",\"revision\":2,\"goal\":\"RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）\",\"steps\":[{\"id\":\"inspect-survey-network\",\"title\":\"校核测量网络与基准\",\"tool\":\"survey_network_validate\",\"risk\":\"write\",\"dependsOn\":[],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"networkId\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\",\"expectedRevision\":1},\"parameterBindings\":[],\"expectedOutputs\":[\"network-validation\"],\"reversibility\":\"revisioned-write\",\"approval\":\"approved\"},{\"id\":\"adjust-survey-network\",\"title\":\"执行确定性测量平差\",\"tool\":\"control_network\",\"risk\":\"write\",\"dependsOn\":[\"inspect-survey-network\"],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"networkId\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\"},\"parameterBindings\":[{\"parameter\":\"expectedRevision\",\"stepId\":\"inspect-survey-network\",\"output\":\"network.revision\"}],\"expectedOutputs\":[\"adjustment-run\",\"deterministic-adjustment-evidence\"],\"reversibility\":\"append-only\",\"approval\":\"approved\"},{\"id\":\"review-survey-quality\",\"title\":\"读取闭合差、残差与精度\",\"tool\":\"survey_adjustment_read\",\"risk\":\"read\",\"dependsOn\":[\"adjust-survey-network\"],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"networkId\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\"},\"parameterBindings\":[{\"parameter\":\"adjustmentId\",\"stepId\":\"adjust-survey-network\",\"output\":\"run.id\"}],\"expectedOutputs\":[\"existing-adjustment-evidence\"],\"reversibility\":\"read-only\",\"approval\":\"approved\"},{\"id\":\"prepare-survey-report\",\"title\":\"准备测量成果与证据包\",\"tool\":\"report_export\",\"risk\":\"export\",\"dependsOn\":[\"review-survey-quality\"],\"inputHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\",\"parameters\":{\"projectId\":\"project_cb802366-c811-4a2b-90c0-37b310447cfe\",\"expectedRevision\":2},\"parameterBindings\":[{\"parameter\":\"adjustmentIds\",\"stepId\":\"adjust-survey-network\",\"output\":\"run.id\",\"asArray\":true}],\"expectedOutputs\":[\"candidate-docx\",\"candidate-pdf\",\"evidence-xlsx\"],\"reversibility\":\"append-only\",\"approval\":\"approved\"}],\"status\":\"approved\",\"createdAt\":\"2026-09-20T08:36:34.169Z\",\"updatedAt\":\"2026-09-20T08:40:58.183Z\"}\nBounded context (no raw observations):\n{\"schemaVersion\":1,\"projectId\":\"project_cb802366-c811-4a2b-90c0-37b310447cfe\",\"projectRevision\":2,\"generatedAt\":\"2026-09-20T08:40:58.192Z\",\"project\":{\"name\":\"审批卡验收（合成数据）\",\"taskType\":\"control-network\",\"monitoringType\":\"control-network\",\"unit\":\"m\",\"reportPeriod\":{},\"thresholds\":{}},\"datasets\":[],\"analyses\":[],\"runs\":[],\"surveyNetworks\":[{\"id\":\"network_365a0846-01d7-4768-a31c-47545fe23c34\",\"networkType\":\"plane-control\",\"coordinateSystem\":\"待确认\",\"verticalDatum\":\"待确认\",\"pointCount\":4,\"observationCount\":5,\"qualityStatus\":\"imported\",\"revision\":1,\"inputAttachmentHash\":\"4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0\"}],\"surveyAdjustments\":[],\"citations\":[],\"watchDrafts\":[],\"contextHash\":\"sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9\"}",
+        "displayText": "RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）"
+      },
+      {
+        "id": "item_text_lfapmtaw",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.327Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_text_c5m14y6k",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.408Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_text_rtveer0q",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.487Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_text_57732tgu",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.571Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_text_pvcl0geq",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.652Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_text_9we306x5",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.727Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_text_ywjmk6le",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "assistant",
+        "status": "completed",
+        "createdAt": "2026-09-20T08:40:58.796Z",
+        "kind": "assistant_text",
+        "text": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete."
+      },
+      {
+        "id": "item_turn_ik4hd4zi_error",
+        "turnId": "turn_ik4hd4zi",
+        "threadId": "thr_wt4kfajs",
+        "role": "system",
+        "status": "failed",
+        "createdAt": "2026-09-20T08:40:58.819Z",
+        "finishedAt": "2026-09-20T08:40:58.819Z",
+        "kind": "error",
+        "message": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report"
+      }
+    ],
+    "taskEvents": [
+      {
+        "sequence": 1,
+        "kind": "task_created",
+        "payload": {
+          "status": "queued"
+        },
+        "createdAt": "2026-09-20T08:40:58.221Z"
+      },
+      {
+        "sequence": 2,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 1
+        },
+        "createdAt": "2026-09-20T08:40:58.251Z"
+      },
+      {
+        "sequence": 3,
+        "kind": "attempt_retrying",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 1,
+          "replans": 0
+        },
+        "createdAt": "2026-09-20T08:40:58.343Z"
+      },
+      {
+        "sequence": 4,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 2
+        },
+        "createdAt": "2026-09-20T08:40:58.349Z"
+      },
+      {
+        "sequence": 5,
+        "kind": "attempt_retrying",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 2,
+          "replans": 0
+        },
+        "createdAt": "2026-09-20T08:40:58.422Z"
+      },
+      {
+        "sequence": 6,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 3
+        },
+        "createdAt": "2026-09-20T08:40:58.427Z"
+      },
+      {
+        "sequence": 7,
+        "kind": "attempt_retrying",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 3,
+          "replans": 0
+        },
+        "createdAt": "2026-09-20T08:40:58.505Z"
+      },
+      {
+        "sequence": 8,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 4
+        },
+        "createdAt": "2026-09-20T08:40:58.514Z"
+      },
+      {
+        "sequence": 9,
+        "kind": "task_replanned",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 4,
+          "replans": 1
+        },
+        "createdAt": "2026-09-20T08:40:58.586Z"
+      },
+      {
+        "sequence": 10,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 5
+        },
+        "createdAt": "2026-09-20T08:40:58.591Z"
+      },
+      {
+        "sequence": 11,
+        "kind": "attempt_retrying",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 5,
+          "replans": 1
+        },
+        "createdAt": "2026-09-20T08:40:58.669Z"
+      },
+      {
+        "sequence": 12,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 6
+        },
+        "createdAt": "2026-09-20T08:40:58.672Z"
+      },
+      {
+        "sequence": 13,
+        "kind": "attempt_retrying",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 6,
+          "replans": 1
+        },
+        "createdAt": "2026-09-20T08:40:58.741Z"
+      },
+      {
+        "sequence": 14,
+        "kind": "attempt_started",
+        "payload": {
+          "turnId": "turn_ik4hd4zi",
+          "attempt": 7
+        },
+        "createdAt": "2026-09-20T08:40:58.745Z"
+      },
+      {
+        "sequence": 15,
+        "kind": "task_stalled",
+        "payload": {
+          "reason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+          "attempt": 7,
+          "replans": 2
+        },
+        "createdAt": "2026-09-20T08:40:58.809Z"
+      }
+    ],
+    "receipts": [],
+    "adjustments": [],
+    "deliveries": []
+  },
+  "audit": {
+    "sourceDatabaseConnections": 0,
+    "sqliteOnlyOnIsolatedCopies": true,
+    "sourceBytesUnchanged": true,
+    "credentialsRead": false,
+    "networkRequests": 0,
+    "scriptSha256": "81abfbbba5d91c897fe7cd399cce883b2e75715b8867918089554383f0f2eae1",
+    "snapshotHelperSha256": "4208d7b689d40d7a46a28b8b280c4f6262347dea8b7d2ac5dbd214bdeb15514b"
+  }
+}

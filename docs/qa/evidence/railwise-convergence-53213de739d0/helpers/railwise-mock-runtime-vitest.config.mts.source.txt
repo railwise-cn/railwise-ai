@@ -1,0 +1,1 @@
+export default { test: { include: ['/private/tmp/railwise-mock-runtime-selfcheck.test.ts'], pool: 'forks', fileParallelism: false } }

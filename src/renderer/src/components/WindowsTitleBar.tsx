@@ -14,11 +14,11 @@ import { useChatStore } from '../store/chat-store'
 type MenuAction = () => void | Promise<void>
 type TitleBarTranslate = (key: string, options?: Record<string, unknown>) => string
 
-const WORKWISE_GITHUB_URL = 'https://github.com/wangjiawei508/WorkWise'
+const WORKWISE_GITHUB_URL = 'https://github.com/railwise-cn/railwise-ai'
 const WORKWISE_PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
 const WORKWISE_AUTHOR_URL = 'https://github.com/wangjiawei508'
 const WORKWISE_PRODUCT_INTRO_URL =
-  'https://github.com/wangjiawei508/WorkWise/blob/main/docs/product-introduction.zh-CN.md'
+  'https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md'
 const WORKWISE_RELEASES_URL = `${WORKWISE_GITHUB_URL}/releases`
 
 export type WindowsTitleBarMenuItem =

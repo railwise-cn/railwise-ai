@@ -1,0 +1,41 @@
+{
+  "status": "baseline-only-no-gui-claim",
+  "projectId": "project_9c8894f5-7683-4b0e-a634-466ffca1dbe0",
+  "logicalRecordsSha256": "5f4235dc0af70d459dba5f6833272de034266cee27562d51b44e951b23c353ba",
+  "guiExecutionVerified": false,
+  "professionalApproval": false,
+  "releaseApproval": false,
+  "records": {
+    "sampling_populations": [
+      {
+        "id": "sampling_population_30fa775e-2f90-42f2-8df9-2eabaf74a27f",
+        "logicalRowSha256": "e614198fb43adf8ee1daaeb06f55f34ce228c58ccffa10d8b1d2e9ddf690d3a2",
+        "storedRecordHash": "ee37e3317b5feeddff9305cf9bdb5f67a3a53e0be47d08c4ec2cb016027629b8"
+      }
+    ],
+    "sampling_runs": [
+      {
+        "id": "sampling_run_de67cfde-0c90-41df-884f-53af2da4cacd",
+        "logicalRowSha256": "efbe3d8f5a6645f7e9237860a1db28be8d61d40a2f2455f63afd495a7f05c324",
+        "storedRecordHash": "33b2dabedc6bec30cc62dfad9f3ffb90eb75b2b050f6001b6cf25851b57fff0b"
+      }
+    ],
+    "quality_scoring_records": [
+      {
+        "id": "quality_scoring_29a60f54-f4d6-4d54-ba73-ae70e032ae70",
+        "logicalRowSha256": "d8b094aaa3a771c6f7d57b614a8cc552e6899f5e0c17a8005061c9734d26244c",
+        "storedRecordHash": "609e189802d608d0bcadb498736c92b61674b674becdf43adad0dbae6077fc90"
+      },
+      {
+        "id": "quality_scoring_796d1da1-6cf1-4bc5-9966-bedddf3b3839",
+        "logicalRowSha256": "2d099100dac8980c4cc48041da9b213914f679bb3f68a59f63aac16c6484b320",
+        "storedRecordHash": "639ca3609258c44761da44815d16ffda730232c03cabf2d64773a220e89ce855"
+      },
+      {
+        "id": "quality_scoring_b30d35cd-867f-4b3e-9bbe-79cf8c4c70b8",
+        "logicalRowSha256": "d099221be6bd2372ec5cdc48dfcf6fd7a4b54827d03d8091b4dde65028251747",
+        "storedRecordHash": "9ca0817997ae6b9fceec1e1f73bbf2c228236e3915f7b2f98bd9b788b33f745f"
+      }
+    ]
+  }
+}

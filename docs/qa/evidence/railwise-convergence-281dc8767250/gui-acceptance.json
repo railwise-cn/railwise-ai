@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "status": "partial-not-release-approval",
+  "sourceHead": "281dc87672509de147357efc3aabbeae0eb4dbcb",
+  "packageVersion": "0.5.0",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head281dc8767250",
+  "asarSha256": "55daa373c28d3bf1ff2b6d98a9af403da7e405c54df500a4bfcaddc09f1ac807",
+  "zipSha256": "0c1849958d5492ef641560bb9168cd245a3354f62ca8940676f717d38d12d83f",
+  "evidenceBasis": [
+    "38 original synthetic native GUI screenshots and AX captures",
+    "gui-operation-notes.json agent-observed operations",
+    "assessment-verification.json independent read-only stored-record verification"
+  ],
+  "scope": {
+    "syntheticDataOnly": true,
+    "projects": 1,
+    "network": "synthetic COSA IN2 plane control; 4 points, 5 observations, 3 parameters, 2 degrees of freedom",
+    "deliverables": ["DOCX", "PDF", "XLSX"],
+    "reviewStatus": "draft",
+    "sampling": "2 explicitly declared units; final-office first-round census",
+    "scores": 3,
+    "scoreCases": ["LINK-01 full 9141/100", "LINK-02 full 9141/100", "LINK-01 declared veto"],
+    "assessments": 4,
+    "assessmentCases": ["missing", "complete", "veto-with-missing", "complete after normal retention append"],
+    "initialRetentionEvents": 4,
+    "finalRetentionEvents": 5,
+    "wrongUnitScoreRejected": true,
+    "healthyCurrentRecordRestoredAfterRejection": true,
+    "sourceChangedOldRecordRejectedAsCurrent": true,
+    "damagedSourceGuiInjection": "not-tested"
+  },
+  "nativeExport": {
+    "cancelObserved": true,
+    "defaultFileAbsentAfterCancel": true,
+    "savedFile": "assessment-complete.json",
+    "bytes": 8213,
+    "sha256": "70ea6e3845de2d6ce26210cea6635be612aef4e3c5cab6629a621d7b74d232a6",
+    "independentSavedRecordEquality": true
+  },
+  "restart": {
+    "originalAssessmentIdsRestored": 3,
+    "fourthAssessmentRestartClaimed": false,
+    "firstQuitExitCode": 0,
+    "finalQuitExitCode": 0,
+    "candidateProcessesAtEnd": 0
+  },
+  "visual": {
+    "observed": ["Chinese light regular and wide", "Chinese light compact stacked", "Chinese dark compact stacked and wide", "English light wide", "English dark wide"],
+    "compactImagePixels": [1163, 764],
+    "regularImagePixels": [1171, 768],
+    "wideImagePixels": [1490, 768],
+    "screenshot26": "named compact but actual image is wide 1490x768; excluded from compact coverage",
+    "nativeBoundsAndCssViewportMeasured": false,
+    "keyboard": "Tab from reverify to export and then history observed; limited coverage",
+    "knownLocaleGap": "Chinese app native save dialog contains English Save generated file and JSON file labels",
+    "finalViewBeforeQuit": "Chinese light healthy current assessment",
+    "marketingImages": ["32-marketing-deliverables-zh-light.jpg", "33-marketing-survey-zh-light.jpg", "34-marketing-model-settings-zh-light.jpg"],
+    "websiteDeploymentVerified": false
+  },
+  "independentVerification": {
+    "baselineUnchanged": true,
+    "scoresChecked": 3,
+    "assessmentRecordsChecked": 4,
+    "nativeExportFilesChecked": 1,
+    "checkerImportsProductModules": false,
+    "crossDatabaseAtomicityClaimed": false,
+    "guiExecutionVerifiedFalseMeaning": "Independent checker cannot certify GUI actions; GUI evidence is separate",
+    "initialFailureRetained": "Manifest canonical hash; Python e-07 versus ECMAScript e-7",
+    "repair": "Standalone ECMAScript serialization helper; strict hashes and Fraction scoring retained",
+    "serializationSelfTests": 6,
+    "developmentFixtureChecks": 6
+  },
+  "remaining": [
+    "All locale/theme/window combinations and measured native minimum bounds",
+    "Complete GUI state, keyboard and accessibility coverage",
+    "Damaged-source GUI rejection and isolation in this exact package",
+    "Successful live model and official V4.1 search session",
+    "Real historical user-data migration",
+    "Professional evidence authenticity, interpretation, authorized signatures and approval",
+    "User personal confirmation of this exact package UI and functions",
+    "Representative production metrics"
+  ],
+  "laterChangesNotInPackage": ["dd919f5 V4.1 automatic model router migration", "7aa944f sampling workspace locale clarification"],
+  "userAcceptance": false,
+  "professionalApproval": false,
+  "releaseApproval": false,
+  "publicReleasePerformed": false
+}

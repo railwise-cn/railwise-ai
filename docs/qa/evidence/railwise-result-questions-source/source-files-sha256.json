@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-20T21:51:43.358Z",
+  "baseHead": "b193fc70d6363dc768e715087ca9c0d9975158c9",
+  "scope": "Changed and untracked TypeScript source/test files in src and kun/src; this is not a complete dependency or package fingerprint.",
+  "changedSourceFiles": [
+    {
+      "path": "kun/src/adapters/tool/engineering-conversation-tools.test.ts",
+      "sha256": "e7795a29df07708947990bd7a1514a7e0471f578e31aeef4b37fbc63fcceea89"
+    },
+    {
+      "path": "kun/src/adapters/tool/engineering-conversation-tools.ts",
+      "sha256": "0eb33b92a54f0ad042b3fce1a340fdf8f836bbee4fe08d775c475000a4892088"
+    },
+    {
+      "path": "kun/src/contracts/index.ts",
+      "sha256": "72384808fa755e4d44e2b5e7849b811c3db7f522c679990f9d18564a38ff8c7a"
+    },
+    {
+      "path": "kun/src/contracts/survey-evidence-reference.ts",
+      "sha256": "a999c2989a3b79f14058fbd43601f5fbb51cbdaf25ccdae42c3ab4b0812a3145"
+    },
+    {
+      "path": "kun/src/engineering/engineering-ai-orchestrator.ts",
+      "sha256": "77c95d1db0a6ebd38f6c5b8f59f33a607e125d197cd6e4954e2188ccb2d008e0"
+    },
+    {
+      "path": "kun/src/engineering/engineering-service.ts",
+      "sha256": "a40cebab5ef67fe08e3c53a4bf15bc12f03d17bb909421ee16fe4647e2d14e23"
+    },
+    {
+      "path": "kun/src/engineering/survey-evidence-readback.test.ts",
+      "sha256": "05fafd2067b3cc24fb3e08e63fc64e356c60a144e0b4b3503f2d447d7fae126f"
+    },
+    {
+      "path": "kun/src/engineering/survey-evidence-reader.test.ts",
+      "sha256": "4fac47096229dc50dd9ef06f88a93664f43a0304ab9a6dd1f85cfa9ce80c3caf"
+    },
+    {
+      "path": "kun/src/engineering/survey-evidence-reader.ts",
+      "sha256": "f14ffcec9cc86918186a06e5016bb99ebc0a21b08ae56776364be6075a5e415a"
+    },
+    {
+      "path": "kun/src/server/runtime-factory.ts",
+      "sha256": "2d6c66b8a7077e2ea2363a6f9138199eaa7dc927f6273893581572d24a53eb94"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringComposer.dom.test.ts",
+      "sha256": "4cc2c7816f24a65751a23bdbeca848519f1eef880d1e60f6ea3be2c0e43ce042"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringComposer.tsx",
+      "sha256": "fe9a68d365b0f47696b54fbdfd90cc4d4141cfeaafccb437cd9c4254afd40474"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringEvidenceQuestion.dom.test.ts",
+      "sha256": "98e73bc837c0d0c9fbcca44d68834025fbe09391a4e533ffcbf9522b51adc2d1"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringEvidenceQuestion.tsx",
+      "sha256": "8f27500c1c4858f62fb8e7fa4d50ac4bdc6b253e37ec687d0ab03491c2d8db3a"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringManifestVerification.dom.test.ts",
+      "sha256": "527f83b39076e5d4edf9c99f9af218f3720306b49f224dda1510996d399d059f"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringManifestVerification.tsx",
+      "sha256": "0ce613bc5df6f520e1f7b251e5852f5de816a412754c6671c28695ed91b6590f"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringMonitoringReplay.dom.test.ts",
+      "sha256": "6fd217c4165adb2d7f27a6d91659afd15a0275aa6b8875338afe32ddff16b07a"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringMonitoringReplay.tsx",
+      "sha256": "4824cb0a54ed76d01d90ce039f69ebc2c6d991334a4d6d8a07058abb32b31aa0"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "eb587be1396e177e53a832b898455990251acecd72ddcaedc221b891ae960402"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "c3ae69f35330b06a3bcf5c406cd7f6ebd8f8427cdb5badacc3d010f9b3c5e1ab"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts",
+      "sha256": "c6d452ee464bfa3f8c86305e7f071dcdbb39a5ec6fde68e843f56c50f263f622"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.tsx",
+      "sha256": "59cf4baf4d088788bdea41ea4ff99d47d39e33bc9a9f1e10d05610aa3ee8c8de"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdvancedModelResult.tsx",
+      "sha256": "a9dc5c97ae3f554418a233dae434591156f6c1fa98fcea6f5e0e9c54ad9f7ab7"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts",
+      "sha256": "3f00c2757c61022685f2ca6d1fee2d8a19fb461c9c85d47bd28e307d29edc7fb"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.tsx",
+      "sha256": "cca5a0dcdad5c8d285ef83c4b238d577abfc0a62503c7d1642df107c6683cf46"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyFreeLevelingTrial.dom.test.ts",
+      "sha256": "66a6938bd32450354e5e2b38ea91ee238d4e84de351567e8655cb66473d404b9"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyFreeLevelingTrial.tsx",
+      "sha256": "626800529d23f0891c28a4e908770ddbec069f75dc50cf65f543f7a791640aca"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts",
+      "sha256": "131b76a6ac3bc53e5174970dc29f0377275946865393748ef35d06284aa315c0"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.tsx",
+      "sha256": "b754c0d14b10326b09841c4a099bce42e6d07e2cf122dbeaeef8cdcf6491a5fd"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.dom.test.ts",
+      "sha256": "dbbef4c8f157bc4d9bcca4ffe89239b219fa64f5d8faacb716cfd77188f86d57"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.tsx",
+      "sha256": "e2c2b03a5667071fa7af76c70bf5964744fac8a304b7f67f9be440cc9d59a4d9"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityScoringResult.tsx",
+      "sha256": "a6e8d07f3a8b919fd4e2bc5865d16ea98adf1b3aeed2a8480d155ec1e8a5748d"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts",
+      "sha256": "ed54d3258f96e2db4ae6b3cfec5ed2ecb5f2d3f60fac880fe031393111d15610"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.tsx",
+      "sha256": "4d90d886a44af8b27bf79d6cf32c1bddb632365e707a9a966c8b5ac23704a249"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityWorkspace.dom.test.ts",
+      "sha256": "84c966749ba76f6aaec1a68bcaef9c27a60f02fc322694acbe4888e81e582e9b"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyQualityWorkspace.tsx",
+      "sha256": "d0739fb56f42d6ea2e4eb9b29b7b10405dd5ccbc234feba0d064f549cb4c2b3d"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyReferenceDatumResult.tsx",
+      "sha256": "63f7192f5def3f51664c5649d33f5c3ff2f85ae9931e8d8ff148069b7c886ddf"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyStandardBasis.dom.test.ts",
+      "sha256": "f6b8aa007a2b3977ed8f78193fa9032293e7a9515c8ee5b6bd54835cc4f20036"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyStandardBasis.tsx",
+      "sha256": "bec9de1b824b342bafa4a24096b95e6fd8832e4427bc14b578a9b7d27e60eccd"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyStaticIncrementalResult.tsx",
+      "sha256": "8a106967aec9108bec41d31dd548d808f4f33675a3190152a00163928ed8c6be"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyStatisticalDiagnostics.dom.test.ts",
+      "sha256": "dfe7c85ce8aeaf2a193b55a946249c7c04e1fa5e87426e521456b5ada0f9c79e"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyStatisticalDiagnostics.tsx",
+      "sha256": "6d36e05fb2b38f85aafce1b889f022c8b6d1e571229e18214fd6388b9c190dce"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/engineering-conversation-drafts.ts",
+      "sha256": "5836d5bfde70a4cef623f3949fe283e4d2f46c79e41a3aa0c9fb54ae5df66081"
+    },
+    {
+      "path": "src/shared/survey-evidence-reference.ts",
+      "sha256": "ff4a148288d10a85711747dcb4d067d32eb00b58ca90dceff3dd9cd3defdb0b4"
+    }
+  ],
+  "changedSourceSetSha256": "4750545d2e202ce726a85f971afc4a2d7c3349eb0999eabc4960f05fc180c399"
+}

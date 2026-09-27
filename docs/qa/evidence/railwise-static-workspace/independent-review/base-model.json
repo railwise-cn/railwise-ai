@@ -1,0 +1,53 @@
+{
+  "base": {
+    "schemaVersion": 1,
+    "model": "fixed-datum-full-column-rank-independent-linear-observations",
+    "covarianceBasis": "caller-declared-known-apriori-independent-absolute-variances",
+    "errorModel": "caller-declared-zero-mean-independent-errors-no-normality-claim",
+    "coefficientMeaning": "dimensionless-all-parameters-share-observation-unit",
+    "networkId": "independent-network",
+    "revision": 11,
+    "unit": "m",
+    "parameterIds": [
+      "parameter-0"
+    ],
+    "sourceAnchor": "independent-base",
+    "sourceSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "observations": [
+      {
+        "id": "obs-0",
+        "value": 0.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "independent-synthetic-row"
+      },
+      {
+        "id": "obs-1",
+        "value": 2.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "independent-synthetic-row"
+      }
+    ]
+  },
+  "append": {
+    "batchId": "independent-append",
+    "nextRevision": 12,
+    "sourceAnchor": "independent-append-source",
+    "observations": [
+      {
+        "id": "obs-2",
+        "value": 10.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "independent-synthetic-row"
+      }
+    ]
+  }
+}

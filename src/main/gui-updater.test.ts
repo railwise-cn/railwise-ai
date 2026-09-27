@@ -135,14 +135,14 @@ describe('gui updater source helpers', () => {
   it('normalizes common GitHub repository URL forms', async () => {
     const module = await import('./gui-updater')
 
-    expect(module._internals.normalizeGithubOwnerRepo('wangjiawei508/WorkWise')).toBe(
-      'wangjiawei508/WorkWise'
+    expect(module._internals.normalizeGithubOwnerRepo('railwise-cn/railwise-ai')).toBe(
+      'railwise-cn/railwise-ai'
     )
-    expect(module._internals.normalizeGithubOwnerRepo('https://github.com/wangjiawei508/WorkWise.git')).toBe(
-      'wangjiawei508/WorkWise'
+    expect(module._internals.normalizeGithubOwnerRepo('https://github.com/railwise-cn/railwise-ai.git')).toBe(
+      'railwise-cn/railwise-ai'
     )
-    expect(module._internals.normalizeGithubOwnerRepo('git@github.com:wangjiawei508/WorkWise.git')).toBe(
-      'wangjiawei508/WorkWise'
+    expect(module._internals.normalizeGithubOwnerRepo('git@github.com:railwise-cn/railwise-ai.git')).toBe(
+      'railwise-cn/railwise-ai'
     )
   })
 
@@ -151,16 +151,16 @@ describe('gui updater source helpers', () => {
     const releases = [
       {
         tag_name: 'v0.3.0-beta.1',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.3.0-beta.1',
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.3.0-beta.1',
         prerelease: true
       },
       {
         tag_name: 'v0.2.0',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.2.0'
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.2.0'
       },
       {
         tag_name: 'draft',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/draft',
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/draft',
         draft: true
       }
     ]
@@ -174,11 +174,11 @@ describe('gui updater source helpers', () => {
     const releases = [
       {
         tag_name: 'v0.4.0',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.4.0'
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.4.0'
       },
       {
         tag_name: 'v0.3.5',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.3.5'
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.3.5'
       }
     ]
 
@@ -191,15 +191,15 @@ describe('gui updater source helpers', () => {
     const releases = [
       {
         tag_name: 'v0.3.6',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.3.6'
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.3.6'
       },
       {
         tag_name: 'v0.4.0',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.4.0'
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.4.0'
       },
       {
         tag_name: 'v0.3.5',
-        html_url: 'https://github.com/wangjiawei508/WorkWise/releases/tag/v0.3.5'
+        html_url: 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.3.5'
       }
     ]
 
@@ -280,10 +280,10 @@ describe('gui updater source helpers', () => {
       process.env.WORKWISE_UPDATE_PROVIDER = 'github'
       expect(module._internals.resolveUpdateFeedConfig('stable')).toMatchObject({
         kind: 'github',
-        owner: 'wangjiawei508',
-        repo: 'WorkWise'
+        owner: 'railwise-cn',
+        repo: 'railwise-ai'
       })
-      expect(module._internals.downloadPageUrl()).toBe('https://github.com/wangjiawei508/WorkWise/releases')
+      expect(module._internals.downloadPageUrl()).toBe('https://github.com/railwise-cn/railwise-ai/releases')
     } finally {
       for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) {

@@ -1,0 +1,24 @@
+{
+  "checkout": "/private/tmp/railwise-quality-scoring",
+  "files": {
+    "kun/src/contracts/survey-quality-scoring.ts": "a3ead74694e1af66eb1d3a43af94e8268c499fdeef81d73191b83de6be0b0043",
+    "kun/src/engineering/survey-quality-scoring.ts": "c46a2816317763f7e260fe4daf77e49465bde1b96abc97c9b403376f5e63ed28",
+    "kun/src/engineering/survey-quality-scoring-exact.ts": "34ca3e3666991e882b1f0d7b15179bc6e39a89526aa13a5074daa7fef1824ac5",
+    "kun/src/engineering/survey-quality-scoring-rules.ts": "ad8af92ab1a3f90d6afece29d9ff1ec027f5b83d97b52caf0444420dab048924",
+    "kun/src/engineering/survey-quality-scoring.test.ts": "b488d4c9c73c807888901d04c8a638113bf7cc21570f2cfe170cbb9f488c1a40",
+    "kun/dist/contracts/survey-quality-scoring.js": "f6ea236aed31f1799a1fb8d94c0ef4ed08f2ba61f9151b7d6ce1895fb66482ff",
+    "kun/dist/engineering/survey-quality-scoring.js": "042dec04f9b4faefb665b8350024a13c551bf9099955d023955c284d7bab3845",
+    "kun/dist/engineering/survey-quality-scoring-exact.js": "94b4b818484fc9efee101192eeaa6e82eb5cc4b8ea3c99d0f195f3b6eabced1c",
+    "kun/dist/engineering/survey-quality-scoring-rules.js": "664b66a54b0d0dfe46156ff1378f7bbda5d709f2dbba74de6456f31d2e338014"
+  },
+  "evidence": {
+    "replay.sh": "18906a1769477d70ae619c0373ac61cc3cf9080ba89fcc0a2308cc22c9d0ac1f",
+    "profile_oracle.py": "51a1041696579e83903d3520f1b35ab48173d194576e715e81e288633cb61092",
+    "request-fixtures.mjs": "f3c9fb91b6f79e923a9bd987f796dbd4abc69e66d0017185158d1e81351330ac",
+    "rules-probe.mjs": "284ced083ea4af400905ff3688b862d47cf94080171157f31e017738ad029251",
+    "public-boundary-probe.mjs": "5edb695a33eb57ce56971c5797b12f3915b8ba607d4a07e1d7b334db599e7d83",
+    "REVIEW.md": "e9e01a83b4585140b372a5630d441adad4e28e35319af32f44df3354cb597d56",
+    "profile-probe.mjs": "c55a2685da94a512f2a386309b4bf8ba2a90d73e3e21383e348d36c24576fd30"
+  },
+  "originalOracle": "9d5b017d5988bf8a24b7397b8c3d92d3dd768cfba3258970f25fcdcd459781bb"
+}

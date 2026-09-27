@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Exact private candidate installation only; no GUI or user-data operation",
+  "sourceHead": "7d4f454feecb09028007ae9b436a318db6856201",
+  "version": "0.5.0",
+  "workflowRunId": 35502074715,
+  "workflowRef": "codex/survey-7d4f454-private-acceptance",
+  "workflowConclusion": "success",
+  "targetArtifactId": 10603320254,
+  "targetArtifactBytes": 589375860,
+  "targetArtifactOuterDigestRehashed": true,
+  "targetArtifactSha256": "9799c4fc194e5cdcf3607524052bcbe79a58396f814e66064b43775fa30ef23e",
+  "targetDownloadMethod": "Complete authenticated GitHub artifact; 24 bounded 1 MiB range workers; outer SHA-256 and ZIP CRC verified; inner application ZIP verified against authenticated updater evidence",
+  "targetZipSha256": "bba7b45bc5e2fc3e2e0067cbff0eb1cb74aa8948452ac06a241c78b49188ba0b",
+  "installedAsarSha256": "5bc6c213da21d9cc9f265a5ef26678ed92444500876ab8ac5351bd71033b2f6d",
+  "matchesCloudUpdaterInstalledTarget": true,
+  "embeddedSourceProvenanceVerified": true,
+  "asarEntriesVerified": 18363,
+  "localCompiledOutputComparisonPerformed": false,
+  "embeddedUpdaterHost": "127.0.0.1",
+  "appPath": "/private/tmp/railwise-survey-7d4f454/Applications/RAILWISE AI Candidate 7d4f454feecb.app",
+  "executablePath": "/private/tmp/railwise-survey-7d4f454/Applications/RAILWISE AI Candidate 7d4f454feecb.app/Contents/MacOS/RAILWISE AI Candidate 7d4f454feecb",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head7d4f454feecb",
+  "candidateEnvPath": "/private/tmp/railwise-survey-7d4f454/candidate.env",
+  "cloudGatekeeperStatus": "assessments enabled",
+  "localGatekeeperStatus": "assessments disabled",
+  "localSignatureVerified": true,
+  "localStapledNotarizationVerified": true,
+  "guiLaunchedByInstallerAgent": false,
+  "guiAcceptance": "not-tested",
+  "userAcceptance": "not-performed",
+  "userDataReadOrModifiedByInstallerAgent": false,
+  "operatorPreparedHistory": "25 copied historical files reported by parent; not opened, copied, modified or independently reverified by this installation task",
+  "candidateCredentialAccess": 0,
+  "productSourceModified": false,
+  "publicReleaseOperation": false,
+  "cloudEvidenceSha256": "c39f4a13d71dfa5592d97e773513741e523ffa10936ef3b27f1a9b03acd2aa1d",
+  "evidenceArtifactOuterDigestRehashed": false,
+  "evidenceArtifactRetrieval": "Parent downloaded cloud-evidence with authenticated gh; this installation task did not rehash its outer artifact",
+  "testOnlyFollowup": "1f07e92 changes only test budgets; this exact application remains product source 7d4f454",
+  "signatureChecks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "/private/tmp/railwise-survey-7d4f454/Applications/RAILWISE AI Candidate 7d4f454feecb.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "/private/tmp/railwise-survey-7d4f454/Applications/RAILWISE AI Candidate 7d4f454feecb.app"
+      ],
+      "exitCode": 0,
+      "output": "Processing: /private/tmp/railwise-survey-7d4f454/Applications/RAILWISE AI Candidate 7d4f454feecb.app\nThe validate action worked!"
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "/private/tmp/railwise-survey-7d4f454/Applications/RAILWISE AI Candidate 7d4f454feecb.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ]
+}

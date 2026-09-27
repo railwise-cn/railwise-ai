@@ -8,6 +8,10 @@
 
 const UTF8 = new TextEncoder()
 const MAX_RAW_SNIPPET_CHARS = 2_048
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024
+const MAX_LINE_BYTES = 16_384
+const MAX_RECORDS = 10_000
+const MAX_COORDINATES = 10_000
 
 export type CosaNetSource = string | Uint8Array
 
@@ -29,6 +33,7 @@ export type CosaNetRecordAnchor = Readonly<{
 }>
 
 export type CosaNetDiagnosticCode =
+  | 'resource-limit'
   | 'invalid-encoding'
   | 'empty-source'
   | 'invalid-record'
@@ -143,7 +148,20 @@ function anchorFor(line: SourceLine): CosaNetRecordAnchor {
 }
 
 function sourceText(source: CosaNetSource): { text: string } | { diagnostic: CosaNetDiagnostic } {
+  if (source.length > MAX_SOURCE_BYTES) return { diagnostic: resourceLimit() }
   const bytes = typeof source === 'string' ? UTF8.encode(source) : source
+  if (bytes.length > MAX_SOURCE_BYTES) return { diagnostic: resourceLimit() }
+  let lineLength = 0
+  let records = 0
+  for (let index = 0; index < bytes.length; index += 1) {
+    if (bytes[index] === 13 || bytes[index] === 10) {
+      if (bytes[index] === 13 && bytes[index + 1] === 10) index += 1
+      records += 1
+      lineLength = 0
+    } else lineLength += 1
+    if (lineLength > MAX_LINE_BYTES || records > MAX_RECORDS) return { diagnostic: resourceLimit() }
+  }
+  if (lineLength && records >= MAX_RECORDS) return { diagnostic: resourceLimit() }
   const nonAsciiOffset = bytes.findIndex((value) => value > 0x7f)
   if (nonAsciiOffset >= 0) {
     const excerpt = Array.from(bytes.subarray(nonAsciiOffset, Math.min(bytes.length, nonAsciiOffset + 64)))
@@ -167,6 +185,10 @@ function sourceText(source: CosaNetSource): { text: string } | { diagnostic: Cos
     }
   }
   return { text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes) }
+}
+
+function resourceLimit(): CosaNetDiagnostic {
+  return diagnostic('resource-limit', 'blocking', 'COSA .NET 超过文件大小、行长、记录数或坐标数量上限。', '请将文件控制在 8 MiB、每行 16384 字节、10000 条记录及 10000 个坐标以内。', virtualAnchor())
 }
 
 function validCoordinate(value: CosaNetCoordinate | undefined): value is CosaNetCoordinate {
@@ -194,6 +216,10 @@ function parseResult(
  * blocking line makes the whole result unusable rather than returning a prefix.
  */
 export function parseCosaNet(source: CosaNetSource, coordinates: ReadonlyMap<string, CosaNetCoordinate>): CosaNetParseResult {
+  if (coordinates.size > MAX_COORDINATES) {
+    const limit = resourceLimit()
+    return parseResult([limit.recordAnchor], [], [limit])
+  }
   const decoded = sourceText(source)
   if ('diagnostic' in decoded) return parseResult([decoded.diagnostic.recordAnchor], [], [decoded.diagnostic])
 

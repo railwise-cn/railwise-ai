@@ -1,0 +1,172 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~								92 文本输入区 (settable) 模型依据原文, Value: 合成软件数学验收：四成员预声明族，统计量反序输入；正态双侧、t自由度1双侧、卡方自由度2上尾，另有缺失成员。分母固定4，不代表实测成果检验。
+~								96 文本输入区 (settable) 完整试算请求 JSON, Value: {
+  "schemaVersion": 1,
+  "familyId": "synthetic-complete-family",
+  "declaration": "caller-declared-before-observing-statistics",
+  "statisticPrecision": "caller-declared-exact-scalar-inputs-no-upstream-error-propagation",
+  "correction": "bonferroni",
+  "alpha": 0.05,
+  "members": [
+    {
+      "id": "a-normal",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "normal",
+        "tail": "two-sided",
+        "statisticBasis": "standardized-by-known-prior-scale",
+        "scaleBasis": "caller-declared-known-prior-standard-deviation",
+        "priorStandardDeviation": 1,
+        "scaleUnit": "m"
+      }
+    },
+    {
+      "id": "b-t",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "student-t",
+        "tail": "two-sided",
+        "statisticBasis": "externally-studentized",
+        "degreesOfFreedom": 1
+      }
+    },
+    {
+      "id": "c-chi",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "chi-square",
+        "tail": "upper",
+        "statisticBasis": "quadratic-form-divided-by-known-prior-variance",
+        "degreesOfFreedom": 2,
+        "scaleBasis": "caller-declared-known-prior-standard-deviation",
+        "priorStandardDeviation": 1,
+        "scaleUnit": "m"
+      }
+    },
+    {
+      "id": "d-missing",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "normal",
+        "tail": "two-sided",
+        "statisticBasis": "standardized-by-known-prior-scale",
+        "scaleBasis": "caller-declared-known-prior-standard-deviation",
+        "priorStandardDeviation": 1,
+        "scaleUnit": "m"
+      }
+    }
+  ],
+  "statistics": [
+    {
+      "memberId": "c-chi",
+      "status": "available",
+      "value": 4
+    },
+    {
+      "memberId": "b-t",
+      "status": "available",
+      "value": 3
+    },
+    {
+      "memberId": "a-normal",
+      "status": "available",
+      "value": 3
+    }
+  ]
+}
+
+~							97 文本 保留原文，不截断或自动修补。最多 256 KiB UTF-8；当前 1965 字节。
+~								99 复选框 我已核对声明模型及依据，确认仅保存独立实验试算；理解假设未核实且结果不构成工程批准。, Value: 0
++							113 标题 已读取的独立试算记录, Value: 4
++								114 文本 已读取的独立试算记录
++							115 container
++								116 text advanced_trial_75fae9e2-0cb3-41f9-b5e7-1cab6467670c  ·  2026-09-20T00:40:36.388Z
++							117 文本 已核对保存字节与摘要，并读取运行时严格重算的结果。这仅证明本地记录一致性，不鉴证输入来源或模型假设。
++							118 按钮 重新核验并重放
++							119 按钮 重新核验并导出 JSON
++							120 标题 模型依据原文, Value: 5
++								121 文本 模型依据原文
++							122 文本 合成软件数学验收：四成员预声明族，统计量反序输入；正态双侧、t自由度1双侧、卡方自由度2上尾，另有缺失成员。分母固定4，不代表实测成果检验。
++							123 container 统计检验族结果
++								124 标题 统计检验族结果, Value: 4
++									125 文本 统计检验族结果
++								126 文本 已计算检验族，请逐项查看成员状态
++								127 文本 检验族预声明与分布假设未经核验。标量比较不构成观测分类、删点或规范符合性结论，也不传播上游统计量的不确定性。
++								128 文本 检验族 synthetic-complete-family · 完整分母 4 · 检验族 alpha 0.05 · 成员 alpha 0.0125
++								129 container 全部预声明检验族成员
++									130 表格
++										131 row
++											132 列标题
++												133 文本 成员及声明来源
++											134 列标题
++												135 文本 状态
++											136 列标题
++												137 文本 声明的统计量
++											138 列标题
++												139 文本 p 值
++											140 列标题
++												141 文本 Bonferroni 调整后 p 值
++											142 列标题
++												143 文本 临界幅值与数值分辨区间
++											144 列标题
++												145 文本 标量比较
++										146 row
++											147 行标题
++												148 text a-normal 正态（双侧）  ·  synthetic-acceptance 声明先验标准差 1 m
++											149 单元格
++												150 文本 已计算
++											151 单元格
++												152 文本 3
++											153 单元格
++												154 文本 0.00269979606326
++											155 单元格
++												156 文本 0.010799184253
++											157 单元格
++												158 text 2.4977054744123723 [ 2.4977054743414655, 2.497705474483279 ]
++											159 单元格
++												160 文本 p 小于调整后的 alpha
++										161 row
++											162 行标题
++												163 text b-t Student t（双侧）  ·  synthetic-acceptance 自由度 1
++											164 单元格
++												165 文本 已计算
++											166 单元格
++												167 文本 3
++											168 单元格
++												169 文本 0.204832764699
++											170 单元格
++												171 文本 0.819331058797
++											172 单元格
++												173 text 50.92303663648548 [ 50.9230366262982, 50.923036646672756 ]
++											174 单元格
++												175 文本 p 大于调整后的 alpha
++										176 row
++											177 行标题
++												178 text c-chi 卡方（上尾）  ·  synthetic-acceptance 自由度 2 声明先验标准差 1 m
++											179 单元格
++												180 文本 已计算
++											181 单元格
++												182 文本 4
++											183 单元格
++												184 文本 0.135335283237
++											185 单元格
++												186 文本 0.541341132946
++											187 单元格
++												188 text 8.764053269347762 [ 8.764053268947762, 8.764053269747777 ]
++											189 单元格
++												190 文本 p 大于调整后的 alpha
++										191 row
++											192 行标题
++												193 text d-missing 正态（双侧）  ·  synthetic-acceptance 声明先验标准差 1 m
++											194 单元格
++												195 text 数值不可解析 未提供统计量，仍计入分母
++											196 单元格 2-6
++												197 文本 未计算
++								198 文本 显示区间表示软件分辨率政策，并非认证误差界。单项失败和缺失统计量保留显示，始终计入完整检验族。
++							199 开合三角标记 原始 JSON 声明
++								200 文本 原始 JSON 声明
++							201 开合三角标记 实际计算的归一化模型
++								202 文本 实际计算的归一化模型
++							203 开合三角标记 完整结果与追溯摘要
++								204 文本 完整结果与追溯摘要
+The focused UI element is 78 标题 高级模型试算, Value: 3

@@ -857,11 +857,17 @@ describe('Kun built-in tools', () => {
     const order: string[] = []
 
     let releaseFirst!: () => void
+    const firstRelease = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    let notifyFirstStarted!: () => void
+    const firstStarted = new Promise<void>((resolve) => {
+      notifyFirstStarted = resolve
+    })
     const first = withFileMutationQueue(target, async () => {
       order.push('first:start')
-      await new Promise<void>((resolve) => {
-        releaseFirst = resolve
-      })
+      notifyFirstStarted()
+      await firstRelease
       order.push('first:end')
     })
 
@@ -870,10 +876,14 @@ describe('Kun built-in tools', () => {
       order.push('second:end')
     })
 
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(order).toEqual(['first:start'])
-    releaseFirst()
-    await Promise.all([first, second])
+    try {
+      // Queue registration and filesystem lock acquisition need not finish in 20 ms.
+      await firstStarted
+      expect(order).toEqual(['first:start'])
+    } finally {
+      releaseFirst()
+      await Promise.all([first, second])
+    }
     expect(order).toEqual(['first:start', 'first:end', 'second:start', 'second:end'])
   })
 

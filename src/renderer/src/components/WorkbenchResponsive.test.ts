@@ -106,7 +106,7 @@ describe('Workbench responsive panel contract', () => {
     ])
 
     expect(engineering).toContain("type TabId = 'ai-command'")
-    expect(engineering).toContain("useState<TabId>('ai-command')")
+    expect(engineering).toContain("workwise.survey.stage.v1:")
     expect(engineering).toContain('<EngineeringAiCommandCenter')
     expect(aiCommandCenter).toContain("t('engineeringAiTitle')")
     expect(engineering).toContain("t('engineeringDashboardConsoleTitle')")

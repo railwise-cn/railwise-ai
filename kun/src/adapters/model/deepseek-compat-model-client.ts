@@ -12,7 +12,6 @@ import {
   type ModelEndpointFormat
 } from '../../contracts/model-endpoint-format.js'
 import { RUNTIME_RESOURCE_LIMITS_V1 } from '../../contracts/resource-limits.js'
-import { modelVisibleToolArguments } from '../../security/tool-persistence-security.js'
 
 /**
  * Configuration for the compatible HTTP model client. Chat
@@ -564,7 +563,7 @@ export class DeepseekCompatModelClient implements ModelClient {
         sawResult = true
         if (expectedCallIds.has(item.callId) && !seenResultIds.has(item.callId)) {
           seenResultIds.add(item.callId)
-          resultMessages.push(this.toolResultToMessage(item))
+          resultMessages.push(this.toolResultToMessage(item, calls.find((call) => call.callId === item.callId)))
         }
         index += 1
         continue
@@ -604,12 +603,24 @@ export class DeepseekCompatModelClient implements ModelClient {
     return {
       id: item.callId,
       type: 'function',
-      function: { name: item.toolName, arguments: JSON.stringify(modelVisibleToolArguments(item)) }
+      function: { name: item.toolName, arguments: JSON.stringify(item.arguments) }
     }
   }
 
-  private toolResultToMessage(item: Extract<TurnItem, { kind: 'tool_result' }>): ChatMessage {
-    const content = toolResultContent(item.output)
+  private toolResultToMessage(
+    item: Extract<TurnItem, { kind: 'tool_result' }>,
+    call?: Extract<TurnItem, { kind: 'tool_call' }>
+  ): ChatMessage {
+    // Persisted arguments are deliberately redacted. Never turn their summary
+    // into a synthetic function parameter: models copy history as call examples.
+    const summary = call && Object.keys(call.arguments).length === 0 ? call.argumentSummary?.trim() : undefined
+    const content = summary
+      ? [
+          'Historical tool execution. Original arguments were omitted for privacy; the empty argument object and summary are not valid arguments to copy. Reconstruct any new call from the current request and tool schema.',
+          `Argument summary (reference data only):\n${summary}`,
+          `Recorded result:\n${toolResultContent(item.output)}`
+        ].join('\n\n')
+      : toolResultContent(item.output)
     const untrusted = isUntrustedToolOutput(item.output)
     return {
       role: 'tool',

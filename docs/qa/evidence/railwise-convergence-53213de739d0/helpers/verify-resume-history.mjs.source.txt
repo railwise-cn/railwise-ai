@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+
+const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+const digest = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
+
+export function verifyResumeHistory({ expected, thread, items, taskEvents, mockReport, strictExecutionMarkers }) {
+  const ids = expected.previousFailedTurnIds ?? [];
+  assert(Array.isArray(ids) && new Set(ids).size === ids.length);
+  if (!ids.length) { assert(!mockReport, 'mockReportPath requires previousFailedTurnIds'); return { checked: false }; }
+  assert.equal(strictExecutionMarkers, true, 'resume-history acceptance requires strict execution markers');
+  assert(mockReport, 'previousFailedTurnIds requires mockReportPath');
+  for (const key of ['projectId', 'networkId', 'threadId']) assert.equal(mockReport[key], expected[key], `mock ${key} differs`);
+  assert.equal(mockReport.syntheticOnly, true); assert.equal(mockReport.externalNetwork, false); assert.equal(mockReport.upstreamCredentialsRead, false);
+  assert.equal(mockReport.tokenRemoved, true); assert.equal(mockReport.cleanupError, undefined);
+  assert.equal(typeof mockReport.answer, 'string'); assert(mockReport.answer.includes(expected.goalMarker));
+  assert(Array.isArray(mockReport.events)); assert.equal(mockReport.requestCount, mockReport.events.length);
+  assert(mockReport.requestCount > 0 && mockReport.requestCount <= 20);
+  assert(mockReport.events.every(event => event.accepted && !event.rejected));
+  assert(mockReport.events.every(event => ['/v1/models', '/v1/chat/completions'].includes(event.route)));
+  const mockChats = mockReport.events.filter(event => event.route === '/v1/chat/completions');
+  assert(mockChats.length > 0);
+  const successful = thread.turns.find(turn => turn.id === expected.turnId); assert(successful);
+  const resumeIndex = thread.turns.indexOf(successful);
+  const resumeAttached = taskEvents.find(event => event.kind === 'turn_attached' && event.payload.turnId === expected.turnId);
+  assert(resumeAttached, 'resumed Turn is not attached to the selected original Task');
+  assert(taskEvents.some(event => event.kind === 'attempt_started' && event.payload.turnId === expected.turnId && event.sequence > resumeAttached.sequence));
+  const histories = ids.map(id => {
+    assert.match(id, /^[a-zA-Z0-9_-]+$/); assert.notEqual(id, expected.turnId);
+    const turn = thread.turns.find(candidate => candidate.id === id); assert(turn, 'previous failed Turn is missing');
+    assert(thread.turns.indexOf(turn) < resumeIndex, 'failed Turn must precede resumed Turn');
+    assert.equal(turn.status, 'failed'); assert.equal(turn.engineeringExecution, true); assert.equal(turn.engineeringPlanId, expected.planId);
+    assert.match(turn.error ?? '', /^engineering_plan_steps_incomplete:/);
+    for (const key of ['model', 'providerId', 'reasoningEffort']) assert.equal(turn[key], expected[key], `previous Turn ${key} missing or changed`);
+    const history = items.filter(item => item.turnId === id);
+    assert(history.length > 0); assert(history.every(item => item.threadId === expected.threadId));
+    assert.equal(history.filter(item => item.kind === 'tool_call' || item.kind === 'tool_result').length, 0, 'mock Turn contains tool execution');
+    const texts = history.filter(item => item.kind === 'assistant_text'); assert(texts.length > 0);
+    assert(texts.every(item => item.text === mockReport.answer), 'mock assistant transcript changed');
+    const attempts = taskEvents.filter(event => event.kind === 'attempt_started' && event.payload.turnId === id);
+    assert.equal(attempts.length, texts.length, 'original Task attempts do not match mock assistant texts');
+    assert(attempts.every(event => event.sequence < resumeAttached.sequence));
+    const lastAttempt = attempts.at(-1);
+    assert(taskEvents.some(event => event.kind === 'task_stalled' && event.sequence > lastAttempt.sequence && event.sequence < resumeAttached.sequence && /^engineering_plan_steps_incomplete:/.test(event.payload.reason ?? '')), 'original Task stalled evidence is missing');
+    assert(Date.parse(turn.finishedAt) <= Date.parse(successful.createdAt), 'resume predates failed Turn finish');
+    return { turnId: id, status: turn.status, exactMockAssistantTextCount: texts.length, attemptCount: attempts.length, turnSha256: digest(turn), transcriptSha256: digest(history) };
+  });
+  const textCount = histories.reduce((total, history) => total + history.exactMockAssistantTextCount, 0);
+  assert.equal(textCount, mockChats.length, 'mock accepted chat count differs from retained assistant texts');
+  if (expected.mockAssistantTextCount !== undefined) assert.equal(textCount, expected.mockAssistantTextCount);
+  assert.equal(taskEvents.filter(event => event.kind === 'task_created').length, 1, 'task identity was recreated');
+  const realCalls = items.filter(item => item.turnId === expected.turnId && item.kind === 'tool_call');
+  const realResults = items.filter(item => item.turnId === expected.turnId && item.kind === 'tool_result');
+  assert.deepEqual(realCalls.filter(item => expected.tools.includes(item.toolName)).map(item => item.toolName), expected.tools);
+  for (const call of realCalls) {
+    const result = realResults.find(item => item.callId === call.callId);
+    assert(result && result.isError === false, 'resumed Turn lacks a successful tool result');
+    assert.equal(call.threadId, expected.threadId); assert.equal(result.threadId, expected.threadId);
+    assert.equal(items.filter(item => item.kind === 'tool_result' && item.callId === call.callId).length, 1, 'tool result belongs to another Turn');
+  }
+  return { checked: true, sameOriginalTask: true, mockRequestCount: mockReport.requestCount, mockChatCount: mockChats.length, exactMockAssistantTextCount: textCount, previousFailedTurns: histories, resumedTurnId: expected.turnId, successfulToolsBelongToResumedTurn: true, taskEventsSha256: digest(taskEvents), mockReportSha256: digest(mockReport), receiptTurnAttribution: 'Corroborated by zero tool execution in prior failed turns and exact matching resumed tool outputs/parameters. Receipt rows themselves have no turnId column.' };
+}

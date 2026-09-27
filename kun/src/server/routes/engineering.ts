@@ -6,6 +6,7 @@ import type { SurveyService } from '../../engineering/survey-service.js'
 import { CosaFileGroupInspectionRequestV1, SkillProvenanceV1, type EngineeringCapabilityV1 } from '../../contracts/survey.js'
 import { identifyCosaFileGroups } from '../../engineering/survey-file-groups.js'
 import { AUDITED_SPECIALIST_SKILLS, SPECIALIST_SKILL_ALIASES, SPECIALIST_SKILL_SOURCE } from '../../engineering/specialist-skill-provenance.generated.js'
+import { MonitoringReplayVerificationV1 } from '../../contracts/engineering.js'
 
 export async function listProjects(service: EngineeringService | undefined): Promise<JsonResponse> {
   if (!service) return ERRORS.unavailable('engineering workbench is unavailable')
@@ -60,6 +61,23 @@ export async function finalizeDeliverable(service: EngineeringService | undefine
   const body = await readJsonBody(request); if (!body.ok) return body.response
   try { return jsonResponse({ manifest: await service.finalize(body.value) }, 201) } catch (error) { return mapError(error) }
 }
+export async function verifyDeliverable(service: EngineeringService | undefined, projectId: string, manifestId: string): Promise<JsonResponse> {
+  if (!service) return ERRORS.unavailable('engineering workbench is unavailable')
+  try { return jsonResponse({ verification: service.verifyDeliverable(projectId, manifestId) }) } catch (error) { return mapError(error) }
+}
+export async function replayMonitoringDeliverable(service: EngineeringService | undefined, request: Request, projectId: string, manifestId: string): Promise<JsonResponse> {
+  if (!service) return ERRORS.unavailable('engineering workbench is unavailable')
+  if (new URL(request.url).search) return ERRORS.validation('monitoring replay does not accept query parameters')
+  const body = await readJsonBody(request, 1024)
+  if (!body.ok) return body.response
+  if (!body.value || typeof body.value !== 'object' || Array.isArray(body.value) || Object.keys(body.value).length) return ERRORS.validation('monitoring replay accepts only an empty request object')
+  try {
+    const response = jsonResponse({ replay: MonitoringReplayVerificationV1.parse(await service.replayMonitoringDeliverable(projectId, manifestId)) })
+    response.headers['cache-control'] = 'no-store'
+    return response
+  }
+  catch { return ERRORS.unavailable('monitoring replay could not persist verification evidence') }
+}
 export async function getRun(service: EngineeringService | undefined, id: string): Promise<JsonResponse> {
   if (!service) return ERRORS.unavailable('engineering workbench is unavailable')
   const run = service.getRun(id); return run ? jsonResponse({ run }) : ERRORS.notFound(`run not found: ${id}`)
@@ -75,11 +93,22 @@ export async function resumeRun(service: EngineeringService | undefined, id: str
 
 export async function importSurveyNetwork(service: SurveyService | undefined, request: Request): Promise<JsonResponse | Response> {
   if (!service) return ERRORS.unavailable('survey adjustment service is unavailable')
-  const body = await readJsonBody(request); if (!body.ok) return body.response
-  if (body.value && typeof body.value === 'object' && !Array.isArray(body.value) && Object.prototype.hasOwnProperty.call(body.value, 'network')) {
-    return ERRORS.validation('结构化网络不能直接通过 Runtime 提交；请以 WorkWise JSON 源文件的 name 与 dataBase64 导入，以保留原始字节、SHA-256 与原始资料账本。')
-  }
   try {
+    // Dispatch reaches this handler only after Runtime authorization. Transport
+    // rejections carry no invented request identity and cannot prove a first task.
+    let body
+    try { body = await readJsonBody(request) } catch (error) {
+      service.recordRejectedImport(undefined, 'body-read')
+      throw error
+    }
+    if (!body.ok) {
+      service.recordRejectedImport(undefined, body.response.status === 413 ? 'body-too-large' : 'invalid-json')
+      return body.response
+    }
+    if (body.value && typeof body.value === 'object' && !Array.isArray(body.value) && Object.prototype.hasOwnProperty.call(body.value, 'network')) {
+      service.recordRejectedImport(body.value, 'structured-http')
+      return ERRORS.validation('结构化网络不能直接通过 Runtime 提交；请以 WorkWise JSON 源文件的 name 与 dataBase64 导入，以保留原始字节、SHA-256 与原始资料账本。')
+    }
     const network = await service.importNetwork(body.value)
     return jsonResponse({ network: { ...network, rawSourceIntegrity: service.getRawSourceIntegrity(network.id), sourceEligibility: service.getSourceEligibility(network.id) } }, 201)
   } catch (error) { return mapSurveyError(error) }
@@ -223,4 +252,4 @@ export function skillsCatalog(): JsonResponse {
 
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error) }
 function mapError(error: unknown): JsonResponse { const code = (error as { code?: string })?.code; if (code === 'stale_request') return ERRORS.staleRequest(errorMessage(error)); if (errorMessage(error).includes('not found')) return ERRORS.notFound(errorMessage(error)); if (errorMessage(error).includes('blocking findings') || errorMessage(error).includes('warnings require')) return ERRORS.conflict(errorMessage(error)); return ERRORS.validation(errorMessage(error)) }
-function mapSurveyError(error: unknown): JsonResponse { const code = (error as { code?: string })?.code; if (code === 'survey_stale_request') return ERRORS.staleRequest(errorMessage(error)); if (errorMessage(error).includes('not found')) return ERRORS.notFound(errorMessage(error)); if (errorMessage(error).includes('exceeds limits') || errorMessage(error).includes('blocking')) return ERRORS.conflict(errorMessage(error)); return ERRORS.validation(errorMessage(error)) }
+function mapSurveyError(error: unknown): JsonResponse { const code = (error as { code?: string })?.code; if (code === 'survey_import_audit_unavailable') return ERRORS.unavailable('survey import audit could not be persisted'); if (code === 'survey_stale_request') return ERRORS.staleRequest(errorMessage(error)); if (errorMessage(error).includes('not found')) return ERRORS.notFound(errorMessage(error)); if (errorMessage(error).includes('exceeds limits') || errorMessage(error).includes('blocking')) return ERRORS.conflict(errorMessage(error)); return ERRORS.validation(errorMessage(error)) }

@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="./src/asset/img/workwise.png" width="112" alt="RAILWISE AI 图标" />
-  <h1>RAILWISE AI</h1>
+  <img src="./src/asset/img/workwise.png" width="112" alt="RailWise AI 图标" />
+  <h1>RailWise AI</h1>
   <p><strong>工程测量内业与编程协作。</strong></p>
-  <p>本地优先的桌面工作平台。RAILWISE Survey 将原始测量资料处理为可审查、可追溯的成果。</p>
+  <p>本地优先的桌面工作平台。RailWise Survey 将原始测量资料处理为可审查、可追溯的成果。</p>
   <p><strong>DeepSeek V4.1-Flash 原生默认支持</strong> · 默认模型 <code>deepseek-flash</code> · Survey 工程测量工作台</p>
   <p>
     简体中文 · <a href="./README.en.md">English</a>
@@ -11,24 +11,24 @@
     <a href="https://www.railwise.cn/products/workwise/">产品主页</a> ·
     <a href="./docs/product-introduction.zh-CN.md">软件介绍</a> ·
     <a href="./docs/USER_GUIDE.zh-CN.md">使用指南</a> ·
-    <a href="https://github.com/wangjiawei508/WorkWise/releases">版本与下载</a> ·
-    <a href="https://github.com/wangjiawei508/WorkWise/issues">问题反馈</a>
+    <a href="https://github.com/railwise-cn/railwise-ai/releases">版本与下载</a> ·
+    <a href="https://github.com/railwise-cn/railwise-ai/issues">问题反馈</a>
   </p>
 </div>
 
 ---
 
-RAILWISE AI 的候选界面以“编程 / 内业”为主入口。RAILWISE Survey 面向工程测量内业，将任务、原始资料、计算记录和候选成果组织在同一工作区；Write、Design、Flow、插件和定时任务继续提供辅助工具。
+RailWise AI 的候选界面以“编程 / 内业”为主入口。RailWise Survey 面向工程测量内业，将任务、原始资料、计算记录和候选成果组织在同一工作区；Write、Design、Flow、插件和定时任务继续提供辅助工具。
 
-**版本边界：**新的命名、四阶段 Survey 界面和后续专业功能仍在隔离候选包中验收，本文更新不替换公开 0.5.0 安装包，也不改变其更新渠道。WorkWise 仓库、安装包名、存储和更新标识保留兼容，见[迁移矩阵](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md)。
+**版本边界：**新的命名、四阶段 Survey 界面和后续专业功能仍在隔离候选包中验收，本文更新不替换公开 0.5.0 安装包，也不改变其更新渠道。仓库已迁移至 `railwise-cn/railwise-ai`；安装包名、存储和更新标识保留兼容，见[迁移矩阵](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md)。
 
-**[0.5.0 正式版](https://github.com/wangjiawei508/WorkWise/releases/tag/v0.5.0)**新增工程测量工作台，将项目数据、格式诊断、闭合差与平差复核、成果导出组织在同一工作区；继续提供统一插件市场、Codex 插件兼容和结构化附件处理。旧版本用户可通过应用内检查更新升级。
+**[0.5.0 正式版](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.0)**新增工程测量工作台，将项目数据、格式诊断、闭合差与平差复核、成果导出组织在同一工作区；继续提供统一插件市场、Codex 插件兼容和结构化附件处理。旧版本用户可通过应用内检查更新升级。
 
 ## DeepSeek V4.1 支持
 
 默认模型使用 DeepSeek V4.1-Flash，官方模型 ID 为 `deepseek-flash`；已经保存的显式模型选择保持不变。截图对应的 `281dc87` 候选已包含该默认值，后续自动选模和失败回退修复属于更新源码。
 
-2026-09-20 的产品适配器真实服务检查已通过官方对话、JSON 输出、声明函数名与参数返回，以及合成图片识别。声明函数检查没有执行实际工具；这些结果也不替代精确安装包内的完整 AI 会话、审批、工具及视觉流程验收。V4.1 官方 Responses 接口会忽略内置 `web_search`，搜索请求返回 HTTP 200 不代表联网搜索成功；需要另行配置浏览器或 MCP 等搜索工具。详见[真实服务核验](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-v41-live-20260920/README.md)。
+2026-09-20 的产品适配器真实服务检查已通过官方对话、JSON 输出、声明函数名与参数返回，以及合成图片识别。声明函数检查没有执行实际工具；这些结果也不替代精确安装包内的完整 AI 会话、审批、工具及视觉流程验收。V4.1 官方 Responses 接口会忽略内置 `web_search`，搜索请求返回 HTTP 200 不代表联网搜索成功；需要另行配置浏览器或 MCP 等搜索工具。详见[真实服务核验](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-v41-live-20260920/README.md)。
 
 - **安装后直接配置 DeepSeek**：首次启动的模型配置只提供 DeepSeek API Key 和可选服务地址，不需要先理解或切换服务商；完成一次配置后，对话、写作和手机连接即可共用。没有 API Key 时仍可先使用本地写作和导出。
 - **统一默认模型**：0.5.0 的主 Agent、Write、定时任务和其他 Agent 默认使用官方模型 ID `deepseek-flash`（DeepSeek V4.1-Flash）；`deepseek-v4-pro` 仍可显式选择，旧 Flash ID 仅为迁移兼容保留。
@@ -39,7 +39,7 @@ RAILWISE AI 的候选界面以“编程 / 内业”为主入口。RAILWISE Surve
 
 完整支持范围与版本边界见[软件介绍](./docs/product-introduction.zh-CN.md)；实现边界见 [DeepSeek Harness 接入说明](./docs/DEEPSEEK_HARNESS.zh-CN.md)。DeepSeek V4.1-Flash 的公开模型参数和接口说明以[官方文档](https://api-docs.deepseek.com/updates)为准。
 
-## RAILWISE Survey
+## RailWise Survey
 
 **原始文件 → 内容识别与预检 → 建网和基准确认 → 确定性平差 → 精度与异常复核 → 成果包 → 人工审查。**
 
@@ -52,23 +52,23 @@ RAILWISE AI 的候选界面以“编程 / 内业”为主入口。RAILWISE Surve
 
 AI 对话跨阶段保留，解释和编排不替代工程计算。计算、项目修改与导出先展示具体参数再确认。生成文件、完整性复验和人工批准分别记录；当前候选成果仍为待审查草稿。
 
-COSA IN1/IN2、Leica GSI 水准数据需通过相应单位、基准和拓扑校验。需要列映射时显式确认；OU1/OU2 当前保留用于归档审查，不能宣传为已验收的产品内自动成果比较。RW5 等部分来源仅支持解析检查或归档，GNSS 原始观测和 RTKLIB 相关来源需后处理，不能直接充当基线平差输入。详见[当前格式范围](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md)。
+COSA IN1/IN2、Leica GSI 水准数据需通过相应单位、基准和拓扑校验。需要列映射时显式确认；OU1/OU2 当前保留用于归档审查，不能宣传为已验收的产品内自动成果比较。RW5 等部分来源仅支持解析检查或归档，GNSS 原始观测和 RTKLIB 相关来源需后处理，不能直接充当基线平差输入。详见[当前格式范围](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md)。
 
 候选已接入自由水准、广义 w、分组 VCE、固定外部尺度 Huber、统计家族、指定参考的两历元比较和静态独立观测追加。它们保留模型声明、历史与严格重算，不自动删除观测、更换正式权或认定稳定点。质量工作区已提供材料保全、完整首轮抽样、限定声明评分，以及最多 8 个样本单位的关联评估；缺项和否决分开显示，不能代替资料鉴真、整改重抽、人员签认或完整规范符合性判定。
 
-已完成与剩余范围按[执行台账](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md)和[高级试算合同](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md)逐项记录，不代表上述功能均已随 0.5.0 正式交付。
+已完成与剩余范围按[执行台账](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md)和[高级试算合同](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md)逐项记录，不代表上述功能均已随 0.5.0 正式交付。
 
 ## 候选界面预览
 
-以下三图均为 `281dc87` 已安装候选包的中文浅色实拍，使用合成平面控制网（4 点、1 测站、5 观测）。截图对应平差结果、成果中心与模型设置；[截图清单](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json)记录来源和哈希。
+以下三图均为 `281dc87` 已安装候选包的中文浅色实拍，使用合成平面控制网（4 点、1 测站、5 观测）。截图对应平差结果、成果中心与模型设置；[截图清单](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json)记录来源和哈希。
 
-![RAILWISE Survey 中文浅色候选平差结果](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
+![RailWise Survey 中文浅色候选平差结果](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
 
-![RAILWISE Survey 中文浅色候选成果中心](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
+![RailWise Survey 中文浅色候选成果中心](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
 
-![RAILWISE AI 中文浅色候选模型设置](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
+![RailWise AI 中文浅色候选模型设置](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
 
-本包完成签名、公证、真实私有升级往返及限定质量关联 GUI 检查，详见[精确包验收记录](https://github.com/wangjiawei508/WorkWise/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md)。完整界面覆盖、包内 AI 流程、专业复核和用户本人确认尚未闭合，整体验收仍为部分完成；后续源码修复不自动计入本包。
+本包完成签名、公证、真实私有升级往返及限定质量关联 GUI 检查，详见[精确包验收记录](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md)。完整界面覆盖、包内 AI 流程、专业复核和用户本人确认尚未闭合，整体验收仍为部分完成；后续源码修复不自动计入本包。
 
 ## 其他工具（历史演示）
 
@@ -143,7 +143,7 @@ Flow 默认可见并标注 Preview。未配置模型、外部账号或配套 CLI
 
 ## 三步开始
 
-1. 从 [GitHub Releases](https://github.com/wangjiawei508/WorkWise/releases) 下载与你的电脑匹配的安装包。
+1. 从 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 下载与你的电脑匹配的安装包。
 2. 首次启动时选择语言，配置你有权使用的模型 API Key，并选择本地工作区。
 3. 在已发布版的 Code、Write 或工程测量入口开始工作，也可把业务文件添加到对话；需要自动化时打开 Flow Preview。“编程 / 内业”和四阶段导航是候选预览，安装 0.5.0 不要求出现这些新菜单。
 
@@ -155,7 +155,7 @@ Flow 默认可见并标注 Preview。未配置模型、外部账号或配套 CLI
 | macOS | Intel | `WorkWise-*-mac-Intel.dmg` |
 | Windows | x64 | `WorkWise-*-win-x64.exe` |
 
-当前不提供 Linux 桌面客户端和便携版。请始终从 [GitHub Releases](https://github.com/wangjiawei508/WorkWise/releases) 或 [WorkWise 产品主页](https://www.railwise.cn/products/workwise/)进入下载。
+当前不提供 Linux 桌面客户端和便携版。请始终从 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 或 [WorkWise 产品主页](https://www.railwise.cn/products/workwise/)进入下载。
 
 ## 更新与帮助
 
@@ -173,7 +173,7 @@ WorkWise 0.5.0 继续使用 `railwise.cn` 官方 Stable 更新源：
 | 状态 | 说明 |
 | --- | --- |
 | 稳定能力 | Code、Write、Design、DeepSeek Harness 结构化附件处理、持久化任务、Agent、四级权限、MCP V2、通用文档附件、文档分段检索、成果验证和应用内更新 |
-| 隔离候选 | RAILWISE 命名、四阶段 Survey、后续高级试算与质量工作区；按精确包分别验收，不改变 0.5.0 下载 |
+| 隔离候选 | RailWise AI 命名、四阶段 Survey、后续高级试算与质量工作区；按精确包分别验收，不改变 0.5.0 下载 |
 | Preview | Flow 画布、类型化节点、Mock/单节点测试、发布校验、运行历史、审批与失败恢复 |
 | 可选能力 | MinerU 高精度解析、在线 Skill 更新、连接手机和外部命令行工具 |
 | 后续方向 | 更多多模态生成节点、行业节点和企业集成 |
@@ -192,8 +192,8 @@ WorkWise 0.5.0 继续使用 `railwise.cn` 官方 Stable 更新源：
 ## 开发与贡献
 
 ```bash
-git clone https://github.com/wangjiawei508/WorkWise.git
-cd WorkWise
+git clone https://github.com/railwise-cn/railwise-ai.git
+cd railwise-ai
 npm install
 npm run dev
 ```
@@ -216,7 +216,7 @@ npm run build
 
 ## 反馈
 
-欢迎在 [GitHub Issues](https://github.com/wangjiawei508/WorkWise/issues) 提交问题和建议。为了更快定位，请附上 WorkWise 版本、操作系统与架构、复现步骤、截图或必要日志；不要公开 API Key、客户资料或其他敏感信息。
+欢迎在 [GitHub Issues](https://github.com/railwise-cn/railwise-ai/issues) 提交问题和建议。为了更快定位，请附上 WorkWise 版本、操作系统与架构、复现步骤、截图或必要日志；不要公开 API Key、客户资料或其他敏感信息。
 
 ## 许可证与来源
 

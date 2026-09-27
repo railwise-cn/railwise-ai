@@ -1,0 +1,14 @@
+
+> kun@0.4.2 test
+> vitest run src/engineering/survey-static-incremental.test.ts src/engineering/survey-adjustment.test.ts src/engineering/survey-generalized-w.test.ts --reporter=dot
+
+
+ RUN  v4.1.8 /private/tmp/railwise-statistical-family/kun
+
+··································································································································································································
+
+ Test Files  2 passed (2)
+      Tests  194 passed (194)
+   Start at  08:24:35
+   Duration  242ms (transform 75ms, setup 0ms, import 132ms, tests 125ms, environment 0ms)
+

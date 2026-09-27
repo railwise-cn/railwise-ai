@@ -1,0 +1,48 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/02-census-identities.ax.txt",
+  "sourceSha256": "3ff3256c374b15b5e388e6b230c969c23a7a2c089ad5a4e8cd2fe1df8bc06b31",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 4,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t279 开合三角标记 来源与目录身份"
+    },
+    {
+      "originalLine": 5,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t280 文本 来源与目录身份"
+    },
+    {
+      "originalLine": 6,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t281 定义列表"
+    },
+    {
+      "originalLine": 7,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t282 container 来源 PDF SHA-256"
+    },
+    {
+      "originalLine": 8,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t\t283 文本 来源 PDF SHA-256"
+    },
+    {
+      "originalLine": 9,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t284 文本 96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487"
+    },
+    {
+      "originalLine": 10,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t285 container 目录规则 SHA-256"
+    },
+    {
+      "originalLine": 11,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t\t286 文本 目录规则 SHA-256"
+    },
+    {
+      "originalLine": 15,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t290 文本 survey-quality-sampling-request-v1"
+    },
+    {
+      "originalLine": 16,
+      "text": "The focused UI element is 279 开合三角标记 来源与目录身份"
+    }
+  ]
+}

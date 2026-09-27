@@ -1,0 +1,93 @@
+{
+  "command": [
+    "/usr/local/bin/python3",
+    "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-quality-scoring-acceptance/inspect-packaged-records.py",
+    "/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-quality-scoring.sqlite3",
+    "--project",
+    "project_9d966747-63bc-4658-9ba6-a8635423a7e0"
+  ],
+  "exitCode": 0,
+  "stdout": "{\n  \"schemaVersion\": 1,\n  \"verification\": \"stdlib-sqlite-and-Fraction-independent-record-check\",\n  \"guiExecutionVerified\": false,\n  \"professionalApproval\": false,\n  \"currentProjectRevisionValidated\": false,\n  \"storedProjectSnapshotBindingVerified\": true,\n  \"database\": \"/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-quality-scoring.sqlite3\",\n  \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\",\n  \"recordsChecked\": 4,\n  \"unmatchedProjectRecordsNotEvaluated\": 0,\n  \"allFourCasesPresent\": true,\n  \"results\": [\n    {\n      \"case\": \"full\",\n      \"recordId\": \"quality_scoring_5cfda612-87bd-4af1-bb3d-85134623733f\",\n      \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\",\n      \"projectRevision\": 2,\n      \"requestSha256\": \"057ed07be0369724874f76c9408de1162198963847e13a3c9b3205c1b22eaf11\",\n      \"declarationSha256\": \"8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113\",\n      \"recordHash\": \"99ea81241997d21e067b74b7f332b94971dadc743e4a75568a4b58f4bb2ce74d\",\n      \"outcome\": \"calculated\",\n      \"scope\": \"complete-declared-product-profile\",\n      \"exactScore\": {\n        \"numerator\": \"9141\",\n        \"denominator\": \"100\"\n      },\n      \"originalBytesVerified\": true,\n      \"sqlBindingsVerified\": true,\n      \"independentFractionChecksPassed\": true\n    },\n    {\n      \"case\": \"child-veto\",\n      \"recordId\": \"quality_scoring_08c1e20d-9e61-426a-a7d1-c04fef253b12\",\n      \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\",\n      \"projectRevision\": 2,\n      \"requestSha256\": \"3a69b82632d050eca7a4bdabf0bac9166eeb428e27b27ee165fe4a93c1545f4a\",\n      \"declarationSha256\": \"fd6720ebd190a9e7b1a0cd38b75ddd28a7ccece04806126d8adc3a7d76028b82\",\n      \"recordHash\": \"1d3760ee09d0e61d5177a5eb3ac894427d25657e6be4f6ef41272722bc359246\",\n      \"outcome\": \"nonconforming\",\n      \"scope\": \"complete-declared-product-profile\",\n      \"exactScore\": null,\n      \"originalBytesVerified\": true,\n      \"sqlBindingsVerified\": true,\n      \"independentFractionChecksPassed\": true\n    },\n    {\n      \"case\": \"pending\",\n      \"recordId\": \"quality_scoring_06297786-f6dc-40ef-9404-0ccb5123464a\",\n      \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\",\n      \"projectRevision\": 2,\n      \"requestSha256\": \"1cdd6e3013b7f6eac31a3f895a17b896105368fa5ee8aa76c11e2795b5c1b3fc\",\n      \"declarationSha256\": \"895754b81584e3ca12ba869d3cb595d192ab436de004703a3c8ab435903a430f\",\n      \"recordHash\": \"0db575fd92f07096118b34f85d497dc15167aa06fa68a7630bf6d590421ca533\",\n      \"outcome\": \"unavailable\",\n      \"scope\": \"unresolved-declared-product-profile\",\n      \"exactScore\": null,\n      \"originalBytesVerified\": true,\n      \"sqlBindingsVerified\": true,\n      \"independentFractionChecksPassed\": true\n    },\n    {\n      \"case\": \"multiple-sixty\",\n      \"recordId\": \"quality_scoring_28dd7875-693c-4b56-be9e-4bcecb9d3215\",\n      \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\",\n      \"projectRevision\": 2,\n      \"requestSha256\": \"cb9e3f5db3c2a186757622ae0480a0d1c559a78cccaf60eada424007fbe4536c\",\n      \"declarationSha256\": \"f309430e4cbca98c732f4b0b33d75d3b78f636f877f527b8ffdebcbdc23c07c0\",\n      \"recordHash\": \"58b426ff40eb896a85d945cd4aa9766184ba3093e3d68d318e337e8653014e34\",\n      \"outcome\": \"unavailable\",\n      \"scope\": \"declared-component-only\",\n      \"exactScore\": null,\n      \"originalBytesVerified\": true,\n      \"sqlBindingsVerified\": true,\n      \"independentFractionChecksPassed\": true\n    }\n  ]\n}\n",
+  "stderr": "",
+  "checkedAt": "2026-09-20T01:49:29.716634+00:00",
+  "status": "passed",
+  "databaseAccess": "existing inspector SQLite mode=ro/query_only",
+  "result": {
+    "schemaVersion": 1,
+    "verification": "stdlib-sqlite-and-Fraction-independent-record-check",
+    "guiExecutionVerified": false,
+    "professionalApproval": false,
+    "currentProjectRevisionValidated": false,
+    "storedProjectSnapshotBindingVerified": true,
+    "database": "/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-quality-scoring.sqlite3",
+    "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+    "recordsChecked": 4,
+    "unmatchedProjectRecordsNotEvaluated": 0,
+    "allFourCasesPresent": true,
+    "results": [
+      {
+        "case": "full",
+        "recordId": "quality_scoring_5cfda612-87bd-4af1-bb3d-85134623733f",
+        "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+        "projectRevision": 2,
+        "requestSha256": "057ed07be0369724874f76c9408de1162198963847e13a3c9b3205c1b22eaf11",
+        "declarationSha256": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113",
+        "recordHash": "99ea81241997d21e067b74b7f332b94971dadc743e4a75568a4b58f4bb2ce74d",
+        "outcome": "calculated",
+        "scope": "complete-declared-product-profile",
+        "exactScore": {
+          "numerator": "9141",
+          "denominator": "100"
+        },
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      },
+      {
+        "case": "child-veto",
+        "recordId": "quality_scoring_08c1e20d-9e61-426a-a7d1-c04fef253b12",
+        "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+        "projectRevision": 2,
+        "requestSha256": "3a69b82632d050eca7a4bdabf0bac9166eeb428e27b27ee165fe4a93c1545f4a",
+        "declarationSha256": "fd6720ebd190a9e7b1a0cd38b75ddd28a7ccece04806126d8adc3a7d76028b82",
+        "recordHash": "1d3760ee09d0e61d5177a5eb3ac894427d25657e6be4f6ef41272722bc359246",
+        "outcome": "nonconforming",
+        "scope": "complete-declared-product-profile",
+        "exactScore": null,
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      },
+      {
+        "case": "pending",
+        "recordId": "quality_scoring_06297786-f6dc-40ef-9404-0ccb5123464a",
+        "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+        "projectRevision": 2,
+        "requestSha256": "1cdd6e3013b7f6eac31a3f895a17b896105368fa5ee8aa76c11e2795b5c1b3fc",
+        "declarationSha256": "895754b81584e3ca12ba869d3cb595d192ab436de004703a3c8ab435903a430f",
+        "recordHash": "0db575fd92f07096118b34f85d497dc15167aa06fa68a7630bf6d590421ca533",
+        "outcome": "unavailable",
+        "scope": "unresolved-declared-product-profile",
+        "exactScore": null,
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      },
+      {
+        "case": "multiple-sixty",
+        "recordId": "quality_scoring_28dd7875-693c-4b56-be9e-4bcecb9d3215",
+        "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+        "projectRevision": 2,
+        "requestSha256": "cb9e3f5db3c2a186757622ae0480a0d1c559a78cccaf60eada424007fbe4536c",
+        "declarationSha256": "f309430e4cbca98c732f4b0b33d75d3b78f636f877f527b8ffdebcbdc23c07c0",
+        "recordHash": "58b426ff40eb896a85d945cd4aa9766184ba3093e3d68d318e337e8653014e34",
+        "outcome": "unavailable",
+        "scope": "declared-component-only",
+        "exactScore": null,
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      }
+    ]
+  }
+}

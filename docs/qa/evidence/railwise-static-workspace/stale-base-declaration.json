@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "operation": "append-independent-observations-only",
+  "base": {
+    "schemaVersion": 1,
+    "model": "fixed-datum-full-column-rank-independent-linear-observations",
+    "covarianceBasis": "caller-declared-known-apriori-independent-absolute-variances",
+    "errorModel": "caller-declared-zero-mean-independent-errors-no-normality-claim",
+    "coefficientMeaning": "dimensionless-all-parameters-share-observation-unit",
+    "networkId": "synthetic:equal-weight-location",
+    "revision": 1,
+    "unit": "mm",
+    "parameterIds": [
+      "x0"
+    ],
+    "sourceAnchor": "original-synthetic-fixed-model:equal-weight-location",
+    "sourceSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "observations": [
+      {
+        "id": "b0",
+        "value": 1.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:b0"
+      },
+      {
+        "id": "b1",
+        "value": 2.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:b1"
+      },
+      {
+        "id": "b2",
+        "value": 4.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:b2"
+      }
+    ]
+  },
+  "expectedBaseFingerprint": "5ce1012b2d69f7021925d88c7cb55d5d25865cabdd9d606f267484e4b12dd510",
+  "append": {
+    "batchId": "append:equal-weight-location",
+    "nextRevision": 2,
+    "sourceAnchor": "original-synthetic-append:equal-weight-location",
+    "observations": [
+      {
+        "id": "a0",
+        "value": 8.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:a0"
+      },
+      {
+        "id": "a1",
+        "value": -1.0,
+        "coefficients": [
+          1.0
+        ],
+        "aprioriVariance": 1.0,
+        "sourceAnchor": "original-synthetic:a1"
+      }
+    ]
+  }
+}

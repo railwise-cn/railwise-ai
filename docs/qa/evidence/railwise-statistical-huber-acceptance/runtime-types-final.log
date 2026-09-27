@@ -1,0 +1,3 @@
+
+> kun@0.4.2 typecheck
+> tsc --noEmit -p tsconfig.json

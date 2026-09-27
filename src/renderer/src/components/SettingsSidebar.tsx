@@ -1,3 +1,4 @@
+import brand from '@shared/product-brand.json'
 import type { Dispatch, ReactElement, SetStateAction } from 'react'
 import { Bot, ChevronLeft, Globe, HelpCircle, ImageIcon, Keyboard, PencilLine, ServerCog, Settings, Smartphone } from 'lucide-react'
 
@@ -78,7 +79,7 @@ export function SettingsSidebar({
             <Settings className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <div className="min-w-0 text-[12px] text-ds-muted">
-            <div className="truncate font-medium text-ds-ink">WorkWise</div>
+            <div className="truncate font-medium text-ds-ink">{brand.platform}</div>
             <div className="truncate">{t('settingsFooter')}</div>
           </div>
         </div>

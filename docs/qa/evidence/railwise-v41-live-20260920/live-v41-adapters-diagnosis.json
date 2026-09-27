@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-09-20T03:21:13.657Z",
+  "model": "deepseek-flash",
+  "origin": "https://api.deepseek.com",
+  "credentialSource": "existing production provider, read in memory only",
+  "settingsChanged": false,
+  "candidateCredentialCopied": false,
+  "scope": "compiled production adapters; not packaged GUI acceptance",
+  "requests": [
+    {
+      "path": "/v1/chat/completions",
+      "status": 200,
+      "elapsedMs": 190
+    },
+    {
+      "path": "/v1/responses",
+      "status": 200,
+      "elapsedMs": 117
+    }
+  ],
+  "searchShapes": [
+    {
+      "status": "completed",
+      "output": [
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "content": [
+            {
+              "type": "reasoning_text",
+              "annotations": []
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "status": "completed",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "chat": {
+    "status": "completed",
+    "expectedResponseMatched": true,
+    "answerCharacters": 15,
+    "stopReason": "stop",
+    "elapsedMs": 540
+  },
+  "search": {
+    "status": "failed",
+    "reason": "DeepSeek Responses web search returned no cited results.",
+    "elapsedMs": 9780
+  }
+}

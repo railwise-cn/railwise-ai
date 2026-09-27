@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join } from 'node:path'
+import { activatePrivateUpdaterTls, validatePrivateUpdaterTls, type PrivateUpdaterTlsInput } from './private-updater-tls'
 import type {
   GuiUpdateChannel,
   GuiUpdateDownloadResult,
@@ -51,6 +52,7 @@ type AcceptanceInput = {
   channel: GuiUpdateChannel
   feedUrl: string
   reportPath: string
+  privateTls?: PrivateUpdaterTlsInput
 }
 
 type AcceptanceState = AcceptanceInput & {
@@ -127,13 +129,18 @@ function parseInput(value: unknown): AcceptanceInput {
   if (typeof input.reportPath !== 'string' || !isAbsolute(input.reportPath)) {
     throw new Error('reportPath must be absolute.')
   }
+  if (input.privateTls !== undefined && (!input.privateTls || typeof input.privateTls !== 'object'
+    || typeof input.privateTls.certificateSha256 !== 'string' || typeof input.privateTls.sourceHead !== 'string')) {
+    throw new Error('Invalid private updater TLS configuration.')
+  }
   return {
     schemaVersion: 1,
     baseVersion,
     targetVersion,
     channel: input.channel,
     feedUrl: `${input.feedUrl.trim().replace(/\/+$/, '')}/`,
-    reportPath: input.reportPath
+    reportPath: input.reportPath,
+    ...(input.privateTls ? { privateTls: input.privateTls } : {})
   }
 }
 
@@ -197,6 +204,11 @@ async function failActive(
 }
 
 export function configureGuiUpdaterAcceptance(acceptance: ActiveGuiUpdaterAcceptance): void {
+  if (acceptance.state.privateTls) {
+    activatePrivateUpdaterTls(validatePrivateUpdaterTls(
+      acceptance.state.privateTls, acceptance.state.feedUrl, dirname(acceptance.statePath)
+    ))
+  }
   process.env.WORKWISE_UPDATE_PROVIDER = 'generic'
   process.env.WORKWISE_UPDATE_URL = acceptance.state.feedUrl
   process.env.WORKWISE_UPDATE_CHANNEL = acceptance.state.channel

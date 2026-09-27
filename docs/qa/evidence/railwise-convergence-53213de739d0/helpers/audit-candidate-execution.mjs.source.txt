@@ -1,0 +1,342 @@
+import assert from 'node:assert/strict';
+import { readFile, realpath, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { verifyResumeHistory } from './verify-resume-history.mjs';
+import { verifyRelayCleanup } from './verify-relay-cleanup.mjs';
+
+const usage = {
+  usage: 'node audit-candidate-execution.mjs INPUT.json [--compare BEFORE_REPORT.json]',
+  requiredInput: {
+    candidateRoot: 'absolute isolated /private/tmp/railwise-* directory',
+    appPath: 'absolute .app path inside candidateRoot',
+    runtimeDir: 'absolute runtime directory inside candidateRoot',
+    workspace: 'absolute selected project workspace inside candidateRoot',
+    threadStore: 'hybrid or file',
+    asarModulePath: 'explicit trusted @electron/asar module entry outside candidate data',
+    pdfinfoPath: 'explicit trusted pdfinfo executable',
+    phase: 'before-restart, after-restart, or historical-self-check',
+    strictExecutionMarkers: 'true for new candidate acceptance; false only for historical-self-check',
+    expected: {
+      sourceHead: '40 lowercase hex characters', asarSha256: '64 lowercase hex characters',
+      packageVersion: 'exact private package version', packageIdentifier: 'exact CFBundleIdentifier',
+      projectId: 'selected project ID', threadId: 'selected thread ID', planId: 'approved plan ID',
+      taskId: 'selected TaskRun ID', turnId: 'execution turn ID', networkId: 'selected network ID',
+      adjustmentId: 'produced adjustment ID', deliveryRunId: 'produced delivery run ID',
+      providerId: 'selected provider ID', model: 'selected model ID', reasoningEffort: 'selected effort',
+      sourceFileSha256: '64 lowercase hex characters', networkRevision: 'positive integer',
+      goalMarker: 'unique synthetic acceptance fixture marker',
+      tools: ['survey_network_validate', 'control_network', 'survey_adjustment_read', 'report_export']
+    }
+  },
+  optionalInput: {
+    'expected.previousFailedTurnIds': 'explicit failed mock Turn IDs retained in the same selected thread and Task',
+    'expected.mockAssistantTextCount': 'expected exact retained mock assistant count, e.g. 7 for this completion-gate probe',
+    mockReportPath: 'required with previousFailedTurnIds; exact scoped stopped-mock report',
+    relayReportPath: 'explicit report inside candidateRoot; all observed request counts are calculated',
+    sourceFilePath: 'explicit original synthetic fixture; sha256 checked against expected.sourceFileSha256',
+    referenceResultPath: 'explicit independent JSON numerical oracle; each supplied leaf compared',
+    numericTolerance: 'nonnegative absolute tolerance for the optional numerical oracle (default 0)',
+    allowContextReads: 'true only to permit additional read-only survey_read_context calls'
+  },
+  restrictions: [
+    'No settings, keys, environment credentials or other projects are read.',
+    'No network requests, product modules, candidate writes, task mutations or app launches are performed.',
+    'Database bytes are copied to a private temporary snapshot before SQLite opens them; snapshots are removed after audit.',
+    'Reports go to stdout; caller chooses where to retain them.',
+    'An after-restart report requires a passed before-restart report via --compare.',
+    'The script verifies retained execution evidence; it does not prove which GUI control was clicked.'
+  ]
+};
+if (process.argv[2] === '--help') { console.log(JSON.stringify(usage, null, 2)); process.exit(0); }
+assert(process.argv[2], usage.usage);
+assert([3, 5].includes(process.argv.length), usage.usage);
+assert(process.argv.length === 3 || process.argv[3] === '--compare', usage.usage);
+const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
+const config = await readJson(resolve(process.argv[2]));
+const expected = config.expected;
+assert(expected && typeof expected === 'object');
+for (const key of ['candidateRoot', 'appPath', 'runtimeDir', 'workspace', 'asarModulePath', 'pdfinfoPath']) assert(typeof config[key] === 'string' && config[key].startsWith('/'), `${key} must be an explicit absolute path`);
+for (const key of ['packageVersion', 'packageIdentifier', 'projectId', 'threadId', 'planId', 'taskId', 'turnId', 'networkId', 'adjustmentId', 'deliveryRunId', 'model', 'goalMarker']) assert(typeof expected[key] === 'string' && expected[key].length > 0, `expected.${key} is required`);
+assert.equal(typeof config.strictExecutionMarkers, 'boolean', 'strictExecutionMarkers must be explicitly specified');
+for (const key of ['providerId', 'reasoningEffort']) assert(typeof expected[key] === 'string' && expected[key].length > 0 || !config.strictExecutionMarkers && expected[key] === null, `expected.${key} must be a nonempty string for strict acceptance, or explicit null for an absent historical field`);
+for (const key of ['projectId', 'threadId', 'planId', 'taskId', 'turnId', 'networkId', 'adjustmentId', 'deliveryRunId']) assert.match(expected[key], /^[a-zA-Z0-9_-]+$/, `unsafe record ID: ${key}`);
+assert.match(expected.sourceHead, /^[a-f0-9]{40}$/);
+for (const key of ['asarSha256', 'sourceFileSha256']) assert.match(expected[key], /^[a-f0-9]{64}$/);
+assert(Number.isInteger(expected.networkRevision) && expected.networkRevision > 0);
+assert(['file', 'hybrid'].includes(config.threadStore));
+assert(['before-restart', 'after-restart', 'historical-self-check'].includes(config.phase));
+assert(config.strictExecutionMarkers || config.phase === 'historical-self-check', 'legacy compatibility is forbidden in new candidate acceptance');
+assert(config.phase !== 'after-restart' || process.argv[4], 'after-restart requires --compare');
+assert(Array.isArray(expected.tools) && expected.tools.length === 4 && new Set(expected.tools).size === 4);
+assert.equal(expected.tools[0], 'survey_network_validate');
+assert(['survey_calculator', 'control_network', 'cpiii_adjustment', 'coord_transform'].includes(expected.tools[1]));
+assert.equal(expected.tools[2], 'survey_adjustment_read');
+assert.equal(expected.tools[3], 'report_export');
+const root = await realpath(config.candidateRoot);
+assert.match(root, /^\/private\/tmp\/railwise-[a-zA-Z0-9._-]+$/);
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+const jsonHash = value => hash(JSON.stringify(canonical(value)));
+const inside = async path => {
+  const real = await realpath(path), child = relative(root, real);
+  assert(child && child !== '..' && !child.startsWith('..' + sep) && !child.startsWith(sep), 'candidate path escaped isolated root');
+  return real;
+};
+const readCandidate = async path => readFile(await inside(path));
+const readCandidateJson = async path => JSON.parse((await readCandidate(path)).toString('utf8'));
+const jsonl = async path => (await readCandidate(path)).toString('utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+const runtime = await inside(config.runtimeDir), app = await inside(config.appPath), workspace = await inside(config.workspace);
+assert.equal(basename(app), `RAILWISE AI Candidate ${expected.sourceHead.slice(0, 12)}.app`, 'unexpected candidate bundle name');
+const databasePaths = ['engineering/engineering-ai.sqlite3', 'engineering/engineering.sqlite3', 'engineering/survey.sqlite3', 'tasks.sqlite3'];
+const databaseHashes = async () => {
+  const entries = [];
+  for (const path of databasePaths) for (const suffix of ['', '-wal']) {
+    try { entries.push([path + suffix, hash(await readCandidate(join(runtime, path + suffix)))]); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; entries.push([path + suffix, null]); }
+  }
+  return Object.fromEntries(entries);
+};
+const before = await databaseHashes();
+const databases = [];
+const snapshotRoot = await mkdtemp('/private/tmp/railwise-audit-snapshot-');
+const open = async path => { const db = new DatabaseSync(join(snapshotRoot, path), { readOnly: true }); databases.push(db); return db; };
+const tables = new Set(['engineering_projects', 'engineering_ai_plans', 'task_runs', 'survey_networks', 'survey_adjustments', 'engineering_runs']);
+const row = (db, table, id) => {
+  assert(tables.has(table));
+  const value = db.prepare(`SELECT data_json FROM ${table} WHERE id = ?`).get(id);
+  assert(value, `missing selected record in ${table}`);
+  return { text: value.data_json, value: JSON.parse(value.data_json) };
+};
+const trustedCommand = (command, args) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 32 * 1024 * 1024 });
+const missingHistoricalFields = [];
+const verifyExecutionMarker = (record, key, wanted, label) => {
+  if (!Object.hasOwn(record, key) && !config.strictExecutionMarkers) { missingHistoricalFields.push(`${label}.${key}`); return; }
+  assert.equal(record[key], wanted, `${label}.${key} missing or mismatched`);
+};
+try {
+  // Never open candidate databases through SQLite: even readOnly connections can create WAL/SHM files.
+  for (const path of databasePaths) for (const suffix of ['', '-wal']) {
+    const key = path + suffix;
+    if (before[key] === null) continue;
+    const bytes = await readCandidate(join(runtime, key));
+    assert.equal(hash(bytes), before[key], 'source database changed while making the audit snapshot');
+    await mkdir(dirname(join(snapshotRoot, key)), { recursive: true });
+    await writeFile(join(snapshotRoot, key), bytes, { flag: 'wx', mode: 0o600 });
+  }
+  assert.deepEqual(await databaseHashes(), before, 'source database changed during snapshot capture');
+  const asarPath = await inside(join(app, 'Contents/Resources/app.asar'));
+  assert.equal(hash(await readFile(asarPath)), expected.asarSha256, 'installed package hash mismatch');
+  const require = createRequire(import.meta.url);
+  const asar = require(await realpath(config.asarModulePath));
+  const packageMetadata = JSON.parse(asar.extractFile(asarPath, 'package.json').toString('utf8'));
+  assert.equal(packageMetadata.buildProvenance?.sourceHead, expected.sourceHead);
+  assert.equal(packageMetadata.version, expected.packageVersion);
+  const info = JSON.parse(trustedCommand('/usr/bin/plutil', ['-convert', 'json', '-o', '-', await inside(join(app, 'Contents/Info.plist'))]));
+  assert.equal(info.CFBundleIdentifier, expected.packageIdentifier);
+  assert.equal(info.CFBundleShortVersionString, expected.packageVersion);
+  trustedCommand('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
+  const packageIdentity = { sourceHead: packageMetadata.buildProvenance.sourceHead, asarSha256: expected.asarSha256, packageVersion: packageMetadata.version, bundleIdentifier: info.CFBundleIdentifier, bundleVersion: info.CFBundleVersion, signatureIntegrityVerified: true };
+  const [ai, engineering, survey, tasks] = await Promise.all(databasePaths.map(open));
+  const projectRecord = row(engineering, 'engineering_projects', expected.projectId), project = projectRecord.value;
+  assert.equal(project.id, expected.projectId); assert.equal(await inside(project.workspace), workspace);
+  const planRecord = row(ai, 'engineering_ai_plans', expected.planId), plan = planRecord.value;
+  assert.equal(plan.projectId, expected.projectId); assert.equal(plan.threadId, expected.threadId);
+  assert.equal(plan.taskId, expected.taskId); assert.equal(plan.executionTurnId, expected.turnId);
+  assert(plan.goal.includes(expected.goalMarker), 'selected plan is not the declared synthetic fixture');
+  assert(['started', 'completed'].includes(plan.status));
+  const taskRecord = row(tasks, 'task_runs', expected.taskId), task = taskRecord.value;
+  assert.equal(task.threadId, expected.threadId); assert.equal(task.status, 'completed');
+  assert.equal(task.activeTurnId, expected.turnId); verifyExecutionMarker(task, 'engineeringPlanId', expected.planId, 'Task');
+  assert(task.nodes.length > 0 && task.nodes.every(node => node.status === 'completed'));
+  const threadDir = join(runtime, 'threads', expected.threadId);
+  const metadataPath = join(threadDir, config.threadStore === 'hybrid' ? 'metadata.jsonl' : 'thread.json');
+  const thread = config.threadStore === 'hybrid' ? (await jsonl(metadataPath)).findLast(item => item.kind === 'thread_metadata' && item.thread?.id === expected.threadId)?.thread : await readCandidateJson(metadataPath);
+  assert(thread); assert.equal(thread.id, expected.threadId); assert.equal(thread.projectId, expected.projectId); assert.equal(thread.domain, 'engineering');
+  assert.equal(await inside(thread.workspace), workspace);
+  const turn = thread.turns.find(item => item.id === expected.turnId);
+  assert(turn); assert.equal(turn.status, 'completed'); verifyExecutionMarker(turn, 'engineeringExecution', true, 'Turn'); verifyExecutionMarker(turn, 'engineeringPlanId', expected.planId, 'Turn');
+  for (const key of ['model', 'providerId', 'reasoningEffort']) {
+    assert.equal(turn[key] ?? null, expected[key], `Turn ${key} differs from selection`); assert.equal(task[key] ?? null, expected[key], `Task ${key} differs from selection`);
+    if (turn[key] === undefined) missingHistoricalFields.push(`Turn.${key}`);
+    if (task[key] === undefined) missingHistoricalFields.push(`Task.${key}`);
+  }
+  assert.equal(turn.toolCatalogDrift, false);
+  for (const key of ['attachmentIds', 'workspaceReferences', 'activeSkillIds', 'injectedMemoryIds']) assert.deepEqual(turn[key] ?? [], [], `unexpected ${key}`);
+  const messagesPath = join(threadDir, 'messages.jsonl');
+  const rawMessages = await jsonl(messagesPath);
+  const unique = [...new Map(rawMessages.map(item => [item.id, item])).values()];
+  const taskEvents = expected.previousFailedTurnIds?.length ? tasks.prepare('SELECT sequence, kind, payload_json FROM task_events WHERE task_id = ? ORDER BY sequence ASC').all(expected.taskId).map(event => ({ sequence: event.sequence, kind: event.kind, payload: JSON.parse(event.payload_json) })) : [];
+  const mockReport = config.mockReportPath ? await readCandidateJson(config.mockReportPath) : undefined;
+  const resumeHistory = verifyResumeHistory({ expected, thread, items: unique, taskEvents, mockReport, strictExecutionMarkers: config.strictExecutionMarkers });
+  const execution = unique.filter(item => item.turnId === expected.turnId);
+  const allCalls = execution.filter(item => item.kind === 'tool_call'), allResults = execution.filter(item => item.kind === 'tool_result');
+  assert.equal(new Set(allCalls.map(item => item.callId)).size, allCalls.length);
+  assert.equal(new Set(allResults.map(item => item.callId)).size, allResults.length);
+  const allowed = new Set([...expected.tools, ...(config.allowContextReads === true ? ['survey_read_context'] : [])]);
+  for (const call of allCalls) {
+    assert(allowed.has(call.toolName), 'unexpected tool called');
+    const result = allResults.find(item => item.callId === call.callId);
+    assert(result); assert.equal(result.toolName, call.toolName); assert.equal(result.isError, false); assert.equal(call.status, 'completed');
+    assert.equal(call.threadId, expected.threadId); assert.equal(result.threadId, expected.threadId);
+  }
+  assert.equal(allCalls.length, allResults.length);
+  const calls = allCalls.filter(item => expected.tools.includes(item.toolName));
+  assert.deepEqual(calls.map(item => item.toolName), expected.tools);
+  const results = calls.map(call => allResults.find(item => item.callId === call.callId));
+  assert.deepEqual(plan.steps.map(step => step.tool), expected.tools);
+  assert.equal(task.finalResponse, execution.filter(item => item.kind === 'assistant_text').at(-1)?.text);
+  const stepRows = ai.prepare('SELECT step_id, parameters_json, handles_json FROM engineering_ai_step_evidence WHERE plan_id = ?').all(expected.planId);
+  assert.equal(stepRows.length, plan.steps.length);
+  const verified = new Set();
+  const steps = plan.steps.map((step, index) => {
+    assert.equal(step.approval, 'approved'); assert.equal(step.inputHash, plan.contextHash);
+    assert(step.dependsOn.every(id => verified.has(id)), 'dependency receipt is not verified before dependent step');
+    assert.equal(step.risk, index === 2 ? 'read' : index === 3 ? 'export' : 'write');
+    const receipt = stepRows.find(item => item.step_id === step.id); assert(receipt);
+    const parameters = JSON.parse(receipt.parameters_json), handles = JSON.parse(receipt.handles_json);
+    const bound = { ...step.parameters };
+    const ancestors = new Set();
+    const visit = id => { assert(!ancestors.has(id), 'duplicate or cyclic dependency traversal'); ancestors.add(id); const item = plan.steps.find(candidate => candidate.id === id); assert(item); for (const dependency of item.dependsOn) if (!ancestors.has(dependency)) visit(dependency); };
+    for (const id of step.dependsOn) if (!ancestors.has(id)) visit(id);
+    for (const binding of step.parameterBindings ?? []) {
+      assert(ancestors.has(binding.stepId)); assert(!Object.hasOwn(bound, binding.parameter));
+      const predecessor = stepRows.find(item => item.step_id === binding.stepId); assert(predecessor);
+      const value = JSON.parse(predecessor.handles_json)[binding.output]; assert.notEqual(value, undefined);
+      bound[binding.parameter] = binding.asArray ? [value] : value;
+    }
+    bound.idempotencyKey = `engineering-plan:${expected.planId}:${step.id}`;
+    assert.deepEqual(parameters, bound, 'receipt arguments differ from approved literals and dependencies');
+    for (const [key, value] of Object.entries(handles)) assert.deepEqual(key.split('.').reduce((object, part) => object?.[part], results[index].output), value, 'receipt handles differ from actual tool output');
+    if (index < 3) assert.equal(parameters.networkId, expected.networkId);
+    if (index === 2) assert.equal(parameters.adjustmentId, expected.adjustmentId);
+    if (index === 3) { assert.equal(parameters.projectId, expected.projectId); assert.deepEqual(parameters.adjustmentIds, [expected.adjustmentId]); }
+    const call = calls[index];
+    assert(call.arguments && typeof call.arguments === 'object');
+    const argumentsRedacted = Object.keys(call.arguments).length === 0;
+    if (!argumentsRedacted) for (const [key, value] of Object.entries(call.arguments)) assert.deepEqual(value, parameters[key]);
+    verified.add(step.id);
+    return { stepId: step.id, tool: step.tool, callId: call.callId, parameters, handles, argumentsRedacted, outputSha256: jsonHash(results[index].output), receiptSha256: jsonHash({ parameters, handles }) };
+  });
+  const networkRecord = row(survey, 'survey_networks', expected.networkId), network = networkRecord.value;
+  assert.equal(network.projectId, expected.projectId); assert.equal(network.revision, expected.networkRevision); assert.equal(network.sourceFile.sha256, expected.sourceFileSha256);
+  if (config.sourceFilePath) assert.equal(hash(await readFile(await realpath(config.sourceFilePath))), expected.sourceFileSha256);
+  for (const [key, value] of Object.entries(results[0].output.network)) {
+    if (key === 'pointCount') assert.equal(value, network.knownPoints.length + network.unknownPoints.length);
+    else if (key === 'observationCount') assert.equal(value, network.observations.length);
+    else if (key !== 'findings') assert.deepEqual(value, network[key]);
+  }
+  const adjustmentRecord = row(survey, 'survey_adjustments', expected.adjustmentId), adjustment = adjustmentRecord.value;
+  assert.equal(adjustment.run.id, expected.adjustmentId); assert.equal(adjustment.run.projectId, expected.projectId); assert.equal(adjustment.run.networkId, expected.networkId);
+  assert.equal(adjustment.run.status, 'completed'); assert.equal(adjustment.result.validation, 'valid');
+  for (const result of results.slice(1, 3)) {
+    assert.deepEqual(result.output.run, adjustment.run);
+    for (const [key, value] of Object.entries(result.output.result)) {
+      const stored = adjustment.result[key];
+      assert.deepEqual(value, Array.isArray(stored) ? stored.slice(0, 200) : stored, `bounded deterministic field differs: ${key}`);
+    }
+  }
+  assert.deepEqual(results[1].output, results[2].output);
+  let oracle = { supplied: false, comparedLeaves: 0 };
+  if (config.referenceResultPath) {
+    const referenceBytes = await readFile(await realpath(config.referenceResultPath));
+    const reference = JSON.parse(referenceBytes.toString('utf8'));
+    const tolerance = config.numericTolerance ?? 0; assert(Number.isFinite(tolerance) && tolerance >= 0);
+    let leaves = 0;
+    const compare = (wanted, actual, path) => {
+      if (typeof wanted === 'number') { assert(Number.isFinite(wanted) && Number.isFinite(actual) && Math.abs(wanted - actual) <= tolerance, `oracle mismatch: ${path}`); leaves++; }
+      else if (Array.isArray(wanted)) { assert(Array.isArray(actual) && actual.length === wanted.length, `oracle array size mismatch: ${path}`); wanted.forEach((item, index) => compare(item, actual[index], `${path}[${index}]`)); }
+      else if (wanted && typeof wanted === 'object') { assert(actual && typeof actual === 'object', `oracle object missing: ${path}`); for (const [key, value] of Object.entries(wanted)) compare(value, actual[key], `${path}.${key}`); }
+      else { assert.deepEqual(actual, wanted, `oracle mismatch: ${path}`); leaves++; }
+    };
+    compare(reference, adjustment.result, 'result'); assert(leaves > 0);
+    oracle = { supplied: true, comparedLeaves: leaves, referenceSha256: hash(referenceBytes), absoluteTolerance: tolerance };
+  }
+  const deliveryRecord = row(engineering, 'engineering_runs', expected.deliveryRunId), delivery = deliveryRecord.value;
+  assert.equal(delivery.projectId, expected.projectId); assert.equal(delivery.status, 'completed');
+  const exported = results[3].output;
+  assert.deepEqual(exported.run, delivery); assert.deepEqual(exported.adjustments, [adjustment.result], 'full deterministic result (including covariance) differs in export');
+  assert.deepEqual(exported.surveySources.map(item => item.networkId), [expected.networkId]);
+  assert.deepEqual(exported.files.map(file => basename(file.path)).sort(), ['evidence.xlsx', 'report.docx', 'report.pdf']);
+  const files = [];
+  for (const file of exported.files) {
+    assert(file.path.startsWith(`.workwise/deliverables/${expected.projectId}/${expected.deliveryRunId}/`));
+    const path = await inside(join(workspace, file.path)), bytes = await readFile(path);
+    assert.equal(bytes.length, file.sizeBytes); assert.equal(hash(bytes), file.sha256);
+    const name = basename(path); let format;
+    if (name.endsWith('.pdf')) {
+      assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
+      const pdfInfo = trustedCommand(await realpath(config.pdfinfoPath), [path]);
+      const pages = Number(pdfInfo.match(/^Pages:\s+(\d+)$/m)?.[1]); assert(pages > 0);
+      format = { parser: 'pdfinfo', pages, parsed: true };
+    } else {
+      trustedCommand('/usr/bin/unzip', ['-t', path]);
+      const entry = name.endsWith('.docx') ? 'word/document.xml' : 'xl/workbook.xml';
+      const types = trustedCommand('/usr/bin/unzip', ['-p', path, '\\[Content_Types\\].xml']);
+      const xml = trustedCommand('/usr/bin/unzip', ['-p', path, entry]);
+      assert(types.includes(name.endsWith('.docx') ? 'wordprocessingml.document.main+xml' : 'spreadsheetml.sheet.main+xml'));
+      assert(xml.includes(name.endsWith('.docx') ? '<w:document' : '<workbook'));
+      const entries = trustedCommand('/usr/bin/unzip', ['-Z1', path]).split(/\r?\n/);
+      const sheetCount = name.endsWith('.xlsx') ? entries.filter(item => /^xl\/worksheets\/sheet\d+\.xml$/.test(item)).length : undefined;
+      if (sheetCount !== undefined) assert(sheetCount > 0);
+      format = { parser: 'unzip', crc32Verified: true, requiredContentTypeAndXmlPresent: true, ...(sheetCount !== undefined ? { sheetCount } : {}) };
+    }
+    files.push({ name, relativePath: file.path, sizeBytes: bytes.length, sha256: hash(bytes), format });
+  }
+  let relay = { supplied: false };
+  if (config.relayReportPath) {
+    const bytes = await readCandidate(config.relayReportPath), report = JSON.parse(bytes.toString('utf8'));
+    const cleanup = await verifyRelayCleanup({ candidateRoot: root, reportPath: config.relayReportPath, report });
+    for (const key of ['projectId', 'networkId', 'threadId']) assert.equal(report[key], expected[key]);
+    assert(Array.isArray(report.events));
+    const failed = report.events.filter(event => event.kind === 'failed'); assert.equal(failed.length, 0);
+    const started = report.events.filter(event => event.kind === 'upstream_started');
+    assert(started.length > 0); assert.equal(new Set(started.map(event => event.requestId)).size, started.length);
+    for (const item of started) for (const kind of ['upstream_status', 'completed']) {
+      const matches = report.events.filter(event => event.requestId === item.requestId && event.kind === kind);
+      assert.equal(matches.length, 1); assert.equal(matches[0].status, 200);
+    }
+    assert.equal(report.upstreamCount, started.length);
+    const byRoute = Object.fromEntries([...new Set(started.map(event => event.route))].map(route => [route, started.filter(event => event.route === route).length]));
+    relay = { supplied: true, reportSha256: hash(bytes), requestCount: report.requestCount, upstreamCount: started.length, byRoute, failedRequests: failed.length, reason: report.reason, cleanup, cleanupVerifierSha256: hash(await readFile(new URL('./verify-relay-cleanup.mjs', import.meta.url))) };
+  }
+  const stableIdentity = {
+    package: packageIdentity,
+    selected: Object.fromEntries(['projectId', 'threadId', 'planId', 'taskId', 'turnId', 'networkId', 'adjustmentId', 'deliveryRunId', 'providerId', 'model', 'reasoningEffort'].map(key => [key, expected[key]])),
+    sourceRecords: { project: hash(projectRecord.text), plan: hash(planRecord.text), task: hash(taskRecord.text), network: hash(networkRecord.text), adjustment: hash(adjustmentRecord.text), delivery: hash(deliveryRecord.text), turn: jsonHash(turn), executionItems: jsonHash(execution), receipts: jsonHash(steps) },
+    sourceFileSha256: network.sourceFile.sha256,
+    files: files.map(({ name, sizeBytes, sha256 }) => ({ name, sizeBytes, sha256 })),
+    ...(resumeHistory.checked ? { resumeHistory } : {})
+  };
+  let restart = { compared: false };
+  if (process.argv[4]) {
+    const previous = await readJson(resolve(process.argv[4]));
+    assert.equal(previous.status, 'passed'); assert.equal(previous.phase, 'before-restart');
+    assert.equal(previous.candidateRoot, root);
+    assert.deepEqual(stableIdentity, previous.stableIdentity, 'record identities or content changed across normal restart');
+    restart = { compared: true, stableRecordsAndFilesUnchanged: true, baselineCheckedAt: previous.checkedAt };
+  }
+  for (const db of databases) db.close(); databases.length = 0;
+  assert.deepEqual(await databaseHashes(), before, 'database or WAL content changed during read-only audit');
+  console.log(JSON.stringify({
+    schemaVersion: 2, status: 'passed', checkedAt: new Date().toISOString(), phase: config.phase, candidateRoot: root,
+    package: packageIdentity, stableIdentity, restart, resumeHistory,
+    compatibility: { strictExecutionMarkers: config.strictExecutionMarkers, missingHistoricalFields, historicalAcceptanceOnly: !config.strictExecutionMarkers },
+    execution: { rawPlanStatus: plan.status, computedPlanComplete: verified.size === plan.steps.length, completedStepIds: [...verified], taskStatus: task.status, turnStatus: turn.status, attempts: task.attempts, replans: task.replans, selectedProviderId: turn.providerId, selectedModel: turn.model, selectedReasoningEffort: turn.reasoningEffort, toolCatalogToolCount: turn.toolCatalogToolCount, actualToolCalls: allCalls.length, actualToolResults: allResults.length, typedToolCalls: calls.length, unauthorizedToolCount: allCalls.filter(call => !allowed.has(call.toolName)).length, fullExportMatchesDeterministicResult: true, steps },
+    numericalOracle: oracle, delivery: { status: delivery.status, files }, relay,
+    audit: { readOnlyDatabases: true, databaseConnectionsUseIsolatedCopies: true, sourceDatabaseAndWalHashes: before, databaseAndWalBytesUnchanged: true, settingsOrCredentialsRead: false, networkRequests: 0, scriptSha256: hash(await readFile(fileURLToPath(import.meta.url))), resumeVerifierSha256: hash(await readFile(new URL('./verify-resume-history.mjs', import.meta.url))) },
+    limitations: [
+      'GUI selection and the real model interaction must be corroborated by separately retained screenshots and provider evidence.',
+      'Exact bound arguments are checked against independent receipt rows because persisted tool-call arguments may be redacted.',
+      'Deterministic result consistency is checked against all exported fields, including fields omitted from bounded model tool output.',
+      ...(oracle.supplied ? [] : ['No independent numerical oracle was supplied; this run checks record consistency, not an independent recalculation.']),
+      ...(relay.supplied ? ['Relay summary was checked; missing original response streams are not reconstructed.'] : ['No relay report was supplied; no independent live-provider provenance claim is made.']),
+      'Code-signature integrity does not establish notarization or user acceptance. This audit is not release approval.',
+      ...(!config.strictExecutionMarkers ? ['Historical compatibility was explicitly enabled. Missing provider/effort and execution markers are reported as unavailable; this result does not pass strict new-candidate acceptance.'] : [])
+    ]
+  }, null, 2));
+} finally { for (const db of databases) db.close(); await rm(snapshotRoot, { recursive: true, force: true }); }

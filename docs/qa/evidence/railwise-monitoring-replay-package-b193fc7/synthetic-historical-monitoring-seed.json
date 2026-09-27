@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "fixtureOnly": true,
+  "realUserData": false,
+  "productionKpi": false,
+  "sourcePackageHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "sourcePackageAsarSha256": "11a060ec6a7c42385eed433a336967a91647251f51a07f0781302420b2f9e20c",
+  "sourceModuleSha256": "12cefbd6b76cae74022c2e4c90f8efa3c7984239efeeee868d81581a18cb5ce8",
+  "nodeAbi": "148",
+  "electron": "43.1.1",
+  "candidateRoot": "/private/tmp/railwise-survey-b193fc7",
+  "runtimeRoot": "/private/tmp/railwise-survey-b193fc7/home/.workwise/runtime",
+  "rootDir": "/private/tmp/railwise-survey-b193fc7/home/.workwise/runtime/engineering",
+  "workspace": "/private/tmp/railwise-survey-b193fc7/workspace/synthetic-historical-monitoring",
+  "projectId": "project_9b98b139-6794-4830-95d1-0ac55449a399",
+  "datasetId": "dataset_984d1de1-14e2-4f20-a491-16dccc12aaaf",
+  "analysisId": "analysis_78dcd6e5-d4ab-47e3-bcff-6b47fb5e8639",
+  "algorithmVersion": "workwise-engineering-2",
+  "manifestId": "manifest_220c5caa-5177-4e66-8928-6bf9d05b1b44",
+  "reviewStatus": "draft",
+  "sourceFileHash": "432c0a22ea357e87ffa329640813d14171df7a7376502bfd2e564df614af487d",
+  "inputHash": "17577cefdee65a99598996f6d2f7304fd6c7ce9654112742dc8e61bf52b2f813",
+  "outputs": [
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/report.docx",
+      "sha256": "d5341323fd2c2cfcdefd9e4e56c607cb14f51be1121abf422b5a4b91c0ac907d",
+      "sizeBytes": 4349
+    },
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/report.pdf",
+      "sha256": "052be06dc2652f68619e99502a6ad4581da21ce5cf01bed38fd785c0d6882923",
+      "sizeBytes": 29300
+    },
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/run_a1d4b27f-418c-4577-99c1-29d290321c54/evidence.xlsx",
+      "sha256": "9a4773262be183bed45186c3f933bf7eb5579d7d0e79f2fbebcc17ba301e9337",
+      "sizeBytes": 31592
+    },
+    {
+      "path": ".workwise/deliverables/project_9b98b139-6794-4830-95d1-0ac55449a399/chart_14b18607-5fbc-429e-a1d9-d6a9a4ef7112/trend.svg",
+      "sha256": "8bcb3dadb3313467263913d06277c64c294af1a9718eefef5caa2a9374b03381",
+      "sizeBytes": 4511
+    }
+  ],
+  "expectedNewReplay": {
+    "status": "not-evaluated",
+    "reasonCode": "source-unavailable"
+  },
+  "createdAt": "2026-09-20T20:56:23.334Z",
+  "oldOriginalSourceTableAbsent": true,
+  "closedDatabaseSha256": "3e9f5826c2e6fa35e5cc205e9f8549455fa80e77cf2e1ba76e19b9365258dec5"
+}

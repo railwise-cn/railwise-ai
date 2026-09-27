@@ -1,0 +1,285 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 53213de739d0.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-53213de/Applications/RAILWISE%20AI%20Candidate%2053213de739d0.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 审批卡验收（合成数据） 控制网 · m · 9/20
+							26 文本 审批卡验收（合成数据）
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 审批卡验收（合成数据） · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 审批卡验收（合成数据）
+							36 文本  · 
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 审批卡验收（合成数据）
+							49 (selected) 新建内业任务
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 导入与预检
+							52 (selected) 导入与预检
+						53 按钮 新建工程测量项目
+					54 文本 任务配置已保存。后续计算会使用当前任务配置。
+					55 按钮 关闭提示
+					56 container
+						57 text 任务 审批卡验收（合成数据） 阶段 导入与预检 数据源 / 格式 golden-plane-control-e2e.in2  ·  COSA-IN2 处置状态 需确认 基准 待确认  ·  待确认 点数 4 测站数 1 观测 5 闭合差 — 精度 — 成果 — 网型 平面控制网 审查 —
+					58 container Survey AI 会话
+						59 container
+							60 标题 Survey AI 会话, Value: 2
+								61 文本 Survey AI 会话
+							62 文本 审批卡验收（合成数据）
+							63 按钮 数据资产
+							64 按钮 测量平差
+							65 按钮 刷新上下文
+						66 标题 Survey AI, Value: 2
+							67 文本 Survey AI
+						68 container
+							69 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							70 按钮 更多操作
+							71 弹出式按钮 模型与推理设置
+							72 按钮 (disabled) 发送
+					73 container
+						74 container 工作视图
+							75 按钮 项目配置
+							76 按钮 数据资产
+							77 按钮 质量校核
+							78 按钮 测量来源与预检
+						79 container 测量与平差控制台
+							80 标题 测量与平差控制台, Value: 3
+								81 文本 测量与平差控制台
+							82 文本 Runtime 确定性计算
+							83 按钮 询问测量 AI
+							84 文本 已有测量网络
+							85 弹出式按钮 Description: 已有测量网络, Value: cosa-in2 · 可进入校核与平差 · 5fe23c34
+								86 (selected) cosa-in2 · 可进入校核与平差 · 5fe23c34
+							87 文本 网络类型
+							88 弹出式按钮 Description: 网络类型, Value: 平面控制网
+								89 (selected) 平面控制网
+							90 文本 Runtime 在线
+							91 container 测量计算状态
+								92 文本 网型
+								93 文本 平面控制网
+								94 container
+									95 文本 当前约束
+									96 container Description: 当前 Runtime 约束, Help: Runtime 当前仅按固定已知点执行；最小约束和自由网尚不可选。
+										97 文本 固定已知点（Runtime 当前实现）
+								98 container
+									99 文本 平差方法 / 权模型
+									100 container Description: 当前 Runtime 执行方式, Help: 条件平差不提供为用户可选项；坐标 / 高程转换按其已选类型由 Runtime 执行。
+										101 文本 加权最小二乘
+								102 文本 可解性
+								103 文本 尚未校核
+							104 container 平差工作区导航
+								105 按钮 网形与基准
+								106 按钮 观测表 5
+									107 文本 观测表
+									108 文本 5
+								109 按钮 点位与坐标 4
+									110 文本 点位与坐标
+									111 文本 4
+								112 按钮 平差结果
+								113 按钮 自由水准试算
+								114 按钮 期次变形 0
+									115 文本 期次变形
+									116 文本 0
+							117 文本 导入仪器、GNSS 或交换文件
+							118 文本 仪器、GNSS 与交换格式；识别不等于可平差。
+							119 按钮 选择专业测量文件
+							120 按钮 导入结构化网络
+							121 按钮 高级 JSON
+							122 文本 原文件按 SHA-256 保留；来源资格通过后才能校核和平差。
+							123 文本 项目基准
+							124 定义列表
+								125 container 网络类型
+									126 文本 网络类型
+								127 文本 平面控制网
+								128 container 平面坐标系
+									129 文本 平面坐标系
+								130 文本 待确认
+								131 container 高程基准
+									132 文本 高程基准
+								133 文本 待确认
+								134 container 输入修订
+									135 文本 输入修订
+								136 文本 1
+							137 container
+								138 文本 导入时使用的已知控制点（可选）
+								139 文本输入区 (settable) Description: 导入时使用的已知控制点（可选）, Placeholder: BM-01,100.000
+								140 文本 每行：点号,高程[,X,Y]，数值单位为米。请在选择文件前填写，输入将随原文件导入并保留映射证据；冲突数据会阻断，不自动替换原记录。
+							141 container COSA 文件组预检
+								142 文本 COSA 同名文件组
+								143 文本 按目录与主文件名关联 .in1、.in2、.NET、.XYO、.ou1、.ou2；关联只用于预检与成果比对，不代表格式已获平差许可。
+								144 文本 1 个文件组已关联
+								145 文本 cosa:golden-plane-control-e2e
+								146 text 关联完成 . IN1 未选择 . IN2
+								147 文本 golden-plane-control-e2e.in2
+								148 text . NET 未选择 . XYO 未选择 . OU1 未选择 . OU2 未选择
+							149 container 专业测量来源筛选
+								150 文本 已有来源筛选
+								151 文本 格式
+								152 弹出式按钮 Description: 按来源格式筛选, Value: 全部格式（1）
+									153 (selected) 全部格式（1）
+								154 文本 就绪状态
+								155 弹出式按钮 Description: 按平差就绪状态筛选, Value: 全部状态
+									156 (selected) 全部状态
+								157 文本 显示 1 / 1
+							158 文本 原始资料身份已验证：SHA-256 与来源账本已复核（1 条记录）。不代表已完成质量复核、签名、规范合规或正式交付。
+							159 container 专业测量来源预检
+								160 文本 golden-plane-control-e2e.in2
+								161 文本 可进入校核与平差
+								162 container
+									163 text COSA(科傻)  ·  cosa-in2  ·  置信度 98%
+								164 文本 10 条已识别记录 · 0.1 KiB
+								165 container
+									166 text 原文件 已保留
+								167 container 来源合同明细
+									168 定义列表
+										169 container 声明扩展名
+											170 文本 声明扩展名
+										171 文本 .in2
+										172 container 厂商 / 内容探测格式
+											173 文本 厂商 / 内容探测格式
+										174 container
+											175 text COSA(科傻)  ·  cosa-in2  ·  版本 未声明
+										176 container 检测方法 / 置信度
+											177 文本 检测方法 / 置信度
+										178 container
+											179 text 结构探针  ·  98%
+										180 container 扩展名一致性 / 人工确认
+											181 文本 扩展名一致性 / 人工确认
+										182 container
+											183 text 未发现冲突  ·  无需人工确认
+										184 container 导入处置 / 下一步
+											185 文本 导入处置 / 下一步
+										186 container
+											187 text 可进入校核与平差  ·  adjustment-ready: P0 格式目录 workwise-survey-format-catalog-1.7.0 — 严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 复核单位、基准和点位角色后执行质量校核。
+										188 container 长度单位（原始 → 规范）
+											189 文本 长度单位（原始 → 规范）
+										190 container
+											191 text m  →  m
+										192 container 角度单位（原始 → 规范）
+											193 文本 角度单位（原始 → 规范）
+										194 container
+											195 text cosa-degree-dot-mmss  →  rad
+										196 container 平面基准 / 高程基准
+											197 文本 平面基准 / 高程基准
+										198 container
+											199 text 未声明  /  未声明
+										200 container 点 / 测站
+											201 文本 点 / 测站
+										202 container
+											203 text 3  /  1
+										204 container 观测 / 记录 / 跳过
+											205 文本 观测 / 记录 / 跳过
+										206 container
+											207 text 5  /  10  /  0
+										208 container 解析器源哈希
+											209 文本 解析器源哈希
+										210 文本 14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04
+										211 container 转换器身份 / 二进制哈希
+											212 文本 转换器身份 / 二进制哈希
+										213 文本 未使用转换器
+								214 定义列表
+									215 container SHA-256
+										216 文本 SHA-256
+									217 文本 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0
+									218 container 解析器
+										219 文本 解析器
+									220 container
+										221 text cosa-in2-parser  ·  0.3.0
+									222 container 内容签名
+										223 文本 内容签名
+									224 文本 COSA .in2 three-value header + L,0 station block
+									225 container 扩展名一致性
+										226 文本 扩展名一致性
+									227 container
+										228 text .in2  ·  未发现冲突
+								229 文本 解析诊断
+								230 text 阻断 0 · 警告 1 ENCODING_DETECTED
+								231 按钮 询问 encoding_detected #1 的测量 AI
+								232 text 文本编码 utf-8 FORMAT_DETECTED
+								233 按钮 询问 format_detected #2 的测量 AI
+								234 text 识别为 COSA(科傻) / cosa-in2，置信度 98% FORMAT_DETECTED
+								235 按钮 询问 format_detected #3 的测量 AI
+								236 text COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 下一步： 继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。
+								237 container
+									238 文本 原始记录锚点
+									239 按钮 查看 10
+									240 文本 锚点用于从规范化观测回溯到仪器文件记录，不展示或改写原始字节。
+							241 文本 点位
+							242 文本 4
+							243 文本 3 已知 · 1 未知
+							244 文本 观测
+							245 文本 5
+							246 文本 已保留单位与权
+							247 文本 质量状态
+							248 文本 已导入
+							249 文本 未校核
+							250 文本 运行状态
+							251 文本 —
+							252 文本 尚未平差
+							253 按钮 质量校核
+							254 按钮 (disabled) 运行平差
+							255 container
+								256 text 质量门禁 COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 当前输入
+								257 定义列表
+									258 container 来源
+										259 文本 来源
+									260 文本 golden-plane-control-e2e.in2
+									261 container 格式
+										262 文本 格式
+									263 文本 cosa-in2
+									264 container 就绪状态
+										265 文本 就绪状态
+									266 文本 可进入校核与平差
+									267 container 阻断项
+										268 文本 阻断项
+									269 文本 0
+								270 文本 结果可追溯
+							271 文本 1 个文件已完成来源预检; 已检查 1 个 COSA 文件的同名关联
+	272 关闭按钮
+	273 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	274 最小化按钮
+275 menu bar
+	276 RAILWISE AI Candidate 53213de739d0
+	277 文件
+	278 编辑
+	279 显示
+	280 窗口
+	281 帮助
+
+The focused UI element is 33 按钮 Survey AI · 新建内业任务 审批卡验收（合成数据） · 0 条消息

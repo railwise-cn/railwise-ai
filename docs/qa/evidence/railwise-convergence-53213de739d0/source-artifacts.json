@@ -1,0 +1,1431 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+  "artifacts": [
+    {
+      "file": "before-resume-zero-receipts-53213.json",
+      "sourceLabel": "<candidate>/evidence/before-resume-zero-receipts-53213.json",
+      "sourceSha256": "3b97643fa9ee087b481d0770d18ac9b39363f71e6946a0fa7d80e3e20d819067",
+      "sha256": "3b97643fa9ee087b481d0770d18ac9b39363f71e6946a0fa7d80e3e20d819067",
+      "bytes": 56243,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "failed-real-resume-53213.json",
+      "sourceLabel": "<candidate>/evidence/failed-real-resume-53213.json",
+      "sourceSha256": "bf31945127a2bb7cd3920324cdab51f22e4d36615df030bb67e405c64a6f0756",
+      "sha256": "bf31945127a2bb7cd3920324cdab51f22e4d36615df030bb67e405c64a6f0756",
+      "bytes": 63435,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "second-before-resume-zero-receipts-53213.json",
+      "sourceLabel": "<candidate>/evidence/second-before-resume-zero-receipts-53213.json",
+      "sourceSha256": "28ea21eff9c90f8c8ac2284617d22e0075f989fbb87b52faa60d0c7f49c43865",
+      "sha256": "28ea21eff9c90f8c8ac2284617d22e0075f989fbb87b52faa60d0c7f49c43865",
+      "bytes": 56863,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "strict-before-restart-audit-53213.json",
+      "sourceLabel": "<candidate>/evidence/strict-before-restart-audit-53213.json",
+      "sourceSha256": "b1a0c15560fa201431594072c070699a8a25586d37c0a18708ef1a478e2407e5",
+      "sha256": "b1a0c15560fa201431594072c070699a8a25586d37c0a18708ef1a478e2407e5",
+      "bytes": 12988,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "strict-after-restart-audit-53213.json",
+      "sourceLabel": "<candidate>/evidence/strict-after-restart-audit-53213.json",
+      "sourceSha256": "f417eb7fccf6971164e6359f4377657e1c5d2713f5b37d985007dd3f71ae9291",
+      "sha256": "f417eb7fccf6971164e6359f4377657e1c5d2713f5b37d985007dd3f71ae9291",
+      "bytes": 13083,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "scenario-lineage-before-restart-53213.json",
+      "sourceLabel": "<candidate>/evidence/scenario-lineage-before-restart-53213.json",
+      "sourceSha256": "c9eede64724c43cd9d206cef7ea22a435768c09750d06dafa4eef4991708de29",
+      "sha256": "c9eede64724c43cd9d206cef7ea22a435768c09750d06dafa4eef4991708de29",
+      "bytes": 2409,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "after-restart-known-ui-defect-53213.json",
+      "sourceLabel": "<candidate>/evidence/after-restart-known-ui-defect-53213.json",
+      "sourceSha256": "df7fe5d5ef8f86dade80e851396107bde90a455c8c0ff108382231b6246aed7d",
+      "sha256": "df7fe5d5ef8f86dade80e851396107bde90a455c8c0ff108382231b6246aed7d",
+      "bytes": 1801,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "independent-selected-result-53213.json",
+      "sourceLabel": "<candidate>/evidence/independent-selected-result-53213.json",
+      "sourceSha256": "d3d2fd37a56eb5ef1b646c2b06f69c1ee5e2e377df511f1231fc521a2ad9fcc5",
+      "sha256": "d3d2fd37a56eb5ef1b646c2b06f69c1ee5e2e377df511f1231fc521a2ad9fcc5",
+      "bytes": 8499,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "independent-oracle-comparison-53213.json",
+      "sourceLabel": "<candidate>/evidence/independent-oracle-comparison-53213.json",
+      "sourceSha256": "d8bfb6a8793c81b1770a7f1ad2a5eed9c469f8d434401d3b718119f663142c77",
+      "sha256": "d8bfb6a8793c81b1770a7f1ad2a5eed9c469f8d434401d3b718119f663142c77",
+      "bytes": 4512,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "mock-completion-report-650cec4a29fd3f75.json",
+      "sourceLabel": "<candidate>/evidence/mock-completion-report-650cec4a29fd3f75.json",
+      "sourceSha256": "5d31993ed6311266fc3b3859efdca995ec2c14f80067fb8940fe10fc36393df1",
+      "sha256": "5d31993ed6311266fc3b3859efdca995ec2c14f80067fb8940fe10fc36393df1",
+      "bytes": 3436,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "mock-completion-report-943a464105dc837f.json",
+      "sourceLabel": "<candidate>/evidence/mock-completion-report-943a464105dc837f.json",
+      "sourceSha256": "5a0bbc82dfb5997d7959d736f3a9d0fc3740426c1462706ee517bb4a686d16c1",
+      "sha256": "5a0bbc82dfb5997d7959d736f3a9d0fc3740426c1462706ee517bb4a686d16c1",
+      "bytes": 3310,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "relay-report-d6fabac586b96a85.json",
+      "sourceLabel": "<candidate>/evidence/relay-report-d6fabac586b96a85.json",
+      "sourceSha256": "017c3080057c2ca3fe8f2bc6e29bab08f82754922e6150b988bd2136c0016ff4",
+      "sha256": "017c3080057c2ca3fe8f2bc6e29bab08f82754922e6150b988bd2136c0016ff4",
+      "bytes": 3930,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "relay-report-43151fd88b293414.json",
+      "sourceLabel": "<candidate>/evidence/relay-report-43151fd88b293414.json",
+      "sourceSha256": "b8684521902756d43bee91f2421b733827e2c95e1ba80847bcc9d1c2a5ba9dd5",
+      "sha256": "b8684521902756d43bee91f2421b733827e2c95e1ba80847bcc9d1c2a5ba9dd5",
+      "bytes": 4424,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "relay-report-193aa816ded2eb21.json",
+      "sourceLabel": "<candidate>/evidence/relay-report-193aa816ded2eb21.json",
+      "sourceSha256": "c633e5a12378b74d77d458964421e452faa7b49d708c246654ba23c1b3d06af3",
+      "sha256": "c633e5a12378b74d77d458964421e452faa7b49d708c246654ba23c1b3d06af3",
+      "bytes": 1166,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "relay-report-bc7039f02b81c32f.json",
+      "sourceLabel": "<candidate>/evidence/relay-report-bc7039f02b81c32f.json",
+      "sourceSha256": "668e93a1680faa043cdf9f00037a39a9d19ef402ca684dd155d629b5d53ca509",
+      "sha256": "668e93a1680faa043cdf9f00037a39a9d19ef402ca684dd155d629b5d53ca509",
+      "bytes": 1522,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "consultation-healthcheck-1789894523837.json",
+      "sourceLabel": "<candidate>/evidence/consultation-healthcheck-1789894523837.json",
+      "sourceSha256": "db6f7021f4646d3354e0efb70dce1c3cea68807b3198a536f3691f6c25c28fa4",
+      "sha256": "db6f7021f4646d3354e0efb70dce1c3cea68807b3198a536f3691f6c25c28fa4",
+      "bytes": 1853,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "consultation-healthcheck-1789894568710.json",
+      "sourceLabel": "<candidate>/evidence/consultation-healthcheck-1789894568710.json",
+      "sourceSha256": "422ec4d66f451c3fc16f2d11a2f801f6924d8f333cddcb0d3fefb09e17d608e7",
+      "sha256": "422ec4d66f451c3fc16f2d11a2f801f6924d8f333cddcb0d3fefb09e17d608e7",
+      "bytes": 1799,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "packaged-text-only-completion-probe-3peCSU.json",
+      "sourceLabel": "<candidate>/evidence/packaged-text-only-completion-probe-3peCSU.json",
+      "sourceSha256": "e1ed2e5ca61ec3d34e429f5d555eaa4ac0948f2a1e719fab84224c3e5101c98b",
+      "sha256": "e1ed2e5ca61ec3d34e429f5d555eaa4ac0948f2a1e719fab84224c3e5101c98b",
+      "bytes": 2790,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui-review-fixture-first-both.json",
+      "sourceLabel": "<candidate>/evidence/gui-review-fixture-first-both.json",
+      "sourceSha256": "03177c5e6e7a41ee06f72ace7e470ab6c0f639468d86bf4dd6ac5afee80f6b91",
+      "sha256": "03177c5e6e7a41ee06f72ace7e470ab6c0f639468d86bf4dd6ac5afee80f6b91",
+      "bytes": 855,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "legacy-completion-copy.json",
+      "sourceLabel": "<candidate>/evidence/legacy-completion-copy.json",
+      "sourceSha256": "7ba0cdc823fd48ff2137680b8e7f9f0bdb42f74bb47e479c8feb299894dbc02c",
+      "sha256": "7ba0cdc823fd48ff2137680b8e7f9f0bdb42f74bb47e479c8feb299894dbc02c",
+      "bytes": 4140,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/01-import-zh-light.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/01-import-zh-light.ax.txt",
+      "sourceSha256": "6243a95d6fc2210c440a3e9da769d18eddd327d483a87dbe7bfc96775e3b9633",
+      "sha256": "6243a95d6fc2210c440a3e9da769d18eddd327d483a87dbe7bfc96775e3b9633",
+      "bytes": 13537,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/01-import-zh-light.png",
+      "sourceLabel": "<candidate>/evidence/gui/01-import-zh-light.png",
+      "sourceSha256": "1f0a8d2b6fcb269ae4698b8005c5794bc72a967385249cddba2fb5ad0ee8143e",
+      "sha256": "1f0a8d2b6fcb269ae4698b8005c5794bc72a967385249cddba2fb5ad0ee8143e",
+      "bytes": 116207,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/02-reviewed-plan.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/02-reviewed-plan.ax.txt",
+      "sourceSha256": "f18540d6c65b5731c663a2463a5abcb7d1ea491ac48ad1d407e34dd21e04d35e",
+      "sha256": "f18540d6c65b5731c663a2463a5abcb7d1ea491ac48ad1d407e34dd21e04d35e",
+      "bytes": 18034,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/02-reviewed-plan.png",
+      "sourceLabel": "<candidate>/evidence/gui/02-reviewed-plan.png",
+      "sourceSha256": "0b5d8b4df2e61d8fc33997e8169d7cbe68f913d352a9f4bd1c08f27838478bf5",
+      "sha256": "0b5d8b4df2e61d8fc33997e8169d7cbe68f913d352a9f4bd1c08f27838478bf5",
+      "bytes": 150256,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/03-mock-stalled.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/03-mock-stalled.ax.txt",
+      "sourceSha256": "a2ceab9da203f75268db9c5a8283c05f81eb519284fa8517f7245d7bb6158d79",
+      "sha256": "a2ceab9da203f75268db9c5a8283c05f81eb519284fa8517f7245d7bb6158d79",
+      "bytes": 19372,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/03-mock-stalled.png",
+      "sourceLabel": "<candidate>/evidence/gui/03-mock-stalled.png",
+      "sourceSha256": "0e46822772f9a0e99a4b5e6444384d74844a634d2dbf6f891a3943674c886920",
+      "sha256": "0e46822772f9a0e99a4b5e6444384d74844a634d2dbf6f891a3943674c886920",
+      "bytes": 156325,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/04-effort-roundtrip.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/04-effort-roundtrip.ax.txt",
+      "sourceSha256": "d50bfd956f5e0798955e6da71150ddc5860954b64353263054cf30c45094fd9e",
+      "sha256": "d50bfd956f5e0798955e6da71150ddc5860954b64353263054cf30c45094fd9e",
+      "bytes": 301,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/05-provider-selection.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/05-provider-selection.ax.txt",
+      "sourceSha256": "4d01347be9ebaa0f5618d84fc97d4af848200feeffc260f9fb5fa7477552cee2",
+      "sha256": "4d01347be9ebaa0f5618d84fc97d4af848200feeffc260f9fb5fa7477552cee2",
+      "bytes": 206,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/06-real-resume-503.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/06-real-resume-503.ax.txt",
+      "sourceSha256": "bd608dcd4be2d926b1d807cc5b1831e79706c91c114b346819eb53c4eaaae884",
+      "sha256": "bd608dcd4be2d926b1d807cc5b1831e79706c91c114b346819eb53c4eaaae884",
+      "bytes": 19489,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/06-real-resume-503.png",
+      "sourceLabel": "<candidate>/evidence/gui/06-real-resume-503.png",
+      "sourceSha256": "de56b2112ab384fc34e1fd1eb9c9a653902a0e0be28f5cb6cdb12af9f8f9bd65",
+      "sha256": "de56b2112ab384fc34e1fd1eb9c9a653902a0e0be28f5cb6cdb12af9f8f9bd65",
+      "bytes": 153931,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/07-second-mock-stalled.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/07-second-mock-stalled.ax.txt",
+      "sourceSha256": "a65d0decb92b81e324ab8cac725831c2888eab0e521199801264c8f11c065e81",
+      "sha256": "a65d0decb92b81e324ab8cac725831c2888eab0e521199801264c8f11c065e81",
+      "bytes": 22202,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/07-second-mock-stalled.png",
+      "sourceLabel": "<candidate>/evidence/gui/07-second-mock-stalled.png",
+      "sourceSha256": "e28e20cb2a1ea2948a5cb0fe44df0ad8a2d7116156b08145e3b823eb6865bba2",
+      "sha256": "e28e20cb2a1ea2948a5cb0fe44df0ad8a2d7116156b08145e3b823eb6865bba2",
+      "bytes": 155629,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/08-real-completed-auto-refresh.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/08-real-completed-auto-refresh.ax.txt",
+      "sourceSha256": "698a80690e0b9fc3fa42e78c0805952b8dd210ee3e61f33fde03cae46fcc0df4",
+      "sha256": "698a80690e0b9fc3fa42e78c0805952b8dd210ee3e61f33fde03cae46fcc0df4",
+      "bytes": 32378,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/08-real-completed-auto-refresh.png",
+      "sourceLabel": "<candidate>/evidence/gui/08-real-completed-auto-refresh.png",
+      "sourceSha256": "fd2064a5932cba933f15251935ceddfd1f913d4d528a256872388131d3c54d74",
+      "sha256": "fd2064a5932cba933f15251935ceddfd1f913d4d528a256872388131d3c54d74",
+      "bytes": 150113,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/09-residual-source.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/09-residual-source.ax.txt",
+      "sourceSha256": "600fb474a88f4711a840aa962fcb53b78ef8f854019eecb6520c40bea0ec5fac",
+      "sha256": "600fb474a88f4711a840aa962fcb53b78ef8f854019eecb6520c40bea0ec5fac",
+      "bytes": 30768,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/09-residual-source.png",
+      "sourceLabel": "<candidate>/evidence/gui/09-residual-source.png",
+      "sourceSha256": "18c640ac7f0abc494dc25d6e21f5d1a6ffdffb3ca281cca578d7cd14bc01f9ed",
+      "sha256": "18c640ac7f0abc494dc25d6e21f5d1a6ffdffb3ca281cca578d7cd14bc01f9ed",
+      "bytes": 163613,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/10-completed-residuals-wide.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/10-completed-residuals-wide.ax.txt",
+      "sourceSha256": "6aaa4ba93d47952b2ae996d3a3be3c11dcc156e02114eed7b5b2892421bebddc",
+      "sha256": "6aaa4ba93d47952b2ae996d3a3be3c11dcc156e02114eed7b5b2892421bebddc",
+      "bytes": 28593,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/10-completed-residuals-wide.png",
+      "sourceLabel": "<candidate>/evidence/gui/10-completed-residuals-wide.png",
+      "sourceSha256": "339870c0301a6a13869b2fbfcf39a07400e9c68b73386b5b5b894d5415a04a9c",
+      "sha256": "339870c0301a6a13869b2fbfcf39a07400e9c68b73386b5b5b894d5415a04a9c",
+      "bytes": 158357,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "gui/11-restart-restored.ax.txt",
+      "sourceLabel": "<candidate>/evidence/gui/11-restart-restored.ax.txt",
+      "sourceSha256": "00818d5ec58e6aa574d470e7663a7068c52b63552c7bfa8405e90a987b727a3d",
+      "sha256": "00818d5ec58e6aa574d470e7663a7068c52b63552c7bfa8405e90a987b727a3d",
+      "bytes": 32135,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "gui/11-restart-restored.png",
+      "sourceLabel": "<candidate>/evidence/gui/11-restart-restored.png",
+      "sourceSha256": "d865a67e229f69e2c75c558b4c74d9a6b669ac9922b5881d71de32f064cda232",
+      "sha256": "d865a67e229f69e2c75c558b4c74d9a6b669ac9922b5881d71de32f064cda232",
+      "bytes": 155729,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "synthetic-deliverables/report.docx",
+      "sourceLabel": "<candidate>/home/.workwise/default_workspace/.workwise/deliverables/project_cb802366-c811-4a2b-90c0-37b310447cfe/run_91826eb5-5db0-4088-8696-99cdd4a92406/report.docx",
+      "sourceSha256": "eb2882c9fdc159517d2de7894058ce7f8202d2dad940f7a98c674efb1fe1831d",
+      "sha256": "eb2882c9fdc159517d2de7894058ce7f8202d2dad940f7a98c674efb1fe1831d",
+      "bytes": 5398,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "synthetic-deliverables/report.pdf",
+      "sourceLabel": "<candidate>/home/.workwise/default_workspace/.workwise/deliverables/project_cb802366-c811-4a2b-90c0-37b310447cfe/run_91826eb5-5db0-4088-8696-99cdd4a92406/report.pdf",
+      "sourceSha256": "29096adb8e6e3445290ff794a5c27a663adee5c35568341c9034df48fe4fe622",
+      "sha256": "29096adb8e6e3445290ff794a5c27a663adee5c35568341c9034df48fe4fe622",
+      "bytes": 39621,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "synthetic-deliverables/evidence.xlsx",
+      "sourceLabel": "<candidate>/home/.workwise/default_workspace/.workwise/deliverables/project_cb802366-c811-4a2b-90c0-37b310447cfe/run_91826eb5-5db0-4088-8696-99cdd4a92406/evidence.xlsx",
+      "sourceSha256": "76f154b54803dff254c5e3109ca096a6c6271650a4234ecac615a2dbc5624241",
+      "sha256": "76f154b54803dff254c5e3109ca096a6c6271650a4234ecac615a2dbc5624241",
+      "bytes": 39084,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": null
+    },
+    {
+      "file": "helpers/audit-candidate-execution.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/audit-candidate-execution.mjs",
+      "sourceSha256": "c32cb064525b5d0f71aa075998b284c8eb7bc6a23f285ee9d986a9293dba64b9",
+      "sha256": "c32cb064525b5d0f71aa075998b284c8eb7bc6a23f285ee9d986a9293dba64b9",
+      "bytes": 29972,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/verify-resume-history.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/verify-resume-history.mjs",
+      "sourceSha256": "0089911d98a7d93932e7ddf3626dbc6931552f028b44a3af9d14259d9feb42f3",
+      "sha256": "0089911d98a7d93932e7ddf3626dbc6931552f028b44a3af9d14259d9feb42f3",
+      "bytes": 6341,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/verify-relay-cleanup.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/verify-relay-cleanup.mjs",
+      "sourceSha256": "c1ced7253e8e5a9a09b3f5132594db6a9cbe0cd1c889a1e5bf5162dd492b5fce",
+      "sha256": "c1ced7253e8e5a9a09b3f5132594db6a9cbe0cd1c889a1e5bf5162dd492b5fce",
+      "bytes": 1917,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/freeze-53213-before-resume.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/freeze-53213-before-resume.mjs",
+      "sourceSha256": "81abfbbba5d91c897fe7cd399cce883b2e75715b8867918089554383f0f2eae1",
+      "sha256": "81abfbbba5d91c897fe7cd399cce883b2e75715b8867918089554383f0f2eae1",
+      "bytes": 8451,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/freeze-53213-failed-resume.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/freeze-53213-failed-resume.mjs",
+      "sourceSha256": "b60892fdd8949d556b51415d26a7fb4fcc31bba8987a04ca3f9571cc2c0bfdb5",
+      "sha256": "b60892fdd8949d556b51415d26a7fb4fcc31bba8987a04ca3f9571cc2c0bfdb5",
+      "bytes": 7383,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/freeze-53213-second-before-resume.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/freeze-53213-second-before-resume.mjs",
+      "sourceSha256": "7b7c64813e485cbda7aea14a2c00980fbc83519f7b4c3b7d61e97833970e6dfa",
+      "sha256": "7b7c64813e485cbda7aea14a2c00980fbc83519f7b4c3b7d61e97833970e6dfa",
+      "bytes": 9992,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/retain-53213-scenario-lineage.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/retain-53213-scenario-lineage.mjs",
+      "sourceSha256": "aa401a1839c271fda5b7ad686e64a81e7c52d0f4d922946298ed4839b6ac2c35",
+      "sha256": "aa401a1839c271fda5b7ad686e64a81e7c52d0f4d922946298ed4839b6ac2c35",
+      "bytes": 5194,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/run-53213-after-restart.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/run-53213-after-restart.mjs",
+      "sourceSha256": "056a4caaafd030480211dcba305cda0a6c20ac7b48ab64069878d9f7176ea5a3",
+      "sha256": "056a4caaafd030480211dcba305cda0a6c20ac7b48ab64069878d9f7176ea5a3",
+      "bytes": 2607,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/resume-history.test.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/resume-history.test.mjs",
+      "sourceSha256": "366da3302f44e568fac625d732453ea87e88b99ccd219bffdbc221b887e1f780",
+      "sha256": "366da3302f44e568fac625d732453ea87e88b99ccd219bffdbc221b887e1f780",
+      "bytes": 5260,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/relay-cleanup.test.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/relay-cleanup.test.mjs",
+      "sourceSha256": "ff113f3ab67bef17170c5e41a85c3d3df2c13cabe19735861a2ff6e1b9088e3b",
+      "sha256": "ff113f3ab67bef17170c5e41a85c3d3df2c13cabe19735861a2ff6e1b9088e3b",
+      "bytes": 2294,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/53213-before-restart-input.json",
+      "sourceLabel": "<local-evidence>/53213-before-restart-input.json",
+      "sourceSha256": "08dfc5c4dfd12b0fff1954d7db4731d5311373e4158ea1711f0c5369af07cc6b",
+      "sha256": "9fe4236dbf386c18628d6b63516fec9542c34b120d617aae4bf919bd93037b01",
+      "bytes": 2148,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/53213-after-restart-input.json",
+      "sourceLabel": "<local-evidence>/53213-after-restart-input.json",
+      "sourceSha256": "3845b1f24994711f3d29b089de3e0541142d79c36801d4f082323d72089b5d17",
+      "sha256": "b1d2be159718b61e2c32d47d6acabe3826d77c6a72b1e1cff80720db928c5ec3",
+      "bytes": 2189,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/53213-audit-method.md",
+      "sourceLabel": "<local-evidence>/53213-audit-method.md",
+      "sourceSha256": "bfb40f3abb57fa5980de10b4dec9ed19a868f098837664a5f3afde58c51393bc",
+      "sha256": "bfb40f3abb57fa5980de10b4dec9ed19a868f098837664a5f3afde58c51393bc",
+      "bytes": 3468,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/relay-cleanup-amendment.md",
+      "sourceLabel": "<local-evidence>/relay-cleanup-amendment.md",
+      "sourceSha256": "8cd016afe423a3410389230b1ee55f593870c740a2b5ae32c8cfe6fd7f16ad5b",
+      "sha256": "8cd016afe423a3410389230b1ee55f593870c740a2b5ae32c8cfe6fd7f16ad5b",
+      "bytes": 1473,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/resume-history-selfcheck.tap",
+      "sourceLabel": "<local-evidence>/resume-history-selfcheck.tap",
+      "sourceSha256": "0a1b50260fa6401b43435f8bbd344a12c9f6af9e5fc97da8c97dd64c331b40c4",
+      "sha256": "0a1b50260fa6401b43435f8bbd344a12c9f6af9e5fc97da8c97dd64c331b40c4",
+      "bytes": 2810,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/relay-cleanup-selfcheck.tap",
+      "sourceLabel": "<local-evidence>/relay-cleanup-selfcheck.tap",
+      "sourceSha256": "657590339f62e098b9d165057c6e5bfb4070b8fcb4f4e7a334525dd36f5ce9af",
+      "sha256": "657590339f62e098b9d165057c6e5bfb4070b8fcb4f4e7a334525dd36f5ce9af",
+      "bytes": 590,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/strict-mode-selfcheck.json",
+      "sourceLabel": "<local-evidence>/strict-mode-selfcheck.json",
+      "sourceSha256": "c4d3ea0463001bce9b2076959e3e27dfde5f51f3cac2339394863b203eb1f54b",
+      "sha256": "c4d3ea0463001bce9b2076959e3e27dfde5f51f3cac2339394863b203eb1f54b",
+      "bytes": 675,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-local-completion-fixture.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-local-completion-fixture.mjs",
+      "sourceSha256": "7bddd4bd844055f2e1a8999fadadc36834a4a70f201d79993590d87f1be7cead",
+      "sha256": "7bddd4bd844055f2e1a8999fadadc36834a4a70f201d79993590d87f1be7cead",
+      "bytes": 7858,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-typed-acceptance-relay.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-typed-acceptance-relay.mjs",
+      "sourceSha256": "7d0236e254d6b235ec088e5e663222dc702de53e21f0419966f4e15f6cbdf3e2",
+      "sha256": "7d0236e254d6b235ec088e5e663222dc702de53e21f0419966f4e15f6cbdf3e2",
+      "bytes": 16560,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-typed-relay-guard.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-typed-relay-guard.mjs",
+      "sourceSha256": "4208d7b689d40d7a46a28b8b280c4f6262347dea8b7d2ac5dbd214bdeb15514b",
+      "sha256": "4208d7b689d40d7a46a28b8b280c4f6262347dea8b7d2ac5dbd214bdeb15514b",
+      "bytes": 17895,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-typed-acceptance-relay.test.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-typed-acceptance-relay.test.mjs",
+      "sourceSha256": "8ba197f133d98e3e36e566cf397e0c3d1ed1dcb7bf363897f61915aff724147a",
+      "sha256": "8ba197f133d98e3e36e566cf397e0c3d1ed1dcb7bf363897f61915aff724147a",
+      "bytes": 19264,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-helper-boundaries.test.mjs.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-helper-boundaries.test.mjs",
+      "sourceSha256": "b7d684650b276ec8987c1313dc50bd54cc48c39972cfa02047ce8e9e86b0e19a",
+      "sha256": "b7d684650b276ec8987c1313dc50bd54cc48c39972cfa02047ce8e9e86b0e19a",
+      "bytes": 12178,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-mock-runtime-selfcheck.test.ts.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-mock-runtime-selfcheck.test.ts",
+      "sourceSha256": "151c3ae9d4de03ca9bc8487c54a69de374a30b2c2b8e33b2aca28d14a9b5b03c",
+      "sha256": "38654ac48862588fa83c664ef7eec408461c14cf64e1d4e9e0500399d3d426df",
+      "bytes": 5616,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-mock-runtime-vitest.config.mts.source.txt",
+      "sourceLabel": "<local-evidence>/railwise-mock-runtime-vitest.config.mts",
+      "sourceSha256": "91b75b8b7363cd7abc8d70dc33ef8485eeaae67dd5bfa5b24ce62f8880e76288",
+      "sha256": "91b75b8b7363cd7abc8d70dc33ef8485eeaae67dd5bfa5b24ce62f8880e76288",
+      "bytes": 134,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-helper-selftests.tap",
+      "sourceLabel": "<local-evidence>/railwise-helper-selftests.tap",
+      "sourceSha256": "ada770ed90bb3f3bb66cdbead05ec0d762629331f1ccfb5c53762ecbb73274a1",
+      "sha256": "ada770ed90bb3f3bb66cdbead05ec0d762629331f1ccfb5c53762ecbb73274a1",
+      "bytes": 6095,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "helpers/railwise-mock-runtime-selfcheck.json",
+      "sourceLabel": "<local-evidence>/railwise-mock-runtime-selfcheck.json",
+      "sourceSha256": "daad766bbd09bd2fe0c4cbef286778a786cf3221ce9f6dbbe6f6cf3457aa8288",
+      "sha256": "daad766bbd09bd2fe0c4cbef286778a786cf3221ce9f6dbbe6f6cf3457aa8288",
+      "bytes": 640,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/build_oracle.py.source.txt",
+      "sourceLabel": "<local-evidence>/build_oracle.py",
+      "sourceSha256": "fc3c2b71ed31b847a959678945dab287d80082e9228609c0ef0e0eec11330092",
+      "sha256": "fc3c2b71ed31b847a959678945dab287d80082e9228609c0ef0e0eec11330092",
+      "bytes": 13005,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/compare_result.py.source.txt",
+      "sourceLabel": "<local-evidence>/compare_result.py",
+      "sourceSha256": "aab52c40424bed9596be7f29f9af21729d768677542015e2d306d8df48f5b9df",
+      "sha256": "aab52c40424bed9596be7f29f9af21729d768677542015e2d306d8df48f5b9df",
+      "bytes": 5122,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/extract_selected_result.py.source.txt",
+      "sourceLabel": "<local-evidence>/extract_selected_result.py",
+      "sourceSha256": "7fd99b3b1b7c0532df2cf1eaa06c9eeb87347a2a0edcffd30b716d72f07547a8",
+      "sha256": "7fd99b3b1b7c0532df2cf1eaa06c9eeb87347a2a0edcffd30b716d72f07547a8",
+      "bytes": 1966,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/export_reference.py.source.txt",
+      "sourceLabel": "<local-evidence>/export_reference.py",
+      "sourceSha256": "c6a7a1cea52fa07fd45feaad3bed764cbd4e1db82efedbc3cad87c1099aa440c",
+      "sha256": "c6a7a1cea52fa07fd45feaad3bed764cbd4e1db82efedbc3cad87c1099aa440c",
+      "bytes": 1176,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/test_oracle.py.source.txt",
+      "sourceLabel": "<local-evidence>/test_oracle.py",
+      "sourceSha256": "aa0617d8041f06c3cec08aed9ae67fac85b2544aa4e03834cc8e71273ff547a6",
+      "sha256": "aa0617d8041f06c3cec08aed9ae67fac85b2544aa4e03834cc8e71273ff547a6",
+      "bytes": 1865,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/independent-oracle.json",
+      "sourceLabel": "<local-evidence>/independent-oracle.json",
+      "sourceSha256": "3c012ae8e25133b2dce1c89851a329f52378c0798b31e32508151993c5f9cfa3",
+      "sha256": "3c012ae8e25133b2dce1c89851a329f52378c0798b31e32508151993c5f9cfa3",
+      "bytes": 10668,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/reference-result.json",
+      "sourceLabel": "<local-evidence>/reference-result.json",
+      "sourceSha256": "6e4547f433c490a71d490767c9501720129ae84af45b50e0434c37dac60d685e",
+      "sha256": "6e4547f433c490a71d490767c9501720129ae84af45b50e0434c37dac60d685e",
+      "bytes": 493,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/comparator-selfcheck.txt",
+      "sourceLabel": "<local-evidence>/comparator-selfcheck.txt",
+      "sourceSha256": "c6b9b1f09add0403cc07e90bfdf272129b1ddfa2f8f7675ea8218862f2516371",
+      "sha256": "c6b9b1f09add0403cc07e90bfdf272129b1ddfa2f8f7675ea8218862f2516371",
+      "bytes": 104,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/README.md",
+      "sourceLabel": "<local-evidence>/README.md",
+      "sourceSha256": "19ff671979aa39c755d17e9b6e22da23b506bb68a0764a98f273b9f001222517",
+      "sha256": "19ff671979aa39c755d17e9b6e22da23b506bb68a0764a98f273b9f001222517",
+      "bytes": 5291,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "oracle/golden-plane-control-e2e.in2",
+      "sourceLabel": "<repository>/kun/src/engineering/fixtures/survey-formats/cosa-in2/golden-plane-control-e2e.in2",
+      "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "bytes": 141,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "post-package-fix/desktop-tests.log",
+      "sourceLabel": "<local-evidence>/railwise-post53213-desktop-tests.log",
+      "sourceSha256": "193c4e86181fab71a761020c3b39bdc675b959254af63cfbd38dd2493296ba49",
+      "sha256": "6530f1d2e3ae41284becc48798bc09c966a1e6df747476d9cb0d8a61ebd66327",
+      "bytes": 2107,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "post-package-fix/runtime-tests.log",
+      "sourceLabel": "<local-evidence>/railwise-post53213-runtime-tests.log",
+      "sourceSha256": "40b87d94d133724f99e85345550ebdc2d65ff717d5eeddaa0b630643e02e9c43",
+      "sha256": "e747289e3b99192efcc2d7edd93b5bcaf0387d0a3e744f97842d68c6f0822821",
+      "bytes": 285,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "post-package-fix/build.log",
+      "sourceLabel": "<local-evidence>/railwise-post53213-build.log",
+      "sourceSha256": "7c9ae8f658ebd702e8ec97dac173c760f39c22b606ae7ee1159aea9b64da9fa1",
+      "sha256": "4df6fa7784090a915b7b4b8e0c0fd1f39b98099659d94d79e3e47e691e65ef0c",
+      "bytes": 36793,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "post-package-fix/lint.log",
+      "sourceLabel": "<local-evidence>/railwise-post53213-lint.log",
+      "sourceSha256": "e91a3d46cd9a132a08d5cb52c4fd8b562115c329fa76880910fc8c74785e0f6f",
+      "sha256": "d2bf66d17f5d941ea12a49ac117f704e1427347d5adfd094d539380449791e7f",
+      "bytes": 285,
+      "originalBytesPreserved": false,
+      "transformation": "personal absolute repository/home path replaced with placeholder; all other bytes retained",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    },
+    {
+      "file": "post-package-fix/openspec.log",
+      "sourceLabel": "<local-evidence>/railwise-post53213-openspec.log",
+      "sourceSha256": "48b4aaeb487796e20f0a783be064b860d93065db93fbc2bf5f681e6ae0f78fc7",
+      "sha256": "48b4aaeb487796e20f0a783be064b860d93065db93fbc2bf5f681e6ae0f78fc7",
+      "bytes": 556,
+      "originalBytesPreserved": true,
+      "transformation": "none",
+      "credentialScan": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0,
+        "privateFeed": 0,
+        "personalAbsolutePath": 0
+      }
+    }
+  ],
+  "screenshotReview": "Nine PNGs individually visually inspected: synthetic fixture only, no visible credential or private source path.",
+  "omissions": [
+    "P0 private source details and coordinates",
+    "Raw database and user settings",
+    "Actual keys and temporary token files",
+    "Private feed URL",
+    "Application binaries and original private source paths"
+  ],
+  "preservation": "Original local evidence remains unchanged. Manifest hashes describe archived bytes; source-artifacts records original hashes and any path redaction."
+}

@@ -1,0 +1,1056 @@
+[
+  {
+    "id": "position-outlier",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.476985200810077e-12,
+    "expected": [
+      0.3333333333333333
+    ],
+    "accepted": [
+      0.333333333332841
+    ],
+    "objective": 9.333333333333334,
+    "score": 7.385203559806541e-13,
+    "scoreError": 7.105427357594705e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-outlier",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.47346578803091e-12,
+    "expected": [
+      3.333333333333333e+99
+    ],
+    "accepted": [
+      3.3333333333284217e+99
+    ],
+    "objective": 9.333333333333334,
+    "score": 7.367439991412539e-13,
+    "scoreError": 7.10542735759472e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-outlier",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.47346578803091e-12,
+    "expected": [
+      -3.333333333333333e+99
+    ],
+    "accepted": [
+      -3.3333333333284217e+99
+    ],
+    "objective": 9.333333333333334,
+    "score": 7.367439991412539e-13,
+    "scoreError": 7.10542735759472e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-outlier",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 4.778972916321964e-14,
+    "expected": [
+      10.333333333333334
+    ],
+    "accepted": [
+      10.33333333333284
+    ],
+    "objective": 9.333333333333334,
+    "score": 7.398526236102043e-13,
+    "scoreError": 9.23705556488067e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-outlier",
+    "mode": "large-offset",
+    "outcome": "iteration-limit",
+    "reason": "max-iterations",
+    "error": null,
+    "expected": [
+      1000000.3333333334
+    ],
+    "accepted": null,
+    "objective": 9.333333333333334,
+    "score": 2.9103830456733704e-10,
+    "scoreError": 8.526519934548556e-8,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "position-outlier",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.4735519471287263e-12,
+    "expected": [
+      333.3333333333333
+    ],
+    "accepted": [
+      333.33333333284213
+    ],
+    "objective": 9.333333333333332,
+    "score": 7.367439991412539e-13,
+    "scoreError": 7.10542735759472e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 6.457334666976067e-13,
+    "expected": [
+      0.4444444444444444
+    ],
+    "accepted": [
+      0.4444444444441574
+    ],
+    "objective": 9.277777777777779,
+    "score": 3.58268970046538e-13,
+    "scoreError": 7.882763899047719e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 6.462530903600417e-13,
+    "expected": [
+      4.444444444444444e+99
+    ],
+    "accepted": [
+      4.444444444441572e+99
+    ],
+    "objective": 9.277777777777779,
+    "score": 3.5849101465146305e-13,
+    "scoreError": 7.882763899047718e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 6.462530903600417e-13,
+    "expected": [
+      -4.444444444444444e+99
+    ],
+    "accepted": [
+      -4.444444444441572e+99
+    ],
+    "objective": 9.277777777777779,
+    "score": 3.5849101465146305e-13,
+    "scoreError": 7.882763899047718e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 2.7722505142554973e-14,
+    "expected": [
+      10.444444444444445
+    ],
+    "accepted": [
+      10.444444444444155
+    ],
+    "objective": 9.277777777777779,
+    "score": 3.611555499105634e-13,
+    "scoreError": 7.882763899050466e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "mode": "large-offset",
+    "outcome": "numerical-boundary",
+    "reason": "stagnation-before-score",
+    "error": null,
+    "expected": [
+      1000000.4444444445
+    ],
+    "accepted": null,
+    "objective": 9.277777777777779,
+    "score": 6.457567813811238e-11,
+    "scoreError": 7.094495391909596e-8,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 6.462670398832416e-13,
+    "expected": [
+      444.4444444444444
+    ],
+    "accepted": [
+      444.44444444415717
+    ],
+    "objective": 9.277777777777777,
+    "score": 3.5860203695392556e-13,
+    "scoreError": 7.882763899047717e-14,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "clean-line",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.3322676295501878e-15,
+    "expected": [
+      1,
+      2
+    ],
+    "accepted": [
+      0.9999999999999987,
+      2
+    ],
+    "objective": 4.930380657631324e-30,
+    "score": 3.1086244689504383e-15,
+    "scoreError": 7.747941786836717e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "clean-line",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 2.331202670670875e-15,
+    "expected": [
+      1e+100,
+      2e-100
+    ],
+    "accepted": [
+      9.999999999999977e+99,
+      2.0000000000000005e-100
+    ],
+    "objective": 6.2677464110138204e-30,
+    "score": 3.3861802251067274e-15,
+    "scoreError": 7.747941786836715e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "clean-line",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 2.331202670670875e-15,
+    "expected": [
+      -1e+100,
+      2e-100
+    ],
+    "accepted": [
+      -9.999999999999977e+99,
+      2.0000000000000005e-100
+    ],
+    "objective": 6.2677464110138204e-30,
+    "score": 3.3861802251067274e-15,
+    "scoreError": 7.747941786836715e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "clean-line",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.1102230246251565e-15,
+    "expected": [
+      11,
+      -2
+    ],
+    "accepted": [
+      10.99999999999999,
+      -1.9999999999999978
+    ],
+    "objective": 1.2187900985664632e-28,
+    "score": 1.4654943925052066e-14,
+    "scoreError": 1.8758328224066637e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "clean-line",
+    "mode": "large-offset",
+    "outcome": "numerical-boundary",
+    "reason": "stagnation-before-score",
+    "error": null,
+    "expected": [
+      1000001,
+      -399998
+    ],
+    "accepted": null,
+    "objective": 7.453889935837843e-19,
+    "score": 1.1641532182693481e-9,
+    "scoreError": 1.7905664151385278e-7,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "clean-line",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 2.7284841053187848e-15,
+    "expected": [
+      1000,
+      2000
+    ],
+    "accepted": [
+      999.9999999999973,
+      2000.0000000000007
+    ],
+    "objective": 7.444625512977249e-30,
+    "score": 3.637978807091713e-15,
+    "scoreError": 7.747941786836715e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-one-outlier",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.895284260759581e-13,
+    "expected": [
+      0.6,
+      2.3
+    ],
+    "accepted": [
+      0.5999999999996463,
+      2.300000000000266
+    ],
+    "objective": 17.95,
+    "score": 5.984275575077191e-13,
+    "scoreError": 9.920662715405517e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-one-outlier",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.949423482441295e-13,
+    "expected": [
+      5.999999999999999e+99,
+      2.3e-100
+    ],
+    "accepted": [
+      5.99999999999643e+99,
+      2.300000000000266e-100
+    ],
+    "objective": 17.95,
+    "score": 5.936362512670712e-13,
+    "scoreError": 9.920662715405508e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-one-outlier",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.949423482441295e-13,
+    "expected": [
+      -5.999999999999999e+99,
+      2.3e-100
+    ],
+    "accepted": [
+      -5.99999999999643e+99,
+      2.300000000000266e-100
+    ],
+    "objective": 17.95,
+    "score": 5.936362512670712e-13,
+    "scoreError": 9.920662715405508e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-one-outlier",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.555618379210072e-13,
+    "expected": [
+      10.6,
+      -1.7000000000000002
+    ],
+    "accepted": [
+      10.599999999999655,
+      -1.6999999999997357
+    ],
+    "objective": 17.950000000000003,
+    "score": 6.038503030936226e-13,
+    "scoreError": 1.9319185287893306e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-one-outlier",
+    "mode": "large-offset",
+    "outcome": "numerical-boundary",
+    "reason": "stagnation-before-score",
+    "error": null,
+    "expected": [
+      1000000.6,
+      -399997.7
+    ],
+    "accepted": null,
+    "objective": 17.950000000093134,
+    "score": 1.0931061611429982e-9,
+    "scoreError": 2.0189382309610183e-7,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "line-one-outlier",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.894662535865791e-13,
+    "expected": [
+      600,
+      2300
+    ],
+    "accepted": [
+      599.9999999996463,
+      2300.0000000002656
+    ],
+    "objective": 17.95,
+    "score": 5.976330541557218e-13,
+    "scoreError": 9.920662715405513e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-two-outliers",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.4765966227514582e-14,
+    "expected": [
+      1.368421052631579,
+      1.868421052631579
+    ],
+    "accepted": [
+      1.3684210526315588,
+      1.8684210526315712
+    ],
+    "objective": 32.80263157894737,
+    "score": 7.993605777301127e-14,
+    "scoreError": 1.3292849298420798e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-two-outliers",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.433839078531221e-14,
+    "expected": [
+      1.3684210526315789e+100,
+      1.868421052631579e-100
+    ],
+    "accepted": [
+      1.3684210526315593e+100,
+      1.8684210526315698e-100
+    ],
+    "objective": 32.80263157894737,
+    "score": 8.79296635503124e-14,
+    "scoreError": 1.32928492984208e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-two-outliers",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.433839078531221e-14,
+    "expected": [
+      -1.3684210526315789e+100,
+      1.868421052631579e-100
+    ],
+    "accepted": [
+      -1.3684210526315593e+100,
+      1.8684210526315698e-100
+    ],
+    "objective": 32.80263157894737,
+    "score": 8.79296635503124e-14,
+    "scoreError": 1.32928492984208e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-two-outliers",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 3.958424808786977e-15,
+    "expected": [
+      11.368421052631579,
+      -2.1315789473684212
+    ],
+    "accepted": [
+      11.368421052631561,
+      -2.1315789473684297
+    ],
+    "objective": 32.80263157894736,
+    "score": 8.171241461241152e-14,
+    "scoreError": 1.9847990871882366e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-two-outliers",
+    "mode": "large-offset",
+    "outcome": "iteration-limit",
+    "reason": "max-iterations",
+    "error": null,
+    "expected": [
+      1000001.3684210526,
+      -399998.13157894736
+    ],
+    "accepted": null,
+    "objective": 32.80263157899333,
+    "score": 2.806837540170193e-10,
+    "scoreError": 2.3203516944463997e-7,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "line-two-outliers",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.3292614872065874e-14,
+    "expected": [
+      1368.421052631579,
+      1868.421052631579
+    ],
+    "accepted": [
+      1368.4210526315608,
+      1868.4210526315696
+    ],
+    "objective": 32.80263157894736,
+    "score": 8.709699628184353e-14,
+    "scoreError": 1.32928492984208e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-nonunit-scales",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.3471877157141129e-11,
+    "expected": [
+      0.3768545994065282,
+      2.5459940652818993
+    ],
+    "accepted": [
+      0.3768545994014513,
+      2.5459940652863473
+    ],
+    "objective": 5.604970326409496,
+    "score": 3.883747923955072e-12,
+    "scoreError": 3.6785267009925055e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-nonunit-scales",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.3469255754786926e-11,
+    "expected": [
+      3.768545994065282e+99,
+      2.545994065281899e-100
+    ],
+    "accepted": [
+      3.7685459940145225e+99,
+      2.5459940652863476e-100
+    ],
+    "objective": 5.6049703264094966,
+    "score": 3.884892407768348e-12,
+    "scoreError": 3.6785267009925075e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-nonunit-scales",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.3469255754786926e-11,
+    "expected": [
+      -3.768545994065282e+99,
+      2.545994065281899e-100
+    ],
+    "accepted": [
+      -3.7685459940145225e+99,
+      2.5459940652863476e-100
+    ],
+    "objective": 5.6049703264094966,
+    "score": 3.884892407768348e-12,
+    "scoreError": 3.6785267009925075e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-nonunit-scales",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 3.0589802799640063e-12,
+    "expected": [
+      10.376854599406528,
+      -1.4540059347181007
+    ],
+    "accepted": [
+      10.376854599401454,
+      -1.454005934713653
+    ],
+    "objective": 5.604970326409496,
+    "score": 3.884947918919579e-12,
+    "scoreError": 5.7451819465138e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "line-nonunit-scales",
+    "mode": "large-offset",
+    "outcome": "numerical-boundary",
+    "reason": "stagnation-before-score",
+    "error": null,
+    "expected": [
+      1000000.3768545995,
+      -399997.4540059347
+    ],
+    "accepted": null,
+    "objective": 5.604970326409496,
+    "score": 4.3677339522929515e-11,
+    "scoreError": 5.957662231884236e-8,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "line-nonunit-scales",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.3469395425785276e-11,
+    "expected": [
+      376.8545994065282,
+      2545.994065281899
+    ],
+    "accepted": [
+      376.8545994014522,
+      2545.9940652863474
+    ],
+    "objective": 5.604970326409496,
+    "score": 3.884670363163423e-12,
+    "scoreError": 3.6785267009925075e-13,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "high-leverage",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 0,
+    "expected": [
+      0.9998000399920016
+    ],
+    "accepted": [
+      0.9998000399920016
+    ],
+    "objective": 0.9998000399920015,
+    "score": 4.378442053365461e-15,
+    "scoreError": 5.6854783282460344e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "high-leverage",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.943057426004174e-16,
+    "expected": [
+      9.998000399920017e+99
+    ],
+    "accepted": [
+      9.998000399920015e+99
+    ],
+    "objective": 0.9998000399920016,
+    "score": 9.83935155574045e-15,
+    "scoreError": 5.685478328246037e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "high-leverage",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.943057426004174e-16,
+    "expected": [
+      -9.998000399920017e+99
+    ],
+    "accepted": [
+      -9.998000399920015e+99
+    ],
+    "objective": 0.9998000399920016,
+    "score": 9.83935155574045e-15,
+    "scoreError": 5.685478328246037e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "high-leverage",
+    "mode": "modest-offset",
+    "outcome": "numerical-boundary",
+    "reason": "score-resolution",
+    "error": null,
+    "expected": [
+      10.999800039992001
+    ],
+    "accepted": null,
+    "objective": 0.999800039992001,
+    "score": 1.7491910697664537e-13,
+    "scoreError": 6.253458124675146e-11,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "high-leverage",
+    "mode": "large-offset",
+    "outcome": "numerical-boundary",
+    "reason": "stagnation-before-score",
+    "error": null,
+    "expected": [
+      1000000.99980004
+    ],
+    "accepted": null,
+    "objective": 0.9998000399826906,
+    "score": 2.8288422812550174e-8,
+    "scoreError": 0.000005684915977328869,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "high-leverage",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 1.1370957508916034e-16,
+    "expected": [
+      999.8000399920016
+    ],
+    "accepted": [
+      999.8000399920015
+    ],
+    "objective": 0.9998000399920015,
+    "score": 5.176414852314792e-15,
+    "scoreError": 5.685478328246036e-12,
+    "uniqueness": "strict-inlier-full-rank-sufficient-condition"
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.820777193576987e-11,
+    "expected": [
+      1
+    ],
+    "accepted": [
+      0.9999999999417922
+    ],
+    "objective": 0.9999999999999999,
+    "score": 4.1159076147323503e-11,
+    "scoreError": 6.029155041111733e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.820741095020263e-11,
+    "expected": [
+      1e+100
+    ],
+    "accepted": [
+      9.999999999417926e+99
+    ],
+    "objective": 0.9999999999999999,
+    "score": 4.1158743080416116e-11,
+    "scoreError": 6.029155041111736e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.820741095020263e-11,
+    "expected": [
+      -1e+100
+    ],
+    "accepted": [
+      -9.999999999417926e+99
+    ],
+    "objective": 0.9999999999999999,
+    "score": 4.1158743080416116e-11,
+    "scoreError": 6.029155041111736e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.291444050602546e-12,
+    "expected": [
+      11
+    ],
+    "accepted": [
+      10.999999999941794
+    ],
+    "objective": 1,
+    "score": 4.115774387969395e-11,
+    "scoreError": 4.622352198341637e-13,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "mode": "large-offset",
+    "outcome": "iteration-limit",
+    "reason": "max-iterations",
+    "error": null,
+    "expected": [
+      1000001
+    ],
+    "accepted": null,
+    "objective": 1,
+    "score": 1.646360825446891e-10,
+    "scoreError": 8.038885446771012e-8,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.820743353979196e-11,
+    "expected": [
+      1000
+    ],
+    "accepted": [
+      999.9999999417926
+    ],
+    "objective": 1,
+    "score": 4.115885410271858e-11,
+    "scoreError": 6.029155041111736e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "mode": "reverse",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.7708171574717404e-11,
+    "expected": [
+      0.9999999999995
+    ],
+    "accepted": [
+      0.9999999999417918
+    ],
+    "objective": 0.9999999999989998,
+    "score": 4.115940921423089e-11,
+    "scoreError": 6.029155041111731e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "mode": "column-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.77075622442618e-11,
+    "expected": [
+      9.999999999995e+99
+    ],
+    "accepted": [
+      9.999999999417924e+99
+    ],
+    "objective": 0.999999999999,
+    "score": 4.115896512502104e-11,
+    "scoreError": 6.029155041111735e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "mode": "negative-rescale",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.77075622442618e-11,
+    "expected": [
+      -9.999999999995e+99
+    ],
+    "accepted": [
+      -9.999999999417924e+99
+    ],
+    "objective": 0.999999999999,
+    "score": 4.115896512502104e-11,
+    "scoreError": 6.029155041111735e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "mode": "modest-offset",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.2459047207199785e-12,
+    "expected": [
+      10.999999999999499
+    ],
+    "accepted": [
+      10.999999999941794
+    ],
+    "objective": 0.9999999999989999,
+    "score": 4.115774387969395e-11,
+    "scoreError": 4.622352198341637e-13,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "mode": "large-offset",
+    "outcome": "iteration-limit",
+    "reason": "max-iterations",
+    "error": null,
+    "expected": [
+      1000001
+    ],
+    "accepted": null,
+    "objective": 1,
+    "score": 1.646360825446891e-10,
+    "scoreError": 8.038885446771012e-8,
+    "uniqueness": "not-evaluated"
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "mode": "unit-mm",
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "error": 5.770766620119659e-11,
+    "expected": [
+      999.9999999995
+    ],
+    "accepted": [
+      999.9999999417923
+    ],
+    "objective": 0.9999999999989999,
+    "score": 4.1159076147323503e-11,
+    "scoreError": 6.029155041111735e-14,
+    "uniqueness": "not-established"
+  },
+  {
+    "id": "scale-extreme-equivalence",
+    "factor": 1e-12,
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "accepted": [
+      3.3333333333284215e-13
+    ],
+    "relativeParameter": 0.33333333333284215,
+    "last": {
+      "iteration": 8,
+      "parameters": [
+        3.3333333333284215e-13
+      ],
+      "fittedObservations": [
+        3.3333333333284215e-13,
+        3.3333333333284215e-13,
+        3.3333333333284215e-13,
+        3.3333333333284215e-13
+      ],
+      "residuals": [
+        -3.3333333333284215e-13,
+        -3.3333333333284215e-13,
+        -3.3333333333284215e-13,
+        9.666666666667157e-12
+      ],
+      "standardizedResiduals": [
+        -0.33333333333284215,
+        -0.33333333333284215,
+        -0.33333333333284215,
+        9.666666666667156
+      ],
+      "robustMultipliers": [
+        1,
+        1,
+        1,
+        0.10344827586206372
+      ],
+      "derivedIrlsWeights": [
+        1e+24,
+        1e+24,
+        1e+24,
+        1.0344827586206373e+23
+      ],
+      "objective": 9.333333333333332,
+      "objectiveRoundoffEstimate": 8.526512829120643e-13,
+      "normalizedScore": [
+        7.367439991412539e-13
+      ],
+      "normalizedScoreInfinity": 7.367439991412539e-13,
+      "scoreRoundoffEstimate": 7.10542735759472e-14,
+      "standardizedPredictionStep": 1.424210740463463e-11,
+      "relativeObjectiveChange": 0,
+      "irlsDesignConditionEstimate": 1
+    }
+  },
+  {
+    "id": "scale-extreme-equivalence",
+    "factor": 1000000000000,
+    "outcome": "stationary",
+    "reason": "score-step-objective",
+    "accepted": [
+      333333333332.84216
+    ],
+    "relativeParameter": 0.33333333333284215,
+    "last": {
+      "iteration": 8,
+      "parameters": [
+        333333333332.84216
+      ],
+      "fittedObservations": [
+        333333333332.84216,
+        333333333332.84216,
+        333333333332.84216,
+        333333333332.84216
+      ],
+      "residuals": [
+        -333333333332.84216,
+        -333333333332.84216,
+        -333333333332.84216,
+        9666666666667.158
+      ],
+      "standardizedResiduals": [
+        -0.33333333333284215,
+        -0.33333333333284215,
+        -0.33333333333284215,
+        9.666666666667158
+      ],
+      "robustMultipliers": [
+        1,
+        1,
+        1,
+        0.1034482758620637
+      ],
+      "derivedIrlsWeights": [
+        1e-24,
+        1e-24,
+        1e-24,
+        1.0344827586206371e-25
+      ],
+      "objective": 9.333333333333334,
+      "objectiveRoundoffEstimate": 8.526512829120644e-13,
+      "normalizedScore": [
+        7.367439991412539e-13
+      ],
+      "normalizedScoreInfinity": 7.367439991412539e-13,
+      "scoreRoundoffEstimate": 7.10542735759472e-14,
+      "standardizedPredictionStep": 1.424200439453125e-11,
+      "relativeObjectiveChange": 0,
+      "irlsDesignConditionEstimate": 1
+    }
+  }
+]

@@ -1,0 +1,15 @@
+import {mkdtempSync,rmSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {afterEach,it,expect,vi} from 'vitest'
+import {SurveyAdvancedTrialsWorkspaceService as Service} from '#repo/kun/src/engineering/survey-advanced-trials-workspace.ts'
+import {advancedTrialTestRequest} from '#repo/kun/src/engineering/survey-advanced-trials-test-helpers.ts'
+vi.mock('#repo/src/renderer/src/agent/runtime-client.ts',()=>({rendererRuntimeClient:{runtimeRequest:vi.fn()}}))
+import {rendererRuntimeClient} from '#repo/src/renderer/src/agent/runtime-client.ts'
+import {readAdvancedTrial,validateAdvancedTrialInput,createAdvancedTrial} from '#repo/src/renderer/src/agent/survey-advanced-trials-client.ts'
+const mock=vi.mocked(rendererRuntimeClient.runtimeRequest)
+afterEach(()=>{vi.unstubAllGlobals();mock.mockReset()})
+export function fixture(kind:string,mutate=(request:any)=>{}){const dir=mkdtempSync(join(tmpdir(),'independent-integration-'));const project={id:'review-project',revision:1,workspace:dir+'/工作区😀'};const service=new Service({rootDir:dir,getProject:(id:string)=>id===project.id?project:null});try {const req=advancedTrialTestRequest(kind);mutate(req);const raw=Buffer.from(' \n'+JSON.stringify(req,null,2)+'\r\n');const summary=service.createTrial(project.id,raw);const record=service.getTrial(project.id,summary.id);return {request:req,raw,summary,record,binding:{projectId:project.id,projectRevision:1,workspaceRoot:project.workspace}}}finally{service.close();rmSync(dir,{recursive:true,force:true})}}
+it.each(['generalized-w','vce','huber','statistical-family'])('preserves raw UTF-8 and renderer restores %s with no Buffer',async kind=>{const f=fixture(kind,r=>{r.modelBasisStatement='  中文😀\n原始空白  ';r.declarationJson=' \n'+r.declarationJson+'\t '});expect(f.record.requestJson).toBe(f.raw.toString());expect(f.record.declarationJson).toBe(f.request.declarationJson);mock.mockResolvedValue({ok:true,status:200,body:JSON.stringify(f.record)} as any);vi.stubGlobal('Buffer',undefined);expect(await readAdvancedTrial(f.binding,f.summary)).toEqual(f.record)})
+it('restores unsorted statistics and whitespace-normalized identities without losing raw bytes',async()=>{const f=fixture('statistical-family',r=>{const m=JSON.parse(r.declarationJson);m.statistics.reverse();m.familyId=' padded-family ';m.members[0].sourceAnchor=' padded-source ';r.declarationJson=JSON.stringify(m,null,2)});expect(validateAdvancedTrialInput(f.binding,f.request)).toBe(true);expect(f.record.result.request.statistics.map((x:any)=>x.memberId)).toEqual(['a','c']);mock.mockResolvedValue({ok:true,status:200,body:JSON.stringify(f.record)} as any);expect(await readAdvancedTrial(f.binding,f.summary)).toEqual(f.record)})
+it.each(['huber','statistical-family'])('rejects duplicate-key declaration preflight for %s',kind=>{const f=fixture(kind);f.request.declarationJson=f.request.declarationJson.replace('"schemaVersion": 1','"schemaVersion": 1,"schemaVersion":1');expect(validateAdvancedTrialInput(f.binding,f.request)).toBe(false)})

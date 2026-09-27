@@ -1,0 +1,117 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 9cf70d71919e.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-9cf70d7/Applications/RAILWISE%20AI%20Candidate%209cf70d71919e.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 返回
+					6 container
+						7 按钮 通用
+						8 按钮 供应商
+						9 按钮 写作
+						10 按钮 图片生成
+						11 按钮 AI 助手
+						12 按钮 键盘快捷键
+						13 按钮 连接手机
+						14 按钮 帮助
+					15 文本 RAILWISE AI
+					16 文本 偏好设置保存在本地。
+					17 文本 AI API Key 未配置
+					18 文本 当前供应商尚未设置 API Key。
+					19 标题 设置, Value: 1
+						20 文本 设置
+					21 文本 管理 API、界面偏好、默认目录和 AI 助手行为。
+					22 文本 修改会自动生效
+					23 container
+						24 标题 基础设置, Value: 2
+							25 文本 基础设置
+						26 text 语言 选择后立即应用。
+						27 弹出式按钮 简体中文
+							28 (selected) 简体中文
+						29 text 主题 浅色、深色或跟随系统。
+						30 弹出式按钮 浅色
+							31 (selected) 浅色
+						32 text 首次设置向导 重新查看首次启动时的基础配置流程。
+						33 按钮 打开引导页
+						34 text 字体大小 调整整体界面的文字尺寸。
+						35 弹出式按钮 小
+							36 (selected) 小
+						37 text 对话显示 简洁模式只显示对话、必要提醒和成果；工作过程可按需展开。
+						38 弹出式按钮 简洁
+							39 (selected) 简洁
+						40 text 回复完成通知 AI 助手回复完成时，显示 Windows/macOS 系统通知。 启用系统通知
+						41 切换 on
+						42 container 通知时机
+							43 文本 通知时机
+							44 复选框 已完成, Value: 1
+							45 复选框 失败, Value: 0
+							46 复选框 已中止, Value: 0
+							47 复选框 被阻塞, Value: 0
+							48 复选框 达到 token 上限, Value: 0
+							49 复选框 等待授权, Value: 0
+						50 文本 当前打开的会话不通知
+						51 切换 off
+						52 文本 仅通知匹配会话
+						53 文本栏 (settable) 仅通知匹配会话, Placeholder: 支持 * 通配符，多个模式用逗号分隔
+						54 文本 排除匹配会话
+						55 文本栏 (settable) 排除匹配会话, Placeholder: 支持 * 通配符，多个模式用逗号分隔
+						56 text 默认工作目录 首次启动默认使用 ~/.workwise/default_workspace；你也可以改成别的目录。
+						57 文本栏 (settable) Value: /private/tmp/railwise-survey-9cf70d7/home/.workwise/default_workspace, Placeholder: ~/.workwise/default_workspace
+						58 按钮 还原默认
+						59 按钮 选择目录
+					60 container
+						61 标题 桌面行为, Value: 2
+							62 文本 桌面行为
+						63 text 开机自动启动 登录系统后自动启动 RAILWISE AI Runtime。
+						64 切换 off
+						65 text 开机后最小化 先开启开机自动启动。此选项用于 Windows 启动。
+						66 切换 (disabled) off
+						67 text 关闭时最小化到托盘 关闭窗口时隐藏到系统托盘。
+						68 切换 off
+					69 container
+						70 标题 文档解析与预览, Value: 2
+							71 文本 文档解析与预览
+						72 text 默认解析模式 自动模式优先使用内置快速解析；复杂或扫描文档可使用已配置的本机 Unlimited-OCR 服务或 MinerU。
+						73 弹出式按钮 自动（推荐）
+							74 (selected) 自动（推荐）
+						75 text 解析引擎 MarkItDown 随客户端提供；Unlimited-OCR 与 MinerU 均为可选本地组件，不会塞进安装包。 Microsoft MarkItDown markitdown-v0.1.4-workwise-1  ·  Microsoft MarkItDown (MIT) Unlimited-OCR（本机服务） 需要配置  ·  Baidu Unlimited-OCR (MIT); local server configured by user Configure an explicit loopback Unlimited-OCR server URL. MinerU（本机） 未安装  ·  MinerU 3.4.4 (MinerU Open Source License) Install the optional high-accuracy parser to use local OCR and layout analysis.
+						76 按钮 安装高精度组件
+						77 text MinerU（企业私有服务） 需要配置  ·  User-configured private MinerU service An enterprise private MinerU endpoint must be configured explicitly. 默认完全本地解析，不会自动上传 MinerU 官方云端。
+						78 按钮 MinerU 许可证
+						79 按钮 refresh
+						80 text 本机 Unlimited-OCR 服务 可选，仅允许回环地址。RAILWISE AI 不会自动启动服务或下载模型。
+						81 文本栏 (settable) http://127.0.0.1:3000
+						82 text 企业私有 MinerU 只允许显式配置的企业私有地址；每个工作区都必须单独授权文档外发。
+						83 文本栏 (settable) https://mineru.example.com
+						84 文本 允许当前工作区向该私有服务发送文档
+						85 切换 (disabled) off
+					86 container
+						87 标题 软件更新, Value: 2
+							88 文本 软件更新
+						89 text 更新渠道 默认使用稳定版本；只有你自己切换后才会改为前沿版本。稳定版只接收正式稳定发布。
+						90 弹出式按钮 稳定版本
+							91 (selected) 稳定版本
+						92 text 软件更新 从 RAILWISE AI 官方 GitHub Releases 检查新版本；支持时可直接下载并安装。 已是最新版本：0.5.0
+						93 按钮 检查更新
+					94 container
+						95 标题 本地错误日志, Value: 2
+							96 文本 本地错误日志
+						97 text 启用错误日志 将工具调用错误、请求失败、应用错误和本地助手服务输出写入日志文件。日志会自动清理。
+						98 切换 on
+						99 text 保留时长 超过所选天数的日志文件将被自动删除。
+						100 弹出式按钮 2 天
+							101 (selected) 2 天
+						102 text 日志目录 应用错误日志和本地助手服务输出会按天写入此文件夹。 /private/tmp/railwise-survey-9cf70d7/user-data/logs
+						103 按钮 打开文件夹
+	104 关闭按钮
+	105 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	106 最小化按钮
+107 menu bar
+	108 RAILWISE AI Candidate 9cf70d71919e
+	109 文件
+	110 编辑
+	111 显示
+	112 窗口
+	113 帮助
+
+The focused UI element is 58 按钮 还原默认

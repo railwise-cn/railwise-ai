@@ -1,0 +1,36 @@
+{
+  "auditVersion": "sampling-independent-python-1",
+  "checkedAt": "2026-09-19T22:07:42.354129+00:00",
+  "implementation": "Python standard library; no product imports",
+  "trust": "Local SHA-256/HMAC consistency is not a signature, independent custody, verified randomness or professional approval.",
+  "snapshot": "Separate read-only SQLite snapshots; run with GUI idle. Commit detection does not make the two snapshots atomic.",
+  "selfTest": "passed",
+  "status": "passed",
+  "populationCount": 1,
+  "runCount": 2,
+  "runs": [
+    {
+      "projectId": "project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5",
+      "populationId": "sampling_population_e8bdc521-c709-4ea2-a690-b77b0055155c",
+      "runId": "sampling_run_5feb6b65-2b31-4dd6-a63a-746658aa92ae",
+      "stage": "acceptance",
+      "inspectionMode": "table-1-simple-random",
+      "unitCount": 1001,
+      "sampleSize": 80,
+      "planHash": "1ed00925627fc849cc9593877455ef0685fda73aef1e3cd0dc7293a629137af3",
+      "independentReplay": "passed"
+    },
+    {
+      "projectId": "project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5",
+      "populationId": "sampling_population_e8bdc521-c709-4ea2-a690-b77b0055155c",
+      "runId": "sampling_run_b939759f-2391-435e-99f9-06483104bdd0",
+      "stage": "process",
+      "inspectionMode": "census",
+      "unitCount": 1001,
+      "sampleSize": 1001,
+      "planHash": "0f2e7e37eb1946c73af72b174a0f445488ccaa1c57bdefe196716bf862ec1b9d",
+      "independentReplay": "passed"
+    }
+  ],
+  "reason": null
+}

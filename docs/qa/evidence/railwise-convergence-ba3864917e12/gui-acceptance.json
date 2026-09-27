@@ -1,0 +1,41 @@
+{
+  "sourceHead": "ba3864917e128f7318b88895441b2b632291d564",
+  "scope": "installed isolated candidate; synthetic leveling data only",
+  "projectCountBeforeAndAfterRestart": 1,
+  "manifestIds": [
+    "manifest_9368e02e-f893-4625-a7a2-9c03769c1842",
+    "manifest_818b045c-d00e-4ddc-9a55-2496906f257a"
+  ],
+  "planIds": [
+    "quality_plan_43229dfa-a252-4823-b8ef-7f7062999c97",
+    "quality_plan_f1aa49c0-6716-4021-a4bd-ec39f0acd223"
+  ],
+  "recordId": "quality_record_6e7cb233-29b0-44be-9920-2241cf14bc08",
+  "eventCountBeforeAndAfterRestart": 4,
+  "headHashBeforeAndAfterRestart": "c7aff541289ab0d991ac17a93ed63d289bc95fee774f1785c668441037a2908c",
+  "checks": {
+    "syntheticImportValidationAdjustmentThreeFormats": "passed",
+    "fiveItemDeliverableVerification": "passed",
+    "freezeRequiresExplicitAcknowledgement": "passed",
+    "initialRecordHasNoChecks": "passed",
+    "fourManualChecksAppendIndividually": "passed",
+    "reverifyDoesNotAppendEvents": "passed",
+    "tamperRejectedAndOldResultCleared": "passed",
+    "unavailableHistoryDoesNotBlockValidPlan": "passed",
+    "originalBytesRestored": "passed",
+    "sameRecordRecoveredAfterFullExitAndRelaunch": "passed",
+    "freeTrialSourceCloseReturnsToLocateCA": "passed",
+    "freeTrialHistoryAndRestoreRetainPersistentFocus": "passed",
+    "zhLightRegularMaximizedAnd960x640": "passed",
+    "enDark960x640AndRestartRegular": "passed",
+    "keyboardFreezeAndHistoryRestore": "passed"
+  },
+  "limitations": [
+    "not complete four-way locale/theme/size matrix or full accessibility acceptance",
+    "synthetic JSON is not P0 format acceptance",
+    "no authenticated model turn or human professional signoff",
+    "no new real GSI/IN2 GUI acceptance in this package",
+    "historical deliverable output subheading incorrectly said no preview; subsequent source fix is outside this package"
+  ],
+  "humanAcceptance": "not-performed"
+}

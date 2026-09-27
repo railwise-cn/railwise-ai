@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Exact private candidate installation only; no GUI or user-data operation",
+  "sourceHead": "b193fc70d6363dc768e715087ca9c0d9975158c9",
+  "version": "0.5.0",
+  "workflowRunId": 35537110911,
+  "workflowRef": "codex/railwise-survey-convergence",
+  "workflowConclusion": "success",
+  "targetArtifactId": 10613960200,
+  "targetArtifactBytes": 589410489,
+  "targetArtifactOuterDigestRehashed": true,
+  "targetArtifactSha256": "ee5eaa80ed543b35b8bc02096c0787a4e7d95ad4e35d0abe203a358865e74a2a",
+  "targetDownloadMethod": "Complete authenticated GitHub artifact; bounded 1 MiB range workers; outer SHA-256 and ZIP CRC verified; inner application ZIP verified against authenticated updater evidence",
+  "targetZipSha256": "e3858ef528873b8e96fccd447a74fd31ade6aeb2a5c66f6618bf6c7f2c8109b7",
+  "installedAsarSha256": "f50b2c373902aae90cdd60726ac0158925aa91e9babb2a12b51ed173f171119a",
+  "matchesCloudUpdaterInstalledTarget": true,
+  "embeddedSourceProvenanceVerified": true,
+  "asarEntriesVerified": 18363,
+  "localCompiledOutputComparisonPerformed": false,
+  "embeddedUpdaterHost": "127.0.0.1",
+  "appPath": "/private/tmp/railwise-survey-b193fc7/Applications/RAILWISE AI Candidate b193fc70d636.app",
+  "executablePath": "/private/tmp/railwise-survey-b193fc7/Applications/RAILWISE AI Candidate b193fc70d636.app/Contents/MacOS/RAILWISE AI Candidate b193fc70d636",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headb193fc70d636",
+  "candidateEnvPath": "/private/tmp/railwise-survey-b193fc7/candidate.env",
+  "cloudGatekeeperStatus": "assessments enabled",
+  "localGatekeeperStatus": "assessments disabled",
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "nativeUpdater": {
+    "status": "passed",
+    "baseVersion": "0.0.0",
+    "targetVersion": "0.5.0",
+    "stages": [
+      "base_started",
+      "update_available",
+      "download_completed",
+      "install_requested",
+      "target_relaunched",
+      "user_data_preserved"
+    ],
+    "browserOpened": false,
+    "syntheticUserDataPreserved": true
+  },
+  "tlsChecks": {
+    "defaultTrustRejected": true,
+    "wrongPinRejected": true,
+    "wrongPortRejected": true,
+    "outsidePathRejected": true,
+    "providerManifestVerified": true,
+    "executorZipVerified": true,
+    "updaterSessionMatched": true
+  },
+  "systemTrustModified": false,
+  "localSignatureVerified": true,
+  "localStapledNotarizationVerified": true,
+  "guiLaunchedByInstallerAgent": false,
+  "guiAcceptance": "not-tested",
+  "userAcceptance": "not-performed",
+  "userDataReadOrModifiedByInstallerAgent": false,
+  "candidateCredentialAccess": 0,
+  "productSourceModified": false,
+  "publicReleaseOperation": false,
+  "cloudEvidenceSha256": "86d8abd182ab79060d746c7df2c23aae6bf41051454342d9a712e4455a4e1685",
+  "evidenceArtifactId": 10613885214,
+  "evidenceArtifactOuterDigestRehashed": true,
+  "evidenceArtifactSha256": "64f551a8ab46ecfd61b5203e629f004ebccc54f27bc45b1ccf6a474d833939e8",
+  "evidenceArtifactRetrieval": "Complete authenticated GitHub artifact; full SHA-256 and ZIP CRC verified",
+  "signatureChecks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "/private/tmp/railwise-survey-b193fc7/Applications/RAILWISE AI Candidate b193fc70d636.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "/private/tmp/railwise-survey-b193fc7/Applications/RAILWISE AI Candidate b193fc70d636.app"
+      ],
+      "exitCode": 0,
+      "output": "Processing: /private/tmp/railwise-survey-b193fc7/Applications/RAILWISE AI Candidate b193fc70d636.app\nThe validate action worked!"
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "/private/tmp/railwise-survey-b193fc7/Applications/RAILWISE AI Candidate b193fc70d636.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ]
+}

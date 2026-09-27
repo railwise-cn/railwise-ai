@@ -1,0 +1,1363 @@
+{
+  "schema": "railwise-quality-scoring-independent-oracle-v1",
+  "standard": "GB/T 24356-2023",
+  "pdfSha256": "96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487",
+  "passed": 72,
+  "cases": [
+    {
+      "id": "accuracy_zero",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_below_03",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "299999",
+          "denominator": "1000000"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_at_03",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "3",
+          "denominator": "10"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_above_03",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "300001",
+          "denominator": "1000000"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "1749999",
+          "denominator": "17500"
+        }
+      }
+    },
+    {
+      "id": "accuracy_below_limit",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "999999",
+          "denominator": "1000000"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "1050001",
+          "denominator": "17500"
+        }
+      }
+    },
+    {
+      "id": "accuracy_at_limit",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "accuracy_above_limit",
+      "operation": "accuracy",
+      "input": {
+        "m": {
+          "numerator": "1000001",
+          "denominator": "1000000"
+        },
+        "m0": 1
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "accuracy_formula_outside_domain"
+      }
+    },
+    {
+      "id": "accuracy_zero_limit",
+      "operation": "accuracy",
+      "input": {
+        "m": 0,
+        "m0": 0
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "accuracy_domain"
+      }
+    },
+    {
+      "id": "accuracy_negative_limit",
+      "operation": "accuracy",
+      "input": {
+        "m": 0,
+        "m0": -1
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "accuracy_domain"
+      }
+    },
+    {
+      "id": "accuracy_negative_detection",
+      "operation": "accuracy",
+      "input": {
+        "m": -1,
+        "m0": 1
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "accuracy_domain"
+      }
+    },
+    {
+      "id": "accuracy_scale_units",
+      "operation": "accuracy",
+      "input": {
+        "m": "0.006",
+        "m0": "0.01"
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "580",
+          "denominator": "7"
+        }
+      }
+    },
+    {
+      "id": "single_60",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          60
+        ],
+        "weights": null
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "multi_equal_60",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          60,
+          100
+        ],
+        "weights": null
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "multiple_accuracy_equality_60"
+      }
+    },
+    {
+      "id": "multi_above_60",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          {
+            "numerator": "60000001",
+            "denominator": "1000000"
+          },
+          100
+        ],
+        "weights": null
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "160000001",
+          "denominator": "2000000"
+        }
+      }
+    },
+    {
+      "id": "multi_weighted",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          80,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "4"
+          },
+          {
+            "numerator": "3",
+            "denominator": "4"
+          }
+        ]
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "95",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "multi_missing",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          null,
+          100
+        ],
+        "weights": null
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "missing_accuracy_item"
+      }
+    },
+    {
+      "id": "multi_below_60",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          59,
+          100
+        ],
+        "weights": null
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "accuracy_score_outside_formula_range"
+      }
+    },
+    {
+      "id": "invalid_weight_sum",
+      "operation": "accuracy_aggregate",
+      "input": {
+        "scores": [
+          80,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "3"
+          },
+          {
+            "numerator": "1",
+            "denominator": "3"
+          }
+        ]
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "weights_positive_sum_one"
+      }
+    },
+    {
+      "id": "deduct_exact_60",
+      "operation": "deduction",
+      "input": {
+        "a": 0,
+        "b": 3,
+        "c": 1,
+        "d": 0,
+        "t": 1
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_below_60",
+      "operation": "deduction",
+      "input": {
+        "a": 0,
+        "b": 3,
+        "c": 1,
+        "d": 1,
+        "t": 1
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "subelement_below_60",
+        "rawScore": {
+          "numerator": "59",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_negative_no_clamp",
+      "operation": "deduction",
+      "input": {
+        "a": 0,
+        "b": 9,
+        "c": 0,
+        "d": 0,
+        "t": 1
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "subelement_below_60",
+        "rawScore": {
+          "numerator": "-8",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "id": "deduct_a_veto",
+      "operation": "deduction",
+      "input": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "t": 1
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "a_class_veto",
+        "fixedADeduction": 42
+      }
+    },
+    {
+      "id": "deduct_t_zero",
+      "operation": "deduction",
+      "input": {
+        "a": 0,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "t": 0
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "adjustment_coefficient"
+      }
+    },
+    {
+      "id": "deduct_adjusted_t",
+      "operation": "deduction",
+      "input": {
+        "a": 0,
+        "b": 1,
+        "c": 0,
+        "d": 0,
+        "t": 2
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "adjusted_t_not_in_minimal_contract"
+      }
+    },
+    {
+      "id": "deduct_negative_count",
+      "operation": "deduction",
+      "input": {
+        "a": 0,
+        "b": -1,
+        "c": 0,
+        "d": 0,
+        "t": 1
+      },
+      "expected": {
+        "state": "invalid",
+        "reason": "defect_count"
+      }
+    },
+    {
+      "id": "grade_59999999/1000000",
+      "operation": "grade",
+      "input": {
+        "score": {
+          "numerator": "59999999",
+          "denominator": "1000000"
+        }
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "score_below_60"
+      }
+    },
+    {
+      "id": "grade_60",
+      "operation": "grade",
+      "input": {
+        "score": 60
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "60",
+          "denominator": "1"
+        },
+        "grade": "qualified"
+      }
+    },
+    {
+      "id": "grade_60000001/1000000",
+      "operation": "grade",
+      "input": {
+        "score": {
+          "numerator": "60000001",
+          "denominator": "1000000"
+        }
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "60000001",
+          "denominator": "1000000"
+        },
+        "grade": "qualified"
+      }
+    },
+    {
+      "id": "grade_74999999/1000000",
+      "operation": "grade",
+      "input": {
+        "score": {
+          "numerator": "74999999",
+          "denominator": "1000000"
+        }
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "74999999",
+          "denominator": "1000000"
+        },
+        "grade": "qualified"
+      }
+    },
+    {
+      "id": "grade_75",
+      "operation": "grade",
+      "input": {
+        "score": 75
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "75",
+          "denominator": "1"
+        },
+        "grade": "good"
+      }
+    },
+    {
+      "id": "grade_75000001/1000000",
+      "operation": "grade",
+      "input": {
+        "score": {
+          "numerator": "75000001",
+          "denominator": "1000000"
+        }
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "75000001",
+          "denominator": "1000000"
+        },
+        "grade": "good"
+      }
+    },
+    {
+      "id": "grade_89999999/1000000",
+      "operation": "grade",
+      "input": {
+        "score": {
+          "numerator": "89999999",
+          "denominator": "1000000"
+        }
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "89999999",
+          "denominator": "1000000"
+        },
+        "grade": "good"
+      }
+    },
+    {
+      "id": "grade_90",
+      "operation": "grade",
+      "input": {
+        "score": 90
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "90",
+          "denominator": "1"
+        },
+        "grade": "excellent"
+      }
+    },
+    {
+      "id": "grade_90000001/1000000",
+      "operation": "grade",
+      "input": {
+        "score": {
+          "numerator": "90000001",
+          "denominator": "1000000"
+        }
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "90000001",
+          "denominator": "1000000"
+        },
+        "grade": "excellent"
+      }
+    },
+    {
+      "id": "grade_100",
+      "operation": "grade",
+      "input": {
+        "score": 100
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "100",
+          "denominator": "1"
+        },
+        "grade": "excellent"
+      }
+    },
+    {
+      "id": "child_59_veto",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          59,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": 0,
+        "complete": true
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "child_below_60"
+      }
+    },
+    {
+      "id": "child_60_allowed",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          60,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": 0,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "498",
+          "denominator": "5"
+        },
+        "grade": "excellent"
+      }
+    },
+    {
+      "id": "a_overrides_high_scores",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          100,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": 1,
+        "complete": true
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "a_class_veto"
+      }
+    },
+    {
+      "id": "missing_child_not_excluded",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          null,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": 0,
+        "complete": true
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "incomplete_unit_evidence"
+      }
+    },
+    {
+      "id": "unknown_a_evidence",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          100,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": null,
+        "complete": true
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "incomplete_unit_evidence"
+      }
+    },
+    {
+      "id": "incomplete_evidence",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          100,
+          100
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": 0,
+        "complete": false
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "incomplete_unit_evidence"
+      }
+    },
+    {
+      "id": "known_child_fail_with_missing",
+      "operation": "unit",
+      "input": {
+        "scores": [
+          59,
+          null
+        ],
+        "weights": [
+          {
+            "numerator": "1",
+            "denominator": "100"
+          },
+          {
+            "numerator": "99",
+            "denominator": "100"
+          }
+        ],
+        "a": 0,
+        "complete": false
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "child_below_60"
+      }
+    },
+    {
+      "id": "partial_hierarchical_normalization",
+      "operation": "hierarchical_partial",
+      "input": {
+        "scope": {
+          "A": [
+            "a"
+          ],
+          "B": [
+            "c",
+            "d"
+          ]
+        },
+        "values": {
+          "a": 60,
+          "c": 80,
+          "d": 100
+        }
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "285",
+          "denominator": "4"
+        },
+        "elementWeights": {
+          "A": {
+            "numerator": "5",
+            "denominator": "8"
+          },
+          "B": {
+            "numerator": "3",
+            "denominator": "8"
+          }
+        },
+        "childWeights": {
+          "A": {
+            "a": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          },
+          "B": {
+            "c": {
+              "numerator": "1",
+              "denominator": "2"
+            },
+            "d": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          }
+        },
+        "scopeLabel": "declared_partial_scope_only"
+      }
+    },
+    {
+      "id": "partial_missing_included_leaf",
+      "operation": "hierarchical_partial",
+      "input": {
+        "scope": {
+          "A": [
+            "a",
+            "b"
+          ]
+        },
+        "values": {
+          "a": 100
+        }
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "missing_included_scope_value"
+      }
+    },
+    {
+      "id": "sample_one_failure",
+      "operation": "sample",
+      "input": {
+        "units": [
+          {
+            "state": "nonconforming",
+            "reason": "score_below_60"
+          },
+          {
+            "state": "calculated",
+            "score": {
+              "numerator": "100",
+              "denominator": "1"
+            },
+            "grade": "excellent"
+          }
+        ]
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "sample_has_failed_unit"
+      }
+    },
+    {
+      "id": "sample_mean",
+      "operation": "sample",
+      "input": {
+        "units": [
+          {
+            "state": "calculated",
+            "score": {
+              "numerator": "60",
+              "denominator": "1"
+            },
+            "grade": "qualified"
+          },
+          {
+            "state": "calculated",
+            "score": {
+              "numerator": "100",
+              "denominator": "1"
+            },
+            "grade": "excellent"
+          }
+        ]
+      },
+      "expected": {
+        "state": "calculated",
+        "score": {
+          "numerator": "80",
+          "denominator": "1"
+        },
+        "grade": "good"
+      }
+    },
+    {
+      "id": "sample_missing",
+      "operation": "sample",
+      "input": {
+        "units": [
+          {
+            "state": "calculated",
+            "score": {
+              "numerator": "100",
+              "denominator": "1"
+            },
+            "grade": "excellent"
+          },
+          {
+            "state": "unavailable",
+            "reason": "missing"
+          }
+        ]
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "sample_has_unresolved_unit"
+      }
+    },
+    {
+      "id": "sample_fail_over_missing",
+      "operation": "sample",
+      "input": {
+        "units": [
+          {
+            "state": "nonconforming",
+            "reason": "score_below_60"
+          },
+          {
+            "state": "unavailable",
+            "reason": "missing"
+          }
+        ]
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "sample_has_failed_unit"
+      }
+    },
+    {
+      "id": "overview_b3",
+      "operation": "overview",
+      "input": {
+        "a": 0,
+        "b": 3
+      },
+      "expected": {
+        "state": "calculated",
+        "qualified": true
+      }
+    },
+    {
+      "id": "overview_b4",
+      "operation": "overview",
+      "input": {
+        "a": 0,
+        "b": 4
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "overview_defects"
+      }
+    },
+    {
+      "id": "overview_a",
+      "operation": "overview",
+      "input": {
+        "a": 1,
+        "b": 0
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "overview_defects"
+      }
+    },
+    {
+      "id": "overview_unknown",
+      "operation": "overview",
+      "input": {
+        "a": null,
+        "b": 0
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "overview_missing_evidence"
+      }
+    },
+    {
+      "id": "final_excellent_equal",
+      "operation": "final_batch",
+      "input": {
+        "e": 5,
+        "g": 4,
+        "q": 1,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "excellent",
+        "count": 10,
+        "excellentRate": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "excellentGoodRate": {
+          "numerator": "9",
+          "denominator": "10"
+        }
+      }
+    },
+    {
+      "id": "final_excellent_below_rate",
+      "operation": "final_batch",
+      "input": {
+        "e": 50,
+        "g": 39,
+        "q": 11,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "good",
+        "count": 100,
+        "excellentRate": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "excellentGoodRate": {
+          "numerator": "89",
+          "denominator": "100"
+        }
+      }
+    },
+    {
+      "id": "final_excellent_below_e",
+      "operation": "final_batch",
+      "input": {
+        "e": 49,
+        "g": 41,
+        "q": 10,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "good",
+        "count": 100,
+        "excellentRate": {
+          "numerator": "49",
+          "denominator": "100"
+        },
+        "excellentGoodRate": {
+          "numerator": "9",
+          "denominator": "10"
+        }
+      }
+    },
+    {
+      "id": "final_good_equal",
+      "operation": "final_batch",
+      "input": {
+        "e": 3,
+        "g": 5,
+        "q": 2,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "good",
+        "count": 10,
+        "excellentRate": {
+          "numerator": "3",
+          "denominator": "10"
+        },
+        "excellentGoodRate": {
+          "numerator": "4",
+          "denominator": "5"
+        }
+      }
+    },
+    {
+      "id": "final_good_below_rate",
+      "operation": "final_batch",
+      "input": {
+        "e": 30,
+        "g": 49,
+        "q": 21,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "qualified",
+        "count": 100,
+        "excellentRate": {
+          "numerator": "3",
+          "denominator": "10"
+        },
+        "excellentGoodRate": {
+          "numerator": "79",
+          "denominator": "100"
+        }
+      }
+    },
+    {
+      "id": "final_good_below_e",
+      "operation": "final_batch",
+      "input": {
+        "e": 29,
+        "g": 51,
+        "q": 20,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "qualified",
+        "count": 100,
+        "excellentRate": {
+          "numerator": "29",
+          "denominator": "100"
+        },
+        "excellentGoodRate": {
+          "numerator": "4",
+          "denominator": "5"
+        }
+      }
+    },
+    {
+      "id": "final_prerequisite_failed",
+      "operation": "final_batch",
+      "input": {
+        "e": 5,
+        "g": 4,
+        "q": 1,
+        "qualified": false,
+        "complete": true
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "batch_prerequisite_failed"
+      }
+    },
+    {
+      "id": "final_prerequisite_missing",
+      "operation": "final_batch",
+      "input": {
+        "e": 5,
+        "g": 4,
+        "q": 1,
+        "qualified": null,
+        "complete": true
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "batch_prerequisite_missing"
+      }
+    },
+    {
+      "id": "final_counts_incomplete",
+      "operation": "final_batch",
+      "input": {
+        "e": 5,
+        "g": 4,
+        "q": 1,
+        "qualified": true,
+        "complete": false
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "batch_prerequisite_missing"
+      }
+    },
+    {
+      "id": "final_rounding_not_allowed",
+      "operation": "final_batch",
+      "input": {
+        "e": 4999,
+        "g": 4001,
+        "q": 1000,
+        "qualified": true,
+        "complete": true
+      },
+      "expected": {
+        "state": "calculated",
+        "grade": "good",
+        "count": 10000,
+        "excellentRate": {
+          "numerator": "4999",
+          "denominator": "10000"
+        },
+        "excellentGoodRate": {
+          "numerator": "9",
+          "denominator": "10"
+        }
+      }
+    },
+    {
+      "id": "accept_both_pass",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "qualified",
+        "fabricated": false,
+        "major": false
+      },
+      "expected": {
+        "state": "calculated",
+        "qualified": true
+      }
+    },
+    {
+      "id": "accept_only_detailed",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "not_performed",
+        "fabricated": false,
+        "major": false
+      },
+      "expected": {
+        "state": "calculated",
+        "qualified": true
+      }
+    },
+    {
+      "id": "accept_overview_pending",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "pending",
+        "fabricated": false,
+        "major": false
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "inspection_unresolved"
+      }
+    },
+    {
+      "id": "accept_overview_missing",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": null,
+        "fabricated": false,
+        "major": false
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "inspection_unresolved"
+      }
+    },
+    {
+      "id": "accept_overview_fail",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "failed",
+        "fabricated": false,
+        "major": false
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "inspection_failed"
+      }
+    },
+    {
+      "id": "accept_detailed_pending",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "pending",
+        "overview": "not_performed",
+        "fabricated": false,
+        "major": false
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "inspection_unresolved"
+      }
+    },
+    {
+      "id": "accept_fabricated",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "qualified",
+        "fabricated": true,
+        "major": false
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "batch_fabrication_or_major_route_veto"
+      }
+    },
+    {
+      "id": "accept_major_route",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "qualified",
+        "fabricated": false,
+        "major": true
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "batch_fabrication_or_major_route_veto"
+      }
+    },
+    {
+      "id": "accept_veto_with_missing",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "pending",
+        "overview": null,
+        "fabricated": true,
+        "major": false
+      },
+      "expected": {
+        "state": "nonconforming",
+        "reason": "batch_fabrication_or_major_route_veto"
+      }
+    },
+    {
+      "id": "accept_unknown_veto",
+      "operation": "acceptance_batch",
+      "input": {
+        "detailed": "qualified",
+        "overview": "qualified",
+        "fabricated": null,
+        "major": false
+      },
+      "expected": {
+        "state": "unavailable",
+        "reason": "batch_veto_evidence_missing"
+      }
+    }
+  ],
+  "limitations": [
+    "Independent declared-input boundary oracle; not implementation acceptance or professional approval.",
+    "Unavailable branches encode the documented conservative minimal contract."
+  ]
+}

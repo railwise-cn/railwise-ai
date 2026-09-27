@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "sourceHead": "e1708d7ccce7e134c502c3b82bc16e3efcd3290b",
+  "baseVersion": "0.0.0",
+  "targetVersion": "0.5.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "productionTouched": false,
+  "publicFeedUploaded": false,
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "baselinePurpose": "same-source isolated updater probe; not a historical-data migration",
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-19T18:11:57.699Z",
+  "steps": [
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:28.254Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:28.269Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:28.270Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:33.171Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:33.172Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:33.427Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:33.428Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:37.288Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:37.332Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:37.414Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:37.415Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:37.425Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:37.426Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:43.587Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:43.588Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:43.813Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:43.813Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:49.182Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:49.211Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:49.269Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:49.271Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:49.282Z"
+    },
+    {
+      "operation": "openssl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:10:50.304Z"
+    },
+    {
+      "operation": "openssl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:10:50.382Z"
+    },
+    {
+      "operation": "native-updater-harness",
+      "status": "started",
+      "timeoutMs": 1500000,
+      "at": "2026-09-19T18:10:50.729Z"
+    },
+    {
+      "operation": "native-updater-harness",
+      "status": "completed",
+      "at": "2026-09-19T18:11:50.603Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:11:50.607Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:11:50.620Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:11:50.622Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:11:53.355Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:11:53.356Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:11:53.587Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:11:53.588Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:11:56.218Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-09-19T18:11:56.281Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-09-19T18:11:56.341Z"
+    },
+    {
+      "operation": "cleanup",
+      "status": "completed",
+      "at": "2026-09-19T18:11:57.699Z"
+    }
+  ],
+  "bundleId": "com.wangjiawei508.workwise.candidate.heade1708d7ccce7",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperStatus": "assessments enabled",
+  "gatekeeperStatusExitCode": 0,
+  "baseDmgSha256": "2e48e8da07ad85e48325a65e8fdc8378871910bb4aac5f3de264f9bb18c32f4c",
+  "targetZipSha256": "77b1c5e073d1e5c91861caf9fd6613d641f6c52d755b238388ef2784c383bf5a",
+  "targetAsarSha256": "fcaa65bb42d526bffe33a860886e83f3863e8b7c44cfc18fca698d41c5bb6a18",
+  "certificateSha256": "2e8a1d4f791365590ae3bcc0c9f54b0f184302b76e6dd30b306cbc3a6023ded1",
+  "installedAsarSha256": "fcaa65bb42d526bffe33a860886e83f3863e8b7c44cfc18fca698d41c5bb6a18",
+  "userDataSentinelPreserved": true,
+  "feedRequests": {
+    "manifest": 1,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 300155476
+  },
+  "manifestSha256": "be6b43813e705a1b64c41fe4d97ca4cc93d6df812d7ec31051b4c86c76c8a0f2"
+}

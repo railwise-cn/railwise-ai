@@ -1,0 +1,49 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { scopedDatabase } from '/private/tmp/railwise-typed-relay-guard.mjs';
+import { verifyRelayCleanup } from './verify-relay-cleanup.mjs';
+const root = '/private/tmp/railwise-survey-53213de', evidence = join(root, 'evidence'), runtime = join(root, 'home/.workwise/runtime');
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const artifacts = {};
+async function read(name) { const bytes = await readFile(join(evidence, name)); artifacts[name] = sha(bytes); return JSON.parse(bytes); }
+const baseline = await read('second-before-resume-zero-receipts-53213.json');
+const failed = await read('failed-real-resume-53213.json');
+const audit = await read('strict-before-restart-audit-53213.json');
+const oracle = await read('independent-oracle-comparison-53213.json');
+const oldRelay = await read('relay-report-d6fabac586b96a85.json');
+const relay = await read('relay-report-43151fd88b293414.json');
+const threadFile = join(runtime, 'threads/thr_wt4kfajs/metadata.jsonl'), messageFile = join(runtime, 'threads/thr_wt4kfajs/messages.jsonl');
+const metadataBytes = await readFile(threadFile), messageBytes = await readFile(messageFile);
+const parseLines = bytes => bytes.toString('utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+const thread = parseLines(metadataBytes).findLast(item => item.kind === 'thread_metadata').thread;
+const messages = [...new Map(parseLines(messageBytes).map(item => [item.id, item])).values()];
+for (const prior of [failed.records.turn, failed.records.previousTurn, baseline.records.turn]) {
+  assert.deepEqual(thread.turns.find(item => item.id === prior.id), prior);
+  const expected = prior.id === baseline.records.turn.id ? baseline.records.messages : failed.records.messages.filter(item => item.turnId === prior.id);
+  assert.deepEqual(messages.filter(item => item.turnId === prior.id), expected);
+}
+const oldTask = (await scopedDatabase(join(runtime, 'tasks.sqlite3'), root, 'SELECT data_json FROM task_runs WHERE id = ?', failed.identities.taskId)).value;
+assert.deepEqual(oldTask, failed.records.task);
+assert.equal(audit.status, 'passed'); assert.equal(oracle.status, 'passed');
+for (const key of ['taskId', 'planId', 'projectId', 'threadId', 'networkId', 'providerId', 'model', 'reasoningEffort']) assert.equal(audit.stableIdentity.selected[key], baseline.identities[key]);
+assert.equal(audit.resumeHistory.previousFailedTurns[0].turnId, baseline.identities.turnId);
+assert.equal(relay.mode, 'typed');
+const chats = relay.events.filter(event => event.kind === 'upstream_started' && event.route === 'chat_completions');
+assert.equal(chats.length, 5); assert(chats.every(event => event.model === baseline.identities.model && event.modelSettings.thinkingType === 'disabled' && event.modelSettings.reasoningEffort === null));
+const oldFailures = oldRelay.events.filter(event => event.kind === 'failed');
+assert.equal(oldFailures.filter(event => event.status === 503 && event.code === 'upstream_rejected' && event.upstreamRequested).length, 1);
+assert.equal(oldFailures.filter(event => event.code === 'tool_not_allowed' && event.upstreamRequested === false).length, 7);
+const oldCleanup = await verifyRelayCleanup({ candidateRoot: root, reportPath: join(evidence, 'relay-report-d6fabac586b96a85.json'), report: oldRelay });
+assert((await readFile(threadFile)).equals(metadataBytes)); assert((await readFile(messageFile)).equals(messageBytes));
+const result = { status: 'passed', scope: 'lineage-and-evidence-preservation-only', checkedAt: new Date().toISOString(), candidateRoot: root,
+  secondScenario: { sameTaskAsBeforeResume: true, taskId: baseline.identities.taskId, planId: baseline.identities.planId, mockTurnId: baseline.identities.turnId, resumedTurnId: audit.stableIdentity.selected.turnId },
+  firstScenario: { status: 'failed', taskId: failed.identities.taskId, failedResumeTurnId: failed.identities.turnId, taskAndBothTurnRecordsUnchanged: true, upstreamHttp503Failures: 1, consultationLocalToolCatalogRejections: 7, rejectedConsultationSentUpstream: false, cleanup: oldCleanup },
+  providerTransport: { mode: relay.mode, model: baseline.identities.model, selectedReasoningEffort: baseline.identities.reasoningEffort, chatRequests: chats.length, actualThinkingType: 'disabled', actualReasoningEffort: null },
+  ordinaryConsultationAcceptance: 'not passed; no successful GUI ordinary consultation is claimed', artifactSha256: artifacts,
+  sourceThreadHashes: { metadata: sha(metadataBytes), messages: sha(messageBytes) },
+  limitations: ['GUI credential-field clearing is separate visual evidence; this audit never reads settings or key values.', 'Synthetic numerical checks do not establish professional acceptance or covariance equivalence.'] };
+const output = join(evidence, 'scenario-lineage-before-restart-53213.json');
+await writeFile(output, JSON.stringify(result, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+console.log(JSON.stringify({ status: result.status, output, sha256: sha(await readFile(output)), artifacts }, null, 2));

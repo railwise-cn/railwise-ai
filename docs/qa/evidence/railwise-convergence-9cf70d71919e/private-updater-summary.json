@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "workflowRunId": 35496645847,
+  "workflowConclusion": "success",
+  "sourceReports": {
+    "privateUpdaterSha256": "fee2684ac9a778f49124d47ade2c2297462a966f387e66f1813c259c0b9ab62f",
+    "nativeUpdaterSha256": "25f7bd1587a2f51bc3be6763e7087829fc622c1c807bab9ef03b4e2bee7b71fd"
+  },
+  "status": "passed",
+  "sourceHead": "9cf70d71919e997e815a9e55ec4264e01572979c",
+  "baseVersion": "0.0.0",
+  "targetVersion": "0.5.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "productionTouched": false,
+  "publicFeedUploaded": false,
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "baselinePurpose": "same-source isolated updater probe; not a historical-data migration",
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-20T07:41:43.324Z",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head9cf70d71919e",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperStatus": "assessments enabled",
+  "gatekeeperStatusExitCode": 0,
+  "baseDmgSha256": "e7adfe62a87ce26dce8f7363aafa65b876698c7ef27ceb6786e46dbb7fec699a",
+  "targetZipSha256": "6b18db96a217df357d96c38abe5a62b3df9dac2a18c55166616effe63b8e75ee",
+  "targetAsarSha256": "a42089f63f154c294243cc020e7ead866a5c73a69da0c74c336a3e2448f9642d",
+  "installedAsarSha256": "a42089f63f154c294243cc020e7ead866a5c73a69da0c74c336a3e2448f9642d",
+  "userDataSentinelPreserved": true,
+  "feedRequests": {
+    "manifest": 1,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 300739307
+  },
+  "manifestSha256": "30894b7782e613749bb8825da5fabfca741beff630f020c2dba44956c45b9bb8",
+  "native": {
+    "status": "passed",
+    "startedAt": "2026-09-20T07:41:06.382Z",
+    "completedAt": "2026-09-20T07:41:36.691Z",
+    "browserOpened": false,
+    "userDataPreserved": true,
+    "isolatedTestChannel": "frontier",
+    "feedUrl": "<redacted-private-loopback-feed>",
+    "stages": [
+      {
+        "name": "base_started",
+        "at": "2026-09-20T07:41:06.382Z"
+      },
+      {
+        "name": "update_available",
+        "at": "2026-09-20T07:41:07.165Z"
+      },
+      {
+        "name": "download_completed",
+        "at": "2026-09-20T07:41:11.543Z"
+      },
+      {
+        "name": "install_requested",
+        "at": "2026-09-20T07:41:11.544Z"
+      },
+      {
+        "name": "target_relaunched",
+        "at": "2026-09-20T07:41:36.690Z"
+      },
+      {
+        "name": "user_data_preserved",
+        "at": "2026-09-20T07:41:36.691Z"
+      }
+    ]
+  },
+  "limitations": [
+    "The test channel is private and is not public promotion.",
+    "The 0.0.0 baseline is a same-source updater probe.",
+    "The user-data sentinel is synthetic, not real-project migration acceptance."
+  ]
+}

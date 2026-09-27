@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "checkedAt": "2026-09-20T06:31:25.976Z",
+  "sourceHead": "fbb88ea715571e9689cbc1c0802da08762e4318d",
+  "projectId": "project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83",
+  "networkId": "network_eb2aeea2-84cc-41ed-984d-db84e49fa5a9",
+  "threadId": "thr_inslys6a",
+  "planId": "eplan_f9a8c3dc-398a-45d2-aeeb-11d2ba1d7ebe",
+  "adjustmentId": "adjustment_23a326c5-4061-4c85-868b-631e4b7f9e60",
+  "deliveryRunId": "run_7273285f-2a85-4262-a287-79050785b2b1",
+  "asarSha256": "15c19b63ea39fe5618e9d02ca8d977b348e6a12a8db5a8e64f56274a244ed96e",
+  "evidenceType": "independent read-only audit of real model execution on a synthetic candidate fixture",
+  "provenance": {
+    "preparedPlanFixture": true,
+    "modelExecution": "official provider through temporary loopback relay",
+    "model": "deepseek-flash",
+    "sourceRecords": {
+      "planSha256": "b8ed79c372b81dfd5d40eac8d7a13a01fca8052ae1b5e9abe3ff2f093c3eb842",
+      "taskSha256": "151dfa86207cbe299b3cd453b682638827f014522afabef3210f9e91e925a8b8",
+      "adjustmentSha256": "f5dc4482f746e1bef8e786972846ecaa3c4ffe0edcd1785ffd65c4446a10344e",
+      "deliveryRunSha256": "eb33739ddb92692bc7c98cda5485c43fef2874e8ad02282c7692294c02b6e908",
+      "messagesJsonlSha256": "482258c540d30dfeab62827c86dd9aeab797982adf476cf19ecc5d459e7ec9b8",
+      "metadataJsonlSha256": "9cb18fd27468051a7f1ee027b3c54f0a6a77cc5748a847a013407fc7cc1af960",
+      "relayReportSha256": "0a3055a72c75a8081ff37fde45985e8fc00828393f2fe266d7e6195fe593a83c"
+    },
+    "helperHashes": {
+      "railwise-typed-acceptance-relay.mjs": "2e76fcbf8276762716968dc7ddce2fbf6157862d9f9a97e3d16ad744f67f1cdf",
+      "railwise-typed-relay-guard.mjs": "ce9baabe911c544b8f0af3e1dc6d06670a9a262c8175fd1e520878f565422d7e",
+      "verify-typed-model-execution.mjs": "aa4e010603effce258d26c3a1d638b66d8941852988b54a22628eb77b44854b0"
+    }
+  },
+  "execution": {
+    "rawPlanStatus": "started",
+    "planRevision": 3,
+    "taskId": "task_0afe8082-8843-4986-9b5d-aa787e931b83",
+    "taskStatus": "completed",
+    "taskAcceptanceKind": "answer",
+    "taskArtifactCardCount": 0,
+    "executionTurnId": "turn_mh3drksb",
+    "turnStatus": "completed",
+    "attempts": 1,
+    "replans": 0,
+    "allowedToolCount": 5,
+    "actualToolCallCount": 4,
+    "actualToolResultCount": 4,
+    "allStepsApprovedAndBound": true,
+    "unauthorizedToolCount": 0,
+    "toolOutputsMatchDeterministicRecords": true,
+    "finalResponseMatchesTask": true,
+    "noAttachmentsOrMemoryInjection": true,
+    "steps": [
+      {
+        "stepId": "inspect-survey-network",
+        "tool": "survey_network_validate",
+        "callId": "call_00_TwagZoExzXgeWOVwtnsS6910",
+        "status": "completed",
+        "isError": false,
+        "parameters": {
+          "networkId": "network_eb2aeea2-84cc-41ed-984d-db84e49fa5a9",
+          "expectedRevision": 1,
+          "idempotencyKey": "engineering-plan:eplan_f9a8c3dc-398a-45d2-aeeb-11d2ba1d7ebe:inspect-survey-network"
+        },
+        "handles": {
+          "network.id": "network_eb2aeea2-84cc-41ed-984d-db84e49fa5a9",
+          "network.revision": 2
+        },
+        "persistedArgumentsRedacted": true,
+        "outputSha256": "c3cf073fbc69341b40a2f3b9cc36d23842189028a5f22a845f30fe5894e98b24",
+        "parameterRecordSha256": "53f333d7f12062a1b7bf46424591ca542621dc60c48e11643f7642a0a68d42ed",
+        "handleRecordSha256": "e7caa03368da6ec0d1ef61b6140a99f135dd6e5375a75e433098cff6412d26c7"
+      },
+      {
+        "stepId": "adjust-survey-network",
+        "tool": "control_network",
+        "callId": "call_00_No6qOMR8AEsCFKcfBQpx0471",
+        "status": "completed",
+        "isError": false,
+        "parameters": {
+          "networkId": "network_eb2aeea2-84cc-41ed-984d-db84e49fa5a9",
+          "expectedRevision": 2,
+          "idempotencyKey": "engineering-plan:eplan_f9a8c3dc-398a-45d2-aeeb-11d2ba1d7ebe:adjust-survey-network"
+        },
+        "handles": {
+          "run.id": "adjustment_23a326c5-4061-4c85-868b-631e4b7f9e60"
+        },
+        "persistedArgumentsRedacted": true,
+        "outputSha256": "53a4d9c6dbc0b7ca36968f725592d2c9db5da7eabdd34836a96165882ca2004a",
+        "parameterRecordSha256": "589fdd94474c9923ccc95579dbb46bdc2450c9d5cf65b03b9a2a81ad84ddc7f4",
+        "handleRecordSha256": "dc574ef71ece0415919012a8d42c1e7d5ed7fe2164ea11d0629d3f5d066043e4"
+      },
+      {
+        "stepId": "review-survey-quality",
+        "tool": "survey_adjustment_read",
+        "callId": "call_00_oDQNhlNRBrKf1JyEaM627710",
+        "status": "completed",
+        "isError": false,
+        "parameters": {
+          "networkId": "network_eb2aeea2-84cc-41ed-984d-db84e49fa5a9",
+          "adjustmentId": "adjustment_23a326c5-4061-4c85-868b-631e4b7f9e60",
+          "idempotencyKey": "engineering-plan:eplan_f9a8c3dc-398a-45d2-aeeb-11d2ba1d7ebe:review-survey-quality"
+        },
+        "handles": {
+          "run.id": "adjustment_23a326c5-4061-4c85-868b-631e4b7f9e60"
+        },
+        "persistedArgumentsRedacted": true,
+        "outputSha256": "53a4d9c6dbc0b7ca36968f725592d2c9db5da7eabdd34836a96165882ca2004a",
+        "parameterRecordSha256": "9efef31b97c7ec64758059eabb854ade01f7559a22b997ab3b2c2c4cc8976f7c",
+        "handleRecordSha256": "dc574ef71ece0415919012a8d42c1e7d5ed7fe2164ea11d0629d3f5d066043e4"
+      },
+      {
+        "stepId": "prepare-survey-report",
+        "tool": "report_export",
+        "callId": "call_00_KtdNc8A8SeGXPoaxSP4Y1094",
+        "status": "completed",
+        "isError": false,
+        "parameters": {
+          "projectId": "project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83",
+          "expectedRevision": 3,
+          "adjustmentIds": [
+            "adjustment_23a326c5-4061-4c85-868b-631e4b7f9e60"
+          ],
+          "idempotencyKey": "engineering-plan:eplan_f9a8c3dc-398a-45d2-aeeb-11d2ba1d7ebe:prepare-survey-report"
+        },
+        "handles": {
+          "run.id": "run_7273285f-2a85-4262-a287-79050785b2b1"
+        },
+        "persistedArgumentsRedacted": true,
+        "outputSha256": "7b44b1c8b2fbfbd73c0730d3753657d8a082485461fcb215dd6670af78e51e99",
+        "parameterRecordSha256": "aa69e5fc0882ba7b6824845218e6866cd99302fb071b7069a6f9393c74e4b9b8",
+        "handleRecordSha256": "6d480f06e2a48110f0c227844559972654865922ec6e037a8f8dbe5056283577"
+      }
+    ]
+  },
+  "delivery": {
+    "runStatus": "completed",
+    "manifestCount": 0,
+    "formalDeliveryApproved": false,
+    "files": [
+      {
+        "path": ".workwise/deliverables/project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83/run_7273285f-2a85-4262-a287-79050785b2b1/report.docx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "sha256": "0f3c7d55fd7b7fc24dabd487a67bb18d731784e77bd8191471a21403f48c26fe",
+        "sizeBytes": 5401,
+        "format": {
+          "parser": "JSZip",
+          "crc32Verified": true,
+          "requiredContentTypeAndXmlPresent": true
+        }
+      },
+      {
+        "path": ".workwise/deliverables/project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83/run_7273285f-2a85-4262-a287-79050785b2b1/report.pdf",
+        "mediaType": "application/pdf",
+        "sha256": "16f3287bb9d619faef470fc01000032b33eb215d6bb7536b18ec3d810e50e3ae",
+        "sizeBytes": 39458,
+        "format": {
+          "parser": "pdfinfo",
+          "pages": 2,
+          "parsed": true
+        }
+      },
+      {
+        "path": ".workwise/deliverables/project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83/run_7273285f-2a85-4262-a287-79050785b2b1/evidence.xlsx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "sha256": "659e2378c34f16040801e86a52c0df01616ecbab8638b15ba163099aa2c59c6a",
+        "sizeBytes": 39084,
+        "format": {
+          "parser": "JSZip",
+          "crc32Verified": true,
+          "requiredContentTypeAndXmlPresent": true,
+          "sheetCount": 15
+        }
+      }
+    ]
+  },
+  "relay": {
+    "startedAt": "2026-09-20T06:20:24.627Z",
+    "stoppedAt": "2026-09-20T06:23:11.770Z",
+    "reason": "SIGINT",
+    "chatRequestsHttp200": 5,
+    "modelListRequestsHttp200": 3,
+    "failedRequests": 0,
+    "originalScopeLabel": "four typed measurement tools; persisted synthetic thread results; buffered original upstream bytes",
+    "scopeLabelCorrection": "Five allowed tools, including read-only survey_read_context; four typed measurement tools actually called."
+  },
+  "cleanup": {
+    "temporaryTokenMissing": true,
+    "loopbackPortClosed": true,
+    "candidateCredentialFieldsChecked": 8,
+    "candidateCredentialFieldsEmpty": true,
+    "runtimeConfigCredentialFieldCount": 0,
+    "providerBaseUrlRestored": true
+  },
+  "audit": {
+    "readOnlyDatabases": true,
+    "databaseAndWalBytesUnchanged": true,
+    "newModelRequests": 0
+  },
+  "limitations": [
+    "The plan and source data were prepared synthetic fixtures; only the subsequent execution was a real model round-trip.",
+    "Persisted tool arguments are redacted; exact bound arguments are corroborated by the independent per-step evidence rows.",
+    "Original provider response streams were not retained. Byte-preserving relay code and successful guard checks support provenance; this audit does not recreate missing wire captures.",
+    "Task and turn completed; the original plan execution record still says started. No formal manifest or delivery approval exists.",
+    "This is not direct official credential-chain acceptance, real-project validation, production KPI measurement or release approval."
+  ]
+}

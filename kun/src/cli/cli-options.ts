@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ModelProviderRoutesSchema } from '../adapters/model/provider-routing-model-client.js'
 import {
   ApprovalPolicySchema,
   DEFAULT_APPROVAL_POLICY,
@@ -46,6 +47,8 @@ export const ServeOptionsSchema = z.object({
   baseUrl: z.string().default('https://api.deepseek.com'),
   endpointFormat: z.preprocess(normalizeModelEndpointFormat, z.enum(MODEL_ENDPOINT_FORMATS)).default(DEFAULT_MODEL_ENDPOINT_FORMAT),
   model: z.string().default(DEFAULT_SERVE_MODEL),
+  modelProviders: ModelProviderRoutesSchema.optional(),
+  defaultModelProviderId: z.string().trim().min(1).max(200).optional(),
   approvalPolicy: ApprovalPolicySchema.default(DEFAULT_APPROVAL_POLICY),
   sandboxMode: SandboxModeSchema.default(DEFAULT_SANDBOX_MODE),
   tokenEconomyMode: z.boolean().default(false),

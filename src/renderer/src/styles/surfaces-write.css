@@ -955,3 +955,17 @@
     min-height: 42px;
   }
 }
+
+/* Size the Survey tables against their available work area, including the AI pane. */
+.engineering-classic-shell { container-type: inline-size; container-name: survey-data; }
+@container survey-data (max-width: 900px) {
+  .survey-workbench-grid { grid-template-columns: minmax(0, 1fr); }
+  .survey-workbench-nav { display: flex; flex-wrap: wrap; border-right: 0; }
+  .survey-workbench-nav > p { display: none; }
+  .survey-workbench-nav > button { width: auto; }
+  .survey-workbench-aside { grid-column: 1 / -1; border-left: 0; }
+  .survey-workbench-main table { min-width: 560px; }
+}
+.engineering-command-strip {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}

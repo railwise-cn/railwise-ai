@@ -1,0 +1,75 @@
+"""Compare an explicitly supplied product result against the independent oracle."""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+
+
+def compare(oracle, supplied):
+    result = supplied.get("record", supplied).get("result", supplied)
+    tolerances = oracle["tolerancesDeclaredBeforeProductComparison"]
+    assert result["observationCount"] == 5
+    assert result["unknownCount"] == 3
+    assert result["degreesOfFreedom"] == 2 and result["redundancy"] == 2
+    assert result["linearUnit"] == "m" and result["angularUnit"] == "rad"
+    assert result["solverDiagnostics"]["rank"] == 3
+    points = {item["id"]: item for item in result["points"]}
+    assert set(points) == {*oracle["fixedControls"], oracle["stationId"]}
+    for name, xy in oracle["fixedControls"].items():
+        assert points[name]["x"] == xy[0] and points[name]["y"] == xy[1], "fixed control changed"
+    station = points[oracle["stationId"]]
+    orientation = result["parameters"]["orientation:" + oracle["stationId"]]
+    assert result["parameterUnits"]["orientation:" + oracle["stationId"]] == "rad"
+    assert math.isfinite(orientation)
+    observed_rows = {item["sourceRow"]: item for item in result["observations"]}
+    assert len(observed_rows) == 5 and len(result["observations"]) == 5
+    models = {}
+    for name, answer in oracle["solutions"].items():
+        dx = abs(station["x"] - answer["station"]["xNorthM"])
+        dy = abs(station["y"] - answer["station"]["yEastM"])
+        assert max(dx, dy) <= tolerances["stationCoordinateAbsoluteM"], "station outside declared oracle tolerance"
+        angle_difference = abs(math.atan2(math.sin(orientation - answer["station"]["orientationRad"]), math.cos(orientation - answer["station"]["orientationRad"])))
+        assert angle_difference <= tolerances["angularResidualAbsoluteRad"]
+        comparisons = []
+        for item in answer["observations"]:
+            actual = observed_rows[item["line"]]
+            assert actual["unit"] == item["unit"]
+            tolerance = tolerances["angularResidualAbsoluteRad"] if item["kind"] == "L" else tolerances["linearResidualAbsoluteM"]
+            difference = abs(actual["residual"] - item["adjustedMinusObserved"])
+            assert difference <= tolerance, "residual outside declared oracle tolerance"
+            assert actual["correction"] == actual["residual"]
+            comparisons.append({"sourceRow": item["line"], "unit": item["unit"], "actualResidual": actual["residual"], "oracleAdjustedMinusObserved": item["adjustedMinusObserved"], "absoluteDifference": difference, "declaredTolerance": tolerance})
+        models[name] = {"coordinateAbsoluteDifferenceM": [dx, dy], "orientationDifferenceRad": angle_difference, "residuals": comparisons}
+    # This is an algebraic reconstruction from product coordinates and the original
+    # observations, not a precision estimate or a fitted tolerance.
+    reconstruction = []
+    for item in oracle["solutions"]["rss"]["observations"]:
+        target = oracle["fixedControls"][item["target"]]
+        dx, dy = target[0] - station["x"], target[1] - station["y"]
+        if item["kind"] == "L":
+            difference = math.atan2(dy, dx) - orientation - item["observed"]
+            residual, tolerance = math.atan2(math.sin(difference), math.cos(difference)), 1e-13
+        else:
+            residual, tolerance = math.hypot(dx, dy) - item["observed"], 1e-10
+        discrepancy = abs(residual - observed_rows[item["line"]]["residual"])
+        assert discrepancy <= tolerance, "residual does not reconstruct from the returned geometry"
+        reconstruction.append({"sourceRow": item["line"], "unit": item["unit"], "absoluteDifference": discrepancy, "floatingPointConsistencyTolerance": tolerance})
+    return {"status": "passed", "countsExact": {"observations": 5, "unknownParameters": 3, "rank": 3, "degreesOfFreedom": 2}, "fixedControlsUnchanged": True, "declaredWeightModelsComparedSeparately": models, "residualReconstruction": reconstruction, "precisionOrCovarianceEquivalenceClaimed": False}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("oracle", type=Path)
+    parser.add_argument("selected_result", type=Path)
+    parser.add_argument("report", type=Path)
+    args = parser.parse_args()
+    oracle_bytes, result_bytes = args.oracle.read_bytes(), args.selected_result.read_bytes()
+    report = compare(json.loads(oracle_bytes), json.loads(result_bytes))
+    report.update({"oracleSha256": hashlib.sha256(oracle_bytes).hexdigest(), "selectedResultSha256": hashlib.sha256(result_bytes).hexdigest(), "syntheticOnly": True, "modelRequests": 0, "professionalAcceptance": False})
+    args.report.write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps({"status": report["status"], "report": str(args.report), "countsExact": report["countsExact"], "coordinateDifferencesByWeightModel": {name: value["coordinateAbsoluteDifferenceM"] for name, value in report["declaredWeightModelsComparedSeparately"].items()}, "precisionOrCovarianceEquivalenceClaimed": False}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

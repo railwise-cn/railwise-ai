@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "purpose": "private Runtime completion guard and historical-state test baseline; not the final GUI acceptance candidate",
+  "sourceHead": "9cf70d71919e997e815a9e55ec4264e01572979c",
+  "evidenceArtifact": {
+    "id": 10600716979,
+    "node_id": "MDg6QXJ0aWZhY3QxMDYwMDcxNjk3OQ==",
+    "name": "private-updater-arm64-9cf70d71919e997e815a9e55ec4264e01572979c",
+    "size_in_bytes": 4176,
+    "url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600716979",
+    "archive_download_url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600716979/zip",
+    "expired": false,
+    "digest": "sha256:41a3ad39ef86b8db3ddf218b5bb8ad5c98908d7262f9139c5a1b644b5202b042",
+    "created_at": "2026-09-20T07:41:44Z",
+    "updated_at": "2026-09-20T07:41:44Z",
+    "expires_at": "2026-09-27T07:41:43Z",
+    "workflow_run": {
+      "id": 35496645847,
+      "repository_id": 1268259206,
+      "head_repository_id": 1268259206,
+      "head_branch": "codex/railwise-survey-convergence",
+      "head_sha": "9cf70d71919e997e815a9e55ec4264e01572979c"
+    }
+  },
+  "targetArtifact": {
+    "id": 10600891727,
+    "node_id": "MDg6QXJ0aWZhY3QxMDYwMDg5MTcyNw==",
+    "name": "private-updater-target-arm64-9cf70d71919e997e815a9e55ec4264e01572979c",
+    "size_in_bytes": 589379687,
+    "url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600891727",
+    "archive_download_url": "https://api.github.com/repos/wangjiawei508/WorkWise/actions/artifacts/10600891727/zip",
+    "expired": false,
+    "digest": "sha256:6489a5f3d7025bf06bcca633383c6513b7c99638ae088b4063e4c551500612cd",
+    "created_at": "2026-09-20T07:42:01Z",
+    "updated_at": "2026-09-20T07:42:01Z",
+    "expires_at": "2026-09-27T07:41:44Z",
+    "workflow_run": {
+      "id": 35496645847,
+      "repository_id": 1268259206,
+      "head_repository_id": 1268259206,
+      "head_branch": "codex/railwise-survey-convergence",
+      "head_sha": "9cf70d71919e997e815a9e55ec4264e01572979c"
+    }
+  },
+  "download": {
+    "status": "passed",
+    "artifactId": 10600891727,
+    "download": "HTTP range extraction of application ZIP only; outer artifact digest not rehashed",
+    "targetZipSha256": "6b18db96a217df357d96c38abe5a62b3df9dac2a18c55166616effe63b8e75ee",
+    "matchesPrivateUpdaterTargetZip": true,
+    "zipPath": "/private/tmp/railwise-survey-9cf70d7/cloud-target/WorkWise-Candidate-9cf70d71919e-0.5.0-mac-arm64.zip"
+  },
+  "checks": {
+    "evidenceArtifactFullDigestVerified": "sha256:41a3ad39ef86b8db3ddf218b5bb8ad5c98908d7262f9139c5a1b644b5202b042",
+    "innerApplicationZipFullyHashed": true,
+    "outerTargetArtifactDigestRehashed": false,
+    "installedAsarMatchesCloudUpdater": true
+  }
+}

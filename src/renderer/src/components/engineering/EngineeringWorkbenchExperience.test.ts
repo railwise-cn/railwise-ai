@@ -93,7 +93,7 @@ describe('engineering workbench experience contract', () => {
     expect(source).toContain("t('surveyStabilityThreshold')")
     expect(source).toContain('/v1/engineering/survey/networks?projectId=')
     expect(source).toContain("t('surveyExistingNetwork')")
-    expect(source).toContain("setSection(restoredAdjustment ? 'result' : 'network')")
+    expect(source).toContain("setSection(preferredSectionRef.current ?? (restoredAdjustment ? 'result' : 'network'))")
     expect(source).toContain("t('surveyPreflight')")
     expect(source).toContain("t('surveyFormatFilterAria')")
     expect(source).toContain("t('surveyReadinessFilterAria')")

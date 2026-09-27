@@ -1,222 +1,111 @@
-import { app, BrowserWindow } from 'electron'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { execSync } from 'node:child_process'
-import { basename, resolve } from 'node:path'
+import { Resvg } from '@resvg/resvg-js'
+import { readFile, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+// Use the user-selected clean SVG artwork. Remove canvas whitespace without
+// changing the ribbon pixels, then place it consistently across app surfaces.
+// Keep historical resource paths for installer and runtime compatibility.
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const defaultSource = resolve(projectRoot, 'src/asset/img/workwise.svg')
-const sourcePath = resolve(process.argv[2] || defaultSource)
 const iconDir = resolve(projectRoot, 'src/asset/img')
+const sourceDir = resolve(iconDir, 'railwise-logo-pack-v2')
+const macIconScale = 0.84
 
-const pngTargets = [
-  { size: 1024, path: resolve(iconDir, 'workwise.png') },
-  { size: 512, path: resolve(iconDir, 'workwise_tray.png') }
-]
-const macDockPngPath = resolve(iconDir, 'workwise_dock.png')
-// Legacy .icns icons aren't masked onto Apple's modern macOS icon grid for us.
-// Keep the visible tile at roughly 80% of the canvas, matching the opaque body
-// of current built-in macOS app icons, and leave the remaining area transparent.
-const macIconScale = 0.8
-const icoSizes = [16, 24, 32, 48, 64, 128, 256]
-const icoPath = resolve(iconDir, 'workwise.ico')
-
-app.on('window-all-closed', () => {
-  // Keep this utility alive while it renders several hidden windows in sequence.
-})
-
-function extractPngDimensions(buffer) {
-  if (buffer.toString('ascii', 1, 4) !== 'PNG') {
-    throw new Error('Expected PNG data from Electron capture.')
+function renderPng(svg, size, scale = 1) {
+  const inset = 1024 * (1 - scale) / 2
+  const source = scale === 1 ? svg : `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><g transform="translate(${inset} ${inset}) scale(${scale})">${svg.replace(/<\?xml[^>]*\?>/g, '')}</g></svg>`
+  const rendered = new Resvg(source, { fitTo: { mode: 'width', value: size }, font: { loadSystemFonts: false } }).render()
+  for (const fraction of [0.25, 0.5, 0.75]) {
+    const alpha = rendered.pixels[(Math.floor(size / 2) * size + Math.floor(size * fraction)) * 4 + 3]
+    if (alpha !== 255) throw new Error(`Unexpected clipping in ${size}px icon at ${fraction}`)
   }
-  return {
-    width: buffer.readUInt32BE(16),
-    height: buffer.readUInt32BE(20)
+  const png = Buffer.from(rendered.asPng())
+  if (png.readUInt32BE(16) !== size || png.readUInt32BE(20) !== size || png[25] !== 6) {
+    throw new Error(`Invalid ${size}px RGBA icon`)
   }
-}
-
-function assertPngHasAlpha(buffer, label) {
-  const colorType = buffer.readUInt8(25)
-  if (colorType !== 6) {
-    throw new Error(`${label} must keep transparency; expected PNG color type 6, got ${colorType}.`)
-  }
+  return png
 }
 
 function buildIco(entries) {
   const header = Buffer.alloc(6)
-  header.writeUInt16LE(0, 0)
   header.writeUInt16LE(1, 2)
   header.writeUInt16LE(entries.length, 4)
-
   const directory = Buffer.alloc(entries.length * 16)
-  let imageOffset = header.length + directory.length
-  entries.forEach((entry, index) => {
-    const { width, height } = extractPngDimensions(entry)
+  let position = header.length + directory.length
+  entries.forEach((png, index) => {
+    const size = png.readUInt32BE(16)
     const offset = index * 16
-    directory.writeUInt8(width >= 256 ? 0 : width, offset)
-    directory.writeUInt8(height >= 256 ? 0 : height, offset + 1)
-    directory.writeUInt8(0, offset + 2)
-    directory.writeUInt8(0, offset + 3)
+    directory.writeUInt8(size === 256 ? 0 : size, offset)
+    directory.writeUInt8(size === 256 ? 0 : size, offset + 1)
     directory.writeUInt16LE(1, offset + 4)
     directory.writeUInt16LE(32, offset + 6)
-    directory.writeUInt32LE(entry.length, offset + 8)
-    directory.writeUInt32LE(imageOffset, offset + 12)
-    imageOffset += entry.length
+    directory.writeUInt32LE(png.length, offset + 8)
+    directory.writeUInt32LE(position, offset + 12)
+    position += png.length
   })
-
   return Buffer.concat([header, directory, ...entries])
 }
 
-function buildIcns(entries) {
-  const body = Buffer.concat(
-    entries.map(({ type, data }) => {
-      const entryHeader = Buffer.alloc(8)
-      entryHeader.write(type, 0, 4, 'ascii')
-      entryHeader.writeUInt32BE(data.length + 8, 4)
-      return Buffer.concat([entryHeader, data])
-    })
-  )
+function buildIcns(svg) {
+  // PNG-compatible ICNS element types, including Retina variants.
+  const sizes = { icp4: 16, icp5: 32, icp6: 64, ic07: 128, ic08: 256, ic09: 512, ic10: 1024, ic11: 32, ic12: 64, ic13: 256, ic14: 512 }
+  const body = Buffer.concat(Object.entries(sizes).map(([type, size]) => {
+    const png = renderPng(svg, size, macIconScale)
+    const header = Buffer.alloc(8)
+    header.write(type, 0, 4, 'ascii')
+    header.writeUInt32BE(png.length + 8, 4)
+    return Buffer.concat([header, png])
+  }))
   const header = Buffer.alloc(8)
   header.write('icns', 0, 4, 'ascii')
   header.writeUInt32BE(body.length + 8, 4)
   return Buffer.concat([header, body])
 }
 
-async function renderPng(svgText, size, { scale = 1, addMacShadow = false } = {}) {
-  const window = new BrowserWindow({
-    show: false,
-    width: size,
-    height: size,
-    useContentSize: true,
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      offscreen: true,
-      sandbox: true
-    }
-  })
-
-  const html = [
-    '<!doctype html>',
-    '<html>',
-    '<head>',
-    '<meta charset="utf-8">',
-    '<style>',
-    'html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;}',
-    'body{display:grid;place-items:center;}',
-    `svg{display:block;width:${scale * 100}vw;height:${scale * 100}vh;` +
-      `${addMacShadow ? 'filter:drop-shadow(0 2.2vw 2.6vw rgba(0,0,0,.28));' : ''}}`,
-    '</style>',
-    '</head>',
-    '<body>',
-    svgText,
-    '</body>',
-    '</html>'
-  ].join('')
-
-  try {
-    await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-    const image = await window.webContents.capturePage()
-    const png = image.resize({ width: size, height: size, quality: 'best' }).toPNG()
-    assertPngHasAlpha(png, `${size}x${size} icon`)
-    return png
-  } finally {
-    window.destroy()
+const symbolSvgSource = await readFile(resolve(sourceDir, 'RAILWISE_AI_symbol_color.svg'), 'utf8')
+const master = new Resvg(symbolSvgSource, { font: { loadSystemFonts: false } }).render()
+let left = master.width, top = master.height, right = -1, bottom = -1
+const pixels = master.pixels
+for (let y = 0; y < master.height; y++) {
+  for (let x = 0; x < master.width; x++) {
+    if (pixels[(y * master.width + x) * 4 + 3] === 0) continue
+    left = Math.min(left, x); right = Math.max(right, x)
+    top = Math.min(top, y); bottom = Math.max(bottom, y)
   }
 }
+if (right < left || bottom < top) throw new Error('Selected symbol is empty')
+// Two source pixels protect the antialiased edge. The original source stays intact.
+left = Math.max(0, left - 2); top = Math.max(0, top - 2)
+right = Math.min(master.width - 1, right + 2); bottom = Math.min(master.height - 1, bottom + 2)
+const markWidth = right - left + 1, markHeight = bottom - top + 1
+const symbolSvg = symbolSvgSource.replace(/<svg\b[^>]*>/, `<svg xmlns="http://www.w3.org/2000/svg" width="${markWidth}" height="${markHeight}" viewBox="${left} ${top} ${markWidth} ${markHeight}"><title>RailWise AI</title>`)
+const symbolPng = Buffer.from(new Resvg(symbolSvg, { fitTo: { mode: 'width', value: 1024 }, font: { loadSystemFonts: false } }).render().asPng())
+const symbolData = symbolPng.toString('base64')
 
-async function generateIcns(svgText) {
-  const icnsPath = resolve(iconDir, 'workwise.icns')
-
-  // Standard macOS icon sizes
-  const icnsSizes = [
-    { type: 'ic04', size: 16 },
-    { type: 'ic05', size: 32 },
-    { type: 'ic07', size: 128 },
-    { type: 'ic08', size: 256 },
-    { type: 'ic09', size: 512 },
-    { type: 'ic10', size: 1024 },
-    { type: 'ic11', size: 32 },
-    { type: 'ic12', size: 64 },
-    { type: 'ic13', size: 512 },
-    { type: 'ic14', size: 1024 }
-  ]
-
-  // Try using iconutil first (macOS native, produces best results)
-  const iconsetDir = resolve(iconDir, 'workwise.iconset')
-  await mkdir(iconsetDir, { recursive: true })
-
-  for (const { type, size } of icnsSizes) {
-    const png = await renderPng(svgText, size, { scale: macIconScale, addMacShadow: true })
-    // iconutil uses Apple's naming convention
-    let filename
-    if (type === 'ic04') filename = 'icon_16x16.png'
-    else if (type === 'ic05') filename = 'icon_32x32.png'
-    else if (type === 'ic07') filename = 'icon_128x128.png'
-    else if (type === 'ic08') filename = 'icon_256x256.png'
-    else if (type === 'ic09') filename = 'icon_512x512.png'
-    else if (type === 'ic10') filename = 'icon_512x512@2x.png'
-    else if (type === 'ic11') filename = 'icon_16x16@2x.png'
-    else if (type === 'ic12') filename = 'icon_32x32@2x.png'
-    else if (type === 'ic13') filename = 'icon_256x256@2x.png'
-    else if (type === 'ic14') filename = 'icon_512x512@2x.png'
-    await writeFile(resolve(iconsetDir, filename), png)
-  }
-
-  try {
-    execSync(`iconutil -c icns "${iconsetDir}" -o "${icnsPath}"`, { stdio: 'pipe' })
-    console.log(`Generated ${icnsPath}`)
-  } catch {
-    // Fallback: build icns manually (works on non-macOS or older iconutil)
-    console.warn('[generate-icons] iconutil failed, building icns manually')
-    const icnsEntries = []
-    for (const { type, size } of icnsSizes) {
-      const png = await renderPng(svgText, size, { scale: macIconScale, addMacShadow: true })
-      icnsEntries.push({ type, data: png })
-    }
-    await writeFile(icnsPath, buildIcns(icnsEntries))
-    console.log(`Generated ${icnsPath} (manual)`)
-  }
-
-  // Clean up iconset directory
-  await rm(iconsetDir, { recursive: true, force: true }).catch(() => {})
+function appTile(theme) {
+  const background = theme === 'light' ? '#F7FAFC' : '#06152D'
+  const width = 832, height = width * markHeight / markWidth
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024"><title>RailWise AI</title><desc>User-selected clean v2 ribbon; canvas whitespace removed.</desc><rect width="1024" height="1024" rx="230" fill="${background}"/><image x="${(1024-width)/2}" y="${(1024-height)/2}" width="${width}" height="${height}" xlink:href="data:image/png;base64,${symbolData}"/></svg>`
 }
 
-async function main() {
-  await app.whenReady()
-  await mkdir(iconDir, { recursive: true })
-
-  const svgText = await readFile(sourcePath, 'utf8')
-  await writeFile(resolve(iconDir, 'workwise.svg'), svgText, 'utf8')
-
-  for (const target of pngTargets) {
-    const png = await renderPng(svgText, target.size)
-    await writeFile(target.path, png)
-    console.log(`Generated ${target.path}`)
-  }
-
-  const macDockPng = await renderPng(svgText, 1024, {
-    scale: macIconScale,
-    addMacShadow: true
-  })
-  await writeFile(macDockPngPath, macDockPng)
-  console.log(`Generated ${macDockPngPath}`)
-
-  const icoEntries = []
-  for (const size of icoSizes) {
-    icoEntries.push(await renderPng(svgText, size))
-  }
-  await writeFile(icoPath, buildIco(icoEntries))
-  console.log(`Generated ${icoPath}`)
-
-  await generateIcns(svgText)
-
-  app.quit()
+const light = appTile('light')
+const dark = appTile('dark')
+const lightPng = renderPng(light, 1024)
+const darkPng = renderPng(dark, 1024)
+const outputs = {
+  'workwise.svg': dark,
+  'workwise-symbol.svg': symbolSvg,
+  'workwise-symbol.png': symbolPng,
+  'workwise.png': darkPng,
+  'workwise-light.png': lightPng,
+  'workwise-dark.png': darkPng,
+  'workwise_tray.png': renderPng(dark, 512),
+  'workwise_dock.png': renderPng(light, 1024, macIconScale),
+  'workwise_dock_dark.png': renderPng(dark, 1024, macIconScale),
+  'workwise.ico': buildIco([16, 24, 32, 48, 64, 128, 256].map((size) => renderPng(dark, size))),
+  'workwise.icns': buildIcns(light)
 }
-
-main().catch((error) => {
-  console.error(`Failed to generate icons from ${basename(sourcePath)}:`)
-  console.error(error)
-  app.exit(1)
-})
+for (const [name, content] of Object.entries(outputs)) {
+  await writeFile(resolve(iconDir, name), content)
+  console.log(`Generated ${name}`)
+}

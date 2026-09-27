@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "trialId": "free_leveling_trial_0ecc28bf-379e-4a81-851e-8458efc6bbbf",
+  "expectedHeights": {
+    "A": -1.3332333333333333,
+    "B": -0.3333333333333333,
+    "C": 1.6665666666666668
+  },
+  "expectedObservationMinusAdjustedResidual": 0.0001,
+  "expectedWeightedSSE": 0.03,
+  "originalFixedPointPreserved": true,
+  "networkRevisionPreserved": true
+}

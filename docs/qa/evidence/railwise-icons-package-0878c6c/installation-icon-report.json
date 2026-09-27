@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "outcome": "passed",
+  "sourceHead": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+  "app": "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app",
+  "executable": "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app/Contents/MacOS/RAILWISE AI Candidate 0878c6cc932c",
+  "packageVersion": "0.5.0",
+  "packageSourceHead": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+  "targetZipSha256": "5d37da574e3a0ff07642ec081f91d2ac5c36a0f42ef8fe793138d0a8772e402a",
+  "asarSha256": "1c39d7b8ee5e94aa8bf3769f7585376ec7f53f802b535298cf19758dfcfabb6a",
+  "checks": [
+    {
+      "command": "/usr/bin/ditto",
+      "args": [
+        "-x",
+        "-k",
+        "<isolated-tmp>/artifacts/private-updater-target-arm64-0878c6cc932c6f7e85855b2ad5be199d7aee67d7/WorkWise-Candidate-0878c6cc932c-0.5.0-mac-arm64.zip",
+        "<isolated-tmp>/Applications"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/codesign",
+      "args": [
+        "--verify",
+        "--deep",
+        "--strict",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/xcrun",
+      "args": [
+        "stapler",
+        "validate",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app"
+      ],
+      "status": 0,
+      "stdout": "Processing: <isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app\nThe validate action worked!\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/sbin/spctl",
+      "args": [
+        "--status"
+      ],
+      "status": 1,
+      "stdout": "assessments disabled\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/sbin/spctl",
+      "args": [
+        "--assess",
+        "--type",
+        "execute",
+        "--verbose=2",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+    },
+    {
+      "command": "/usr/bin/plutil",
+      "args": [
+        "-extract",
+        "CFBundleShortVersionString",
+        "raw",
+        "-o",
+        "-",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app/Contents/Info.plist"
+      ],
+      "status": 0,
+      "stdout": "0.5.0\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/plutil",
+      "args": [
+        "-extract",
+        "CFBundleIdentifier",
+        "raw",
+        "-o",
+        "-",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app/Contents/Info.plist"
+      ],
+      "status": 0,
+      "stdout": "com.wangjiawei508.workwise.candidate.head0878c6cc932c\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/plutil",
+      "args": [
+        "-extract",
+        "CFBundleExecutable",
+        "raw",
+        "-o",
+        "-",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate 0878c6cc932c.app/Contents/Info.plist"
+      ],
+      "status": 0,
+      "stdout": "RAILWISE AI Candidate 0878c6cc932c\n",
+      "stderr": ""
+    }
+  ],
+  "packagedResources": [
+    {
+      "path": "app.asar/out/main/chunks/workwise-7YLH2qA_.png",
+      "sizeBytes": 896088,
+      "sha256": "a7bdcb1ceb3920e95c9a84e3bdfaa13f49099b2e947709474ae6545eb218aa20"
+    },
+    {
+      "path": "app.asar/out/main/chunks/workwise-light-CSvAVN5f.png",
+      "sizeBytes": 833794,
+      "sha256": "296f9b511279f219f98e8855a6ded3bbfa623c7a699a7bdb59651b946f36f026"
+    },
+    {
+      "path": "app.asar/out/main/chunks/workwise_dock-DlNVjA7R.png",
+      "sizeBytes": 605830,
+      "sha256": "9a4a80b611cff69a934d23ebb48f00e0855ae220b4df6c8b101c569ce2bd8f6a"
+    },
+    {
+      "path": "app.asar/out/main/chunks/workwise_dock_dark-DG8vZKhK.png",
+      "sizeBytes": 646301,
+      "sha256": "d3cd52276f583daa52e4baa8ad8f980375e1fb2df2b6250691ae1de15f5b9e46"
+    },
+    {
+      "path": "app.asar/out/main/chunks/workwise_tray-BquGuXjp.png",
+      "sizeBytes": 287688,
+      "sha256": "dbcb2e555ed098a015ca971cf808d102cb187638d63bbc582edf132a53bd5461"
+    },
+    {
+      "path": "app.asar/out/renderer/assets/workwise-7YLH2qA_.png",
+      "sizeBytes": 896088,
+      "sha256": "a7bdcb1ceb3920e95c9a84e3bdfaa13f49099b2e947709474ae6545eb218aa20"
+    },
+    {
+      "path": "app.asar/out/renderer/assets/workwise-light-CSvAVN5f.png",
+      "sizeBytes": 833794,
+      "sha256": "296f9b511279f219f98e8855a6ded3bbfa623c7a699a7bdb59651b946f36f026"
+    },
+    {
+      "path": "Contents/Resources/icon.icns",
+      "sizeBytes": 1122761,
+      "sha256": "458939bd02b82f5085c06be79a6bccb855dbfed09b1a0fba6e6ae61937bccc27"
+    }
+  ],
+  "expectedRepositoryAssets": [
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise.png",
+      "sha256": "a7bdcb1ceb3920e95c9a84e3bdfaa13f49099b2e947709474ae6545eb218aa20",
+      "sizeBytes": 896088,
+      "packageMatches": [
+        "app.asar/out/main/chunks/workwise-7YLH2qA_.png",
+        "app.asar/out/renderer/assets/workwise-7YLH2qA_.png"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise-light.png",
+      "sha256": "296f9b511279f219f98e8855a6ded3bbfa623c7a699a7bdb59651b946f36f026",
+      "sizeBytes": 833794,
+      "packageMatches": [
+        "app.asar/out/main/chunks/workwise-light-CSvAVN5f.png",
+        "app.asar/out/renderer/assets/workwise-light-CSvAVN5f.png"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise-dark.png",
+      "sha256": "a7bdcb1ceb3920e95c9a84e3bdfaa13f49099b2e947709474ae6545eb218aa20",
+      "sizeBytes": 896088,
+      "packageMatches": [
+        "app.asar/out/main/chunks/workwise-7YLH2qA_.png",
+        "app.asar/out/renderer/assets/workwise-7YLH2qA_.png"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise_dock.png",
+      "sha256": "9a4a80b611cff69a934d23ebb48f00e0855ae220b4df6c8b101c569ce2bd8f6a",
+      "sizeBytes": 605830,
+      "packageMatches": [
+        "app.asar/out/main/chunks/workwise_dock-DlNVjA7R.png"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise_dock_dark.png",
+      "sha256": "d3cd52276f583daa52e4baa8ad8f980375e1fb2df2b6250691ae1de15f5b9e46",
+      "sizeBytes": 646301,
+      "packageMatches": [
+        "app.asar/out/main/chunks/workwise_dock_dark-DG8vZKhK.png"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise_tray.png",
+      "sha256": "dbcb2e555ed098a015ca971cf808d102cb187638d63bbc582edf132a53bd5461",
+      "sizeBytes": 287688,
+      "packageMatches": [
+        "app.asar/out/main/chunks/workwise_tray-BquGuXjp.png"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise.icns",
+      "sha256": "458939bd02b82f5085c06be79a6bccb855dbfed09b1a0fba6e6ae61937bccc27",
+      "sizeBytes": 1122761,
+      "packageMatches": [
+        "Contents/Resources/icon.icns"
+      ]
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise.ico",
+      "sha256": "2bbdee69be2dd8d5fb5552aa5be0ac02c1d5fe8fde039a0b6b43eedcf78e4e7e",
+      "sizeBytes": 125097,
+      "packageMatches": []
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/workwise.svg",
+      "sha256": "2a62d468191a1c0d4fd21549c8bba0e59c00c4ff41582d7ea29a936d600fb7f7",
+      "sizeBytes": 383821,
+      "packageMatches": []
+    },
+    {
+      "repositoryRevision": "0878c6cc932c6f7e85855b2ad5be199d7aee67d7",
+      "repositoryPath": "src/asset/img/railwise-icon-source.png",
+      "sha256": "36855e7ce50dd2c47333a9e76adb434e6f1a3a39b9c927e34ec01c9c4b0be614",
+      "sizeBytes": 1117033,
+      "packageMatches": []
+    }
+  ],
+  "omittedAssets": [
+    {
+      "repositoryPath": "src/asset/img/workwise.ico",
+      "reason": "Windows resource; not used by this macOS package"
+    },
+    {
+      "repositoryPath": "src/asset/img/workwise.svg",
+      "reason": "Build source; no byte-identical runtime asset required"
+    },
+    {
+      "repositoryPath": "src/asset/img/railwise-icon-source.png",
+      "reason": "Build source; no byte-identical runtime asset required"
+    }
+  ],
+  "guiStarted": false,
+  "userInterfaceAcceptance": false,
+  "themeSwitchingAcceptance": false,
+  "iconArtworkSource": "user-provided image, final crop-fix revision",
+  "olderCandidateTouched": false,
+  "publicReleaseApproval": false,
+  "checkedAt": "2026-09-24T07:20:52.802Z"
+}

@@ -1,0 +1,15 @@
+{
+  "independentTests": 24,
+  "clientServiceTests": 12,
+  "guiTests": 12,
+  "compiledFixtureCases": 4,
+  "authorRuntimeHttpWiringTestsRerun": 55,
+  "authorIpcDomTestsRerun": 27,
+  "maximumSampleUnits": 128,
+  "maximumPageRecords": 10,
+  "maximumPageWorkUnits": 191,
+  "followingReadWorkUnits": 21,
+  "findings": [],
+  "pureKernelHashesUnchanged": true,
+  "scope": "Runtime and renderer integration, happy-dom GUI and mocked native Save As; not packaged visual acceptance or release approval"
+}

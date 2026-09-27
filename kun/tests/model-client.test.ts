@@ -1297,7 +1297,7 @@ describe('DeepseekCompatModelClient', () => {
     expect(messages.some((message) => message.role === 'tool' && message.tool_call_id === 'call_ok')).toBe(true)
   })
 
-  it('sends a durable safe argument summary for redacted tool calls after restart', async () => {
+  it('keeps persisted argument summaries out of executable tool arguments after restart', async () => {
     const sentBodies: Array<{ messages?: Array<Record<string, unknown>> }> = []
     const fetchImpl: typeof fetch = async (_url, init) => {
       sentBodies.push(JSON.parse(String(init?.body ?? '{}')))
@@ -1352,9 +1352,13 @@ describe('DeepseekCompatModelClient', () => {
       function?: { arguments?: string }
     }> | undefined)?.[0]
     const wireArguments = JSON.parse(wireCall?.function?.arguments ?? '{}') as Record<string, unknown>
-    expect(wireArguments).toEqual({
-      _workwise_summary: 'Run write\nTarget: <workspace>/exports/report.docx\nContent: omitted (12480 chars)'
-    })
+    expect(wireArguments).toEqual({})
+    const result = sentBodies[0]?.messages?.find((message) => message.tool_call_id === 'call_safe_summary')
+    expect(result?.content).toContain('Original arguments were omitted for privacy')
+    expect(result?.content).toContain('not valid arguments to copy')
+    expect(result?.content).toContain('Target: <workspace>/exports/report.docx')
+    expect(result?.content).toContain('"ok":true')
+    expect(JSON.stringify(sentBodies)).not.toContain('_workwise_summary')
     expect(JSON.stringify(sentBodies)).not.toContain('raw-secret')
   })
 

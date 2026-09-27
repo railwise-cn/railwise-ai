@@ -1,0 +1,80 @@
+
+> kun@0.4.2 test
+> vitest run --maxWorkers=4
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ❯ tests/loop.test.ts (80 tests | 3 failed) 1234ms
+     × routes turn model auto before sending the real model request 3ms
+     × keeps explicit turn reasoning effort when auto routing chooses the model 1ms
+     × falls back to a concrete heuristic model when auto router fails 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/loop.test.ts > AgentLoop > routes turn model auto before sending the real model request
+AssertionError: expected [ 'deepseek-flash', 'deepseek-v4-pro' ] to deeply equal [ 'deepseek-v4-flash', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "deepseek-v4-flash",
++   "deepseek-flash",
+    "deepseek-v4-pro",
+  ]
+
+ ❯ tests/loop.test.ts:2821:24
+    2819|     await h.loop.runTurn(h.threadId, turnId)
+    2820|
+    2821|     expect(seenModels).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'…
+       |                        ^
+    2822|   })
+    2823|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/loop.test.ts > AgentLoop > keeps explicit turn reasoning effort when auto routing chooses the model
+AssertionError: expected [ 'deepseek-flash', 'deepseek-v4-pro' ] to deeply equal [ 'deepseek-v4-flash', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "deepseek-v4-flash",
++   "deepseek-flash",
+    "deepseek-v4-pro",
+  ]
+
+ ❯ tests/loop.test.ts:2855:24
+    2853|     await h.loop.runTurn(h.threadId, turnId)
+    2854|
+    2855|     expect(seenModels).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'…
+       |                        ^
+    2856|   })
+    2857|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/loop.test.ts > AgentLoop > falls back to a concrete heuristic model when auto router fails
+AssertionError: expected 'deepseek-flash' to be 'deepseek-v4-flash' // Object.is equality
+
+Expected: "deepseek-v4-flash"
+Received: "deepseek-flash"
+
+ ❯ tests/loop.test.ts:2888:30
+    2886|     await h.loop.runTurn(h.threadId, turnId)
+    2887|
+    2888|     expect(realRequestModel).toBe('deepseek-v4-flash')
+       |                              ^
+    2889|   })
+    2890|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed | 176 passed | 2 skipped (179)
+      Tests  3 failed | 2752 passed | 22 skipped (2777)
+   Start at  11:35:07
+   Duration  20.04s (transform 3.10s, setup 0ms, import 15.62s, tests 52.06s, environment 7ms)
+

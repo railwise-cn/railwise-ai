@@ -1,0 +1,36 @@
+"""Read one explicitly selected candidate record through an isolated SQLite copy."""
+import argparse
+import hashlib
+import json
+import sqlite3
+import tempfile
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("database", type=Path)
+parser.add_argument("adjustment_id")
+parser.add_argument("output", type=Path)
+args = parser.parse_args()
+assert args.database.is_absolute() and str(args.database.resolve()).startswith("/private/tmp/railwise-survey-")
+assert args.output.is_absolute() and str(args.output).startswith("/private/tmp/")
+
+def capture():
+    return {suffix: (Path(str(args.database) + suffix).read_bytes() if Path(str(args.database) + suffix).exists() else None) for suffix in ["", "-wal"]}
+
+before = capture()
+with tempfile.TemporaryDirectory(prefix="railwise-independent-oracle-snapshot-", dir="/private/tmp") as folder:
+    target = Path(folder) / "survey.sqlite3"
+    for suffix, data in before.items():
+        if data is not None:
+            Path(str(target) + suffix).write_bytes(data)
+    assert capture() == before
+    connection = sqlite3.connect(target.as_uri() + "?mode=ro", uri=True)
+    try:
+        row = connection.execute("SELECT data_json FROM survey_adjustments WHERE id = ?", (args.adjustment_id,)).fetchone()
+        assert row
+        record = json.loads(row[0])
+    finally:
+        connection.close()
+assert capture() == before
+args.output.write_text(json.dumps({"adjustmentId": args.adjustment_id, "databaseRecordSha256": hashlib.sha256(row[0].encode()).hexdigest(), "sourceDatabaseBytesUnchanged": True, "record": record}, ensure_ascii=False, indent=2) + "\n")
+print(json.dumps({"output": str(args.output), "resultKeys": list(record["result"]), "points": record["result"].get("points"), "observations": record["result"].get("observations"), "counts": {key: record["result"].get(key) for key in ["observationCount", "unknownCount", "degreesOfFreedom", "redundancy"]}}, ensure_ascii=False, indent=2))

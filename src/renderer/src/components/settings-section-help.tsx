@@ -17,14 +17,14 @@ import {
 } from 'lucide-react'
 import { SettingsCard } from './settings-controls'
 
-const WORKWISE_GITHUB_URL = 'https://github.com/wangjiawei508/WorkWise'
+const WORKWISE_GITHUB_URL = 'https://github.com/railwise-cn/railwise-ai'
 const WORKWISE_PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
-const WORKWISE_ISSUES_URL = 'https://github.com/wangjiawei508/WorkWise/issues'
-const WORKWISE_README_URL = 'https://github.com/wangjiawei508/WorkWise#readme'
-const WORKWISE_GUIDE_URL = 'https://github.com/wangjiawei508/WorkWise/blob/main/docs/USER_GUIDE.zh-CN.md'
+const WORKWISE_ISSUES_URL = 'https://github.com/railwise-cn/railwise-ai/issues'
+const WORKWISE_README_URL = 'https://github.com/railwise-cn/railwise-ai#readme'
+const WORKWISE_GUIDE_URL = 'https://github.com/railwise-cn/railwise-ai/blob/main/docs/USER_GUIDE.zh-CN.md'
 const WORKWISE_AUTHOR_URL = 'https://github.com/wangjiawei508'
 const WORKWISE_PRODUCT_INTRO_URL =
-  'https://github.com/wangjiawei508/WorkWise/blob/main/docs/product-introduction.zh-CN.md'
+  'https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md'
 
 function HelpLinkButton({
   href,

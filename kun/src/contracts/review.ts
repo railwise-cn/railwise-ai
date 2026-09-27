@@ -54,7 +54,8 @@ export type ReviewTarget = z.infer<typeof ReviewTargetSchema>
 
 export const StartReviewRequest = z.object({
   target: ReviewTargetSchema,
-  model: z.string().trim().min(1).optional()
+  model: z.string().trim().min(1).optional(),
+  providerId: z.string().trim().min(1).max(200).optional()
 })
 export type StartReviewRequest = z.infer<typeof StartReviewRequest>
 

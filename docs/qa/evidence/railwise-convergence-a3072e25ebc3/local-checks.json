@@ -1,0 +1,28 @@
+{
+  "sourceHead": "a3072e25ebc33ee30702d5278c8144e3fbb625f7",
+  "desktop": {
+    "passed": 2606,
+    "skipped": 2
+  },
+  "runtime": {
+    "passed": 1852,
+    "skipped": 3
+  },
+  "desktopTypecheck": "passed",
+  "runtimeTypecheck": "passed",
+  "build": "passed",
+  "lint": {
+    "errors": 0,
+    "existingWarnings": 1
+  },
+  "openspec": {
+    "passed": 11,
+    "failed": 0
+  },
+  "github": {
+    "pushQuality": "35470941770",
+    "prQuality": "35470939174",
+    "privateUpdater": "35470964394"
+  },
+  "note": "These counts belong to a3072e2; later generalized-w and VCE code is excluded."
+}

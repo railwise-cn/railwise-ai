@@ -443,6 +443,19 @@ describe('FloatingComposer image transfer helpers', () => {
 })
 
 describe('FloatingComposer capability controls', () => {
+  it('renders the domain-specific unavailable reason without enabling submission', () => {
+    useChatStore.setState({ activeThreadId: null, route: 'engineering', workspaceRoot: '/workspace', threads: [] })
+    const html = renderToStaticMarkup(createElement(FloatingComposer, {
+      variant: 'compact', input: 'Retain my draft', setInput: () => undefined, mode: 'agent', setMode: () => undefined,
+      busy: false, runtimeReady: false, unavailableReason: 'Preparing this project conversation', hasActiveThread: false,
+      composerModel: '', composerPickList: [], onComposerModelChange: () => undefined, queuedMessages: [],
+      onRemoveQueuedMessage: () => undefined, onSend: () => undefined, onInterrupt: () => undefined
+    }))
+    expect(html).toContain('placeholder="Preparing this project conversation"')
+    expect(html).not.toContain('Connect to the runtime first')
+    expect(html).toContain('Retain my draft')
+  })
+
   it('keeps the file picker available in the compact Write composer', () => {
     useChatStore.setState({ activeThreadId: 'thr_write', route: 'write', workspaceRoot: '/workspace', threads: [] })
     const html = renderToStaticMarkup(createElement(FloatingComposer, {

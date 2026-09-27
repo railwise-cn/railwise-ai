@@ -1,0 +1,15 @@
+{
+  "command": "npm",
+  "args": [
+    "run",
+    "test",
+    "--",
+    "--config",
+    "/private/tmp/railwise-result-questions-validation/vitest-worktree.config.mts"
+  ],
+  "startedAt": "2026-09-20T21:43:58.068Z",
+  "finishedAt": "2026-09-20T21:44:34.114Z",
+  "log": "/private/tmp/railwise-result-questions-validation/desktop-test-worktree-allow.log",
+  "exitCode": 0,
+  "signal": null
+}

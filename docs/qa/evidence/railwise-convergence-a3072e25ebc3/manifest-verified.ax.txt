@@ -1,0 +1,141 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate a3072e25ebc3.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-a3072e2/Applications/RAILWISE%20AI%20Candidate%20a3072e25ebc3.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 合成抽样验收 · 1001 单位 控制网 · m · 9/20
+							26 文本 合成抽样验收 · 1001 单位
+							27 文本 控制网
+							28 文本  ·
+							29 文本 m
+							30 文本  ·
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 合成抽样验收 · 1001 单位 · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成抽样验收 · 1001 单位
+							36 文本  ·
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 合成抽样验收 · 1001 单位
+							49 (selected) 合成抽样验收 · 1001 单位
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 成果与审查
+							52 (selected) 成果与审查
+						53 按钮 新建工程测量项目
+					54 文本 成果已固化为待审查清单 manifest_9ceb5ee5-4582-49c2-a250-7c312ec31b0f；复核、审核、批准与签名完成前不得作为已批准交付。
+					55 按钮 关闭提示
+					56 container
+						57 text 任务 合成抽样验收 · 1001 单位 阶段 成果与审查 数据源 / 格式 workwise-network.json  ·  WORKWISE-JSON 处置状态 候选成果 基准 待确认  ·  待确认 点数 3 测站数 0 观测 3 闭合差 0.0003 m 精度 0.0001 m 成果 候选成果 网型 水准 / 高程控制网 审查 草案
+					58 container Survey AI 会话
+						59 container
+							60 标题 Survey AI 会话, Value: 2
+								61 文本 Survey AI 会话
+							62 文本 合成抽样验收 · 1001 单位
+							63 按钮 数据资产
+							64 按钮 测量平差
+							65 按钮 刷新上下文
+						66 标题 Survey AI, Value: 2
+							67 文本 Survey AI
+						68 container
+							69 文本输入区 (settable) 向智能体提问…
+							70 按钮 更多操作
+							71 弹出式按钮 模型与推理设置
+							72 按钮 (disabled) 发送
+					73 container
+						74 container 工作视图
+							75 按钮 交付总览
+							76 按钮 成果中心
+							77 按钮 审查归档
+							78 按钮 技能与规范
+						79 标题 待审查成果清单, Value: 2
+							80 文本 待审查成果清单
+						81 文本 基础质量门禁通过后可生成不可原地覆盖的待审查清单。复核、审核、批准与签名流程尚未实施，系统不会产生已批准交付。
+						82 按钮 生成待审查清单
+						83 开合三角标记 单位成果总体与首轮抽样
+							84 文本 单位成果总体与首轮抽样
+						85 文本 审查清单
+						86 container
+							87 text 已选择并保存来源资料 ·  条件已满足
+						88 文本 1 项准入通过的平差 · 0 项变形结果
+						89 container
+							90 text 阻断项已清零 ·  条件已满足
+						91 文本 当前数据集没有待处理阻断项。
+						92 container
+							93 text 警告项已确认 ·  条件已满足
+						94 文本 当前没有需要接受的警告项。
+						95 container
+							96 text 已完成确定性分析 ·  条件已满足
+						97 文本 确定性 Survey 计算已完成，当前来源准入通过。
+						98 container
+							99 text 已生成可审查成果 ·  条件已满足
+						100 文本 3 个输出文件带有 SHA-256 哈希。
+						101 文本 待审查清单
+						102 文本 每次生成独立 manifest，历史版本保持只读；该记录不代表批准。
+						103 文本 manifest_9ceb5ee5-4582-49c2-a250-7c312ec31b0f
+						104 按钮 询问 manifest_9ceb5ee5-4582-49c2-a250-7c312ec31b0f 的测量 AI
+						105 container
+							106 text 3 个输出  ·  草案  ·  2026/9/20 06:28:30
+						107 按钮 重新验证成果
+						108 container
+							109 text 本次证据检查通过  ·
+							110 文本 2026/9/20 06:29:00
+							111 内容列表
+								112 container
+									113 text 清单文件与持久记录 :  通过
+								114 container
+									115 text 输出文件哈希与大小 :  通过
+								116 container
+									117 text 运行与当前输入绑定 :  通过
+								118 container
+									119 text 测量结果严格重算 :  通过
+								120 container
+									121 text 测量原始来源与准入 :  通过
+							122 文本 这是标注时间的完整性与当前证据检查，不是专业复核、规范符合性或数字签名。监测结果未在此重新计算；每次尝试另存审计记录，原清单及其审查状态保持不变。
+						123 开合三角标记 质检证据保全工作区
+							124 文本 质检证据保全工作区
+						125 文本 审查说明：1 项
+						126 container
+							127 text 待审查状态 当前项目修订 3 可生成待审查清单 清单会记录输出哈希、分析输入哈希、引用和人工处置状态。复核、审核、批准与签名完成前，不得将其表述为已批准交付。 最近 manifest manifest_9ceb5ee5-4582-49c2-a250-7c312ec31b0f
+	128 关闭按钮
+	129 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	130 最小化按钮
+131 menu bar
+	132 RAILWISE AI Candidate a3072e25ebc3
+	133 文件
+	134 编辑
+	135 显示
+	136 窗口
+	137 帮助
+
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-a3072e2/Applications/RAILWISE%20AI%20Candidate%20a3072e25ebc3.app/Contents/Resources/app.asar/out/renderer/index.html

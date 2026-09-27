@@ -1,0 +1,5 @@
+{"hierarchicalScopes": 127, "scopeScoreCases": 508, "finalBatchCases": 5455, "output": "/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-quality-independent.Y4UpjC/profile-boundaries.json"}
+{"passed":70}
+{"passed":6471,"profileCases":1016,"finalBatchCases":5455,"resultSha256":"15b84b7bfab34939a409643ed910828b8a2d42d623e8b74b6cf7fc9574dafafa","module":"kun/dist/engineering/survey-quality-scoring.js"}
+{"passed":97,"module":"kun/dist/engineering/survey-quality-scoring.js"}
+Evidence: /var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T//railwise-quality-independent.Y4UpjC

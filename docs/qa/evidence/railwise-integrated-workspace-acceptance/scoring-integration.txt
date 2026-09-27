@@ -1,0 +1,34 @@
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-quality-scoring-workspace/independent-review
+
+ ✓ gui.test.ts > renders partial exact score/grade as partial and unverified in en without Buffer 52ms
+ ✓ gui.test.ts > renders partial exact score/grade as partial and unverified in zh without Buffer 29ms
+ ✓ gui.test.ts > shows actual acceptance fixture full with exact result and honest scope 32ms
+ ✓ gui.test.ts > shows actual acceptance fixture pending with exact result and honest scope 30ms
+ ✓ gui.test.ts > shows actual acceptance fixture child-veto with exact result and honest scope 29ms
+ ✓ gui.test.ts > shows actual acceptance fixture multiple-sixty with exact result and honest scope 23ms
+ ✓ gui.test.ts > keeps 24-decimal near-threshold fraction visible without rounding to 60 30ms
+ ✓ gui.test.ts > exports exact Unicode record without Buffer and suppresses delayed export after project switch 80ms
+ ✓ gui.test.ts > drops late quality detail after workspace change 50ms
+ ✓ gui.test.ts > drops late quality detail after revision change 50ms
+ ✓ gui.test.ts > drops late quality detail after runtime change 51ms
+ ✓ gui.test.ts > restored height record labels its actual profile and stage independently of draft defaults 32ms
+ ✓ client-service.test.ts > real Runtime Unicode full survives renderer without Buffer and retains trust boundaries 24ms
+ ✓ client-service.test.ts > real Runtime Unicode pending survives renderer without Buffer and retains trust boundaries 11ms
+ ✓ client-service.test.ts > real Runtime Unicode child-veto survives renderer without Buffer and retains trust boundaries 10ms
+ ✓ client-service.test.ts > real Runtime Unicode multiple-sixty survives renderer without Buffer and retains trust boundaries 5ms
+ ✓ client-service.test.ts > real Runtime Unicode partial survives renderer without Buffer and retains trust boundaries 7ms
+ ✓ client-service.test.ts > real Runtime Unicode near60 survives renderer without Buffer and retains trust boundaries 9ms
+ ✓ client-service.test.ts > real Runtime Unicode sample128 survives renderer without Buffer and retains trust boundaries 43ms
+ ✓ client-service.test.ts > rejects byte/parser ambiguity and lossy numeric precision without requesting 7ms
+ ✓ client-service.test.ts > rejects project contamination and pagination skipping or duplicates 8ms
+ ✓ client-service.test.ts > max sample ten-record page replays at 191 units and remains browsable 267ms
+ ✓ client-service.test.ts > actual Runtime recomputation rejects altered exact score even after every unkeyed hash is restamped 8ms
+ ✓ client-service.test.ts > Runtime rejects invalid UTF-8 and preserves raw exact-byte idempotency 9ms
+
+ Test Files  2 passed (2)
+      Tests  24 passed (24)
+   Start at  08:41:16
+   Duration  1.40s (transform 162ms, setup 0ms, import 283ms, tests 895ms, environment 87ms)
+
+{"compiledCases":4}

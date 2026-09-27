@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "status": "passed-selected-history-preservation",
+  "phase": "after",
+  "recordedAt": "2026-09-20T10:12:29.754511+00:00",
+  "checks": [
+    "plans-existing-records-unchanged",
+    "tasks-existing-records-unchanged",
+    "projects-existing-records-unchanged",
+    "thread-identities-preserved",
+    "thread-json-and-history-prefixes-preserved"
+  ],
+  "baselineSha256": "6c6bf89e31df0f3ef7688786f7c9ea3cbaedd67ae2dfc2d35f76fa4d5a344581",
+  "allowedChanges": [
+    "new independent projects/threads/tasks/plans are ignored when checking old identities",
+    "global GUI config is outside copied whitelist and audit scope",
+    "thread index caches may refresh; stable identity/workspace fields remain exact",
+    "existing message/event/metadata logs may append while old byte prefixes stay unchanged"
+  ],
+  "limits": "Does not execute tools, verify new UI appearance or certify overall migration. Historical project JSON, selected task/plan JSON and receipt rows must remain unchanged."
+}

@@ -1,0 +1,12 @@
+
+> workwise@0.5.0 test
+> vitest run src/main/services/agent-pack-service.test.ts src/main/services/skill-service.test.ts
+
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+   Start at  07:57:07
+   Duration  1.45s (transform 178ms, setup 0ms, import 243ms, tests 1.91s, environment 0ms)

@@ -1,0 +1,2 @@
+  CXX      gama_local-gama-local.o
+  CXXLD    gama-local

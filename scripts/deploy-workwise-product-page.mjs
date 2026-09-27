@@ -70,7 +70,7 @@ function validateSource(sourceDirectory, version) {
 
   const manifest = JSON.parse(readFileSync(files[2].source, 'utf8'))
   if (manifest.version !== version) throw new Error(`Manifest version is ${manifest.version}, expected ${version}.`)
-  if (manifest.releaseUrl !== `https://github.com/wangjiawei508/WorkWise/releases/tag/v${version}`) {
+  if (manifest.releaseUrl !== `https://github.com/railwise-cn/railwise-ai/releases/tag/v${version}`) {
     throw new Error('Manifest Release URL does not match the requested version.')
   }
 
@@ -409,7 +409,7 @@ async function verifyPublic(sourceDirectory, version) {
   const html = await response.text()
   const required = [
     `softwareVersion":"v${version}`,
-    `WorkWise v${version} 已发布`,
+    `${manifest.name || 'WorkWise'} v${version} 已发布`,
     `releases/tag/v${version}`,
     ...manifest.platforms.map((item) => item.url)
   ]

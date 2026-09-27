@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-09-20T09:06:20.481Z",
+  "candidateSourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+  "calculationAndPersistenceAudit": "passed",
+  "auditReport": "/private/tmp/railwise-survey-53213de/evidence/strict-after-restart-audit-53213.json",
+  "auditReportSha256": "f417eb7fccf6971164e6359f4377657e1c5d2713f5b37d985007dd3f71ae9291",
+  "baselineReport": "/private/tmp/railwise-survey-53213de/evidence/strict-before-restart-audit-53213.json",
+  "baselineReportSha256": "b1a0c15560fa201431594072c070699a8a25586d37c0a18708ef1a478e2407e5",
+  "restart": {
+    "compared": true,
+    "stableRecordsAndFilesUnchanged": true,
+    "baselineCheckedAt": "2026-09-20T09:02:05.471Z"
+  },
+  "selected": {
+    "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+    "threadId": "thr_wt4kfajs",
+    "planId": "eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3",
+    "taskId": "task_05adc31c-0268-4cf7-80b5-7c9b5733faee",
+    "turnId": "turn_hcl2310o",
+    "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+    "adjustmentId": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2",
+    "deliveryRunId": "run_91826eb5-5db0-4088-8696-99cdd4a92406",
+    "providerId": "custom-provider-3",
+    "model": "deepseek-flash",
+    "reasoningEffort": "off"
+  },
+  "knownUiDefect": {
+    "status": "open-in-reviewed-candidate",
+    "description": "A stale waitingReason remains visible in the bottom UI after the task has completed. This was reported from GUI review and is being fixed separately in product source.",
+    "affectsClaim": "This candidate does not pass final UI acceptance; computation and persistence checks passed."
+  },
+  "scope": "Read-only post-restart record and file comparison. No calculations, consultations, settings changes or GUI operations were initiated by this audit."
+}

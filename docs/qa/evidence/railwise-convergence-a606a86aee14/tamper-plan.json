@@ -1,0 +1,10 @@
+{
+  "recordId": "advanced_trial_75fae9e2-0cb3-41f9-b5e7-1cab6467670c",
+  "mutation": "append one ASCII space to isolated synthetic record declaration_bytes only",
+  "appendOnlyUpdateInitiallyBlocked": true,
+  "injection": "temporarily drop UPDATE trigger within transaction and restore before commit",
+  "originalSha256": "0284950f8077ed3cdce00d68c5c8a8c4e2af2aecddd5b7e5ceaae0edcf02a790",
+  "mutatedSha256": "a5b2f31bebdad393c13e5deee66e6fd7d5771ccb0ed211367521c38dba1761f6",
+  "restored": true,
+  "triggersRestored": true
+}

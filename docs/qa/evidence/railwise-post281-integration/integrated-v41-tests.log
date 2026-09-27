@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run src/loop/agent-loop-v41-routing.test.ts tests/auto-model-router.test.ts src/loop/agent-loop.test.ts src/runtime-factory.test.ts
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+
+ Test Files  3 passed (3)
+      Tests  28 passed (28)
+   Start at  11:02:27
+   Duration  572ms (transform 612ms, setup 0ms, import 910ms, tests 68ms, environment 0ms)
+

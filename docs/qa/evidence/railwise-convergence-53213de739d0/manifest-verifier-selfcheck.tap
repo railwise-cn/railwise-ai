@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: default verification preserves the baseline and rejects changed bytes and extra entries
+ok 1 - default verification preserves the baseline and rejects changed bytes and extra entries
+  ---
+  duration_ms: 165.805917
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 212.889583

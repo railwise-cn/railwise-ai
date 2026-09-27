@@ -1,0 +1,104 @@
+{
+  "sourceHead": "4f859c081b33e6f0f9b8d16f9c046466ccb90e75",
+  "scope": "isolated candidate",
+  "trials": [
+    {
+      "id": "free_leveling_trial_e97a9ea9-97d7-4c34-9c11-a8928906c110",
+      "networkId": "network_6a7203b3-9cac-46fa-9b06-3d9efeb06351",
+      "inputHash": "ba34d278e28d21ede82bb0bdb948e7f3c1ff53cb2d8f8407fdcf97125f3c9c92",
+      "recordHash": "60fe7ef050934d4ab4931e067ca1495d2d0b4a62aca8f0d2b2b8d0c90f10ac41",
+      "outputHash": "a9876440bdd448d7ace3a8346dd1898dc48225606e69b1a36c14f843d3460d31",
+      "analyticCheck": "passed",
+      "originalFixedPointPreserved": true
+    }
+  ],
+  "manifests": [
+    {
+      "id": "manifest_916c53a9-d808-4286-ae79-4c8bf78e0be0",
+      "reviewStatus": "draft",
+      "outputs": [
+        {
+          "sha256": "220c4734261db9f2ff59ab49ba7f9c98f018d1e92e8212bdac2baab9f8f3a037",
+          "size": 24817,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "sha256": "05d2fc7f18fcdfa799f220fe98d7d0141bebb8a7eaaab92fbea11650a0585e85",
+          "size": 48895,
+          "mediaType": "application/pdf"
+        },
+        {
+          "sha256": "ab9542b5cc3dbc375b63ea57122f2f1691b5a4c35c49b72786bd2341e684455d",
+          "size": 291311,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      ]
+    },
+    {
+      "id": "manifest_59478205-3a2e-46fe-a3be-79862c708d37",
+      "reviewStatus": "draft",
+      "outputs": [
+        {
+          "sha256": "f4522f9cc137066426ecc4360dc1d775fa02c5a122bafdf0fe5a6c55482fa5b1",
+          "size": 10065,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "sha256": "36684b457cca575068a2dc809ba5bde9042dce71d1dfb2e193d8f4df3b4fe225",
+          "size": 37040,
+          "mediaType": "application/pdf"
+        },
+        {
+          "sha256": "f16ffb844797aa0ecf0938987a95dae038394930c9672990f509f671e3e38ebc",
+          "size": 153899,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      ]
+    }
+  ],
+  "projectCount": 3,
+  "verificationAttempts": [
+    {
+      "id": "verification_7fa60a1a-c812-4bea-b01f-370cb889a29e",
+      "manifestId": "manifest_916c53a9-d808-4286-ae79-4c8bf78e0be0",
+      "outcome": "passed",
+      "bindingStable": true,
+      "completedAt": "2026-09-19T19:58:47.753Z"
+    },
+    {
+      "id": "verification_b9fe87ce-1dbc-4583-90dc-9966d04b8ea1",
+      "manifestId": "manifest_916c53a9-d808-4286-ae79-4c8bf78e0be0",
+      "outcome": "failed",
+      "bindingStable": true,
+      "completedAt": "2026-09-19T19:59:19.650Z"
+    },
+    {
+      "id": "verification_d5b0aef7-650f-4a17-bcc8-551ca273e863",
+      "manifestId": "manifest_916c53a9-d808-4286-ae79-4c8bf78e0be0",
+      "outcome": "passed",
+      "bindingStable": true,
+      "completedAt": "2026-09-19T20:00:00.095Z"
+    },
+    {
+      "id": "verification_3dc85d26-dbc4-418e-9d0b-5b440a71e4f3",
+      "manifestId": "manifest_59478205-3a2e-46fe-a3be-79862c708d37",
+      "outcome": "passed",
+      "bindingStable": true,
+      "completedAt": "2026-09-19T20:02:38.138Z"
+    },
+    {
+      "id": "verification_b5ae4d04-f72e-45bf-92d1-e67211a22550",
+      "manifestId": "manifest_59478205-3a2e-46fe-a3be-79862c708d37",
+      "outcome": "passed",
+      "bindingStable": true,
+      "completedAt": "2026-09-19T20:04:32.535Z"
+    },
+    {
+      "id": "verification_66891f83-6836-4b0b-9314-9d47a61e7561",
+      "manifestId": "manifest_916c53a9-d808-4286-ae79-4c8bf78e0be0",
+      "outcome": "passed",
+      "bindingStable": true,
+      "completedAt": "2026-09-19T20:04:45.793Z"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "kind": "independent-numerical-software-review-not-professional-acceptance",
+  "sourceSha256": "593f4c3e5063e71b9d758299bdc3360454292b48fac520e2fc0d8aa472f7f9fa",
+  "singleGroup": {
+    "cases": 1356,
+    "counts": {
+      "numerical-boundary": 467,
+      "nonpositive-component": 126,
+      "converged": 763
+    },
+    "maxVarianceRelativeError": 1.1731683692532264e-15,
+    "maxResidualScaledError": 5.183031964016193e-16,
+    "maxFitScaledError": 2.731215320639424e-15,
+    "comparisonTolerance": 1e-7
+  },
+  "unidentifiable": {
+    "residualDof1": {
+      "stochastic-rank-or-conditioning": 195
+    },
+    "residualDof2": {
+      "stochastic-rank-or-conditioning": 455
+    },
+    "randomized": {
+      "stochastic-rank-or-conditioning": 10000
+    }
+  },
+  "failures": []
+}

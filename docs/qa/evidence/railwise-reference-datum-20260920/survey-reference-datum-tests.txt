@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run src/engineering/survey-reference-datum.test.ts src/engineering/survey-free-leveling.test.ts src/engineering/survey-free-leveling-service.test.ts src/engineering/survey-deformation.test.ts --reporter=dot
+
+
+ RUN  v4.1.8 /private/tmp/railwise-statistical-family/kun
+
+····································································································································
+
+ Test Files  4 passed (4)
+      Tests  132 passed (132)
+   Start at  07:46:23
+   Duration  644ms (transform 386ms, setup 0ms, import 615ms, tests 418ms, environment 0ms)

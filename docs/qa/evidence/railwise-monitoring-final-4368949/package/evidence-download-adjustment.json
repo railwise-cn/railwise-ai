@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "workflowRunId": 35505966672,
+  "artifactId": 10604675574,
+  "reason": "Intentional bounded concurrency increase after slow progress; not a network failure",
+  "initialConcurrency": 12,
+  "resumedConcurrency": 24,
+  "maximumConcurrency": 24,
+  "previousProcessTerminatedAndExitVerified": true,
+  "previousExitCode": 143,
+  "overlappingDownloaderProcesses": false,
+  "completeSizeRangesRetained": 118,
+  "totalRanges": 563,
+  "partialRetryFilesReusedAsComplete": false,
+  "maximumAttemptsPerRange": 4,
+  "fullArtifactSha256Required": true,
+  "fullZipCrcRequired": true,
+  "initialLog": "/private/tmp/railwise-4368949-download.log",
+  "resumedLog": "/private/tmp/railwise-4368949-download-24.log"
+}

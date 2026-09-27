@@ -30,6 +30,7 @@ export async function startReview(
         prompt: reviewTargetPrompt(parsed.data.target),
         displayText: title,
         model: parsed.data.model,
+        providerId: parsed.data.providerId,
         mode: 'agent'
       }
     })
@@ -52,6 +53,9 @@ export async function startReview(
     onStarted?.(response, parsed.data.target, parsed.data.model)
     return jsonResponse(response, 202)
   } catch (error) {
+    if ((error as { code?: unknown })?.code === 'model_provider_unavailable') {
+      return jsonResponse({ code: 'model_provider_unavailable', message: (error as Error).message }, 400)
+    }
     if (error instanceof Error && /not found/i.test(error.message)) {
       return ERRORS.notFound(error.message)
     }

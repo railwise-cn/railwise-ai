@@ -1,0 +1,54 @@
+{
+  "sourceHead": "4f859c081b33e6f0f9b8d16f9c046466ccb90e75",
+  "directory": "/private/tmp/railwise-survey-4f859c0/evidence",
+  "screenshots": [
+    {
+      "file": "gsi-verified-en-dark.jpg",
+      "sha256": "b25e5bd1653abf176345e91d0178b809a7536f0ea182d907295a60ff48516433",
+      "bytes": 140722,
+      "location": "local-only"
+    },
+    {
+      "file": "free-trial-zh-light.jpg",
+      "sha256": "30d3dedf9304616838c8bf6970fb3dc1d947bec8fd7de409366303a83381919a",
+      "bytes": 128615,
+      "location": "local-only"
+    },
+    {
+      "file": "in2-tamper-rejected-en-dark.jpg",
+      "sha256": "88b50f8ccd88a823e4bbefedeebff7d9bbd58c09387c18a9e353246f369fac4f",
+      "bytes": 143457,
+      "location": "local-only"
+    },
+    {
+      "file": "free-trial-restored-after-restart.jpg",
+      "sha256": "1c0a58ab2240611037d2559d1ee86a7ce68b36315e6788fda5b3cf220d747ae5",
+      "bytes": 141346,
+      "location": "local-only"
+    },
+    {
+      "file": "free-trial-resize-attempt.jpg",
+      "sha256": "2426f241145d9ae091b388c29173a388df5ccac044c9ce3fef3eb743b835e3e9",
+      "bytes": 139123,
+      "location": "local-only"
+    },
+    {
+      "file": "free-trial-source-zh-light.jpg",
+      "sha256": "31620b66178caa1a1475d6c4a0e8dc19490c7b35de99c1921569d2331ac6929d",
+      "bytes": 123292,
+      "location": "local-only"
+    },
+    {
+      "file": "free-trial-max-zh-light.jpg",
+      "sha256": "fac4064f4bfc2c629d230114a9d9b96d641e7970fed6122a93c40fec2c84bff4",
+      "bytes": 138929,
+      "location": "local-only"
+    },
+    {
+      "file": "free-trial-en-dark.jpg",
+      "sha256": "3ada98499b05c5542ee61b21576b871eed671dcf32907013c9c691f9340e63df",
+      "bytes": 148296,
+      "location": "local-only"
+    }
+  ]
+}

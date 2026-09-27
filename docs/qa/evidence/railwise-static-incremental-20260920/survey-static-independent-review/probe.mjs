@@ -1,0 +1,9 @@
+import {readFileSync,writeFileSync} from 'node:fs'
+import {dirname,resolve,join} from 'node:path'
+import {fileURLToPath,pathToFileURL} from 'node:url'
+import {createHash} from 'node:crypto'
+import assert from 'node:assert/strict'
+const dir=dirname(fileURLToPath(import.meta.url)),repo=resolve(process.argv[2]);const {appendSurveyStaticLinearObservationsV1:run,hashSurveyStaticIncrementalBaseV1:baseHash}=await import(pathToFileURL(join(repo,'kun/dist/engineering/survey-static-incremental.js')).href)
+const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');const cases=JSON.parse(readFileSync(join(dir,'cases.json'))).cases,outputs=[]
+for(const c of cases){const prefixes=[];for(let k=1;k<=c.append.observations.length;k++){const q={schemaVersion:1,operation:'append-independent-observations-only',base:c.base,expectedBaseFingerprint:baseHash(c.base),append:{...c.append,observations:c.append.observations.slice(0,k)}};const original=JSON.stringify(q);const r=run(q);assert.equal(JSON.stringify(q),original,c.name+' mutation');assert.equal(r.outcome,'calculated',c.name+' prefix '+k+' '+r.code);assert.equal(r.requestSha256,hash(r.request));assert.equal(r.computedBaseFingerprint,hash(r.request.base));assert.equal(r.finalFingerprint,baseHash({...c.base,revision:c.append.nextRevision,observations:[...c.base.observations,...q.append.observations]}));for(const s of [r.baseQrState,r.updatedQrState]){const{stateSha256,...unsigned}=s;assert.equal(stateSha256,hash(unsigned))}assert.deepEqual(r.updatedQrState.columnScales,r.baseQrState.columnScales);assert.equal(r.steps.length,k);assert.equal(r.steps.at(-1).stateSha256,r.updatedQrState.stateSha256);prefixes.push(r)}outputs.push({name:c.name,prefixes})}
+writeFileSync(join(dir,'outputs.json'),JSON.stringify({node:process.version,cases:outputs},null,2)+'\n');console.log(JSON.stringify({models:outputs.length,appendPrefixes:outputs.reduce((s,c)=>s+c.prefixes.length,0)}))

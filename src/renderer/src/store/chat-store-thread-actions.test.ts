@@ -69,10 +69,41 @@ function buildHarness(): {
 }
 
 describe('chat-store-thread-actions queued messages', () => {
+  it('pins provider identity at enqueue time for explicit and default selections', async () => {
+    const settings = { agents: { kun: { ...defaultManagedRuntimeSettings(), providerId: 'provider-a' } }, provider: { providers: [{ id: 'provider-a', name: 'A', baseUrl: 'http://127.0.0.1:1/v1', apiKey: '', endpointFormat: 'chat_completions', models: ['shared-model'] }], baseUrl: 'http://127.0.0.1:1/v1', apiKey: '' } } as unknown as WorkWiseSettingsV2
+    vi.spyOn(rendererRuntimeClient, 'getSettings').mockResolvedValue(settings)
+    const { actions, state } = buildHarness()
+    state.composerModel = 'shared-model'
+    state.composerProviderId = 'provider-b'
+    expect(await actions.sendMessage('explicit', 'agent', { reasoningEffort: 'off' })).toBe(true)
+    state.composerProviderId = undefined
+    expect(await actions.sendMessage('default', 'agent')).toBe(true)
+    state.composerProviderId = 'provider-c'
+    expect(state.queuedMessages).toMatchObject([
+      { text: 'explicit', model: 'shared-model', providerId: 'provider-b', reasoningEffort: 'off' },
+      { text: 'default', model: 'shared-model', providerId: 'provider-a' }
+    ])
+    expect(await actions.sendMessage('explicit', 'agent', { queued: state.queuedMessages[0] })).toBe(true)
+    expect(state.queuedMessages.at(-1)).toMatchObject({ providerId: 'provider-b', model: 'shared-model' })
+  })
   beforeEach(() => {
     registryMock.getProvider.mockReset()
     registryMock.getProvider.mockReturnValue({})
     vi.restoreAllMocks()
+  })
+
+  it('passes the composer provider identity to the review action', async () => {
+    const reviewThread = vi.fn(async () => ({ threadId: 'thr_existing', turnId: 'turn_review', reviewItemId: 'review_item' }))
+    registryMock.getProvider.mockReturnValue({ reviewThread, subscribeThreadEvents: vi.fn(async () => undefined) })
+    const { actions, state } = buildHarness()
+    state.busy = false
+    state.composerModel = 'shared-model'
+    state.composerProviderId = 'compatible-b'
+    state.lastSeq = 0
+    state.refreshThreads = vi.fn(async () => undefined)
+    const target = { kind: 'custom' as const, instructions: 'Review synthetic input.' }
+    await expect(actions.reviewActiveThread(target)).resolves.toBe(true)
+    expect(reviewThread).toHaveBeenCalledWith('thr_existing', target, { model: 'shared-model', providerId: 'compatible-b' })
   })
 
   it('stores the resolved vision model on queued auto image messages', async () => {
@@ -137,7 +168,7 @@ describe('chat-store-thread-actions queued messages', () => {
     })).resolves.toBe(false)
 
     expect(state.queuedMessages).toEqual([])
-    expect(state.error).toContain(DEEPSEEK_VISION_MODEL_ID)
+    expect(state.error).toContain('provider is unavailable')
   })
 
   it('returns a recoverable failure when image routing settings cannot be read', async () => {

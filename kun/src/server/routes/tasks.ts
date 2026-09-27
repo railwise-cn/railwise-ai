@@ -4,6 +4,13 @@ import { readJsonBody } from '../read-json-body.js'
 import { TaskRunStatusSchema } from '../../contracts/tasks.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
+import type { TaskRun } from '../../contracts/tasks.js'
+
+async function isEngineeringExecutionTask(runtime: ServerRuntime, task: TaskRun): Promise<boolean> {
+  if (task.engineeringPlanId || runtime.engineeringAi?.planForTask(task.threadId, task.id)) return true
+  const thread = await runtime.threadService.get(task.threadId)
+  return Boolean(thread?.turns.find(turn => turn.id === task.activeTurnId)?.engineeringExecution)
+}
 
 const TaskMutationRequest = z.object({
   expectedRevision: z.number().int().nonnegative(),
@@ -59,10 +66,13 @@ export async function resumeTask(runtime: ServerRuntime, taskId: string, request
   const parsed = TaskMutationRequest.safeParse(body.value)
   if (!parsed.success) return ERRORS.validation('invalid task resume body', parsed.error.issues)
   try {
+    const current = runtime.taskRepository.get(taskId)
+    if (current && await isEngineeringExecutionTask(runtime, current)) return ERRORS.conflict('engineering_plan_typed_resume_required: continue or replan from the approved engineering plan')
     const prepared = runtime.taskController.prepareResume(taskId, parsed.data.expectedRevision, parsed.data.model)
     const checkpoint = runtime.taskRepository.latestCheckpoint(taskId)
     const response = await runtime.turnService.startTurn({
       threadId: prepared.threadId,
+      continuationTaskId: prepared.id,
       request: {
         prompt: [
           'Continue the persisted task from its last verified checkpoint.',
@@ -72,6 +82,8 @@ export async function resumeTask(runtime: ServerRuntime, taskId: string, request
         ].filter(Boolean).join('\n'),
         displayText: '继续未完成任务',
         model: parsed.data.model ?? prepared.model,
+        providerId: prepared.providerId,
+        reasoningEffort: prepared.reasoningEffort,
         mode: 'agent'
       }
     })
@@ -95,12 +107,15 @@ export async function retryTask(runtime: ServerRuntime, taskId: string, request:
     return ERRORS.conflict('retry is only valid for a terminal failed or cancelled task; use resume otherwise')
   }
   try {
+    if (await isEngineeringExecutionTask(runtime, previous)) return ERRORS.conflict('engineering_plan_typed_resume_required: continue or replan from the approved engineering plan')
     const response = await runtime.turnService.startTurn({
       threadId: previous.threadId,
       request: {
         prompt: `Retry the failed persisted task and satisfy its original acceptance contract.\nGoal: ${previous.goal}`,
         displayText: '重试未完成任务',
         model: parsed.data.model ?? previous.model,
+        providerId: previous.providerId,
+        reasoningEffort: previous.reasoningEffort,
         mode: 'agent'
       }
     })
@@ -148,6 +163,7 @@ export async function cancelTask(runtime: ServerRuntime, taskId: string, request
 function taskError(error: unknown): JsonResponse {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
   const message = error instanceof Error ? error.message : String(error)
+  if (code === 'model_provider_unavailable') return jsonResponse({ code, message }, 400)
   if (code === 'not_found') return ERRORS.notFound(message)
   if (code === 'stale_request' || code === 'invalid_state' || code === 'turn_in_progress') return ERRORS.conflict(message)
   if (code === 'resource_limit') return ERRORS.resourceLimit(message)

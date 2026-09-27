@@ -1,0 +1,12 @@
+test_csv_blank_zero_and_complete_provenance (__main__.AuditHelpers.test_csv_blank_zero_and_complete_provenance) ... ok
+test_equivalent_offset_ties_cannot_pass (__main__.AuditHelpers.test_equivalent_offset_ties_cannot_pass) ... ok
+test_full_arithmetic_including_threshold_and_anomaly (__main__.AuditHelpers.test_full_arithmetic_including_threshold_and_anomaly) ... ok
+test_js_serialization_handles_integer_floats_and_canonical_keys (__main__.AuditHelpers.test_js_serialization_handles_integer_floats_and_canonical_keys) ... ok
+test_result_validator_rejects_missing_source_pass (__main__.AuditHelpers.test_result_validator_rejects_missing_source_pass) ... ok
+test_single_observation_omits_undefined (__main__.AuditHelpers.test_single_observation_omits_undefined) ... ok
+test_xlsx_requested_mapping_and_worksheet_provenance (__main__.AuditHelpers.test_xlsx_requested_mapping_and_worksheet_provenance) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.066s
+
+OK

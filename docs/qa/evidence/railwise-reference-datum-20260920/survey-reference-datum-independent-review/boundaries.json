@@ -1,0 +1,6423 @@
+{
+  "cases": [
+    {
+      "name": "independent-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "numerically-positive-definite"
+      },
+      "jointMinimumEigenvalue120digit": "1.0"
+    },
+    {
+      "name": "invalid-joint-despite-positive-D-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-cross-covariance",
+          "sourceAnchor": "explicit-cross",
+          "firstToSecondCovariance": [
+            [
+              -2,
+              0,
+              0
+            ],
+            [
+              0,
+              -2,
+              0
+            ],
+            [
+              0,
+              0,
+              -2
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-not-positive-semidefinite"
+      },
+      "jointMinimumEigenvalue120digit": "-1.0"
+    },
+    {
+      "name": "zero-covariance-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "0.0"
+    },
+    {
+      "name": "rank-one-reference-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "1.93629595742465913640901531664317592378510959602439543274388147067220817404884298243134111713850729845402877125377723377e-121"
+    },
+    {
+      "name": "free-datum-all-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            },
+            {
+              "id": "a3",
+              "coordinate": 3
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            },
+            {
+              "id": "b3",
+              "coordinate": 11
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          },
+          {
+            "id": "p3",
+            "firstPointId": "a3",
+            "secondPointId": "b3"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-1.45222196806849435230676148748238194283883219701829657455791110300415613053663223682350583785388047384052157844033292533e-121"
+    },
+    {
+      "name": "free-datum-subset-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            },
+            {
+              "id": "a3",
+              "coordinate": 3
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            },
+            {
+              "id": "b3",
+              "coordinate": 11
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          },
+          {
+            "id": "p3",
+            "firstPointId": "a3",
+            "secondPointId": "b3"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-1.45222196806849435230676148748238194283883219701829657455791110300415613053663223682350583785388047384052157844033292533e-121"
+    },
+    {
+      "name": "near-indefinite-retained-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1.00000000005,
+              0
+            ],
+            [
+              1.00000000005,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1.00000000005,
+              0
+            ],
+            [
+              1.00000000005,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-0.0000000000500000041370185499545186758041381835937499999999999999999999999999999999999999999999999999999999999999999999998063704043"
+    },
+    {
+      "name": "near-PSD-positive-unresolved-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.99999999995,
+              0
+            ],
+            [
+              0.99999999995,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.99999999995,
+              0
+            ],
+            [
+              0.99999999995,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "0.0000000000500000041370185499545186758041381835937500000000000000000000000000000000000000000000000000000000000000000000001936295957"
+    },
+    {
+      "name": "near-joint-negative-difference-variance-equal-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-cross-covariance",
+          "sourceAnchor": "explicit-cross",
+          "firstToSecondCovariance": [
+            [
+              1.000000000001,
+              0,
+              0
+            ],
+            [
+              0,
+              1.000000000001,
+              0
+            ],
+            [
+              0,
+              0,
+              1.000000000001
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "numeric-range-or-resolution",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-0.00000000000100008890058234101161360740661621093749999999999999999999999999999999999999999999999999999999999999999999999980637040426"
+    },
+    {
+      "name": "independent-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "numerically-positive-definite"
+      },
+      "jointMinimumEigenvalue120digit": "1.0"
+    },
+    {
+      "name": "invalid-joint-despite-positive-D-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-cross-covariance",
+          "sourceAnchor": "explicit-cross",
+          "firstToSecondCovariance": [
+            [
+              -2,
+              0,
+              0
+            ],
+            [
+              0,
+              -2,
+              0
+            ],
+            [
+              0,
+              0,
+              -2
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-not-positive-semidefinite"
+      },
+      "jointMinimumEigenvalue120digit": "-1.0"
+    },
+    {
+      "name": "zero-covariance-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "reference-covariance-rank-or-conditioning",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "0.0"
+    },
+    {
+      "name": "rank-one-reference-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "reference-covariance-rank-or-conditioning",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "1.93629595742465913640901531664317592378510959602439543274388147067220817404884298243134111713850729845402877125377723377e-121"
+    },
+    {
+      "name": "free-datum-all-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            },
+            {
+              "id": "a3",
+              "coordinate": 3
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            },
+            {
+              "id": "b3",
+              "coordinate": 11
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          },
+          {
+            "id": "p3",
+            "firstPointId": "a3",
+            "secondPointId": "b3"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "reference-covariance-rank-or-conditioning",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-1.45222196806849435230676148748238194283883219701829657455791110300415613053663223682350583785388047384052157844033292533e-121"
+    },
+    {
+      "name": "free-datum-subset-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            },
+            {
+              "id": "a3",
+              "coordinate": 3
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            },
+            {
+              "id": "b3",
+              "coordinate": 11
+            }
+          ],
+          "covariance": [
+            [
+              0.75,
+              -0.25,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              0.75,
+              -0.25,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              0.75,
+              -0.25
+            ],
+            [
+              -0.25,
+              -0.25,
+              -0.25,
+              0.75
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          },
+          {
+            "id": "p3",
+            "firstPointId": "a3",
+            "secondPointId": "b3"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-1.45222196806849435230676148748238194283883219701829657455791110300415613053663223682350583785388047384052157844033292533e-121"
+    },
+    {
+      "name": "near-indefinite-retained-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1.00000000005,
+              0
+            ],
+            [
+              1.00000000005,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1.00000000005,
+              0
+            ],
+            [
+              1.00000000005,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-0.0000000000500000041370185499545186758041381835937499999999999999999999999999999999999999999999999999999999999999999999998063704043"
+    },
+    {
+      "name": "near-PSD-positive-unresolved-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.99999999995,
+              0
+            ],
+            [
+              0.99999999995,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.99999999995,
+              0
+            ],
+            [
+              0.99999999995,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "0.0000000000500000041370185499545186758041381835937500000000000000000000000000000000000000000000000000000000000000000000001936295957"
+    },
+    {
+      "name": "near-joint-negative-difference-variance-gls-reference-mean",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-cross-covariance",
+          "sourceAnchor": "explicit-cross",
+          "firstToSecondCovariance": [
+            [
+              1.000000000001,
+              0,
+              0
+            ],
+            [
+              0,
+              1.000000000001,
+              0
+            ],
+            [
+              0,
+              0,
+              1.000000000001
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "numeric-range-or-resolution",
+        "classification": "semidefinite-or-unresolved-within-numerical-tolerance"
+      },
+      "jointMinimumEigenvalue120digit": "-0.00000000000100008890058234101161360740661621093749999999999999999999999999999999999999999999999999999999999999999999999980637040426"
+    },
+    {
+      "name": "gls-condition-0.999999999",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.999999999,
+              0
+            ],
+            [
+              0.999999999,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.999999999,
+              0
+            ],
+            [
+              0.999999999,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated"
+      },
+      "jointMinimumEigenvalue120digit": "0.000000000999999971718068536574719473719596862792968750000000000000000000000000000000000000000000000000000000000000000000193629596"
+    },
+    {
+      "name": "gls-condition-0.99999999999",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.99999999999,
+              0
+            ],
+            [
+              0.99999999999,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0.99999999999,
+              0
+            ],
+            [
+              0.99999999999,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "reference-covariance-rank-or-conditioning"
+      },
+      "jointMinimumEigenvalue120digit": "0.0000000000100000008274037099909037351608276367187500000000000000000000000000000000000000000000000000000000000000000000000968147979"
+    },
+    {
+      "name": "strict-asymmetry",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              1e-16,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-not-symmetric"
+      },
+      "jointMinimumEigenvalue120digit": "0.99999999999999990000000000000000209022132759653964381588850591532635636582426741369999945163726806640625"
+    },
+    {
+      "name": "negative-input-variance",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              -1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-not-positive-semidefinite"
+      },
+      "jointMinimumEigenvalue120digit": "-1.0"
+    },
+    {
+      "name": "zero-diagonal-nonzero-row",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              0,
+              1e-20,
+              0
+            ],
+            [
+              1e-20,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-not-positive-semidefinite"
+      },
+      "jointMinimumEigenvalue120digit": "-9.99999999999999890306542908419146311622539581197420023591408508596560495258432076682143448148568001609462352378687368278e-41"
+    },
+    {
+      "name": "small-variance-domain",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1e-101,
+              0,
+              0
+            ],
+            [
+              0,
+              1e-101,
+              0
+            ],
+            [
+              0,
+              0,
+              1e-101
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1e-101,
+              0,
+              0
+            ],
+            [
+              0,
+              1e-101,
+              0
+            ],
+            [
+              0,
+              0,
+              1e-101
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-scale-outside-supported-domain"
+      },
+      "jointMinimumEigenvalue120digit": "1.00000000000000005171617276904849891057306773641595375547783862720029046933129748311113501222953641373783893800821542867e-101"
+    },
+    {
+      "name": "variance-ratio-domain",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1e-13,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "covariance-scale-outside-supported-domain"
+      },
+      "jointMinimumEigenvalue120digit": "0.00000000000010000000000000000303737455634003709136034716842278413651001756079494953155517578125"
+    },
+    {
+      "name": "subnormal-coordinate",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 5e-324
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "unavailable",
+        "code": "numeric-range-or-resolution"
+      },
+      "jointMinimumEigenvalue120digit": "1.0"
+    },
+    {
+      "name": "missing-dependence-not-defaulted",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ]
+      },
+      "expected": {
+        "outcome": "invalid-input"
+      }
+    },
+    {
+      "name": "single-reference-not-supported",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "invalid-input"
+      }
+    },
+    {
+      "name": "nonbijective-map",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "invalid-input"
+      }
+    },
+    {
+      "name": "missing-reference-not-autoselected",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "absent"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "invalid-input"
+      }
+    },
+    {
+      "name": "cofactor-not-absolute-covariance",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "equal-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "relative-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p1",
+          "p2"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "invalid-input"
+      }
+    },
+    {
+      "name": "maximum-32-gls",
+      "request": {
+        "schemaVersion": 1,
+        "model": "two-epoch-one-dimensional-declared-reference-datum",
+        "unit": "m",
+        "method": "gls-reference-mean",
+        "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+        "testingStrategy": "none-datum-comparison-only",
+        "firstEpoch": {
+          "id": "first",
+          "sourceAnchor": "independent-synthetic-first",
+          "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "a0",
+              "coordinate": 0
+            },
+            {
+              "id": "a1",
+              "coordinate": 1
+            },
+            {
+              "id": "a2",
+              "coordinate": 2
+            },
+            {
+              "id": "a3",
+              "coordinate": 3
+            },
+            {
+              "id": "a4",
+              "coordinate": 4
+            },
+            {
+              "id": "a5",
+              "coordinate": 5
+            },
+            {
+              "id": "a6",
+              "coordinate": 6
+            },
+            {
+              "id": "a7",
+              "coordinate": 7
+            },
+            {
+              "id": "a8",
+              "coordinate": 8
+            },
+            {
+              "id": "a9",
+              "coordinate": 9
+            },
+            {
+              "id": "a10",
+              "coordinate": 10
+            },
+            {
+              "id": "a11",
+              "coordinate": 11
+            },
+            {
+              "id": "a12",
+              "coordinate": 12
+            },
+            {
+              "id": "a13",
+              "coordinate": 13
+            },
+            {
+              "id": "a14",
+              "coordinate": 14
+            },
+            {
+              "id": "a15",
+              "coordinate": 15
+            },
+            {
+              "id": "a16",
+              "coordinate": 16
+            },
+            {
+              "id": "a17",
+              "coordinate": 17
+            },
+            {
+              "id": "a18",
+              "coordinate": 18
+            },
+            {
+              "id": "a19",
+              "coordinate": 19
+            },
+            {
+              "id": "a20",
+              "coordinate": 20
+            },
+            {
+              "id": "a21",
+              "coordinate": 21
+            },
+            {
+              "id": "a22",
+              "coordinate": 22
+            },
+            {
+              "id": "a23",
+              "coordinate": 23
+            },
+            {
+              "id": "a24",
+              "coordinate": 24
+            },
+            {
+              "id": "a25",
+              "coordinate": 25
+            },
+            {
+              "id": "a26",
+              "coordinate": 26
+            },
+            {
+              "id": "a27",
+              "coordinate": 27
+            },
+            {
+              "id": "a28",
+              "coordinate": 28
+            },
+            {
+              "id": "a29",
+              "coordinate": 29
+            },
+            {
+              "id": "a30",
+              "coordinate": 30
+            },
+            {
+              "id": "a31",
+              "coordinate": 31
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "secondEpoch": {
+          "id": "second",
+          "sourceAnchor": "independent-synthetic-second",
+          "sourceSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+          "points": [
+            {
+              "id": "b0",
+              "coordinate": 2
+            },
+            {
+              "id": "b1",
+              "coordinate": 5
+            },
+            {
+              "id": "b2",
+              "coordinate": 8
+            },
+            {
+              "id": "b3",
+              "coordinate": 11
+            },
+            {
+              "id": "b4",
+              "coordinate": 14
+            },
+            {
+              "id": "b5",
+              "coordinate": 17
+            },
+            {
+              "id": "b6",
+              "coordinate": 20
+            },
+            {
+              "id": "b7",
+              "coordinate": 23
+            },
+            {
+              "id": "b8",
+              "coordinate": 26
+            },
+            {
+              "id": "b9",
+              "coordinate": 29
+            },
+            {
+              "id": "b10",
+              "coordinate": 32
+            },
+            {
+              "id": "b11",
+              "coordinate": 35
+            },
+            {
+              "id": "b12",
+              "coordinate": 38
+            },
+            {
+              "id": "b13",
+              "coordinate": 41
+            },
+            {
+              "id": "b14",
+              "coordinate": 44
+            },
+            {
+              "id": "b15",
+              "coordinate": 47
+            },
+            {
+              "id": "b16",
+              "coordinate": 50
+            },
+            {
+              "id": "b17",
+              "coordinate": 53
+            },
+            {
+              "id": "b18",
+              "coordinate": 56
+            },
+            {
+              "id": "b19",
+              "coordinate": 59
+            },
+            {
+              "id": "b20",
+              "coordinate": 62
+            },
+            {
+              "id": "b21",
+              "coordinate": 65
+            },
+            {
+              "id": "b22",
+              "coordinate": 68
+            },
+            {
+              "id": "b23",
+              "coordinate": 71
+            },
+            {
+              "id": "b24",
+              "coordinate": 74
+            },
+            {
+              "id": "b25",
+              "coordinate": 77
+            },
+            {
+              "id": "b26",
+              "coordinate": 80
+            },
+            {
+              "id": "b27",
+              "coordinate": 83
+            },
+            {
+              "id": "b28",
+              "coordinate": 86
+            },
+            {
+              "id": "b29",
+              "coordinate": 89
+            },
+            {
+              "id": "b30",
+              "coordinate": 92
+            },
+            {
+              "id": "b31",
+              "coordinate": 95
+            }
+          ],
+          "covariance": [
+            [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "mapping": [
+          {
+            "id": "p0",
+            "firstPointId": "a0",
+            "secondPointId": "b0"
+          },
+          {
+            "id": "p1",
+            "firstPointId": "a1",
+            "secondPointId": "b1"
+          },
+          {
+            "id": "p2",
+            "firstPointId": "a2",
+            "secondPointId": "b2"
+          },
+          {
+            "id": "p3",
+            "firstPointId": "a3",
+            "secondPointId": "b3"
+          },
+          {
+            "id": "p4",
+            "firstPointId": "a4",
+            "secondPointId": "b4"
+          },
+          {
+            "id": "p5",
+            "firstPointId": "a5",
+            "secondPointId": "b5"
+          },
+          {
+            "id": "p6",
+            "firstPointId": "a6",
+            "secondPointId": "b6"
+          },
+          {
+            "id": "p7",
+            "firstPointId": "a7",
+            "secondPointId": "b7"
+          },
+          {
+            "id": "p8",
+            "firstPointId": "a8",
+            "secondPointId": "b8"
+          },
+          {
+            "id": "p9",
+            "firstPointId": "a9",
+            "secondPointId": "b9"
+          },
+          {
+            "id": "p10",
+            "firstPointId": "a10",
+            "secondPointId": "b10"
+          },
+          {
+            "id": "p11",
+            "firstPointId": "a11",
+            "secondPointId": "b11"
+          },
+          {
+            "id": "p12",
+            "firstPointId": "a12",
+            "secondPointId": "b12"
+          },
+          {
+            "id": "p13",
+            "firstPointId": "a13",
+            "secondPointId": "b13"
+          },
+          {
+            "id": "p14",
+            "firstPointId": "a14",
+            "secondPointId": "b14"
+          },
+          {
+            "id": "p15",
+            "firstPointId": "a15",
+            "secondPointId": "b15"
+          },
+          {
+            "id": "p16",
+            "firstPointId": "a16",
+            "secondPointId": "b16"
+          },
+          {
+            "id": "p17",
+            "firstPointId": "a17",
+            "secondPointId": "b17"
+          },
+          {
+            "id": "p18",
+            "firstPointId": "a18",
+            "secondPointId": "b18"
+          },
+          {
+            "id": "p19",
+            "firstPointId": "a19",
+            "secondPointId": "b19"
+          },
+          {
+            "id": "p20",
+            "firstPointId": "a20",
+            "secondPointId": "b20"
+          },
+          {
+            "id": "p21",
+            "firstPointId": "a21",
+            "secondPointId": "b21"
+          },
+          {
+            "id": "p22",
+            "firstPointId": "a22",
+            "secondPointId": "b22"
+          },
+          {
+            "id": "p23",
+            "firstPointId": "a23",
+            "secondPointId": "b23"
+          },
+          {
+            "id": "p24",
+            "firstPointId": "a24",
+            "secondPointId": "b24"
+          },
+          {
+            "id": "p25",
+            "firstPointId": "a25",
+            "secondPointId": "b25"
+          },
+          {
+            "id": "p26",
+            "firstPointId": "a26",
+            "secondPointId": "b26"
+          },
+          {
+            "id": "p27",
+            "firstPointId": "a27",
+            "secondPointId": "b27"
+          },
+          {
+            "id": "p28",
+            "firstPointId": "a28",
+            "secondPointId": "b28"
+          },
+          {
+            "id": "p29",
+            "firstPointId": "a29",
+            "secondPointId": "b29"
+          },
+          {
+            "id": "p30",
+            "firstPointId": "a30",
+            "secondPointId": "b30"
+          },
+          {
+            "id": "p31",
+            "firstPointId": "a31",
+            "secondPointId": "b31"
+          }
+        ],
+        "referenceIds": [
+          "p0",
+          "p2",
+          "p4",
+          "p6",
+          "p8",
+          "p10",
+          "p12",
+          "p14",
+          "p16",
+          "p18",
+          "p20",
+          "p22",
+          "p24",
+          "p26",
+          "p28",
+          "p30"
+        ],
+        "dependence": {
+          "kind": "caller-declared-independent",
+          "sourceAnchor": "explicit-independent"
+        }
+      },
+      "expected": {
+        "outcome": "calculated",
+        "classification": "numerically-positive-definite"
+      },
+      "jointMinimumEigenvalue120digit": "1.0"
+    }
+  ]
+}

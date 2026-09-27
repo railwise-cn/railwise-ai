@@ -89,7 +89,7 @@ describe('Flow workspace controls and typed connections', () => {
     const html = renderToStaticMarkup(createElement(FlowWorkspaceView, {
       leftSidebarCollapsed: false, onToggleLeftSidebar: vi.fn(), filter: 'all'
     }))
-    expect(html).toContain('WorkWise Flow')
+    expect(html).toContain('RailWise AI Flow')
     expect(html).toContain('Preview')
     expect(html).toContain('保存')
     expect(html).toContain('校验')

@@ -9,6 +9,7 @@ import {
   defaultManagedRuntimeTokenEconomySettings,
   isManagedRuntimeInsecure,
   resolveManagedRuntimeSettings,
+  getModelProviderSettings,
   isOfficialDeepSeekBaseUrl,
   type ManagedRuntimeSettingsV1,
   type AppSettingsV1
@@ -498,7 +499,14 @@ export async function startManagedRuntimeChild(
         'ppt-master-python',
         process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'
       ),
-      DEEPSEEK_API_KEY: runtime.apiKey || process.env.DEEPSEEK_API_KEY || ''
+      DEEPSEEK_API_KEY: runtime.apiKey || process.env.DEEPSEEK_API_KEY || '',
+      WORKWISE_DEFAULT_MODEL_PROVIDER_ID: runtime.providerId,
+      WORKWISE_MODEL_PROVIDERS_SECRET: JSON.stringify(getModelProviderSettings(settings).providers.map(provider => ({
+        id: provider.id, baseUrl: provider.id === runtime.providerId ? runtime.baseUrl : provider.baseUrl,
+        apiKey: provider.id === runtime.providerId ? runtime.apiKey || process.env.DEEPSEEK_API_KEY || '' : provider.apiKey,
+        endpointFormat: provider.id === runtime.providerId ? runtime.endpointFormat : provider.endpointFormat,
+        model: provider.id === runtime.providerId ? runtime.model : provider.models[0] || runtime.model
+      })))
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false,

@@ -1,0 +1,28 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/05-standard-pdf8.ax.txt",
+  "sourceSha256": "dbac9ef72beb995ed773225ab0f44feff17ebaf82c659e887cec70c98eb8117b",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 3,
+      "text": "~0 标准窗口 P020230829590929227708.pdf - Google Chrome - <profile>, URL: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=8, Secondary Actions: Raise"
+    },
+    {
+      "originalLine": 4,
+      "text": "~\t1 container P020230829590929227708.pdf - Google Chrome - <profile>, URL: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=8"
+    },
+    {
+      "originalLine": 5,
+      "text": "~\t\t\t\t\t9 文本栏 (settable) Description: 地址和搜索栏, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=8, Placeholder: 在 Google 中搜索，或输入网址"
+    },
+    {
+      "originalLine": 6,
+      "text": "+\t\t\t\t573 HTML 内容 zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=8"
+    },
+    {
+      "originalLine": 21,
+      "text": "The focused UI element is 580 按钮 知道了"
+    }
+  ]
+}

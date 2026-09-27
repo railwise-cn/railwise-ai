@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "platform": "darwin",
+  "arch": "arm64",
+  "baseVersion": "0.0.0",
+  "targetVersion": "0.5.0",
+  "channel": "frontier",
+  "feedUrl": "[REDACTED: isolated private updater feed URL]",
+  "startedAt": "2026-09-20T01:19:48.384Z",
+  "browserOpened": false,
+  "userDataPreserved": true,
+  "stages": [
+    {
+      "name": "base_started",
+      "at": "2026-09-20T01:19:48.384Z"
+    },
+    {
+      "name": "update_available",
+      "at": "2026-09-20T01:19:48.962Z",
+      "detail": "0.5.0"
+    },
+    {
+      "name": "download_completed",
+      "at": "2026-09-20T01:19:53.977Z",
+      "detail": "1 artifact(s)"
+    },
+    {
+      "name": "install_requested",
+      "at": "2026-09-20T01:19:53.980Z"
+    },
+    {
+      "name": "target_relaunched",
+      "at": "2026-09-20T01:20:17.694Z",
+      "detail": "0.5.0"
+    },
+    {
+      "name": "user_data_preserved",
+      "at": "2026-09-20T01:20:17.698Z",
+      "detail": "0.0.0"
+    }
+  ],
+  "completedAt": "2026-09-20T01:20:17.698Z"
+}

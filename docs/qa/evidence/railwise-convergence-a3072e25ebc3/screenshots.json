@@ -1,0 +1,61 @@
+{
+  "sourceHead": "a3072e25ebc33ee30702d5278c8144e3fbb625f7",
+  "asarSha256": "3c8d0a22c8bc3bbeea2ea38fa44c7035aaf347b11ca4bd47323e9a2d574c62ea",
+  "screenshots": [
+    {
+      "file": "sampling-zh-light.jpg",
+      "sha256": "8000d2d662d0a1082abed534b87fcffc864c30fb095deb4b875629e88cc165aa",
+      "imageDimensions": [
+        1171,
+        768
+      ],
+      "syntheticOnly": true
+    },
+    {
+      "file": "sampling-zh-light-maximized.jpg",
+      "sha256": "e8363a5fc84daedc1b3528b4ac532acaddce4cffb4ee84f09efeceeb87c80d7a",
+      "imageDimensions": [
+        1490,
+        768
+      ],
+      "syntheticOnly": true
+    },
+    {
+      "file": "sampling-en-dark-regular.jpg",
+      "sha256": "ae573c8e03567b1ef4369726ec034f7cbe858d3e1a1fa1c98a1ab19172e90422",
+      "imageDimensions": [
+        1171,
+        768
+      ],
+      "syntheticOnly": true
+    },
+    {
+      "file": "sampling-en-dark-narrow.jpg",
+      "sha256": "69645b7f3014a42cbf099971930dd205d3d4e26d6b3c52e8641871ab47891472",
+      "imageDimensions": [
+        878,
+        768
+      ],
+      "syntheticOnly": true
+    },
+    {
+      "file": "sampling-zh-light-narrow.jpg",
+      "sha256": "a93d6246f7e2079f313fd6b683c91ab804ae9cc0eae2beaac73580b35883502a",
+      "imageDimensions": [
+        878,
+        768
+      ],
+      "syntheticOnly": true
+    },
+    {
+      "file": "history-output-subtitle-zh.jpg",
+      "sha256": "3037093ee0f7052bf86cf38f315759329017b1daead6927564924173c42d920f",
+      "imageDimensions": [
+        1171,
+        768
+      ],
+      "syntheticOnly": true
+    }
+  ],
+  "note": "CUA capture dimensions may be scaled; they are not independently measured NSWindow dimensions."
+}

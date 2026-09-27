@@ -1,0 +1,42 @@
+{
+  "sourceHead": "281dc87672509de147357efc3aabbeae0eb4dbcb",
+  "recordKind": "agent-observed-native-gui-operations",
+  "guiMethod": "cua native accessibility controls and system file dialogs; no API or database seeding",
+  "syntheticData": true,
+  "professionalApproval": false,
+  "userAcceptance": false,
+  "nativeExport": {
+    "cancelObserved": true,
+    "defaultCancelledPath": "/private/tmp/railwise-survey-281dc87/home/.workwise/default_workspace/survey-declared-linkage-assessment.json",
+    "cancelledPathAbsentShellTestExitCode": 0,
+    "savedPath": "/private/tmp/railwise-survey-281dc87/evidence/assessment-complete.json",
+    "savedBytes": 8213,
+    "evidence": ["10-native-export-before-cancel.ax.txt", "11-native-export-cancelled.ax.txt", "12-native-export-before-save.ax.txt", "13-native-export-saved.ax.txt"]
+  },
+  "restart": {
+    "firstLaunchExecSession": 95737,
+    "firstQuitExitCode": 0,
+    "restartExecSession": 77123,
+    "finalQuitExitCode": 0,
+    "threeOriginalAssessmentIdsRestored": true,
+    "finalCandidateProcessSearchExitCode": 1,
+    "finalCandidateProcessSearchMatches": 0
+  },
+  "additionalChecks": {
+    "wrongUnitScoreRejected": "37-wrong-unit-rejected.ax.txt",
+    "healthyCurrentRestoredAfterRejection": "38-healthy-current-after-wrong-unit.ax.txt",
+    "tabFromReverifyToExport": "35-current-zh-light-keyboard-export.ax.txt",
+    "nextTabToHistory": "36-current-zh-light-keyboard-history.ax.txt"
+  },
+  "visualLimits": {
+    "nativeWindowBoundsMeasured": false,
+    "allEightRequestedLocaleThemeSizeCombinationsCompleted": false,
+    "completeAccessibilityAudit": false,
+    "compactStackedChineseLightAndDarkObserved": true,
+    "englishLightAndDarkWideObserved": true,
+    "screenshot26LabelCorrection": "Filename says compact, but its actual image remains wide. Do not count it as a compact viewport.",
+    "nativeSaveDialogLocalization": "Chinese app still displays English Save generated file and JSON file labels. Not full localization acceptance."
+  },
+  "toolingIncident": "A previously defined CUA helper retained the old 6ff app handle and brought up the old isolated candidate. It was immediately closed without a project mutation. All 281 operations thereafter used separately named app281 helpers; final process search found neither candidate running.",
+  "laterSourceChangesExcludedFromPackage": ["V4.1 automatic router migration", "clarified sampling workspace locale boundary"]
+}

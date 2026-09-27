@@ -48,6 +48,7 @@ import {
   persistComposerModel,
   readCodeWorkspaceRoots,
   readStoredComposerModel,
+  readStoredComposerSelection,
   rememberCodeWorkspaceRoots,
   rememberTurnModel
 } from './chat-store-helpers'
@@ -151,7 +152,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   turnReasoningFirstAtByUserId: {},
   turnReasoningLastAtByUserId: {},
   inspectorSelectedId: null,
-  composerModel: '',
+  composerModel: readStoredComposerSelection()?.model ?? '',
+  composerProviderId: readStoredComposerSelection()?.providerId,
   composerPickList: mergeComposerPickList(false, []),
   composerModelGroups: [],
   queuedMessages: [],

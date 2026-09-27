@@ -1,0 +1,35 @@
+{
+  "command": [
+    "/usr/local/bin/python3",
+    "-c",
+    "import sqlite3,json,hashlib\nfrom pathlib import Path\nproject='project_9d966747-63bc-4658-9ba6-a8635423a7e0'\nrecord_id='advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401'\ndb=Path('/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-advanced-trials.sqlite3')\nexport=Path('/private/tmp/railwise-survey-6ff82c8/home/.workwise/default_workspace/静态最大模型-6ff82c8.json')\ndef pairs(items):\n d={}\n for k,v in items:\n  assert k not in d,'duplicate JSON field'\n  d[k]=v\n return d\ndef reject(v):raise ValueError('Nonfinite JSON '+v)\ndef load(raw):return json.loads(raw,object_pairs_hook=pairs,parse_constant=reject)\ndef sha(raw):return hashlib.sha256(raw).hexdigest()\nraw=export.read_bytes();parsed=load(raw)\nwith sqlite3.connect(db.resolve().as_uri()+'?mode=ro',uri=True)as c:\n c.row_factory=sqlite3.Row;c.execute('PRAGMA query_only=ON');c.execute('BEGIN')\n row=c.execute(\"SELECT * FROM advanced_trials WHERE project_id=? AND id=? AND kind='static-incremental'\",(project,record_id)).fetchone()\n assert row is not None\n data=row['data_json'].encode();record=load(data)\n assert parsed==record,'Native export JSON differs from stored full record'\n assert raw==data+b'\\n','Native export bytes must equal stored JSON plus newline'\n assert record['id']==record_id and record['projectId']==project and record['recordHash']==row['record_hash']\n assert record['baseObservationCount']==128 and record['appendedObservationCount']==128 and record['observationCount']==256 and record['parameterCount']==16\n assert record['result']['outcome']=='calculated' and len(record['result']['steps'])==128\n assert record['requestJson'].encode()==row['request_bytes'] and record['declarationJson'].encode()==row['declaration_bytes']\n assert sha(row['request_bytes'])==row['request_hash']==record['requestSha256']\n assert sha(row['declaration_bytes'])==record['declarationSha256']\n assert sha(record['modelBasisStatement'].encode())==record['modelBasisSha256']\n result={'status':'passed','projectId':project,'recordId':record_id,'exportPath':str(export),'exportSizeBytes':len(raw),'exportFileSha256':sha(raw),'databaseJsonSizeBytes':len(data),'databaseJsonSha256':sha(data),'exactJsonRecordEquality':True,'exactByteEquality':'export = database data_json UTF-8 + one newline','recordHash':record['recordHash'],'requestSha256':record['requestSha256'],'declarationSha256':record['declarationSha256'],'rawDeclarationAndRequestBindingsVerified':True,'baseObservationCount':128,'appendedObservationCount':128,'totalObservationCount':256,'parameterCount':16,'stepCount':128,'scope':'Native output identity and exact bytes, stored raw hashes; numerical verification in independent-static.json, not re-certification of JS canonical hashes or professional approval'}\nprint(json.dumps(result,ensure_ascii=False))\n"
+  ],
+  "exitCode": 0,
+  "stdout": "{\"status\": \"passed\", \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\", \"recordId\": \"advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401\", \"exportPath\": \"/private/tmp/railwise-survey-6ff82c8/home/.workwise/default_workspace/静态最大模型-6ff82c8.json\", \"exportSizeBytes\": 965532, \"exportFileSha256\": \"9ddd615c28a58d4f1043cce605e44cb3336e9f55a202631157685d7c55558dea\", \"databaseJsonSizeBytes\": 965531, \"databaseJsonSha256\": \"dc8f84caee8c3e99cf8dbba84c799e6e5b5015572b8941c7e17be49e6920663b\", \"exactJsonRecordEquality\": true, \"exactByteEquality\": \"export = database data_json UTF-8 + one newline\", \"recordHash\": \"385194f4fcbed92a908ce7811b7bac5641d1bd2c47f2adeecabc5c4474b79143\", \"requestSha256\": \"69b761536a5eea9fc219bf543dde1026d1111f2ad3dfe2bf12a01ebeb914b420\", \"declarationSha256\": \"79ac796e3c057bedd3ab47370981ae32425d936c3bc4237489ce31c9f7b491ba\", \"rawDeclarationAndRequestBindingsVerified\": true, \"baseObservationCount\": 128, \"appendedObservationCount\": 128, \"totalObservationCount\": 256, \"parameterCount\": 16, \"stepCount\": 128, \"scope\": \"Native output identity and exact bytes, stored raw hashes; numerical verification in independent-static.json, not re-certification of JS canonical hashes or professional approval\"}\n",
+  "stderr": "",
+  "databaseAccess": "SQLite mode=ro and PRAGMA query_only=ON",
+  "checkedAt": "2026-09-20T01:35:51.683675+00:00",
+  "status": "passed",
+  "result": {
+    "status": "passed",
+    "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+    "recordId": "advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401",
+    "exportPath": "/private/tmp/railwise-survey-6ff82c8/home/.workwise/default_workspace/静态最大模型-6ff82c8.json",
+    "exportSizeBytes": 965532,
+    "exportFileSha256": "9ddd615c28a58d4f1043cce605e44cb3336e9f55a202631157685d7c55558dea",
+    "databaseJsonSizeBytes": 965531,
+    "databaseJsonSha256": "dc8f84caee8c3e99cf8dbba84c799e6e5b5015572b8941c7e17be49e6920663b",
+    "exactJsonRecordEquality": true,
+    "exactByteEquality": "export = database data_json UTF-8 + one newline",
+    "recordHash": "385194f4fcbed92a908ce7811b7bac5641d1bd2c47f2adeecabc5c4474b79143",
+    "requestSha256": "69b761536a5eea9fc219bf543dde1026d1111f2ad3dfe2bf12a01ebeb914b420",
+    "declarationSha256": "79ac796e3c057bedd3ab47370981ae32425d936c3bc4237489ce31c9f7b491ba",
+    "rawDeclarationAndRequestBindingsVerified": true,
+    "baseObservationCount": 128,
+    "appendedObservationCount": 128,
+    "totalObservationCount": 256,
+    "parameterCount": 16,
+    "stepCount": 128,
+    "scope": "Native output identity and exact bytes, stored raw hashes; numerical verification in independent-static.json, not re-certification of JS canonical hashes or professional approval"
+  }
+}

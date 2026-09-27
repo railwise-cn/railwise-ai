@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Exact private candidate installation only; no GUI or user-data operation",
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "version": "0.5.0",
+  "workflowRunId": 35505966672,
+  "workflowRef": "codex/railwise-survey-convergence",
+  "workflowConclusion": "success",
+  "targetArtifactId": 10604675574,
+  "targetArtifactBytes": 589389709,
+  "targetArtifactOuterDigestRehashed": true,
+  "targetArtifactSha256": "5dffec7d4f188735f97aaf6c3851c1b36c3155b3c5daf6af5cfdb40e6b58468e",
+  "targetDownloadMethod": "Complete authenticated GitHub artifact; bounded 1 MiB range workers; outer SHA-256 and ZIP CRC verified; inner application ZIP verified against authenticated updater evidence",
+  "targetZipSha256": "f68de842dd36f5d0463c928f53d375607f71b8e1da1608fa8fa88224d1a3679a",
+  "installedAsarSha256": "11a060ec6a7c42385eed433a336967a91647251f51a07f0781302420b2f9e20c",
+  "matchesCloudUpdaterInstalledTarget": true,
+  "embeddedSourceProvenanceVerified": true,
+  "asarEntriesVerified": 18363,
+  "localCompiledOutputComparisonPerformed": false,
+  "embeddedUpdaterHost": "127.0.0.1",
+  "appPath": "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app",
+  "executablePath": "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app/Contents/MacOS/RAILWISE AI Candidate 43689493ab58",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head43689493ab58",
+  "candidateEnvPath": "<CANDIDATE_ROOT>/candidate.env",
+  "cloudGatekeeperStatus": "assessments enabled",
+  "localGatekeeperStatus": "assessments disabled",
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "nativeUpdater": {
+    "status": "passed",
+    "baseVersion": "0.0.0",
+    "targetVersion": "0.5.0",
+    "stages": [
+      "base_started",
+      "update_available",
+      "download_completed",
+      "install_requested",
+      "target_relaunched",
+      "user_data_preserved"
+    ],
+    "browserOpened": false,
+    "syntheticUserDataPreserved": true
+  },
+  "tlsChecks": {
+    "defaultTrustRejected": true,
+    "wrongPinRejected": true,
+    "wrongPortRejected": true,
+    "outsidePathRejected": true,
+    "providerManifestVerified": true,
+    "executorZipVerified": true,
+    "updaterSessionMatched": true
+  },
+  "systemTrustModified": false,
+  "localSignatureVerified": true,
+  "localStapledNotarizationVerified": true,
+  "guiLaunchedByInstallerAgent": false,
+  "guiAcceptance": "not-tested",
+  "userAcceptance": "not-performed",
+  "userDataReadOrModifiedByInstallerAgent": false,
+  "candidateCredentialAccess": 0,
+  "productSourceModified": false,
+  "publicReleaseOperation": false,
+  "cloudEvidenceSha256": "a4bf09477b3e68e42cede58a452d62434dd34b30d2c2673e459890ca85a6fa92",
+  "evidenceArtifactId": 10604595735,
+  "evidenceArtifactOuterDigestRehashed": true,
+  "evidenceArtifactSha256": "90f9a0e743769abe609e28d5d1e9b653220cafd593dbebcbb1358b3d55f849e8",
+  "evidenceArtifactRetrieval": "Complete authenticated GitHub artifact; full SHA-256 and ZIP CRC verified",
+  "signatureChecks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app"
+      ],
+      "exitCode": 0,
+      "output": "Processing: <CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app\nThe validate action worked!"
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ]
+}

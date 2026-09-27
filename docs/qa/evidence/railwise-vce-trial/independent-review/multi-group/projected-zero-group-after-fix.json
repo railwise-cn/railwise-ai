@@ -1,0 +1,114 @@
+[
+  {
+    "n": 3,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 3,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 3,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 3,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  }
+]

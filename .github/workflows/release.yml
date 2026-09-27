@@ -6,6 +6,16 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
+      private_updater_acceptance:
+        description: 'Only run signed candidate native updater acceptance over runner-local private HTTPS. No public uploads, releases, feeds or website changes.'
+        required: false
+        type: boolean
+        default: false
+      isolated_survey_candidate:
+        description: 'Only build a separately identified, signed/notarized Survey candidate as an authenticated Actions artifact. Never publish a release or feed.'
+        required: false
+        type: boolean
+        default: false
       candidate_only:
         description: 'Build and verify all three clients without creating or updating a GitHub Release.'
         required: false
@@ -78,12 +88,26 @@ env:
   WORKWISE_DOWNLOAD_URL: https://www.railwise.cn/products/workwise/
   WORKWISE_UPDATE_PROVIDER: generic
   WORKWISE_UPDATE_BASE_URL: https://www.railwise.cn/downloads
-  WORKWISE_GITHUB_REPO: wangjiawei508/WorkWise
+  WORKWISE_GITHUB_REPO: railwise-cn/railwise-ai
 
 jobs:
+  private-updater-acceptance:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/private-updater-acceptance.yml
+    secrets: inherit
+
+  isolated-survey-candidate:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate == true }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/isolated-survey-candidate.yml
+    secrets: inherit
+
   native-updater-acceptance:
     name: Native updater acceptance
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_updater_acceptance == true && inputs.cleanup_acceptance_run_id == '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance == true && inputs.cleanup_acceptance_run_id == '' }}
     uses: ./.github/workflows/updater-acceptance-e2e.yml
     with:
       base_version: ${{ inputs.acceptance_base_version }}
@@ -92,7 +116,7 @@ jobs:
 
   cleanup-updater-acceptance:
     name: Cleanup updater acceptance
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.cleanup_acceptance_run_id != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.cleanup_acceptance_run_id != '' }}
     uses: ./.github/workflows/updater-acceptance-cleanup.yml
     with:
       run_id: ${{ inputs.cleanup_acceptance_run_id }}
@@ -100,7 +124,7 @@ jobs:
 
   repair-website-cache:
     name: Repair website updater metadata cache
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
     runs-on: ubuntu-latest
     env:
       WORKWISE_WEBSITE_SSH_HOST: ${{ secrets.WORKWISE_WEBSITE_SSH_HOST }}
@@ -148,7 +172,7 @@ jobs:
 
   rollback-stable:
     name: Roll back WorkWise Stable pointers
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
     runs-on: ubuntu-latest
     env:
       ROLLBACK_TAG: ${{ inputs.rollback_stable_tag }}
@@ -226,7 +250,7 @@ jobs:
 
   prepare:
     name: Prepare release version
-    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.run_updater_acceptance == true || inputs.cleanup_acceptance_run_id != '' || inputs.repair_website_cache == true || inputs.rollback_stable_tag != '')) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.private_updater_acceptance == true || inputs.isolated_survey_candidate == true || inputs.run_updater_acceptance == true || inputs.cleanup_acceptance_run_id != '' || inputs.repair_website_cache == true || inputs.rollback_stable_tag != '')) }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -798,7 +822,7 @@ jobs:
           if [[ "${MAC_SIGNED}" == "true" ]]; then
             mac_line="- macOS: Developer ID signed and notarized"
           else
-            mac_line="- macOS: UNSIGNED build — run \`xattr -dr com.apple.quarantine /Applications/WorkWise.app\` (or scripts/mac-unquarantine.sh) before first launch"
+            mac_line="- macOS: UNSIGNED build — run \`xattr -dr com.apple.quarantine /Applications/RailWise AI.app\` (or scripts/mac-unquarantine.sh) before first launch"
           fi
 
           {

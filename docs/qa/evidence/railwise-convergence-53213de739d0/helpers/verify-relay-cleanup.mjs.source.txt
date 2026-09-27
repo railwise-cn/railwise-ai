@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { lstat, realpath } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+
+export async function verifyRelayCleanup({ candidateRoot, reportPath, report }) {
+  assert.equal(report.tokenRemoved, true, 'relay report does not confirm token removal');
+  assert.equal(report.cleanupError, undefined, 'relay report contains a cleanup error');
+  const root = await realpath(candidateRoot);
+  assert.match(root, /^\/private\/tmp\/railwise-[a-zA-Z0-9._-]+$/);
+  assert(isAbsolute(reportPath), 'relay report path must be absolute');
+  const reportReal = await realpath(reportPath);
+  const reportChild = relative(root, reportReal);
+  assert(reportChild && reportChild !== '..' && !reportChild.startsWith('..' + sep) && !isAbsolute(reportChild), 'relay report escaped candidate root');
+  assert((await lstat(reportReal)).isFile(), 'relay report must be a regular file');
+  const session = /^relay-report-([a-f0-9]{16})\.json$/.exec(basename(reportReal))?.[1];
+  assert(session, 'relay report filename must identify its exact session');
+  const tokenPath = join(dirname(reportReal), `relay-local-token-${session}.txt`);
+  if (report.tokenPath !== undefined) {
+    assert(typeof report.tokenPath === 'string' && isAbsolute(report.tokenPath), 'reported token path must be absolute');
+    assert.equal(resolve(report.tokenPath), tokenPath, 'reported token path differs from scoped relay session');
+  }
+  // lstat also rejects dangling symlinks; no token contents are opened.
+  let tokenAbsent = false;
+  try { await lstat(tokenPath); } catch (error) { if (error.code !== 'ENOENT') throw error; tokenAbsent = true; }
+  assert(tokenAbsent, 'relay token path still exists despite cleanup report');
+  return { tokenRemoved: true, tokenPathAbsent: true, tokenRelativePath: relative(root, tokenPath), tokenContentsRead: false };
+}

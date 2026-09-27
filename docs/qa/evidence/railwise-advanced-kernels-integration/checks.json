@@ -1,0 +1,43 @@
+{
+  "baseCommit": "a3072e25ebc33ee30702d5278c8144e3fbb625f7",
+  "scope": "generalized-w and VCE pure kernels plus evidence; no HTTP/UI integration",
+  "desktop": {
+    "passed": 2606,
+    "skipped": 2
+  },
+  "runtime": {
+    "passed": 1939,
+    "skipped": 3
+  },
+  "desktopTypecheck": "passed",
+  "runtimeTypecheck": "passed",
+  "build": "passed",
+  "lint": {
+    "errors": 0,
+    "existingWarnings": 1
+  },
+  "openspec": {
+    "passed": 11,
+    "failed": 0
+  },
+  "generalizedWReplay": {
+    "cases": 136,
+    "failures": 0
+  },
+  "vceReplay": {
+    "singleGroup": 1356,
+    "multiGroupFirstStep": 160,
+    "highPrecisionIterations": 32,
+    "unidentifiableVariants": 14956,
+    "failures": 0
+  },
+  "sourceHashes": {
+    "kun/src/engineering/survey-generalized-w.ts": "03239b6ae350033eb2662b803d8b637c13758d3e56a1ac1c91d4144d6fead3f5",
+    "kun/src/contracts/survey-generalized-w.ts": "9bfe99f7757f63ae932be0b0cee985c3d591a1a6787d9ba44400dff7b4b6365b",
+    "kun/src/engineering/survey-vce-trial.ts": "593f4c3e5063e71b9d758299bdc3360454292b48fac520e2fc0d8aa472f7f9fa",
+    "kun/src/contracts/survey-vce-trial.ts": "93d1c940c4d7935bb317e9f649e95a885bab4e8782e4d11dfb18819c8128bc3c"
+  },
+  "packagedAcceptance": "not-performed for these subsequent kernels",
+  "professionalSignoff": false,
+  "publicReleaseChanged": false
+}

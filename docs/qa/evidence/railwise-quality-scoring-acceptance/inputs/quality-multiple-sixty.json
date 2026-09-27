@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "standardCode": "GB/T 24356-2023",
+  "sourceDigest": "96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487",
+  "productProfileId": "planar-control-point",
+  "productProfileVersion": "gbt24356-2023-control-declared-counts-1",
+  "profileWeightTable": 43,
+  "profileClassificationTable": 44,
+  "declaredBasis": "caller-declared-inspection-records-not-authenticated",
+  "evidenceRefs": [
+    "synthetic-inspection-not-production"
+  ],
+  "unitId": "synthetic-point",
+  "unitType": "point",
+  "inspectionStage": "detailed-inspection",
+  "operation": "accuracy",
+  "declaredScope": "declared-mathematical-accuracy-only",
+  "model": {
+    "items": [
+      {
+        "id": "accuracy-1",
+        "m": "1",
+        "m0": "1",
+        "unit": "mm",
+        "source": "caller-declared-error-magnitude-not-derived-from-adjustment-residuals",
+        "evidenceRefs": [
+          "synthetic-accuracy"
+        ]
+      },
+      {
+        "id": "accuracy-2",
+        "m": "3/10",
+        "m0": "1",
+        "unit": "mm",
+        "source": "caller-declared-error-magnitude-not-derived-from-adjustment-residuals",
+        "evidenceRefs": [
+          "synthetic-accuracy"
+        ]
+      }
+    ],
+    "aggregation": {
+      "kind": "arithmetic"
+    },
+    "aCount": 0,
+    "aEvidenceRefs": [
+      "synthetic-a-check"
+    ]
+  }
+}

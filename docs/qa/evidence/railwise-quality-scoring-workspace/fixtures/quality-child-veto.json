@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "standardCode": "GB/T 24356-2023",
+  "sourceDigest": "96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487",
+  "productProfileId": "planar-control-point",
+  "productProfileVersion": "gbt24356-2023-control-declared-counts-1",
+  "profileWeightTable": 43,
+  "profileClassificationTable": 44,
+  "declaredBasis": "caller-declared-inspection-records-not-authenticated",
+  "evidenceRefs": [
+    "synthetic-inspection-not-production"
+  ],
+  "unitId": "synthetic-point",
+  "unitType": "point",
+  "inspectionStage": "detailed-inspection",
+  "operation": "unit",
+  "declaredScope": "explicit-profile-leaves",
+  "leaves": [
+    {
+      "elementId": "data-quality",
+      "subelementId": "mathematical-accuracy",
+      "state": "checked",
+      "record": {
+        "kind": "accuracy",
+        "model": {
+          "items": [
+            {
+              "id": "accuracy-1",
+              "m": "13/20",
+              "m0": "1",
+              "unit": "mm",
+              "source": "caller-declared-error-magnitude-not-derived-from-adjustment-residuals",
+              "evidenceRefs": [
+                "synthetic-accuracy"
+              ]
+            }
+          ],
+          "aggregation": {
+            "kind": "arithmetic"
+          },
+          "aCount": 0,
+          "aEvidenceRefs": [
+            "synthetic-a-check"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "data-quality",
+      "subelementId": "observation-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 4,
+          "c": 0,
+          "d": 0,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "data-quality",
+      "subelementId": "calculation-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 10,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "point-quality",
+      "subelementId": "selection-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 0,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "point-quality",
+      "subelementId": "marking-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 1,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "material-quality",
+      "subelementId": "presentation-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 2,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "material-quality",
+      "subelementId": "completeness",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 3,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    }
+  ]
+}

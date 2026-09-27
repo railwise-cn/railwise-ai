@@ -10,14 +10,20 @@ import {
 } from '../src/contracts/index.js'
 import { parseReviewOutput, renderReviewOutput } from '../src/review/review-output.js'
 import { resolveReviewTargetPrompt } from '../src/review/git-review-target.js'
+import { startReview } from '../src/server/routes/review.js'
+import { ReviewService } from '../src/services/review-service.js'
+import type { ModelClient, ModelRequest, ModelStreamChunk } from '../src/ports/model-client.js'
+import { makeHarness } from './loop-test-harness.js'
 
 describe('review contracts', () => {
   it('accepts review start requests and persisted review items', () => {
     const request = StartReviewRequest.parse({
       target: { kind: 'baseBranch', branch: 'main' },
-      model: 'deepseek-chat'
+      model: 'deepseek-chat',
+      providerId: 'compatible-provider'
     })
     expect(request.target).toEqual({ kind: 'baseBranch', branch: 'main' })
+    expect(request.providerId).toBe('compatible-provider')
 
     const item = TurnItem.parse({
       id: 'item_review_1',
@@ -39,6 +45,41 @@ describe('review contracts', () => {
       }
     })
     expect(item.kind).toBe('review')
+  })
+})
+
+describe('review provider identity', () => {
+  it.each(['provider-a', 'provider-b', undefined])('preserves %s from the HTTP request through the isolated reviewer', async providerId => {
+    const requests: ModelRequest[] = []
+    const model: ModelClient = {
+      provider: 'test', model: 'default-model',
+      async *stream(request): AsyncIterable<ModelStreamChunk> {
+        requests.push(request)
+        yield { kind: 'assistant_text_delta', text: JSON.stringify({ findings: [], overallCorrectness: 'patch is correct', overallExplanation: 'No findings in the synthetic input.', overallConfidenceScore: 0.8 }) }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    }
+    const h = makeHarness(model)
+    const thread = await h.threads.create({ title: 'Review identity', workspace: '/tmp', model: 'thread-default', mode: 'agent' })
+    const target = { kind: 'custom' as const, instructions: 'Inspect this synthetic review input.' }
+    const response = await startReview(h.turns, thread.id, new Request('http://localhost/review', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, model: 'shared-model', ...(providerId ? { providerId } : {}) })
+    }))
+    expect(response.status).toBe(202)
+    const started = JSON.parse(response instanceof Response ? await response.text() : response.body)
+    expect((await h.threadStore.get(thread.id))?.turns.find(turn => turn.id === started.turnId)).toMatchObject({ model: 'shared-model', ...(providerId ? { providerId } : {}) })
+    const service = new ReviewService({ threadStore: h.threadStore, turns: h.turns, model, defaultModel: 'fallback-default', nowIso: h.nowIso })
+    await expect(service.runReview({ ...started, target, model: 'outdated-callback-model' })).resolves.toBe('completed')
+    expect(requests.length).toBeGreaterThan(0)
+    expect(requests.every(request => request.model === 'shared-model' && request.providerId === providerId)).toBe(true)
+    expect(requests[0]?.threadId).not.toBe(thread.id)
+  })
+
+  it('rejects malformed provider identity before creating a review turn', async () => {
+    for (const providerId of ['', '   ', 'a'.repeat(201)]) {
+      expect(StartReviewRequest.safeParse({ target: { kind: 'custom', instructions: 'synthetic' }, providerId }).success).toBe(false)
+    }
   })
 })
 

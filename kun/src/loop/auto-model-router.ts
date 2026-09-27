@@ -2,8 +2,8 @@ import { makeUserItem } from '../domain/item.js'
 import type { TurnItem } from '../contracts/items.js'
 import type { ModelClient, ModelRequest, ModelStreamChunk } from '../ports/model-client.js'
 
-export const AUTO_MODEL_ROUTER_MODEL = 'deepseek-v4-flash'
-export const AUTO_MODEL_FLASH = 'deepseek-v4-flash'
+export const AUTO_MODEL_ROUTER_MODEL = 'deepseek-flash'
+export const AUTO_MODEL_FLASH = 'deepseek-flash'
 export const AUTO_MODEL_PRO = 'deepseek-v4-pro'
 export const AUTO_MODEL_ROUTER_TIMEOUT_MS = 4_000
 
@@ -18,8 +18,8 @@ export type AutoModelRouteSelection = {
 
 export const AUTO_MODEL_ROUTER_SYSTEM_PROMPT = [
   'You are the DeepSeek TUI auto-routing classifier. Return only compact JSON:',
-  '{"model":"deepseek-v4-flash|deepseek-v4-pro","thinking":"off|high|max"}.',
-  'Use deepseek-v4-flash for trivial, conversational, status, or single-step work.',
+  '{"model":"deepseek-flash|deepseek-v4-pro","thinking":"off|high|max"}.',
+  'Use deepseek-flash for trivial, conversational, status, or single-step work.',
   'Use deepseek-v4-pro for coding, debugging, release work, multi-step tasks, high-risk decisions, tool-heavy work, ambiguous requests, or anything that benefits from deeper reasoning.',
   'Use thinking off only for trivial no-tool answers, high for ordinary reasoning, and max for agentic, coding, multi-file, release, architecture, debugging, security, tool-heavy, or uncertain work.'
 ].join(' ')
@@ -28,6 +28,7 @@ export async function resolveAutoModelRoute(input: {
   modelClient: ModelClient
   threadId: string
   turnId: string
+  providerId?: string
   latestRequest: string
   recentContext: string
   selectedModelMode: string
@@ -46,6 +47,7 @@ export async function resolveAutoModelRoute(input: {
     const request: ModelRequest = {
       threadId: input.threadId,
       turnId: `${input.turnId}_auto_router`,
+      providerId: input.providerId,
       model: AUTO_MODEL_ROUTER_MODEL,
       systemPrompt: AUTO_MODEL_ROUTER_SYSTEM_PROMPT,
       prefix: [],
@@ -203,6 +205,7 @@ function normalizeAutoRouteModel(model: string): typeof AUTO_MODEL_FLASH | typeo
     case 'v4-pro':
     case 'pro':
       return AUTO_MODEL_PRO
+    case 'deepseek-flash':
     case 'deepseek-v4-flash':
     case 'v4-flash':
     case 'flash':

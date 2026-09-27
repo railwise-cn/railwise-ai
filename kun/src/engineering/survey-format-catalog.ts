@@ -91,6 +91,7 @@ export type SurveyFormatRegistryCatalogEntry = Readonly<{
   supportedDispositions: readonly SurveyImportDisposition[]
   currentDisposition: SurveyImportDisposition
   currentDispositionReason: string
+  currentDispositionReasonEn?: string
   fixtureRefs: readonly Readonly<{
     path: string
     kind: string
@@ -132,6 +133,7 @@ function freezeRegisteredEntry<Entry extends SurveyFormatRegistryCatalogEntry>(i
     supportedDispositions: Object.freeze([...input.supportedDispositions]),
     currentDisposition: input.currentDisposition,
     currentDispositionReason: input.currentDispositionReason,
+    ...(input.currentDispositionReasonEn ? { currentDispositionReasonEn: input.currentDispositionReasonEn } : {}),
     fixtureRefs: Object.freeze(input.fixtureRefs.map((reference) => Object.freeze({
       path: reference.path,
       kind: reference.kind,
@@ -296,6 +298,7 @@ export type P0SurveyFormatCatalogEntry = Readonly<{
   supportedDispositions: readonly SurveyImportDisposition[]
   currentDisposition: SurveyImportDisposition
   currentDispositionReason: string
+  currentDispositionReasonEn?: string
   fixtureRefs: readonly FormatFixtureRef[]
 }>
 
@@ -361,6 +364,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['adjustment-ready', 'archive-only'],
       currentDisposition: 'adjustment-ready',
       currentDispositionReason: '仅在用户提供并验证显式已知点/测段列映射、m/km 单位声明且严格解析成功时可进入策略校验；缺失或无效映射仍归档。',
+      currentDispositionReasonEn: 'Strategy validation requires confirmed known-point/section mappings, explicit m/km units and a successful strict parse. Missing or invalid mappings remain archive-only.',
       fixtureRefs: COSA_IN1_FIXTURE_REFS
     }),
     entry({
@@ -374,6 +378,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['adjustment-ready', 'archive-only'],
       currentDisposition: 'adjustment-ready',
       currentDispositionReason: '严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。',
+      currentDispositionReasonEn: 'Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.',
       fixtureRefs: COSA_IN2_FIXTURE_REFS
     }),
     entry({
@@ -387,6 +392,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['archive-only'],
       currentDisposition: 'archive-only',
       currentDispositionReason: '隔离的 .NET 拓扑读取核心仅有 synthetic 证据；registry 尚未具备调用方坐标和文件组来源的接入条件，当前只能归档审查。',
+      currentDispositionReasonEn: 'The isolated .NET topology reader has synthetic evidence only. Registry integration with caller coordinates and companion-file provenance is incomplete; archive review only.',
       fixtureRefs: []
     }),
     entry({
@@ -400,6 +406,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['archive-only'],
       currentDisposition: 'archive-only',
       currentDispositionReason: 'Read-only result comparison fields are planned; no accepted parser/fixture evidence is registered yet.',
+      currentDispositionReasonEn: 'Read-only result comparison fields are planned; no accepted parser/fixture evidence is registered yet.',
       fixtureRefs: []
     }),
     entry({
@@ -413,6 +420,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['archive-only'],
       currentDisposition: 'archive-only',
       currentDispositionReason: 'Read-only result comparison fields are planned; no accepted parser/fixture evidence is registered yet.',
+      currentDispositionReasonEn: 'Read-only result comparison fields are planned; no accepted parser/fixture evidence is registered yet.',
       fixtureRefs: []
     }),
     entry({
@@ -426,6 +434,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['archive-only'],
       currentDisposition: 'archive-only',
       currentDispositionReason: 'Authoritative DAT column order is n.a.; no default mapping may be guessed and unmapped files are archive-only.',
+      currentDispositionReasonEn: 'Authoritative DAT column order is n.a.; no default mapping may be guessed and unmapped files are archive-only.',
       fixtureRefs: [
         fixture('kun/src/engineering/fixtures/survey-formats/professional/south-dat-explicit.dat', 'golden'),
         fixture('kun/src/engineering/fixtures/survey-formats/professional/south-dat-negative.dat', 'negative')
@@ -442,6 +451,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['adjustment-ready', 'archive-only'],
       currentDisposition: 'adjustment-ready',
       currentDispositionReason: '严格识别 For M5 aBFFB 测段、Rb/Rf 顺序、米制读数和原始记录锚点后可进入策略校验；已知高程基准、闭合、拓扑和精度条件仍由平差入口逐项验证。',
+      currentDispositionReasonEn: 'Strict For M5 aBFFB section recognition, Rb/Rf order, metre readings and raw-record anchors permit strategy validation. Known height datum, closure, topology and precision are checked at adjustment entry.',
       fixtureRefs: [
         fixture('kun/src/engineering/fixtures/survey-formats/professional/trimble-m5.m5', 'golden'),
         fixture('kun/src/engineering/fixtures/survey-formats/professional/trimble-m5-dat.dat', 'golden'),
@@ -460,6 +470,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['adjustment-ready', 'archive-only'],
       currentDisposition: 'adjustment-ready',
       currentDispositionReason: '词法、观测语义和单位转换成功后可进入策略校验；固定控制、基准、几何、闭合和精度条件仍由平差入口逐项验证。',
+      currentDispositionReasonEn: 'Validated lexical structure, observation semantics and unit conversion permit strategy validation. Fixed control, datum, geometry, closure and precision are still checked at adjustment entry.',
       fixtureRefs: [
         fixture('fixtures/survey-formats/professional/leica-gsi8.gsi', 'golden'),
         fixture('fixtures/survey-formats/professional/leica-gsi-negative.gsi', 'negative')
@@ -476,6 +487,7 @@ const P0_SURVEY_FORMAT_CATALOG_DIRECTORY = new SurveyFormatRegistryCatalog<
       supportedDispositions: ['adjustment-ready', 'archive-only'],
       currentDisposition: 'adjustment-ready',
       currentDispositionReason: '词法、观测语义和单位转换成功后可进入策略校验；固定控制、基准、几何、闭合和精度条件仍由平差入口逐项验证。',
+      currentDispositionReasonEn: 'Validated lexical structure, observation semantics and unit conversion permit strategy validation. Fixed control, datum, geometry, closure and precision are still checked at adjustment entry.',
       fixtureRefs: [
         fixture('fixtures/survey-formats/professional/leica-gsi16.gsi', 'golden'),
         fixture('fixtures/survey-formats/professional/leica-gsi-negative.gsi', 'negative')

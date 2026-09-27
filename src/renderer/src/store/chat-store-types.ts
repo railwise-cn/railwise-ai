@@ -27,6 +27,7 @@ export type QueuedUserMessage = {
   displayText?: string
   mode?: string
   model?: string
+  providerId?: string
   modelLabel?: string
   reasoningEffort?: string
   attachmentIds?: string[]
@@ -72,6 +73,7 @@ export type GuiDesignMessageContext = {
 export type SendMessageOverrides = {
   queued?: QueuedUserMessage
   model?: string
+  providerId?: string
   modelLabel?: string
   reasoningEffort?: string
   displayText?: string
@@ -166,6 +168,7 @@ export type ChatState = {
   turnReasoningLastAtByUserId: Record<string, number>
   inspectorSelectedId: string | null
   composerModel: string
+  composerProviderId?: string
   composerPickList: string[]
   composerModelGroups: ModelProviderModelGroup[]
   queuedMessages: QueuedUserMessage[]
@@ -181,7 +184,7 @@ export type ChatState = {
   activeClawChannelId: string
   appendLocalClawTurn: (userText: string, replyText: string) => void
   setError: (message: string | null) => void
-  setComposerModel: (modelId: string) => void
+  setComposerModel: (modelId: string, providerId?: string) => void
   loadComposerModels: () => Promise<void>
   setRoute: (r: AppRoute) => void
   openWrite: () => Promise<void>

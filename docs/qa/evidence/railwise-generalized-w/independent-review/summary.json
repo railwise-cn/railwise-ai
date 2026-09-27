@@ -1,0 +1,101 @@
+{
+  "review": "independent-generalized-w-replay-1",
+  "pythonVersion": "3.12.7",
+  "bunVersion": "1.3.10",
+  "productSourceSha256": {
+    "kun/src/engineering/survey-generalized-w.ts": "03239b6ae350033eb2662b803d8b637c13758d3e56a1ac1c91d4144d6fead3f5",
+    "kun/src/contracts/survey-generalized-w.ts": "9bfe99f7757f63ae932be0b0cee985c3d591a1a6787d9ba44400dff7b4b6365b"
+  },
+  "method": "Exact Python Fraction GLS and 70-digit Decimal w; no product imports in expected-value generation.",
+  "seed": 20260920,
+  "analytical": {
+    "count": 13,
+    "resolved": 13,
+    "unavailable": [],
+    "maximumScaledError": 1.4046629748614745e-14,
+    "maximumErrorCase": {
+      "id": "directionPlusModelSpace",
+      "field": "test"
+    },
+    "tolerance": 1e-11
+  },
+  "seeded": {
+    "count": 96,
+    "resolved": 95,
+    "unavailable": [
+      {
+        "id": 60,
+        "reason": "numeric-range-or-backward-error"
+      }
+    ],
+    "maximumScaledError": 2.098321516541546e-14,
+    "maximumErrorCase": {
+      "id": 90,
+      "field": "v[1]"
+    },
+    "tolerance": 1e-11
+  },
+  "subnormal": [
+    {
+      "multiplier": 1,
+      "variance": 5e-324,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 2,
+      "variance": 1e-323,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 3,
+      "variance": 1.5e-323,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 4,
+      "variance": 2e-323,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 5,
+      "variance": 2.5e-323,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 7,
+      "variance": 3.5e-323,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 100,
+      "variance": 4.94e-322,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 100000,
+      "variance": 4.94066e-319,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    },
+    {
+      "multiplier": 10000000000,
+      "variance": 4.9406564584e-314,
+      "status": "unavailable",
+      "reason": "numeric-range-or-backward-error"
+    }
+  ],
+  "extremeMean": {
+    "cases": 18,
+    "unavailable": 18
+  },
+  "failures": [],
+  "professionalSignoff": false,
+  "scope": "pure numeric kernel only; no production model authentication, distributions, multiple comparisons or complete Baarda procedure"
+}

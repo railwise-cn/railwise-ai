@@ -1,0 +1,140 @@
+{
+  "startedAt": "2026-09-20T05:02:41.264Z",
+  "stoppedAt": "2026-09-20T05:08:05.562Z",
+  "reason": "SIGINT",
+  "model": "deepseek-flash",
+  "requestCount": 6,
+  "upstreamCount": 6,
+  "candidateCredentialAccess": "unchanged; require 0",
+  "officialCredentialStoredInCandidate": false,
+  "acceptanceScope": "GUI via loopback relay to official provider; not direct official credential-chain acceptance",
+  "events": [
+    {
+      "at": "2026-09-20T05:02:59.390Z",
+      "requestId": 1,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T05:02:59.547Z",
+      "requestId": 1,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:02:59.550Z",
+      "requestId": 1,
+      "kind": "completed",
+      "model": null,
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:02:59.941Z",
+      "requestId": 2,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T05:03:00.271Z",
+      "requestId": 2,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:03:00.272Z",
+      "requestId": 2,
+      "kind": "completed",
+      "model": null,
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:03:06.903Z",
+      "requestId": 3,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T05:03:07.031Z",
+      "requestId": 3,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:03:07.031Z",
+      "requestId": 3,
+      "kind": "completed",
+      "model": null,
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:06:28.560Z",
+      "requestId": 4,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T05:06:29.114Z",
+      "requestId": 4,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:06:29.116Z",
+      "requestId": 4,
+      "kind": "completed",
+      "model": null,
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:06:35.818Z",
+      "requestId": 5,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T05:06:35.952Z",
+      "requestId": 5,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:06:35.952Z",
+      "requestId": 5,
+      "kind": "completed",
+      "model": null,
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:07:22.777Z",
+      "requestId": 6,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T05:07:22.946Z",
+      "requestId": 6,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T05:07:23.589Z",
+      "requestId": 6,
+      "kind": "completed",
+      "model": "deepseek-flash",
+      "status": 200
+    }
+  ],
+  "operatorReportedShutdownChecks": {
+    "signal": "SIGINT",
+    "processExitCode": 0,
+    "tokenFileAbsent": true,
+    "curlAfterShutdownExitCode": 7
+  },
+  "shutdownAttribution": "Main agent reported process exit/token removal/connection refusal; archive worker did not rerun live GUI or inspect credentials."
+}

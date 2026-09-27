@@ -1,0 +1,115 @@
+{
+  "sourceHead": "172704aff7948775bd5e24ad25b69c09200b4a19",
+  "version": "0.5.0",
+  "dmgSha256": "f6463dd56d79ae5b797503f68d8f1f96030c83fefbd112974baea7a0b59e395b",
+  "asarSha256": "e4441b54fec609106678f8dde4d52a7c9d666b47f6b63b162d8cc3a2a2accaa4",
+  "signatureVerified": true,
+  "notarizationPassed": false,
+  "gatekeeperOverride": "security disabled; not acceptance evidence",
+  "updaterRoundTripPassed": false,
+  "runtime": {
+    "gsi": {
+      "status": "completed",
+      "validation": "valid",
+      "points": 27,
+      "observations": 28,
+      "outputCount": 3,
+      "reviewStatus": "draft"
+    },
+    "in2": {
+      "status": "completed",
+      "validation": "valid",
+      "points": 33,
+      "observations": 160,
+      "outputCount": 3,
+      "reviewStatus": "draft"
+    }
+  },
+  "numericalReference": {
+    "gsi": {
+      "maximumHeightDifferenceMm": 0.02031550931747006,
+      "maximumReferenceStandardErrorMm": 0.26658109269216607,
+      "rule": "each unknown within one reference standard error; fixed heights within 1e-9 m",
+      "mismatches": 0,
+      "passed": true
+    },
+    "gsiSourceDifferencesRequireReview": true,
+    "in2": {
+      "status": "matched",
+      "comparedPointCount": 33,
+      "mismatchCount": 0,
+      "maxPlanarCoordinateDifferenceMetres": 6.341583922171748e-05
+    }
+  },
+  "gui": {
+    "syntheticIn2DeliveryComplete": true,
+    "realFormatsGuiReplayedInThisPackage": false,
+    "projectRevision": 3,
+    "reviewStatus": "draft",
+    "preflightQuestionPrepared": true,
+    "residualQuestionPreservesWrittenText": true,
+    "referenceSurvivesStageAndSettingsNavigation": true,
+    "exactRecordLocated": "cosa-in2-record-10",
+    "exactByteRange": [
+      129,
+      11
+    ],
+    "fileAndManifestQuestionsPrepared": true,
+    "narrowWindowResponsiveLayoutVerified": true,
+    "keyboardComposerFocusOrder": [
+      "input",
+      "more actions",
+      "model settings",
+      "send"
+    ],
+    "fullKeyboardVerified": false,
+    "englishDarkReviewInspected": true,
+    "chineseLightReviewInspected": true,
+    "maximizedInspected": true,
+    "restartRestoresTaskStageManifests": true,
+    "successfulModelTurn": false,
+    "modelFailure": "401 Authentication Fails (governor); consultation has no assistant answer",
+    "dockTrayUiVerified": false
+  },
+  "discoveredIssues": [
+    "Overview still counted drafts as archived and displayed monitoring stages for Survey-only tasks; fixed in subsequent source changes, not in this package.",
+    "Model authentication failure clears the submitted composer draft; message remains in history. Successful model conversation has not been accepted."
+  ],
+  "screenshots": [
+    {
+      "name": "gui-en-dark-narrow.jpg",
+      "sha256": "21100b6d792504aa8b6815dff5ff576094dacb1612a2a9d520f08198449fa5ab",
+      "syntheticDataOnly": true
+    },
+    {
+      "name": "gui-en-dark-review.jpg",
+      "sha256": "6372b9cc9ab81134e59dd8232583a213a9e3ac85d65edc55d4a235ba382d7048",
+      "syntheticDataOnly": true
+    },
+    {
+      "name": "gui-en-exact-reference.jpg",
+      "sha256": "b2aa087082aaa934ee1c38bbb0089f1bd2fcc44b769ccfbb80a10b16f25c6a33",
+      "syntheticDataOnly": true
+    },
+    {
+      "name": "gui-zh-light-maximized.jpg",
+      "sha256": "e3c3cdfa3fb4624a3a3640ea40555f272799d394044449960fc5d1ded3fd8728",
+      "syntheticDataOnly": true
+    },
+    {
+      "name": "gui-zh-light-model-unavailable.jpg",
+      "sha256": "b051753f727d2e3acdf8dff38b6216f0943209b54b796e010bdb02ef6135168f",
+      "syntheticDataOnly": true
+    }
+  ],
+  "ci": {
+    "sourceHead": "172704aff7948775bd5e24ad25b69c09200b4a19",
+    "desktopPassed": 2481,
+    "runtimePassed": 1590,
+    "runIds": [
+      35421132664,
+      35421134463
+    ],
+    "allChecksPassed": true
+  }
+}

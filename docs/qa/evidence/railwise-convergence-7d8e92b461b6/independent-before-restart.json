@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "projectId": "project_7530b2cd-3fa9-4f00-802f-f6e8a83be3c3",
+  "count": 3,
+  "records": [
+    {
+      "id": "advanced_trial_7b98cb57-c9cf-4040-a450-0b03e8479f7d",
+      "fixture": "w-diagonal",
+      "requestSha256": "c8c2c5b48e3a1530bd3a229af417a8514100845f3caa4db89c440f557d69aed0",
+      "declarationSha256": "154ba666bfb32e85bbae70b40335ab113fc1f6835903150c49e5227eb5414c81",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    },
+    {
+      "id": "advanced_trial_d4fe9f4e-111a-4ffc-9347-c0ffd2b32887",
+      "fixture": "vce-single-group",
+      "requestSha256": "3bc52733786b539ceac48bbcca229b617a68429eb264c6cc888b8d73eff70dda",
+      "declarationSha256": "9784f23f1d936037831fbc4763272e99bdd002eff18afcf21081f10da6d123c1",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    },
+    {
+      "id": "advanced_trial_61a598ce-9079-4437-a584-1883f5ff1a75",
+      "fixture": "vce-nonpositive",
+      "requestSha256": "9ce1b41a804f9de475e5184e1fe7accd79dd28a9699f2062beba8cc0eab3ad83",
+      "declarationSha256": "2089aed0878ce72d9f95876d31fbcb73922ecd64f1206663c5d2442a415ca376",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    }
+  ],
+  "scope": "raw byte and SQL identity bindings plus independent acceptance arithmetic; not canonical hash replay or professional approval"
+}

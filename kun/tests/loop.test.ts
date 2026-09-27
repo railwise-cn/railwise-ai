@@ -2818,7 +2818,7 @@ describe('AgentLoop', () => {
 
     await h.loop.runTurn(h.threadId, turnId)
 
-    expect(seenModels).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
+    expect(seenModels).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
   })
 
   it('keeps explicit turn reasoning effort when auto routing chooses the model', async () => {
@@ -2852,7 +2852,7 @@ describe('AgentLoop', () => {
 
     await h.loop.runTurn(h.threadId, turnId)
 
-    expect(seenModels).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
+    expect(seenModels).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
   })
 
   it('falls back to a concrete heuristic model when auto router fails', async () => {
@@ -2885,7 +2885,7 @@ describe('AgentLoop', () => {
 
     await h.loop.runTurn(h.threadId, turnId)
 
-    expect(realRequestModel).toBe('deepseek-v4-flash')
+    expect(realRequestModel).toBe('deepseek-flash')
   })
 
   it('uses the latest compaction item as the effective history boundary', async () => {

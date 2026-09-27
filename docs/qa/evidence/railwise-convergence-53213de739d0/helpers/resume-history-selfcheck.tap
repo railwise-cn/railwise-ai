@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: pure fixture validates seven retained mock texts and four tools in the original Task resume
+ok 1 - pure fixture validates seven retained mock texts and four tools in the original Task resume
+  ---
+  duration_ms: 1.377459
+  type: 'test'
+  ...
+# Subtest: legacy inputs without resume history retain their existing audit path
+ok 2 - legacy inputs without resume history retain their existing audit path
+  ---
+  duration_ms: 0.059
+  type: 'test'
+  ...
+# Subtest: strict resume history rejects missing previous Turn engineeringExecution
+ok 3 - strict resume history rejects missing previous Turn engineeringExecution
+  ---
+  duration_ms: 0.557084
+  type: 'test'
+  ...
+# Subtest: strict resume history rejects missing previous Turn engineeringPlanId
+ok 4 - strict resume history rejects missing previous Turn engineeringPlanId
+  ---
+  duration_ms: 0.267875
+  type: 'test'
+  ...
+# Subtest: strict resume history rejects missing previous Turn providerId
+ok 5 - strict resume history rejects missing previous Turn providerId
+  ---
+  duration_ms: 0.126583
+  type: 'test'
+  ...
+# Subtest: strict resume history rejects missing previous Turn model
+ok 6 - strict resume history rejects missing previous Turn model
+  ---
+  duration_ms: 0.07125
+  type: 'test'
+  ...
+# Subtest: strict resume history rejects missing previous Turn reasoningEffort
+ok 7 - strict resume history rejects missing previous Turn reasoningEffort
+  ---
+  duration_ms: 0.065375
+  type: 'test'
+  ...
+# Subtest: retained assistant text cannot be omitted or altered
+ok 8 - retained assistant text cannot be omitted or altered
+  ---
+  duration_ms: 0.127833
+  type: 'test'
+  ...
+# Subtest: an unrelated original Task cannot supply resume attachment or attempts
+ok 9 - an unrelated original Task cannot supply resume attachment or attempts
+  ---
+  duration_ms: 0.173292
+  type: 'test'
+  ...
+# Subtest: successful tools cannot be borrowed from the failed mock Turn
+ok 10 - successful tools cannot be borrowed from the failed mock Turn
+  ---
+  duration_ms: 0.11375
+  type: 'test'
+  ...
+# Subtest: HTTP or transport failure cannot replace incomplete-step stalled evidence
+ok 11 - HTTP or transport failure cannot replace incomplete-step stalled evidence
+  ---
+  duration_ms: 0.090334
+  type: 'test'
+  ...
+# Subtest: mock rejection, leaked token, wrong scope and missing report are rejected
+ok 12 - mock rejection, leaked token, wrong scope and missing report are rejected
+  ---
+  duration_ms: 1.71475
+  type: 'test'
+  ...
+# Subtest: new resume-history acceptance cannot enable historical compatibility
+ok 13 - new resume-history acceptance cannot enable historical compatibility
+  ---
+  duration_ms: 0.078667
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 53.941959

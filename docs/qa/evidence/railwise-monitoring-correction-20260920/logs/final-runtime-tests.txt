@@ -1,0 +1,70 @@
+
+> kun@0.4.2 test
+> vitest run
+
+
+ RUN  v4.1.8 <REPOSITORY>/kun
+
+ ❯ tests/builtin-tools.test.ts (38 tests | 1 failed) 10831ms
+     × serializes same-file mutations like pi file-mutation-queue 44ms
+ ❯ tests/engineering-completion-gate.test.ts (10 tests | 3 failed) 38437ms
+     × rejects text-only completion and projects an old false-completed task as needs_attention 6983ms
+     × rejects partial-only completion and projects an old false-completed task as needs_attention 6481ms
+     × completes only after all four real tools succeed 5961ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/builtin-tools.test.ts > Kun built-in tools > serializes same-file mutations like pi file-mutation-queue
+AssertionError: expected [] to deeply equal [ 'first:start' ]
+
+- Expected
++ Received
+
+- [
+-   "first:start",
+- ]
++ []
+
+ ❯ tests/builtin-tools.test.ts:874:19
+    872|
+    873|     await new Promise((resolve) => setTimeout(resolve, 20))
+    874|     expect(order).toEqual(['first:start'])
+       |                   ^
+    875|     releaseFirst()
+    876|     await Promise.all([first, second])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:97:39
+     95|
+     96| describe('Engineering successful-step completion gate', () => {
+     97|   it.each(['text', 'partial'] as const)('rejects %s-only completion an…
+       |                                       ^
+     98|     const f = await fixture(mode)
+     99|     const { plan, turn } = await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:113:3
+    111|   })
+    112|
+    113|   it('completes only after all four real tools succeed', async () => {
+       |   ^
+    114|     const f = await fixture('all')
+    115|     const { plan } = await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  2 failed | 185 passed | 2 skipped (189)
+      Tests  4 failed | 2840 passed | 22 skipped (2866)
+   Start at  18:34:40
+   Duration  43.97s (transform 28.01s, setup 0ms, import 85.33s, tests 319.24s, environment 56ms)
+

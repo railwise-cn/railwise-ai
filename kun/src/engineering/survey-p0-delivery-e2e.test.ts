@@ -1,11 +1,13 @@
-import { mkdtemp, readFile, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
+import Database from 'better-sqlite3'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import type { CosaIn1Mapping } from './survey-cosa-in1.js'
 import { EngineeringService } from './engineering-service.js'
 import { SurveyService } from './survey-service.js'
+import type { AdjustmentRunV1, AdjustmentResultV1, SurveyNetworkV1 } from '../contracts/survey.js'
 import { readReportPdf } from '../../tests/helpers/report-pdf.js'
 
 const fixtures = new URL('./fixtures/survey-formats/', import.meta.url)
@@ -26,7 +28,7 @@ describe('P0 professional survey delivery', () => {
         return stored?.run.projectId === projectId && stored.result ? [stored.result] : []
       }),
       getAdjustmentEvidence: (projectId, ids) => ids.flatMap((id) => {
-        const stored = survey.getAdjustment(id)
+        const stored = survey.getAdjustmentForProjectNewUse(projectId, id)
         return stored?.run.projectId === projectId && stored.result
           ? [{
               run: {
@@ -133,6 +135,14 @@ describe('P0 professional survey delivery', () => {
     expect(planeAdjustment.result).toMatchObject({ strategyId: 'plane-control', validation: 'valid', linearUnit: 'm', angularUnit: 'rad' })
     expect(planeAdjustment.result.closure).not.toEqual({})
     expect(planeAdjustment.result.precision.passed).toBe(true)
+    // Exercise the retained v6 dispatch in the current host as well as the
+    // separately recorded replay of an actual v6 packaged-app database.
+    const legacyRun = { ...planeAdjustment.run, algorithmVersion: 'workwise-survey-adjustment-6' }
+    const legacyResult = (survey as unknown as { calculateAdjustmentResult(network: SurveyNetworkV1, run: AdjustmentRunV1): AdjustmentResultV1 })
+      .calculateAdjustmentResult(checkedPlane, legacyRun)
+    expect(legacyResult.algorithmVersion).toBe('workwise-survey-adjustment-6')
+    expect(legacyResult.points).toEqual(planeAdjustment.result.points.map(({ xyErrorEllipse: _ellipse, ...point }) => point))
+    expect(legacyResult.observations).toEqual(planeAdjustment.result.observations)
 
     const adjustmentIds = [levelAdjustment.run.id, planeAdjustment.run.id]
     const previewRequest = {
@@ -192,6 +202,16 @@ describe('P0 professional survey delivery', () => {
     expect(workbookXml).toContain('survey_sources')
     expect(workbookXml).toContain('survey_closures')
     expect(workbookXml).toContain('survey_parameters')
+    expect(workbookXml).toContain('survey_error_ellipses')
+    const ellipse = planeAdjustment.result.points.find(point => point.id === 'S1')!.xyErrorEllipse!
+    expect(ellipse).toBeDefined()
+    expect(documentXml).toContain(`长半轴=${ellipse.semiMajor} m`)
+    expect(documentXml).toContain('单位马氏半径，非置信百分比')
+    expect(pdf.text).toContain('survey-xy-error-ellipse-1')
+    expect(worksheetXml).toContain('Cxx_m2')
+    expect(worksheetXml).toContain(String(ellipse.semiMajor))
+    expect(worksheetXml).toContain('unit-mahalanobis-radius')
+    expect(JSON.parse(persistedManifest).adjustments.find((a: { strategyId: string }) => a.strategyId === 'plane-control').points.find((p: { id: string }) => p.id === 'S1').xyErrorEllipse).toEqual(ellipse)
     expect(workbookXml).not.toContain('normalized_data')
     expect(workbookXml).not.toContain('analysis_results')
     expect(documentXml).not.toContain('监测类型')
@@ -214,8 +234,38 @@ describe('P0 professional survey delivery', () => {
     await expect(engineering.previewReport({ ...previewRequest, adjustmentIds: [], idempotencyKey: 'p0-empty-report' })).rejects.toThrow(/selected survey results/)
     await expect(engineering.previewReport({ ...previewRequest, analysisId: 'unrelated-analysis', idempotencyKey: 'p0-orphan-analysis' })).rejects.toThrow(/analysisId requires datasetId/)
     await expect(engineering.previewReport({ ...previewRequest, expectedRevision: project.revision + 1, idempotencyKey: 'p0-stale-project' })).rejects.toThrow(/project revision conflict/)
+    const verification = engineering.verifyDeliverable(project.id, manifest.id)
+    expect(verification).toMatchObject({ valid: true, reviewStatus: 'draft' })
+    expect(verification.checks).toHaveLength(5)
+    expect(verification.checks.every(item => item.status === 'passed')).toBe(true)
+    expect(() => engineering.verifyDeliverable('other-project', manifest.id)).toThrow(/not found in project/)
+    const sealedOutput = join(workspace, manifest.outputs[0]!.path)
+    const original = await readFile(sealedOutput)
+    await writeFile(sealedOutput, 'tampered')
+    expect(engineering.verifyDeliverable(project.id, manifest.id)).toMatchObject({ valid: false, checks: expect.arrayContaining([{ id: 'outputs', status: 'failed', detail: expect.stringContaining('recorded hash') }]) })
+    await writeFile(sealedOutput, original)
+    await writeFile(manifestPath, persistedManifest + '\n')
+    expect(engineering.verifyDeliverable(project.id, manifest.id)).toMatchObject({ valid: false, checks: expect.arrayContaining([{ id: 'manifest', status: 'failed', detail: expect.stringContaining('durable manifest') }]) })
+    await writeFile(manifestPath, persistedManifest)
+    expect(engineering.verifyDeliverable(project.id, manifest.id).valid).toBe(true)
+    expect(await readFile(manifestPath, 'utf8')).toBe(persistedManifest)
+    const db = new Database(join(root, 'runtime', 'survey.sqlite3'))
+    try {
+      const adjustmentId = manifest.adjustments[0]!.runId
+      const before = db.prepare('SELECT data_json FROM survey_adjustments WHERE id = ?').get(adjustmentId) as { data_json: string }
+      const altered = JSON.parse(before.data_json)
+      altered.result.unitWeightStdDev += 0.123
+      db.prepare('UPDATE survey_adjustments SET data_json = ? WHERE id = ?').run(JSON.stringify(altered), adjustmentId)
+      const rejected = engineering.verifyDeliverable(project.id, manifest.id)
+      expect(rejected.valid).toBe(false)
+      expect(rejected.checks.find(item => item.id === 'surveyReplay')?.status).toBe('failed')
+      db.prepare('UPDATE survey_adjustments SET data_json = ? WHERE id = ?').run(before.data_json, adjustmentId)
+    } finally { db.close() }
+    expect(engineering.verifyDeliverable(project.id, manifest.id).valid).toBe(true)
+
     engineering.updateProject(project.id, { name: 'Changed project', expectedRevision: project.revision, idempotencyKey: 'p0-change-project' })
     await expect(engineering.previewReport({ ...previewRequest, expectedRevision: 0 })).rejects.toThrow()
     await expect(engineering.finalize({ ...finalizeRequest, expectedRevision: 0 })).rejects.toThrow()
+    expect(engineering.verifyDeliverable(project.id, manifest.id)).toMatchObject({ valid: false, checks: expect.arrayContaining([{ id: 'inputs', status: 'failed', detail: expect.any(String) }]) })
   })
 })

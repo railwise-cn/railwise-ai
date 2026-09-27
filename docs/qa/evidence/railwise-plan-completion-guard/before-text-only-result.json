@@ -1,0 +1,43 @@
+{
+  "syntheticOnly": true,
+  "realModelUsed": false,
+  "planId": "eplan_a182eba4-90a7-4e36-9e14-f1775460b944",
+  "networkId": "network_db8367cf-e6de-4197-b235-7ee935f9b91a",
+  "steps": [
+    {
+      "id": "inspect-survey-network",
+      "tool": "survey_network_validate",
+      "receipt": null
+    },
+    {
+      "id": "adjust-survey-network",
+      "tool": "survey_calculator",
+      "receipt": null
+    },
+    {
+      "id": "review-survey-quality",
+      "tool": "survey_adjustment_read",
+      "receipt": null
+    },
+    {
+      "id": "prepare-survey-report",
+      "tool": "report_export",
+      "receipt": null
+    }
+  ],
+  "modelCalls": 1,
+  "turnStatus": "completed",
+  "taskStatus": "completed",
+  "taskAcceptance": {
+    "kind": "answer",
+    "requiredNodeKinds": [
+      "deliver"
+    ],
+    "requireFinalResponse": true,
+    "requireActionableArtifactCard": false
+  },
+  "rawPlanStatus": "started",
+  "toolCalls": 0,
+  "adjustmentCount": 0,
+  "finalResponse": "The approved survey work is complete. All observations have been processed and the results are ready."
+}

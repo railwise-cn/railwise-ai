@@ -1,0 +1,159 @@
+{
+  "startedAt": "2026-09-20T08:42:40.001Z",
+  "stoppedAt": "2026-09-20T08:47:08.164Z",
+  "reason": "SIGINT",
+  "model": "deepseek-flash",
+  "requestCount": 11,
+  "upstreamCount": 4,
+  "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+  "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+  "threadId": "thr_wt4kfajs",
+  "tokenRemoved": true,
+  "relayScope": "four typed measurement tools plus read-only project context; persisted synthetic thread results; buffered original upstream bytes",
+  "candidateCredentialAccess": "unchanged; require 0",
+  "officialCredentialStoredInCandidate": false,
+  "acceptanceScope": "GUI via loopback relay to official provider; not direct official credential-chain acceptance",
+  "events": [
+    {
+      "at": "2026-09-20T08:42:53.660Z",
+      "requestId": 1,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T08:42:53.822Z",
+      "requestId": 1,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T08:42:53.826Z",
+      "requestId": 1,
+      "kind": "completed",
+      "status": 200,
+      "model": null
+    },
+    {
+      "at": "2026-09-20T08:42:59.283Z",
+      "requestId": 2,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T08:42:59.391Z",
+      "requestId": 2,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T08:42:59.391Z",
+      "requestId": 2,
+      "kind": "completed",
+      "status": 200,
+      "model": null
+    },
+    {
+      "at": "2026-09-20T08:43:02.530Z",
+      "requestId": 3,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T08:43:03.163Z",
+      "requestId": 3,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T08:43:03.164Z",
+      "requestId": 3,
+      "kind": "completed",
+      "status": 200,
+      "model": null
+    },
+    {
+      "at": "2026-09-20T08:44:46.856Z",
+      "requestId": 4,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:44:47.031Z",
+      "requestId": 4,
+      "kind": "upstream_status",
+      "status": 503
+    },
+    {
+      "at": "2026-09-20T08:44:47.031Z",
+      "requestId": 4,
+      "kind": "failed",
+      "status": 503,
+      "code": "upstream_rejected",
+      "upstreamRequested": true
+    },
+    {
+      "at": "2026-09-20T08:45:57.651Z",
+      "requestId": 5,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    },
+    {
+      "at": "2026-09-20T08:45:57.708Z",
+      "requestId": 6,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    },
+    {
+      "at": "2026-09-20T08:45:57.762Z",
+      "requestId": 7,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    },
+    {
+      "at": "2026-09-20T08:45:57.811Z",
+      "requestId": 8,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    },
+    {
+      "at": "2026-09-20T08:45:57.855Z",
+      "requestId": 9,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    },
+    {
+      "at": "2026-09-20T08:45:57.897Z",
+      "requestId": 10,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    },
+    {
+      "at": "2026-09-20T08:45:57.964Z",
+      "requestId": 11,
+      "kind": "failed",
+      "status": 400,
+      "code": "tool_not_allowed",
+      "upstreamRequested": false
+    }
+  ]
+}

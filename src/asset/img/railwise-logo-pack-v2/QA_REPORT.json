@@ -1,0 +1,122 @@
+{
+  "RAILWISE_AI_symbol_color_1024.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      1024,
+      1024
+    ]
+  },
+  "RAILWISE_AI_symbol_color_128.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      128,
+      128
+    ]
+  },
+  "RAILWISE_AI_symbol_color_16.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ]
+  },
+  "RAILWISE_AI_symbol_color_24.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      24,
+      24
+    ]
+  },
+  "RAILWISE_AI_symbol_color_256.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      256,
+      256
+    ]
+  },
+  "RAILWISE_AI_symbol_color_32.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      32,
+      32
+    ]
+  },
+  "RAILWISE_AI_symbol_color_48.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      48,
+      48
+    ]
+  },
+  "RAILWISE_AI_symbol_color_512.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      512,
+      512
+    ]
+  },
+  "RAILWISE_AI_symbol_color_64.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      64,
+      64
+    ]
+  },
+  "RAILWISE_AI_symbol_color_master_2048.png": {
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "size": [
+      2048,
+      2048
+    ]
+  }
+}

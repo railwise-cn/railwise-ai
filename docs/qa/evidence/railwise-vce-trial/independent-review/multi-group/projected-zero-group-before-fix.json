@@ -1,0 +1,241 @@
+[
+  {
+    "n": 3,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 3,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "nonpositive-component",
+    "iterations": [
+      {
+        "iteration": 1,
+        "currentVariances": [
+          0.000001,
+          1000000
+        ],
+        "candidateVariances": [
+          0,
+          1999999.9999999995
+        ],
+        "covarianceScale": 1,
+        "normal": [
+          [
+            2.5849394142282115e-14,
+            0
+          ],
+          [
+            0,
+            5e-13
+          ]
+        ],
+        "rightHandSide": [
+          0,
+          9.999999999999997e-7
+        ],
+        "stochasticNormalConditionInfinity": 19.34281311383407,
+        "relativeChange": 1,
+        "fit": {
+          "parameters": [
+            100,
+            -100
+          ],
+          "residuals": [
+            0,
+            -1,
+            0.9999999999999999
+          ],
+          "functionalNormalConditionInfinity": 5004.000800000089
+        }
+      }
+    ]
+  },
+  {
+    "n": 3,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 3,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 1,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "nonpositive-component",
+    "iterations": [
+      {
+        "iteration": 1,
+        "currentVariances": [
+          0.000001,
+          1000000
+        ],
+        "candidateVariances": [
+          0,
+          3999999.9999999995
+        ],
+        "covarianceScale": 1,
+        "normal": [
+          [
+            1.0339757656912846e-13,
+            0
+          ],
+          [
+            0,
+            1.0000000000000002e-12
+          ]
+        ],
+        "rightHandSide": [
+          0,
+          0.000004
+        ],
+        "stochasticNormalConditionInfinity": 9.671406556917034,
+        "relativeChange": 1,
+        "fit": {
+          "parameters": [
+            300,
+            -300
+          ],
+          "residuals": [
+            0,
+            -2,
+            9.714451466277913e-17,
+            2
+          ],
+          "functionalNormalConditionInfinity": 13337.333633332639
+        }
+      }
+    ]
+  },
+  {
+    "n": 4,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 4,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 2,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 5,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 3,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.01,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.02,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "nonpositive-component",
+    "iterations": [
+      {
+        "iteration": 1,
+        "currentVariances": [
+          0.000001,
+          1000000
+        ],
+        "candidateVariances": [
+          0,
+          10000000
+        ],
+        "covarianceScale": 1,
+        "normal": [
+          [
+            1.6155871338926322e-15,
+            0
+          ],
+          [
+            0,
+            2e-12
+          ]
+        ],
+        "rightHandSide": [
+          0,
+          0.000019999999999999998
+        ],
+        "stochasticNormalConditionInfinity": 1237.9400392853804,
+        "relativeChange": 1,
+        "fit": {
+          "parameters": [
+            250,
+            -250
+          ],
+          "residuals": [
+            0,
+            -4,
+            -2,
+            -2.7755575595989432e-17,
+            2,
+            4
+          ],
+          "functionalNormalConditionInfinity": 2004.0020000001252
+        }
+      }
+    ]
+  },
+  {
+    "n": 6,
+    "a": 0.03,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  },
+  {
+    "n": 6,
+    "a": 0.1,
+    "residualDegreesOfFreedom": 4,
+    "outcome": "stochastic-rank-or-conditioning",
+    "iterations": []
+  }
+]

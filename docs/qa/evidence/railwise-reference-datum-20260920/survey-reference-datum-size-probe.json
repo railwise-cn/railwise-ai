@@ -1,0 +1,12 @@
+{
+  "node": "v26.8.2",
+  "pointCount": 32,
+  "referenceCount": 32,
+  "maximumIdCodeUnits": 160,
+  "requestUtf8Bytes": 164307,
+  "outputUtf8Bytes": 261804,
+  "elapsedMs": 12.916833000000004,
+  "outcome": "calculated",
+  "covarianceClassification": "numerically-positive-definite",
+  "caveat": "one local synthetic long-ID and maximum-dimension probe; not worst-case byte proof or production SLA"
+}

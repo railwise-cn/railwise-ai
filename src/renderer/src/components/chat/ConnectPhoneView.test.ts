@@ -59,9 +59,9 @@ describe('ConnectPhoneView', () => {
       })
     )
 
-    expect(html).toContain('Use your phone to connect WorkWise')
+    expect(html).toContain('Use your phone to connect RailWise AI')
     expect(html).toContain('Generate authorization QR')
-    expect(html).not.toContain('WorkWise Runtime usage')
+    expect(html).not.toContain('RailWise AI Runtime usage')
   })
 
   it('resolves every common connection label instead of exposing translation keys', async () => {
@@ -109,9 +109,9 @@ describe('ConnectPhoneView', () => {
     await expect(pending).rejects.toThrow('IM_INSTALL_POLL_TIMEOUT')
   })
 
-  it('builds the default WorkWise channel payload after a successful scan', () => {
+  it('builds the default RailWise AI channel payload after a successful scan', () => {
     expect(createConnectPhoneAgentProfile()).toEqual({
-      name: 'WorkWise',
+      name: 'RailWise AI',
       description: '',
       identity: '',
       personality: '',

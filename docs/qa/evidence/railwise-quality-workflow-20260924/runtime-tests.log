@@ -1,0 +1,302 @@
+
+> kun@0.4.2 test
+> vitest run --reporter=default
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ✓ src/engineering/survey-quality-scoring-workspace.test.ts (46 tests) 2664ms
+     ✓ fits a full maximum-precision-item page within the replay budget  445ms
+stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension generalized-w model within the explicit response bound
+advanced-trial-size generalized-w: 121066 bytes; 0 iterations
+
+ ✓ src/engineering/survey-golden.test.ts (37 tests) 3226ms
+ ✓ src/engineering/survey-service.test.ts (46 tests) 4492ms
+ ✓ tests/ui-action-service.test.ts (12 tests) 1760ms
+     ✓ keeps the source model identity for explicit UI action turns and tasks  749ms
+     ✓ keeps the source model identity for legacy UI action turns and tasks  533ms
+     ✓ keeps the source model identity for removed UI action turns and tasks  463ms
+ ✓ tests/runtime-factory.test.ts (13 tests) 3952ms
+     ✓ starts without an analyzer for enabled invalid endpoint "" and fails only image turns  1137ms
+     ✓ starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns  893ms
+     ✓ registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID  372ms
+ ✓ src/engineering/engineering-verification-audit.test.ts (14 tests) 5894ms
+     ✓ records actual strict replay, feeds Python, and supersedes passing evidence after an output failure without modifying checked objects  818ms
+     ✓ excludes stale numerical inputs even when old stored inputHash strings are left unchanged  564ms
+     ✓ retains lookup errors, rejects update/delete/replace, and fails closed if the audit cannot be written  335ms
+     ✓ keeps verification usable when the optional audit network provider is absent but refuses coverage credit  388ms
+     ✓ fails the recorded metrics closed after audit corruption instead of substituting an earlier pass  422ms
+     ✓ keeps the correct durable denominator when started persistence fails  410ms
+     ✓ keeps the correct durable denominator when finished persistence fails  443ms
+     ✓ keeps the correct durable denominator when terminal persistence fails  559ms
+     ✓ does not count a finish at the exclusive cutoff for its started cohort  482ms
+     ✓ rolls back terminal evidence on a backwards clock and preserves the start  310ms
+     ✓ preserves legacy terminal bytes and metrics when opening a database without lifecycle history  367ms
+     ✓ retains a committed start after an actual process termination  488ms
+ ✓ src/engineering/engineering-plan-execution.test.ts (9 tests) 1535ms
+     ✓ runs the actual deterministic tool chain with approved literals and persisted predecessor handles  320ms
+     ✓ executes namespaced monitoring tools with validation revisions and bound analysis outputs  305ms
+ ✓ src/engineering/survey-quality-assessment.test.ts (13 tests) 6507ms
+     ✓ freezes all three census units, preserves exact request bytes and draft files, performs exactly two score reads per unit, and restarts  785ms
+     ✓ keeps partial unit scope unresolved instead of complete  541ms
+     ✓ keeps pending unit scope unresolved instead of complete  495ms
+     ✓ keeps multi60 unit scope unresolved instead of complete  572ms
+     ✓ shows explicit veto alongside missing unit and checks every original retention requirement  485ms
+     ✓ resolves each explicit reference location only to the same unit and passed mapping  416ms
+     ✓ rejects subset/order/member/duplicate/unsupported sample scopes without slicing  820ms
+     ✓ rejects duplicate keys, escaped-equivalent keys, surrogates and invalid UTF-8  379ms
+     ✓ does not replay sources for list and isolates own damaged rows  384ms
+     ✓ rejects coherent result+all hash forgery through recomputation  352ms
+     ✓ isolates malformed SQL identities without hiding healthy history  325ms
+     ✓ uses exactly 224 scoring work units for eight maximum unit records; next replay is rate-limited  666ms
+ ✓ src/engineering/survey-import-audit.test.ts (12 tests) 1345ms
+ ✓ tests/loop.test.ts (80 tests) 2481ms
+     ✓ keeps running past the legacy eight-step ceiling until the model stops  309ms
+     ✓ handles concurrent file thread index writes in the same millisecond  413ms
+     ✓ finalizes open turn items in messages.jsonl when a turn is aborted  515ms
+     ✓ finalizes open turn items in messages.jsonl when a turn is failed  629ms
+ ✓ tests/survey-quality-scoring-workspace-http.test.ts (8 tests) 1284ms
+ ✓ src/engineering/engineering-service.analysis-time.test.ts (9 tests) 1372ms
+   ✓ preserves explicit legacy analyses, reports and manifests while automatic requests compute the new algorithm  507ms
+ ✓ src/engineering/survey-historical-source-gates.test.ts (10 tests) 1468ms
+     ✓ binds deformation replays to their epoch set and refuses a ready-source key collision  316ms
+stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension vce model within the explicit response bound
+advanced-trial-size vce: 333063 bytes; 55 iterations
+
+ ✓ tests/cli-agent.test.ts (9 tests) 512ms
+stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size huber result within the response bound
+advanced-new-size huber: 2925050 bytes
+
+ ✓ src/engineering/survey-free-leveling-service.test.ts (16 tests) 1059ms
+stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size statistical-family result within the response bound
+advanced-new-size statistical-family: 482156 bytes
+
+ ✓ src/engineering/monitoring-replay.test.ts (32 tests) 9557ms
+   ✓ reparses actual source bytes, recomputes exact results and preserves all old business/output/audit records  418ms
+   ✓ does not guess the environment for workwise-engineering-1  310ms
+   ✓ does not read oversized original blobs  1394ms
+   ✓ does not read oversized source context or persist a new oversized import  373ms
+   ✓ bounds actual XLSX expanded before storing a new import  780ms
+   ✓ bounds actual XLSX entries before storing a new import  303ms
+   ✓ reports a preserved pre-budget XLSX as not-evaluated when actual expansion exceeds the limit  420ms
+   ✓ retains a real committed start after child-process SIGKILL  341ms
+ ✓ tests/survey-advanced-trials-workspace-http.test.ts (15 tests) 8128ms
+     ✓ exports a maximum-dimension vce model within the explicit response bound  5539ms
+     ✓ exports a real maximum-size huber result within the response bound  777ms
+ ✓ tests/hybrid-store.test.ts (17 tests) 1324ms
+ ✓ src/engineering/engineering-plan-resume.test.ts (12 tests) 1414ms
+ ✓ tests/builtin-tools.test.ts (38 tests) 9791ms
+     ✓ returns a pollable bash session for foreground long-running commands  1063ms
+     ✓ polls completed bash sessions for final output  3562ms
+     ✓ blocks the poll action for at least yield_seconds while the session keeps running  3067ms
+     ✓ returns from poll early once the session exits before yield_seconds  1067ms
+ ✓ src/engineering/survey-statistical-service.test.ts (8 tests) 763ms
+ ✓ src/services/task-controller.test.ts (14 tests) 442ms
+ ✓ src/engineering/engineering-service.test.ts (12 tests) 1272ms
+     ✓ imports CSV, validates findings, analyses trends and writes reviewable deliverables  321ms
+ ✓ src/engineering/survey-sampling-workspace.test.ts (11 tests) 476ms
+ ✓ src/flow/flow-runtime.test.ts (16 tests) 963ms
+ ✓ src/services/git-checkpoint-coordinator.test.ts (2 tests) 814ms
+     ✓ binds a mutation to the nearest nested repository instead of the parent repository  567ms
+ ✓ src/engineering/engineering-ai-orchestrator.test.ts (10 tests) 821ms
+ ✓ src/server/routes/survey-quality-assessment.test.ts (2 tests) 916ms
+     ✓ requires auth and returns full create/reverify/export detail with no-store and no follow-up read  535ms
+     ✓ preserves resource, unavailable and corruption classifications  380ms
+ ✓ src/engineering/engineering-survey-deliverable.test.ts (2 tests) 1076ms
+     ✓ keeps adjustment results and displacement evidence in manifest and XLSX  806ms
+ ✓ tests/runtime-quality-assessment-wiring.test.ts (1 test) 767ms
+   ✓ wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown  766ms
+ ✓ src/adapters/tool/engineering-conversation-tools.test.ts (10 tests) 1355ms
+ ✓ src/engineering/survey-advanced-trials-workspace.test.ts (58 tests) 11889ms
+     ✓ rejects oversized persisted content before materializing or parsing it  353ms
+     ✓ reads a full ten-row page at the maximum declared VCE cost without overcharging  460ms
+     ✓ reads ten maximum-cost huber records and enforces the remaining replay budget  5460ms
+     ✓ reads ten maximum-cost statistical-family records and enforces the remaining replay budget  1064ms
+     ✓ strictly replays ten complete 32-point cross-covariance records within the history budget  829ms
+     ✓ loads 10 maximum 256-row records in one rate window and enforces its bounded work charge  1230ms
+ ✓ tests/attachment-store.test.ts (21 tests) 1384ms
+ ✓ src/engineering/survey-format-registry.test.ts (136 tests) 1031ms
+     ✓ blocks text record and parsed point limits before a network reaches the matrix layer  595ms
+ ✓ src/engineering/survey-derived-correction-service.test.ts (4 tests) 314ms
+ ✓ src/engineering/survey-p0-delivery-e2e.test.ts (1 test) 711ms
+     ✓ delivers mapped COSA .in1 and COSA .in2 adjustments with traceable closure and precision evidence  709ms
+ ✓ src/server/routes/engineering-survey.test.ts (8 tests) 483ms
+ ✓ src/engineering/engineering-evidence-selection.test.ts (2 tests) 485ms
+     ✓ resolves an exact historical output while refusing cross-project and mismatched delivery references  319ms
+ ✓ tests/http-server.test.ts (49 tests) 846ms
+ ✓ src/adapters/tool/railwise-tool-provider.test.ts (1 test) 625ms
+     ✓ validates, adjusts and reads a bounded strategy-correct result with explicit units  624ms
+ ✓ tests/survey-sampling-workspace-http.test.ts (5 tests) 397ms
+ ✓ tests/delegation-runtime.test.ts (9 tests) 206ms
+ ✓ src/engineering/survey-raw-data-integrity.test.ts (8 tests) 255ms
+ ✓ tests/ppt-master-tool.test.ts (9 tests) 218ms
+ ✓ src/engineering/engineering-service.numeric-cells.test.ts (4 tests) 360ms
+ ✓ tests/skill-runtime.test.ts (12 tests) 225ms
+ ✓ tests/image-gen-tool-provider.test.ts (11 tests) 286ms
+ ✓ tests/workwise-0.3.3-acceptance.test.ts (2 tests) 346ms
+ ✓ src/engineering/survey-quality-workflow.test.ts (11 tests) 5702ms
+     ✓ uses two page-wide passes and shortens source-budget pages without dropping the next item  756ms
+     ✓ bounds body, pagination, per-project creation and event capacity with cached source verification  3626ms
+ ✓ tests/memory-store.test.ts (5 tests) 303ms
+ ✓ tests/survey-quality-workspace-http.test.ts (2 tests) 395ms
+     ✓ freezes actual EngineeringService output through authenticated reference APIs and never changes draft review  393ms
+ ✓ src/engineering/survey-quality-sampling.test.ts (48 tests) 261ms
+ ✓ src/engineering/survey-evidence-readback.test.ts (2 tests) 261ms
+ ✓ src/engineering/survey-converter.test.ts (36 tests | 20 skipped) 112ms
+ ✓ src/engineering/engineering-service.trend-chart.test.ts (1 test) 253ms
+ ✓ src/engineering/engineering-report-metadata.test.ts (1 test) 187ms
+ ✓ tests/workspace-reference-service.test.ts (9 tests) 69ms
+ ✓ tests/create-plan-tool.test.ts (27 tests) 59ms
+ ✓ src/adapters/tool/file-mutation-queue.test.ts (2 tests) 205ms
+ ✓ tests/review.test.ts (10 tests) 187ms
+ ✓ tests/runtime-advanced-trials-wiring.test.ts (1 test) 122ms
+ ✓ src/engineering/survey-quality-workspace.test.ts (13 tests) 356ms
+ ✓ tests/ppt-master-tool-provider.test.ts (3 tests) 61ms
+ ✓ src/engineering/survey-static-incremental.test.ts (152 tests) 157ms
+ ✓ src/engineering/survey-gnss-source-evidence.test.ts (59 tests) 191ms
+ ✓ src/flow/restricted-code.test.ts (3 tests) 326ms
+ ✓ tests/runtime-quality-scoring-wiring.test.ts (1 test) 106ms
+ ✓ src/engineering/survey-public-fixtures.test.ts (11 tests) 105ms
+ ✓ src/engineering/survey-statistical-family.test.ts (231 tests) 130ms
+ ✓ tests/runtime-sampling-wiring.test.ts (1 test) 105ms
+ ✓ src/engineering/survey-reference-datum.test.ts (82 tests) 102ms
+ ✓ src/services/task-run-repository.test.ts (4 tests) 54ms
+ ✓ tests/survey-free-leveling-http.test.ts (2 tests) 113ms
+ ✓ src/adapters/tool/design-export-runner.test.ts (7 tests) 30ms
+ ✓ src/loop/task-run-recovery.test.ts (2 tests) 55ms
+ ✓ src/engineering/specialist-skill-provenance.test.ts (26 tests) 79ms
+ ✓ src/engineering/survey-cosa-ou1.test.ts (15 tests) 75ms
+ ✓ src/adapters/tool/image-gen-reference-security.test.ts (6 tests) 39ms
+ ✓ tests/atomic-write.test.ts (3 tests) 42ms
+ ✓ src/engineering/engineering-report-pdf.test.ts (2 tests) 108ms
+ ✓ src/engineering/survey-rtklib-fixtures.test.ts (8 tests) 91ms
+ ✓ src/server/routes/survey-quality-workflow.test.ts (4 tests) 149ms
+ ✓ tests/goal-repetition-guard.test.ts (4 tests) 47ms
+ ✓ tests/survey-statistics-http.test.ts (2 tests) 92ms
+ ✓ src/flow/webhook-security.test.ts (2 tests) 39ms
+ ✓ src/engineering/survey-free-leveling.test.ts (30 tests) 69ms
+ ✓ src/skills/skill-runtime-preferred.test.ts (2 tests) 60ms
+ ✓ src/adapters/hybrid/hybrid-thread-agent-index.test.ts (1 test) 30ms
+ ✓ src/engineering/engineering-service.regression-1.test.ts (1 test) 41ms
+ ✓ tests/workspace-instructions.test.ts (3 tests) 32ms
+ ✓ src/engineering/survey-professional-fixture-manifest.test.ts (47 tests) 77ms
+ ✓ tests/vision-evidence-service.test.ts (33 tests) 57ms
+ ✓ src/flow/runtime-adapters.test.ts (3 tests) 39ms
+ ✓ src/services/artifact-validator.test.ts (4 tests) 23ms
+ ✓ tests/model-client.test.ts (44 tests) 60ms
+ ✓ src/engineering/survey-vce-trial.test.ts (45 tests) 72ms
+ ✓ src/engineering/survey-huber-trial.test.ts (61 tests) 60ms
+ ✓ src/contracts/survey-quality-sampling-workspace.test.ts (7 tests) 42ms
+ ✓ tests/thread-service.test.ts (13 tests) 36ms
+ ✓ src/engineering/survey-native-format-golden.test.ts (23 tests) 38ms
+ ✓ tests/file-session-store.test.ts (1 test) 30ms
+ ✓ src/engineering/survey-standard-basis.test.ts (15 tests) 41ms
+ ✓ src/engineering/survey-leica-gsi-units.test.ts (62 tests) 41ms
+ ✓ tests/deepseek-responses-web-provider.test.ts (17 tests) 24ms
+ ✓ src/loop/agent-loop.test.ts (16 tests) 48ms
+ ✓ src/engineering/survey-cosa-net.test.ts (5 tests) 38ms
+ ✓ src/engineering/survey-standard-registry.test.ts (43 tests) 38ms
+ ✓ src/engineering/engineering-task-migration.test.ts (2 tests) 23ms
+ ✓ src/server/routes/flows.test.ts (1 test) 53ms
+ ✓ src/engineering/survey-cosa-in2-initializer.test.ts (4 tests) 27ms
+ ✓ tests/contracts.test.ts (35 tests) 24ms
+ ✓ src/engineering/survey-cosa-in2.test.ts (10 tests) 22ms
+ ✓ src/engineering/survey-evidence-reader.test.ts (32 tests) 20ms
+ ✓ src/engineering/survey-leica-gsi-leveling.test.ts (10 tests) 24ms
+ ❯ src/server/routes/engineering-monitoring-replay.test.ts (10 tests | 1 failed) 17ms
+   ✓ accepts an empty request and returns uncached scoped evidence (undefined) 4ms
+   ✓ accepts an empty request and returns uncached scoped evidence ({}) 4ms
+   ✓ rejects nonempty or invalid bodies null without starting an audit 0ms
+   ✓ rejects nonempty or invalid bodies [] without starting an audit 0ms
+   ✓ rejects nonempty or invalid bodies {"force":true} without starting an audit 0ms
+   ✓ rejects nonempty or invalid bodies invalid without starting an audit 0ms
+   ✓ rejects nonempty or invalid bodies "text" without starting an audit 0ms
+   ✓ rejects query parameters and oversized bodies before invoking the service 0ms
+   ✓ does not claim success when evidence cannot be persisted or the contract is invalid 1ms
+   × enforces the real registered HTTP route bearer gate before replay and admits the authenticated request 6ms
+ ✓ src/engineering/survey-quality-scoring.test.ts (101 tests) 29ms
+ ✓ tests/usage-service.test.ts (14 tests) 25ms
+ ✓ src/engineering/survey-generalized-w.test.ts (42 tests) 35ms
+ ✓ tests/survey-standard-basis-http.test.ts (2 tests) 33ms
+ ✓ src/loop/turn-completion-guard.test.ts (16 tests) 17ms
+ ✓ src/services/runtime-span-service.test.ts (1 test) 12ms
+ ✓ tests/user-input-disabled.test.ts (2 tests) 31ms
+ ✓ src/skills/rail-any-station-skill.test.ts (1 test) 13ms
+ ✓ src/engineering/survey-rw5-inspection.test.ts (22 tests) 22ms
+ ✓ tests/agent-loop-attachments.test.ts (3 tests) 26ms
+ ✓ src/engineering/engineering-trend-chart.test.ts (17 tests) 12ms
+ ✓ src/engineering/survey-cosa-in1.test.ts (31 tests) 26ms
+ ✓ src/adapters/mcp/survey-context-server.test.ts (9 tests) 27ms
+ ✓ src/engineering/survey-quality-record.test.ts (16 tests) 25ms
+ ✓ tests/agent-loop-sandbox.test.ts (1 test) 16ms
+ ✓ tests/ports.test.ts (24 tests) 20ms
+ ✓ src/engineering/survey-format-coverage.test.ts (33 tests) 19ms
+ ✓ src/engineering/survey-derived-correction-ledger.test.ts (3 tests) 21ms
+ ✓ src/engineering/survey-gnss-format-manifest.test.ts (1 test) 22ms
+ ✓ src/server/routes/engineering-ai.test.ts (3 tests) 15ms
+ ✓ tests/cache.test.ts (20 tests) 18ms
+ ✓ tests/read-json-body.test.ts (5 tests) 17ms
+ ✓ tests/engineering-ai-errors.test.ts (1 test) 15ms
+ ✓ tests/safe-web-fetch.test.ts (6 tests) 9ms
+ ✓ src/loop/agent-loop-v41-routing.test.ts (8 tests) 19ms
+ ✓ tests/request-history-hygiene.test.ts (5 tests) 7ms
+ ✓ tests/child-agent-executor.test.ts (2 tests) 22ms
+ ✓ tests/web-tool-provider.test.ts (11 tests) 14ms
+ ✓ src/engineering/survey-deformation.test.ts (4 tests) 7ms
+ ✓ src/engineering/survey-fixture-manifest.test.ts (1 test) 7ms
+ ✓ tests/mcp-tool-provider.test.ts (13 tests) 21ms
+ ✓ tests/dsh-ui.test.ts (8 tests) 14ms
+ ✓ tests/todo-tools.test.ts (2 tests) 8ms
+ ✓ src/engineering/survey-statistical-diagnostics.test.ts (16 tests) 9ms
+ ✓ src/engineering/survey-cosa-ou2.test.ts (16 tests) 8ms
+ ✓ src/server/routes/engineering-provenance.test.ts (1 test) 10ms
+ ✓ src/adapters/tool/builtin-tool-utils.test.ts (16 tests) 7ms
+ ✓ src/adapters/mcp/survey-context-reader.test.ts (9 tests) 9ms
+ ✓ src/contracts/survey-source-file.test.ts (8 tests) 8ms
+ ✓ src/engineering/survey-cosa-in2-writer.test.ts (4 tests) 3ms
+ ✓ tests/mcp-config.test.ts (6 tests) 5ms
+ ✓ tests/goal-tools.test.ts (3 tests) 9ms
+ ✓ tests/runtime-event-reducer.test.ts (4 tests) 3ms
+ ✓ tests/deepseek-pricing.test.ts (15 tests) 5ms
+ ✓ src/services/thread-agent-policy.test.ts (1 test) 4ms
+ ✓ tests/runtime-event-recorder.test.ts (3 tests) 5ms
+ ✓ src/engineering/survey-format-catalog.test.ts (10 tests) 4ms
+ ✓ src/engineering/survey-units.test.ts (8 tests) 3ms
+ ✓ tests/token-economy.test.ts (4 tests) 4ms
+ ✓ tests/tool-call-repair.test.ts (4 tests) 2ms
+ ✓ src/engineering/survey-import-diagnostic-catalog.test.ts (4 tests) 9ms
+ ✓ src/engineering/survey-leica-gsi-lexer.test.ts (16 tests) 4ms
+ ✓ tests/model-history-repair.test.ts (5 tests) 6ms
+ ✓ src/engineering/survey-error-ellipse.test.ts (7 tests) 8ms
+ ✓ src/engineering/survey-file-groups.test.ts (8 tests) 4ms
+ ✓ tests/auto-model-router.test.ts (4 tests) 3ms
+ ✓ tests/web-tool-failure-guard.test.ts (3 tests) 2ms
+ ✓ tests/domain.test.ts (18 tests) 4ms
+ ✓ src/engineering/survey-coordinate-transform.test.ts (10 tests) 5ms
+ ✓ src/adapters/tool/design-tool-provider.test.ts (8 tests) 8ms
+ ✓ src/engineering/survey-cosa-net-generator.test.ts (5 tests) 4ms
+ ✓ src/engineering/survey-adjustment-core.test.ts (8 tests) 4ms
+ ✓ src/engineering/survey-raw-data-ledger.test.ts (5 tests) 4ms
+ ✓ src/engineering/survey-column-mapping.test.ts (5 tests) 3ms
+ ✓ src/contracts/survey-correction-state.test.ts (3 tests) 4ms
+ ✓ src/flow/monitoring-report-template.test.ts (1 test) 4ms
+ ✓ tests/tool-storm-breaker.test.ts (3 tests) 2ms
+ ✓ tests/capability-registry.test.ts (5 tests) 7ms
+ ✓ src/adapters/tool/image-gen-network-error.test.ts (6 tests) 3ms
+ ✓ src/config/kun-config.test.ts (3 tests) 2ms
+ ✓ src/adapters/tool/flow-tool-provider.test.ts (2 tests) 3ms
+ ✓ src/engineering/survey-leveling-closure.test.ts (2 tests) 3ms
+ ✓ tests/output-accumulator.test.ts (3 tests) 2ms
+ ✓ src/server/routes/engineering-verification.test.ts (1 test) 2ms
+ ✓ src/adapters/tool/delegation-tool-provider.test.ts (1 test) 2ms
+ ✓ src/server/routes/health.test.ts (1 test) 1ms
+ ↓ src/engineering/survey-leica-gsi-real-source.test.ts (1 test | 1 skipped)
+ ↓ src/engineering/survey-leica-gsi-known-evidence.test.ts (1 test | 1 skipped)
+ ✓ src/engineering/index.test.ts (1 test) 1ms
+ ❯ tests/model-provider-routing.test.ts (6 tests | 4 failed) 20017ms
+     ✓ rejects invalid private startup configuration without echoing credentials and strips request endpoints 3ms
+     ✓ prices the selected model rather than the first model of its provider 6ms
+     × routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers 5003ms
+     × keeps the saved default after restart and replays omitted model continuation idempotently 5003ms
+     × carries identity through Auto and child requests while Flow internal requests retain the default 5000ms
+     × preserves saved provider and effort in generic resume and retry routes 5002ms

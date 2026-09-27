@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-20",
+  "baseline": "7d8e92b461b6697cf782d197c05c392b6d62de03",
+  "scope": "isolated pure reference datum core and versioned contract; no existing kernels, runtime, IPC, UI, version, release or main-workspace changes",
+  "checks": [
+    {
+      "command": "npm --prefix kun run test -- src/engineering/survey-reference-datum.test.ts src/engineering/survey-free-leveling.test.ts src/engineering/survey-free-leveling-service.test.ts src/engineering/survey-deformation.test.ts --reporter=dot",
+      "exitCode": 0,
+      "testFiles": 4,
+      "passed": 132,
+      "newModuleTests": 82,
+      "adjacentRegressionTests": 50
+    },
+    {
+      "command": "npm run typecheck --prefix kun",
+      "exitCode": 0
+    },
+    {
+      "command": "npx eslint kun/src/contracts/survey-reference-datum.ts kun/src/engineering/survey-reference-datum.ts kun/src/engineering/survey-reference-datum.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build --prefix kun",
+      "exitCode": 0
+    },
+    {
+      "command": "node survey-reference-datum-node-probe.mjs CHECKOUT_ROOT",
+      "exitCode": 0,
+      "node": "v26.8.2",
+      "models": 54,
+      "allCalculated": true
+    },
+    {
+      "command": "python survey-reference-datum-audit.py",
+      "exitCode": 0,
+      "oracle": "stdlib Fraction and mpmath==1.3.0 at 120 decimal digits",
+      "models": 54,
+      "scalarComparisons": 5048,
+      "maximumScaledAbsoluteDifference": "3.108624468950438313186168670654296875e-15"
+    },
+    {
+      "command": "Original independent-review portable replay.sh in a fresh temporary directory",
+      "exitCode": 0,
+      "independentModels": 108,
+      "independentScalarComparisons": 8466,
+      "independentBoundaryCases": 32
+    }
+  ],
+  "limitations": [
+    "Reference datum definition only; no physical stability or significance inference",
+    "No verified immutable record binding; caller source pointers and covariance/dependence declarations remain unverified",
+    "No automatic interpretation of existing free-leveling cofactors as absolute covariance",
+    "Near-zero joint correlation spectrum is explicitly semidefinite-or-numerically-unresolved, not a certified PSD result; no matrix repair",
+    "GLS singular or ill-conditioned reference covariance returns unavailable without switching method",
+    "Negative propagated variances are refused, never clipped",
+    "Roundoff diagnostics are software estimates, not certified numerical or engineering accuracy bounds"
+  ],
+  "externalAgentReview": {
+    "status": "completed-no-unresolved-numerical-blocker",
+    "models": 108,
+    "scalarComparisons": 8466,
+    "boundaryCases": 32,
+    "maximumOperationScaleNormalizedError": "2.220446049250313e-16",
+    "report": "survey-reference-datum-independent-review/REVIEW.md",
+    "sourceAndEvidenceHashesVerified": true
+  }
+}

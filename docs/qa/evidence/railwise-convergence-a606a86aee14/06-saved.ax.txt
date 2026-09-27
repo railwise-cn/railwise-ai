@@ -1,0 +1,291 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 227-237
+~224 标准窗口 RAILWISE AI, Secondary Actions: Raise
+~	225 container RAILWISE AI
+~		226 container
++			227 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-a606a86/Applications/RAILWISE%20AI%20Candidate%20a606a86aee14.app/Contents/Resources/app.asar/out/renderer/index.html
++				228 container
++					229 按钮 RAILWISE AI
++					230 container
++						231 container 编程 / 内业
++							232 按钮 编程
++							233 按钮 内业
++						234 切换 Description: 专注模式, Value: off
++						235 container 工作区工具
++							236 按钮 写作
++							237 按钮 插件
++							238 按钮 定时任务
++							239 按钮 Flow 流程
++							240 按钮 设计
++						241 按钮 新建工程测量项目
++					242 container
++						243 text 工程测量项目 1
++						244 按钮 新建工程测量项目
++						245 切换按钮 Description: 刷新工程测量项目, Value: 0
++						246 按钮 Survey AI 测绘目标、计划、证据与交付
++							247 文本 Survey AI
++							248 文本 测绘目标、计划、证据与交付
++						249 按钮 合成验收·统计家族与 Huber·a606a86 控制网 · m · 9/20
++							250 文本 合成验收·统计家族与 Huber·a606a86
++							251 文本 控制网
++							252 文本  · 
++							253 文本 m
++							254 文本  · 
++							255 文本 9/20
++						256 text Survey AI 会话 1
++						257 按钮 Survey AI · 新建内业任务 合成验收·统计家族与 Huber·a606a86 · 0 条消息
++							258 文本 Survey AI · 新建内业任务
++							259 文本 合成验收·统计家族与 Huber·a606a86
++							260 文本  · 
++							261 文本 0
++							262 文本 条消息
++						263 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
++					264 container
++						265 切换按钮 连接手机, Value: 0
++						266 按钮 设置
++					267 container
++						268 按钮 收起侧边栏
++						269 标题 RAILWISE Survey, Value: 1
++							270 文本 RAILWISE Survey
++						271 text 工程测量内业 当前内业任务
++						272 弹出式按钮 当前内业任务, Value: 合成验收·统计家族与 Huber·a606a86
++							273 (selected) 新建内业任务
++						274 文本 工作视图
++						275 弹出式按钮 工作视图, Value: 建网与平差
++						276 按钮 新建工程测量项目
++					277 文本 任务配置已保存。后续计算会使用当前任务配置。
++					278 按钮 关闭提示
++					279 container
++						280 text 任务 合成验收·统计家族与 Huber·a606a86 阶段 建网与平差 数据源 / 格式 —  ·  — 处置状态 未开始 基准 待确认  ·  待确认 点数 — 测站数 — 观测 — 闭合差 — 精度 — 成果 — 网型 — 审查 —
++					281 container Survey AI 会话
++						282 container
++							283 标题 Survey AI 会话, Value: 2
++								284 文本 Survey AI 会话
++							285 文本 合成验收·统计家族与 Huber·a606a86
++							286 按钮 数据资产
++							287 按钮 测量平差
++							288 按钮 刷新上下文
++						289 标题 Survey AI, Value: 2
++							290 文本 Survey AI
++						291 container
++							292 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
++							293 按钮 更多操作
++							294 弹出式按钮 模型与推理设置
++							295 按钮 (disabled) 发送
++					296 container
++						297 container 工作视图
++							298 按钮 测量平差
++							299 按钮 高级模型试算
++						300 container 高级模型试算
++							301 标题 高级模型试算, Value: 3
++								302 文本 高级模型试算
++							303 文本 独立声明实验模型，保存输入原文与试算证据。无需交付清单；请自行提供模型、单位和依据。
++							304 文本 仅供声明模型试算：模型假设和来源真实性未核实，不代表工程合格、规范符合或真人签认；不会替换正式平差权、删除观测或批准成果。
++							305 文本 项目 project_03666500-1e91-45f6-8150-6cfc34bc90e7 · 修订 2
++							306 container
++								307 文本 试算方法
++								308 弹出式按钮 试算方法, Value: 固定尺度 Huber 试算
++									309 (selected) 固定尺度 Huber 试算
++							310 文本 仅支持独立观测及固定外部尺度。须声明完整线性模型、初值和停止条件；试算不能替换正式观测权。
++							311 开合三角标记 查看合成输入示例
++								312 文本 查看合成输入示例
++							313 container
++								314 文本 模型依据原文
++								315 文本输入区 (settable) 模型依据原文, Value: 合成软件数学验收，仅验证固定尺度 Huber 数值、原文保存和恢复。观测 [0,0,0,10]，单位 m，独立固定尺度1、k=1；无真实工程或来源真实性声明。
++							316 文本 写明模型适用范围、观测与单位来源、随机模型和分组依据。原文最多 16 KiB；保存不等于专业确认。
++							317 container
++								318 文本 完整试算请求 JSON
++								319 文本输入区 (settable) 完整试算请求 JSON, Value: {
+  "schemaVersion": 1,
+  "model": "fixed-linear-full-column-rank",
+  "independenceDeclaration": "caller-declared-independent-observations",
+  "residualConvention": "observed-minus-fitted",
+  "observationUnit": "m",
+  "parameterIds": [
+    "position"
+  ],
+  "parameterUnits": [
+    "m"
+  ],
+  "initialParameters": [
+    0
+  ],
+  "scale": {
+    "kind": "fixed-external",
+    "value": 1,
+    "unit": "m",
+    "basisStatement": "Synthetic fixed external scale for acceptance arithmetic only."
+  },
+  "loss": {
+    "kind": "huber",
+    "k": 1
+  },
+  "observations": [
+    {
+      "id": "o0",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o1",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o2",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o3",
+      "value": 10,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    }
+  ],
+  "stopping": {
+    "maxIterations": 200,
+    "standardizedPredictionStepTolerance": 1e-10,
+    "relativeObjectiveTolerance": 1e-10,
+    "normalizedScoreTolerance": 1e-10
+  }
+}
+
++							320 文本 保留原文，不截断或自动修补。最多 256 KiB UTF-8；当前 1398 字节。
++							321 container
++								322 复选框 我已核对声明模型及依据，确认仅保存独立实验试算；理解假设未核实且结果不构成工程批准。, Value: 0
++								323 文本 我已核对声明模型及依据，确认仅保存独立实验试算；理解假设未核实且结果不构成工程批准。
++							324 按钮 (disabled) 确认并保存试算
++							325 按钮 试算历史
++							326 标题 已读取的独立试算记录, Value: 4
++								327 文本 已读取的独立试算记录
++							328 container
++								329 text advanced_trial_47f90b25-0429-4c00-a7d1-f83f7cb98a9f  ·  2026-09-20T00:38:03.475Z
++							330 文本 已核对保存字节与摘要，并读取运行时严格重算的结果。这仅证明本地记录一致性，不鉴证输入来源或模型假设。
++							331 按钮 重新核验并重放
++							332 按钮 重新核验并导出 JSON
++							333 文本 已另存为 /tmp/railwise-survey-a606a86/home/.workwise/default_workspace/huber-实机-a606.json。导出的是独立试算记录，不是工程批准成果。
++							334 标题 模型依据原文, Value: 5
++								335 文本 模型依据原文
++							336 文本 合成软件数学验收，仅验证固定尺度 Huber 数值、原文保存和恢复。观测 [0,0,0,10]，单位 m，独立固定尺度1、k=1；无真实工程或来源真实性声明。
++							337 container Huber 试算结果
++								338 标题 Huber 试算结果, Value: 4
++									339 文本 Huber 试算结果
++								340 container
++									341 text 已满足声明的停止条件  ·  score、预测步长和目标变化均满足停止条件
++								342 文本 尺度与独立性未经核验。乘子与派生 IRLS 权仅为试算值；不提供协方差、高斯 WLS 精度、删点操作或工程验收结论。
++								343 文本 严格内点秩满足数值充分条件；未认证唯一性。
++								344 文本 固定尺度 1 m · Huber k 1
++								345 文本 Synthetic fixed external scale for acceptance arithmetic only.
++								346 文本 最多 200 次迭代 · score 容差 1e-10 · 预测步长容差 1e-10 · 目标变化容差 1e-10
++								347 container 估计参数及声明单位
++									348 表格 估计参数及声明单位
++										349 文本 估计参数及声明单位
++										350 row
++											351 行标题
++												352 文本 position (m)
++											353 单元格
++												354 文本 0.333333333333
++								355 container 逐轮试算记录
++									356 开合三角标记 第 0 次迭代 · 目标值 9.5 · score 0.5
++										357 文本 第 0 次迭代 · 目标值 9.5 · score 0.5
++									358 开合三角标记 第 1 次迭代 · 目标值 9.33350676379 · score 0.0161290322581
++										359 文本 第 1 次迭代 · 目标值 9.33350676379 · score 0.0161290322581
++									360 开合三角标记 第 2 次迭代 · 目标值 9.33333352562 · score 0.000537056928034
++										361 文本 第 2 次迭代 · 目标值 9.33333352562 · score 0.000537056928034
++									362 开合三角标记 第 3 次迭代 · 目标值 9.33333333355 · score 0.0000179012566681
++										363 文本 第 3 次迭代 · 目标值 9.33333333355 · score 0.0000179012566681
++									364 开合三角标记 第 4 次迭代 · 目标值 9.33333333333 · score 5.9670784347e-7
++										365 文本 第 4 次迭代 · 目标值 9.33333333333 · score 5.9670784347e-7
++									366 开合三角标记 第 5 次迭代 · 目标值 9.33333333333 · score 1.98902604387e-8
++										367 文本 第 5 次迭代 · 目标值 9.33333333333 · score 1.98902604387e-8
++									368 开合三角标记 第 6 次迭代 · 目标值 9.33333333333 · score 6.63008925539e-10
++										369 文本 第 6 次迭代 · 目标值 9.33333333333 · score 6.63008925539e-10
++									370 开合三角标记 第 7 次迭代 · 目标值 9.33333333333 · score 2.20999329947e-11
++										371 文本 第 7 次迭代 · 目标值 9.33333333333 · score 2.20999329947e-11
++									372 container
++										373 开合三角标记 第 8 次迭代 · 目标值 9.33333333333 · score 7.36743999141e-13
++											374 文本 第 8 次迭代 · 目标值 9.33333333333 · score 7.36743999141e-13
++										375 文本 score 舍入估计 7.10542735759e-14 · 预测步长 1.42421074933e-11 · 相对目标变化 1.90323947079e-16
++										376 container Huber 观测试算值（只读）
++											377 表格
++												378 row
++													379 列标题
++														380 文本 观测编号
++													381 列标题
++														382 text 观测减拟合残差  (m)
++													383 列标题
++														384 文本 标准化残差
++													385 列标题
++														386 文本 试算乘子
++													387 列标题
++														388 text 派生 IRLS 权  (m⁻²)
++												389 row
++													390 行标题
++														391 文本 o0
++													392 单元格
++														393 文本 -0.333333333333
++													394 单元格
++														395 文本 -0.333333333333
++													396 单元格
++														397 文本 1
++													398 单元格
++														399 文本 1
++												400 row
++													401 行标题
++														402 文本 o1
++													403 单元格
++														404 文本 -0.333333333333
++													405 单元格
++														406 文本 -0.333333333333
++													407 单元格
++														408 文本 1
++													409 单元格
++														410 文本 1
++												411 row
++													412 行标题
++														413 文本 o2
++													414 单元格
++														415 文本 -0.333333333333
++													416 单元格
++														417 文本 -0.333333333333
++													418 单元格
++														419 文本 1
++													420 单元格
++														421 文本 1
++												422 row
++													423 行标题
++														424 文本 o3
++													425 单元格
++														426 文本 9.66666666667
++													427 单元格
++														428 文本 9.66666666667
++													429 单元格
++														430 文本 0.103448275862
++													431 单元格
++														432 文本 0.103448275862
++							433 开合三角标记 原始 JSON 声明
++								434 文本 原始 JSON 声明
++							435 开合三角标记 实际计算的归一化模型
++								436 文本 实际计算的归一化模型
++							437 开合三角标记 完整结果与追溯摘要
++								438 文本 完整结果与追溯摘要
++	439 关闭按钮
++	440 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
++	441 最小化按钮
+The focused UI element is 301 标题 高级模型试算, Value: 3

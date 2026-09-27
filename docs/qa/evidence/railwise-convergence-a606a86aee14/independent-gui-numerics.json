@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "projectId": "project_03666500-1e91-45f6-8150-6cfc34bc90e7",
+  "count": 3,
+  "records": [
+    {
+      "id": "advanced_trial_47f90b25-0429-4c00-a7d1-f83f7cb98a9f",
+      "fixture": "huber-unique",
+      "requestSha256": "76af260100cef43063ef3152f39dba4a264677745de1916dfedd47ecbecdd698",
+      "declarationSha256": "31ee0fa26c4d2ce34472ba857554660dc73f91c9a47896d8c4fbcf9f7795a404",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    },
+    {
+      "id": "advanced_trial_ba87952f-4585-4156-bf5c-3b3bf9e1efb2",
+      "fixture": "huber-flat",
+      "requestSha256": "db30885c468c2bc4a920cb56394c28102dd02e7f6a8d3b9f948a793662a59cd8",
+      "declarationSha256": "f8ea21310f9027b037cf93bde68a47d22b9f21173539c6297b6b4b8bfae9aae8",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    },
+    {
+      "id": "advanced_trial_75fae9e2-0cb3-41f9-b5e7-1cab6467670c",
+      "fixture": "statistical-reversed",
+      "requestSha256": "8c0863b3eff399699a18baf5e3c1ac1d7e7545eb7da5712170b63edfdac328ae",
+      "declarationSha256": "0284950f8077ed3cdce00d68c5c8a8c4e2af2aecddd5b7e5ceaae0edcf02a790",
+      "rawBindings": "passed",
+      "independentNumerics": "passed"
+    }
+  ],
+  "scope": "raw byte and SQL identity bindings plus independent acceptance arithmetic; not canonical hash replay or professional approval"
+}

@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run
+
+
+ RUN  v4.1.8 <REPOSITORY>/kun
+
+
+ Test Files  188 passed | 2 skipped (190)
+      Tests  2853 passed | 22 skipped (2875)
+   Start at  18:42:07
+   Duration  26.26s (transform 11.48s, setup 0ms, import 36.12s, tests 178.70s, environment 10ms)
+

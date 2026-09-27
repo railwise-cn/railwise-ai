@@ -1,0 +1,27 @@
+{
+  "manifestId": "manifest_06f6325a-824e-49c5-9ce8-be539cfbefb2",
+  "projectRevision": 3,
+  "outputs": [
+    {
+      "name": "report.docx",
+      "sha256": "fd3c6ee8ff1d7ec36b06d72cb0245842bd2a51383e5aeeb2963636221726a1c0",
+      "expectedSha256": "fd3c6ee8ff1d7ec36b06d72cb0245842bd2a51383e5aeeb2963636221726a1c0",
+      "matched": true,
+      "size": 5049
+    },
+    {
+      "name": "report.pdf",
+      "sha256": "d365a096a3775ced6e5a69698a1b46304aae9603ab4b6a239eae8b999fe45132",
+      "expectedSha256": "d365a096a3775ced6e5a69698a1b46304aae9603ab4b6a239eae8b999fe45132",
+      "matched": true,
+      "size": 36553
+    },
+    {
+      "name": "evidence.xlsx",
+      "sha256": "6903cb0e0161032c2a1bc2ebfc3faba9566fab7c19b301e17d59d821e2980b79",
+      "expectedSha256": "6903cb0e0161032c2a1bc2ebfc3faba9566fab7c19b301e17d59d821e2980b79",
+      "matched": true,
+      "size": 36795
+    }
+  ]
+}

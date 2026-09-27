@@ -1,0 +1,213 @@
+"""Independent synthetic IN2 oracle. Imports no product parser or adjustment code."""
+import argparse
+import csv
+import hashlib
+import json
+import math
+from decimal import Decimal
+from pathlib import Path
+
+import numpy as np
+
+ARCSEC = math.pi / (180.0 * 3600.0)
+EXPECTED_SHA = "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+
+
+def dms_degrees(token):
+    value = Decimal(token)
+    if not value.is_finite() or value < 0:
+        raise ValueError("nonnegative finite compact DMS required")
+    degrees = int(value)
+    packed_minutes = (value - degrees) * 100
+    minutes = int(packed_minutes)
+    seconds = (packed_minutes - minutes) * 100
+    if minutes >= 60 or seconds >= 60 or degrees >= 360:
+        raise ValueError("compact DMS component outside range")
+    return float(Decimal(degrees) + Decimal(minutes) / 60 + seconds / 3600)
+
+
+def parse_source(raw):
+    rows = list(csv.reader(raw.decode("ascii").splitlines()))
+    if len(rows[0]) != 3:
+        raise ValueError("three prior sigma fields required")
+    priors = [float(Decimal(value)) for value in rows[0]]
+    if any(value <= 0 for value in priors):
+        raise ValueError("positive prior sigmas required")
+    controls, observations, station = {}, [], None
+    for line, row in enumerate(rows[1:], start=2):
+        if station is None and len(row) == 3:
+            controls[row[0]] = np.array([float(Decimal(row[1])), float(Decimal(row[2]))])
+        elif len(row) == 1 and station is None:
+            station = row[0]
+        elif station and len(row) == 3 and row[0] in controls and row[1] in ("L", "S"):
+            value = math.radians(dms_degrees(row[2])) if row[1] == "L" else float(Decimal(row[2]))
+            if row[1] == "S" and value <= 0:
+                raise ValueError("oracle only admits positive observed distances, not S,0 known edges")
+            observations.append({"line": line, "target": row[0], "kind": row[1], "sourceToken": row[2], "observed": value, "unit": "rad" if row[1] == "L" else "m"})
+        else:
+            raise ValueError("unsupported source grammar or second station")
+    assert len(controls) == 3 and station == "S1" and len(observations) == 5
+    assert observations[0]["kind"] == "L" and observations[0]["observed"] == 0
+    assert sum(item["kind"] == "L" for item in observations) == 3
+    return priors, controls, station, observations
+
+
+def wrap(value):
+    return math.atan2(math.sin(value), math.cos(value))
+
+
+def residual_jacobian(parameters, controls, observations):
+    x, y, orientation = parameters
+    residual, jacobian = [], []
+    for observation in observations:
+        dx, dy = controls[observation["target"]] - [x, y]
+        radius2 = dx * dx + dy * dy
+        if radius2 <= 1e-10:
+            raise ValueError("station too near a fixed control")
+        if observation["kind"] == "L":
+            residual.append(wrap(math.atan2(dy, dx) - orientation - observation["observed"]))
+            jacobian.append([dy / radius2, -dx / radius2, -1.0])
+        else:
+            radius = math.sqrt(radius2)
+            residual.append(radius - observation["observed"])
+            jacobian.append([-dx / radius, -dy / radius, 0.0])
+    return np.array(residual), np.array(jacobian)
+
+
+def sigmas_for(priors, observations, mode):
+    direction, constant_mm, ppm = priors
+    sigmas = []
+    for item in observations:
+        if item["kind"] == "L":
+            sigmas.append(direction * ARCSEC)
+        else:
+            constant, proportional = constant_mm / 1000, item["observed"] * ppm / 1e6
+            sigmas.append(math.hypot(constant, proportional) if mode == "rss" else constant + proportional)
+    return np.array(sigmas)
+
+
+def circle_initial(controls, observations):
+    distances = [item for item in observations if item["kind"] == "S"]
+    first, second = distances
+    p, q = controls[first["target"]], controls[second["target"]]
+    vector = q - p
+    spacing = np.linalg.norm(vector)
+    unit = vector / spacing
+    along = (first["observed"] ** 2 - second["observed"] ** 2 + spacing ** 2) / (2 * spacing)
+    perpendicular = math.sqrt(first["observed"] ** 2 - along ** 2)
+    midpoint = p + along * unit
+    normal = np.array([-unit[1], unit[0]])
+    candidates = []
+    for coordinate in [midpoint + perpendicular * normal, midpoint - perpendicular * normal]:
+        backsight = controls[observations[0]["target"]] - coordinate
+        orientation = math.atan2(backsight[1], backsight[0])
+        parameters = np.array([*coordinate, orientation])
+        residual, _ = residual_jacobian(parameters, controls, observations)
+        candidates.append((float(np.linalg.norm(residual)), parameters))
+    return min(candidates, key=lambda item: item[0])[1], candidates
+
+
+def solve(controls, observations, sigmas, initial):
+    parameters = np.array(initial, dtype=float)
+    trace = []
+    # Scaling turns orientation into a displacement at a nominal 100 m sight.
+    scale = np.array([1.0, 1.0, 0.01])
+    for iteration in range(30):
+        residual, jacobian = residual_jacobian(parameters, controls, observations)
+        design = jacobian / sigmas[:, None] * scale
+        normalized = residual / sigmas
+        scaled_step, _, rank, _ = np.linalg.lstsq(design, -normalized, rcond=None)
+        assert rank == 3
+        delta = scale * scaled_step
+        trace.append({"iteration": iteration, "weightedSumSquares": float(normalized @ normalized), "coordinateStepM": float(np.max(np.abs(delta[:2]))), "orientationStepRad": float(abs(delta[2]))})
+        parameters += delta
+        if np.max(np.abs(delta[:2])) < 1e-11 and abs(delta[2]) < 1e-13:
+            break
+    else:
+        raise AssertionError("independent least-squares iterations failed to converge")
+    residual, jacobian = residual_jacobian(parameters, controls, observations)
+    design = jacobian / sigmas[:, None]
+    rank = int(np.linalg.matrix_rank(design))
+    dof = len(observations) - rank
+    normalized = residual / sigmas
+    correction = np.linalg.lstsq(design * scale, -normalized, rcond=None)[0] * scale
+    assert np.max(np.abs(correction[:2])) < 2e-10 and abs(correction[2]) < 2e-12
+    apriori_covariance = np.linalg.inv(design.T @ design)
+    return {
+        "station": {"id": "S1", "xNorthM": float(parameters[0]), "yEastM": float(parameters[1]), "orientationRad": float(parameters[2] % (2 * math.pi))},
+        "observations": [{**item, "sigma": float(sigmas[index]), "adjustedMinusObserved": float(residual[index]), "observedMinusAdjusted": float(-residual[index]), "adjusted": float((item["observed"] + residual[index]) % (2 * math.pi) if item["kind"] == "L" else item["observed"] + residual[index])} for index, item in enumerate(observations)],
+        "observationCount": len(observations), "unknownParameterCount": 3, "rank": rank, "degreesOfFreedom": dof,
+        "weightedSumSquares": float(normalized @ normalized), "unitWeightStdDev": math.sqrt(float(normalized @ normalized) / dof),
+        "aprioriCovariance": apriori_covariance.tolist(), "covarianceParameterUnits": ["m", "m", "rad"],
+        "posteriorCovariance": (apriori_covariance * float(normalized @ normalized) / dof).tolist(),
+        "iterations": trace,
+    }
+
+
+def selfchecks(controls, observations, priors, initial):
+    assert abs(dms_degrees("12.5959995") - (12 + 59 / 60 + 59.995 / 3600)) < 1e-13
+    assert abs(dms_degrees("12.3045") - (12 + 30 / 60 + 45 / 3600)) < 1e-13
+    for token in ["12.6000", "12.5960", "-1", "NaN"]:
+        try:
+            dms_degrees(token)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid DMS admitted")
+    at = initial + [0.31, -0.27, 0.004]
+    _, analytical = residual_jacobian(at, controls, observations)
+    finite = np.zeros_like(analytical)
+    for column, step in enumerate([1e-3, 1e-3, 1e-5]):
+        delta = np.zeros(3); delta[column] = step
+        positive, _ = residual_jacobian(at + delta, controls, observations)
+        negative, _ = residual_jacobian(at - delta, controls, observations)
+        finite[:, column] = (positive - negative) / (2 * step)
+    jacobian_error = float(np.max(np.abs(analytical - finite)))
+    assert jacobian_error < 1e-8
+    ideal = {key: value.copy() for key, value in controls.items()}
+    ideal["C"] = np.array([50 + 100 / math.sqrt(2), 50 + 100 / math.sqrt(2)])
+    exact = solve(ideal, observations, sigmas_for(priors, observations, "rss"), [50.2, 49.8, math.pi / 2 + 0.001])
+    assert abs(exact["station"]["xNorthM"] - 50) < 1e-10 and abs(exact["station"]["yEastM"] - 50) < 1e-10
+    assert max(abs(item["adjustedMinusObserved"]) for item in exact["observations"]) < 1e-10
+    starts = []
+    for offset in [[0, 0, 0], [1, -1, 0.01], [-2, 2, -0.02], [10, 5, 0.1]]:
+        answer = solve(controls, observations, sigmas_for(priors, observations, "rss"), initial + offset)
+        starts.append([answer["station"]["xNorthM"], answer["station"]["yEastM"], answer["station"]["orientationRad"]])
+    spread = np.ptp(np.array(starts), axis=0)
+    assert max(spread[:2]) < 1e-9 and spread[2] < 1e-11
+    return {"compactDmsChecksPassed": True, "invalidDmsRejected": 4, "analyticalJacobianMaxDifferenceFromCentralDifference": jacobian_error, "idealUnroundedGeometryRecovers50_50": True, "independentInitializations": len(starts), "solutionSpread": spread.tolist()}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("fixture", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    raw = args.fixture.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == EXPECTED_SHA
+    priors, controls, station, observations = parse_source(raw)
+    initial, candidates = circle_initial(controls, observations)
+    checks = selfchecks(controls, observations, priors, initial)
+    report = {
+        "schemaVersion": 1, "status": "independent-oracle-generated", "syntheticOnly": True,
+        "sourceFileSha256": EXPECTED_SHA, "sourceFileBytes": len(raw), "numpyVersion": np.__version__,
+        "method": "Independently parsed CSV and Decimal compact D.MMSS; two-distance circle intersection for initial geometry; analytical direction/distance derivatives; NumPy LAPACK least squares for weighted Gauss-Newton corrections. No product parser or solver imported.",
+        "coordinateConvention": "X north, Y east; azimuth=atan2(deltaY,deltaX) clockwise from north; predicted direction=azimuth-station orientation modulo 2pi.",
+        "fixedControls": {key: value.tolist() for key, value in controls.items()}, "stationId": station,
+        "header": {"directionSigmaArcsec": priors[0], "distanceConstantSigmaMm": priors[1], "distanceScaleSigmaPpm": priors[2]},
+        "weightModels": {
+            "rss": "Independent diagonal observations; angle sigma=header arcsec*pi/648000; distance sigma=sqrt((constant_mm/1000)^2+(ppm*observed_m/1e6)^2). Treat the backsight zero as one observed direction, with a shared unknown station orientation.",
+            "additive": "Alternative declared instrument-spec combination, same angle model; distance sigma=constant_mm/1000+ppm*observed_m/1e6. Provided because the fixture header description does not prescribe how constant and ppm components combine."
+        },
+        "tolerancesDeclaredBeforeProductComparison": {"stationCoordinateAbsoluteM": 2e-6, "linearResidualAbsoluteM": 2e-6, "angularResidualAbsoluteRad": 2e-8, "countAndDegreesOfFreedom": "exact", "precisionAndCovariance": "not an acceptance comparison unless product weighting semantics are independently established identical"},
+        "analyticInitialCandidates": [{"mixedResidualNormForSelectionOnly": score, "parameters": candidate.tolist()} for score, candidate in candidates],
+        "selfchecks": checks,
+        "solutions": {mode: solve(controls, observations, sigmas_for(priors, observations, mode), initial) for mode in ["rss", "additive"]},
+        "limitations": ["Synthetic parser fixture only, not real field-data validation or professional approval.", "Control coordinates are treated as exact. Their printed rounding creates small nonzero misclosures.", "The independent direction model treats three directions as independent observations; correlated direction-difference interpretation would require a different declared covariance.", "Two distance-weight alternatives are explicit and not inferred from product output.", "Tolerance gates validate geometry/residual consistency for this near-exact fixture; they do not establish precision equivalence, robust statistics, production performance, or release readiness."]
+    }
+    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf8")
+    print(json.dumps({"status": report["status"], "output": str(args.output), "selfchecks": checks, "solutions": {mode: {"station": value["station"], "degreesOfFreedom": value["degreesOfFreedom"], "weightedSumSquares": value["weightedSumSquares"]} for mode, value in report["solutions"].items()}}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

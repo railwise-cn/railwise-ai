@@ -1,0 +1,24 @@
+Window: "Save generated file", App: RAILWISE AI Candidate 281dc8767250.
+0 表单 Description: save generated file, ID: save-panel, Secondary Actions: Raise
+	1 分离组
+		2 分离器 (disabled, settable, float) -1
+		3 文本 Value: 位置：, ID: whereLabel
+		4 弹出式按钮 位置：, Value: evidence, ID: where popup
+		5 显示三角形 Description: 显示更多选项, Value: 0
+		6 文本 Value: 保存为：, ID: nameFieldLabel
+		7 文本栏 (settable) Value: assessment-complete.json, ID: saveAsNameTextField
+		8 文本 Value: 标签：, ID: tagsLabel
+		9 文本栏 (settable) 标签编辑器
+		10 文本 Format:
+		11 弹出式按钮 JSON file
+		12 按钮 取消, ID: CancelButton
+		13 按钮 保存, ID: OKButton
+14 menu bar
+	15 RAILWISE AI Candidate 281dc8767250
+	16 文件
+	17 编辑
+	18 显示
+	19 窗口
+	20 帮助
+
+The focused UI element is 7 文本栏 (settable) Value: assessment-complete.json, ID: saveAsNameTextField

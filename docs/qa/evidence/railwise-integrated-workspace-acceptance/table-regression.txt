@@ -1,0 +1,13 @@
+
+> workwise@0.5.0 test
+> vitest run src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts
+
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+
+ Test Files  1 passed (1)
+      Tests  35 passed (35)
+   Start at  08:52:32
+   Duration  3.51s (transform 211ms, setup 0ms, import 323ms, tests 2.87s, environment 202ms)
+

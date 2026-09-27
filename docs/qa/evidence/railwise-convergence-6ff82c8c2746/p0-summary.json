@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "6ff82c8c27466ee42f2604b053397fd132d5a0a7",
+  "candidateVersion": "0.5.0",
+  "packageAsarSha256": "ba7edf57c3afe50473a633700a96898c773a4ab42b255eb42c9da91e2e3ebe4d",
+  "checkedAt": "2026-09-20T02:05:50.846351+00:00",
+  "scope": "actual isolated installed-candidate GUI records; read-only database and file verification; not release approval",
+  "projectCount": 3,
+  "networkCount": 2,
+  "algorithmVersion": "workwise-survey-adjustment-7",
+  "manifestCount": 2,
+  "networks": [
+    {
+      "format": "IN2",
+      "sourceSha256": "3a01828c195bc6a7cee89d4293f21c1957b51ad150d16066980d1066a2b40500",
+      "sourceSizeBytes": 5238,
+      "preservedSourceBytesMatch": true,
+      "networkRevision": 2,
+      "points": 33,
+      "observations": 160,
+      "degreesOfFreedom": 87,
+      "rawAnchorCount": 174,
+      "sourceAdmissionAndAdjustmentBindingsMatch": true,
+      "fixedControlsPreserved": true,
+      "pointAndObservationIdentitySetsMatch": true,
+      "inputHash": "9ec585a698db8ef2ffcbfb3446de3fc7ed83454549d786ecda7b6da24b9d9ec4",
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "rawAnchorBytesAndAllObservationLinksVerified": true,
+      "independentReference": {
+        "method": "independent Python parser of original COSA adjusted-coordinate table; no product parser or calculator imported",
+        "sourceSha256": "5c72252c90038bb3713c3d4bb0834cdd53cc693c3c99810f1b2d8ea6268934b7",
+        "comparedPoints": 33,
+        "fixedPoints": 2,
+        "strictPublishedRoundingMismatches": 0,
+        "precisionEnvelopeMismatches": 0,
+        "maximumPlanarDifferenceMm": 0.06341583922171747,
+        "maximumCombinedNormalizedDifferenceSigma": 0.08899925199598996,
+        "precisionEnvelopeLimitSigma": 1,
+        "passed": true
+      }
+    },
+    {
+      "format": "GSI",
+      "sourceSha256": "05b5ecc571cb85152a4e36c4c362118b3c71e582e05cf68b5cf8feac877fdf40",
+      "sourceSizeBytes": 8767,
+      "preservedSourceBytesMatch": true,
+      "networkRevision": 2,
+      "points": 27,
+      "observations": 28,
+      "degreesOfFreedom": 7,
+      "rawAnchorCount": 156,
+      "sourceAdmissionAndAdjustmentBindingsMatch": true,
+      "fixedControlsPreserved": true,
+      "pointAndObservationIdentitySetsMatch": true,
+      "inputHash": "ed65678ea949d96ec48335600a8a5f4bfaa28ce1bf93d9bce33b538b06632a79",
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "rawAnchorBytesAndAllObservationLinksVerified": true,
+      "independentReference": {
+        "scope": "independent-numerical-comparison-not-packaged-gui-acceptance",
+        "method": "numpy.linalg.lstsq; inverse-route-length weights; residual-scaled covariance",
+        "numpyVersion": "2.4.6",
+        "checkerSha256": "1728c87266881ff04ca97c3582b23451a7311578bc098847def399d705b371c0",
+        "sourceSha256": "05b5ecc571cb85152a4e36c4c362118b3c71e582e05cf68b5cf8feac877fdf40",
+        "referenceIn1Sha256": "f84252fc2990157ae7c1b01bfcce09035addaeac9ad24e56459c51017ad6b21b",
+        "knownPointsSha256": "dfef93712de67cef4bf48016c337d12169eb430ba9a2e8e8e1fe550479cc6750",
+        "packageAsarSha256": "ba7edf57c3afe50473a633700a96898c773a4ab42b255eb42c9da91e2e3ebe4d",
+        "referenceObservations": 14,
+        "comparedUnknownPoints": 7,
+        "comparedFixedPoints": 6,
+        "degreesOfFreedom": 7,
+        "numericalComparison": {
+          "maximumHeightDifferenceMm": 0.02031550931747006,
+          "maximumReferenceStandardErrorMm": 0.26658109269216607,
+          "rule": "each unknown within one reference standard error; fixed heights within 1e-9 m",
+          "mismatches": 0,
+          "passed": true
+        },
+        "sourceConversionComparison": {
+          "routesWithMatchingEndpoints": 14,
+          "maximumHeightDifferenceMm": 0.020000000000020002,
+          "strictHalfPrintedUnitMismatches": 7,
+          "maximumDistanceDifferenceMetres": 0.4862899999999968,
+          "maximumClosureDifferenceMm": 0.010000000000065512,
+          "sourceDifferencesRequireReview": true
+        },
+        "selfCheck": "closed-form two-route solution and datum-free rejection passed"
+      },
+      "independentSourceDiscrepancies": {
+        "schemaVersion": 1,
+        "scope": "source-discrepancy-audit-not-professional-acceptance",
+        "numpyVersion": "2.4.6",
+        "sourceCoverage": "GSI8-WI41-unit8-BFFB-331-332-336-335-final-WI83..08",
+        "hashes": {
+          "checkerSha256": "7fcc7c6f88ba563e80711b90690d7f1d8a6a3e6ddd9e274c44c02195db720dad",
+          "numericalCheckerSha256": "1728c87266881ff04ca97c3582b23451a7311578bc098847def399d705b371c0",
+          "sourceSha256": "05b5ecc571cb85152a4e36c4c362118b3c71e582e05cf68b5cf8feac877fdf40",
+          "referenceIn1Sha256": "f84252fc2990157ae7c1b01bfcce09035addaeac9ad24e56459c51017ad6b21b",
+          "knownPointsSha256": "dfef93712de67cef4bf48016c337d12169eb430ba9a2e8e8e1fe550479cc6750",
+          "actualEvidenceSha256": "9ea26522a729b6679e8f99c9024501a193f8af7f2d344b160e4c0f2146308779",
+          "packageAsarSha256": "ba7edf57c3afe50473a633700a96898c773a4ab42b255eb42c9da91e2e3ebe4d"
+        },
+        "rawSourceToPackaged": {
+          "observationCount": 28,
+          "maximumHeightDifferenceMetres": 1e-16,
+          "maximumDistanceDifferenceMetres": 4e-14
+        },
+        "referenceConversion": {
+          "routeCount": 14,
+          "heightBeyondHalfPrintedUnitCount": 7,
+          "rawMeanBeyondHalfPrintedUnitCount": 2,
+          "distanceRoundedToPrintedUnitMatchCount": 14,
+          "maximumDistanceDifferenceMetres": 0.48629,
+          "heightConversionProvenance": "unresolved"
+        },
+        "sameSourceIndependentAdjustment": {
+          "unknownPointCount": 21,
+          "degreesOfFreedom": 7,
+          "maximumVsPackagedMm": 1.7053025658242404e-10
+        },
+        "referenceInputVariants": {
+          "sameSourceReduced": {
+            "maximumVsPackagedMm": 1.0658141036401503e-11,
+            "maximumVsSameSourceReferenceMm": 0.0
+          },
+          "referenceBoth": {
+            "maximumVsPackagedMm": 0.02031550931747006,
+            "maximumVsSameSourceReferenceMm": 0.02031550931747006
+          },
+          "referenceHeightOnly": {
+            "maximumVsPackagedMm": 0.02017777466178927,
+            "maximumVsSameSourceReferenceMm": 0.02017777466178927
+          },
+          "referenceDistanceOnly": {
+            "maximumVsPackagedMm": 0.0007124150336323964,
+            "maximumVsSameSourceReferenceMm": 0.0007124150371851101
+          }
+        },
+        "selfCheck": "passed",
+        "interpretationBoundary": "Printed-unit comparisons are representation checks, not normative accuracy limits. No source/converter identity, correction policy, evidence authenticity or professional sign-off is inferred."
+      }
+    }
+  ],
+  "manifests": [
+    {
+      "format": "IN2",
+      "reviewStatus": "draft",
+      "resultAndSourceEqualStoredRecords": true,
+      "outputs": [
+        {
+          "sha256": "356a12d95f02c57a909386841e640f1137d17fb6db40ce7e183a88d1e5a92517",
+          "sizeBytes": 24822,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "sha256": "fade82f779a1d1cc00f3bac2dd28492d47b4d0736b060daf3e336e1b9c4290e3",
+          "sizeBytes": 49606,
+          "mediaType": "application/pdf"
+        },
+        {
+          "sha256": "a045cb2cda2d7805a00089d4efd66f2eb2a1784eb1c6a04b6ce8c900f2a27dec",
+          "sizeBytes": 291311,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      ]
+    },
+    {
+      "format": "GSI",
+      "reviewStatus": "draft",
+      "resultAndSourceEqualStoredRecords": true,
+      "outputs": [
+        {
+          "sha256": "b2d1e31323bfb53af35f375799b39b9784bdaa99dca4afdd56ab56d1fb0f3288",
+          "sizeBytes": 10070,
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        },
+        {
+          "sha256": "2f6cda33ba18ff60560bdf1fa3c7710c711ee20267979ac3448bbeabf27ff3f0",
+          "sizeBytes": 37676,
+          "mediaType": "application/pdf"
+        },
+        {
+          "sha256": "74c963e633dc7dc1c2e72254992fed4f87605150434529fb8b638181a7caeef5",
+          "sizeBytes": 153899,
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      ]
+    }
+  ],
+  "verificationAttempts": [
+    {
+      "format": "IN2",
+      "completedAt": "2026-09-20T01:53:55.167Z",
+      "outcome": "passed",
+      "bindingStable": true,
+      "recordHash": "0bcd80b4c85501f6911347f674da381895bf219627de1cfad7969a3d36757fa5",
+      "checksPassed": 5
+    },
+    {
+      "format": "GSI",
+      "completedAt": "2026-09-20T01:57:48.742Z",
+      "outcome": "passed",
+      "bindingStable": true,
+      "recordHash": "ec4be5b9766a11263508604ebe1017948add1a12086111a006a04b0bc85258ed",
+      "checksPassed": 5
+    },
+    {
+      "format": "GSI",
+      "completedAt": "2026-09-20T02:00:31.733Z",
+      "outcome": "passed",
+      "bindingStable": true,
+      "recordHash": "1e3da6269807dec08029621d3a4539c77821a84165ac784a9929edd40ca4adfd",
+      "checksPassed": 5
+    },
+    {
+      "format": "IN2",
+      "completedAt": "2026-09-20T02:00:58.205Z",
+      "outcome": "passed",
+      "bindingStable": true,
+      "recordHash": "7b7fe46de0f19a06279410d1f67cc10cfb894315050176c72f3172a7e97e150e",
+      "checksPassed": 5
+    }
+  ],
+  "guiRestart": {
+    "status": "passed-parent-execution-and-four-persistent-successful-verification-records",
+    "parentConfirmedFullQuitAndNoProcessBeforeRestart": true,
+    "privateAxEvidencePresent": true
+  },
+  "limitations": [
+    "Two candidate datasets are not representative production metrics.",
+    "GSI reference-conversion height discrepancies remain unresolved; independent numeric agreement does not authenticate conversion or field provenance.",
+    "No professional signoff or personal user acceptance is implied.",
+    "No coordinate, point identifier, source path, or original source content is included in this summary."
+  ],
+  "status": "passed-file-and-storage-integrity-and-numerical-precision; GSI-reference-source-differences-unresolved",
+  "checkerSha256": "982b4527451b53b9eb99301c5e8172447cabc92ffc99cc3c9b896477c10cccb6",
+  "historicalIntegrityLogicSha256": "00851ecb19534eb20cf46719e1fa6c85b94f42a1981ae92bec4ababb5098fc13"
+}

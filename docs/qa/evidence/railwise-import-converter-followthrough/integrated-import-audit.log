@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run --run src/engineering/survey-import-audit.test.ts src/engineering/survey-service.test.ts tests/engineering-routes.test.ts
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+
+ Test Files  2 passed (2)
+      Tests  58 passed (58)
+   Start at  11:34:12
+   Duration  2.48s (transform 388ms, setup 0ms, import 609ms, tests 3.01s, environment 0ms)
+

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "path": "/private/tmp/railwise-survey-267aade/evidence/installation-context.json",
+      "sha256": "8860d5a68f352b8448d697559fbcc097917f88a52537f0afaa60254902338fb0"
+    },
+    {
+      "path": "/private/tmp/railwise-survey-27738f4/evidence/cloud-context.json",
+      "sha256": "8eaa620f168418518bef23b33a4c8a7754d0e3bd8432ceb1a4a48b6f7ba72566"
+    }
+  ],
+  "archive": {
+    "path": "candidate-summary.json",
+    "sha256": "77ed758dd7bd4ee62516cf33b2c46590ac52edcaa27cc892e33c371ad8d5530c"
+  },
+  "excluded": [
+    "candidate.env",
+    "credentials",
+    "private feed URLs",
+    "raw logs",
+    "user data"
+  ]
+}

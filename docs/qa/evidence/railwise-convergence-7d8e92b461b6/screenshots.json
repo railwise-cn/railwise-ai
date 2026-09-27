@@ -1,0 +1,38 @@
+[
+  {
+    "file": "vce-negative-en-dark.jpg",
+    "sha256": "5b4673aac27fc9eda87fcbd5d22dc2a646b8490bed2050cb9ee170b6336be6b0",
+    "content": "synthetic acceptance only",
+    "dimensionsMeaning": "screenshot pixels are not independently verified native window bounds"
+  },
+  {
+    "file": "w-result-zh-light.jpg",
+    "sha256": "2d292b3bfb0c47741a9869000a0e5319eb7cd2ee6ff8b3bf911c86dbe938771e",
+    "content": "synthetic acceptance only",
+    "dimensionsMeaning": "screenshot pixels are not independently verified native window bounds"
+  },
+  {
+    "file": "vce-negative-zh-light.jpg",
+    "sha256": "6053a4383c989f508c7ff8538bc0c3ca17a363426fa3e340cbe7bb9e7c91b192",
+    "content": "synthetic acceptance only",
+    "dimensionsMeaning": "screenshot pixels are not independently verified native window bounds"
+  },
+  {
+    "file": "w-zh-light.jpg",
+    "sha256": "da5716e9eda6b11d1db6693b18e913dba3ebdb3520bb75f7025fc5b802198947",
+    "content": "synthetic acceptance only",
+    "dimensionsMeaning": "screenshot pixels are not independently verified native window bounds"
+  },
+  {
+    "file": "w-maximized-zh-light.jpg",
+    "sha256": "30322ed1685078cb2569c39d9ca44ed37f733f28a8df3fe58de8d5c8bb9f5d01",
+    "content": "synthetic acceptance only",
+    "dimensionsMeaning": "screenshot pixels are not independently verified native window bounds"
+  },
+  {
+    "file": "damaged-history-zh-light.jpg",
+    "sha256": "94d7baba3d4bf3ccc283db003ce3dce2ad89ba5de79a3faa33ac5aaa835862ac",
+    "content": "synthetic acceptance only",
+    "dimensionsMeaning": "screenshot pixels are not independently verified native window bounds"
+  }
+]

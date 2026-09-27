@@ -23,6 +23,7 @@ import {
 import { readBrowserStorageItem, writeBrowserStorageItem } from '../lib/browser-storage'
 
 const COMPOSER_MODEL_STORAGE_KEY = 'workwise.composerModel'
+const COMPOSER_SELECTION_STORAGE_KEY = 'workwise.composerSelection.v1'
 const TURN_MODEL_STORAGE_KEY = 'workwise.turnModelLabel'
 const CODE_WORKSPACE_ROOTS_STORAGE_KEY = 'workwise.codeWorkspaceRoots.v1'
 export const MAX_CODE_WORKSPACE_ROOTS = 30
@@ -40,6 +41,20 @@ export function readStoredComposerModel(allowedIds: readonly string[]): string {
 
 export function persistComposerModel(model: string): void {
   writeBrowserStorageItem(COMPOSER_MODEL_STORAGE_KEY, model)
+}
+
+export function readStoredComposerSelection(): { model: string; providerId?: string } | null {
+  try {
+    const raw = readBrowserStorageItem(COMPOSER_SELECTION_STORAGE_KEY)
+    if (!raw) return null
+    const value = JSON.parse(raw)
+    if (value?.version !== 1 || typeof value.model !== 'string' || (value.providerId !== undefined && (typeof value.providerId !== 'string' || !value.providerId.trim()))) return null
+    return { model: value.model, ...(value.providerId ? { providerId: value.providerId } : {}) }
+  } catch { return null }
+}
+
+export function persistComposerSelection(model: string, providerId?: string): void {
+  writeBrowserStorageItem(COMPOSER_SELECTION_STORAGE_KEY, JSON.stringify({ version: 1, model, ...(providerId ? { providerId } : {}) }))
 }
 
 export function compactCodeWorkspaceRoots(workspaceRoots: readonly (string | undefined | null)[]): string[] {

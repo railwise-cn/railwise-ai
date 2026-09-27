@@ -1,0 +1,117 @@
+{
+  "syntheticOnly": true,
+  "externalNetwork": false,
+  "upstreamCredentialsRead": false,
+  "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+  "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+  "threadId": "thr_wt4kfajs",
+  "answer": "RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete.",
+  "port": 58714,
+  "reason": "SIGINT",
+  "requestCount": 10,
+  "tokenRemoved": true,
+  "events": [
+    {
+      "at": "2026-09-20T08:49:58.465Z",
+      "request": 1,
+      "route": "/v1/models",
+      "accepted": true
+    },
+    {
+      "at": "2026-09-20T08:49:58.564Z",
+      "request": 2,
+      "route": "/v1/models",
+      "accepted": true
+    },
+    {
+      "at": "2026-09-20T08:50:04.107Z",
+      "request": 3,
+      "route": "/v1/models",
+      "accepted": true
+    },
+    {
+      "at": "2026-09-20T08:51:45.419Z",
+      "request": 4,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "a232735261fe9c9fabf31633e0cb438c7de4568b67d4ee0f72018b6452577384",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:51:45.503Z",
+      "request": 5,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "d0959439d832d2aca229346b8a2f6931a79294d5dafb1f9518f31feb1c4ff800",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:51:45.576Z",
+      "request": 6,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "d7964547b0228cbd110d4ab963cdbcb0832d6f64083498d0c17ed0c0d83f82c5",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:51:45.651Z",
+      "request": 7,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "658b60c985e204ecde87b8274526d39e02642f593e449c30070fe763cb74c401",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:51:45.730Z",
+      "request": 8,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "5341ca7c425269a49b999346d534fc1faa72dedf73abf0db8a243e9fb6752fa7",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:51:45.808Z",
+      "request": 9,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "a9f9f75616117324294e23d4e1dd661da11535e0e255e1225dfffe78354e0175",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    },
+    {
+      "at": "2026-09-20T08:51:45.883Z",
+      "request": 10,
+      "route": "/v1/chat/completions",
+      "accepted": true,
+      "bodySha256": "e73a45da25256fa98917afeb2d382f245efea305335e69755ba3aa53a8ef8947",
+      "model": "deepseek-flash",
+      "modelSettings": {
+        "thinkingType": "disabled",
+        "reasoningEffort": null
+      }
+    }
+  ]
+}

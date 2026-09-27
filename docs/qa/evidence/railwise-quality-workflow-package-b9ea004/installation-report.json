@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "outcome": "passed",
+  "sourceHead": "b9ea004b668d68b34a7d82ece6674ef2273a9bc3",
+  "app": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app",
+  "targetZipSha256": "db63b72181d41c2020fd1175201270fd43ac9b73dc8fded041bddfe01f32243b",
+  "asarSha256": "a8aa1bd0c4a07faf4b5903bd308faf9cd3c849a46e7014497f3ee5bcf49ac71c",
+  "checks": [
+    {
+      "command": "/usr/bin/ditto",
+      "args": [
+        "-x",
+        "-k",
+        "<isolated-tmp>/artifacts/private-updater-target-arm64-b9ea004b668d68b34a7d82ece6674ef2273a9bc3/WorkWise-Candidate-b9ea004b668d-0.5.0-mac-arm64.zip",
+        "<isolated-tmp>/Applications"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/codesign",
+      "args": [
+        "--verify",
+        "--deep",
+        "--strict",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/xcrun",
+      "args": [
+        "stapler",
+        "validate",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app"
+      ],
+      "status": 0,
+      "stdout": "Processing: <isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app\nThe validate action worked!\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/sbin/spctl",
+      "args": [
+        "--status"
+      ],
+      "status": 1,
+      "stdout": "assessments disabled\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/sbin/spctl",
+      "args": [
+        "--assess",
+        "--type",
+        "execute",
+        "--verbose=2",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+    },
+    {
+      "command": "/usr/bin/plutil",
+      "args": [
+        "-extract",
+        "CFBundleShortVersionString",
+        "raw",
+        "-o",
+        "-",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Info.plist"
+      ],
+      "status": 0,
+      "stdout": "0.5.0\n",
+      "stderr": ""
+    },
+    {
+      "command": "/usr/bin/plutil",
+      "args": [
+        "-extract",
+        "CFBundleIdentifier",
+        "raw",
+        "-o",
+        "-",
+        "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Info.plist"
+      ],
+      "status": 0,
+      "stdout": "com.wangjiawei508.workwise.candidate.headb9ea004b668d\n",
+      "stderr": ""
+    }
+  ],
+  "newUserProvidedIconIncluded": false,
+  "guiStarted": false,
+  "scope": "isolated private candidate installation, not release approval",
+  "checkedAt": "2026-09-24T04:44:52.648Z"
+}

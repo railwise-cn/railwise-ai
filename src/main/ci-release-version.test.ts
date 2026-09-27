@@ -36,7 +36,7 @@ describe('CI release version computation', () => {
     ).toEqual({
       version: '0.3.0',
       tag: 'v0.3.0',
-      releaseName: 'WorkWise 0.3.0 Candidate',
+      releaseName: 'RailWise AI 0.3.0 Candidate',
       previousTag: 'v0.2.9',
       existingTag: false
     })
@@ -52,7 +52,7 @@ describe('CI release version computation', () => {
     ).toEqual({
       version: '0.1.1',
       tag: 'v0.1.1',
-      releaseName: 'WorkWise 0.1.1',
+      releaseName: 'RailWise AI 0.1.1',
       previousTag: '',
       existingTag: false
     })

@@ -1,0 +1,52 @@
+import copy
+import json
+import unittest
+from pathlib import Path
+
+from compare_result import compare
+
+ROOT = Path(__file__).parent
+
+
+class IndependentComparatorTests(unittest.TestCase):
+    def setUp(self):
+        self.oracle = json.loads((ROOT / "independent-oracle.json").read_text())
+        self.product = json.loads((ROOT / "fbb-selected-result.json").read_text())
+
+    def test_historical_selected_result(self):
+        self.assertEqual(compare(self.oracle, self.product)["status"], "passed")
+
+    def test_coordinate_mutation(self):
+        altered = copy.deepcopy(self.product)
+        altered["record"]["result"]["points"][-1]["x"] += 0.001
+        with self.assertRaises(AssertionError):
+            compare(self.oracle, altered)
+
+    def test_degree_of_freedom_mutation(self):
+        altered = copy.deepcopy(self.product)
+        altered["record"]["result"]["degreesOfFreedom"] = 3
+        with self.assertRaises(AssertionError):
+            compare(self.oracle, altered)
+
+    def test_direction_units_mutation(self):
+        altered = copy.deepcopy(self.product)
+        altered["record"]["result"]["observations"][0]["unit"] = "deg"
+        with self.assertRaises(AssertionError):
+            compare(self.oracle, altered)
+
+    def test_zeroed_tiny_residual_detected_by_geometry(self):
+        altered = copy.deepcopy(self.product)
+        for key in ["residual", "correction"]:
+            altered["record"]["result"]["observations"][0][key] = 0
+        with self.assertRaisesRegex(AssertionError, "does not reconstruct"):
+            compare(self.oracle, altered)
+
+    def test_missing_observation(self):
+        altered = copy.deepcopy(self.product)
+        altered["record"]["result"]["observations"].pop()
+        with self.assertRaises(AssertionError):
+            compare(self.oracle, altered)
+
+
+if __name__ == "__main__":
+    unittest.main()

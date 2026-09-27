@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "model": "two-epoch-one-dimensional-declared-reference-datum",
+  "unit": "mm",
+  "method": "equal-reference-mean",
+  "referenceDeclaration": "caller-selected-reference-set-not-verified-stable",
+  "testingStrategy": "none-datum-comparison-only",
+  "mapping": [
+    {
+      "id": "a",
+      "firstPointId": "a",
+      "secondPointId": "a"
+    },
+    {
+      "id": "b",
+      "firstPointId": "b",
+      "secondPointId": "b"
+    },
+    {
+      "id": "c",
+      "firstPointId": "c",
+      "secondPointId": "c"
+    }
+  ],
+  "referenceIds": [
+    "a",
+    "b"
+  ],
+  "dependence": {
+    "kind": "caller-declared-independent",
+    "sourceAnchor": "synthetic-independent-not-authenticated"
+  },
+  "firstEpoch": {
+    "id": "firstEpoch",
+    "sourceAnchor": "synthetic-only-not-authenticated",
+    "sourceSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+    "points": [
+      {
+        "id": "a",
+        "coordinate": 0
+      },
+      {
+        "id": "b",
+        "coordinate": 10
+      },
+      {
+        "id": "c",
+        "coordinate": 20
+      }
+    ],
+    "covariance": [
+      [
+        1,
+        -1,
+        0
+      ],
+      [
+        -1,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ]
+  },
+  "secondEpoch": {
+    "id": "secondEpoch",
+    "sourceAnchor": "synthetic-only-not-authenticated",
+    "sourceSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "covarianceBasis": "caller-declared-full-coordinate-covariance-not-cofactor",
+    "points": [
+      {
+        "id": "a",
+        "coordinate": 2
+      },
+      {
+        "id": "b",
+        "coordinate": 14
+      },
+      {
+        "id": "c",
+        "coordinate": 27
+      }
+    ],
+    "covariance": [
+      [
+        1,
+        -1,
+        0
+      ],
+      [
+        -1,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ]
+  }
+}

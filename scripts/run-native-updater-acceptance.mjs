@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import {
   closeSync,
   existsSync,
@@ -9,10 +9,25 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { boundedCommand } from './updater-acceptance-process.mjs'
+
+export function validateCandidateAcceptanceRoot(root, env = process.env) {
+  const prefix = env.RUNNER_TEMP && realpathSync(env.RUNNER_TEMP)
+  if (env.GITHUB_ACTIONS !== 'true' || env.RUNNER_OS !== 'macOS' || !prefix
+    || env.RUNNER_ENVIRONMENT !== 'github-hosted'
+    || !isAbsolute(root) || dirname(realpathSync(root)) !== prefix
+    || !/^workwise-private-updater-[A-Za-z0-9]+$/.test(basename(root))) {
+    throw new Error('Private candidate acceptance requires a dedicated directory in an ephemeral macOS Actions runner.')
+  }
+  if (!existsSync(join(root, 'candidate.env'))) throw new Error('Private candidate environment is missing.')
+  return realpathSync(root)
+}
 
 function argument(name, fallback = '') {
   const prefix = `--${name}=`
@@ -25,13 +40,15 @@ function required(name) {
   return value
 }
 
-function run(command, args) {
-  const result = spawnSync(command, args, { stdio: 'inherit', windowsHide: true })
-  if (result.error) throw result.error
-  if (result.status !== 0) throw new Error(`${command} exited with ${result.status}`)
+function progress(event) {
+  console.info(`[native-updater] ${event.operation}: ${event.status}`)
 }
 
-function installMac(installer, root) {
+function run(command, args) {
+  boundedCommand(command, args, { stdio: 'inherit', windowsHide: true, progress })
+}
+
+function installMac(installer, root, candidateHead = '') {
   if (!installer.toLowerCase().endsWith('.dmg')) throw new Error('macOS base installer must be a DMG.')
   const mount = join(root, 'mount')
   const applications = join(root, 'Applications')
@@ -41,7 +58,10 @@ function installMac(installer, root) {
   try {
     const appName = readdirSync(mount).find((name) => name.endsWith('.app'))
     if (!appName) throw new Error('DMG does not contain an application bundle.')
-    const destination = join(applications, 'WorkWise.app')
+    if (candidateHead && appName !== `RailWise AI Candidate ${candidateHead.slice(0, 12)}.app`) {
+      throw new Error('Private acceptance installer has an unexpected candidate identity.')
+    }
+    const destination = join(applications, appName)
     run('ditto', [join(mount, appName), destination])
     run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', destination])
     run('spctl', ['--assess', '--type', 'execute', '--verbose=2', destination])
@@ -64,8 +84,9 @@ function installWindows(installer, root) {
   mkdirSync(destination, { recursive: true })
   // NSIS requires /D to be the final argument and does not accept quotes around it.
   run(installer, ['/S', `/D=${destination}`])
-  const executable = join(destination, 'WorkWise.exe')
-  if (!existsSync(executable)) throw new Error(`NSIS did not install ${executable}`)
+  const executableName = readdirSync(destination).find((name) => name.endsWith('.exe'))
+  const executable = executableName ? join(destination, executableName) : ''
+  if (!executable || !existsSync(executable)) throw new Error(`NSIS did not install an executable in ${destination}`)
   return executable
 }
 
@@ -136,7 +157,18 @@ async function main() {
     throw new Error('timeout-minutes must be between 1 and 60.')
   }
 
-  const root = mkdtempSync(join(tmpdir(), 'workwise-native-updater-'))
+  const candidateRoot = argument('candidate-root')
+  const candidateHead = argument('candidate-source-head')
+  const certificateSha256 = argument('certificate-sha256')
+  if (certificateSha256 && (!candidateHead || !/^[a-f0-9]{64}$/.test(certificateSha256))) {
+    throw new Error('A private certificate pin requires the isolated candidate and a complete SHA256.')
+  }
+  if (Boolean(candidateRoot) !== Boolean(candidateHead) || (candidateHead && !/^[a-f0-9]{40}$/.test(candidateHead))) {
+    throw new Error('Private acceptance requires both candidate-root and the exact candidate source HEAD.')
+  }
+  const root = candidateRoot
+    ? validateCandidateAcceptanceRoot(candidateRoot)
+    : mkdtempSync(join(tmpdir(), 'workwise-native-updater-'))
   const reportPath = argument('report')
     ? resolve(argument('report'))
     : join(root, `updater-acceptance-${process.platform}-${process.arch}.json`)
@@ -149,12 +181,19 @@ async function main() {
     targetVersion,
     channel,
     feedUrl,
-    reportPath
+    reportPath,
+    ...(certificateSha256 ? { privateTls: { certificateSha256, sourceHead: candidateHead } } : {})
   }, null, 2)}\n`, 'utf8')
 
   const executable = process.platform === 'darwin'
-    ? installMac(installer, root)
+    ? installMac(installer, root, candidateHead)
     : installWindows(installer, root)
+  if (candidateHead) {
+    // Verify the app actually copied from the DMG, not merely the adjacent
+    // unpacked build directory. Keep generic legacy harness runs dependency-free.
+    const { verifyBundle } = await import('./run-private-macos-updater-acceptance.mjs')
+    verifyBundle(executable, candidateHead, baseVersion, progress)
+  }
   const logPath = join(dirname(reportPath), `${basename(reportPath, '.json')}.log`)
   const log = openSync(logPath, 'a')
   const acceptanceArgument = `--workwise-updater-acceptance=${configPath}`
@@ -165,8 +204,11 @@ async function main() {
         '--stdout', logPath,
         '--stderr', logPath,
         '--env', 'WORKWISE_STARTUP_TRACE=1',
+        ...(certificateSha256 ? ['GITHUB_ACTIONS', 'RUNNER_OS', 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP']
+          .flatMap(name => ['--env', `${name}=${process.env[name] ?? ''}`]) : []),
         executable,
-        '--args', acceptanceArgument
+        '--args', acceptanceArgument,
+        ...(candidateRoot ? [`--workwise-candidate-env-file=${join(root, 'candidate.env')}`] : [])
       ]
     : [acceptanceArgument]
   const child = spawn(launchCommand, launchArguments, {
@@ -184,7 +226,9 @@ async function main() {
   console.info(`Evidence: ${reportPath}`)
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.stack || error.message : String(error))
-  process.exitCode = 1
-})
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.stack || error.message : String(error))
+    process.exitCode = 1
+  })
+}

@@ -1,0 +1,37 @@
+{
+  "sourceSha": "bea9a0484ebbdf4b1abca89220ca45bba2c3eb1f",
+  "toolsSha": "bea9a0484ebbdf4b1abca89220ca45bba2c3eb1f",
+  "renderedBy": "remote-website-php",
+  "htmlSha256": "73d818b9e1e826c13a33f6043dee5b160591ecbd7bb500e6ca1f9266a298b616",
+  "productSectionsSha256": "70921ad13315554ca927045e1bfdf45ce2fb9c25f89d9909367df4bfec93bccb",
+  "files": [
+    {
+      "relative": "products/workwise/index.php",
+      "sha256": "0e96daa62677f4d6ea13545f0c50db67fd42d7bed9b4434de7f88123dffa66f2"
+    },
+    {
+      "relative": "products/screenshots/workwise/04-survey-candidate-zh-light.jpg",
+      "sha256": "454d6756a9615bbc9e4b3c015e1aeaad6130b905d5ba6a5c4e04425e97938d9e"
+    },
+    {
+      "relative": "products/screenshots/workwise/05-survey-candidate-delivery.jpg",
+      "sha256": "c6f2bc61afe051bf24bd4c31cfe8ec3cc23bd30db579943948b19b6063d188b2"
+    },
+    {
+      "relative": "products/screenshots/workwise/06-candidate-model-settings.jpg",
+      "sha256": "1f85a22a761f47c7ed1d3cc7d7c24536ba062f3dd66b146f3e1b765c089c7f86"
+    },
+    {
+      "relative": "products/screenshots/workwise/candidate-screenshots.json",
+      "sha256": "40805fefad422aee718fa28afe5415f6acd39fa2395ea5d390e45ac71fd41075"
+    },
+    {
+      "relative": "includes/workwise_product.php",
+      "sha256": "273a514ce9d658c8d60467457452d3ac587ce2076c680d4c0ceaea61a469c701"
+    },
+    {
+      "relative": "data/workwise-product.json",
+      "sha256": "680e5d0441235881bf229647099db3e4445a2da31915d107df1f55fcd0d531c7"
+    }
+  ]
+}

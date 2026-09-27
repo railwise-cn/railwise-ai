@@ -1,0 +1,32 @@
+[
+  {
+    "tool": "写作",
+    "mainNavigation": true,
+    "surveyReturn": true,
+    "restored": true
+  },
+  {
+    "tool": "插件",
+    "mainNavigation": true,
+    "surveyReturn": true,
+    "restored": true
+  },
+  {
+    "tool": "定时任务",
+    "mainNavigation": true,
+    "surveyReturn": true,
+    "restored": true
+  },
+  {
+    "tool": "Flow 流程",
+    "mainNavigation": true,
+    "surveyReturn": true,
+    "restored": true
+  },
+  {
+    "tool": "设计",
+    "mainNavigation": true,
+    "surveyReturn": true,
+    "restored": true
+  }
+]

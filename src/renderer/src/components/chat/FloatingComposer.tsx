@@ -111,12 +111,15 @@ type Props = {
   setMode: (m: 'plan' | 'agent') => void
   busy: boolean
   runtimeReady: boolean
+  /** A domain may be waiting for its conversation even while Runtime is online. */
+  unavailableReason?: string
   hasActiveThread: boolean
   composerModel: string
+  composerProviderId?: string
   composerPickList: string[]
   composerModelGroups?: ModelProviderModelGroup[]
   composerReasoningEffort?: string
-  onComposerModelChange: (modelId: string) => void
+  onComposerModelChange: (modelId: string, providerId?: string) => void
   onComposerReasoningEffortChange?: (effort: ComposerReasoningEffort) => void
   agentProfiles?: Array<{
     id: string
@@ -530,8 +533,10 @@ export function FloatingComposer({
   setMode,
   busy,
   runtimeReady,
+  unavailableReason,
   hasActiveThread,
   composerModel,
+  composerProviderId,
   composerPickList,
   composerModelGroups = EMPTY_MODEL_GROUPS,
   composerReasoningEffort,
@@ -696,7 +701,7 @@ export function FloatingComposer({
   const goalPanelRef = useRef<HTMLDivElement | null>(null)
   const goalRuntimeStartedAtRef = useRef<number | null>(null)
   const placeholder = !runtimeReady
-    ? t('runtimeActionNeedsConnection')
+    ? unavailableReason || t('runtimeActionNeedsConnection')
     : !hasActiveThread && !effectiveWorkspaceRoot
       ? t('workspaceRequiredToCreateThread')
       : goalPanelOpen && route !== 'claw'
@@ -713,7 +718,7 @@ export function FloatingComposer({
                 ? t('placeholder')
                 : t('composerStartsThread')
   const footerHint = !runtimeReady
-    ? t('composerOfflineHint')
+    ? unavailableReason || t('composerOfflineHint')
     : !hasActiveThread && !effectiveWorkspaceRoot
       ? t('composerWorkspaceHint')
       : route === 'claw'
@@ -2160,6 +2165,7 @@ export function FloatingComposer({
                   compact={compact}
                   mode={modelPickerMode}
                   composerModel={composerModel}
+                  composerProviderId={composerProviderId}
                   composerPickList={composerPickList}
                   composerModelGroups={composerModelGroups}
                   composerReasoningEffort={composerReasoningEffort}

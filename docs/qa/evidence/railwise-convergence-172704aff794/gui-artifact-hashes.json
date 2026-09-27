@@ -1,0 +1,25 @@
+{
+  "manifestId": "manifest_f170b830-6810-4331-b736-f37de9f0238d",
+  "reviewStatus": "draft",
+  "projectRevision": null,
+  "outputs": [
+    {
+      "name": "report.docx",
+      "recordedSha256": "31d0d414844a4223c91f7b2654c0bcb0565ad6a72c332a031697d802b3fe02d6",
+      "actualSha256": "31d0d414844a4223c91f7b2654c0bcb0565ad6a72c332a031697d802b3fe02d6",
+      "matches": true
+    },
+    {
+      "name": "report.pdf",
+      "recordedSha256": "af42efa9a61fe7d9c294b34970e0e5be8d1546ba750518accf6b78e9597c442e",
+      "actualSha256": "af42efa9a61fe7d9c294b34970e0e5be8d1546ba750518accf6b78e9597c442e",
+      "matches": true
+    },
+    {
+      "name": "evidence.xlsx",
+      "recordedSha256": "4945383f28c7745593d3baa3de83cd7f03053de20236fcb29462ff3aa913f5cc",
+      "actualSha256": "4945383f28c7745593d3baa3de83cd7f03053de20236fcb29462ff3aa913f5cc",
+      "matches": true
+    }
+  ]
+}

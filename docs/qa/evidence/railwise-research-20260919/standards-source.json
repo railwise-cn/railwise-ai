@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-09-19",
+  "source": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=2874EFAC7523FB293E6AF2E4068CEB02&refer=outter",
+  "standard": "GB/T 24356-2023",
+  "titleZh": "测绘成果质量检查与验收",
+  "titleEn": "Specifications for quality inspection and acceptance of surveying and mapping products",
+  "status": "现行",
+  "published": "2023-05-23",
+  "effective": "2023-05-23",
+  "ccs": "A75",
+  "ics": "07.040",
+  "authority": "自然资源部（测绘地理）",
+  "issuer": "国家市场监督管理总局、国家标准化管理委员会",
+  "officialOnlinePreview": {
+    "url": "https://openstd.samr.gov.cn/bzgk/std/showGb?type=online&hcno=2874EFAC7523FB293E6AF2E4068CEB02&request_locale=zh",
+    "visiblePageCount": 129,
+    "fullTextRetrieved": false,
+    "reason": "下载入口要求验证码；未提交或绕过验证码"
+  },
+  "verifiedScope": "official metadata and online preview availability only; no clause-level rule encoded"
+}

@@ -1,0 +1,27 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~							134 container 试算历史
++								135 标题 试算历史, Value: 4
++									136 文本 试算历史
++								137 container
++									138 text 此条记录不可恢复  ·  advanced_trial_7b98cb57-c9cf-4040-a450-0b03e8479f7d 保存的输入或结果完整性检查失败，此条记录不可恢复。
++								139 按钮 严格核对并恢复 · VCE · 互斥分组方差分量试算 · 非正分量停止，候选保留但不接受 advanced_trial_61a598ce-9079-4437-a584-1883f5ff1a75 · 2026-09-19T23:35:33.437Z
++									140 文本 严格核对并恢复
++									141 文本  ·
++									142 文本 VCE · 互斥分组方差分量试算
++									143 文本  ·
++									144 文本 非正分量停止，候选保留但不接受
++									145 文本 advanced_trial_61a598ce-9079-4437-a584-1883f5ff1a75
++									146 文本  ·
++									147 文本 2026-09-19T23:35:33.437Z
++								148 按钮 严格核对并恢复 · VCE · 互斥分组方差分量试算 · 试算数值收敛 · 不代表工程合格 advanced_trial_d4fe9f4e-111a-4ffc-9347-c0ffd2b32887 · 2026-09-19T23:35:12.468Z
++									149 文本 严格核对并恢复
++									150 文本  ·
++									151 文本 VCE · 互斥分组方差分量试算
++									152 文本  ·
++									153 文本 试算数值收敛 · 不代表工程合格
++									154 文本 advanced_trial_d4fe9f4e-111a-4ffc-9347-c0ffd2b32887
++									155 文本  ·
++									156 文本 2026-09-19T23:35:12.468Z
++								157 按钮 (disabled) 上一页
++								158 按钮 (disabled) 下一页
+The focused UI element is 123 标题 高级模型试算, Value: 3

@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run --maxWorkers=4
+
+
+ RUN  v4.1.8 <repo>/kun
+
+
+ Test Files  179 passed | 2 skipped (181)
+      Tests  2772 passed | 22 skipped (2794)
+   Start at  12:14:50
+   Duration  24.21s (transform 4.01s, setup 0ms, import 19.25s, tests 63.11s, environment 8ms)
+

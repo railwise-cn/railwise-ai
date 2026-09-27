@@ -5,7 +5,7 @@ const { appendFileSync, readFileSync } = require('node:fs')
 const { join } = require('node:path')
 
 const ROOT = join(__dirname, '..')
-const PRODUCT_NAME = 'WorkWise'
+const PRODUCT_NAME = 'RailWise AI'
 const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)$/
 const SEMVER_VERSION = /^(\d+)\.(\d+)\.(\d+)$/
 

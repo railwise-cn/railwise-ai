@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_DESIGN_CANVAS_FORMAT,
   DESIGN_CANVAS_FORMATS,
@@ -169,12 +169,15 @@ describe('createDesignPage 工厂', () => {
     expect(page.height).toBe(500)
   })
 
-  it('页面 id 唯一', () => {
-    const ids = new Set<string>()
-    for (let i = 0; i < 50; i++) {
-      ids.add(createDesignPage().id)
-    }
-    expect(ids.size).toBe(50)
+  it('does not collide when pages, elements and documents are created in the same millisecond', () => {
+    const time = vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    try {
+      for (const create of [createDesignPage, () => createDesignElement('rect'), createDesignDocument]) {
+        const ids = Array.from({ length: 50 }, () => create().id)
+        expect(new Set(ids).size).toBe(50)
+      }
+    } finally { time.mockRestore(); random.mockRestore() }
   })
 })
 

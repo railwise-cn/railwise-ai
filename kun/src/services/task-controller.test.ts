@@ -167,6 +167,39 @@ describe('TaskController reliability boundaries', () => {
     repository.close()
   }, PERSISTENCE_TEST_TIMEOUT_MS)
 
+  it.each([undefined, 'Historical stalled reason'])('clears obsolete reasons after resumed completion while preserving failure history (legacy reason: %s)', async legacyReason => {
+    const { repository, controller, sessionStore, task } = await fixture('What is 2 + 3?')
+    try {
+      for (let attempt = 0; attempt < 7; attempt += 1) {
+        controller.beginAttempt(task.threadId, 'turn_reliability')
+        controller.recordAttemptFailure(task.threadId, 'turn_reliability', 'network_unavailable', 'network unavailable')
+      }
+      const stalled = repository.get(task.id)!
+      expect(stalled.status).toBe('stalled')
+      const resumed = controller.prepareResume(task.id, stalled.revision)
+      expect(resumed.waitingReason).toBeTruthy()
+      controller.beginAttempt(task.threadId, 'turn_reliability')
+      if (legacyReason) {
+        const running = repository.get(task.id)!
+        repository.update(task.id, running.revision, current => ({ ...current, stalledReason: legacyReason }))
+      }
+      await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+        id: 'item_resumed_answer', threadId: task.threadId, turnId: 'turn_reliability', text: '2 + 3 = 5.', status: 'completed'
+      }))
+      const history = repository.events(task.id)
+      const decision = await controller.assessCandidate(task.threadId, 'turn_reliability')
+      expect(decision).toMatchObject({ kind: 'completed', task: { status: 'completed' } })
+      const completed = repository.get(task.id)!
+      expect(completed.waitingReason).toBeUndefined()
+      expect(completed.stalledReason).toBeUndefined()
+      expect(repository.events(task.id).slice(0, history.length)).toEqual(history)
+      expect(repository.events(task.id).filter(event => event.kind === 'task_stalled')).toHaveLength(1)
+      expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(1)
+    } finally {
+      repository.close()
+    }
+  }, PERSISTENCE_TEST_TIMEOUT_MS)
+
   it('fails at a hard attempt budget without ever writing a completion event', async () => {
     const { repository, controller, task } = await fixture()
     let decision

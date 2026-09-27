@@ -1,0 +1,36 @@
+{
+  "sourceHead": "8e38dfde1bec35433f06ff5f7d690554011a0ba5",
+  "desktop": {
+    "passed": 2496,
+    "skipped": 2
+  },
+  "runtime": {
+    "passed": 1607,
+    "skipped": 3
+  },
+  "typecheck": "passed both",
+  "build": "passed",
+  "lint": {
+    "errors": 0,
+    "existingWarnings": 1
+  },
+  "strictOpenSpec": {
+    "passed": 11,
+    "failed": 0
+  },
+  "ci": [
+    {
+      "id": 35427895059,
+      "conclusion": "success"
+    },
+    {
+      "id": 35427891905,
+      "conclusion": "success"
+    }
+  ],
+  "ellipseRegression": {
+    "oldCode": "failed",
+    "fixedCode": "passed"
+  },
+  "legacyAlgorithm6Replay": "strict unchanged"
+}

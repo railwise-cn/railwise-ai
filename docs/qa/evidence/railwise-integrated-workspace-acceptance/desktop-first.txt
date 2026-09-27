@@ -1,0 +1,66 @@
+
+> workwise@0.5.0 test
+> vitest run
+
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+(node:70208) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72555) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/skill-service.test.ts (21 tests | 1 failed) 12306ms
+     × installs the bundled PPT Master slim skill with WorkWise overlay files 5324ms
+ ❯ src/main/services/agent-pack-service.test.ts (6 tests | 1 failed) 14471ms
+     × updates assets previously installed from the same bundled agent pack 5161ms
+(node:76380) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76485) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76515) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76590) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76660) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76675) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76695) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:76757) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/main/services/agent-pack-service.test.ts > agent-pack-service > updates assets previously installed from the same bundled agent pack
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/agent-pack-service.test.ts:115:3
+    113|   })
+    114|
+    115|   it('updates assets previously installed from the same bundled agent …
+       |   ^
+    116|     const codexRoot = join(tempRoot, 'codex-update')
+    117|     const firstInstall = await installBundledAgentPack({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/skill-service.test.ts:463:3
+    461|   })
+    462|
+    463|   it('installs the bundled PPT Master slim skill with WorkWise overlay…
+       |   ^
+    464|     const workspaceRoot = join(tempRoot, 'workspace-bundled-ppt-master…
+    465|     const skillInstallRoot = join(workspaceRoot, '.agents', 'skills')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 320 passed | 2 skipped (324)
+      Tests  2 failed | 2677 passed | 2 skipped (2681)
+   Start at  08:42:50
+   Duration  37.14s (transform 21.86s, setup 0ms, import 51.40s, tests 216.81s, environment 9.18s)
+

@@ -1,0 +1,12 @@
+{
+  "sourceSha256": "47fcbec6e5ddff9d89d4a3760e29d5bc9b69262264e929251a2d0e92ea186d96",
+  "source": "native-updater.redacted.log",
+  "scope": "Cloud updater log only; local restart warning is separately operator reported",
+  "lines": [
+    "[3550:0920/110320.055217:ERROR:electron/shell/common/platform_util_mac.mm:260] Unable to set login item: The operation couldn’t be completed. Operation not permitted",
+    "ERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription",
+    "ERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription",
+    "ERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription",
+    "ERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription"
+  ]
+}

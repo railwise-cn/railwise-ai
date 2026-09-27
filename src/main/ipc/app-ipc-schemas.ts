@@ -1,5 +1,15 @@
+import { SurveyQualityAssessmentPlanCreateV1, SurveyQualityAssessmentCreateV1, SurveyQualityAssessmentReverifyV1, QUALITY_ASSESSMENT_LIMITS, parseAssessmentJson } from '../../shared/survey-quality-assessment'
+import { SurveyQualityScoringCreateV1, SurveyQualityScoringReverifyRequestV1, SURVEY_QUALITY_SCORING_WORKSPACE_LIMITS, SurveyQualityScoringInputV1, parseQualityScoringJson } from '../../shared/survey-quality-scoring'
+import { SurveySamplingPopulationCreateV1, SurveySamplingRunCreateV1, SurveySamplingVerifyRequestV1, SURVEY_SAMPLING_WORKSPACE_LIMITS } from '../../shared/survey-quality-sampling-workspace'
+import { SurveyAdvancedTrialCreateV1, SurveyAdvancedTrialReverifyRequestV1, SURVEY_ADVANCED_TRIAL_LIMITS, SurveyGeneralizedWRequestV1, SurveyVceTrialInputV1, SurveyHuberTrialInputV1, SurveyStatisticalFamilyInputV1, SurveyReferenceDatumInputV1, SurveyStaticIncrementalInputV1, parseAdvancedTrialJson } from '../../shared/survey-advanced-trials'
 import { z } from 'zod'
+import { RUNTIME_STANDARD_BASIS_PATH, STANDARD_BASIS_QUERY_KEYS, SurveyStandardBasisReferenceV1 } from '../../shared/survey-standard-basis'
+import { SurveyFreeLevelingTrialRequestV1 } from '../../shared/survey-free-leveling'
+import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQualityRecordCreateV1, SurveyQualityCheckAppendV1 } from '../../shared/survey-quality-workspace'
+import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import {
+  RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
+  RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
   RUNTIME_APPROVAL_TEMPLATE,
   RUNTIME_ATTACHMENT_CONTENT_TEMPLATE,
   RUNTIME_ATTACHMENT_DIAGNOSTICS_TEMPLATE,
@@ -52,6 +62,8 @@ import {
   RUNTIME_ENGINEERING_CHARTS_TEMPLATE,
   RUNTIME_ENGINEERING_REPORT_PREVIEW_TEMPLATE,
   RUNTIME_ENGINEERING_DELIVERABLES_FINALIZE_TEMPLATE,
+  RUNTIME_ENGINEERING_MANIFEST_VERIFY_TEMPLATE,
+  RUNTIME_ENGINEERING_MONITORING_REPLAY_TEMPLATE,
   RUNTIME_ENGINEERING_RUN_TEMPLATE,
   RUNTIME_ENGINEERING_RUN_CANCEL_TEMPLATE,
   RUNTIME_ENGINEERING_RUN_RESUME_TEMPLATE,
@@ -59,6 +71,8 @@ import {
   RUNTIME_ENGINEERING_AI_EVIDENCE_TEMPLATE,
   RUNTIME_ENGINEERING_AI_WATCH_DRAFTS_TEMPLATE,
   RUNTIME_ENGINEERING_AI_PLANS_TEMPLATE,
+  RUNTIME_ENGINEERING_AI_PROJECT_SUGGESTIONS_TEMPLATE,
+  RUNTIME_ENGINEERING_AI_PROJECT_SUGGESTION_DECISION_TEMPLATE,
   RUNTIME_ENGINEERING_AI_PLAN_TEMPLATE,
   RUNTIME_ENGINEERING_AI_PLAN_VALIDATE_TEMPLATE,
   RUNTIME_ENGINEERING_AI_PLAN_APPROVE_TEMPLATE,
@@ -78,6 +92,7 @@ import {
   ,RUNTIME_ENGINEERING_ADJUSTMENT_CANCEL_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENT_RESUME_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENT_PREVIEW_TEMPLATE
+  ,RUNTIME_ENGINEERING_STATISTICAL_DIAGNOSTICS_TEMPLATE
   ,RUNTIME_ENGINEERING_DEFORMATIONS_TEMPLATE
   ,RUNTIME_ENGINEERING_DEFORMATION_TEMPLATE
 } from '../../shared/runtime-endpoints'
@@ -168,10 +183,10 @@ function compileEndpoint(
   allowedQueryParams?: readonly string[]
 ): EndpointTemplate {
   // Build a regex from the template by escaping the literal parts and
-  // substituting the `{id}` / `{turn}` placeholders with `[^/]+`. The
+  // substituting the approved identifier placeholders with `[^/]+`. The
   // template fragments are URL-encoded by the path helpers, so they
   // contain only characters that are safe to escape directly.
-  const pattern = template.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\{(?:id|turn)\}/g, '[^/]+')
+  const pattern = template.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\{(?:id|turn|manifestId|adjustmentId|networkId|trialId|planId|recordId|populationId|runId)\}/g, '[^/]+')
   const regex = new RegExp(`^${pattern}$`)
   return {
     match: (path: string) => regex.test(path),
@@ -185,13 +200,59 @@ function hasAllowedQuery(url: URL, endpoint: EndpointTemplate): boolean {
   const seen = new Set<string>()
   for (const [key, value] of url.searchParams.entries()) {
     if (!endpoint.allowedQueryParams.has(key) || seen.has(key)) return false
+    if (key === 'download' && value !== '1') return false
     if (!value.trim() || value.length > MAX_ID_LENGTH) return false
     seen.add(key)
   }
   return true
 }
 
+const QUALITY_ENDPOINTS = [
+  { suffix: 'quality-plans', methods: ['GET', 'POST'], schema: SurveyQualityPlanCreateV1, paginated: true },
+  { suffix: 'quality-plans/{planId}', methods: ['GET'], paginated: false },
+  { suffix: 'quality-evidence', methods: ['POST'], schema: SurveyQualityEvidenceCreateV1, paginated: false },
+  { suffix: 'quality-records', methods: ['GET', 'POST'], schema: SurveyQualityRecordCreateV1, paginated: true },
+  { suffix: 'quality-records/{recordId}', methods: ['GET'], paginated: false },
+  { suffix: 'quality-records/{recordId}/checks', methods: ['POST'], schema: SurveyQualityCheckAppendV1, paginated: false },
+  { suffix: 'quality-records/{recordId}/verify', methods: ['POST'], schema: z.object({}).strict(), paginated: false }
+].map(entry => ({ ...entry, endpoint: compileEndpoint(`/v1/engineering/projects/{id}/${entry.suffix}`, entry.methods, entry.paginated ? ['limit', 'offset'] : []) }))
+
+const QUALITY_WORKFLOW_ENDPOINTS = [
+  { suffix: 'quality-workflows', methods: ['GET', 'POST'], schema: SurveyQualityWorkflowCreateV1, paginated: true },
+  { suffix: 'quality-workflows/{id}', methods: ['GET'], paginated: false },
+  { suffix: 'quality-workflows/{id}/events', methods: ['POST'], schema: SurveyQualityWorkflowAppendV1, paginated: false }
+].map(entry => ({ ...entry, endpoint: compileEndpoint(`/v1/engineering/projects/{id}/${entry.suffix}`, entry.methods, entry.paginated ? ['limit', 'offset'] : []) }))
+
+const SAMPLING_ENDPOINTS = [
+  { suffix: 'sampling-populations', methods: ['GET', 'POST'], schema: SurveySamplingPopulationCreateV1, paginated: true },
+  { suffix: 'sampling-populations/{populationId}', methods: ['GET'], paginated: false },
+  { suffix: 'sampling-populations/{populationId}/units', methods: ['GET'], paginated: true },
+  { suffix: 'sampling-runs', methods: ['GET', 'POST'], schema: SurveySamplingRunCreateV1, paginated: true },
+  { suffix: 'sampling-runs/{runId}', methods: ['GET'], paginated: false },
+  { suffix: 'sampling-runs/{runId}/samples', methods: ['GET'], paginated: true },
+  { suffix: 'sampling-runs/{runId}/verify', methods: ['POST'], schema: SurveySamplingVerifyRequestV1, paginated: false }
+].map(entry => ({ ...entry, endpoint: compileEndpoint(`/v1/engineering/projects/{id}/${entry.suffix}`, entry.methods, entry.paginated ? ['limit', 'offset'] : []) }))
+
 const ENDPOINTS: readonly EndpointTemplate[] = [
+  compileEndpoint(RUNTIME_STANDARD_BASIS_PATH, ['GET'], []),
+  compileEndpoint(`${RUNTIME_STANDARD_BASIS_PATH}/{id}/{recordId}`, ['GET'], STANDARD_BASIS_QUERY_KEYS),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-assessment-plans', ['GET', 'POST'], ['limit', 'offset']),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-assessment-plans/{recordId}', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-assessments', ['GET', 'POST'], ['limit', 'offset']),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-assessments/{recordId}', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-assessments/{recordId}/reverify', ['POST'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-assessments/{recordId}/export', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-scoring', ['GET', 'POST'], ['limit', 'offset']),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-scoring/{recordId}', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-scoring/{recordId}/reverify', ['POST'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/quality-scoring/{recordId}/export', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/advanced-trials', ['GET', 'POST'], ['limit', 'offset']),
+  compileEndpoint('/v1/engineering/projects/{id}/advanced-trials/{trialId}', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/advanced-trials/{trialId}/reverify', ['POST'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/advanced-trials/{trialId}/export', ['GET'], []),
+  ...QUALITY_ENDPOINTS.map(entry => entry.endpoint),
+  ...QUALITY_WORKFLOW_ENDPOINTS.map(entry => entry.endpoint),
+  ...SAMPLING_ENDPOINTS.map(entry => entry.endpoint),
   compileEndpoint(RUNTIME_HEALTH_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_INFO_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TOOLS_TEMPLATE, ['GET']),
@@ -231,6 +292,8 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ENGINEERING_CHARTS_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_REPORT_PREVIEW_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_DELIVERABLES_FINALIZE_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_ENGINEERING_MANIFEST_VERIFY_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_ENGINEERING_MONITORING_REPLAY_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_ENGINEERING_RUN_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_ENGINEERING_RUN_CANCEL_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_RUN_RESUME_TEMPLATE, ['POST']),
@@ -238,6 +301,8 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ENGINEERING_AI_EVIDENCE_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_ENGINEERING_AI_WATCH_DRAFTS_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_AI_PLANS_TEMPLATE, ['GET', 'POST'], ['threadId', 'projectId']),
+  compileEndpoint(RUNTIME_ENGINEERING_AI_PROJECT_SUGGESTIONS_TEMPLATE, ['GET'], ['threadId', 'projectId']),
+  compileEndpoint(RUNTIME_ENGINEERING_AI_PROJECT_SUGGESTION_DECISION_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_AI_PLAN_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_ENGINEERING_AI_PLAN_VALIDATE_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_AI_PLAN_APPROVE_TEMPLATE, ['POST']),
@@ -257,6 +322,9 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_CANCEL_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_RESUME_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_PREVIEW_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_ENGINEERING_STATISTICAL_DIAGNOSTICS_TEMPLATE, ['GET'], ['download']),
+  compileEndpoint(RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE, ['GET', 'POST'], ['limit', 'offset']),
+  compileEndpoint(RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE, ['GET'], ['download']),
   compileEndpoint(RUNTIME_ENGINEERING_DEFORMATIONS_TEMPLATE, ['GET', 'POST'], ['projectId']),
   compileEndpoint(RUNTIME_ENGINEERING_DEFORMATION_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_MEMORY_TEMPLATE, ['GET', 'POST']),
@@ -308,6 +376,134 @@ export const runtimeRequestPayloadSchema = z
   })
   .strict()
   .superRefine((payload, context) => {
+    let url: URL
+    try { url = new URL(payload.path, 'http://localhost') } catch {
+      context.addIssue({ code: 'custom', message: 'invalid runtime request URL' })
+      return
+    }
+    if (url.pathname === RUNTIME_STANDARD_BASIS_PATH || url.pathname.startsWith(`${RUNTIME_STANDARD_BASIS_PATH}/`)) {
+      let valid = (payload.method ?? 'GET') === 'GET' && payload.body === undefined && !url.hash
+      if (url.pathname === RUNTIME_STANDARD_BASIS_PATH) valid = valid && !url.search
+      else {
+        const parts = url.pathname.slice(RUNTIME_STANDARD_BASIS_PATH.length + 1).split('/')
+        const query = Object.fromEntries(url.searchParams)
+        valid = valid && parts.length === 2 && [...url.searchParams].length === STANDARD_BASIS_QUERY_KEYS.length
+          && SurveyStandardBasisReferenceV1.safeParse({ ...query, ruleId: parts[0], ruleVersion: parts[1] }).success
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid read-only standard basis request' })
+    }
+    const assessment = /^\/v1\/engineering\/projects\/[^/]+\/(quality-assessment-plans|quality-assessments)(?:\/([^/]+)(?:\/(reverify|export))?)?$/.exec(url.pathname)
+    if (assessment) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (assessment[2] || !['limit','offset'].includes(key) || url.searchParams.getAll(key).length !== 1 || !/^(0|[1-9]\d*)$/.test(value)
+          || !Number.isSafeInteger(Number(value)) || (key === 'limit' ? Number(value) < 1 || Number(value) > 10 : Number(value) > 128)) valid = false
+      }
+      if (method === 'POST' && !url.search && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= QUALITY_ASSESSMENT_LIMITS.requestBytes) {
+        try {
+          const data = parseAssessmentJson(payload.body)
+          if (assessment[3] === 'reverify' && assessment[1] === 'quality-assessments') valid = SurveyQualityAssessmentReverifyV1.safeParse(data).success
+          else if (!assessment[2]) valid = (assessment[1] === 'quality-assessment-plans' ? SurveyQualityAssessmentPlanCreateV1 : SurveyQualityAssessmentCreateV1).safeParse(data).success
+        } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid declared linkage request' })
+    }
+    const scoring = /^\/v1\/engineering\/projects\/[^/]+\/quality-scoring(?:\/[^/]+(?:\/(reverify|export))?)?$/.exec(url.pathname)
+    if (scoring) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (key === 'limit' && (!/^[1-9]\d*$/.test(value) || Number(value) > SURVEY_QUALITY_SCORING_WORKSPACE_LIMITS.pageSize)) valid = false
+        if (key === 'offset' && (!/^(0|[1-9]\d*)$/.test(value) || Number(value) > SURVEY_QUALITY_SCORING_WORKSPACE_LIMITS.recordsPerProject)) valid = false
+      }
+      if (method === 'POST' && !url.search && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= SURVEY_QUALITY_SCORING_WORKSPACE_LIMITS.requestBytes) {
+        try {
+          if (scoring[1] === 'reverify') valid = SurveyQualityScoringReverifyRequestV1.safeParse(parseQualityScoringJson(payload.body)).success
+          else if (url.pathname.endsWith('/quality-scoring')) {
+            const body = SurveyQualityScoringCreateV1.safeParse(parseQualityScoringJson(payload.body))
+            const declaration = body.success ? SurveyQualityScoringInputV1.safeParse(parseQualityScoringJson(body.data.declarationJson)) : null
+            valid = body.success && !!declaration?.success && body.data.kind === declaration.data.operation
+          }
+        } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoring model trial request' })
+    }
+    const advanced = /^\/v1\/engineering\/projects\/[^/]+\/advanced-trials(?:\/[^/]+(?:\/(reverify|export))?)?$/.exec(url.pathname)
+    if (advanced) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (key === 'limit' && (!/^[1-9]\d*$/.test(value) || Number(value) > SURVEY_ADVANCED_TRIAL_LIMITS.pageSize)) valid = false
+        if (key === 'offset' && (!/^(0|[1-9]\d*)$/.test(value) || Number(value) > SURVEY_ADVANCED_TRIAL_LIMITS.trialsPerProject)) valid = false
+      }
+      if (method === 'POST' && !url.search && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= SURVEY_ADVANCED_TRIAL_LIMITS.requestBytes) {
+        try {
+          if (advanced[1] === 'reverify') valid = SurveyAdvancedTrialReverifyRequestV1.safeParse(parseAdvancedTrialJson(payload.body)).success
+          else if (url.pathname.endsWith('/advanced-trials')) {
+            const body = SurveyAdvancedTrialCreateV1.safeParse(parseAdvancedTrialJson(payload.body))
+            valid = body.success && ({ 'generalized-w': SurveyGeneralizedWRequestV1, vce: SurveyVceTrialInputV1, huber: SurveyHuberTrialInputV1, 'statistical-family': SurveyStatisticalFamilyInputV1, 'reference-datum': SurveyReferenceDatumInputV1, 'static-incremental': SurveyStaticIncrementalInputV1 })[body.data.kind].safeParse(parseAdvancedTrialJson(body.data.declarationJson)).success
+          }
+        } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid advanced model trial request' })
+    }
+    const sampling = SAMPLING_ENDPOINTS.find(entry => entry.endpoint.match(url.pathname))
+    if (sampling) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (key === 'limit' && (!/^[1-9]\d*$/.test(value) || Number(value) > SURVEY_SAMPLING_WORKSPACE_LIMITS.pageSize)) valid = false
+        if (key === 'offset' && (!/^(0|[1-9]\d*)$/.test(value) || Number(value) > SURVEY_SAMPLING_WORKSPACE_LIMITS.unitsPerPopulation)) valid = false
+      }
+      if (method === 'POST' && !url.search && sampling.schema && payload.body !== undefined
+        && Buffer.byteLength(payload.body, 'utf8') <= SURVEY_SAMPLING_WORKSPACE_LIMITS.requestBytes) {
+        try { valid = sampling.schema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid sampling workspace request' })
+    }
+    const quality = QUALITY_ENDPOINTS.find(entry => entry.endpoint.match(url.pathname))
+    if (quality) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (key === 'limit' && (!/^[1-9]\d*$/.test(value) || Number(value) > 50)) valid = false
+        if (key === 'offset' && (!/^(0|[1-9]\d*)$/.test(value) || Number(value) > 10_000)) valid = false
+      }
+      if (method === 'POST' && !url.search && quality.schema) {
+        try { valid = quality.schema.safeParse(JSON.parse(payload.body ?? '')).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid quality workspace request' })
+    }
+    const workflow = QUALITY_WORKFLOW_ENDPOINTS.find(entry => entry.endpoint.match(url.pathname))
+    if (workflow) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (key === 'limit' && (!/^[1-9]\d*$/.test(value) || Number(value) > QUALITY_WORKFLOW_LIMITS.pageSize)) valid = false
+        if (key === 'offset' && (!/^(0|[1-9]\d*)$/.test(value) || Number(value) > QUALITY_WORKFLOW_LIMITS.workflowsPerProject)) valid = false
+      }
+      if (method === 'POST' && !url.search && workflow.schema && payload.body !== undefined
+        && Buffer.byteLength(payload.body, 'utf8') <= QUALITY_WORKFLOW_LIMITS.requestBytes) {
+        try { valid = workflow.schema.safeParse(parseQualityWorkflowJson(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid quality workflow request' })
+    }
+    if (compileEndpoint(RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE, ['GET', 'POST']).match(url.pathname)) {
+      const method = payload.method ?? 'GET'
+      let valid = method === 'GET' && payload.body === undefined
+      for (const [key, value] of url.searchParams) {
+        if (key === 'limit' && (!/^[1-9]\d*$/.test(value) || Number(value) > 50)) valid = false
+        if (key === 'offset' && (!/^(0|[1-9]\d*)$/.test(value) || Number(value) > 100_000)) valid = false
+      }
+      if (method === 'POST' && !url.search) {
+        try { valid = SurveyFreeLevelingTrialRequestV1.safeParse(JSON.parse(payload.body ?? '')).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid free leveling trial request' })
+    }
+    if (compileEndpoint(RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE, ['GET']).match(url.pathname) && payload.body !== undefined) {
+      context.addIssue({ code: 'custom', message: 'free leveling trial reads cannot contain a body' })
+    }
     if (payload.body === undefined) return
     let pathname = ''
     try {

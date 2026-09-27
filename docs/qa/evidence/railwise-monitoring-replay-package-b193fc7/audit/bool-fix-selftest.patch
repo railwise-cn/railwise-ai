@@ -1,0 +1,33 @@
+--- selftest.before-bool-fix.py	2026-09-21 05:05:28
++++ selftest.py	2026-09-21 05:47:26
+@@ -40,6 +40,21 @@
+         result = audit.arithmetic([{'monitoringItem': 's', 'point': 'P', 'timestamp': '2026-01-01', 'value': 2, 'cumulative': 0}, {'monitoringItem': 's', 'point': 'P', 'timestamp': '2026-01-03', 'value': 10, 'cumulative': 12}], self.project())
+         self.assertEqual(result, [{'monitoringItem': 's', 'point': 'P', 'currentValue': 10, 'previousValue': 2, 'cumulativeChange': 12, 'changeRate': 4, 'trend': 'rising', 'anomaly': True, 'thresholdStatus': 'alarm'}])
+ 
++    def test_workbook_boolean_comparison_preserves_false_and_true(self):
++        for value in (False, True):
++            expected = [{'monitoringItem': 's', 'point': 'P', 'anomaly': value, 'currentValue': 0}]
++            for actual in (value, str(value).lower()):
++                audit.legacy.compare_analysis(expected, [{**expected[0], 'anomaly': actual, 'currentValue': '0'}])
++
++    def test_workbook_boolean_comparison_rejects_wrong_or_coerced_values(self):
++        for value in (False, True):
++            expected = [{'monitoringItem': 's', 'point': 'P', 'anomaly': value}]
++            for actual in (not value, str(not value).lower(), 0, 1, '0', '1', '', None, 'FALSE', 'TRUE'):
++                with self.subTest(value=value, actual=actual), self.assertRaisesRegex(AssertionError, 'analysis differs'):
++                    audit.legacy.compare_analysis(expected, [{**expected[0], 'anomaly': actual}])
++        with self.assertRaisesRegex(AssertionError, 'analysis differs'):
++            audit.legacy.compare_analysis([{'monitoringItem': 's', 'point': 'P', 'currentValue': 1}], [{'monitoringItem': 's', 'point': 'P', 'currentValue': True}])
++
+     def test_single_observation_omits_undefined(self):
+         result = audit.arithmetic([{'monitoringItem': 's', 'point': 'P', 'timestamp': '2026-01-01', 'value': 8}], self.project())[0]
+         self.assertEqual(result['trend'], 'unknown'); self.assertEqual(result['thresholdStatus'], 'warning')
+@@ -68,6 +83,7 @@
+     stream = io.StringIO()
+     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(AuditHelpers))
+     log = stream.getvalue()
+-    (audit.BASE / 'selftest.log').write_text(log)
++    with (audit.BASE / 'selftest-corrected.log').open('x') as handle:
++        handle.write(log)
+     print(log, end='')
+     raise SystemExit(0 if result.wasSuccessful() else 1)

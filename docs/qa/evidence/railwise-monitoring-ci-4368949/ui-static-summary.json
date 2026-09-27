@@ -1,0 +1,22 @@
+{
+  "schema": "survey-ui-static-inventory-v1",
+  "head": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "sourceSetSha256": "6eb1d244ba4af0031e1416cc756e06ff8851015aea9cec95833a128c06f2f9f3",
+  "boundary": "Static engineering-directory inventory. Dynamic calls, external shared components, runtime text and actual visible states require separate review. No GUI or production coverage rate.",
+  "summary": {
+    "componentFiles": 21,
+    "helperFiles": 14,
+    "literalCallSites": 1233,
+    "dynamicCallSites": 134,
+    "catalogStringCandidateSites": 441,
+    "selectedUniqueKeys": 1338,
+    "selectedMissingEn": 0,
+    "selectedMissingZh": 0,
+    "selectedEnglishHanKeys": [],
+    "untranslatedJsxCandidateSites": 171
+  },
+  "sourceArtifactSha256": "bba54179472ece4d47d08a0a15c294180d8b48727a0918d60bbbbf95dec3729e",
+  "rawInventoryArchived": false,
+  "priorStaticDocumentBaseline": "267aadeafebeecdbbb3bc012f3844793d060990a",
+  "priorStaticDocumentModified": false
+}

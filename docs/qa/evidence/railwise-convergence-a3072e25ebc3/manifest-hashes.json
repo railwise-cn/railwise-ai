@@ -1,0 +1,25 @@
+{
+  "manifestId": "manifest_9ceb5ee5-4582-49c2-a250-7c312ec31b0f",
+  "manifestSha256": "fca3f8c0e0625049b944ed148c79a5e4e50a43b82195c33f28380e7f99e84927",
+  "synthetic": true,
+  "outputs": [
+    {
+      "path": ".workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/report.docx",
+      "sha256": "744fe28f69a32c0e5e7e7015307ccb32a6f883fb4b5df8ca6ccde89db4ec4e7b",
+      "sizeBytes": 4248,
+      "matchesManifest": true
+    },
+    {
+      "path": ".workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/report.pdf",
+      "sha256": "2b393e6a9453fd6bb91cd804fdd5a14a65095441e4a5f63e028a35b6d402abb6",
+      "sizeBytes": 28532,
+      "matchesManifest": true
+    },
+    {
+      "path": ".workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/evidence.xlsx",
+      "sha256": "519397534c4283769efadddfa1a45777040688cfb22edf0b9b77f60342f228df",
+      "sizeBytes": 32498,
+      "matchesManifest": true
+    }
+  ]
+}

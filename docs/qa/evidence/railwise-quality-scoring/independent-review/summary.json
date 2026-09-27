@@ -1,0 +1,18 @@
+{
+  "independentChecksPassed": 6638,
+  "rules": 70,
+  "publicProfile": 1016,
+  "finalBatch": 5455,
+  "publicBoundary": 97,
+  "productTestsRerunPassed": 101,
+  "unresolvedFindings": [],
+  "reviewTime": "2026-09-20T08:10:45+08:00",
+  "compiledNodeEsm": true,
+  "exactThresholds": "BigInt rational checked against independent Python Fraction",
+  "limitations": [
+    "declared inspection only",
+    "no source authenticity",
+    "no human signoff",
+    "no Runtime/UI integration acceptance"
+  ]
+}

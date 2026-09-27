@@ -1,0 +1,18 @@
+{
+  "independentTests": 22,
+  "clientServiceTests": 14,
+  "guiTests": 8,
+  "compiledFixtureCases": 2,
+  "authorRuntimeHttpWiringTestsRerun": 74,
+  "authorIpcDomTestsRerun": 42,
+  "maximumTotalObservations": 256,
+  "maximumBaseObservationsTested": 128,
+  "maximumAppendedObservations": 128,
+  "maximumParameters": 16,
+  "maximumPageRecords": 10,
+  "maximumPageWorkUnits": 191,
+  "followingReadWorkUnits": 21,
+  "findings": [],
+  "pureKernelSourceAndDistUnchanged": true,
+  "scope": "Runtime/client/happy-dom GUI; native transport and Save As mocked; not packaged visual acceptance or release authorization"
+}

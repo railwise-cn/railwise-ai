@@ -1,0 +1,51 @@
+{
+  "sourceHead": "4f859c081b33e6f0f9b8d16f9c046466ccb90e75",
+  "version": "0.5.0",
+  "appPath": "/private/tmp/railwise-survey-4f859c0/Applications/RAILWISE AI Candidate 4f859c081b33.app",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head4f859c081b33",
+  "asarSha256": "bd1afdce126d77809fa1f11800d3839b851f2c1219f5c20b2217a07f10aafb93",
+  "matchesNativeUpdaterInstalledTarget": true,
+  "dmgSha256": "b8ad7fa65e97347bdce93b19c74d25b9c6b625f17aad0b0fe5ccc6018caea0c5",
+  "checks": [
+    {
+      "tool": "codesign",
+      "args": [
+        "--verify",
+        "--deep",
+        "--strict"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "xcrun",
+      "args": [
+        "stapler",
+        "validate"
+      ],
+      "exitCode": 0,
+      "output": "Processing: /private/tmp/railwise-survey-4f859c0/Applications/RAILWISE AI Candidate 4f859c081b33.app\nThe validate action worked!"
+    },
+    {
+      "tool": "spctl",
+      "args": [
+        "--assess",
+        "--type",
+        "execute"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "spctl",
+      "args": [
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ],
+  "guiAcceptance": "not-tested",
+  "userAcceptance": "not-performed",
+  "recordScope": "installation-time snapshot; subsequent GUI acceptance is recorded in gui-integrity.json and README.md"
+}

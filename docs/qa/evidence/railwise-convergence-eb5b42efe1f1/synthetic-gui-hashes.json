@@ -1,0 +1,23 @@
+[
+  {
+    "manifestId": "manifest_800b5928-7273-440d-ab4d-4f6f5143b8b0",
+    "reviewStatus": "draft",
+    "files": [
+      {
+        "format": ".docx",
+        "sha256": "3c2eb788fc2779911c1226d6ff094602ca36f306f16bcda50bd3f424155a51d8",
+        "matches": true
+      },
+      {
+        "format": ".pdf",
+        "sha256": "2eb7fa29f8248060bc654eab1dd93148ae2d54a10c7122fa9f25320df82bfb42",
+        "matches": true
+      },
+      {
+        "format": ".xlsx",
+        "sha256": "a86730cc3880a82f977e2982d7ff44c22069c589184138cec070ca021d79ed1a",
+        "matches": true
+      }
+    ]
+  }
+]

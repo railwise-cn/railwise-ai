@@ -1,0 +1,10 @@
+{
+  "oldPackageHead": "6c3f5f691a327928c24086f58d99daf722341e9e",
+  "electron": "43.1.1",
+  "node": "24.18.0",
+  "algorithmVersion": "workwise-survey-adjustment-6",
+  "runId": "adjustment_ad77061b-e422-4920-975e-94cda70553d5",
+  "freshDeterministicReplay": true,
+  "legacyResultUnchanged": true,
+  "legacyResultSha256": "9a63360e85b0aa63ce0d4ad50f85dd916a8830d7c750f036158f05563f33ca79"
+}

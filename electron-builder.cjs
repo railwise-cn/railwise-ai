@@ -1,8 +1,15 @@
+const productBrand = require('./src/shared/product-brand.json')
 const { existsSync, readFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { verifyCandidateSourceTree } = require('./scripts/candidate-source-provenance.cjs')
 const { markitdownResourceFilter } = require('./scripts/markitdown-packaging-policy.cjs')
 const { agentPackResourceFilter, asarBlockedSkillFilters } = require('./scripts/specialist-skill-audit.cjs')
+
+// Keep these paths absolute. electron-builder resolves hook configuration from
+// its own process context, and a relative entitlements path can silently fall
+// back to a hardened-runtime signature with no V8 JIT permissions.
+const macEntitlementsPath = join(__dirname, 'build', 'entitlements.mac.plist')
+const macEntitlementsInheritPath = join(__dirname, 'build', 'entitlements.mac.inherit.plist')
 
 function loadLocalReleaseEnv() {
   const candidates = [
@@ -106,7 +113,7 @@ const hasGenericUpdateFeed = true
 const updateProvider = (
   process.env.WORKWISE_UPDATE_PROVIDER || (hasGenericUpdateFeed ? 'generic' : 'github')
 ).trim().toLowerCase()
-const configuredGithubRepo = (process.env.WORKWISE_GITHUB_REPO || 'wangjiawei508/WorkWise').trim()
+const configuredGithubRepo = (process.env.WORKWISE_GITHUB_REPO || 'railwise-cn/railwise-ai').trim()
 const githubRepoMatch = configuredGithubRepo.match(/^([\w.-]+)\/([\w.-]+)$/)
 const genericUpdateUrl = explicitUpdateUrl
   ? explicitUpdateUrl.replace(/\{channel\}/g, updateChannel).replace(/\/?$/, '/')
@@ -121,8 +128,8 @@ const candidateSourceHead = (
 ).trim()
 const candidateIdentitySuffix = candidateSourceHead ? `head${candidateSourceHead.slice(0, 12)}` : ''
 const packagedProductName = isCandidateBuild
-  ? `WorkWise Candidate ${candidateSourceHead.slice(0, 12)}`
-  : 'WorkWise'
+  ? `${productBrand.platform} Candidate ${candidateSourceHead.slice(0, 12)}`
+  : productBrand.platform
 const artifactVersion = releaseAppVersion || '${version}'
 const packagedUpdateProvider = isCandidateBuild ? 'generic' : updateProvider
 const packagedGenericUpdateUrl = isCandidateBuild
@@ -273,8 +280,8 @@ const builderConfig = {
     forceCodeSigning: hasExplicitMacSigningIdentity,
     timestamp: hasExplicitMacSigningIdentity ? 'http://timestamp.apple.com/ts01' : null,
     gatekeeperAssess: false,
-    entitlements: 'build/entitlements.mac.plist',
-    entitlementsInherit: 'build/entitlements.mac.inherit.plist',
+    entitlements: macEntitlementsPath,
+    entitlementsInherit: macEntitlementsInheritPath,
     icon: './src/asset/img/workwise.icns',
     // arm64 (Apple Silicon) + x64 (Intel). On M 系列 Mac 本地打包会各出一组 dmg/zip。
     target: [

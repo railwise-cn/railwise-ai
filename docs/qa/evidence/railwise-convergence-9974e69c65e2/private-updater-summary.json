@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "workflowRunId": 35494784734,
+  "workflowConclusion": "success",
+  "sourceReports": {
+    "privateUpdaterSha256": "09aa174c3a493343c493f7f5d3b06760c8efb08542818fdd409a488a8e4028ed",
+    "nativeUpdaterSha256": "a446162e0434b3520ba451d10e2db5252a246168da2782a776a9215c555fa1f1"
+  },
+  "status": "passed",
+  "sourceHead": "9974e69c65e2f76bf3318e713191b4125cb0e75e",
+  "baseVersion": "0.0.0",
+  "targetVersion": "0.5.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "productionTouched": false,
+  "publicFeedUploaded": false,
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "baselinePurpose": "same-source isolated updater probe; not a historical-data migration",
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-20T06:57:16.023Z",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head9974e69c65e2",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperStatus": "assessments enabled",
+  "gatekeeperStatusExitCode": 0,
+  "baseDmgSha256": "c1f412c6cf52bf5746b25ec0e301dc84ce5c3a70434631d9a51c221df1376f04",
+  "targetZipSha256": "236a70cccccffb4f37c471eec560fd3b240f3fd207d1474a07b3e52fb502784b",
+  "targetAsarSha256": "ab3b385b6d6f422c609694ca36adb0512a6486b1ce005f3976acce4a7c97a0a5",
+  "installedAsarSha256": "ab3b385b6d6f422c609694ca36adb0512a6486b1ce005f3976acce4a7c97a0a5",
+  "userDataSentinelPreserved": true,
+  "feedRequests": {
+    "manifest": 1,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 300733217
+  },
+  "manifestSha256": "a083e582f3ea2f55402cdcc069a753acaf43105be81d60feaf2dafda10ebd266",
+  "native": {
+    "status": "passed",
+    "isolatedTestChannel": "frontier",
+    "feedUrl": "<redacted-private-loopback-feed>",
+    "startedAt": "2026-09-20T06:56:42.281Z",
+    "completedAt": "2026-09-20T06:57:09.045Z",
+    "browserOpened": false,
+    "userDataPreserved": true,
+    "stages": [
+      {
+        "name": "base_started",
+        "at": "2026-09-20T06:56:42.281Z"
+      },
+      {
+        "name": "update_available",
+        "at": "2026-09-20T06:56:42.949Z",
+        "detail": "0.5.0"
+      },
+      {
+        "name": "download_completed",
+        "at": "2026-09-20T06:56:47.272Z",
+        "detail": "1 artifact(s)"
+      },
+      {
+        "name": "install_requested",
+        "at": "2026-09-20T06:56:47.274Z"
+      },
+      {
+        "name": "target_relaunched",
+        "at": "2026-09-20T06:57:09.043Z",
+        "detail": "0.5.0"
+      },
+      {
+        "name": "user_data_preserved",
+        "at": "2026-09-20T06:57:09.045Z",
+        "detail": "0.0.0"
+      }
+    ]
+  },
+  "limitations": [
+    "The frontier label is isolated test configuration, not public feed promotion.",
+    "The 0.0.0 baseline is a same-source probe, not historical application migration.",
+    "The preserved sentinel is synthetic; this is not real-project migration evidence."
+  ]
+}

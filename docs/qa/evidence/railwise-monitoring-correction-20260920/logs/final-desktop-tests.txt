@@ -1,0 +1,103 @@
+
+> workwise@0.5.0 test
+> vitest run
+
+
+ RUN  v4.1.7 <REPOSITORY>
+
+(node:90706) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92605) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/ipc/register-app-ipc-handlers.test.ts (34 tests | 1 failed) 5724ms
+     × accepts the active-thread flag for terminal notifications 5061ms
+(node:95778) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/skill-service.test.ts (21 tests | 1 failed) 13191ms
+     × installs the bundled PPT Master slim skill with WorkWise overlay files 5190ms
+(node:96466) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96610) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:97050) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:97144) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:97198) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:97252) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/agent-pack-service.test.ts (6 tests | 2 failed) 15684ms
+     × installs the bundled metro monitoring agent pack into a Codex layout 5213ms
+     × updates assets previously installed from the same bundled agent pack 5164ms
+(node:97541) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/main/ipc/register-app-ipc-handlers.test.ts > registerAppIpcHandlers > accepts the active-thread flag for terminal notifications
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/ipc/register-app-ipc-handlers.test.ts:107:3
+    105|   })
+    106|
+    107|   it('accepts the active-thread flag for terminal notifications', asyn…
+       |   ^
+    108|     const { registerAppIpcHandlers } = await import('./register-app-ip…
+    109|     const showTurnCompleteNotification = vi.fn(async () => ({ ok: true…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/main/services/agent-pack-service.test.ts > agent-pack-service > installs the bundled metro monitoring agent pack into a Codex layout
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/agent-pack-service.test.ts:19:3
+     17|   })
+     18|
+     19|   it('installs the bundled metro monitoring agent pack into a Codex la…
+       |   ^
+     20|     const codexRoot = join(tempRoot, 'codex')
+     21|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/main/services/agent-pack-service.test.ts > agent-pack-service > installs the bundled metro monitoring agent pack into a Codex layout
+Error: ENOTEMPTY: directory not empty, rmdir '<SYSTEM_TEMP>/workwise-agent-pack-IHuQrm/codex/skills/.workwise-install-operational-monitoring-F6Ko22/references'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/main/services/agent-pack-service.test.ts > agent-pack-service > updates assets previously installed from the same bundled agent pack
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/agent-pack-service.test.ts:115:3
+    113|   })
+    114|
+    115|   it('updates assets previously installed from the same bundled agent …
+       |   ^
+    116|     const codexRoot = join(tempRoot, 'codex-update')
+    117|     const firstInstall = await installBundledAgentPack({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/skill-service.test.ts:463:3
+    461|   })
+    462|
+    463|   it('installs the bundled PPT Master slim skill with WorkWise overlay…
+       |   ^
+    464|     const workspaceRoot = join(tempRoot, 'workspace-bundled-ppt-master…
+    465|     const skillInstallRoot = join(workspaceRoot, '.agents', 'skills')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: ENOTEMPTY: directory not empty, rmdir '<SYSTEM_TEMP>/gui-skills-jRZDTJ/workspace-bundled-ppt-master/.agents/skills/.workwise-install-ppt-master-Twtreg/examples/ppt169_building_effective_agents/notes'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  3 failed | 326 passed | 2 skipped (331)
+      Tests  4 failed | 2814 passed | 2 skipped (2820)
+   Start at  18:34:41
+   Duration  39.54s (transform 33.93s, setup 0ms, import 76.80s, tests 296.76s, environment 7.40s)
+

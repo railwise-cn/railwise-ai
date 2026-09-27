@@ -1,0 +1,834 @@
+[
+  {
+    "request": {
+      "expectedHeadHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "idempotencyKey": "audit-event-1",
+      "event": {
+        "kind": "check",
+        "checkId": "synthetic-check-1",
+        "outcome": "failed",
+        "evidence": {
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "memberId": "output-1"
+        }
+      }
+    },
+    "response": {
+      "workflow": {
+        "schemaVersion": 1,
+        "id": "quality_workflow_f23d7eea-2e18-4e54-82b8-8ca2112329d9",
+        "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "binding": {
+          "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+          "projectRevision": 1,
+          "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+          "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+          "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+          "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+          "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+        },
+        "request": {
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "expectedProjectRevision": 1,
+          "idempotencyKey": "audit-workflow-create"
+        },
+        "semantics": "caller-declared-workflow-only"
+      },
+      "entries": [
+        {
+          "request": {
+            "expectedHeadHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "idempotencyKey": "audit-event-1",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_46733ed7-aaa8-4868-a4ac-335effd429eb",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 1,
+            "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "thisHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        }
+      ],
+      "headHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+      "recordIntegrity": true,
+      "openIssueCount": 0,
+      "recordedCheckCount": 1,
+      "semantics": "caller-declared-workflow-only",
+      "checkpointTrust": "local-records-only",
+      "standardConformity": "not-evaluated",
+      "humanSignatureVerification": "not-evaluated",
+      "deliveryApproval": "not-granted"
+    }
+  },
+  {
+    "request": {
+      "expectedHeadHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+      "idempotencyKey": "audit-event-2",
+      "event": {
+        "kind": "issue-opened",
+        "issueId": "synthetic-issue-1",
+        "checkId": "synthetic-check-1",
+        "evidence": {
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "memberId": "output-1"
+        }
+      }
+    },
+    "response": {
+      "workflow": {
+        "schemaVersion": 1,
+        "id": "quality_workflow_f23d7eea-2e18-4e54-82b8-8ca2112329d9",
+        "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "binding": {
+          "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+          "projectRevision": 1,
+          "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+          "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+          "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+          "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+          "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+        },
+        "request": {
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "expectedProjectRevision": 1,
+          "idempotencyKey": "audit-workflow-create"
+        },
+        "semantics": "caller-declared-workflow-only"
+      },
+      "entries": [
+        {
+          "request": {
+            "expectedHeadHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "idempotencyKey": "audit-event-1",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_46733ed7-aaa8-4868-a4ac-335effd429eb",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 1,
+            "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "thisHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        },
+        {
+          "request": {
+            "expectedHeadHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "idempotencyKey": "audit-event-2",
+            "event": {
+              "kind": "issue-opened",
+              "issueId": "synthetic-issue-1",
+              "checkId": "synthetic-check-1",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_87e49cea-cc63-43c5-b9f0-7c92bba0f328",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 2,
+            "previousHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "thisHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "issue-opened",
+              "issueId": "synthetic-issue-1",
+              "checkId": "synthetic-check-1",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        }
+      ],
+      "headHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+      "recordIntegrity": true,
+      "openIssueCount": 1,
+      "recordedCheckCount": 1,
+      "semantics": "caller-declared-workflow-only",
+      "checkpointTrust": "local-records-only",
+      "standardConformity": "not-evaluated",
+      "humanSignatureVerification": "not-evaluated",
+      "deliveryApproval": "not-granted"
+    }
+  },
+  {
+    "request": {
+      "expectedHeadHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+      "idempotencyKey": "audit-event-3",
+      "event": {
+        "kind": "correction-recorded",
+        "issueId": "synthetic-issue-1",
+        "correctionId": "synthetic-correction-1",
+        "corrected": {
+          "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+          "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+          "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51"
+        },
+        "evidence": {
+          "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+          "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+          "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+          "memberId": "output-1"
+        }
+      }
+    },
+    "response": {
+      "workflow": {
+        "schemaVersion": 1,
+        "id": "quality_workflow_f23d7eea-2e18-4e54-82b8-8ca2112329d9",
+        "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "binding": {
+          "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+          "projectRevision": 1,
+          "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+          "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+          "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+          "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+          "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+        },
+        "request": {
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "expectedProjectRevision": 1,
+          "idempotencyKey": "audit-workflow-create"
+        },
+        "semantics": "caller-declared-workflow-only"
+      },
+      "entries": [
+        {
+          "request": {
+            "expectedHeadHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "idempotencyKey": "audit-event-1",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_46733ed7-aaa8-4868-a4ac-335effd429eb",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 1,
+            "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "thisHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        },
+        {
+          "request": {
+            "expectedHeadHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "idempotencyKey": "audit-event-2",
+            "event": {
+              "kind": "issue-opened",
+              "issueId": "synthetic-issue-1",
+              "checkId": "synthetic-check-1",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_87e49cea-cc63-43c5-b9f0-7c92bba0f328",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 2,
+            "previousHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "thisHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "issue-opened",
+              "issueId": "synthetic-issue-1",
+              "checkId": "synthetic-check-1",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        },
+        {
+          "request": {
+            "expectedHeadHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "idempotencyKey": "audit-event-3",
+            "event": {
+              "kind": "correction-recorded",
+              "issueId": "synthetic-issue-1",
+              "correctionId": "synthetic-correction-1",
+              "corrected": {
+                "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+                "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+                "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51"
+              },
+              "evidence": {
+                "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+                "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+                "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_3379c7ec-4947-4d70-b647-5172bb57cf88",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 3,
+            "previousHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "thisHash": "780fcb70aec7bae7d5d82084a42aefe52277806fac0a002678b6722d5d9851df",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "correction-recorded",
+              "issueId": "synthetic-issue-1",
+              "correctionId": "synthetic-correction-1",
+              "correctedArtifactSha256": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+              "evidenceSha256": "3a4cf69c54ce280ee6702e791677d3258f71585ef105cd60c718d459e51bd4ab"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+            "planHash": "59d9de90a0e58b00947b2028bb29c0677759b459679f14f694037af019ba3fc6",
+            "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+            "recordHash": "4e201c5645e275a7688c08e051d87a7d051de72e000aeeb43810e78438879e83",
+            "retentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+            "artifactId": "quality_artifact_441d99a5-51b3-42d1-a97a-40168d38d9ce",
+            "artifactHash": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+            "manifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+            "manifestHash": "a2d675dd9561e7f91a78172bce99036d09d8af3779b819cba3996c4817dc0e39"
+          },
+          "targetBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+            "planHash": "59d9de90a0e58b00947b2028bb29c0677759b459679f14f694037af019ba3fc6",
+            "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+            "recordHash": "4e201c5645e275a7688c08e051d87a7d051de72e000aeeb43810e78438879e83",
+            "retentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+            "artifactId": "quality_artifact_441d99a5-51b3-42d1-a97a-40168d38d9ce",
+            "artifactHash": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+            "manifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+            "manifestHash": "a2d675dd9561e7f91a78172bce99036d09d8af3779b819cba3996c4817dc0e39"
+          }
+        }
+      ],
+      "headHash": "780fcb70aec7bae7d5d82084a42aefe52277806fac0a002678b6722d5d9851df",
+      "recordIntegrity": true,
+      "openIssueCount": 1,
+      "recordedCheckCount": 1,
+      "semantics": "caller-declared-workflow-only",
+      "checkpointTrust": "local-records-only",
+      "standardConformity": "not-evaluated",
+      "humanSignatureVerification": "not-evaluated",
+      "deliveryApproval": "not-granted"
+    }
+  },
+  {
+    "request": {
+      "expectedHeadHash": "780fcb70aec7bae7d5d82084a42aefe52277806fac0a002678b6722d5d9851df",
+      "idempotencyKey": "audit-event-4",
+      "event": {
+        "kind": "issue-rechecked",
+        "issueId": "synthetic-issue-1",
+        "correctionId": "synthetic-correction-1",
+        "rechecked": {
+          "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+          "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+          "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51"
+        },
+        "outcome": "resolved",
+        "evidence": {
+          "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+          "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+          "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+          "memberId": "output-1"
+        }
+      }
+    },
+    "response": {
+      "workflow": {
+        "schemaVersion": 1,
+        "id": "quality_workflow_f23d7eea-2e18-4e54-82b8-8ca2112329d9",
+        "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+        "createdAt": "2026-09-24T09:00:00.000Z",
+        "binding": {
+          "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+          "projectRevision": 1,
+          "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+          "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+          "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+          "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+          "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+        },
+        "request": {
+          "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+          "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+          "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+          "expectedProjectRevision": 1,
+          "idempotencyKey": "audit-workflow-create"
+        },
+        "semantics": "caller-declared-workflow-only"
+      },
+      "entries": [
+        {
+          "request": {
+            "expectedHeadHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "idempotencyKey": "audit-event-1",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_46733ed7-aaa8-4868-a4ac-335effd429eb",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 1,
+            "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "thisHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "check",
+              "checkId": "synthetic-check-1",
+              "outcome": "failed",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        },
+        {
+          "request": {
+            "expectedHeadHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "idempotencyKey": "audit-event-2",
+            "event": {
+              "kind": "issue-opened",
+              "issueId": "synthetic-issue-1",
+              "checkId": "synthetic-check-1",
+              "evidence": {
+                "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+                "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+                "expectedRetentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_87e49cea-cc63-43c5-b9f0-7c92bba0f328",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 2,
+            "previousHash": "e103e2c3397b43cd89fa8e81aed30ac4d1040718ff5eed2f53dd361430039994",
+            "thisHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "issue-opened",
+              "issueId": "synthetic-issue-1",
+              "checkId": "synthetic-check-1",
+              "evidenceSha256": "93c818570012bad4ba227b4d09f3437bc8717a8f85f91e15efc0004ac07921a3"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_914ff589-ef01-4fad-ac32-57f053a54140",
+            "planHash": "491a1bc419654e00c44a40e4f30bc1e4b44c621e9f2d98b0215419af30ac841a",
+            "recordId": "quality_record_73662d43-b811-4eb1-8718-7d26ab529d86",
+            "recordHash": "ca8edc70300dbc8ea64ce0ebcae8d1425c872a2aaef174ea329f4b4566235432",
+            "retentionHeadHash": "8c9ba3f7e18be8b0a5cf5587fde23fe5779b9bb9c9381a188eb09242d42aa8e7",
+            "artifactId": "quality_artifact_c0e0d238-c2e5-4de8-acaa-648ea60506b9",
+            "artifactHash": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "manifestId": "manifest_b77ddea6-c228-4a41-bdbf-ccfb2253d39e",
+            "manifestHash": "f8d0f1f9041c7f24adeddc9833e853e593946448ff2f79c437145a64be112c31"
+          },
+          "targetBinding": null
+        },
+        {
+          "request": {
+            "expectedHeadHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "idempotencyKey": "audit-event-3",
+            "event": {
+              "kind": "correction-recorded",
+              "issueId": "synthetic-issue-1",
+              "correctionId": "synthetic-correction-1",
+              "corrected": {
+                "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+                "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+                "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51"
+              },
+              "evidence": {
+                "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+                "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+                "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_3379c7ec-4947-4d70-b647-5172bb57cf88",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 3,
+            "previousHash": "6448bf06935b1134726284deaa8816a90104427297e3de4bc80dcf839707ca23",
+            "thisHash": "780fcb70aec7bae7d5d82084a42aefe52277806fac0a002678b6722d5d9851df",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "correction-recorded",
+              "issueId": "synthetic-issue-1",
+              "correctionId": "synthetic-correction-1",
+              "correctedArtifactSha256": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+              "evidenceSha256": "3a4cf69c54ce280ee6702e791677d3258f71585ef105cd60c718d459e51bd4ab"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+            "planHash": "59d9de90a0e58b00947b2028bb29c0677759b459679f14f694037af019ba3fc6",
+            "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+            "recordHash": "4e201c5645e275a7688c08e051d87a7d051de72e000aeeb43810e78438879e83",
+            "retentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+            "artifactId": "quality_artifact_441d99a5-51b3-42d1-a97a-40168d38d9ce",
+            "artifactHash": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+            "manifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+            "manifestHash": "a2d675dd9561e7f91a78172bce99036d09d8af3779b819cba3996c4817dc0e39"
+          },
+          "targetBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+            "planHash": "59d9de90a0e58b00947b2028bb29c0677759b459679f14f694037af019ba3fc6",
+            "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+            "recordHash": "4e201c5645e275a7688c08e051d87a7d051de72e000aeeb43810e78438879e83",
+            "retentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+            "artifactId": "quality_artifact_441d99a5-51b3-42d1-a97a-40168d38d9ce",
+            "artifactHash": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+            "manifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+            "manifestHash": "a2d675dd9561e7f91a78172bce99036d09d8af3779b819cba3996c4817dc0e39"
+          }
+        },
+        {
+          "request": {
+            "expectedHeadHash": "780fcb70aec7bae7d5d82084a42aefe52277806fac0a002678b6722d5d9851df",
+            "idempotencyKey": "audit-event-4",
+            "event": {
+              "kind": "issue-rechecked",
+              "issueId": "synthetic-issue-1",
+              "correctionId": "synthetic-correction-1",
+              "rechecked": {
+                "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+                "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+                "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51"
+              },
+              "outcome": "resolved",
+              "evidence": {
+                "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+                "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+                "expectedRetentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+                "memberId": "output-1"
+              }
+            }
+          },
+          "event": {
+            "schemaVersion": 1,
+            "id": "quality_workflow_event_1e6be6a8-14e0-4a42-84d1-763db884b183",
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "artifactSha256": "00e874e20f09741c4ac687263c7b5dcbec94a3c6edcf0947e4149ebe502e3caf",
+            "sequence": 4,
+            "previousHash": "780fcb70aec7bae7d5d82084a42aefe52277806fac0a002678b6722d5d9851df",
+            "thisHash": "f84cc4af7065793bba054979c563a075114c0346b162bcc0ef830acb5d62cfb9",
+            "occurredAt": "2026-09-24T09:00:00.000Z",
+            "actor": {
+              "id": "survey-quality-workflow",
+              "kind": "system"
+            },
+            "stage": "declared-workflow",
+            "event": {
+              "kind": "issue-rechecked",
+              "issueId": "synthetic-issue-1",
+              "correctionId": "synthetic-correction-1",
+              "recheckedArtifactSha256": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+              "outcome": "resolved",
+              "evidenceSha256": "3a4cf69c54ce280ee6702e791677d3258f71585ef105cd60c718d459e51bd4ab"
+            }
+          },
+          "evidenceBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+            "planHash": "59d9de90a0e58b00947b2028bb29c0677759b459679f14f694037af019ba3fc6",
+            "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+            "recordHash": "4e201c5645e275a7688c08e051d87a7d051de72e000aeeb43810e78438879e83",
+            "retentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+            "artifactId": "quality_artifact_441d99a5-51b3-42d1-a97a-40168d38d9ce",
+            "artifactHash": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+            "manifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+            "manifestHash": "a2d675dd9561e7f91a78172bce99036d09d8af3779b819cba3996c4817dc0e39"
+          },
+          "targetBinding": {
+            "projectId": "project_184765f7-4009-4b34-9d46-c093499b20a9",
+            "projectRevision": 1,
+            "projectBindingHash": "a274a933278b31290eac24220e7d17658b73316a736fe4d4c8659060eed3268e",
+            "planId": "quality_plan_962fc6f1-d633-4240-a64f-e25444d3a32e",
+            "planHash": "59d9de90a0e58b00947b2028bb29c0677759b459679f14f694037af019ba3fc6",
+            "recordId": "quality_record_144760a0-4278-429e-89bc-6fb5481f29b3",
+            "recordHash": "4e201c5645e275a7688c08e051d87a7d051de72e000aeeb43810e78438879e83",
+            "retentionHeadHash": "24492a2e25c8a04facbb39e460293e4423bb52836f2fc074eb4a1d22f4ac6c51",
+            "artifactId": "quality_artifact_441d99a5-51b3-42d1-a97a-40168d38d9ce",
+            "artifactHash": "719d5e6a6f9d579b71061e9fbcda06e8ef3cad9517a6ac1f42be34d1e157f28a",
+            "manifestId": "manifest_29716d88-c8e7-4aa4-b3dc-3c5f17599e6a",
+            "manifestHash": "a2d675dd9561e7f91a78172bce99036d09d8af3779b819cba3996c4817dc0e39"
+          }
+        }
+      ],
+      "headHash": "f84cc4af7065793bba054979c563a075114c0346b162bcc0ef830acb5d62cfb9",
+      "recordIntegrity": true,
+      "openIssueCount": 0,
+      "recordedCheckCount": 1,
+      "semantics": "caller-declared-workflow-only",
+      "checkpointTrust": "local-records-only",
+      "standardConformity": "not-evaluated",
+      "humanSignatureVerification": "not-evaluated",
+      "deliveryApproval": "not-granted"
+    }
+  }
+]

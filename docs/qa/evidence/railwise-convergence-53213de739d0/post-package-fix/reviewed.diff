@@ -1,0 +1,138 @@
+diff --git a/kun/src/services/task-controller.test.ts b/kun/src/services/task-controller.test.ts
+index 86c7841..70675d6 100644
+--- a/kun/src/services/task-controller.test.ts
++++ b/kun/src/services/task-controller.test.ts
+@@ -167,6 +167,39 @@ describe('TaskController reliability boundaries', () => {
+     repository.close()
+   }, PERSISTENCE_TEST_TIMEOUT_MS)
+ 
++  it.each([undefined, 'Historical stalled reason'])('clears obsolete reasons after resumed completion while preserving failure history (legacy reason: %s)', async legacyReason => {
++    const { repository, controller, sessionStore, task } = await fixture('What is 2 + 3?')
++    try {
++      for (let attempt = 0; attempt < 7; attempt += 1) {
++        controller.beginAttempt(task.threadId, 'turn_reliability')
++        controller.recordAttemptFailure(task.threadId, 'turn_reliability', 'network_unavailable', 'network unavailable')
++      }
++      const stalled = repository.get(task.id)!
++      expect(stalled.status).toBe('stalled')
++      const resumed = controller.prepareResume(task.id, stalled.revision)
++      expect(resumed.waitingReason).toBeTruthy()
++      controller.beginAttempt(task.threadId, 'turn_reliability')
++      if (legacyReason) {
++        const running = repository.get(task.id)!
++        repository.update(task.id, running.revision, current => ({ ...current, stalledReason: legacyReason }))
++      }
++      await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
++        id: 'item_resumed_answer', threadId: task.threadId, turnId: 'turn_reliability', text: '2 + 3 = 5.', status: 'completed'
++      }))
++      const history = repository.events(task.id)
++      const decision = await controller.assessCandidate(task.threadId, 'turn_reliability')
++      expect(decision).toMatchObject({ kind: 'completed', task: { status: 'completed' } })
++      const completed = repository.get(task.id)!
++      expect(completed.waitingReason).toBeUndefined()
++      expect(completed.stalledReason).toBeUndefined()
++      expect(repository.events(task.id).slice(0, history.length)).toEqual(history)
++      expect(repository.events(task.id).filter(event => event.kind === 'task_stalled')).toHaveLength(1)
++      expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(1)
++    } finally {
++      repository.close()
++    }
++  }, PERSISTENCE_TEST_TIMEOUT_MS)
++
+   it('fails at a hard attempt budget without ever writing a completion event', async () => {
+     const { repository, controller, task } = await fixture()
+     let decision
+diff --git a/kun/src/services/task-controller.ts b/kun/src/services/task-controller.ts
+index 1fb3866..6f6a4cc 100644
+--- a/kun/src/services/task-controller.ts
++++ b/kun/src/services/task-controller.ts
+@@ -275,6 +275,8 @@ export class TaskController {
+     const completed = this.repository.update(task.id, task.revision, (current) => ({
+       ...current,
+       status: 'completed',
++      waitingReason: undefined,
++      stalledReason: undefined,
+       finalResponse,
+       artifacts,
+       noProgressCount: 0,
+diff --git a/src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts b/src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts
+index 78ddf50..fe1c1e2 100644
+--- a/src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts
++++ b/src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts
+@@ -249,6 +249,40 @@ describe('Engineering AI session recovery states', () => {
+     expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+   })
+ 
++  it.each(['en', 'zh'])('hides obsolete diagnostics after verified completion in %s', async language => {
++    await i18n.changeLanguage(language)
++    const steps = ['validate', 'adjust', 'read', 'report'].map(id => ({ ...refreshedPlan.steps[0], id }))
++    const plan = { ...resumablePlan, status: 'completed', steps, execution: { complete: true, completedStepIds: steps.map(step => step.id), pendingStepIds: [] } }
++    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status: 'completed', waitingReason: 'User requested continuation from checkpoint.', stalledReason: 'model_provider_unavailable' })) })
++    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
++    await render(); await settle()
++    expect([...container.querySelectorAll('[data-step-state]')].map(node => node.getAttribute('data-step-state'))).toEqual(['done', 'done', 'done', 'done'])
++    expect(container.textContent).toContain(i18n.t('engineeringStatusCompleted'))
++    expect(container.textContent).not.toContain(i18n.t('engineeringStatusNeedsAttention'))
++    expect(container.querySelector('[data-testid="engineering-task-diagnostic"]')).toBeNull()
++  })
++
++  it.each(['stalled', 'failed', 'cancelled', 'waiting_user', 'waiting_approval'])('keeps current %s diagnostics, including a plan needing attention', async status => {
++    const plan = { ...resumablePlan, status: 'needs_attention' }
++    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status, stalledReason: 'model_provider_unavailable', waitingReason: 'model_provider_unavailable' })) })
++    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
++    await render(); await settle()
++    expect(container.querySelector('[data-testid="engineering-task-diagnostic"]')?.textContent).toBe(i18n.t('runtimeModelProviderUnavailable'))
++    expect(container.querySelector('[data-testid="engineering-plan-incomplete-evidence"]')).not.toBeNull()
++  })
++
++  it.each([
++    { id: 'other-task', threadId: 'thread-a', status: 'failed' },
++    { id: resumablePlan.taskId, threadId: 'other-thread', status: 'stalled' },
++    { id: resumablePlan.taskId, threadId: 'thread-a', status: 'running' },
++    { id: resumablePlan.taskId, threadId: 'thread-a', status: 'retrying' }
++  ])('hides diagnostics from an unbound or active task: %o', async task => {
++    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ ...task, stalledReason: 'model_provider_unavailable', waitingReason: 'model_provider_unavailable' })) })
++    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: resumablePlan } : { cards: [] }))
++    await render(); await settle()
++    expect(container.querySelector('[data-testid="engineering-task-diagnostic"]')).toBeNull()
++  })
++
+   it.each(['completed', 'failed', 'cancelled', 'stalled', 'waiting_user', 'waiting_approval'])('refreshes authoritative project data once when execution becomes %s', async status => {
+     const plan = { ...refreshedPlan, status: 'started', taskId: 'task-1', executionTurnId: 'execution-1' }
+     const getTaskRun = vi.fn().mockResolvedValueOnce({ id: 'task-1', status: 'running' }).mockResolvedValue({ id: 'task-1', status })
+@@ -271,7 +305,7 @@ describe('Engineering AI session recovery states', () => {
+   it('refreshes verified partial results when the execution stalls without replaying any tool', async () => {
+     const steps = ['validate', 'adjust', 'report'].map(id => ({ ...refreshedPlan.steps[0], id, title: id }))
+     let reads = 0
+-    const getTaskRun = vi.fn().mockResolvedValueOnce({ id: 'partial-task', status: 'running' }).mockResolvedValue({ id: 'partial-task', status: 'stalled', stalledReason: 'engineering_plan_steps_incomplete: adjust, report' })
++    const getTaskRun = vi.fn().mockResolvedValueOnce({ id: 'partial-task', threadId: 'thread-a', status: 'running' }).mockResolvedValue({ id: 'partial-task', threadId: 'thread-a', status: 'stalled', stalledReason: 'engineering_plan_steps_incomplete: adjust, report' })
+     Object.assign(window.workwise, { getTaskRun })
+     runtimeRequest.mockImplementation(async path => {
+       if (!path.startsWith('/v1/engineering/ai/plans?')) return response(200, { cards: [] })
+diff --git a/src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx b/src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx
+index 3dfe288..2e5f654 100644
+--- a/src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx
++++ b/src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx
+@@ -267,6 +267,13 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
+   const retrySessionRead = useCallback((): void => { setSessionReadRevision((revision) => revision + 1) }, [])
+   const scopedTaskStatus = taskRun?.id === scopedPlan?.taskId ? taskRun?.status : undefined
+   const planStatus = scopedPlan ? projectAiPlanStatus(scopedPlan, scopedTaskStatus) : undefined
++  const taskDiagnostic = taskRun?.id === scopedPlan?.taskId && taskRun?.threadId === timelineThreadId
++    ? ['stalled', 'failed', 'cancelled'].includes(taskRun?.status ?? '')
++      ? taskRun?.stalledReason || taskRun?.waitingReason
++      : ['waiting_user', 'waiting_approval'].includes(taskRun?.status ?? '')
++        ? taskRun?.waitingReason || taskRun?.stalledReason
++        : undefined
++    : undefined
+   const planSteps = scopedPlan ? projectAiPlanSteps(scopedPlan, scopedTaskStatus, t) : []
+   const completedStepCount = planSteps.filter(step => step.state === 'done').length
+   const planReviewComplete = scopedPlan?.steps.every(step => step.parameters && step.parameterBindings && step.expectedOutputs?.length && step.reversibility)
+@@ -346,7 +353,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
+         {!planReviewComplete ? <p role="status" className="text-[11px] text-amber-700 dark:text-amber-300">{t('engineeringPlanDetailsMissing')}</p> : null}
+         {planStatus === 'needs_attention' && !hasCompleteExecutionEvidence(scopedPlan) ? <p role="status" data-testid="engineering-plan-incomplete-evidence" className="text-[11px] text-amber-700 dark:text-amber-300">{t('engineeringPlanExecutionIncomplete', { completed: completedStepCount, total: scopedPlan.steps.length })}</p> : null}
+         <p className="break-all font-mono text-[10px] text-ds-faint">{scopedPlan.id} · {scopedPlan.contextHash.slice(0, 22)}</p>
+-        {taskRun?.stalledReason || taskRun?.waitingReason ? <p className="break-words text-[11px] text-amber-700 dark:text-amber-300">{formatRuntimeError(new Error(taskRun.stalledReason || taskRun.waitingReason), t('engineeringStatusNeedsAttention'))}</p> : null}
++        {taskDiagnostic ? <p data-testid="engineering-task-diagnostic" className="break-words text-[11px] text-amber-700 dark:text-amber-300">{formatRuntimeError(new Error(taskDiagnostic), t('engineeringStatusNeedsAttention'))}</p> : null}
+         {planReviewComplete && (needsApproval || scopedPlan.status === 'approved') ? <button type="button" onClick={() => void approveAndStartPlan()} disabled={planBusy || busy || !connected || !engineeringThreadActive || (needsApproval && !riskConfirmed)} className="inline-flex h-8 items-center gap-2 rounded-md bg-accent px-3 text-[12px] font-medium text-white disabled:opacity-50">{planBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}{t('engineeringApproveAndStart')}</button> : null}
+         {canResumePlan ? <button type="button" data-testid="engineering-resume" onClick={() => void resumeExecutionPlan()} disabled={planBusy} className="inline-flex h-8 items-center gap-2 rounded-md bg-accent px-3 text-[12px] font-medium text-white disabled:opacity-50">{planBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}{t('engineeringResumePlan')}</button> : null}
+         {canReplan ? <button type="button" data-testid="engineering-replan" onClick={() => void replanStalePlan()} disabled={planBusy || busy || !connected || !engineeringThreadActive} className="inline-flex h-8 items-center gap-2 rounded-md bg-accent px-3 text-[12px] font-medium text-white disabled:opacity-50">{planBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}{planBusy ? t('engineeringReplanning') : t('engineeringReplan')}</button> : null}

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "9974e69c65e2f76bf3318e713191b4125cb0e75e",
+  "workflowRunId": 35494774730,
+  "workflowUrl": "https://github.com/wangjiawei508/WorkWise/actions/runs/35494774730",
+  "workflowConclusion": "success",
+  "provenance": "Original file re-fetched with gh run view 35494774730 --repo wangjiawei508/WorkWise --log; byte-for-byte identical.",
+  "otherSameHeadSuccessfulRunId": 35494773433,
+  "rawLog": {
+    "file": "CloudQuality.log",
+    "bytes": 1510496,
+    "sha256": "ddb4a98302f754a882c1c24f6799bf2efc6471f87f69b75fbad9c7231bad883c",
+    "whitespacePreserved": true,
+    "redacted": false
+  },
+  "credentialScan": {
+    "githubTokenHits": 0,
+    "privateKeyHits": 0,
+    "apiTokenHits": 0,
+    "credentialUrlHits": 0,
+    "unmaskedAuthorizationHits": 0
+  },
+  "testSummaries": {
+    "desktop": {
+      "passed": 2776,
+      "skipped": 6
+    },
+    "runtime": {
+      "passed": 2795,
+      "skipped": 22
+    },
+    "windowsCoreSecurity": {
+      "passed": 128,
+      "skipped": 0
+    },
+    "windowsPluginSecurity": {
+      "passed": 104,
+      "skipped": 0
+    },
+    "windowsPersistenceSubset": {
+      "passed": 58,
+      "skipped": 2
+    }
+  },
+  "limitations": [
+    "Raw logs include expected synthetic failures and skipped tests; inspect the complete log for context.",
+    "Successful quality checks did not cover the packaged text-only false-completion counterexample."
+  ],
+  "counterexample": {
+    "file": "packaged-text-only-completion-probe-S7X5xb.json",
+    "sha256": "8c006983ac3c29ae2fbc25da8cf93abfafeca1b0fe3915066daafe7cfbc8aa3b",
+    "logFile": "packaged-text-only-completion-probe.log",
+    "logSha256": "8c006983ac3c29ae2fbc25da8cf93abfafeca1b0fe3915066daafe7cfbc8aa3b",
+    "syntheticOnly": true,
+    "realModelUsed": false,
+    "expectation": "reproduce"
+  }
+}

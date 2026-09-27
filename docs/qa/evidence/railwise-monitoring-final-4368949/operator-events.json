@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "source": "Primary task operator messages; no invented terminal transcript",
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "events": [
+    {"event": "pre-restart-extra-xlsx-verification", "startedAt": "2026-09-20T11:39:10.415Z", "countsAsAfterRestart": false},
+    {"event": "cua-restart-without-explicit-candidate-env", "observed": "Code home showed default and disconnected runtime; Survey was not opened", "actualEnvironmentLoadingDetermined": false, "dataLossOrWrongDatabaseClaimed": false, "dataOperationsPerformed": false, "action": "Immediate normal quit", "countsAsValidRestart": false},
+    {"event": "first-shell-launch-wrong-binary-name", "exitCode": 127, "countsAsValidRestart": false},
+    {"event": "correct-shell-exec-launch", "environment": "Original isolated candidate environment loaded; values not archived", "operatorSession": 41752, "projectsRecovered": true, "warning": "Unable to set login item: Operation not permitted", "warningBlockedSelectedWorkflow": false},
+    {"event": "xlsx-same-manifest-afterrestart-verification", "startedAt": "2026-09-20T11:43:51.604Z", "checksPassed": 3, "checksNotApplicable": 2, "reviewStatus": "draft"},
+    {"event": "csv-same-manifest-afterrestart-verification", "startedAt": "2026-09-20T11:44:21.456Z", "checksPassed": 3, "checksNotApplicable": 2, "reviewStatus": "draft"},
+    {"event": "final-normal-quit", "action": "CUA super+q", "sessionExitCode": 0, "processSearchExitCode": 1, "independentFileHandlesCheck": "no open handles before/after audit"},
+    {"event": "actual-deliverable-visual-review", "reviewer": "Primary task agent", "pdfRenderer": "pdftoppm", "svgRenderer": "bundled sharp", "observations": "Chinese report text, units and draft status readable without clipping; separate point lines, actual 1:3 time intervals and values correct", "originalOutputsModified": false}
+  ],
+  "userPersonalAcceptance": "not-performed",
+  "fullProductMatrixClosure": false,
+  "professionalSignoff": false,
+  "productionKpiEvidence": false,
+  "publicReleaseOperation": false
+}

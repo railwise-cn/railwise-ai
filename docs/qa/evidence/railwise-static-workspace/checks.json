@@ -1,0 +1,28 @@
+{
+  "baseCommit": "cbb7b5d",
+  "kind": "static-incremental",
+  "status": "pass",
+  "runtimeTests": 74,
+  "desktopIpcDomTests": 42,
+  "checks": [
+    "kun full typecheck",
+    "desktop full typecheck",
+    "full npm run build including Runtime and Electron bundles",
+    "targeted ESLint",
+    "git diff --check",
+    "compiled Node ESM long-Unicode capacity probe"
+  ],
+  "productionFiles": 15,
+  "pureKernelSource": "separately delivered frozen static-incremental patch",
+  "releaseOperations": false,
+  "packagedVisualAcceptance": "parent integration task; not claimed by DOM tests",
+  "independentReview": {
+    "status": "pass",
+    "tests": 22,
+    "compiledCases": 2,
+    "authorTestsIndependentlyRerun": 116,
+    "portableReplay": "pass from fresh canonical /private/tmp copy; macOS /var TMPDIR alias avoided",
+    "sourceHashesVerified": true,
+    "professionalSignoff": false
+  }
+}

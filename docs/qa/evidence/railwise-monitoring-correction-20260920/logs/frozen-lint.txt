@@ -1,0 +1,10 @@
+
+> workwise@0.5.0 lint
+> eslint .
+
+
+<REPOSITORY>/src/renderer/src/components/Workbench.tsx
+  1406:6  warning  React Hook useEffect has a missing dependency: 'setInput'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+

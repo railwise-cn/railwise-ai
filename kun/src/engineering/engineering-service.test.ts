@@ -31,6 +31,7 @@ describe('EngineeringService', () => {
     expect(workbookXml).toContain('manifest_summary')
     const manifest = await service.finalize({ projectId: project.id, datasetId: dataset.id, analysisId: analysis.id, expectedRevision: validated.revision, idempotencyKey: 'finalize-csv-001', acknowledgeWarnings: true })
     expect(manifest.reviewStatus).toBe('draft')
+    expect(service.verifyDeliverable(project.id, manifest.id)).toMatchObject({ valid: true, reviewStatus: 'draft', checks: expect.arrayContaining([{ id: 'surveyReplay', status: 'not-applicable' }, { id: 'sources', status: 'not-applicable' }]) })
     expect(manifest.validation.warnings).toContain('尚未完成复核、审核、批准与签名流程；该成果清单仅供待审查使用，不得作为已批准交付。')
     expect(await readFile(join(workspace, '.workwise', 'deliverables', project.id, manifest.runId, 'manifest.json'), 'utf8')).toContain(manifest.id)
     service.close()

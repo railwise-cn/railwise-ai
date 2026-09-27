@@ -6,6 +6,7 @@ import { InMemoryUserInputGate } from '../adapters/in-memory-user-input-gate.js'
 import type { ImmutablePrefix } from '../cache/immutable-prefix.js'
 import type { ModelCapabilityMetadata } from '../contracts/capabilities.js'
 import type { TurnItem } from '../contracts/items.js'
+import type { StartTurnRequest } from '../contracts/turns.js'
 import type { ApprovalPolicy, SandboxMode } from '../contracts/policy.js'
 import type { RuntimeTuningConfig } from '../config/kun-config.js'
 import { AgentLoop } from '../loop/agent-loop.js'
@@ -26,6 +27,7 @@ import { UsageService } from '../services/usage-service.js'
 import type { ChildRunExecutor } from './delegation-runtime.js'
 
 export type ChildAgentExecutorOptions = {
+  parentSelection?: (threadId: string, turnId: string) => Promise<Pick<StartTurnRequest, 'model' | 'providerId' | 'reasoningEffort'>>
   model: ModelClient
   toolHost: ToolHost
   prefix: ImmutablePrefix
@@ -104,7 +106,8 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
       ...(options.runtime?.toolArgumentRepair ? { toolArgumentRepair: options.runtime.toolArgumentRepair } : {})
     })
 
-    const model = input.model?.trim() || options.defaultModel
+    const inheritedSelection = await options.parentSelection?.(input.parentThreadId, input.parentTurnId)
+    const model = input.model?.trim() || inheritedSelection?.model || options.defaultModel
     const thread = await threads.create({
       title: childThreadTitle(input.childId, input.label),
       workspace: input.workspace?.trim() || '~',
@@ -119,6 +122,7 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
     const started = await turns.startTurn({
       threadId: thread.id,
       request: {
+        ...inheritedSelection,
         prompt: input.prompt,
         model,
         mode: 'agent'

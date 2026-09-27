@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "scope": "Public mathematical definitions, not engineering approval or high-precision rounded NIST table oracles",
+  "sources": [
+    {
+      "url": "https://www.itl.nist.gov/div898/handbook/eda/section3/eda3661.htm",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 13382,
+      "sha256": "62c4f7f3735be940da562cbb8bc700d232bedc39ce63a404486648dce4f876b1",
+      "use": "Standard normal density and distribution assumptions",
+      "read": true
+    },
+    {
+      "url": "https://www.itl.nist.gov/div898/handbook/eda/section3/eda3664.htm",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 11043,
+      "sha256": "15a32fa2bbf835a48ee9c500f8fb9a834a596d9f60ce92f8343e1985b50cc539",
+      "use": "Student t density, explicit degrees of freedom; no rounded quantile used as high precision truth",
+      "read": true
+    },
+    {
+      "url": "https://www.itl.nist.gov/div898/handbook/eda/section3/eda3666.htm",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 11766,
+      "sha256": "f845b4c1cea6600b07df4b2f408f7b9963f071a13f50f73315000f6939a9bfa1",
+      "use": "Chi-square density and incomplete gamma CDF",
+      "read": true
+    },
+    {
+      "url": "https://www.itl.nist.gov/div898/handbook/prc/section4/prc473.htm",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 14825,
+      "sha256": "ef363b7d111cc0dbe1cd055b446b03e384f7926995ce199f74cbd9489960065a",
+      "use": "Preselected finite comparisons and Bonferroni alpha/g; general union bound, distinct from ANOVA-specific examples",
+      "read": true
+    },
+    {
+      "url": "https://dlmf.nist.gov/7.11.E2.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 83,
+      "sha256": "1d3fa72a219f95c0a6acb18bff38e25197cb259da5e443f33b58acf13c11b504",
+      "use": "erfc and upper incomplete gamma",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-7.11.E2.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.2.E4a.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 72,
+      "sha256": "231af61f752dcbeadd76393a05699ecebf92fe170be6a03665be887ebc7c411e",
+      "use": "Normalized lower incomplete gamma P",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.2.E4a.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.2.E4b.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 72,
+      "sha256": "eb4cacf74ab49f61f1c990bd7cbe8ca795cc4de356213110f741bc97937a06ec",
+      "use": "Normalized upper incomplete gamma Q",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.2.E4b.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.2.E6.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 115,
+      "sha256": "30b2dcf8833f4354345c3abd8dc09d02295e258ead53cffdb0f4418ae11f8511",
+      "use": "gamma star and P",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.2.E6.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.7.E1.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 173,
+      "sha256": "60b0a0e145236232868686b8dac6e95ce01dc2ad65a4e59aadd140b7826cdd23",
+      "use": "Positive lower incomplete gamma series",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.7.E1.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.9.E2.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 192,
+      "sha256": "7894e18fe14130a2e90f38cad845241e71b392e590f1360eb4e07e564556c9ab",
+      "use": "Upper incomplete gamma continued fraction; implementation uses even contraction",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.9.E2.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.17.E1.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 79,
+      "sha256": "485e79287c52138ceb07142041364b42cda5fd4ed73ceb855dcae11407c1c182",
+      "use": "Incomplete beta integral",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.17.E1.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.17.E2.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 84,
+      "sha256": "08074a8b76f07dded857dc4165d78c8bbcb8a4a57aca57e3720341136dc2b173",
+      "use": "Regularized incomplete beta I",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.17.E2.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.17.E4.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 52,
+      "sha256": "7b36a06fe2e999746ea66698ccb53224242ae4b9d3c62e354edc89e3532027c4",
+      "use": "Incomplete beta complementary identity",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.17.E4.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.17.E22.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 162,
+      "sha256": "4374d45d7deaac2f3cd520b0385e24cb50fcc49c49c53a42ac305e2a5b06e7b6",
+      "use": "Incomplete beta continued fraction",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.17.E22.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.17.E23a.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 42,
+      "sha256": "38c438b3b61a5734cab0078c13c6ff9edecf72e2abd04411bc0b2b054682f3e9",
+      "use": "Even continued fraction coefficient",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.17.E23a.tex"
+    },
+    {
+      "url": "https://dlmf.nist.gov/8.17.E23b.tex",
+      "retrievedDate": "2026-09-20",
+      "httpStatus": 200,
+      "bytes": 51,
+      "sha256": "2c69c3fe77bd73517bf191eafa8cb7d840ef74c8351a0b80c1d6f04039af51ff",
+      "use": "Odd continued fraction coefficient",
+      "read": true,
+      "localSnapshot": "survey-statistical-family-source-8.17.E23b.tex"
+    }
+  ]
+}

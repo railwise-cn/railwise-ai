@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell, type WebContents } from 'electron'
+import brand from '../../shared/product-brand.json'
 import { watch, type FSWatcher } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -437,18 +438,18 @@ export function buildAttachmentParserProvenance(document: {
   }
 }
 
-function saveDialogFilters(fileName: string, mimeType: string | undefined): Electron.FileFilter[] {
+function saveDialogFilters(fileName: string, mimeType: string | undefined, locale: AppSettingsV1['locale']): Electron.FileFilter[] {
   const ext = extname(fileName).replace(/^\./, '').trim()
   const mime = mimeType?.toLowerCase().trim() ?? ''
   const filters: Electron.FileFilter[] = []
   if (mime.startsWith('image/')) {
-    filters.push({ name: 'Images', extensions: ext ? [ext] : ['png', 'jpg', 'jpeg', 'webp', 'gif'] })
+    filters.push({ name: locale === 'zh' ? '图片' : 'Images', extensions: ext ? [ext] : ['png', 'jpg', 'jpeg', 'webp', 'gif'] })
   } else if (mime.startsWith('video/')) {
-    filters.push({ name: 'Videos', extensions: ext ? [ext] : ['mp4', 'webm', 'mov', 'm4v'] })
+    filters.push({ name: locale === 'zh' ? '视频' : 'Videos', extensions: ext ? [ext] : ['mp4', 'webm', 'mov', 'm4v'] })
   } else if (ext) {
-    filters.push({ name: `${ext.toUpperCase()} file`, extensions: [ext] })
+    filters.push({ name: `${ext.toUpperCase()} ${locale === 'zh' ? '文件' : 'file'}`, extensions: [ext] })
   }
-  filters.push({ name: 'All Files', extensions: ['*'] })
+  filters.push({ name: locale === 'zh' ? '所有文件' : 'All Files', extensions: ['*'] })
   return filters
 }
 
@@ -519,7 +520,8 @@ async function rasterizeImportedDesignSvg(input: {
 
 async function saveWorkspaceFileAs(
   payload: unknown,
-  getMainWindow: () => BrowserWindow | null
+  getMainWindow: () => BrowserWindow | null,
+  store: JsonSettingsStore
 ): Promise<WorkspaceFileSaveAsResult> {
   const request = parseIpcPayload('file:save-as', workspaceFileSaveAsPayloadSchema, payload)
   try {
@@ -530,10 +532,11 @@ async function saveWorkspaceFileAs(
     const defaultPath = request.workspaceRoot?.trim()
       ? join(expandHomePath(request.workspaceRoot), fileName)
       : fileName
+    const { locale } = await store.load()
     const options: Electron.SaveDialogOptions = {
-      title: 'Save generated file',
+      title: locale === 'zh' ? '保存生成的文件' : 'Save generated file',
       defaultPath,
-      filters: saveDialogFilters(fileName, request.mimeType)
+      filters: saveDialogFilters(fileName, request.mimeType, locale)
     }
     const mainWindow = getMainWindow()
     const result = mainWindow
@@ -864,8 +867,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     } catch {
       return { ok: false, message: 'The runtime returned an invalid diagnostics response.' }
     }
+    const { locale } = await store.load()
     const options: Electron.SaveDialogOptions = {
-      title: '导出 WorkWise 任务诊断包',
+      title: locale === 'zh' ? `导出 ${brand.platform} 任务诊断包` : `Export ${brand.platform} task diagnostics`,
       defaultPath: `WorkWise-task-diagnostics-${request.taskId}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }]
     }
@@ -1010,14 +1014,15 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('plugin:list-installed', async () => pluginManagementService.listInstalled())
   ipcMain.handle('plugin:pick-package', async (_, payload: unknown): Promise<WorkspacePickResult> => {
     const request = parseIpcPayload('plugin:pick-package', pluginPackagePickerPayloadSchema, payload)
+    const { locale } = await store.load()
     const options: Electron.OpenDialogOptions = request.mode === 'file'
       ? {
-          title: 'Import WorkWise plugin package',
-          filters: [{ name: 'Plugin packages', extensions: ['wwx', 'mcpb', 'zip'] }],
+          title: locale === 'zh' ? `导入 ${brand.platform} 插件包` : `Import ${brand.platform} plugin package`,
+          filters: [{ name: locale === 'zh' ? '插件包' : 'Plugin packages', extensions: ['wwx', 'mcpb', 'zip'] }],
           properties: ['openFile', 'dontAddToRecent']
         }
       : {
-          title: 'Import Codex plugin directory',
+          title: locale === 'zh' ? '导入 Codex 插件目录' : 'Import Codex plugin directory',
           properties: ['openDirectory', 'dontAddToRecent']
         }
     const mainWindow = getMainWindow()
@@ -1540,8 +1545,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       z.object({ defaultPath: defaultPathSchema }).strict(),
       { defaultPath }
     ).defaultPath
+    const { locale } = await store.load()
     const options: Electron.OpenDialogOptions = {
-      title: 'Select working directory',
+      title: locale === 'zh' ? '选择工作目录' : 'Select working directory',
       defaultPath: normalizedDefaultPath,
       properties: ['openDirectory', 'createDirectory', 'dontAddToRecent']
     }
@@ -1884,7 +1890,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     }
   })
   ipcMain.handle('file:save-as', async (_, payload: unknown) =>
-    saveWorkspaceFileAs(payload, getMainWindow)
+    saveWorkspaceFileAs(payload, getMainWindow, store)
   )
   ipcMain.handle('file:write-workspace', async (_, payload: unknown) =>
     writeWorkspaceFile(

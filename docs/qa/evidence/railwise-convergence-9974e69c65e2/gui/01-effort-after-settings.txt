@@ -1,0 +1,11 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 9974e69c65e2.
+0 菜单 Secondary Actions: Cancel
+	1 文本 推理
+	2 低, Value: 1
+	3 中, Value: 0
+	4 高, Value: 0
+	5 超高, Value: 0
+	6 文本 模型
+	7 自动, Value: 1
+	8 DeepSeek
+	9 Agnes AI

@@ -4,5 +4,5 @@ contact_links:
     url: mailto:security@railwise.cn
     about: Please report security issues privately instead of opening a public issue.
   - name: Contribution guide
-    url: https://github.com/wangjiawei508/WorkWise/blob/main/docs/CONTRIBUTING.md
+    url: https://github.com/railwise-cn/railwise-ai/blob/main/docs/CONTRIBUTING.md
     about: Read the contribution workflow and validation expectations before opening a PR.

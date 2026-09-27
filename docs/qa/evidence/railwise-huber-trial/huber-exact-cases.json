@@ -1,0 +1,814 @@
+[
+  {
+    "id": "position-outlier",
+    "input": {
+      "id": "position-outlier",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "y": [
+        0,
+        0,
+        0,
+        10
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "1/3"
+        ],
+        "residuals": [
+          "-1/3",
+          "-1/3",
+          "-1/3",
+          "29/3"
+        ],
+        "standardizedResiduals": [
+          "-1/3",
+          "-1/3",
+          "-1/3",
+          "29/3"
+        ],
+        "objective": "28/3",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "position-flat",
+    "input": {
+      "id": "position-flat",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "y": [
+        0,
+        0,
+        10,
+        10
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "9"
+        ],
+        "residuals": [
+          "-9",
+          "-9",
+          "1",
+          "1"
+        ],
+        "standardizedResiduals": [
+          "-9",
+          "-9",
+          "1",
+          "1"
+        ],
+        "objective": "18",
+        "score": [
+          "0"
+        ]
+      },
+      {
+        "parameters": [
+          "1"
+        ],
+        "residuals": [
+          "-1",
+          "-1",
+          "9",
+          "9"
+        ],
+        "standardizedResiduals": [
+          "-1",
+          "-1",
+          "9",
+          "9"
+        ],
+        "objective": "18",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": true
+  },
+  {
+    "id": "position-nonunit-sigma",
+    "input": {
+      "id": "position-nonunit-sigma",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "y": [
+        0,
+        0,
+        0,
+        10
+      ],
+      "sigma": [
+        1,
+        1,
+        2,
+        1
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "4/9"
+        ],
+        "residuals": [
+          "-4/9",
+          "-4/9",
+          "-4/9",
+          "86/9"
+        ],
+        "standardizedResiduals": [
+          "-4/9",
+          "-4/9",
+          "-2/9",
+          "86/9"
+        ],
+        "objective": "167/18",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "clean-line",
+    "input": {
+      "id": "clean-line",
+      "A": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ]
+      ],
+      "y": [
+        1,
+        3,
+        5,
+        7
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "1",
+          "2"
+        ],
+        "residuals": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "standardizedResiduals": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "objective": "0",
+        "score": [
+          "0",
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "line-one-outlier",
+    "input": {
+      "id": "line-one-outlier",
+      "A": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ]
+      ],
+      "y": [
+        1,
+        3,
+        5,
+        7,
+        9,
+        30
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "3/5",
+          "23/10"
+        ],
+        "residuals": [
+          "2/5",
+          "1/10",
+          "-1/5",
+          "-1/2",
+          "-4/5",
+          "179/10"
+        ],
+        "standardizedResiduals": [
+          "2/5",
+          "1/10",
+          "-1/5",
+          "-1/2",
+          "-4/5",
+          "179/10"
+        ],
+        "objective": "359/20",
+        "score": [
+          "0",
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "line-two-outliers",
+    "input": {
+      "id": "line-two-outliers",
+      "A": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          6
+        ]
+      ],
+      "y": [
+        1,
+        3,
+        20,
+        7,
+        9,
+        -8,
+        13
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "26/19",
+          "71/38"
+        ],
+        "residuals": [
+          "-7/19",
+          "-9/38",
+          "283/19",
+          "1/38",
+          "3/19",
+          "-711/38",
+          "8/19"
+        ],
+        "standardizedResiduals": [
+          "-7/19",
+          "-9/38",
+          "283/19",
+          "1/38",
+          "3/19",
+          "-711/38",
+          "8/19"
+        ],
+        "objective": "2493/76",
+        "score": [
+          "0",
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "line-nonunit-scales",
+    "input": {
+      "id": "line-nonunit-scales",
+      "A": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ]
+      ],
+      "y": [
+        1,
+        3,
+        5,
+        7,
+        9,
+        30
+      ],
+      "sigma": [
+        1,
+        2,
+        1,
+        3,
+        1,
+        2
+      ],
+      "scale": 2,
+      "k": "1.5"
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "127/337",
+          "858/337"
+        ],
+        "residuals": [
+          "210/337",
+          "26/337",
+          "-158/337",
+          "-342/337",
+          "-526/337",
+          "5693/337"
+        ],
+        "standardizedResiduals": [
+          "105/337",
+          "13/674",
+          "-79/337",
+          "-57/337",
+          "-263/337",
+          "5693/1348"
+        ],
+        "objective": "15111/2696",
+        "score": [
+          "0",
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "two-dimensional-flat",
+    "input": {
+      "id": "two-dimensional-flat",
+      "A": [
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "y": [
+        0,
+        0,
+        10,
+        10,
+        0,
+        0,
+        10,
+        10
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "9",
+          "9"
+        ],
+        "residuals": [
+          "-9",
+          "-9",
+          "1",
+          "1",
+          "-9",
+          "-9",
+          "1",
+          "1"
+        ],
+        "standardizedResiduals": [
+          "-9",
+          "-9",
+          "1",
+          "1",
+          "-9",
+          "-9",
+          "1",
+          "1"
+        ],
+        "objective": "36",
+        "score": [
+          "0",
+          "0"
+        ]
+      },
+      {
+        "parameters": [
+          "9",
+          "1"
+        ],
+        "residuals": [
+          "-9",
+          "-9",
+          "1",
+          "1",
+          "-1",
+          "-1",
+          "9",
+          "9"
+        ],
+        "standardizedResiduals": [
+          "-9",
+          "-9",
+          "1",
+          "1",
+          "-1",
+          "-1",
+          "9",
+          "9"
+        ],
+        "objective": "36",
+        "score": [
+          "0",
+          "0"
+        ]
+      },
+      {
+        "parameters": [
+          "1",
+          "9"
+        ],
+        "residuals": [
+          "-1",
+          "-1",
+          "9",
+          "9",
+          "-9",
+          "-9",
+          "1",
+          "1"
+        ],
+        "standardizedResiduals": [
+          "-1",
+          "-1",
+          "9",
+          "9",
+          "-9",
+          "-9",
+          "1",
+          "1"
+        ],
+        "objective": "36",
+        "score": [
+          "0",
+          "0"
+        ]
+      },
+      {
+        "parameters": [
+          "1",
+          "1"
+        ],
+        "residuals": [
+          "-1",
+          "-1",
+          "9",
+          "9",
+          "-1",
+          "-1",
+          "9",
+          "9"
+        ],
+        "standardizedResiduals": [
+          "-1",
+          "-1",
+          "9",
+          "9",
+          "-1",
+          "-1",
+          "9",
+          "9"
+        ],
+        "objective": "36",
+        "score": [
+          "0",
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": true
+  },
+  {
+    "id": "high-leverage",
+    "input": {
+      "id": "high-leverage",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          100
+        ]
+      ],
+      "y": [
+        0,
+        0,
+        100
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "5000/5001"
+        ],
+        "residuals": [
+          "-5000/5001",
+          "-5000/5001",
+          "100/5001"
+        ],
+        "standardizedResiduals": [
+          "-5000/5001",
+          "-5000/5001",
+          "100/5001"
+        ],
+        "objective": "5000/5001",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "unique-on-breakpoint",
+    "input": {
+      "id": "unique-on-breakpoint",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "y": [
+        0,
+        2
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "1"
+        ],
+        "residuals": [
+          "-1",
+          "1"
+        ],
+        "standardizedResiduals": [
+          "-1",
+          "1"
+        ],
+        "objective": "1",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  },
+  {
+    "id": "tiny-flat-interval",
+    "input": {
+      "id": "tiny-flat-interval",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "y": [
+        0,
+        "2.000000000001"
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "1000000000001/1000000000000"
+        ],
+        "residuals": [
+          "-1000000000001/1000000000000",
+          "1"
+        ],
+        "standardizedResiduals": [
+          "-1000000000001/1000000000000",
+          "1"
+        ],
+        "objective": "1000000000001/1000000000000",
+        "score": [
+          "0"
+        ]
+      },
+      {
+        "parameters": [
+          "1"
+        ],
+        "residuals": [
+          "-1",
+          "1000000000001/1000000000000"
+        ],
+        "standardizedResiduals": [
+          "-1",
+          "1000000000001/1000000000000"
+        ],
+        "objective": "1000000000001/1000000000000",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": true
+  },
+  {
+    "id": "near-breakpoint-unique",
+    "input": {
+      "id": "near-breakpoint-unique",
+      "A": [
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "y": [
+        0,
+        "1.999999999999"
+      ]
+    },
+    "candidateMinima": [
+      {
+        "parameters": [
+          "1999999999999/2000000000000"
+        ],
+        "residuals": [
+          "-1999999999999/2000000000000",
+          "1999999999999/2000000000000"
+        ],
+        "standardizedResiduals": [
+          "-1999999999999/2000000000000",
+          "1999999999999/2000000000000"
+        ],
+        "objective": "3999999999996000000000001/4000000000000000000000000",
+        "score": [
+          "0"
+        ]
+      }
+    ],
+    "multipleExactMinimizersFound": false
+  }
+]

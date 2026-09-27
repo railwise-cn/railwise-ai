@@ -15,17 +15,17 @@ describe('auto model router', () => {
       reasoningEffort: 'max'
     })
     expect(parseAutoRouteRecommendation('noise {"model":"v4-flash"} tail')).toEqual({
-      model: 'deepseek-v4-flash'
+      model: 'deepseek-flash'
     })
     expect(parseAutoRouteRecommendation('{"model":"auto"}')).toBeNull()
     expect(parseAutoRouteRecommendation('not json')).toBeNull()
   })
 
   it('falls back to the DeepSeek TUI heuristic shape', () => {
-    expect(autoModelHeuristic('hello')).toBe('deepseek-v4-flash')
+    expect(autoModelHeuristic('hello')).toBe('deepseek-flash')
     expect(autoModelHeuristic('please debug this failing migration')).toBe('deepseek-v4-pro')
     expect(autoModelHeuristic('x'.repeat(501))).toBe('deepseek-v4-pro')
-    expect(autoModelHeuristic('x'.repeat(200))).toBe('deepseek-v4-flash')
+    expect(autoModelHeuristic('x'.repeat(200))).toBe('deepseek-flash')
   })
 
   it('builds recent context without the active turn', () => {
@@ -61,7 +61,7 @@ describe('auto model router', () => {
       }
     }
 
-    await resolveAutoModelRoute({
+    const route = await resolveAutoModelRoute({
       modelClient,
       threadId: 'thr_1',
       turnId: 'turn_1',
@@ -72,6 +72,8 @@ describe('auto model router', () => {
     })
 
     const capturedRequest = seenRequest as ModelRequest | null
+    expect(route).toMatchObject({ model: 'deepseek-flash', reasoningEffort: 'off', source: 'flash-router' })
+    expect(capturedRequest?.model).toBe('deepseek-flash')
     expect(capturedRequest?.tools).toEqual([])
     expect(capturedRequest?.responseFormat).toBe('json_object')
   })

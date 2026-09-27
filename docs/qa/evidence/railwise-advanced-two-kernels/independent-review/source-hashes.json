@@ -1,0 +1,28 @@
+{
+  "reviewedCheckout": "/private/tmp/railwise-huber-trial",
+  "files": {
+    "kun/src/contracts/survey-advanced-trials-workspace.ts": "9abcd39c37d275154b5d656f1fcc5f1ac29fc410bae49f18be42a1c90848f944",
+    "kun/src/engineering/survey-advanced-trials-workspace.ts": "dd827776b84ffe19b7a03f477c4090de7802c965d172036fe7697e56464bb265",
+    "kun/src/engineering/survey-advanced-trials-test-helpers.ts": "eaff2f45f6ccd76c645bd054d21226c365971fc5120831dd4bf46d8c9426b9db",
+    "src/main/ipc/app-ipc-schemas.ts": "af8b1121c09d5f61ed9246194603f1a4981aabc0f6295dce89d458b2feacc09b",
+    "src/renderer/src/agent/survey-advanced-trials-client.ts": "f08d475f15c421aa4e329a70ffa803aaddd8371cb956cfc1f6b1a98899a9dab1",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelResult.tsx": "6929b4e19df5a2197c4fc27ebfe64837ff12a024307ca073e595bd791056b6c7",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.tsx": "015e39c347e251be5e7d30b5a2bc09f4ce888056d4d72e3c9f9e92b2180456f1",
+    "src/shared/survey-advanced-trials.ts": "f8e7d20e2f1fe0b019e9bd625d1de95e3168f8d0378a759d03608323c7d85419",
+    "src/renderer/src/locales/en/common.json": "89998cb2ecbed9f2e541b93f49d170f563f286219b137143fd3c650eb06f534d",
+    "src/renderer/src/locales/zh/common.json": "8474884d63d64b742a1899e24e95b818d28b0934ecd814ced3376f770f02f131",
+    "kun/src/contracts/survey-huber-trial.ts": "e70edcacd816500ceed124cc339301db1ac63a787b7a91009ddd8081060f879a",
+    "kun/src/engineering/survey-huber-trial.ts": "18e9dcebc1111e1a3acde8c0e549e16f4caf201fe55d464b91184bee077060bc",
+    "kun/src/engineering/survey-huber-trial-qr.ts": "462062e25b7bd8a2cb1d69a6f8a5d7efef999a889a03205e6a3c6ac9c30aa0ac",
+    "kun/src/contracts/survey-statistical-family.ts": "404b88e9f0c3db8fdfff38a8f0f191da66e988aa53caf51a9e4f0a2366e4e139",
+    "kun/src/engineering/survey-statistical-family.ts": "f7dd1ce769e5c2934adb93a0d69e06eef3e8b41a21a1384f1019416a78a4cd82"
+  },
+  "evidence": {
+    "replay.sh": "0b08f8b6d8d8fd1b03bb69b179acab90464c7b3c695fcae254b894ab2849ed08",
+    "gui.test.ts": "5a19183d0bf7de362530e524f08f3c577a354e37e84860dc3f659ea0e1bf3033",
+    "service.test.ts": "f6ad77346e1351a62fb8fb7e697a995b7ef1802c4ace9677bc5d17eecc721a36",
+    "vitest.config.mjs": "ff76108f93ca751ab3ab50bac6484b434455ab84ccc41f3f8927212adfe32078",
+    "REVIEW.md": "8f7a237d848d035fb2a311bcbacede710acac87d48c1fbaca2f5f9a8190f3939",
+    "client.test.ts": "071e8ca4367aab8c95152bb7af794301e9fe79d351835932c0e912d27cba2126"
+  }
+}

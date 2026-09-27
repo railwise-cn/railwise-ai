@@ -1,0 +1,24 @@
+{
+  "fixtureOnly": true,
+  "modelCalled": false,
+  "transcriptWritten": false,
+  "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+  "asarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+  "mode": "both",
+  "runKey": "first",
+  "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+  "threadId": "thr_wt4kfajs",
+  "projectRevision": 2,
+  "contextHash": "sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9",
+  "suggestionId": "esuggestion_9de08364-9dcd-4144-928a-4890ea92df5b",
+  "suggestionStatus": "pending",
+  "proposedName": "审批卡已确认（合成数据）",
+  "planId": "eplan_fe78dc9f-b541-49a4-a910-32e36364b708",
+  "planStatus": "awaiting_approval",
+  "operations": [
+    "survey_network_validate",
+    "control_network",
+    "survey_adjustment_read",
+    "report_export"
+  ]
+}

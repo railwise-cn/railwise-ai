@@ -1,0 +1,29 @@
+{
+  "status": "prepared-not-injected",
+  "preparationCommand": [
+    "python3",
+    "/private/tmp/railwise-survey-6ff82c8/evidence/quality-corruption-control.py",
+    "prepare"
+  ],
+  "scriptAstValid": true,
+  "currentDatabaseDeclarationEqualsOriginalBackup": true,
+  "directUpdateGuardProbeExecuted": false,
+  "guardProbeTiming": "only when inject is explicitly executed",
+  "sourceSha256": "7faa702cd0c844236bdc0718fb2a8bdf443a51ec9207518f85e30004a52bfeb9",
+  "backupSha256": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113",
+  "backupBytes": 4182,
+  "manifestSha256": "39e941b952912de344fe438807b125c16a0e165b08c3826e8166f0d1c0732e0a",
+  "databaseModified": false,
+  "mutationCommands": {
+    "inject": [
+      "/usr/local/bin/python3",
+      "/private/tmp/railwise-survey-6ff82c8/evidence/quality-corruption-control.py",
+      "inject"
+    ],
+    "restore": [
+      "/usr/local/bin/python3",
+      "/private/tmp/railwise-survey-6ff82c8/evidence/quality-corruption-control.py",
+      "restore"
+    ]
+  }
+}

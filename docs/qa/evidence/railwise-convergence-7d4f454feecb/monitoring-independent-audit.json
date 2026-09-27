@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "candidatePrefix": "7d4f454",
+  "status": "csv-selected-checks-passed-xlsx-regression-preserved",
+  "checkedAt": "2026-09-20T10:17:02.637762+00:00",
+  "independentExpected": {
+    "currentValue": 4,
+    "previousValue": 2,
+    "cumulativeChange": 2.0,
+    "changeRate": 2.0,
+    "trend": "rising"
+  },
+  "csv": {
+    "projectId": "project_3cf48e4d-fefe-4580-b0a0-854c93e39c44",
+    "datasetId": "dataset_b2d536af-88e8-4cbb-b5b0-33e8dea492ae",
+    "analysisId": "analysis_89dbb059-eb63-4e73-a2be-2dec2438b11f",
+    "manifestId": "manifest_c5c6c1f2-6538-4537-9a57-6901c2e74267",
+    "runId": "run_e044189e-19bc-4dfc-b5e3-ec3b8b4d81bb",
+    "actual": {
+      "currentValue": 4,
+      "previousValue": 2,
+      "cumulativeChange": 2,
+      "changeRate": 2,
+      "trend": "rising"
+    },
+    "outputs": [
+      {
+        "sha256": "e50954e8200a02601cb2254894a2ce357f72e2be144db8f1637f816ebb96cf9a",
+        "sizeBytes": 4206,
+        "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      },
+      {
+        "sha256": "4bcb8db5b4761d47c4fa47297e3584ef9286e6c009fd3dfec8642d474c7391ff",
+        "sizeBytes": 29012,
+        "mediaType": "application/pdf"
+      },
+      {
+        "sha256": "15cdc35446be6984100cebd983c4f214d84221ec467a7c65ebead3044660b17b",
+        "sizeBytes": 28894,
+        "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      },
+      {
+        "sha256": "583e88dc88ef113d3d55ac751b531b7454d116ba519fbb8d6dc01ac5aeb24757",
+        "sizeBytes": 189,
+        "mediaType": "image/svg+xml"
+      }
+    ],
+    "reviewStatus": "draft",
+    "verification": [
+      {
+        "id": "verification_74c7c914-2260-4170-84f8-7a16928469da",
+        "checks": {
+          "manifest": "passed",
+          "outputs": "passed",
+          "inputs": "passed",
+          "surveyReplay": "not-applicable",
+          "sources": "not-applicable"
+        },
+        "lifecycleBindingsVerified": true
+      }
+    ]
+  },
+  "xlsx": {
+    "projectId": "project_7dd8e81e-66a5-4f88-9840-6917956664bc",
+    "datasetId": "dataset_a35fe995-7d92-4327-bdcb-2105b3794a77",
+    "analysisId": "analysis_c3e6d4ac-ba31-42c0-8315-ac35a696da6d",
+    "sourceSha256": "42bd4072a015c3e5a5d60aa5dff0606162b50182f9f99541145d0f02fe573c74",
+    "sourceCumulativeAndRateAreBlank": true,
+    "storedCumulativeAndRateAreZero": true,
+    "actual": {
+      "currentValue": 4,
+      "previousValue": 2,
+      "cumulativeChange": 0,
+      "changeRate": 2,
+      "trend": "stable"
+    },
+    "matchesIndependentExpected": false,
+    "runsOrManifests": 0,
+    "historyRewritten": false
+  },
+  "inputAndOutputFilesUnchanged": true,
+  "databaseReadMode": "existing-closed-snapshot-immutable-query_only",
+  "limitations": [
+    "No GUI or production acceptance claim from this read-only audit.",
+    "Old XLSX error remains recorded; source-code fix has not changed installed7d or historical records.",
+    "CSV workbook/DOCX structure and rising text verified; PDF signature/footer only, not independent rendered-page inspection."
+  ]
+}

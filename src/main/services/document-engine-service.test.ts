@@ -463,14 +463,26 @@ describe('DocumentEngineService', () => {
 
   it('keeps late timed-out parser artifacts away from an immediate retry', async () => {
     const { root } = await fixture()
+    const deferred = (): { promise: Promise<void>; resolve: () => void } => {
+      let resolve!: () => void
+      const promise = new Promise<void>((done) => { resolve = done })
+      return { promise, resolve }
+    }
+    const firstStarted = deferred()
+    const releaseFirst = deferred()
+    const firstWritten = deferred()
     let attempts = 0
     const bridge = vi.fn<DocumentEngineRunner>(async (input) => {
-      attempts += 1
+      const attempt = ++attempts
       await mkdir(input.outputDirectory, { recursive: true })
-      const markdown = attempts === 1 ? 'late old result' : 'retry result'
-      if (attempts === 1) await new Promise((resolve) => setTimeout(resolve, 200))
+      const markdown = attempt === 1 ? 'late old result' : 'retry result'
+      if (attempt === 1) {
+        firstStarted.resolve()
+        await releaseFirst.promise
+      }
       const markdownPath = join(input.outputDirectory, 'document.md')
       await writeFile(markdownPath, markdown)
+      if (attempt === 1) firstWritten.resolve()
       return {
         ok: true,
         engine: input.engine,
@@ -488,15 +500,26 @@ describe('DocumentEngineService', () => {
       idempotencyKey: 'late-output-retry'
     }
 
-    await expect(service.parse(request)).rejects.toMatchObject({ code: 'document_parse_timeout' })
-    const retry = await service.parse({ ...request, parseId: 'late-output-retry-2' })
-    await new Promise((resolve) => setTimeout(resolve, 240))
-    expect(retry.markdown).toBe('retry result')
-    await expect(service.parse({ ...request, parseId: 'late-output-retry-cache' })).resolves.toMatchObject({
-      cacheHit: true,
-      markdown: 'retry result'
-    })
-    expect(bridge).toHaveBeenCalledTimes(2)
+    // Advance only the first deadline; real disk I/O must not race a 100 ms CI budget.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const timedOut = expect(service.parse(request)).rejects.toMatchObject({ code: 'document_parse_timeout' })
+      await firstStarted.promise
+      await vi.advanceTimersByTimeAsync(100)
+      await timedOut
+      const retry = await service.parse({ ...request, parseId: 'late-output-retry-2' })
+      releaseFirst.resolve()
+      await firstWritten.promise
+      expect(retry.markdown).toBe('retry result')
+      await expect(service.parse({ ...request, parseId: 'late-output-retry-cache' })).resolves.toMatchObject({
+        cacheHit: true,
+        markdown: 'retry result'
+      })
+      expect(bridge).toHaveBeenCalledTimes(2)
+    } finally {
+      releaseFirst.resolve()
+      vi.useRealTimers()
+    }
   }, 15_000)
 
   it('rejects oversized cache metadata before parsing JSON', async () => {

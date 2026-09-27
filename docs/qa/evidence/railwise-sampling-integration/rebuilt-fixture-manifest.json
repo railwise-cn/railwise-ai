@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "provenance": "real-source-services-with-synthetic-inputs-not-packaged-gui",
+  "sourceCommit": "a3072e25ebc33ee30702d5278c8144e3fbb625f7",
+  "createdAt": "2026-09-19T21:44:31.820Z",
+  "nodeVersion": "v26.8.2",
+  "root": "/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-sampling-service-rebuild-Bu0yPf",
+  "runtimeDirectory": "/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-sampling-service-rebuild-Bu0yPf/runtime",
+  "workspaceDirectory": "/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-sampling-service-rebuild-Bu0yPf/workspace",
+  "projectId": "project_5aad90c0-4a6c-4968-8b3f-9415d155961c",
+  "populationId": "sampling_population_39fea30f-7a0a-4424-b6cb-38f587947327",
+  "unitCount": 1001,
+  "runs": [
+    {
+      "id": "sampling_run_9c11e98b-f927-4450-a240-56e7bfdf8368",
+      "stage": "process",
+      "inspectionMode": "census",
+      "sampleSize": 1001,
+      "planHash": "a3315cbe97e57f884ab63306a9c2b0d10a8cb7cad8e5167005bf9d927db65842"
+    },
+    {
+      "id": "sampling_run_7e3752d8-404c-4f20-ba16-119116887c1a",
+      "stage": "final-field",
+      "inspectionMode": "table-1-simple-random",
+      "sampleSize": 80,
+      "planHash": "21edbaedaf45d7f77782feddc5e0f1a0bacf8dd8b7bfd3fa774add1e2a2352fb"
+    }
+  ],
+  "trust": "Synthetic service fixture only; no independent seed witness, field measurements, professional review or packaged UI acceptance."
+}

@@ -1,0 +1,53 @@
+
+> workwise@0.5.0 test:survey-converter-sandbox
+> npm --prefix kun run test:survey-converter-sandbox
+
+
+> kun@0.4.2 test:survey-converter-sandbox
+> WORKWISE_TEST_MACOS_SURVEY_SANDBOX=1 vitest run src/engineering/survey-converter.test.ts --reporter=verbose
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > uses a valid user-supplied converter output as the active source while retaining both source identities 11ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > applies normal parser and admission gates to converted workwise-json output 7ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > applies normal parser and admission gates to converted delimited-text output 3ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > applies normal parser and admission gates to converted xlsx output 5ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > retains and blocks the opaque original when converter output does not match its declared format 3ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > requires license and redistribution approval only for a WorkWise-bundled converter 2ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > blocks a changed executable before invoking the converter 1ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > returns no adapter for unapproved formats instead of executing a fallback 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps trimble-t01 intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps trimble-t02 intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps trimble-t04 intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps trimble-job intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps leica-dbx intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps leica-mdb intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > keeps spectra-survey-pro intact and converter-required when no audited adapter is registered 0ms
+ ✓ src/engineering/survey-converter.test.ts > SurveyConverterRegistry > rejects oversized and symbolic outputs even from an executor that reports success 2ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for trimble-t00 without changing the format allowlist 14ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for trimble-t01 without changing the format allowlist 11ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for trimble-t02 without changing the format allowlist 10ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for trimble-t04 without changing the format allowlist 11ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for trimble-job without changing the format allowlist 10ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for leica-dbx without changing the format allowlist 12ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for leica-mdb without changing the format allowlist 10ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for spectra-survey-pro without changing the format allowlist 10ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > executes a hash-pinned synthetic adapter for hatanaka-rinex without changing the format allowlist 11ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > terminates the real parent and child and removes the workspace after timeout 3009ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > terminates the real parent and child and removes the workspace after cancel 309ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > cleans up a background descendant even when the converter parent exits successfully 305ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > fails on oversized UTF-8 stdout bytes instead of silently truncating characters 290ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > fails on oversized UTF-8 stderr bytes instead of silently truncating characters 291ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > accepts exactly the stdout and output-file byte limits 303ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > rejects a real oversized output on exit without accepting a prefix 262ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > rejects a real oversized output on keep-running without accepting a prefix 312ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > rejects a real symlink output and a pre-cancelled invocation without starting the script 280ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > propagates cancellation through format ingestion while retaining the opaque source 283ms
+ ✓ src/engineering/survey-converter.test.ts > real macOS converter process boundaries > still denies network access for the real hash-pinned process 291ms
+
+ Test Files  1 passed (1)
+      Tests  36 passed (36)
+   Start at  11:29:14
+   Duration  6.32s (transform 121ms, setup 0ms, import 182ms, tests 6.07s, environment 0ms)
+

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Intermediate candidates only; no GUI acceptance, no release approval",
+  "candidates": [
+    {
+      "sourceHead": "267aadeafebeecdbbb3bc012f3844793d060990a",
+      "version": "0.5.0",
+      "workflowRunId": 35503443821,
+      "workflowConclusion": "success",
+      "evidenceArtifactId": 10603132699,
+      "evidenceArtifactSha256": "885405869242bf00925f81af5111830de96699731315716930a3a40671a51f68",
+      "evidenceArtifactOuterDigestRehashed": true,
+      "cloudEvidenceSha256": "dc98b414ce2cdb7c6e03633a0b7dcdc40d30d30948fabf33139c33afad1dbd83",
+      "targetArtifactId": 10603082866,
+      "targetArtifactBytes": 589380945,
+      "cloudGatekeeperStatus": "assessments enabled",
+      "nativeUpdater": {
+        "status": "passed",
+        "baseVersion": "0.0.0",
+        "targetVersion": "0.5.0",
+        "browserOpened": false,
+        "syntheticUserDataPreserved": true
+      },
+      "tlsChecks": {
+        "defaultTrustRejected": true,
+        "wrongPinRejected": true,
+        "wrongPortRejected": true,
+        "outsidePathRejected": true,
+        "providerManifestVerified": true,
+        "executorZipVerified": true,
+        "updaterSessionMatched": true
+      },
+      "systemTrustModified": false,
+      "guiAcceptance": "not-tested",
+      "userAcceptance": "not-performed",
+      "publicReleaseOperation": false,
+      "scope": "Local isolated installation and cloud native updater only",
+      "targetArtifactSha256": "3ff87e86d9abf9c2027db2d0033563b09840a2a9578e453232f0c90fce859b17",
+      "targetArtifactOuterDigestRehashed": true,
+      "targetZipSha256": "e51b44bb51807908c1d6ef2cd360da2f76f7f356b987ec81b8a9ae768a30227a",
+      "installedAsarSha256": "2404fa3f13c8454c38a5c12c48204e0e52b518e0421c734929da8a4b06e0fc11",
+      "matchesCloudUpdaterInstalledTarget": true,
+      "embeddedSourceProvenanceVerified": true,
+      "asarEntriesVerified": 18363,
+      "embeddedUpdaterHost": "127.0.0.1",
+      "localGatekeeperStatus": "assessments disabled",
+      "localSignatureVerified": true,
+      "localStapledNotarizationVerified": true,
+      "localInstallationPerformed": true,
+      "guiLaunched": false,
+      "userDataReadOrModified": false,
+      "localSignatureCheckExitCodes": [
+        {
+          "executable": "codesign",
+          "operation": "--verify",
+          "exitCode": 0
+        },
+        {
+          "executable": "xcrun",
+          "operation": "stapler",
+          "exitCode": 0
+        },
+        {
+          "executable": "spctl",
+          "operation": "--assess",
+          "exitCode": 0
+        },
+        {
+          "executable": "spctl",
+          "operation": "--status",
+          "exitCode": 1
+        }
+      ],
+      "downloadRecovery": {
+        "initialDownloadFailed": true,
+        "initialFailure": "Artifact range download failed; underlying transport cause not determined",
+        "completeRangesRetained": 561,
+        "totalRanges": 563,
+        "shortRanges": [
+          {
+            "range": 464,
+            "receivedBytes": 965571,
+            "expectedBytes": 1048576
+          },
+          {
+            "range": 478,
+            "receivedBytes": 129987,
+            "expectedBytes": 1048576
+          }
+        ],
+        "retryAttemptsPerShortRange": 1,
+        "fullArtifactRehashedAfterRecovery": true,
+        "fullArchiveCrcVerifiedAfterRecovery": true
+      }
+    },
+    {
+      "sourceHead": "27738f42dc9d1774b9cfafe000d87e65158cd554",
+      "version": "0.5.0",
+      "workflowRunId": 35504596329,
+      "workflowConclusion": "success",
+      "evidenceArtifactId": 10603821444,
+      "evidenceArtifactSha256": "5dc86642e8d85e3ff132869215884940dc57bc908aaf88959c76e69d15645b6c",
+      "evidenceArtifactOuterDigestRehashed": true,
+      "cloudEvidenceSha256": "9aadc3da249fccfc9e5ebfdee62eb0bea6dbf970c4500250c4fba5fe16d9c8d1",
+      "targetArtifactId": 10603479060,
+      "targetArtifactBytes": 589390423,
+      "cloudGatekeeperStatus": "assessments enabled",
+      "nativeUpdater": {
+        "status": "passed",
+        "baseVersion": "0.0.0",
+        "targetVersion": "0.5.0",
+        "stages": [
+          "base_started",
+          "update_available",
+          "download_completed",
+          "install_requested",
+          "target_relaunched",
+          "user_data_preserved"
+        ],
+        "browserOpened": false,
+        "syntheticUserDataPreserved": true
+      },
+      "tlsChecks": {
+        "defaultTrustRejected": true,
+        "wrongPinRejected": true,
+        "wrongPortRejected": true,
+        "outsidePathRejected": true,
+        "providerManifestVerified": true,
+        "executorZipVerified": true,
+        "updaterSessionMatched": true
+      },
+      "systemTrustModified": false,
+      "guiAcceptance": "not-tested",
+      "userAcceptance": "not-performed",
+      "publicReleaseOperation": false,
+      "scope": "Cloud evidence only; target package not downloaded locally",
+      "targetArtifactDeclaredDigest": "sha256:9c0c15caad4ae476a2426f4f7085b1b041b6f7e613092b975fd049979484aa09",
+      "targetArtifactDownloaded": false,
+      "targetArtifactOuterDigestRehashed": false,
+      "cloudTargetZipSha256": "02bdde4b0b9071e464b51b4f28ea40054c17de72366bd1b815f4261c0910725c",
+      "cloudInstalledAsarSha256": "53f6cfe5aa1a9a24ab110769efc2add1bf9b16052d6a232f125d38870b20925c",
+      "cloudSignatureVerified": true,
+      "cloudStapledNotarizationVerified": true,
+      "localInstallationPerformed": false,
+      "guiLaunched": false,
+      "userDataReadOrModified": false
+    }
+  ]
+}

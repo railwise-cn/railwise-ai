@@ -3,6 +3,7 @@ const { createHash } = require('node:crypto')
 const { createReadStream } = require('node:fs')
 const { readdir, readFile, stat, writeFile } = require('node:fs/promises')
 const { basename, join, resolve } = require('node:path')
+const productBrand = require('../src/shared/product-brand.json')
 
 function usage() {
   console.error(`Usage:
@@ -143,7 +144,7 @@ async function listChecksumTargets(distDir) {
 
 async function assertLatestJson(distDir) {
   const manifest = JSON.parse(await readFile(join(distDir, 'latest.json'), 'utf8'))
-  if (manifest.schemaVersion !== 1 || manifest.productName !== 'WorkWise') {
+  if (manifest.schemaVersion !== 1 || manifest.productName !== productBrand.platform) {
     throw new Error('latest.json has an invalid schema or product identity.')
   }
   if (!/^\d+\.\d+\.\d+$/.test(manifest.version || '') || manifest.tag !== `v${manifest.version}`) {

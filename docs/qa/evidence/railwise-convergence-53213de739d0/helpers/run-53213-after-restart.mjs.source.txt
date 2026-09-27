@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+const scripts = '/private/tmp/railwise-candidate-audit.byCLwE';
+const evidence = '/private/tmp/railwise-survey-53213de/evidence';
+const baselinePath = join(evidence, 'strict-before-restart-audit-53213.json');
+const input = JSON.parse(await readFile(join(scripts, '53213-before-restart-input.json'), 'utf8'));
+assert.equal(input.phase, 'before-restart');
+input.phase = 'after-restart';
+const inputPath = join(scripts, '53213-after-restart-input.json');
+await writeFile(inputPath, JSON.stringify(input, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+const stdout = execFileSync(process.execPath, [join(scripts, 'audit-candidate-execution.mjs'), inputPath, '--compare', baselinePath], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+const report = JSON.parse(stdout);
+assert.equal(report.status, 'passed'); assert.equal(report.restart.compared, true); assert.equal(report.restart.stableRecordsAndFilesUnchanged, true);
+const output = join(evidence, 'strict-after-restart-audit-53213.json');
+await writeFile(output, stdout, { flag: 'wx', mode: 0o600 });
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const note = {
+  checkedAt: new Date().toISOString(), candidateSourceHead: input.expected.sourceHead,
+  calculationAndPersistenceAudit: 'passed', auditReport: output, auditReportSha256: sha(stdout), baselineReport: baselinePath, baselineReportSha256: sha(await readFile(baselinePath)),
+  restart: report.restart, selected: report.stableIdentity.selected,
+  knownUiDefect: { status: 'open-in-reviewed-candidate', description: 'A stale waitingReason remains visible in the bottom UI after the task has completed. This was reported from GUI review and is being fixed separately in product source.', affectsClaim: 'This candidate does not pass final UI acceptance; computation and persistence checks passed.' },
+  scope: 'Read-only post-restart record and file comparison. No calculations, consultations, settings changes or GUI operations were initiated by this audit.'
+};
+const notePath = join(evidence, 'after-restart-known-ui-defect-53213.json');
+await writeFile(notePath, JSON.stringify(note, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+console.log(JSON.stringify({ status: report.status, output, outputSha256: sha(stdout), notePath, restart: report.restart, selected: report.stableIdentity.selected, fileCount: report.delivery.files.length }, null, 2));

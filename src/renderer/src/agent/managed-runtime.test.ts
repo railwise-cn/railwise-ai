@@ -326,6 +326,7 @@ describe('WorkWiseRuntimeProvider', () => {
 
     await provider.sendUserMessage('thr_1', 'think harder', {
       model: 'auto',
+      providerId: 'provider-b',
       reasoningEffort: 'max'
     })
 
@@ -335,11 +336,24 @@ describe('WorkWiseRuntimeProvider', () => {
       JSON.stringify({
         prompt: 'think harder',
         model: 'auto',
+        providerId: 'provider-b',
         approvalPolicy: 'auto',
         sandboxMode: 'danger-full-access',
         reasoningEffort: 'max'
       })
     )
+  })
+
+  it('posts the selected provider alongside a same-named model for reviews', async () => {
+    const runtimeRequest = vi.fn(async () => ({
+      ok: true, status: 202,
+      body: JSON.stringify({ threadId: 'thr_review', turnId: 'turn_review', userMessageItemId: 'item_review_user', reviewItemId: 'item_review' })
+    }))
+    installDsGui({ runtimeRequest })
+    const provider = new WorkWiseRuntimeProvider()
+    const target = { kind: 'custom' as const, instructions: 'Review this synthetic input.' }
+    await provider.reviewThread('thr_review', target, { model: 'shared-model', providerId: 'compatible-b' })
+    expect(runtimeRequest).toHaveBeenCalledWith('/v1/threads/thr_review/review', 'POST', JSON.stringify({ target, model: 'shared-model', providerId: 'compatible-b' }))
   })
 
   it('posts GUI plan context with WorkWise Runtime plan turn requests', async () => {

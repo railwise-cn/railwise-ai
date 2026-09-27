@@ -1,0 +1,18 @@
+--- legacy-monitoring-helpers.before-bool-fix.py	2026-09-21 04:58:38
++++ legacy-monitoring-helpers.py	2026-09-21 05:47:26
+@@ -164,7 +164,14 @@
+     for row in expected:
+         other = keyed[(row['monitoringItem'], row['point'])]
+         for key, value in row.items():
+-            assert close(value, other[key]) if isinstance(value, (float, int)) else value == other[key], 'analysis differs from source arithmetic'
++            actual = other[key]
++            if isinstance(value, bool):
++                matches = actual is value if isinstance(actual, bool) else isinstance(actual, str) and actual == str(value).lower()
++            elif isinstance(value, (float, int)):
++                matches = not isinstance(actual, bool) and close(value, actual)
++            else:
++                matches = value == actual
++            assert matches, 'analysis differs from source arithmetic'
+ 
+ 
+ def chart_check(raw, rows):

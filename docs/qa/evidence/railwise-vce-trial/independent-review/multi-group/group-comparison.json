@@ -1,0 +1,12 @@
+{
+  "count": 160,
+  "outcomes": {
+    "nonpositive-component": 58,
+    "iteration-limit": 83,
+    "stochastic-rank-or-conditioning": 19
+  },
+  "maxScaledError": 1.018935972940625e-13,
+  "tolerance": 1e-9,
+  "numericalStops": [],
+  "failures": []
+}

@@ -1,6 +1,7 @@
 import type i18next from 'i18next'
 import type { AppSettingsV1 } from '@shared/app-settings'
 import { rendererRuntimeClient } from '../agent/runtime-client'
+import { persistComposerSelection, readStoredComposerSelection } from './chat-store-helpers'
 import type { ChatState, ChatStoreGet, ChatStoreSet, InitialSetupMode, PluginHostRoute, SettingsRouteSection } from './chat-store-types'
 
 type CreateAppActionsOptions = {
@@ -58,9 +59,10 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
   return {
     setError: (message) => set({ error: message }),
 
-    setComposerModel: (modelId) => {
+    setComposerModel: (modelId, providerId) => {
       persistComposerModel(modelId)
-      set({ composerModel: modelId })
+      persistComposerSelection(modelId, providerId)
+      set({ composerModel: modelId, composerProviderId: providerId })
     },
 
     loadComposerModels: async () => {
@@ -72,13 +74,17 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
         const groups = res.ok ? res.modelGroups ?? [] : []
         const allowed = new Set(pick)
         set((state) => {
+          const selection = readStoredComposerSelection()
+          // Keep explicit identities even when a provider is temporarily absent.
+          // Sending then fails explicitly instead of silently changing endpoints.
+          if (selection?.providerId) return { composerPickList: pick, composerModel: selection.model, composerProviderId: selection.providerId, composerModelGroups: groups }
           let model = state.composerModel
           if (model !== '' && !allowed.has(model)) {
             model = readStoredComposerModel(pick)
           }
           if (model !== '' && !allowed.has(model)) model = ''
           if (model !== state.composerModel) persistComposerModel(model)
-          return { composerPickList: pick, composerModel: model, composerModelGroups: groups }
+          return { composerPickList: pick, composerModel: model, composerProviderId: undefined, composerModelGroups: groups }
         })
       })().finally(() => {
         setComposerModelLoadPromise(null)

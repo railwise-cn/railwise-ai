@@ -1,0 +1,14 @@
+
+> kun@0.4.2 test
+> vitest run tests/deepseek-responses-web-provider.test.ts tests/runtime-factory.test.ts tests/web-tool-provider.test.ts --reporter=dot
+
+
+ RUN  v4.1.8 /private/tmp/railwise-static-workspace/kun
+
+········································
+
+ Test Files  3 passed (3)
+      Tests  40 passed (40)
+   Start at  08:58:48
+   Duration  1.86s (transform 819ms, setup 0ms, import 1.27s, tests 843ms, environment 0ms)
+

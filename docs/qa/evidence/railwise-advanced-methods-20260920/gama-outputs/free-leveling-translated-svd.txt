@@ -1,0 +1,62 @@
+Adjustment of local geodetic network        version: 2.29-svd / Clang C/C++ 21.0
+************************************
+http://www.gnu.org/software/gama/
+
+
+Network description
+*******************
+Same three-point benchmark with every approximate height translated by 1234.5 m.
+
+
+General parameters of the adjustment
+************************************
+
+Coordinates           xyz     xy       z
+
+Adjusted       :       0       0       3
+Constrained  * :       0       0       3
+Fixed          :       0       0       0
+-----------------------------------------
+Total          :       0       0       3
+
+
+Number of project equations:     3            Number of unknowns:     3
+Degrees of freedom         :     1            Network defect    :     1
+
+m0  apriori    :     1.00
+m0' aposteriori:     0.17         [pvv] : 3.00000e-02
+
+During statistical analysis we work
+
+- with apriori standard deviation 1.00
+- with confidence level 95 %
+Ratio m0' aposteriori / m0 apriori: 0.173
+95 % interval (0.031, 2.241) contains value m0'/m0
+
+Maximal normalized residual 0.17 does not exceed critical value 1.96
+on significance level 5 % for observation #2
+<dh from="B" to="C" val="2.000" stdev="1000.0" />
+
+
+Adjusted heights
+****************
+
+  i        point     approximate  correction  adjusted    std.dev conf.i.
+======================= value ====== [m] ====== value ========== [mm] ===
+
+  1            A *    1234.50000  -1.23333    1233.26667   471.4   923.9
+  2            B *    1234.50000  -0.33333    1234.16667   471.4   923.9
+  3            C *    1234.50000   1.56667    1236.06667   471.4   923.9
+
+
+Adjusted observations
+*********************
+
+   i   standpoint       target           observed     adjusted std.dev conf.i.
+=========================================== value ==== [m|g] ====== [mm|cc] ==
+
+   1            A            B h dif      1.00000      0.90000   816.5  1600.3
+   2            B            C h dif      2.00000      1.90000   816.5  1600.3
+   3            C            A h dif     -2.70000     -2.80000   816.5  1600.3
+
+

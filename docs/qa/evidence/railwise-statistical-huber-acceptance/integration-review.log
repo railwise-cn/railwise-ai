@@ -1,0 +1,26 @@
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-two-kernels/independent-review
+
+ ✓ gui.test.ts > renders full maximum huber and conclusion boundaries without Buffer 1282ms
+ ✓ gui.test.ts > renders full maximum statistical-family and conclusion boundaries without Buffer 1396ms
+ ✓ gui.test.ts > exports exact Unicode huber and blocks late native save after project change 109ms
+ ✓ gui.test.ts > exports exact Unicode statistical-family and blocks late native save after project change 300ms
+ ✓ gui.test.ts > drops late restore on workspace scope change 140ms
+ ✓ gui.test.ts > drops late restore on revision scope change 106ms
+ ✓ gui.test.ts > drops late restore on runtime scope change 151ms
+ ✓ service.test.ts > replays ten maximum huber records under full declared-model budget 9407ms
+ ✓ service.test.ts > replays ten maximum statistical-family records under full declared-model budget 3454ms
+ ✓ service.test.ts > preserves raw retry identity and byte conflicts for huber 34ms
+ ✓ service.test.ts > preserves raw retry identity and byte conflicts for statistical-family 51ms
+ ✓ client.test.ts > preserves raw UTF-8 and renderer restores generalized-w with no Buffer 104ms
+ ✓ client.test.ts > preserves raw UTF-8 and renderer restores vce with no Buffer 54ms
+ ✓ client.test.ts > preserves raw UTF-8 and renderer restores huber with no Buffer 21ms
+ ✓ client.test.ts > preserves raw UTF-8 and renderer restores statistical-family with no Buffer 12ms
+ ✓ client.test.ts > restores unsorted statistics and whitespace-normalized identities without losing raw bytes 12ms
+ ✓ client.test.ts > rejects duplicate-key declaration preflight for huber 8ms
+ ✓ client.test.ts > rejects duplicate-key declaration preflight for statistical-family 7ms
+
+ Test Files  3 passed (3)
+      Tests  18 passed (18)
+   Start at  07:55:52
+   Duration  19.05s (transform 854ms, setup 0ms, import 1.42s, tests 16.65s, environment 310ms)

@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-20",
+  "checkout": "/private/tmp/railwise-quality-assessment",
+  "base": "8f81d8ac9dc59902954877a8d992d2668c6c8604",
+  "runtimeTests": {
+    "tests": 30,
+    "files": 5,
+    "passed": true
+  },
+  "desktopTests": {
+    "tests": 46,
+    "files": 4,
+    "passed": true
+  },
+  "runtimeTypecheck": true,
+  "desktopTypecheck": true,
+  "targetedEslint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "runtimeBuild": true,
+  "electronViteBuild": true,
+  "packagedAcceptancePerformed": false,
+  "includedInCurrentCandidate": false,
+  "publicReleasePerformed": false,
+  "independentReview": {
+    "totalTests": 81,
+    "passed": 81,
+    "unresolvedDevelopmentBlockers": 0,
+    "freshCopyRuntimeTests": 25,
+    "freshCopyDomTests": 10,
+    "compiledChecks": 5
+  }
+}

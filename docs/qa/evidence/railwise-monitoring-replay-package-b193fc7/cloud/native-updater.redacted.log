@@ -1,0 +1,60 @@
+[startup +     0ms] main module evaluated
+[startup +     3ms] legacy data migration checked {
+  userDataPath: '/Users/runner/work/_temp/workwise-private-updater-qvifrv/user-data',
+  migratedUserData: false,
+  importedHomeEntries: 0
+}
+[startup +    14ms] app icon loaded { source: 'path' }
+[startup +    14ms] single instance lock checked {
+  gotSingleInstanceLock: true,
+  skippedForClawScheduleMcpServer: false,
+  skippedForImCredentialHelper: false,
+  skippedForGuiUpdaterAcceptance: true
+}
+[startup +   188ms] app.whenReady:start
+[startup +   233ms] install webview guards:start
+[startup +   233ms] install webview guards:done
+[startup +   258ms] settings load:start
+[startup +   309ms] candidate service ports isolated { runtime: 0, schedule: 49267, im: 49268 }
+[startup +   327ms] settings load:done
+[18834:0920/211532.103617:ERROR:electron/shell/common/platform_util_mac.mm:260] Unable to set login item: The operation couldn’t be completed. Operation not permitted
+2026-09-20 21:15:32.403 RAILWISE AI Candidate b193fc70d636 Helper[18909:214169] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid
+2026-09-20 21:15:32.403 RAILWISE AI Candidate b193fc70d636 Helper[18909:214174] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid
+2026-09-20 21:15:32.405 RAILWISE AI Candidate b193fc70d636 Helper[18909:214174] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid
+[startup +   707ms] logger configured
+[startup +   708ms] claw runtime sync:start { clawEnabled: false, imEnabled: false, enabledChannels: 0 }
+[im-startup] sync { clawEnabled: false, imEnabled: false, enabledChannels: 0 }
+[im-startup] webhook reservation handed off { port: 49268 }
+[im-startup] feishu sync { targets: 0 }
+[startup +   709ms] claw runtime sync:scheduled
+[startup +   710ms] ipc registration:start
+[startup +   716ms] ipc registration:done
+[startup +   717ms] createWindow:start
+[startup +   728ms] createWindow:load { devUrl: 'file' }
+[startup +   732ms] createWindow:returned
+[workwise updater] Checking for update
+[workwise updater] Generated new staging user ID: ffeddc73-1556-567c-8f33-1e879d9d1c5a
+[workwise updater] Found version 0.5.0 (url: WorkWise-Candidate-b193fc70d636-0.5.0-mac-arm64.zip)
+[workwise updater] Downloading update from WorkWise-Candidate-b193fc70d636-0.5.0-mac-arm64.zip
+[workwise updater] Checked for macOS Rosetta environment (isRosetta=false)
+[workwise updater] Checked 'uname -a': arm64=true
+[workwise updater] Unable to locate previous update.zip for differential download (is this first install?), falling back to full download
+[startup +  1792ms] window:did-finish-load
+[startup +  2731ms] window:fallback-show-timeout
+[startup +  2735ms] window:ready-to-show
+[workwise updater] New version 0.5.0 has been downloaded to /Users/runner/Library/Caches/workwise-private-updater-b193fc70d636-updater/pending/WorkWise-Candidate-b193fc70d636-0.5.0-mac-arm64.zip
+[im-startup] stop
+[workwise] failed to start runtime: Error: WorkWise Runtime exited during startup with signal SIGTERM
+    at ChildProcess.onExit (file:///Users/runner/work/_temp/workwise-private-updater-qvifrv/Applications/RAILWISE%20AI%20Candidate%20b193fc70d636.app/Contents/Resources/app.asar/out/main/index.js:10683:14)
+    at Object.onceWrapper (node:events:631:26)
+    at ChildProcess.emit (node:events:521:24)
+    at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+[workwise updater] / requested
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+[workwise updater] /d2b5d6870cb281cd1e1cd79e6fd53e9e02307812a0806290036942a9572d37c49de3784ab740f7710837d37677b1b38e92e4bce44e1ddff630b3440b6491c5b7.zip requested
+[workwise updater] /d2b5d6870cb281cd1e1cd79e6fd53e9e02307812a0806290036942a9572d37c49de3784ab740f7710837d37677b1b38e92e4bce44e1ddff630b3440b6491c5b7.zip requested by Squirrel.Mac, pipe /Users/runner/Library/Caches/workwise-private-updater-b193fc70d636-updater/pending/WorkWise-Candidate-b193fc70d636-0.5.0-mac-arm64.zip
+2026-09-20 21:15:41.171 RAILWISE AI Candidate b193fc70d636[18834:214009] Download completed to: file:///Users/runner/Library/Caches/com.wangjiawei508.workwise.candidate.headb193fc70d636.ShipIt/update.Mwt7c9p/d2b5d6870cb281cd1e1cd79e6fd53e9e02307812a0806290036942a9572d37c49de3784ab740f7710837d37677b1b38e92e4bce44e1ddff630b3440b6491c5b7.zip
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+[workwise updater] Proxy server for native Squirrel.Mac is closed (fileToProxy=https://127.0.0.1:49266/private-[redacted]/WorkWise-Candidate-b193fc70d636-0.5.0-mac-arm64.zip)

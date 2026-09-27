@@ -77,6 +77,9 @@ export const TurnSchema = z.object({
   status: TurnStatus,
   prompt: z.string(),
   model: z.string().optional(),
+  providerId: z.string().trim().min(1).max(200).optional(),
+  engineeringExecution: z.boolean().optional(),
+  engineeringPlanId: z.string().min(1).max(200).optional(),
   reasoningEffort: TurnReasoningEffortSchema.optional(),
   /** Steered text queued by the user mid-turn. Cleared on completion. */
   steering: z.array(z.string()).default([]),
@@ -118,6 +121,7 @@ export const StartTurnRequest = z.object({
   prompt: byteLimitedString(RUNTIME_RESOURCE_LIMITS_V1.promptBytes).pipe(z.string().min(1)),
   displayText: byteLimitedString(RUNTIME_RESOURCE_LIMITS_V1.displayTextBytes).optional(),
   model: z.string().optional(),
+  providerId: z.string().trim().min(1).max(200).optional(),
   reasoningEffort: TurnReasoningEffortSchema.optional(),
   approvalPolicy: ApprovalPolicySchema.optional(),
   sandboxMode: SandboxModeSchema.optional(),

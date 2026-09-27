@@ -1,0 +1,46 @@
+[
+  {
+    "projectId": "project_1298abb6-79fd-4b1e-ae56-bc60d2682370",
+    "manifestId": "manifest_b8aac5a1-16d5-401a-839c-c71da1706d8c",
+    "reviewStatus": "draft",
+    "outputs": [
+      {
+        "sha256Matches": true,
+        "sizeMatches": true,
+        "file": "report.docx"
+      },
+      {
+        "sha256Matches": true,
+        "sizeMatches": true,
+        "file": "report.pdf"
+      },
+      {
+        "sha256Matches": true,
+        "sizeMatches": true,
+        "file": "evidence.xlsx"
+      }
+    ]
+  },
+  {
+    "projectId": "project_4baa1801-5013-41e0-b7de-24c513cc0b72",
+    "manifestId": "manifest_2836c341-2b67-460d-bb55-e41d4f65020a",
+    "reviewStatus": "draft",
+    "outputs": [
+      {
+        "sha256Matches": true,
+        "sizeMatches": true,
+        "file": "report.docx"
+      },
+      {
+        "sha256Matches": true,
+        "sizeMatches": true,
+        "file": "report.pdf"
+      },
+      {
+        "sha256Matches": true,
+        "sizeMatches": true,
+        "file": "evidence.xlsx"
+      }
+    ]
+  }
+]

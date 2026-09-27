@@ -1,0 +1,32 @@
+[
+  {
+    "case": "SQL stage identity tamper",
+    "result": "passed",
+    "expectedAuditResult": "run-sql-row-hash"
+  },
+  {
+    "case": "sample forged with repaired outer row hash",
+    "result": "passed",
+    "expectedAuditResult": "independent-plan-hmac-table-replay"
+  },
+  {
+    "case": "actual definition bytes changed with repaired row hash",
+    "result": "passed",
+    "expectedAuditResult": "definition-actual-byte-binding"
+  },
+  {
+    "case": "current project revision changed",
+    "result": "passed",
+    "expectedAuditResult": "stale-project-binding"
+  },
+  {
+    "case": "all run records removed",
+    "result": "passed",
+    "expectedAuditResult": "not-evaluated"
+  },
+  {
+    "case": "valid-looking duplicate same-stage draw with repaired hashes",
+    "result": "passed",
+    "expectedAuditResult": "same-stage-redraw"
+  }
+]

@@ -90,7 +90,9 @@
 }
 
 .ds-claw-empty-work-logo.ds-work-logo {
-  transform: translateZ(0) scale(1.2);
+  width: 64px;
+  height: 34px;
+  transform: translateZ(0);
 }
 
 .ds-work-logo::after {
@@ -360,7 +362,9 @@
 }
 
 .ds-runtime-wake-logo.ds-work-logo {
-  transform: translateZ(0) scale(1.35);
+  height: calc(var(--runtime-logo-width, 64px) * 0.52);
+  width: var(--runtime-logo-width, 64px);
+  transform: translateZ(0);
   z-index: 2;
 }
 

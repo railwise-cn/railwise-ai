@@ -1,0 +1,53 @@
+{
+  "icons": {
+    "workwise-light.png": {
+      "sha256": "296f9b511279f219f98e8855a6ded3bbfa623c7a699a7bdb59651b946f36f026",
+      "alphaBounds": [
+        0,
+        0,
+        1024,
+        1024
+      ]
+    },
+    "workwise-dark.png": {
+      "sha256": "a7bdcb1ceb3920e95c9a84e3bdfaa13f49099b2e947709474ae6545eb218aa20",
+      "alphaBounds": [
+        0,
+        0,
+        1024,
+        1024
+      ]
+    }
+  },
+  "icoSizes": [
+    [
+      16,
+      16
+    ],
+    [
+      24,
+      24
+    ],
+    [
+      32,
+      32
+    ],
+    [
+      48,
+      48
+    ],
+    [
+      64,
+      64
+    ],
+    [
+      128,
+      128
+    ],
+    [
+      256,
+      256
+    ]
+  ],
+  "scope": "asset-only-not-packaged-GUI"
+}

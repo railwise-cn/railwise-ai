@@ -1,0 +1,18 @@
+{
+  "sourceHead": "ba3864917e128f7318b88895441b2b632291d564",
+  "runId": "35467214890",
+  "artifacts": [
+    {
+      "id": 10591831618,
+      "name": "private-updater-arm64-ba3864917e128f7318b88895441b2b632291d564",
+      "sha256": "77a7d5776633a6599d41bfdd70fb1e56adbd5224edc9bacb0ceefa0241f4c911",
+      "sizeBytes": 4383
+    },
+    {
+      "id": 10592096184,
+      "name": "private-updater-target-arm64-ba3864917e128f7318b88895441b2b632291d564",
+      "sha256": "3099ad36008fd4012ea19174bc7b7028a4430d32c42df06464c7ff90e7901dc7",
+      "sizeBytes": 588552809
+    }
+  ]
+}

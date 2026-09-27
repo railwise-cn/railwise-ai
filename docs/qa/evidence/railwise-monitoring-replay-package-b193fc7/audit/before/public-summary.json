@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "b193fc70d6363dc768e715087ca9c0d9975158c9",
+  "packageAsarSha256": "f50b2c373902aae90cdd60726ac0158925aa91e9babb2a12b51ed173f171119a",
+  "phase": "before",
+  "checkedAt": "2026-09-20T21:45:52.549743+00:00",
+  "fixtureOnly": true,
+  "productionKpi": false,
+  "status": "failed",
+  "projects": [],
+  "guiRestartVerifiedByScript": false,
+  "selectedRecordedReplayCounts": {
+    "passed": 7,
+    "failed": 1,
+    "not-evaluated": 1,
+    "not-applicable": 0,
+    "incomplete": 0
+  },
+  "originalFilesAndClosedStateUnchanged": true,
+  "limitations": [
+    "Selected synthetic fixtures only; not a source authenticity, professional approval or production KPI claim.",
+    "GUI operations and actual restart are separate operator evidence; script checks records observed after those actions.",
+    "Full normalized originals and complete arithmetic results checked; workbook values, document metadata and SVG geometry checked, not pixel rendering.",
+    "Original database is only byte-copied after process/handle guards; SQLite opens only private copies. No full database appears in this public summary."
+  ]
+}

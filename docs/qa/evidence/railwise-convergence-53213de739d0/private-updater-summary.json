@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "workflowRunId": 35498678787,
+  "status": "passed",
+  "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+  "baseVersion": "0.0.0",
+  "targetVersion": "0.5.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "productionTouched": false,
+  "publicFeedUploaded": false,
+  "privateTransport": "certificate-pinned loopback HTTPS manifest and ZIP; Squirrel uses electron-updater internal localhost HTTP",
+  "baselinePurpose": "same-source isolated updater probe; not a historical-data migration",
+  "systemTrustModified": false,
+  "updatedAt": "2026-09-20T08:29:13.902Z",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head53213de739d0",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperStatus": "assessments enabled",
+  "gatekeeperStatusExitCode": 0,
+  "baseDmgSha256": "c6c14b2791f26c9a748b46f66330d68098d81f29afac21a6fcf7df015ecb9570",
+  "targetZipSha256": "08b10e861ae15cac22a1e2bf724ff1a435f4cb17633bf8ebc7aac9196d134db7",
+  "targetAsarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+  "installedAsarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+  "userDataSentinelPreserved": true,
+  "feedRequests": {
+    "manifest": 1,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 300738727
+  },
+  "manifestSha256": "aad689c7d033c25186e3cc5c2472044b228ddaab52f48642f365040bae0d7c00",
+  "native": {
+    "status": "passed",
+    "startedAt": "2026-09-20T08:28:29.802Z",
+    "completedAt": "2026-09-20T08:29:06.192Z",
+    "browserOpened": false,
+    "userDataPreserved": true,
+    "isolatedTestChannel": "frontier",
+    "feedUrl": "<omitted-private-loopback-feed>",
+    "stages": [
+      {
+        "name": "base_started",
+        "at": "2026-09-20T08:28:29.802Z"
+      },
+      {
+        "name": "update_available",
+        "at": "2026-09-20T08:28:30.497Z"
+      },
+      {
+        "name": "download_completed",
+        "at": "2026-09-20T08:28:35.563Z"
+      },
+      {
+        "name": "install_requested",
+        "at": "2026-09-20T08:28:35.571Z"
+      },
+      {
+        "name": "target_relaunched",
+        "at": "2026-09-20T08:29:06.191Z"
+      },
+      {
+        "name": "user_data_preserved",
+        "at": "2026-09-20T08:29:06.192Z"
+      }
+    ]
+  },
+  "sourceReports": {
+    "updaterSha256": "86c4a25ddf50c5621466e1fb281b5fb4dd34bab8507858d72163e9dc0932c72d",
+    "nativeSha256": "1d71001f85355a0013cb468d08a856c4ac952ff2ad4513ddf1ac0fdf6a61f3d2"
+  },
+  "limitations": [
+    "Same-source 0.0.0 updater probe, not historical user-data migration.",
+    "No public channel promotion.",
+    "Cloud Gatekeeper enabled; local pre-existing Gatekeeper disabled."
+  ]
+}

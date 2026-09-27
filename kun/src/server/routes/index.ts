@@ -1,4 +1,13 @@
+import { registerSurveyQualityAssessmentRoutes } from './survey-quality-assessment.js'
+import { registerSurveyStandardBasisRoutes } from './survey-standard-basis.js'
+import { registerSurveyQualityScoringWorkspaceRoutes } from './survey-quality-scoring-workspace.js'
 import { Router } from '../router.js'
+import { getStatisticalDiagnostics } from './survey-statistics.js'
+import * as freeLevelingRoutes from './survey-free-leveling.js'
+import { registerSurveyAdvancedTrialsWorkspaceRoutes } from './survey-advanced-trials-workspace.js'
+import { registerSurveySamplingWorkspaceRoutes } from './survey-sampling-workspace.js'
+import { registerSurveyQualityWorkspaceRoutes } from './survey-quality-workspace.js'
+import { registerSurveyQualityWorkflowRoutes } from './survey-quality-workflow.js'
 import { healthJsonResponse } from './health.js'
 import {
   buildWorkspaceStatusResponse,
@@ -95,6 +104,25 @@ import * as engineeringAiRoutes from './engineering-ai.js'
  */
 export function buildRouter(runtime: ServerRuntime): Router {
   const router = new Router()
+  registerSurveyQualityWorkflowRoutes(router, { getService: () => runtime.surveyQualityWorkflowService, authorize: request => authorize(request, runtime) })
+  registerSurveyStandardBasisRoutes(router, { authorize: request => authorize(request, runtime) })
+  registerSurveyQualityAssessmentRoutes(router, { getService: () => runtime.surveyQualityAssessmentService, authorize: request => authorize(request, runtime) })
+  registerSurveyQualityWorkspaceRoutes(router, {
+    getService: () => runtime.surveyQualityWorkspaceService,
+    authorize: (request) => authorize(request, runtime)
+  })
+  registerSurveyQualityScoringWorkspaceRoutes(router, {
+    getService: () => runtime.surveyQualityScoringWorkspaceService,
+    authorize: (request) => authorize(request, runtime)
+  })
+  registerSurveyAdvancedTrialsWorkspaceRoutes(router, {
+    getService: () => runtime.surveyAdvancedTrialsWorkspaceService,
+    authorize: (request) => authorize(request, runtime)
+  })
+  registerSurveySamplingWorkspaceRoutes(router, {
+    getService: () => runtime.surveySamplingWorkspaceService,
+    authorize: (request) => authorize(request, runtime)
+  })
   router.add('GET', '/health', () => healthJsonResponse())
   router.add('GET', '/v1/runtime/info', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
@@ -114,6 +142,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/engineering/analyses', async (request) => authorize(request, runtime) ? engineeringRoutes.createAnalysis(runtime.engineeringService, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/charts', async (request) => authorize(request, runtime) ? engineeringRoutes.createChart(runtime.engineeringService, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/reports/preview', async (request) => authorize(request, runtime) ? engineeringRoutes.previewReport(runtime.engineeringService, request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/engineering/projects/:id/manifests/:manifestId/verify', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.verifyDeliverable(runtime.engineeringService, ctx.params.id, ctx.params.manifestId) : ERRORS.unauthorized())
+  router.add('POST', '/v1/engineering/projects/:id/manifests/:manifestId/monitoring-replay', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.replayMonitoringDeliverable(runtime.engineeringService, request, ctx.params.id, ctx.params.manifestId) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/deliverables/finalize', async (request) => authorize(request, runtime) ? engineeringRoutes.finalizeDeliverable(runtime.engineeringService, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/runs/:id', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.getRun(runtime.engineeringService, ctx.params.id) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/runs/:id/cancel', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.cancelRun(runtime.engineeringService, ctx.params.id, request) : ERRORS.unauthorized())
@@ -123,6 +153,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/engineering/ai/watch-drafts', async (request) => authorize(request, runtime) ? engineeringAiRoutes.createWatchDraft(runtime, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/ai/plans', async (request) => authorize(request, runtime) ? engineeringAiRoutes.createPlan(runtime, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/ai/plans', async (request) => authorize(request, runtime) ? engineeringAiRoutes.latestPlan(runtime, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/engineering/ai/project-suggestions', async (request) => authorize(request, runtime) ? engineeringAiRoutes.projectSuggestions(runtime, request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/engineering/ai/project-suggestions/:id/decision', async (request, ctx) => authorize(request, runtime) ? engineeringAiRoutes.decideProjectChange(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/ai/plans/:id', async (request, ctx) => authorize(request, runtime) ? engineeringAiRoutes.getPlan(runtime, ctx.params.id) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/ai/plans/:id/validate', async (request, ctx) => authorize(request, runtime) ? engineeringAiRoutes.validatePlan(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/ai/plans/:id/approve', async (request, ctx) => authorize(request, runtime) ? engineeringAiRoutes.approvePlan(runtime, ctx.params.id, request) : ERRORS.unauthorized())
@@ -140,6 +172,10 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/engineering/adjustments', async (request) => authorize(request, runtime) ? engineeringRoutes.createAdjustment(runtime.surveyService, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/adjustments', async (request) => authorize(request, runtime) ? engineeringRoutes.listAdjustments(runtime.surveyService, new URL(request.url).searchParams.get('projectId') ?? undefined) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/adjustments/:id', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.getAdjustment(runtime.surveyService, ctx.params.id) : ERRORS.unauthorized())
+  router.add('GET', '/v1/engineering/projects/:projectId/adjustments/:id/statistical-diagnostics', async (request, ctx) => authorize(request, runtime) ? getStatisticalDiagnostics(runtime.surveyService, ctx.params.projectId, ctx.params.id, new URL(request.url).searchParams.get('download') === '1') : ERRORS.unauthorized())
+  router.add('POST', '/v1/engineering/projects/:projectId/networks/:networkId/free-leveling-trials', async (request, ctx) => authorize(request, runtime) ? freeLevelingRoutes.createFreeLevelingTrial(runtime.surveyService, request, ctx.params.projectId, ctx.params.networkId) : ERRORS.unauthorized())
+  router.add('GET', '/v1/engineering/projects/:projectId/networks/:networkId/free-leveling-trials', async (request, ctx) => authorize(request, runtime) ? freeLevelingRoutes.listFreeLevelingTrials(runtime.surveyService, request, ctx.params.projectId, ctx.params.networkId) : ERRORS.unauthorized())
+  router.add('GET', '/v1/engineering/projects/:projectId/networks/:networkId/free-leveling-trials/:trialId', async (request, ctx) => authorize(request, runtime) ? freeLevelingRoutes.getFreeLevelingTrial(runtime.surveyService, request, ctx.params.projectId, ctx.params.networkId, ctx.params.trialId) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/adjustments/:id/cancel', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.cancelAdjustment(runtime.surveyService, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/adjustments/:id/resume', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.resumeAdjustment(runtime.surveyService, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/adjustments/:id/preview', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.previewAdjustment(runtime.surveyService, ctx.params.id) : ERRORS.unauthorized())

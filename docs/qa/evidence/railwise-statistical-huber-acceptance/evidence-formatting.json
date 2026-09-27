@@ -1,0 +1,20 @@
+[
+  {
+    "file": "docs/qa/evidence/railwise-convergence-7d8e92b461b6/damaged-history.ax.txt",
+    "originalSha256": "ea70f4cb9e6e8d746eecdd1864ff7b3f35847e70cc64e872f98299019250ed29",
+    "normalizedSha256": "f75cb88aadf95da0ab97e35d08a03eb3c10144a22790f1ba0f0b5d4dfedc0bb3",
+    "change": "presentation-only trailing whitespace/blank EOF removal; no values changed"
+  },
+  {
+    "file": "docs/qa/evidence/railwise-reference-datum-20260920/survey-reference-datum-tests.txt",
+    "originalSha256": "9383a079d7c21ad037659e53ebff0fe4007bdbecfa239bba8a74c766456beab6",
+    "normalizedSha256": "369618e41fc1ae29c86d087138845a635b2c1f261bc7b2df97f7b677629bbd7c",
+    "change": "presentation-only trailing whitespace/blank EOF removal; no values changed"
+  },
+  {
+    "file": "docs/qa/evidence/railwise-statistical-family-20260920/survey-statistical-family-tests.txt",
+    "originalSha256": "8a5915776e45b6998e3331c8a87b6b649f02e81769e27a811fe9f09fd40fbb9c",
+    "normalizedSha256": "08f7034e08842d1416889e6509b7dc72fb297b9d9f5462b9143753611b0c5515",
+    "change": "presentation-only trailing whitespace/blank EOF removal; no values changed"
+  }
+]

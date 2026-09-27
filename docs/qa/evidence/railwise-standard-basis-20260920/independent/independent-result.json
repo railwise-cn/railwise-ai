@@ -1,0 +1,82 @@
+{
+  "gitHead": "be0d7ac47550d4d178674f63ce4406ee7c614e66",
+  "productFileHashes": {
+    "kun/src/engineering/survey-standard-basis.ts": "14a91412cc7cd68727d8dd0681b39ea94b395a0c3c6c0a4729d6f39794d9a1dc",
+    "kun/src/contracts/survey-standard-basis.ts": "727e9f2ef29f0bf41f28863404cdbf9be71f8b3fe952a24b9a32f721d23b2cf0",
+    "kun/src/server/routes/survey-standard-basis.ts": "e03ef0f0166d5f7f3f4c98f83c03699f6acd3b84106a69402bf343e60da25c01",
+    "src/main/ipc/app-ipc-schemas.ts": "e032a42210b5ec363837fa79925304a28ea25683bb13c5e22272eba540797a41",
+    "src/renderer/src/agent/survey-standard-basis-client.ts": "926f21efbb967a23505d8dd33693e1215538aa4082e3c7663947409d91f6f397",
+    "src/renderer/src/components/engineering/SurveyStandardBasis.tsx": "3b6e5edcc478ab62d3346446a4aedc7e7af0cc9a176de67b91b5586e5f919cc0"
+  },
+  "contract": {
+    "actualRuntimeIpcDesktopRoundTrips": 16,
+    "actualReadonlyCalls": 32,
+    "rejectedIdentityFields": [
+      [
+        "standardCode",
+        409
+      ],
+      [
+        "standardVersion",
+        409
+      ],
+      [
+        "ruleId",
+        404
+      ],
+      [
+        "ruleVersion",
+        404
+      ],
+      [
+        "sourceSha256",
+        409
+      ],
+      [
+        "algorithmVersion",
+        409
+      ],
+      [
+        "profileId",
+        409
+      ],
+      [
+        "profileVersion",
+        409
+      ]
+    ],
+    "retainedSourcesAndPagesChecked": true,
+    "historicalScoreBytesUnchanged": true,
+    "finding": {
+      "code": "unit-formula-6-clause-missing",
+      "present": false,
+      "clauses": [
+        "6.2.1.2",
+        "6.2.2",
+        "6.2.3",
+        "6.2.4.4",
+        "6.2.4.5",
+        "6.2.5"
+      ],
+      "sourceEvidence": "Retained official PDF pages 10/11, printed 7/8: 6.2.4.5 contains formula (6); 6.2.5 contains grade table 3."
+    }
+  },
+  "dom": {
+    "domChecks": [
+      "lazy-open",
+      "actual-runtime-catalog-and-detail",
+      "official-pdf-page",
+      "offline-clears-basis",
+      "close-and-changed-context-discard-late-response",
+      "unsupported-version-no-links",
+      "missing-identity-no-links"
+    ],
+    "totalRequests": 8,
+    "errors": []
+  },
+  "limitations": [
+    "An in-process real Router and schema replace network transport, not the production catalog/client/component.",
+    "No packaged Electron, browser PDF download, renderer pixel or real professional acceptance test.",
+    "Probe identities and samples are synthetic. No project database or user credentials were read."
+  ]
+}

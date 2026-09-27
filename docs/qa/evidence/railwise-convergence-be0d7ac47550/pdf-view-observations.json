@@ -1,0 +1,19 @@
+{
+  "reviewer": "archive agent visually inspected original screenshots; no browser actions performed",
+  "observations": [
+    {
+      "sourceFile": "evidence/04-standard-pdf60.png",
+      "sourceSha256": "f9359c2875dd82482f7edfa7690556a09634e02009630f06afe54d009be3f0f4",
+      "pdfPage": 60,
+      "observation": "Official URL has #page=60; PDF viewer counter reads 60 / 129 at 76%; visible page header is GB/T 24356-2023 and Table 42 continued. The bottom 7.5.1 introduction is outside this screenshot.",
+      "originalImageRetainedLocally": true
+    },
+    {
+      "sourceFile": "evidence/05-standard-pdf8.png",
+      "sourceSha256": "12458f3aa4edcfe66874eac900d56a6c83737f60ea56c96472f1444486921644",
+      "pdfPage": 8,
+      "observation": "Official URL has #page=8; PDF viewer counter reads 8 / 129 at 76%; visible text includes section 5, 5.1, 5.2.1 and Table 1 heading. A browser help bubble overlays the upper page.",
+      "originalImageRetainedLocally": true
+    }
+  ]
+}

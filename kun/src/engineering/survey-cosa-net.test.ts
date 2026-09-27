@@ -69,4 +69,25 @@ describe('COSA .NET reader', () => {
     expect(encoded).toMatchObject({ state: 'blocked', triangles: [] })
     expect(encoded.diagnostics[0]).toMatchObject({ code: 'invalid-encoding', severity: 'blocking', recoverable: true, recordAnchor: expect.objectContaining({ byteOffset: 2, rawSnippet: expect.stringMatching(/^hex:/) }) })
   })
+
+  it('bounds line length, records, bytes and coordinate dimensions before building topology', () => {
+    const points = coordinates({ A: [0, 0], B: [5, 0], C: [0, 3] })
+    expect(parseCosaNet('A,B,C'.padEnd(16_384), points).state).toBe('valid')
+    expect(parseCosaNet('A,B,C\r\n'.repeat(10_000), points).triangles).toHaveLength(10_000)
+    const oversizedPoints = new Map(Array.from({ length: 10_001 }, (_, i) => [`P${i}`, { x: i, y: 0 }]))
+    for (const [source, map] of [
+      ['A,B,C'.padEnd(16_385), points],
+      ['A,B,C\r\n'.repeat(10_001), points],
+      ['A,B,C\n'.repeat(10_000) + 'A,B,C', points],
+      [' '.repeat(8 * 1024 * 1024 + 1), points],
+      [new Uint8Array(8 * 1024 * 1024 + 1), points],
+      ['A,B,C', oversizedPoints]
+    ] as const) {
+      const result = parseCosaNet(source, map)
+      expect(result).toMatchObject({ state: 'blocked', triangles: [] })
+      expect(result.diagnostics).toHaveLength(1)
+      expect(result.diagnostics[0]).toMatchObject({ code: 'resource-limit', severity: 'blocking' })
+      expect(result.records).toHaveLength(1)
+    }
+  })
 })

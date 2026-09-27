@@ -1,0 +1,81 @@
+{
+  "core-tests-final.json": {
+    "numTotalTests": 33,
+    "numPassedTests": 33,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "route-tests.json": {
+    "numTotalTests": 20,
+    "numPassedTests": 20,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "ui/final-tests.json": {
+    "numTotalTests": 28,
+    "numPassedTests": 28,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "portable/independent-runtime.json": {
+    "numTotalTests": 25,
+    "numPassedTests": 25,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "portable/independent-ui.json": {
+    "numTotalTests": 10,
+    "numPassedTests": 10,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "frozenKernelHashes": [
+    {
+      "path": "kun/src/contracts/survey-quality-scoring.ts",
+      "sha256": "a3ead74694e1af66eb1d3a43af94e8268c499fdeef81d73191b83de6be0b0043",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/engineering/survey-quality-scoring.ts",
+      "sha256": "c46a2816317763f7e260fe4daf77e49465bde1b96abc97c9b403376f5e63ed28",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/engineering/survey-quality-scoring-exact.ts",
+      "sha256": "34ca3e3666991e882b1f0d7b15179bc6e39a89526aa13a5074daa7fef1824ac5",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/engineering/survey-quality-scoring-rules.ts",
+      "sha256": "ad8af92ab1a3f90d6afece29d9ff1ec027f5b83d97b52caf0444420dab048924",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/contracts/survey-quality-sampling.ts",
+      "sha256": "e1a73a39aca723ad850862ca85129d2488c48dfe8b821ada4e87b8dca12b9c71",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/engineering/survey-quality-sampling.ts",
+      "sha256": "06d3472f43f9c4c859b86f5f409708482bc1809036017c8319b2eb11b689674a",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/contracts/survey-static-incremental.ts",
+      "sha256": "2510cd1f7a4772f0cf13583a569d7db6d7de71d2028ed66a1c18fe119175b9c5",
+      "matches8f81d8a": true
+    },
+    {
+      "path": "kun/src/engineering/survey-static-incremental.ts",
+      "sha256": "8a1bc11068eaeb8a95b88ab95d481e1ac22543e7c7b792e9e2c88f5c86c84919",
+      "matches8f81d8a": true
+    }
+  ],
+  "limitations": [
+    "Synthetic source data; no authenticated field inspection or professional signoff",
+    "Happy-dom and native-save mock are not packaged visual/native acceptance",
+    "Two-pass optimistic snapshot is not cross-database ACID or independent custody",
+    "Independent change excluded from current final candidate"
+  ],
+  "portableReplayDirectory": "/private/tmp/railwise-assessment-replay-7XzFWf"
+}

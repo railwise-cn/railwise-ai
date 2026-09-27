@@ -1,3 +1,6 @@
+import { SurveyQualityAssessmentService } from '../engineering/survey-quality-assessment.js'
+import { SurveyEvidenceReader } from '../engineering/survey-evidence-reader.js'
+import { SurveyQualityScoringWorkspaceService } from '../engineering/survey-quality-scoring-workspace.js'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { buildRouter } from './routes/index.js'
@@ -10,6 +13,7 @@ import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
 import { FileSessionStore, FileThreadStore } from '../adapters/file/index.js'
 import { HybridSessionStore, HybridThreadStore } from '../adapters/hybrid/index.js'
 import { DeepseekCompatModelClient } from '../adapters/model/deepseek-compat-model-client.js'
+import { ProviderRoutingModelClient, unavailableModelProvider, type ModelProviderRoutes } from '../adapters/model/provider-routing-model-client.js'
 import { CapabilityRegistry } from '../adapters/tool/capability-registry.js'
 import { buildGoalLocalTools } from '../adapters/tool/goal-tools.js'
 import { buildTodoLocalTools } from '../adapters/tool/todo-tools.js'
@@ -90,6 +94,10 @@ import { buildEngineeringConversationTools } from '../adapters/tool/engineering-
 import { EngineeringAiRepository } from '../engineering/engineering-ai-repository.js'
 import { buildRailwiseToolProviders } from '../adapters/tool/railwise-tool-provider.js'
 import { SurveyService } from '../engineering/survey-service.js'
+import { SurveyAdvancedTrialsWorkspaceService } from '../engineering/survey-advanced-trials-workspace.js'
+import { SurveySamplingWorkspaceService } from '../engineering/survey-sampling-workspace.js'
+import { SurveyQualityWorkspaceService } from '../engineering/survey-quality-workspace.js'
+import { SurveyQualityWorkflowService } from '../engineering/survey-quality-workflow.js'
 
 export type KunServeRuntimeOptions = {
   host: string
@@ -101,6 +109,8 @@ export type KunServeRuntimeOptions = {
   baseUrl: string
   endpointFormat?: ModelEndpointFormat
   model: string
+  modelProviders?: ModelProviderRoutes
+  defaultModelProviderId?: string
   approvalPolicy: ApprovalPolicy
   sandboxMode: SandboxMode
   tokenEconomyMode: boolean
@@ -127,6 +137,8 @@ export type KunServeHandle = NodeHttpServerHandle & {
 export async function createKunServeRuntime(
   options: KunServeRuntimeOptions
 ): Promise<ServerRuntime> {
+  // Provider credentials are parsed at startup and must not reach tool subprocesses.
+  delete process.env.WORKWISE_MODEL_PROVIDERS_SECRET
   await mkdir(options.dataDir, { recursive: true })
   const eventBus = new InMemoryEventBus()
   const stores = await createPersistentStores({
@@ -160,7 +172,8 @@ export async function createKunServeRuntime(
     threadStore,
     sessionStore,
     nowIso,
-    spans: spanService
+    spans: spanService,
+    completionGuard: input => engineeringAi.assessCompletion(input)
   })
   const recoveredTasks = taskController.reconcileStartup()
   taskRepository.reconcileShellSessionsStartup(nowIso())
@@ -251,18 +264,26 @@ export async function createKunServeRuntime(
     ids,
     nowIso,
     tasks: taskController,
+    resolveModelSelection: (request, thread) => {
+      const providerId = request.providerId ?? options.defaultModelProviderId
+      if (!providerId) return { model: request.model }
+      const provider = options.modelProviders?.find(route => route.id === providerId)
+      if (!provider) throw unavailableModelProvider(providerId)
+      return { providerId, model: request.model ?? (thread.agentProfile?.model || thread.model || provider.model) }
+    },
     approvalGate,
     userInputGate,
     workspaceReferences: workspaceReferenceService
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
   await seedUsageCarryover({ threadStore, sessionStore, usageService })
-  const modelClient = new DeepseekCompatModelClient({
+  const defaultModelClient = new DeepseekCompatModelClient({
     baseUrl: options.baseUrl,
     apiKey: options.apiKey,
     endpointFormat: options.endpointFormat ?? DEFAULT_MODEL_ENDPOINT_FORMAT,
     model: options.model
   })
+  const modelClient = new ProviderRoutingModelClient(defaultModelClient, options.modelProviders ?? [])
   const modelProfiles = modelContextProfilesFromConfig({
     contextCompaction: options.contextCompaction,
     models: options.models
@@ -329,6 +350,10 @@ export async function createKunServeRuntime(
       const result = surveyService.getDeformationForProjectNewUse(projectId, id)
       return result ? [result] : []
     }),
+    getSurveyNetworkSnapshot: (projectId, networkId) => {
+      const network = surveyService.getNetwork(networkId)
+      return network?.projectId === projectId ? network : null
+    },
     getSurveySources: (projectId, networkIds) => networkIds.flatMap((id) => {
       const network = surveyService.getNetwork(id)
       return network?.projectId === projectId
@@ -354,6 +379,44 @@ export async function createKunServeRuntime(
     nowIso
   })
   const engineeringContext = new EngineeringContextService(engineeringService, nowIso, surveyService)
+  const surveyQualityWorkspaceService = new SurveyQualityWorkspaceService({
+    rootDir: join(options.dataDir, 'engineering'),
+    nowIso,
+    getProject: (projectId) => engineeringService.getProject(projectId),
+    getManifest: (projectId, manifestId) => engineeringService.getManifestForProject(projectId, manifestId)
+  })
+  const surveyQualityScoringWorkspaceService = new SurveyQualityScoringWorkspaceService({
+    rootDir: join(options.dataDir, 'engineering'), nowIso,
+    getProject: (projectId) => engineeringService.getProject(projectId)
+  })
+  const surveyQualityWorkflowService = new SurveyQualityWorkflowService({
+    rootDir: join(options.dataDir, 'engineering'), nowIso,
+    sources: Object.freeze({
+      getProject: (projectId: string) => engineeringService.getProject(projectId),
+      retentionSnapshot: (pid: string, plan: string, record: string) => surveyQualityWorkspaceService.getAssessmentSnapshot(pid, plan, record)
+    })
+  })
+  const surveyAdvancedTrialsWorkspaceService = new SurveyAdvancedTrialsWorkspaceService({
+    rootDir: join(options.dataDir, 'engineering'), nowIso,
+    getProject: (projectId) => engineeringService.getProject(projectId)
+  })
+  const surveySamplingWorkspaceService = new SurveySamplingWorkspaceService({
+    rootDir: join(options.dataDir, 'engineering'),
+    nowIso,
+    getProject: (projectId) => engineeringService.getProject(projectId)
+  })
+  const surveyQualityAssessmentService = new SurveyQualityAssessmentService({
+    rootDir: join(options.dataDir, 'engineering'), nowIso,
+    sources: Object.freeze({
+      getProject: (pid: string) => engineeringService.getProject(pid),
+      getManifest: (pid: string, id: string) => engineeringService.getManifestForProject(pid, id),
+      retentionSnapshot: (pid: string, plan: string, record: string) => surveyQualityWorkspaceService.getAssessmentSnapshot(pid, plan, record),
+      getPopulation: (pid: string, id: string) => surveySamplingWorkspaceService.getPopulation(pid, id),
+      getRun: (pid: string, id: string) => surveySamplingWorkspaceService.getRun(pid, id),
+      listSamples: (pid: string, id: string, limit: number, offset: number) => surveySamplingWorkspaceService.listSamples(pid, id, limit, offset),
+      getScore: (pid: string, id: string) => surveyQualityScoringWorkspaceService.getRecord(pid, id)
+    })
+  })
   const visionEvidenceRuntime = createVisionEvidenceService(options.visionEvidence)
   const visionEvidence = visionEvidenceRuntime.service
   const attachmentCleanupTimer = attachmentStore
@@ -419,7 +482,7 @@ export async function createKunServeRuntime(
     ...imageGenProviders.providers,
     ...pptMasterProviders.providers,
     ...designProviders.providers,
-    ...buildRailwiseToolProviders(engineeringService, surveyService)
+    ...buildRailwiseToolProviders(engineeringService, surveyService, () => engineeringAi)
   ]
   const childRegistry = new CapabilityRegistry(baseToolProviders)
   const childToolHost = new LocalToolHost({ registry: childRegistry, readTracker: true })
@@ -430,6 +493,10 @@ export async function createKunServeRuntime(
         events,
         nowIso,
         executor: createChildAgentExecutor({
+          parentSelection: async (threadId, turnId) => {
+            const parent = (await threadStore.get(threadId))?.turns.find(turn => turn.id === turnId)
+            return { model: parent?.model, providerId: parent?.providerId, reasoningEffort: parent?.reasoningEffort }
+          },
           model: modelClient,
           toolHost: childToolHost,
           prefix,
@@ -519,7 +586,11 @@ export async function createKunServeRuntime(
   let engineeringAi: EngineeringAiOrchestrator
   const toolHost = new LocalToolHost({ registry, readTracker: true })
   let loop: AgentLoop
-  registry.registerProvider(buildEngineeringConversationTools(threadStore, () => engineeringAi))
+  registry.registerProvider(buildEngineeringConversationTools(threadStore, () => engineeringAi, new SurveyEvidenceReader({
+    engineering: engineeringService, survey: surveyService, advanced: surveyAdvancedTrialsWorkspaceService,
+    scoring: surveyQualityScoringWorkspaceService, retention: surveyQualityWorkspaceService,
+    sampling: surveySamplingWorkspaceService, assessment: surveyQualityAssessmentService
+  })))
   loop = new AgentLoop({
     threadStore,
     sessionStore,
@@ -567,6 +638,7 @@ export async function createKunServeRuntime(
   })
   engineeringAi = new EngineeringAiOrchestrator({
     context: engineeringContext,
+    engineering: engineeringService,
     repository: engineeringAiRepository,
     threadStore,
     turns: turnService,
@@ -600,6 +672,12 @@ export async function createKunServeRuntime(
     engineeringContext,
     engineeringAi,
     surveyService,
+    surveyQualityAssessmentService,
+    surveyQualityWorkflowService,
+    surveyQualityWorkspaceService,
+    surveyQualityScoringWorkspaceService,
+    surveyAdvancedTrialsWorkspaceService,
+    surveySamplingWorkspaceService,
     runTurn(threadId, turnId) {
       return loop.runTurn(threadId, turnId)
     },
@@ -669,6 +747,12 @@ export async function createKunServeRuntime(
           await surveyService.flush()
           await engineeringService.flush()
           surveyService.close()
+          surveyQualityAssessmentService.close()
+          surveyQualityWorkflowService.close()
+          surveyQualityWorkspaceService.close()
+          surveyQualityScoringWorkspaceService.close()
+          surveyAdvancedTrialsWorkspaceService.close()
+          surveySamplingWorkspaceService.close()
           engineeringService.close()
         } finally {
           await stores.shutdown?.()
@@ -678,7 +762,7 @@ export async function createKunServeRuntime(
   }
   if (recoveredTasks.length > 0) {
     setImmediate(() => {
-      void resumeRecoveredTasks({ recoveredTasks, taskRepository, turnService, loop })
+      void resumeRecoveredTasks({ recoveredTasks, taskRepository, turnService, loop, engineeringAi, threadStore })
     })
   }
   if (delegationRuntime) {
@@ -710,6 +794,8 @@ async function resumeRecoveredTasks(input: {
   taskRepository: TaskRunRepository
   turnService: TurnService
   loop: AgentLoop
+  engineeringAi: EngineeringAiOrchestrator
+  threadStore: ThreadStore
 }): Promise<void> {
   for (const recovered of input.recoveredTasks) {
     if (recovered.parentTaskId) continue
@@ -722,8 +808,15 @@ async function resumeRecoveredTasks(input: {
         })
       }
       const checkpoint = input.taskRepository.latestCheckpoint(recovered.id)
+      const legacyPlan = !recovered.engineeringPlanId ? input.engineeringAi.planForTask(recovered.threadId, recovered.id) : null
+      if (legacyPlan) {
+        const thread = await input.threadStore.get(recovered.threadId)
+        if (thread?.domain !== 'engineering' || legacyPlan.projectId !== thread.projectId || legacyPlan.status !== 'started') throw new Error('engineering_plan_binding_missing')
+      }
       const started = await input.turnService.startTurn({
         threadId: recovered.threadId,
+        continuationTaskId: recovered.id,
+        engineeringPlanId: recovered.engineeringPlanId ?? legacyPlan?.id,
         request: {
           prompt: [
             'Continue the persisted task automatically after an application restart.',
@@ -733,6 +826,8 @@ async function resumeRecoveredTasks(input: {
           ].filter(Boolean).join('\n'),
           displayText: '正在自动恢复未完成任务',
           model: recovered.model,
+          providerId: recovered.providerId,
+          reasoningEffort: recovered.reasoningEffort,
           mode: 'agent'
         }
       })

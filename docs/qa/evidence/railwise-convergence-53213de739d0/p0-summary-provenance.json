@@ -1,0 +1,35 @@
+{
+  "sourceLabel": "interface-agent-reviewed-public-summary",
+  "phases": [
+    {
+      "file": "p0-before-public-summary.json",
+      "sha256": "8255c256681a899f53701bde6b2b66706418ed325ebc10055ce0f1aa07f8e978",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "p0-afterrestart-public-summary.json",
+      "sha256": "b7c81f190e1d8e64ac44b6b0e5308e5e85d8f1203f8a1c9c22a0e5ff24aadc11",
+      "originalBytesPreserved": true
+    }
+  ],
+  "contains": "opaque identifiers, hashes, counts and bounded numerical comparison summaries only",
+  "originalAuditScriptSha256": "1e5f02f7e3cd3647459f2605298fb1a52c46ca3b2901ae17f19f0e0bd9299894",
+  "excluded": [
+    "private records",
+    "private source paths",
+    "point names and coordinates",
+    "full snapshot provenance",
+    "real-data screenshots and files"
+  ],
+  "restartPhase": "selected-record-and-file-comparison-passed",
+  "comparison": {
+    "unchangedIdentityCount": 8,
+    "unchangedOutputCount": 6,
+    "eachNetworkStarted": 2,
+    "eachNetworkFinished": 2,
+    "eachNetworkIncomplete": 0,
+    "eachNetworkPassed": 2,
+    "draftStatusPreserved": true
+  },
+  "guiObservation": "Parent agent observed normal exit, process absence, same-bundle restart and five checks passed for GSI at 17:23:42 and IN2 at 17:24:20 Asia/Shanghai on 2026-09-20; private AX retained locally, not published. The audit script itself does not certify GUI or restart."
+}

@@ -6,8 +6,24 @@ import { createFileReferenceHref } from '../../lib/file-references'
 import { clearFileReferenceValidationCache } from '../../lib/file-reference-validation'
 import { shouldAnimateStreamingText } from './StreamdownAssistant'
 import { StreamdownAssistant } from './StreamdownAssistant'
+import i18n from '../../i18n'
 
 describe('shouldAnimateStreamingText', () => {
+  it.each(['zh', 'en'])('renders table control titles in %s using the library translation API', async language => {
+    const previousLanguage = i18n.language
+    try {
+      await i18n.changeLanguage(language)
+      const html = renderToStaticMarkup(createElement(StreamdownAssistant, { text: '| Point | Height |\n| --- | --- |\n| BM1 | 10.00 |', streaming: false }))
+      for (const key of ['markdownCopyTable', 'markdownDownloadTable', 'markdownViewFullscreen']) {
+        expect(html).toContain(`title="${i18n.t(`common:${key}`)}"`)
+      }
+      if (language === 'zh') {
+        expect(html).not.toContain('title="Copy table"')
+        expect(html).not.toContain('title="Download table"')
+        expect(html).not.toContain('title="View fullscreen"')
+      }
+    } finally { await i18n.changeLanguage(previousLanguage) }
+  })
   it('keeps the lightweight reveal for short single-line text', () => {
     expect(shouldAnimateStreamingText('正在检查配置。')).toBe(true)
     expect(shouldAnimateStreamingText('Checking the CSS variables.')).toBe(true)

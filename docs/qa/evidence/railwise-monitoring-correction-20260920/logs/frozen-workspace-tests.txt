@@ -1,0 +1,9 @@
+
+ RUN  v4.1.7 <REPOSITORY>
+
+No test files found, exiting with code 1
+
+filter: src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.tsx
+include: src/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+

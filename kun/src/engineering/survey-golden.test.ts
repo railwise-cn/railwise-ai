@@ -259,7 +259,7 @@ describe('survey adjustment golden fixtures', () => {
     expect(output.result.validation).toBe('valid')
     expect(output.result.strategyId).toBe('traverse')
     expect(output.result.observationCount).toBe(3)
-    expect(output.result.algorithmVersion).toBe('workwise-survey-adjustment-6')
+    expect(output.result.algorithmVersion).toBe('workwise-survey-adjustment-7')
     expect(output.result.redundancy).toBe(1)
     expect(output.result.points.find((point) => point.id === 'P')).toMatchObject({ id: 'P' })
     expect(output.result.points.find((point) => point.id === 'P')?.x).toBeCloseTo(0, 6)

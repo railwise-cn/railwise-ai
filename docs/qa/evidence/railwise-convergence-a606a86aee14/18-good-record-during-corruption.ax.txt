@@ -1,0 +1,115 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 136-158
+~							134 标题 Restored independent trial record, Value: 4
+~								135 文本 Restored independent trial record
++							136 container
++								137 text advanced_trial_47f90b25-0429-4c00-a7d1-f83f7cb98a9f  ·  2026-09-20T00:38:03.475Z
++							138 文本 Saved bytes and hashes have been checked against the Runtime’s strictly replayed result. This establishes local record consistency only, not input authenticity or model assumptions.
++							139 按钮 Reverify and replay
++							140 按钮 Reverify and export JSON
++							141 标题 Model basis statement, Value: 5
++								142 文本 Model basis statement
++							143 文本 合成软件数学验收，仅验证固定尺度 Huber 数值、原文保存和恢复。观测 [0,0,0,10]，单位 m，独立固定尺度1、k=1；无真实工程或来源真实性声明。
++							144 container Huber trial results
++								145 标题 Huber trial results, Value: 4
++									146 文本 Huber trial results
++								147 container
++									148 text Declared stopping conditions met  ·  Score, prediction step and objective change satisfy the stopping policy
++								149 文本 Scale and independence are unverified. Multipliers and derived IRLS weights are trial values only. No covariance, Gaussian WLS precision, observation removal or engineering approval is provided.
++								150 文本 Strict-inlier rank satisfies a numerical sufficient condition; uniqueness is not certified.
++								151 文本 Fixed scale 1 m · Huber k 1
++								152 文本 Synthetic fixed external scale for acceptance arithmetic only.
++								153 文本 Maximum 200 iterations · score tolerance 1e-10 · prediction-step tolerance 1e-10 · objective-change tolerance 1e-10
++								154 container Estimated parameters and declared units
++									155 表格 Estimated parameters and declared units
++										156 文本 Estimated parameters and declared units
++										157 row
++											158 行标题
++												159 文本 position (m)
++											160 单元格
++												161 文本 0.333333333333
++								162 container Iteration trace
++									163 开合三角标记 Iteration 0 · objective 9.5 · score 0.5
++										164 文本 Iteration 0 · objective 9.5 · score 0.5
++									165 开合三角标记 Iteration 1 · objective 9.33350676379 · score 0.0161290322581
++										166 文本 Iteration 1 · objective 9.33350676379 · score 0.0161290322581
++									167 开合三角标记 Iteration 2 · objective 9.33333352562 · score 0.000537056928034
++										168 文本 Iteration 2 · objective 9.33333352562 · score 0.000537056928034
++									169 开合三角标记 Iteration 3 · objective 9.33333333355 · score 0.0000179012566681
++										170 文本 Iteration 3 · objective 9.33333333355 · score 0.0000179012566681
++									171 开合三角标记 Iteration 4 · objective 9.33333333333 · score 5.9670784347e-7
++										172 文本 Iteration 4 · objective 9.33333333333 · score 5.9670784347e-7
++									173 开合三角标记 Iteration 5 · objective 9.33333333333 · score 1.98902604387e-8
++										174 文本 Iteration 5 · objective 9.33333333333 · score 1.98902604387e-8
++									175 开合三角标记 Iteration 6 · objective 9.33333333333 · score 6.63008925539e-10
++										176 文本 Iteration 6 · objective 9.33333333333 · score 6.63008925539e-10
++									177 开合三角标记 Iteration 7 · objective 9.33333333333 · score 2.20999329947e-11
++										178 文本 Iteration 7 · objective 9.33333333333 · score 2.20999329947e-11
++									179 container
++										180 开合三角标记 Iteration 8 · objective 9.33333333333 · score 7.36743999141e-13
++											181 文本 Iteration 8 · objective 9.33333333333 · score 7.36743999141e-13
++										182 文本 Score roundoff estimate 7.10542735759e-14 · prediction step 1.42421074933e-11 · relative objective change 1.90323947079e-16
++										183 container Read-only Huber observation values
++											184 表格
++												185 row
++													186 列标题
++														187 文本 Observation ID
++													188 列标题
++														189 text Observed minus fitted  (m)
++													190 列标题
++														191 文本 Standardized residual
++													192 列标题
++														193 文本 Trial multiplier
++													194 列标题
++														195 text Derived IRLS weight  (m⁻²)
++												196 row
++													197 行标题
++														198 文本 o0
++													199 单元格
++														200 文本 -0.333333333333
++													201 单元格
++														202 文本 -0.333333333333
++													203 单元格
++														204 文本 1
++													205 单元格
++														206 文本 1
++												207 row
++													208 行标题
++														209 文本 o1
++													210 单元格
++														211 文本 -0.333333333333
++													212 单元格
++														213 文本 -0.333333333333
++													214 单元格
++														215 文本 1
++													216 单元格
++														217 文本 1
++												218 row
++													219 行标题
++														220 文本 o2
++													221 单元格
++														222 文本 -0.333333333333
++													223 单元格
++														224 文本 -0.333333333333
++													225 单元格
++														226 文本 1
++													227 单元格
++														228 文本 1
++												229 row
++													230 行标题
++														231 文本 o3
++													232 单元格
++														233 文本 9.66666666667
++													234 单元格
++														235 文本 9.66666666667
++													236 单元格
++														237 文本 0.103448275862
++													238 单元格
++														239 文本 0.103448275862
++							240 开合三角标记 Original JSON declaration
++								241 文本 Original JSON declaration
++							242 开合三角标记 Normalized model used for computation
++								243 文本 Normalized model used for computation
++							244 开合三角标记 Complete result and provenance hashes
++								245 文本 Complete result and provenance hashes
+The focused UI element is 123 标题 Advanced model trials, Value: 3

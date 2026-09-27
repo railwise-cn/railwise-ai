@@ -3,6 +3,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync
@@ -74,6 +75,8 @@ function createCandidatePackagingRepo(): { repo: string; sourceHead: string } {
   const repo = join(fixtureRoot, 'repo')
   mkdirSync(join(repo, 'kun'), { recursive: true })
   mkdirSync(join(repo, 'scripts'), { recursive: true })
+  mkdirSync(join(repo, 'src', 'shared'), { recursive: true })
+  copyFileSync(join(process.cwd(), 'src/shared/product-brand.json'), join(repo, 'src/shared/product-brand.json'))
   mkdirSync(join(repo, 'src', 'asset', 'agent-packs', 'metro-monitoring-agent-pack'), { recursive: true })
   copyFileSync(join(process.cwd(), 'electron-builder.cjs'), join(repo, 'electron-builder.cjs'))
   copyFileSync(join(process.cwd(), 'kun', 'package-lock.json'), join(repo, 'kun', 'package-lock.json'))
@@ -371,10 +374,10 @@ describe('electron-builder WorkWise packaging', () => {
       updateChannel: 'frontier'
     })
     expect(config.appId).toBe(`com.wangjiawei508.workwise.candidate.head${shortHead}`)
-    expect(config.productName).toBe(`WorkWise Candidate ${shortHead}`)
+    expect(config.productName).toBe(`RailWise AI Candidate ${shortHead}`)
     expect(config.artifactName).toContain(`WorkWise-Candidate-${shortHead}-`)
-    expect(config.nsis.shortcutName).toBe(`WorkWise Candidate ${shortHead}`)
-    expect(config.nsis.uninstallDisplayName).toBe(`WorkWise Candidate ${shortHead}`)
+    expect(config.nsis.shortcutName).toBe(`RailWise AI Candidate ${shortHead}`)
+    expect(config.nsis.uninstallDisplayName).toBe(`RailWise AI Candidate ${shortHead}`)
     expect(config.publish).toEqual([
       { provider: 'generic', url: 'https://127.0.0.1/' }
     ])
@@ -451,10 +454,34 @@ describe('electron-builder WorkWise packaging', () => {
     expect(signedConfig.mac.signIgnore).toBeUndefined()
   })
 
+  it('uses absolute Electron entitlements paths and keeps the V8 runtime permissions', () => {
+    expect(builderConfig.mac.entitlements).toBe(join(process.cwd(), 'build/entitlements.mac.plist'))
+    expect(builderConfig.mac.entitlementsInherit)
+      .toBe(join(process.cwd(), 'build/entitlements.mac.inherit.plist'))
+
+    const entitlements = readFileSync(builderConfig.mac.entitlements, 'utf8')
+    expect(macNotarize._internals.missingRuntimeEntitlements(entitlements)).toEqual([])
+    expect(afterPack.MAC_ENTITLEMENTS_PATH).toBe(builderConfig.mac.entitlements)
+  })
+
+  it('rejects a signed runtime that lost any required Electron/V8 entitlement', () => {
+    const complete = `<?xml version="1.0"?><plist><dict>
+      <key>com.apple.security.cs.allow-jit</key><true/>
+      <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+      <key>com.apple.security.cs.disable-library-validation</key><true/>
+    </dict></plist>`
+    expect(macNotarize._internals.missingRuntimeEntitlements(complete)).toEqual([])
+
+    const missingJit = complete.replace('<key>com.apple.security.cs.allow-jit</key><true/>', '')
+    expect(macNotarize._internals.missingRuntimeEntitlements(missingJit)).toEqual([
+      'com.apple.security.cs.allow-jit'
+    ])
+  })
+
   it('checks timestamp candidates across nested macOS signed code', () => {
     const root = tempRoot()
-    const appBundle = join(root, 'WorkWise.app')
-    const mainExecutable = join(appBundle, 'Contents/MacOS/WorkWise')
+    const appBundle = join(root, 'RailWise AI.app')
+    const mainExecutable = join(appBundle, 'Contents/MacOS/RailWise AI')
     const framework = join(appBundle, 'Contents/Frameworks/Electron Framework.framework')
     const nativeAddon = join(
       appBundle,

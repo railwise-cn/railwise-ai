@@ -1,0 +1,41 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 188-191
++							204 container
++								205 开合三角标记 原始 JSON 声明
++									206 文本 原始 JSON 声明
++								207 text 原文摘要与模型摘要不同：前者保留空白和文本顺序，后者对应严格解析后的模型。VCE 编号会按合同去除首尾空白；请对照实际计算模型。 {
+  "schemaVersion": 1,
+  "familyId": "synthetic-complete-family",
+  "declaration": "caller-declared-before-observing-statistics",
+  "statisticPrecision": "caller-declared-exact-scalar-inputs-no-upstream-error-propagation",
+  "correction": "bonferroni",
+  "alpha": 0.05,
+  "members": [
+    {
+      "id": "a-normal",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "normal",
+        "tail": "two-sided",
+        "statisticBasis": "standardized-by-known-prior-scale",
+        
++							208 container
++								209 开合三角标记 实际计算的归一化模型
++									210 文本 实际计算的归一化模型
++								211 文本 {
+  "schemaVersion": 1,
+  "familyId": "synthetic-complete-family",
+  "declaration": "caller-declared-before-observing-statistics",
+  "statisticPrecision": "caller-declared-exact-scalar-inputs-no-upstream-error-propagation",
+  "correction": "bonferroni",
+  "alpha": 0.05,
+  "members": [
+    {
+      "id": "a-normal",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "normal",
+        "tail": "two-sided",
+        "statisticBasis": "standardized-by-known-prior-scale",
+        
+The focused UI element is 209 开合三角标记 实际计算的归一化模型

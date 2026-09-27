@@ -1,0 +1,37 @@
+{
+  "sourceHead": "df23e7d354c442f924ae3f2e984c314a5f65eca8",
+  "version": "0.5.0",
+  "dmgSha256": "dd238a328155cdde404732954e17289d64e033914f28dc6f7385388a7c00b274",
+  "asarSha256": "2ebef02c078fb8bb282ce04fefe02d07a508655d5490c80584de3566c72f2316",
+  "signatureExit": 0,
+  "notarizationExit": 65,
+  "fixtureOnly": true,
+  "modelCalled": false,
+  "projectRevision": 3,
+  "suggestionStatus": "applied",
+  "planStatuses": [
+    "stale",
+    "awaiting_approval"
+  ],
+  "planTaskRuns": 0,
+  "manifestStatuses": [
+    "draft"
+  ],
+  "verifiedFiles": [
+    {
+      "name": "report.docx",
+      "sha256": "4dfcfde311ed7c3c7a85b211a1688bdcdcc7408f128b498b7639bea817514708",
+      "bytes": 5046
+    },
+    {
+      "name": "report.pdf",
+      "sha256": "1d8c5fec0fb844298f63cb76b139cf032b90f83e0c02db16476b7cf85a449568",
+      "bytes": 36055
+    },
+    {
+      "name": "evidence.xlsx",
+      "sha256": "d76e436f16a87a900d6fafe8ad875c6125ef689ea563896ffc8fc01463595a65",
+      "bytes": 36795
+    }
+  ]
+}

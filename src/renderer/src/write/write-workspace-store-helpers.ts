@@ -32,6 +32,7 @@ import type { WritePreviewMode, WriteWorkspaceState } from './write-workspace-st
 export const WRITE_PREVIEW_MODE_KEY = 'workwise.write.preview-mode'
 export const WRITE_ASSISTANT_OPEN_KEY = 'workwise.write.assistant-open'
 export const WRITE_ASSISTANT_MODEL_KEY = 'workwise.write.assistant-model'
+export const WRITE_ASSISTANT_SELECTION_KEY = 'workwise.write.assistant-selection.v1'
 const DEFAULT_WRITE_ASSISTANT_MODEL = 'auto'
 
 export function readStoredPreviewMode(): WritePreviewMode {
@@ -46,7 +47,17 @@ export function readStoredAssistantOpen(): boolean {
 }
 
 export function readStoredAssistantModel(): string {
+  const selection = readStoredAssistantSelection()
+  if (selection) return selection.model
   return readBrowserStorageItem(WRITE_ASSISTANT_MODEL_KEY)?.trim() || DEFAULT_WRITE_ASSISTANT_MODEL
+}
+
+export function readStoredAssistantSelection(): { model: string; providerId?: string } | null {
+  try {
+    const value = JSON.parse(readBrowserStorageItem(WRITE_ASSISTANT_SELECTION_KEY) || 'null')
+    return value?.version === 1 && typeof value.model === 'string' &&
+      (value.providerId === undefined || typeof value.providerId === 'string') ? value : null
+  } catch { return null }
 }
 
 export function normalizePath(value: string): string {

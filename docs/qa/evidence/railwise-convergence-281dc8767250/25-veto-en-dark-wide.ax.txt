@@ -1,0 +1,171 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 281dc8767250.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-281dc87/Applications/RAILWISE%20AI%20Candidate%20281dc8767250.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container Code / Survey
+							8 按钮 Code
+							9 按钮 Survey
+						10 切换 Description: Focus mode, Value: off
+						11 container Workspace tools
+							12 按钮 Write
+							13 按钮 Plugins
+							14 按钮 Scheduled tasks
+							15 按钮 Flow
+							16 按钮 Design
+						17 按钮 New Survey project
+					18 container
+						19 text Survey projects 1
+						20 按钮 New Survey project
+						21 切换按钮 Description: Refresh Survey projects, Value: 0
+						22 按钮 Survey AI desk Goals, plans, evidence, delivery
+							23 文本 Survey AI desk
+							24 文本 Goals, plans, evidence, delivery
+						25 按钮 控制网内业演示（合成数据） Control network · m · 9/20
+							26 文本 控制网内业演示（合成数据）
+							27 文本 Control network
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI sessions 1
+						33 按钮 Survey AI · 新建内业任务 控制网内业演示（合成数据） · 0 messages
+							34 文本 Survey AI · 新建内业任务
+							35 文本 控制网内业演示（合成数据）
+							36 文本  · 
+							37 文本 0
+							38 文本 messages
+						39 文本 Survey jobs, datasets, runs, and deliverables stay separate from Code and Design sessions.
+					40 container
+						41 切换按钮 Connect phone, Value: 0
+						42 按钮 Settings
+					43 container
+						44 按钮 Collapse sidebar
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text Engineering Survey Processing Current Survey job
+						48 弹出式按钮 Current Survey job, Value: 控制网内业演示（合成数据）
+							49 (selected) 控制网内业演示（合成数据）
+						50 文本 Work view
+						51 弹出式按钮 Work view, Value: Deliverables and review
+							52 (selected) Deliverables and review
+						53 按钮 New Survey project
+					54 container
+						55 text Task 控制网内业演示（合成数据） Stage Deliverables and review Source / format plane-control.in2  ·  COSA-IN2 Disposition Candidate deliverable Datum Unconfirmed  ·  Unconfirmed Points 4 Stations 1 Observations 5 Closure 1.3727E-7 m Precision 1.3592E-7 m Deliverable Candidate deliverable Network Plane control Review Draft
+					56 container Survey AI session
+						57 container
+							58 标题 Survey AI session, Value: 2
+								59 文本 Survey AI session
+							60 文本 控制网内业演示（合成数据）
+							61 按钮 Data assets
+							62 按钮 Survey adjustment
+							63 按钮 Refresh context
+						64 标题 Survey AI, Value: 2
+							65 文本 Survey AI
+						66 container
+							67 文本输入区 (settable) Create a project so AI can bind the evidence boundary.
+							68 按钮 More actions
+							69 弹出式按钮 Model and reasoning settings
+							70 按钮 (disabled) Send
+					71 container
+						72 container Work view
+							73 按钮 Delivery overview
+							74 按钮 Deliverables
+							75 按钮 Review and archive
+							76 按钮 Skills and standards
+						77 标题 Review-pending deliverables, Value: 2
+							78 文本 Review-pending deliverables
+						79 文本 After the basic quality gates pass, create an immutable review-pending list. Review, approval, and signing are not implemented, so the system never creates an approved delivery.
+						80 按钮 Generate review list
+						81 开合三角标记 Unit product populations and first-round sampling
+							82 文本 Unit product populations and first-round sampling
+						83 container Declared inspection linkage assessment
+							84 标题 Declared inspection linkage assessment, Value: 3
+								85 文本 Declared inspection linkage assessment
+							86 文本 Links caller-declared local records only. Inspection authenticity, organizational duties and signatures are not verified. Drafts remain unchanged; the five deliverable checks and deliverable numerical replay are not performed.
+							87 文本 This version supports all 1–8 units of one first-round run and existing planar-control-point or height-control-section unit scores. It produces no sample or batch qualification.
+							88 按钮 Saved plans
+							89 按钮 Saved assessments
+							90 按钮 New linkage plan
+							91 container Linkage assessment result
+								92 文本 Material linkage scope
+								93 文本 All declared material requirements linked
+								94 文本 Unit result coverage
+								95 文本 Unit results missing, partial or unavailable
+								96 文本 Declared nonconformity
+								97 文本 Contains declared nonconforming results
+								98 container
+									99 text Original manifest status :  Pending review  ·  Declared linkage incomplete
+								100 文本 Expected 2 · Linked scores 1 · Full unit results 1 · Retained mappings 2/2 · Unresolved references 0
+								101 文本 assessment_6e4da1bc-bc03-48b3-a9b7-b8817a0e4ee1
+								102 文本 LINK-01
+								103 文本 Complete declared profile · Declared nonconforming
+								104 container
+									105 text Existing record linked after calculation; target association is caller-declared  ·  quality_scoring_796d1da1-6cf1-4bc5-9966-bedddf3b3839  ·  A below-60 or A-class child cannot be offset by weighted averaging.
+								106 container
+									107 text synthetic-linkage  →  output-1  ·  Retained bytes linked  ·  合成声明 LINK-01；共用 output-1，仅作字节关联。
+								108 文本 LINK-02
+								109 文本 Leave score missing
+								110 container
+									111 text synthetic-linkage  →  output-1  ·  Retained bytes linked  ·  合成声明 LINK-02；共用 output-1，仅作字节关联。
+								112 按钮 Reverify linkage
+								113 按钮 Save freshly verified record as
+							114 文本 Saved-time result; dependencies are not replayed on this list. Opening rechecks current sources.
+							115 按钮 2026-09-20T02:49:05.140Z · assessment_6e4da1bc-bc03-48b3-a9b7-b8817a0e4ee1 · Declared linkage incomplete
+								116 文本 2026-09-20T02:49:05.140Z
+								117 文本  · 
+								118 文本 assessment_6e4da1bc-bc03-48b3-a9b7-b8817a0e4ee1
+								119 文本  · Declared linkage incomplete
+							120 按钮 2026-09-20T02:47:23.595Z · assessment_310839d6-3b44-45a4-8f99-5f44e0d815ed · Declared linkage complete (no engineering approval)
+								121 文本 2026-09-20T02:47:23.595Z
+								122 文本  · 
+								123 文本 assessment_310839d6-3b44-45a4-8f99-5f44e0d815ed
+								124 文本  · Declared linkage complete (no engineering approval)
+							125 按钮 2026-09-20T02:46:44.838Z · assessment_07daf090-925b-4093-a010-d012477dac4f · Declared linkage incomplete
+								126 文本 2026-09-20T02:46:44.838Z
+								127 文本  · 
+								128 文本 assessment_07daf090-925b-4093-a010-d012477dac4f
+								129 文本  · Declared linkage incomplete
+						130 文本 Review checklist
+						131 container
+							132 text Source inputs selected and saved ·  Condition met
+						133 文本 1 eligible adjustment(s) · 0 deformation result(s)
+						134 container
+							135 text Blocking items cleared ·  Condition met
+						136 文本 No pending blocking items in the current dataset.
+						137 container
+							138 text Warnings confirmed ·  Condition met
+						139 文本 No warnings require acceptance.
+						140 container
+							141 text Deterministic analysis completed ·  Condition met
+						142 文本 Completed deterministic Survey results with current source admission.
+						143 container
+							144 text Reviewable deliverables generated ·  Condition met
+						145 文本 3 output file(s) include SHA-256 hashes.
+						146 文本 Review-pending list
+						147 文本 Each list is an independent manifest; historical versions remain read-only. This record is not approval.
+						148 文本 manifest_8c993a08-4f8f-4ce4-bb93-74da8a52dcf4
+						149 按钮 Ask Survey AI about manifest_8c993a08-4f8f-4ce4-bb93-74da8a52dcf4
+						150 container
+							151 text 3 outputs  ·  Draft  ·  9/20/2026, 10:41:37
+						152 按钮 Verify deliverable again
+						153 开合三角标记 Quality evidence retention workspace
+							154 文本 Quality evidence retention workspace
+						155 文本 Review notes: 1
+						156 container
+							157 text Review status Current project revision 2 Review list can be generated The list records output hashes, analysis input hashes, citations, and human disposition. Do not describe it as approved delivery before review, approval, and signing are complete. Latest manifest manifest_8c993a08-4f8f-4ce4-bb93-74da8a52dcf4
+	158 关闭按钮
+	159 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	160 最小化按钮
+161 menu bar
+	162 RAILWISE AI Candidate 281dc8767250
+	163 File
+	164 Edit
+	165 View
+	166 Window
+	167 Help
+
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-281dc87/Applications/RAILWISE%20AI%20Candidate%20281dc8767250.app/Contents/Resources/app.asar/out/renderer/index.html

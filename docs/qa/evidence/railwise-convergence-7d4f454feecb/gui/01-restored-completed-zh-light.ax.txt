@@ -1,0 +1,696 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 7d4f454feecb.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-7d4f454/Applications/RAILWISE%20AI%20Candidate%207d4f454feecb.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 3
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 GSI 本机验收 水准网 · m · 9/20
+							26 文本 GSI 本机验收
+							27 文本 水准网
+							28 文本  ·
+							29 文本 m
+							30 文本  ·
+							31 文本 9/20
+						32 按钮 IN2 本机验收 控制网 · m · 9/20
+							33 文本 IN2 本机验收
+							34 文本 控制网
+							35 文本  ·
+							36 文本 m
+							37 文本  ·
+							38 文本 9/20
+						39 按钮 审批卡验收（合成数据） 控制网 · m · 9/20
+							40 文本 审批卡验收（合成数据）
+							41 文本 控制网
+							42 文本  ·
+							43 文本 m
+							44 文本  ·
+							45 文本 9/20
+						46 text Survey AI 会话 3
+						47 按钮 Survey AI · GSI 本机验收 GSI 本机验收 · 0 条消息
+							48 文本 Survey AI · GSI 本机验收
+							49 文本 GSI 本机验收
+							50 文本  ·
+							51 文本 0
+							52 文本 条消息
+						53 按钮 Survey AI · 新建内业任务 IN2 本机验收 · 0 条消息
+							54 文本 Survey AI · 新建内业任务
+							55 文本 IN2 本机验收
+							56 文本  ·
+							57 文本 0
+							58 文本 条消息
+						59 按钮 Survey AI · 新建内业任务 审批卡验收（合成数据） · 26 条消息
+							60 文本 Survey AI · 新建内业任务
+							61 文本 审批卡验收（合成数据）
+							62 文本  ·
+							63 文本 26
+							64 文本 条消息
+						65 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					66 container
+						67 切换按钮 连接手机, Value: 0
+						68 按钮 设置
+					69 container
+						70 按钮 收起侧边栏
+						71 标题 RAILWISE Survey, Value: 1
+							72 文本 RAILWISE Survey
+						73 text 工程测量内业 当前内业任务
+						74 弹出式按钮 当前内业任务, Value: 审批卡验收（合成数据）
+							75 (selected) 审批卡验收（合成数据）
+						76 文本 工作视图
+						77 弹出式按钮 工作视图, Value: 导入与预检
+							78 (selected) 导入与预检
+						79 按钮 新建工程测量项目
+					80 container
+						81 text 任务 审批卡验收（合成数据） 阶段 导入与预检 数据源 / 格式 golden-plane-control-e2e.in2  ·  COSA-IN2 处置状态 候选成果 基准 待确认  ·  待确认 点数 4 测站数 1 观测 5 闭合差 1.3727E-7 m 精度 1.3592E-7 m 成果 — 网型 平面控制网 审查 —
+					82 container Survey AI 会话
+						83 container
+							84 标题 Survey AI 会话, Value: 2
+								85 文本 Survey AI 会话
+							86 文本 审批卡验收（合成数据）
+							87 按钮 数据资产
+							88 按钮 测量平差
+							89 按钮 刷新上下文
+						90 container
+							91 文本 RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）
+							92 按钮 复制消息
+							93 按钮 工作过程（1 步）
+							94 text engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							95 按钮 复制消息
+							96 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							97 按钮 复制消息
+							98 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							99 按钮 复制消息
+							100 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							101 按钮 复制消息
+							102 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							103 按钮 复制消息
+							104 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							105 按钮 复制消息
+							106 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:40
+							107 按钮 复制消息
+							108 文本 继续工程 AI 计划
+							109 按钮 复制消息
+							110 按钮 工作过程（1 步）
+							111 文本 本次模型或工具尝试失败，任务将从检查点继续。
+							112 文本 RAILWISE-SYNTHETIC-ACCEPTANCE 合成验收：2+3是多少？仅回答结果，不调用工具。
+							113 按钮 复制消息
+							114 按钮 工作过程（1 步）
+							115 文本 本次模型或工具尝试失败，任务将从检查点继续。
+							116 文本 RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）
+							117 按钮 复制消息
+							118 按钮 编辑并重发
+							119 text 已生成工程测量 Typed Plan，当前仅供审查，尚未执行。 计划编号：eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3 上下文哈希：sha256-15f2f1f1ff07b764b8a7dfb1872eec829f9531fa9faea20ce9dc5f7e564741a9
+							120 内容列表
+								121 container
+									122 AXListMarker 1.
+									123 文本 校核测量网络与基准（survey_network_validate，需单独审批）
+								124 container
+									125 AXListMarker 2.
+									126 文本 执行确定性测量平差（control_network，需单独审批）
+								127 container
+									128 AXListMarker 3.
+									129 文本 读取闭合差、残差与精度（survey_adjustment_read，只读）
+								130 container
+									131 AXListMarker 4.
+									132 文本 准备测量成果与证据包（report_export，需单独审批）
+							133 text 审批并明确启动前，不会创建 TaskRun、调用模型或执行任何工具。 9月20日 16:48
+							134 按钮 复制消息
+							135 文本 RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）
+							136 按钮 复制消息
+							137 按钮 工作过程（1 步）
+							138 text engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							139 按钮 复制消息
+							140 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							141 按钮 复制消息
+							142 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							143 按钮 复制消息
+							144 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							145 按钮 复制消息
+							146 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							147 按钮 复制消息
+							148 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							149 按钮 复制消息
+							150 text RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete. 9月20日 16:51
+							151 按钮 复制消息
+							152 文本 继续工程 AI 计划
+							153 按钮 复制消息
+							154 text I'll start with the first pending step, validating the network at its current revision. 9月20日 16:58
+							155 按钮 复制消息
+							156 text Step 1 succeeded: network validation passed and the network revision is now 2. I'll set the network to the latest revision, then run the deterministic adjustment. 9月20日 16:58
+							157 按钮 复制消息
+							158 文本 Step 2 succeeded (adjustment
+							159 文本 adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2
+							160 text , source-admissible). Next pending step: read the adjustment evidence bound to that run id. 9月20日 16:58
+							161 按钮 复制消息
+							162 text I'll continue with the final pending step, exporting the deliverables bound to the produced adjustment id. 9月20日 16:58
+							163 按钮 复制消息
+							164 text RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）— 计划 eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3 已全部执行完成，四个步骤均有成功回执。 执行结果
+							165 内容列表
+								166 container
+									167 AXListMarker 1.
+									168 文本 校核测量网络与基准 — 成功
+									169 内容列表
+										170 container
+											171 AXListMarker •
+											172 文本 网络 network_365a0846-01d7-4768-a31c-47545fe23c34
+										173 container
+											174 AXListMarker •
+											175 文本 修订号 1 → 2，qualityStatus: imported → validated
+										176 container
+											177 AXListMarker •
+											178 文本 遗留一条开放告警：cosa-in2 格式目录策略为 adjustment-ready，需基准/拓扑/闭合/精度条件全部满足；本次各条件均通过，未阻断平差。
+								179 container
+									180 AXListMarker 2.
+									181 文本 执行确定性平差 — 成功
+									182 内容列表
+										183 container
+											184 AXListMarker •
+											185 文本 平差 run: adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2（completed）
+										186 container
+											187 AXListMarker •
+											188 文本 结果 id: adjustment_result_dfcc032f-8dd4-44f7-af91-90723981c4c7
+										189 container
+											190 AXListMarker •
+											191 文本 方法 weighted-least-squares，约束 fixed-known-points，算法版本 workwise-survey-adjustment-7
+										192 container
+											193 AXListMarker •
+											194 文本 观测 5、未知数 3、冗余 2、自由度 2；validation: valid
+										195 container
+											196 AXListMarker •
+											197 文本 闭合差：水平 1.3726709029343796e-7 m；角度 3.111529177070756e-10 rad
+										198 container
+											199 AXListMarker •
+											200 文本 单位权中误差 unitWeightStdDev = 1.0671165867325277e-4（无量纲）；方差因子 varianceFactor = 1.1387378096796804e-8（无量纲，按后验估计）
+										201 container
+											202 AXListMarker •
+											203 文本 精度：maxPointStdDev = 1.3592152495710963e-7 m，passed: true
+										204 container
+											205 AXListMarker •
+											206 文本 解算诊断：迭代 2 次，rank 3，条件数估计 116.49152888654937
+										207 container
+											208 AXListMarker •
+											209 文本 平差后坐标（m）：A(50, 150)、B(150, 50)、C(120.710678, 120.710678)、S1(49.99999999284098, 49.999999963710295)，S1 改正数 (−1.9446147803137137e-8, 1.95930319080162e-7)
+										210 container
+											211 AXListMarker •
+											212 文本 最大标准化残差（sigma 倍数）：cosa-in2-10-distance 为 1.3639997445091467e-4 σ，全部观测 outlier: false
+										213 container
+											214 AXListMarker •
+											215 文本 来源准入：current-admissible，原始来源完整性 verified（ledgerEntryCount 2）
+								216 container
+									217 AXListMarker 3.
+									218 文本 读取闭合差、残差与精度 — 成功
+									219 内容列表
+										220 container
+											221 AXListMarker •
+											222 文本 读取到上述同一份平差证据，数值与第 2 步一致，未做任何再计算或改动。
+								223 container
+									224 AXListMarker 4.
+									225 文本 准备测量成果与证据包 — 成功
+									226 内容列表
+										227 container
+											228 AXListMarker •
+											229 文本 导出 run: run_91826eb5-5db0-4088-8696-99cdd4a92406（completed），adjustmentIds = adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2
+										230 container
+											231 AXListMarker •
+											232 文本 report.docx — sha256 eb2882c9fdc159517d2de7894058ce7f8202d2dad940f7a98c674efb1fe1831d，5398 字节
+										233 container
+											234 AXListMarker •
+											235 文本 report.pdf — sha256 29096adb8e6e3445290ff794a5c27a663adee5c35568341c9034df48fe4fe622，39621 字节
+										236 container
+											237 AXListMarker •
+											238 文本 evidence.xlsx — sha256 76f154b54803dff254c5e3109ca096a6c6271650a4234ecac615a2dbc5624241，39084 字节
+										239 container
+											240 AXListMarker •
+											241 文本 交付来源引用原始附件 sha256 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0（golden-plane-control-e2e.in2），原始文件已保留。
+							242 文本 完成状态
+							243 内容列表
+								244 container
+									245 AXListMarker •
+									246 文本 待执行步骤：无。
+								247 container
+									248 AXListMarker •
+									249 文本 所有 ID 均取自当前有界上下文；未修改任何数值结果或单位。
+								250 container
+									251 AXListMarker •
+									252 文本 未执行计划外的任何工具调用。
+								253 container
+									254 AXListMarker •
+									255 文本 说明：上述文件哈希来自导出运行时回执，属于交付产物元数据，本次未对磁盘文件做新的完整性校验。
+							256 text 注意：本线程此前有一个关于「2+3 是多少？仅回答结果」的问题——其答案是  5 ，与本次工程执行无关，特此单独说明。 9月20日 16:58
+							257 按钮 复制消息
+							258 文本 成果文件
+							259 container report.docx
+								260 文本 report.docx
+								261 文本 DOCX
+								262 按钮 另存为
+								263 按钮 打开
+								264 按钮 显示位置
+							265 container report.pdf
+								266 文本 report.pdf
+								267 文本 PDF
+								268 按钮 另存为
+								269 按钮 打开
+								270 按钮 显示位置
+							271 container evidence.xlsx
+								272 文本 evidence.xlsx
+								273 文本 XLSX
+								274 按钮 另存为
+								275 按钮 打开
+								276 按钮 显示位置
+						277 container 项目修改待确认
+							278 标题 项目修改待确认, Value: 3
+								279 文本 项目修改待确认
+							280 container
+								281 text 合成 GUI 验收 fixture：由本地测试 helper 创建，未调用模型。 基于项目修订 2  ·  未采用
+								282 定义列表
+									283 container 项目名称
+										284 文本 项目名称
+									285 container
+										286 text 修改前 "审批卡验收（合成数据）" 修改后 "审批卡已确认（合成数据）"
+								287 文本 确认后递增项目修订，旧计算计划需重新审查。此修改不会转换已导入坐标、改写原始观测或重新计算历史成果；新设置在后续操作中使用。历史记录保留；撤销需再次修改并确认。
+						288 container Typed Plan
+							289 按钮 Typed Plan 已完成
+								290 文本 Typed Plan
+								291 文本 已完成
+							292 文本 RAILWISE-SYNTHETIC-ACCEPTANCE 控制网平差与成果（合成 GUI 验收样例）
+							293 container
+								294 text 校核测量网络与基准 需要审批
+							295 文本 已核验执行回执
+							296 定义列表
+								297 container
+									298 container 工具:
+										299 text 工具 :
+									300 文本 survey_network_validate
+								301 container 确认参数与前序结果绑定
+									302 文本 确认参数与前序结果绑定
+								303 文本 {
+  "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+  "expectedRevision": 1
+}
+								304 container
+									305 container 预期产物:
+										306 text 预期产物 :
+									307 文本 网络校核修订
+								308 container
+									309 container 可逆性:
+										310 text 可逆性 :
+									311 文本 生成新的校核修订，原始文件不变；不支持自动撤销。
+							312 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							313 container
+								314 text 执行确定性测量平差 需要审批
+							315 文本 已核验执行回执
+							316 定义列表
+								317 container
+									318 container 工具:
+										319 text 工具 :
+									320 文本 control_network
+								321 container 确认参数与前序结果绑定
+									322 文本 确认参数与前序结果绑定
+								323 container
+									324 text {
+  "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34"
+} expectedRevision  ←  inspect-survey-network . network.revision
+								325 container
+									326 container 预期产物:
+										327 text 预期产物 :
+									328 文本 平差运行 · 残差、闭合差与精度
+								329 container
+									330 container 可逆性:
+										331 text 可逆性 :
+									332 文本 新增计算记录或候选文件，历史证据保留；不支持自动撤销。
+							333 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							334 container
+								335 text 读取闭合差、残差与精度 只读
+							336 文本 已核验执行回执
+							337 定义列表
+								338 container
+									339 container 工具:
+										340 text 工具 :
+									341 文本 survey_adjustment_read
+								342 container 确认参数与前序结果绑定
+									343 文本 确认参数与前序结果绑定
+								344 container
+									345 text {
+  "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34"
+} adjustmentId  ←  adjust-survey-network . run.id
+								346 container
+									347 container 预期产物:
+										348 text 预期产物 :
+									349 文本 已有平差证据
+								350 container
+									351 container 可逆性:
+										352 text 可逆性 :
+									353 文本 仅读取现有证据，不修改已保存状态。
+							354 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							355 container
+								356 text 准备测量成果与证据包 需要审批
+							357 文本 已核验执行回执
+							358 定义列表
+								359 container
+									360 container 工具:
+										361 text 工具 :
+									362 文本 report_export
+								363 container 确认参数与前序结果绑定
+									364 文本 确认参数与前序结果绑定
+								365 container
+									366 text {
+  "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+  "expectedRevision": 2
+} adjustmentIds  ←  adjust-survey-network . run.id  []
+								367 container
+									368 container 预期产物:
+										369 text 预期产物 :
+									370 文本 候选 DOCX · 候选 PDF · XLSX 证据表
+								371 container
+									372 container 可逆性:
+										373 text 可逆性 :
+									374 文本 新增计算记录或候选文件，历史证据保留；不支持自动撤销。
+							375 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							376 container
+								377 text eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3  ·  sha256-15f2f1f1ff07b76
+						378 container
+							379 文本输入区 (settable) 正在准备当前任务的对话，输入草稿会保留。
+							380 按钮 更多操作
+							381 弹出式按钮 模型与推理设置
+							382 按钮 (disabled) 发送
+					383 container
+						384 container 工作视图
+							385 按钮 项目配置
+							386 按钮 数据资产
+							387 按钮 质量校核
+							388 按钮 测量来源与预检
+						389 container 测量与平差控制台
+							390 标题 测量与平差控制台, Value: 3
+								391 文本 测量与平差控制台
+							392 文本 Runtime 确定性计算
+							393 按钮 询问测量 AI
+							394 文本 已有测量网络
+							395 弹出式按钮 Description: 已有测量网络, Value: cosa-in2 · 可进入校核与平差 · 5fe23c34
+								396 (selected) cosa-in2 · 可进入校核与平差 · 5fe23c34
+							397 文本 网络类型
+							398 弹出式按钮 Description: 网络类型, Value: 平面控制网
+								399 (selected) 平面控制网
+							400 文本 Runtime 在线
+							401 container 测量计算状态
+								402 文本 网型
+								403 文本 平面控制网
+								404 container
+									405 文本 当前约束
+									406 container Description: 当前 Runtime 约束, Help: Runtime 当前仅按固定已知点执行；最小约束和自由网尚不可选。
+										407 文本 固定已知点（Runtime 当前实现）
+								408 container
+									409 文本 平差方法 / 权模型
+									410 container Description: 当前 Runtime 执行方式, Help: 条件平差不提供为用户可选项；坐标 / 高程转换按其已选类型由 Runtime 执行。
+										411 文本 加权最小二乘
+								412 文本 可解性
+								413 文本 已通过校核
+							414 container 平差工作区导航
+								415 按钮 网形与基准
+								416 按钮 观测表 5
+									417 文本 观测表
+									418 文本 5
+								419 按钮 点位与坐标 4
+									420 文本 点位与坐标
+									421 文本 4
+								422 按钮 平差结果
+								423 按钮 自由水准试算
+								424 按钮 期次变形 0
+									425 文本 期次变形
+									426 文本 0
+							427 文本 导入仪器、GNSS 或交换文件
+							428 文本 仪器、GNSS 与交换格式；识别不等于可平差。
+							429 按钮 选择专业测量文件
+							430 按钮 导入结构化网络
+							431 按钮 高级 JSON
+							432 文本 原文件按 SHA-256 保留；来源资格通过后才能校核和平差。
+							433 文本 项目基准
+							434 定义列表
+								435 container 网络类型
+									436 文本 网络类型
+								437 文本 平面控制网
+								438 container 平面坐标系
+									439 文本 平面坐标系
+								440 文本 待确认
+								441 container 高程基准
+									442 文本 高程基准
+								443 文本 待确认
+								444 container 输入修订
+									445 文本 输入修订
+								446 文本 2
+							447 container
+								448 文本 导入时使用的已知控制点（可选）
+								449 文本输入区 (settable) Description: 导入时使用的已知控制点（可选）, Placeholder: BM-01,100.000
+								450 文本 每行：点号,高程[,X,Y]，数值单位为米。请在选择文件前填写，输入将随原文件导入并保留映射证据；冲突数据会阻断，不自动替换原记录。
+							451 container 专业测量来源筛选
+								452 文本 已有来源筛选
+								453 文本 格式
+								454 弹出式按钮 Description: 按来源格式筛选, Value: 全部格式（1）
+									455 (selected) 全部格式（1）
+								456 文本 就绪状态
+								457 弹出式按钮 Description: 按平差就绪状态筛选, Value: 全部状态
+									458 (selected) 全部状态
+								459 文本 显示 1 / 1
+							460 文本 原始资料身份已验证：SHA-256 与来源账本已复核（2 条记录）。不代表已完成质量复核、签名、规范合规或正式交付。
+							461 container 专业测量来源预检
+								462 文本 golden-plane-control-e2e.in2
+								463 文本 可进入校核与平差
+								464 container
+									465 text COSA(科傻)  ·  cosa-in2  ·  置信度 98%
+								466 文本 10 条已识别记录 · 0.1 KiB
+								467 container
+									468 text 原文件 已保留
+								469 container 来源合同明细
+									470 定义列表
+										471 container 声明扩展名
+											472 文本 声明扩展名
+										473 文本 .in2
+										474 container 厂商 / 内容探测格式
+											475 文本 厂商 / 内容探测格式
+										476 container
+											477 text COSA(科傻)  ·  cosa-in2  ·  版本 未声明
+										478 container 检测方法 / 置信度
+											479 文本 检测方法 / 置信度
+										480 container
+											481 text 结构探针  ·  98%
+										482 container 扩展名一致性 / 人工确认
+											483 文本 扩展名一致性 / 人工确认
+										484 container
+											485 text 未发现冲突  ·  无需人工确认
+										486 container 导入处置 / 下一步
+											487 文本 导入处置 / 下一步
+										488 container
+											489 text 可进入校核与平差  ·  adjustment-ready: P0 格式目录 workwise-survey-format-catalog-1.7.0 — 严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 复核单位、基准和点位角色后执行质量校核。
+										490 container 长度单位（原始 → 规范）
+											491 文本 长度单位（原始 → 规范）
+										492 container
+											493 text m  →  m
+										494 container 角度单位（原始 → 规范）
+											495 文本 角度单位（原始 → 规范）
+										496 container
+											497 text cosa-degree-dot-mmss  →  rad
+										498 container 平面基准 / 高程基准
+											499 文本 平面基准 / 高程基准
+										500 container
+											501 text 未声明  /  未声明
+										502 container 点 / 测站
+											503 文本 点 / 测站
+										504 container
+											505 text 3  /  1
+										506 container 观测 / 记录 / 跳过
+											507 文本 观测 / 记录 / 跳过
+										508 container
+											509 text 5  /  10  /  0
+										510 container 解析器源哈希
+											511 文本 解析器源哈希
+										512 文本 14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04
+										513 container 转换器身份 / 二进制哈希
+											514 文本 转换器身份 / 二进制哈希
+										515 文本 未使用转换器
+								516 定义列表
+									517 container SHA-256
+										518 文本 SHA-256
+									519 文本 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0
+									520 container 解析器
+										521 文本 解析器
+									522 container
+										523 text cosa-in2-parser  ·  0.3.0
+									524 container 内容签名
+										525 文本 内容签名
+									526 文本 COSA .in2 three-value header + L,0 station block
+									527 container 扩展名一致性
+										528 文本 扩展名一致性
+									529 container
+										530 text .in2  ·  未发现冲突
+								531 文本 解析诊断
+								532 text 阻断 0 · 警告 1 ENCODING_DETECTED
+								533 按钮 询问 encoding_detected #1 的测量 AI
+								534 text 文本编码 utf-8 FORMAT_DETECTED
+								535 按钮 询问 format_detected #2 的测量 AI
+								536 text 识别为 COSA(科傻) / cosa-in2，置信度 98% FORMAT_DETECTED
+								537 按钮 询问 format_detected #3 的测量 AI
+								538 text COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 下一步： 继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。
+								539 container
+									540 文本 原始记录锚点
+									541 按钮 查看 10
+									542 文本 锚点用于从规范化观测回溯到仪器文件记录，不展示或改写原始字节。
+							543 文本 点位
+							544 文本 4
+							545 文本 3 已知 · 1 未知
+							546 文本 观测
+							547 文本 5
+							548 文本 已保留单位与权
+							549 文本 质量状态
+							550 文本 已通过校核
+							551 文本 已通过校核
+							552 文本 运行状态
+							553 文本 已完成
+							554 文本 adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2
+							555 按钮 质量校核
+							556 按钮 运行平差
+							557 container
+								558 text 质量门禁 COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 当前输入
+								559 定义列表
+									560 container 来源
+										561 文本 来源
+									562 文本 golden-plane-control-e2e.in2
+									563 container 格式
+										564 文本 格式
+									565 文本 cosa-in2
+									566 container 就绪状态
+										567 文本 就绪状态
+									568 文本 可进入校核与平差
+									569 container 阻断项
+										570 文本 阻断项
+									571 文本 0
+								572 文本 结果可追溯
+							573 container 平差点位成果
+								574 标题 点位成果与复核摘要, Value: 4
+									575 文本 点位成果与复核摘要
+								576 文本 平差后的坐标/高程、改正数和点位中误差；这是可写入成果包的确定性结果。
+								577 text 长度单位 m 协方差 已返回 粗差候选 0
+								578 文本 半轴采用单位马氏半径，不代表置信百分比。轴向从 +X 转向 +Y，按 180° 周期表示。XY 为解算坐标平面，GNSS 的 XY 不等同于当地东/北。固定点和旧成果不补造椭圆。
+								579 container 平差点位成果
+									580 表格
+										581 row
+											582 列标题
+												583 文本 点号
+											584 列标题
+												585 文本 平差 X（m）
+											586 列标题
+												587 文本 平差 Y（m）
+											588 列标题
+												589 文本 纬度 / 经度（°）
+											590 列标题
+												591 文本 平差高程（m）
+											592 列标题
+												593 文本 改正数（m）
+											594 列标题
+												595 文本 点位中误差（m）
+											596 列标题
+												597 文本 XY 标准误差椭圆
+										598 row
+											599 单元格
+												600 文本 A
+												601 按钮 询问 A 的测量 AI
+											602 单元格
+												603 文本 50
+											604 单元格
+												605 文本 150
+											606 单元格
+												607 文本 —
+											608 单元格
+												609 文本 —
+											610 单元格
+												611 文本 —
+											612 单元格
+												613 文本 —
+											614 单元格
+												615 文本 —
+										616 row
+											617 单元格
+												618 文本 B
+												619 按钮 询问 B 的测量 AI
+											620 单元格
+												621 文本 150
+											622 单元格
+												623 文本 50
+											624 单元格
+												625 文本 —
+											626 单元格
+												627 文本 —
+											628 单元格
+												629 文本 —
+											630 单元格
+												631 文本 —
+											632 单元格
+												633 文本 —
+										634 row
+											635 单元格
+												636 文本 C
+												637 按钮 询问 C 的测量 AI
+											638 单元格
+												639 文本 120.710678
+											640 单元格
+												641 文本 120.710678
+											642 单元格
+												643 文本 —
+											644 单元格
+												645 文本 —
+											646 单元格
+												647 文本 —
+											648 单元格
+												649 文本 —
+											650 单元格
+												651 文本 —
+										652 row
+											653 单元格
+												654 文本 S1
+												655 按钮 询问 S1 的测量 AI
+											656 单元格
+												657 文本 50
+											658 单元格
+												659 文本 50
+											660 单元格
+												661 文本 —
+											662 单元格
+												663 文本 —
+											664 单元格
+												665 文本 -1.944615e-8
+											666 单元格
+												667 文本 1.35922e-7
+											668 单元格
+												669 container 半轴采用单位马氏半径，不代表置信百分比。轴向从 +X 转向 +Y，按 180° 周期表示。XY 为解算坐标平面，GNSS 的 XY 不等同于当地东/北。固定点和旧成果不补造椭圆。
+													670 文本 长半轴 1.28481e-7 m · 短半轴 4.43548e-8 m
+													671 文本 轴向：129.401°
+													672 文本 后验方差
+	673 关闭按钮
+	674 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	675 最小化按钮
+676 menu bar
+	677 RAILWISE AI Candidate 7d4f454feecb
+	678 文件
+	679 编辑
+	680 显示
+	681 窗口
+	682 帮助
+
+The focused UI element is 9 按钮 内业

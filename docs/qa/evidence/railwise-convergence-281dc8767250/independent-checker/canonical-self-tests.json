@@ -1,0 +1,13 @@
+{
+  "scope": "independent-checker-serialization-self-tests-not-gui-or-production-acceptance",
+  "command": [
+    "python3",
+    "-B",
+    "test-canonical.py",
+    "-v"
+  ],
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "",
+  "stderr": "test_ecmascript_numeric_boundaries_and_negative_zero (__main__.CanonicalTests.test_ecmascript_numeric_boundaries_and_negative_zero) ... ok\ntest_float_regression_detected_and_mutation_changes_digest (__main__.CanonicalTests.test_float_regression_detected_and_mutation_changes_digest) ... ok\ntest_integer_scoring_contract_unchanged (__main__.CanonicalTests.test_integer_scoring_contract_unchanged) ... ok\ntest_nonfinite_rejected (__main__.CanonicalTests.test_nonfinite_rejected) ... ok\ntest_recursive_canonical_order_is_not_insertion_order (__main__.CanonicalTests.test_recursive_canonical_order_is_not_insertion_order) ... ok\ntest_unicode_strings_and_utf16_key_order (__main__.CanonicalTests.test_unicode_strings_and_utf16_key_order) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.209s\n\nOK\n"
+}

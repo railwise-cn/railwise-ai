@@ -1,0 +1,396 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 7d4f454feecb.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-7d4f454/Applications/RAILWISE%20AI%20Candidate%207d4f454feecb.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 SYNTHETIC packaged completion probe 控制网 · mm · 9/20
+							26 文本 SYNTHETIC packaged completion probe
+							27 文本 控制网
+							28 文本  ·
+							29 文本 mm
+							30 文本  ·
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 New chat SYNTHETIC packaged completion probe · 4 条消息
+							34 文本 New chat
+							35 文本 SYNTHETIC packaged completion probe
+							36 文本  ·
+							37 文本 4
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: SYNTHETIC packaged completion probe
+							49 (selected) SYNTHETIC packaged completion probe
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 导入与预检
+							52 (selected) 导入与预检
+						53 按钮 新建工程测量项目
+					54 container
+						55 text 任务 SYNTHETIC packaged completion probe 阶段 导入与预检 数据源 / 格式 workwise-survey-network.json  ·  WORKWISE-JSON 处置状态 需确认 基准 待确认  ·  待确认 点数 2 测站数 0 观测 2 闭合差 — 精度 — 成果 — 网型 水准 / 高程控制网 审查 —
+					56 container Survey AI 会话
+						57 container
+							58 标题 Survey AI 会话, Value: 2
+								59 文本 Survey AI 会话
+							60 文本 SYNTHETIC packaged completion probe
+							61 按钮 数据资产
+							62 按钮 测量平差
+							63 按钮 刷新上下文
+						64 container
+							65 文本 Synthetic leveling adjustment and report
+							66 按钮 复制消息
+							67 按钮 编辑并重发
+							68 text 已生成工程测量 Typed Plan，当前仅供审查，尚未执行。 计划编号：eplan_32a41a1b-906d-4a3d-b04a-6870d2170c09 上下文哈希：sha256-63471880edcc68334e90b78b7f816a48b31529ecfd4816e8e425123473aa6f8e
+							69 内容列表
+								70 container
+									71 AXListMarker 1.
+									72 文本 校核测量网络与基准（survey_network_validate，需单独审批）
+								73 container
+									74 AXListMarker 2.
+									75 文本 执行确定性测量平差（survey_calculator，需单独审批）
+								76 container
+									77 AXListMarker 3.
+									78 文本 读取闭合差、残差与精度（survey_adjustment_read，只读）
+								79 container
+									80 AXListMarker 4.
+									81 文本 准备测量成果与证据包（report_export，需单独审批）
+							82 text 审批并明确启动前，不会创建 TaskRun、调用模型或执行任何工具。 9月20日 15:03
+							83 按钮 复制消息
+							84 文本 Synthetic leveling adjustment and report
+							85 按钮 复制消息
+							86 text The approved survey work is complete. All observations have been processed and the results are ready. 9月20日 15:03
+							87 按钮 复制消息
+						88 container Typed Plan
+							89 按钮 Typed Plan 需要处理
+								90 文本 Typed Plan
+								91 文本 需要处理
+							92 文本 Synthetic leveling adjustment and report
+							93 container
+								94 text 校核测量网络与基准 需要审批
+							95 文本 缺少执行回执
+							96 定义列表
+								97 container
+									98 container 工具:
+										99 text 工具 :
+									100 文本 survey_network_validate
+								101 container 确认参数与前序结果绑定
+									102 文本 确认参数与前序结果绑定
+								103 文本 {
+  "networkId": "network_f13ffb62-69cf-47df-9d41-0928ecdd8ee6",
+  "expectedRevision": 1
+}
+								104 container
+									105 container 预期产物:
+										106 text 预期产物 :
+									107 文本 网络校核修订
+								108 container
+									109 container 可逆性:
+										110 text 可逆性 :
+									111 文本 生成新的校核修订，原始文件不变；不支持自动撤销。
+							112 按钮 定位证据
+							113 container
+								114 text 执行确定性测量平差 需要审批
+							115 文本 缺少执行回执
+							116 定义列表
+								117 container
+									118 container 工具:
+										119 text 工具 :
+									120 文本 survey_calculator
+								121 container 确认参数与前序结果绑定
+									122 文本 确认参数与前序结果绑定
+								123 container
+									124 text {
+  "networkId": "network_f13ffb62-69cf-47df-9d41-0928ecdd8ee6"
+} expectedRevision  ←  inspect-survey-network . network.revision
+								125 container
+									126 container 预期产物:
+										127 text 预期产物 :
+									128 文本 平差运行 · 残差、闭合差与精度
+								129 container
+									130 container 可逆性:
+										131 text 可逆性 :
+									132 文本 新增计算记录或候选文件，历史证据保留；不支持自动撤销。
+							133 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							134 container
+								135 text 读取闭合差、残差与精度 只读
+							136 文本 缺少执行回执
+							137 定义列表
+								138 container
+									139 container 工具:
+										140 text 工具 :
+									141 文本 survey_adjustment_read
+								142 container 确认参数与前序结果绑定
+									143 文本 确认参数与前序结果绑定
+								144 container
+									145 text {
+  "networkId": "network_f13ffb62-69cf-47df-9d41-0928ecdd8ee6"
+} adjustmentId  ←  adjust-survey-network . run.id
+								146 container
+									147 container 预期产物:
+										148 text 预期产物 :
+									149 文本 已有平差证据
+								150 container
+									151 container 可逆性:
+										152 text 可逆性 :
+									153 文本 仅读取现有证据，不修改已保存状态。
+							154 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							155 container
+								156 text 准备测量成果与证据包 需要审批
+							157 文本 缺少执行回执
+							158 定义列表
+								159 container
+									160 container 工具:
+										161 text 工具 :
+									162 文本 report_export
+								163 container 确认参数与前序结果绑定
+									164 文本 确认参数与前序结果绑定
+								165 container
+									166 text {
+  "projectId": "project_42bbde42-eb6b-485d-ba1d-0322137dc875",
+  "expectedRevision": 1
+} adjustmentIds  ←  adjust-survey-network . run.id  []
+								167 container
+									168 container 预期产物:
+										169 text 预期产物 :
+									170 文本 候选 DOCX · 候选 PDF · XLSX 证据表
+								171 container
+									172 container 可逆性:
+										173 text 可逆性 :
+									174 文本 新增计算记录或候选文件，历史证据保留；不支持自动撤销。
+							175 按钮 (disabled) 定位证据, Help: 精确证据绑定缺失、重复或已过期，请刷新证据后再定位。
+							176 文本 执行证据不完整：已核验 0 / 4 步。请核查结果后再决定是否继续。
+							177 container
+								178 text eplan_32a41a1b-906d-4a3d-b04a-6870d2170c09  ·  sha256-63471880edcc683
+							179 按钮 按当前上下文重新生成计划
+						180 container
+							181 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							182 按钮 更多操作
+							183 弹出式按钮 模型与推理设置
+							184 按钮 (disabled) 发送
+					185 container
+						186 container 工作视图
+							187 按钮 项目配置
+							188 按钮 数据资产
+							189 按钮 质量校核
+							190 按钮 测量来源与预检
+						191 container 测量与平差控制台
+							192 标题 测量与平差控制台, Value: 3
+								193 文本 测量与平差控制台
+							194 文本 Runtime 确定性计算
+							195 按钮 询问测量 AI
+							196 文本 已有测量网络
+							197 弹出式按钮 Description: 已有测量网络, Value: 结构化 JSON · 可进入校核与平差 · ecdd8ee6
+								198 (selected) 结构化 JSON · 可进入校核与平差 · ecdd8ee6
+							199 文本 网络类型
+							200 弹出式按钮 Description: 网络类型, Value: 水准 / 高程控制网
+							201 文本 Runtime 在线
+							202 container 测量计算状态
+								203 文本 网型
+								204 文本 水准 / 高程控制网
+								205 container
+									206 文本 当前约束
+									207 container Description: 当前 Runtime 约束, Help: Runtime 当前仅按固定已知点执行；最小约束和自由网尚不可选。
+										208 文本 固定已知点（Runtime 当前实现）
+								209 container
+									210 文本 平差方法 / 权模型
+									211 container Description: 当前 Runtime 执行方式, Help: 条件平差不提供为用户可选项；坐标 / 高程转换按其已选类型由 Runtime 执行。
+										212 文本 加权最小二乘
+								213 文本 可解性
+								214 文本 尚未校核
+							215 container 平差工作区导航
+								216 文本 工作区
+								217 按钮 网形与基准
+								218 按钮 观测表 2
+									219 文本 观测表
+									220 文本 2
+								221 按钮 点位与坐标 2
+									222 文本 点位与坐标
+									223 文本 2
+								224 按钮 平差结果
+								225 按钮 自由水准试算
+								226 按钮 期次变形 0
+									227 文本 期次变形
+									228 文本 0
+							229 文本 导入仪器、GNSS 或交换文件
+							230 文本 仪器、GNSS 与交换格式；识别不等于可平差。
+							231 按钮 选择专业测量文件
+							232 按钮 导入结构化网络
+							233 按钮 高级 JSON
+							234 文本 原文件按 SHA-256 保留；来源资格通过后才能校核和平差。
+							235 文本 项目基准
+							236 定义列表
+								237 container 网络类型
+									238 文本 网络类型
+								239 文本 水准 / 高程控制网
+								240 container 平面坐标系
+									241 文本 平面坐标系
+								242 文本 待确认
+								243 container 高程基准
+									244 文本 高程基准
+								245 文本 待确认
+								246 container 输入修订
+									247 文本 输入修订
+								248 文本 1
+							249 container
+								250 文本 导入时使用的已知控制点（可选）
+								251 文本输入区 (settable) Description: 导入时使用的已知控制点（可选）, Placeholder: BM-01,100.000
+								252 文本 每行：点号,高程[,X,Y]，数值单位为米。请在选择文件前填写，输入将随原文件导入并保留映射证据；冲突数据会阻断，不自动替换原记录。
+							253 container 专业测量来源筛选
+								254 文本 已有来源筛选
+								255 文本 格式
+								256 弹出式按钮 Description: 按来源格式筛选, Value: 全部格式（1）
+									257 (selected) 全部格式（1）
+								258 文本 就绪状态
+								259 弹出式按钮 Description: 按平差就绪状态筛选, Value: 全部状态
+									260 (selected) 全部状态
+								261 文本 显示 1 / 1
+							262 文本 原始资料身份已验证：SHA-256 与来源账本已复核（1 条记录）。不代表已完成质量复核、签名、规范合规或正式交付。
+							263 container 专业测量来源预检
+								264 文本 workwise-survey-network.json
+								265 文本 可进入校核与平差
+								266 container
+									267 text WorkWise/open  ·  结构化 JSON  版本 1  ·  置信度 99%
+								268 文本 4 条已识别记录 · 0.5 KiB
+								269 container
+									270 text 原文件 已保留
+								271 container 来源合同明细
+									272 定义列表
+										273 container 声明扩展名
+											274 文本 声明扩展名
+										275 文本 .json
+										276 container 厂商 / 内容探测格式
+											277 文本 厂商 / 内容探测格式
+										278 container
+											279 text WorkWise/open  ·  结构化 JSON  ·  版本 1
+										280 container 检测方法 / 置信度
+											281 文本 检测方法 / 置信度
+										282 container
+											283 text 内容签名  ·  99%
+										284 container 扩展名一致性 / 人工确认
+											285 文本 扩展名一致性 / 人工确认
+										286 container
+											287 text 未发现冲突  ·  无需人工确认
+										288 container 导入处置 / 下一步
+											289 文本 导入处置 / 下一步
+										290 container
+											291 text 可进入校核与平差  ·  冻结来源合同 workwise-survey-network@1 复核单位、基准和点位角色后执行质量校核。
+										292 container 长度单位（原始 → 规范）
+											293 文本 长度单位（原始 → 规范）
+										294 container
+											295 text m  →  m
+										296 container 角度单位（原始 → 规范）
+											297 文本 角度单位（原始 → 规范）
+										298 container
+											299 text not-declared  →  rad
+										300 container 平面基准 / 高程基准
+											301 文本 平面基准 / 高程基准
+										302 container
+											303 text 待确认  /  待确认
+										304 container 点 / 测站
+											305 文本 点 / 测站
+										306 container
+											307 text 2  /  0
+										308 container 观测 / 记录 / 跳过
+											309 文本 观测 / 记录 / 跳过
+										310 container
+											311 text 2  /  4  /  0
+										312 container 解析器源哈希
+											313 文本 解析器源哈希
+										314 文本 41953772e9b62f9cd059f0f546362887fd99db327826dad2e3944aa2bddb7cc3
+										315 container 转换器身份 / 二进制哈希
+											316 文本 转换器身份 / 二进制哈希
+										317 文本 未使用转换器
+								318 定义列表
+									319 container SHA-256
+										320 文本 SHA-256
+									321 文本 3988e8c52489e897e675f3b1681dfee29f598e25851af51e2d2440c02dc34c1b
+									322 container 解析器
+										323 文本 解析器
+									324 container
+										325 text workwise-survey-source  ·  1
+									326 container 内容签名
+										327 文本 内容签名
+									328 文本 workwise-survey-network@1
+									329 container 扩展名一致性
+										330 文本 扩展名一致性
+									331 container
+										332 text .json  ·  未发现冲突
+								333 文本 解析诊断
+								334 text 阻断 0 · 警告 0 ENCODING_DETECTED
+								335 按钮 询问 encoding_detected #1 的测量 AI
+								336 text 文本编码 utf-8 FORMAT_DETECTED
+								337 按钮 询问 format_detected #2 的测量 AI
+								338 文本 识别为 WorkWise/open / workwise-json 1，置信度 99%
+								339 container
+									340 文本 原始记录锚点
+									341 按钮 查看 4
+									342 文本 锚点用于从规范化观测回溯到仪器文件记录，不展示或改写原始字节。
+							343 文本 点位
+							344 文本 2
+							345 文本 1 已知 · 1 未知
+							346 文本 观测
+							347 文本 2
+							348 文本 已保留单位与权
+							349 文本 质量状态
+							350 文本 已导入
+							351 文本 未校核
+							352 文本 运行状态
+							353 文本 —
+							354 文本 尚未平差
+							355 按钮 质量校核
+							356 按钮 (disabled) 运行平差
+							357 container
+								358 text 质量门禁 导入后这里会列出格式、转换器、GNSS 解算、缺点、断网、单位冲突、秩亏和闭合差超限。 当前输入
+								359 定义列表
+									360 container 来源
+										361 文本 来源
+									362 文本 workwise-survey-network.json
+									363 container 格式
+										364 文本 格式
+									365 文本 结构化 JSON
+									366 container 就绪状态
+										367 文本 就绪状态
+									368 文本 可进入校核与平差
+									369 container 阻断项
+										370 文本 阻断项
+									371 文本 0
+								372 文本 结果可追溯
+	373 关闭按钮
+	374 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	375 最小化按钮
+376 menu bar
+	377 RAILWISE AI Candidate 7d4f454feecb
+	378 文件
+	379 编辑
+	380 显示
+	381 窗口
+	382 帮助
+
+The focused UI element is 9 按钮 内业

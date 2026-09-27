@@ -1,0 +1,40 @@
+{
+  "workwise.png": {
+    "size": [
+      1024,
+      1024
+    ],
+    "rgba": true,
+    "sha256": "57feb58ed2d82984f152496415f6e9e0a51bcb56c67a0e46c41699f801c1170c"
+  },
+  "workwise_tray.png": {
+    "size": [
+      512,
+      512
+    ],
+    "rgba": true,
+    "sha256": "9e43790936cb90436975457575002a386fe338c1501a022f3c58942006a24be7"
+  },
+  "workwise_dock.png": {
+    "size": [
+      1024,
+      1024
+    ],
+    "rgba": true,
+    "sha256": "9899d143993f23aa22bc35c93d06c02c8833c98da7e8b984e58b184113d0932a"
+  },
+  "icnsEntries": [
+    "icp4",
+    "icp5",
+    "icp6",
+    "ic07",
+    "ic08",
+    "ic09",
+    "ic10",
+    "ic11",
+    "ic12",
+    "ic13",
+    "ic14"
+  ],
+  "icoEntries": 7
+}

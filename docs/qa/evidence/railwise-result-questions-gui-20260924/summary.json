@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-24",
+  "candidateCommit": "3f0dbf1024577b5d28db1fe1570fe2e3173ae52a",
+  "packageAsarSha256": "0be93bf52ea87fe3b413a97e52674608156a53eceb4050ce504aa221a80bb744",
+  "origin": "native-candidate-GUI-explicit-send",
+  "data": "synthetic-only",
+  "result": "model-readback-failed",
+  "observedUI": [
+    "Chinese light Survey workspace loaded",
+    "point A button prepared draft only",
+    "Q10 network source question preserved existing user text",
+    "explicit send produced actual Runtime turn",
+    "upstream error shown with retry/configuration controls"
+  ],
+  "turns": [
+    {
+      "threadId": "thr_w87p35ib",
+      "turnId": "turn_ttb36he0",
+      "result": "failed",
+      "errorCode": "http_401",
+      "errorMessage": "model request failed with status 401: Authentication Fails (governor)",
+      "recordedErrors": 7,
+      "toolCalls": 0,
+      "assistantReplies": 0,
+      "typedReferencePresent": false
+    },
+    {
+      "threadId": "thr_w87p35ib",
+      "turnId": "turn_suau4ag3",
+      "result": "failed",
+      "errorCode": "http_401",
+      "errorMessage": "model request failed with status 401: Authentication Fails (governor)",
+      "recordedErrors": 7,
+      "toolCalls": 0,
+      "assistantReplies": 0,
+      "typedReferencePresent": true
+    }
+  ],
+  "businessSnapshotBeforeSha256": "1b88fd1f95676b3ff44d9019674981fa4b2f0e1ecebf3be7748964b56bd2a6a8",
+  "businessSnapshotAfterSha256": "1b88fd1f95676b3ff44d9019674981fa4b2f0e1ecebf3be7748964b56bd2a6a8",
+  "businessSnapshotUnchanged": true,
+  "privateExportHashes": {
+    "events.jsonl": "a010dd0c4dcf46907eee6a5de9a489fe6d9dd6575620e6accda3c95228aad54c",
+    "messages.jsonl": "da1c76dbea2c5b25e11a2f7f6610157140b9b83fbacb40eac7570da64cd44f5d",
+    "metadata.jsonl": "5d1a86e8deae262307353e7a0ea6f07bd9eeb8ae5bc327ae988a3eaa9655b3b3"
+  },
+  "limitations": [
+    "No successful model reply or survey_read_evidence tool call",
+    "No complete Q10-Q17 UI matrix, restart or accessibility acceptance",
+    "No human or professional acceptance",
+    "No public release operation"
+  ]
+}

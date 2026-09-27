@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-20",
+  "baseline": "7d8e92b461b6697cf782d197c05c392b6d62de03",
+  "scope": "isolated pure core and versioned contract; no runtime, IPC, UI, main-workspace, version or release changes",
+  "checks": [
+    {
+      "command": "npm --prefix kun run test -- src/engineering/survey-statistical-family.test.ts src/engineering/survey-generalized-w.test.ts src/engineering/survey-statistical-diagnostics.test.ts src/engineering/survey-statistical-service.test.ts --reporter=dot",
+      "exitCode": 0,
+      "testFiles": 4,
+      "passed": 297,
+      "newModuleTests": 231,
+      "adjacentRegressionTests": 66
+    },
+    {
+      "command": "npm run typecheck --prefix kun",
+      "exitCode": 0
+    },
+    {
+      "command": "npx eslint kun/src/contracts/survey-statistical-family.ts kun/src/engineering/survey-statistical-family.ts kun/src/engineering/survey-statistical-family.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build --prefix kun",
+      "exitCode": 0
+    },
+    {
+      "command": "node --input-type=module imports kun/dist/engineering/survey-statistical-family.js and evaluates 256 distinct chi-square df from 1000 through 745, alpha=1e-12",
+      "exitCode": 0,
+      "node": "v26.8.2",
+      "calculatedMembers": 256,
+      "jsonBytes": 168486,
+      "elapsedMs": 12.178834,
+      "timingMeaning": "one local smoke measurement, not a production SLA"
+    },
+    {
+      "command": "bun docs/qa/evidence/railwise-statistical-family-20260920/survey-statistical-family-review-probe.ts /private/tmp/railwise-statistical-family",
+      "exitCode": 0
+    },
+    {
+      "command": "Python mpmath1.3.0 review-audit.py",
+      "exitCode": 0,
+      "tails": 839,
+      "criticals": 45,
+      "boundaryAndSideEvaluations": 225
+    },
+    {
+      "command": "Regenerate all three independently authored review fixture files after archive-prefix rename",
+      "exitCode": 0,
+      "allFixtureBytesMatchOriginalSha256": true
+    },
+    {
+      "command": "Archived portable independent-review replay script in fresh temporary directory",
+      "exitCode": 0,
+      "tails": 839,
+      "criticals": 45,
+      "boundaryAndSideEvaluations": 225
+    }
+  ],
+  "independentReviewFinding": {
+    "priority": "P1",
+    "finding": "Extensionless production contract import would remain extensionless after tsc and fail under Node ESM despite Bun/Vitest passing",
+    "fix": "Production core imports ../contracts/survey-statistical-family.js",
+    "verification": "kun build and real Node import plus 256-member functional smoke passed"
+  },
+  "limitations": [
+    "Caller declarations and exact upstream scalar assumptions remain unverified",
+    "Software log margin and numerical resolution interval are empirical policy, not certified error bounds",
+    "No automatic import of approximate generalized-w or t upstream results",
+    "No complete Baarda, power/MDB, observation deletion, engineering approval, real instrument acceptance or public release"
+  ]
+}

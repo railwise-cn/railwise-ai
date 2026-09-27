@@ -1,0 +1,4 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 135-225
+~							134 文本 Integrity checks failed for stored input or results. This record cannot be restored.
+The focused UI element is 123 标题 Advanced model trials, Value: 3

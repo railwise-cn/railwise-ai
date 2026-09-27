@@ -1,0 +1,295 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 6ff82c8c2746.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-6ff82c8/Applications/RAILWISE%20AI%20Candidate%206ff82c8c2746.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container Code / Survey
+							8 按钮 Code
+							9 按钮 Survey
+						10 切换 Description: Focus mode, Value: off
+						11 container Workspace tools
+							12 按钮 Write
+							13 按钮 Plugins
+							14 按钮 Scheduled tasks
+							15 按钮 Flow
+							16 按钮 Design
+						17 按钮 New Survey project
+					18 container
+						19 text Survey projects 1
+						20 按钮 New Survey project
+						21 切换按钮 Description: Refresh Survey projects, Value: 0
+						22 按钮 Survey AI desk Goals, plans, evidence, delivery
+							23 文本 Survey AI desk
+							24 文本 Goals, plans, evidence, delivery
+						25 按钮 合成验收·参考与评分与静态追加·6ff82c8 Control network · m · 9/20
+							26 文本 合成验收·参考与评分与静态追加·6ff82c8
+							27 文本 Control network
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI sessions 1
+						33 按钮 Survey AI · 新建内业任务 合成验收·参考与评分与静态追加·6ff82c8 · 0 messages
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成验收·参考与评分与静态追加·6ff82c8
+							36 文本  · 
+							37 文本 0
+							38 文本 messages
+						39 文本 Survey jobs, datasets, runs, and deliverables stay separate from Code and Design sessions.
+					40 container
+						41 切换按钮 Connect phone, Value: 0
+						42 按钮 Settings
+					43 container
+						44 按钮 Collapse sidebar
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text Engineering Survey Processing Current Survey job
+						48 弹出式按钮 Current Survey job, Value: 合成验收·参考与评分与静态追加·6ff82c8
+							49 (selected) 合成验收·参考与评分与静态追加·6ff82c8
+						50 文本 Work view
+						51 弹出式按钮 Work view, Value: Network and adjustment
+						52 按钮 New Survey project
+					53 container
+						54 text Task 合成验收·参考与评分与静态追加·6ff82c8 Stage Network and adjustment Source / format —  ·  — Disposition Not started Datum Unconfirmed  ·  Unconfirmed Points — Stations — Observations — Closure — Precision — Deliverable — Network — Review —
+					55 container Survey AI session
+						56 container
+							57 标题 Survey AI session, Value: 2
+								58 文本 Survey AI session
+							59 文本 合成验收·参考与评分与静态追加·6ff82c8
+							60 按钮 Data assets
+							61 按钮 Survey adjustment
+							62 按钮 Refresh context
+						63 标题 Survey AI, Value: 2
+							64 文本 Survey AI
+						65 container
+							66 文本输入区 (settable) Ask the agent…
+							67 按钮 More actions
+							68 弹出式按钮 Model and reasoning settings
+							69 按钮 (disabled) Send
+					70 container
+						71 container Work view
+							72 按钮 Survey adjustment
+							73 按钮 Advanced model trials
+						74 container Advanced model trials
+							75 标题 Advanced model trials, Value: 3
+								76 文本 Advanced model trials
+							77 文本 Declare an independent experimental model and preserve its original input and trial evidence. No delivery manifest is required. Supply the model, units and basis explicitly.
+							78 文本 Declared-model trials only. Model assumptions and source authenticity are unverified. Results are not engineering acceptance, standards conformity or a professional signature. Formal adjustment weights, observations and approvals are unchanged.
+							79 文本 Project project_9d966747-63bc-4658-9ba6-a8635423a7e0 · Revision 2
+							80 container
+								81 文本 Trial method
+								82 弹出式按钮 Trial method, Value: Fixed-scale Huber trial
+									83 (selected) Fixed-scale Huber trial
+							84 文本 Independent observations and a fixed external scale only. Supply the full linear model, initial values and stopping policy. This trial cannot replace formal observation weights.
+							85 开合三角标记 View a synthetic input example
+								86 文本 View a synthetic input example
+							87 container
+								88 文本 Model basis statement
+								89 文本输入区 (settable) Model basis statement, Value: Synthetic fixed external scale Huber acceptance; independent exact objective and parameter oracle. No formal observation or weight replacement.
+							90 文本 Describe model applicability, observation and unit sources, and the covariance or grouping basis. Maximum 16 KiB of original text. Saving does not provide professional confirmation.
+							91 container
+								92 文本 Complete trial request JSON
+								93 文本输入区 (settable) Complete trial request JSON, Value: {
+  "schemaVersion": 1,
+  "model": "fixed-linear-full-column-rank",
+  "independenceDeclaration": "caller-declared-independent-observations",
+  "residualConvention": "observed-minus-fitted",
+  "observationUnit": "m",
+  "parameterIds": [
+    "position"
+  ],
+  "parameterUnits": [
+    "m"
+  ],
+  "initialParameters": [
+    0
+  ],
+  "scale": {
+    "kind": "fixed-external",
+    "value": 1,
+    "unit": "m",
+    "basisStatement": "Synthetic fixed external scale for acceptance arithmetic only."
+  },
+  "loss": {
+    "kind": "huber",
+    "k": 1
+  },
+  "observations": [
+    {
+      "id": "o0",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o1",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o2",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o3",
+      "value": 10,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    }
+  ],
+  "stopping": {
+    "maxIterations": 200,
+    "standardizedPredictionStepTolerance": 1e-10,
+    "relativeObjectiveTolerance": 1e-10,
+    "normalizedScoreTolerance": 1e-10
+  }
+}
+
+							94 文本 Original text is preserved without truncation or automatic repairs. Maximum 256 KiB UTF-8; currently 1398 bytes.
+							95 container
+								96 复选框 Value: 0, I have checked the declared model and basis and confirm saving an independent experimental trial only. I understand that assumptions are unverified and results do not constitute engineering approval.
+								97 文本 I have checked the declared model and basis and confirm saving an independent experimental trial only. I understand that assumptions are unverified and results do not constitute engineering approval.
+							98 按钮 (disabled) Confirm and save trial
+							99 按钮 Trial history
+							100 标题 Restored independent trial record, Value: 4
+								101 文本 Restored independent trial record
+							102 container
+								103 text advanced_trial_f27adf75-3b21-4cf0-9c01-7d7953f92559  ·  2026-09-20T01:47:48.880Z
+							104 文本 Saved bytes and hashes have been checked against the Runtime’s strictly replayed result. This establishes local record consistency only, not input authenticity or model assumptions.
+							105 按钮 Reverify and replay
+							106 按钮 Reverify and export JSON
+							107 标题 Model basis statement, Value: 5
+								108 文本 Model basis statement
+							109 文本 Synthetic fixed external scale Huber acceptance; independent exact objective and parameter oracle. No formal observation or weight replacement.
+							110 container Huber trial results
+								111 标题 Huber trial results, Value: 4
+									112 文本 Huber trial results
+								113 container
+									114 text Declared stopping conditions met  ·  Score, prediction step and objective change satisfy the stopping policy
+								115 文本 Scale and independence are unverified. Multipliers and derived IRLS weights are trial values only. No covariance, Gaussian WLS precision, observation removal or engineering approval is provided.
+								116 文本 Strict-inlier rank satisfies a numerical sufficient condition; uniqueness is not certified.
+								117 文本 Fixed scale 1 m · Huber k 1
+								118 文本 Synthetic fixed external scale for acceptance arithmetic only.
+								119 文本 Maximum 200 iterations · score tolerance 1e-10 · prediction-step tolerance 1e-10 · objective-change tolerance 1e-10
+								120 container Estimated parameters and declared units
+									121 表格 Estimated parameters and declared units
+										122 文本 Estimated parameters and declared units
+										123 row
+											124 行标题
+												125 文本 position (m)
+											126 单元格
+												127 文本 0.333333333333
+								128 container Iteration trace
+									129 开合三角标记 Iteration 0 · objective 9.5 · score 0.5
+										130 文本 Iteration 0 · objective 9.5 · score 0.5
+									131 开合三角标记 Iteration 1 · objective 9.33350676379 · score 0.0161290322581
+										132 文本 Iteration 1 · objective 9.33350676379 · score 0.0161290322581
+									133 开合三角标记 Iteration 2 · objective 9.33333352562 · score 0.000537056928034
+										134 文本 Iteration 2 · objective 9.33333352562 · score 0.000537056928034
+									135 开合三角标记 Iteration 3 · objective 9.33333333355 · score 0.0000179012566681
+										136 文本 Iteration 3 · objective 9.33333333355 · score 0.0000179012566681
+									137 开合三角标记 Iteration 4 · objective 9.33333333333 · score 5.9670784347e-7
+										138 文本 Iteration 4 · objective 9.33333333333 · score 5.9670784347e-7
+									139 开合三角标记 Iteration 5 · objective 9.33333333333 · score 1.98902604387e-8
+										140 文本 Iteration 5 · objective 9.33333333333 · score 1.98902604387e-8
+									141 开合三角标记 Iteration 6 · objective 9.33333333333 · score 6.63008925539e-10
+										142 文本 Iteration 6 · objective 9.33333333333 · score 6.63008925539e-10
+									143 开合三角标记 Iteration 7 · objective 9.33333333333 · score 2.20999329947e-11
+										144 文本 Iteration 7 · objective 9.33333333333 · score 2.20999329947e-11
+									145 container
+										146 开合三角标记 Iteration 8 · objective 9.33333333333 · score 7.36743999141e-13
+											147 文本 Iteration 8 · objective 9.33333333333 · score 7.36743999141e-13
+										148 文本 Score roundoff estimate 7.10542735759e-14 · prediction step 1.42421074933e-11 · relative objective change 1.90323947079e-16
+										149 container Read-only Huber observation values
+											150 表格
+												151 row
+													152 列标题
+														153 文本 Observation ID
+													154 列标题
+														155 text Observed minus fitted  (m)
+													156 列标题
+														157 文本 Standardized residual
+													158 列标题
+														159 文本 Trial multiplier
+													160 列标题
+														161 text Derived IRLS weight  (m⁻²)
+												162 row
+													163 行标题
+														164 文本 o0
+													165 单元格
+														166 文本 -0.333333333333
+													167 单元格
+														168 文本 -0.333333333333
+													169 单元格
+														170 文本 1
+													171 单元格
+														172 文本 1
+												173 row
+													174 行标题
+														175 文本 o1
+													176 单元格
+														177 文本 -0.333333333333
+													178 单元格
+														179 文本 -0.333333333333
+													180 单元格
+														181 文本 1
+													182 单元格
+														183 文本 1
+												184 row
+													185 行标题
+														186 文本 o2
+													187 单元格
+														188 文本 -0.333333333333
+													189 单元格
+														190 文本 -0.333333333333
+													191 单元格
+														192 文本 1
+													193 单元格
+														194 文本 1
+												195 row
+													196 行标题
+														197 文本 o3
+													198 单元格
+														199 文本 9.66666666667
+													200 单元格
+														201 文本 9.66666666667
+													202 单元格
+														203 文本 0.103448275862
+													204 单元格
+														205 文本 0.103448275862
+							206 开合三角标记 Original JSON declaration
+								207 文本 Original JSON declaration
+							208 开合三角标记 Normalized model used for computation
+								209 文本 Normalized model used for computation
+							210 开合三角标记 Complete result and provenance hashes
+								211 文本 Complete result and provenance hashes
+	212 关闭按钮
+	213 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	214 最小化按钮
+215 menu bar
+	216 RAILWISE AI Candidate 6ff82c8c2746
+	217 File
+	218 Edit
+	219 View
+	220 Window
+	221 Help
+
+The focused UI element is 75 标题 Advanced model trials, Value: 3

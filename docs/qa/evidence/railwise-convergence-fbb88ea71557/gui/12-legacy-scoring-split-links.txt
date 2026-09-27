@@ -1,0 +1,216 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate fbb88ea71557.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-fbb88ea/Applications/RAILWISE%20AI%20Candidate%20fbb88ea71557.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 新建内业任务 控制网 · m · 9/20
+							26 文本 新建内业任务
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 新建内业任务 · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 新建内业任务
+							36 文本  · 
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 新建内业任务
+							49 (selected) 新建内业任务
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 导入与预检
+							52 (selected) 导入与预检
+						53 按钮 新建工程测量项目
+					54 container
+						55 text 任务 新建内业任务 阶段 导入与预检 数据源 / 格式 —  ·  — 处置状态 未开始 基准 待确认  ·  待确认 点数 — 测站数 — 观测 — 闭合差 — 精度 — 成果 — 网型 — 审查 —
+					56 container Survey AI 会话
+						57 container
+							58 标题 Survey AI 会话, Value: 2
+								59 文本 Survey AI 会话
+							60 文本 新建内业任务
+							61 按钮 数据资产
+							62 按钮 测量平差
+							63 按钮 刷新上下文
+						64 标题 Survey AI, Value: 2
+							65 文本 Survey AI
+						66 container
+							67 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							68 按钮 更多操作
+							69 弹出式按钮 模型与推理设置
+							70 按钮 (disabled) 发送
+					71 container
+						72 container 工作视图
+							73 按钮 项目配置
+							74 按钮 数据资产
+							75 按钮 质量校核
+							76 按钮 测量来源与预检
+						77 container 质量评分试算
+							78 标题 质量评分试算, Value: 3
+								79 文本 质量评分试算
+							80 文本 依据 GB/T 24356—2023 已核查条文，对明确声明的检查记录进行精确评分。选择成果类型和检查阶段，并填写适用依据及原始声明。
+							81 文本 本工具仅对声明检查记录试算。证据引用、缺陷分类和既有批合格前提均未验真；试算结果不构成规范符合性认证、工程质量批准或专业人员签字。
+							82 文本 项目 project_e53c6744-12ba-45bf-95f4-860f31b6a49c · 修订 2
+							83 container
+								84 文本 评分阶段
+								85 弹出式按钮 评分阶段, Value: 选择评分阶段
+									86 (selected) 选择评分阶段
+							87 按钮 (disabled) 试算并保存声明记录
+							88 按钮 评分记录历史
+							89 标题 已恢复的声明评分记录, Value: 4
+								90 文本 已恢复的声明评分记录
+							91 container
+								92 text quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802  ·  2026-09-20T04:51:01.009Z
+							93 container
+								94 text 平面控制测量 · 点（表43/44）  ·  单位成果分层评分  ·  GB/T 24356-2023
+							95 文本 已核对原字节、哈希与 Runtime 严格重算结果。这仅证明当前本地记录一致，不证明引用资料、人工分类或既有合格前提真实。
+							96 按钮 重新核验并重放
+							97 按钮 重新核验并导出 JSON
+							98 标题 检查适用依据与资料说明, Value: 5
+								99 文本 检查适用依据与资料说明
+							100 文本 合成 GUI 验收，平面控制点表43/44，完整七子元素声明；仅核对目录关联和精确评分，不代表现场检查或专业批准。
+							101 container 本次声明评分结果
+								102 标题 本次声明评分结果, Value: 5
+									103 文本 本次声明评分结果
+								104 文本 完整产品范围 · 依据未验真的声明
+								105 文本 已按声明计算
+								106 文本 “已计算”或声明条件满足，只说明本次输入在所列范围内的计算结果；部分范围、单项、样本和批次不可互相替代。
+								107 文本 已在声明范围内完成精确计算。
+								108 定义列表
+									109 container 精确得分
+										110 文本 精确得分
+									111 文本 9141/100
+									112 container 本次声明范围等级
+										113 文本 本次声明范围等级
+									114 文本 优
+									115 container 声明条件下的合格判定
+										116 文本 声明条件下的合格判定
+									117 文本 声明条件满足（未验真）
+								118 文本 数值按精确“分子/分母”展示；等级判定使用未舍入值。率值为比值，不是已四舍五入的百分数。
+								119 container
+									120 text 已提供检查记录 ： 数学精度 · 观测质量 · 计算质量 · 选点质量 · 埋石质量 · 整饰质量 · 资料完整性
+								121 开合三角标记 查看逐项计算及分层权重
+									122 文本 查看逐项计算及分层权重
+								123 container
+									124 开合三角标记 查看规范依据
+										125 文本 查看规范依据
+									126 container 本次结果的规范依据
+										127 标题 本次结果的规范依据, Value: 6
+											128 文本 本次结果的规范依据
+										129 文本 智能体复核的只读目录。项目适用性、规范符合性与人员签认仍为未评估。
+										130 文本 本说明按结果保留的来源、算法与输入合同匹配，不向原记录补写规则引用或批准状态。
+										131 文本 声明单位成果分层评分
+										132 文本 按两个控制测量profile的七子元素逐层加权；缺失、明确排除和已检查分开，任何A类或低于60子项不能被平均抵销。
+										133 定义列表
+											134 container 标准
+												135 文本 标准
+											136 文本 GB/T 24356-2023
+											137 container 成果类别
+												138 文本 成果类别
+											139 文本 平面控制测量（点）
+											140 container 目录规则及版本
+												141 文本 目录规则及版本
+											142 container
+												143 text gbt24356-2023.scoring.unit  ·  1
+											144 container 结果算法
+												145 文本 结果算法
+											146 文本 gbt24356-declared-exact-quality-scoring-1
+										147 container 条款与官方原文页码
+											148 container
+												149 text 条款 6.2.1.2, 6.2.2, 6.2.3, 6.2.4.4, 6.2.4.5, 6.2.5  · 表 2, 3
+											150 文本 式(6)属于6.2.4.5，6.2.5为等级及表3。旧算法trace的6.2.5/formula-6标签保留原样，本目录补正定位；部分声明范围不等于完整验收。
+											151 link Description: 印刷第 6 页 · PDF 第 9 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=9
+											152 link Description: 印刷第 7 页 · PDF 第 10 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=10
+											153 link Description: 印刷第 8 页 · PDF 第 11 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=11
+											154 container
+												155 text 条款 7.5.1  · 表 43
+											156 文本 表43：平面控制测量质量元素、子元素、检查项及权；单位为点。
+											157 link Description: 印刷第 58 页 · PDF 第 61 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=61
+											158 container
+												159 text 条款 7.5.1  · 表 44
+											160 文本 表44及续表：错漏分类；分类仍由调用方声明，未编码完整自动分类表。
+											161 link Description: 印刷第 59 页 · PDF 第 62 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=62
+											162 link Description: 印刷第 60 页 · PDF 第 63 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=63
+											163 文本 条款 7.5.1
+											164 文本 7.5.1条款引导位于页底；本页上部为表42续表，表43从下一页开始。
+											165 link Description: 印刷第 57 页 · PDF 第 60 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=60
+										166 文本 已实现范围
+										167 内容列表
+											168 container
+												169 AXListMarker • 
+												170 文本 有界约分BigInt有理数，不预先舍入、不使用epsilon放宽阈值。
+											171 container
+												172 AXListMarker • 
+												173 文本 目录只描述现有声明试算合同；依据解析不会执行计算，也不会改变旧得分或升级旧记录。
+										174 文本 未覆盖范围与待解释分支
+										175 内容列表
+											176 container
+												177 AXListMarker • 
+												178 文本 仅覆盖两个控制测量profile；不覆盖地形、线路或变形测量成果。
+											179 container
+												180 AXListMarker • 
+												181 文本 部分范围得分不认证排除依据、完整检查或项目合格。
+											182 container
+												183 AXListMarker • 
+												184 文本 不认证检查证据、缺陷分类、既有资格或项目适用性。
+											185 container
+												186 AXListMarker • 
+												187 文本 不自动批准工程成果、签字或认证组织独立。
+										188 开合三角标记 来源与目录身份
+											189 文本 来源与目录身份
+							190 开合三角标记 原始 JSON 声明
+								191 文本 原始 JSON 声明
+							192 开合三角标记 计算采用的严格解析声明
+								193 文本 计算采用的严格解析声明
+							194 开合三角标记 完整结果与追溯摘要
+								195 文本 完整结果与追溯摘要
+						196 标题 质量校核与问题处置, Value: 2
+							197 文本 质量校核与问题处置
+						198 文本 阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。
+						199 按钮 (disabled) 重新校核
+						200 标题 请选择或导入数据集, Value: 3
+							201 文本 请选择或导入数据集
+						202 文本 质量校核会检查缺失值、重复测点、非法数值、时间顺序、单位冲突和阈值缺失。
+	203 关闭按钮
+	204 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	205 最小化按钮
+206 menu bar
+	207 RAILWISE AI Candidate fbb88ea71557
+	208 文件
+	209 编辑
+	210 显示
+	211 窗口
+	212 帮助
+
+The focused UI element is 124 开合三角标记 查看规范依据

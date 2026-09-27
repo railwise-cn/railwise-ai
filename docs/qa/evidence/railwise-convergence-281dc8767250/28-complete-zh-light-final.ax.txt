@@ -1,0 +1,175 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 281dc8767250.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-281dc87/Applications/RAILWISE%20AI%20Candidate%20281dc8767250.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 控制网内业演示（合成数据） 控制网 · m · 9/20
+							26 文本 控制网内业演示（合成数据）
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 控制网内业演示（合成数据） · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 控制网内业演示（合成数据）
+							36 文本  · 
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 控制网内业演示（合成数据）
+							49 (selected) 控制网内业演示（合成数据）
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 成果与审查
+							52 (selected) 成果与审查
+						53 按钮 新建工程测量项目
+					54 container
+						55 text 任务 控制网内业演示（合成数据） 阶段 成果与审查 数据源 / 格式 plane-control.in2  ·  COSA-IN2 处置状态 候选成果 基准 待确认  ·  待确认 点数 4 测站数 1 观测 5 闭合差 1.3727E-7 m 精度 1.3592E-7 m 成果 候选成果 网型 平面控制网 审查 草案
+					56 container Survey AI 会话
+						57 container
+							58 标题 Survey AI 会话, Value: 2
+								59 文本 Survey AI 会话
+							60 文本 控制网内业演示（合成数据）
+							61 按钮 数据资产
+							62 按钮 测量平差
+							63 按钮 刷新上下文
+						64 标题 Survey AI, Value: 2
+							65 文本 Survey AI
+						66 container
+							67 文本输入区 (settable) 创建项目后，AI 会绑定资料边界。
+							68 按钮 更多操作
+							69 弹出式按钮 模型与推理设置
+							70 按钮 (disabled) 发送
+					71 container
+						72 container 工作视图
+							73 按钮 交付总览
+							74 按钮 成果中心
+							75 按钮 审查归档
+							76 按钮 技能与规范
+						77 标题 待审查成果清单, Value: 2
+							78 文本 待审查成果清单
+						79 文本 基础质量门禁通过后可生成不可原地覆盖的待审查清单。复核、审核、批准与签名流程尚未实施，系统不会产生已批准交付。
+						80 按钮 生成待审查清单
+						81 开合三角标记 单位成果总体与首轮抽样
+							82 文本 单位成果总体与首轮抽样
+						83 container 声明检查关联评估
+							84 标题 声明检查关联评估, Value: 3
+								85 文本 声明检查关联评估
+							86 文本 仅关联调用方声明的本地记录。未认证真实检查，未完成组织职责与签认核验；不改变待审草稿，不执行成果五项复验或成果数值重放。
+							87 文本 本版仅支持一个首轮运行的全部 1–8 个单位、已有平面控制点或高程控制测段单位评分；不生成样本或批合格结论。
+							88 按钮 已保存计划
+							89 按钮 已保存评估
+							90 按钮 新建关联计划
+							91 container 关联评估结果
+								92 文本 资料关联范围
+								93 文本 声明材料要求已关联齐全
+								94 文本 单位结果覆盖
+								95 文本 全部目标有完整产品范围单位结果
+								96 文本 声明否决
+								97 文本 所有声明单位结果已计算
+								98 container
+									99 text 原清单状态 :  待审查  ·  声明关联齐全（非工程批准）
+								100 文本 目标 2 · 已关联评分 2 · 完整单位结果 2 · 已保全映射 2/2 · 未解析引用 0
+								101 文本 assessment_310839d6-3b44-45a4-8f99-5f44e0d815ed
+								102 文本 LINK-01
+								103 container
+									104 text 完整声明产品范围 · 已计算  · 9141/100
+								105 container
+									106 text 计算后关联已有记录；成果关联由调用方声明  ·  quality_scoring_29a60f54-f4d6-4d54-ba73-ae70e032ae70  ·  已在声明范围内完成精确计算。
+								107 container
+									108 text synthetic-linkage  →  output-1  ·  已关联保全字节  ·  合成声明 LINK-01；共用 output-1，仅作字节关联。
+								109 文本 LINK-02
+								110 container
+									111 text 完整声明产品范围 · 已计算  · 9141/100
+								112 container
+									113 text 计算后关联已有记录；成果关联由调用方声明  ·  quality_scoring_b30d35cd-867f-4b3e-9bbe-79cf8c4c70b8  ·  已在声明范围内完成精确计算。
+								114 container
+									115 text synthetic-linkage  →  output-1  ·  已关联保全字节  ·  合成声明 LINK-02；共用 output-1，仅作字节关联。
+								116 按钮 重新核验关联
+								117 按钮 另存当前核验记录
+							118 文本 保存时结果；此列表未重放依赖。打开后重新核验当前来源。
+							119 按钮 2026-09-20T02:49:05.140Z · assessment_6e4da1bc-bc03-48b3-a9b7-b8817a0e4ee1 · 声明关联不完整
+								120 文本 2026-09-20T02:49:05.140Z
+								121 文本  · 
+								122 文本 assessment_6e4da1bc-bc03-48b3-a9b7-b8817a0e4ee1
+								123 文本  · 声明关联不完整
+							124 按钮 2026-09-20T02:47:23.595Z · assessment_310839d6-3b44-45a4-8f99-5f44e0d815ed · 声明关联齐全（非工程批准）
+								125 文本 2026-09-20T02:47:23.595Z
+								126 文本  · 
+								127 文本 assessment_310839d6-3b44-45a4-8f99-5f44e0d815ed
+								128 文本  · 声明关联齐全（非工程批准）
+							129 按钮 2026-09-20T02:46:44.838Z · assessment_07daf090-925b-4093-a010-d012477dac4f · 声明关联不完整
+								130 文本 2026-09-20T02:46:44.838Z
+								131 文本  · 
+								132 文本 assessment_07daf090-925b-4093-a010-d012477dac4f
+								133 文本  · 声明关联不完整
+						134 文本 审查清单
+						135 container
+							136 text 已选择并保存来源资料 ·  条件已满足
+						137 文本 1 项准入通过的平差 · 0 项变形结果
+						138 container
+							139 text 阻断项已清零 ·  条件已满足
+						140 文本 当前数据集没有待处理阻断项。
+						141 container
+							142 text 警告项已确认 ·  条件已满足
+						143 文本 当前没有需要接受的警告项。
+						144 container
+							145 text 已完成确定性分析 ·  条件已满足
+						146 文本 确定性 Survey 计算已完成，当前来源准入通过。
+						147 container
+							148 text 已生成可审查成果 ·  条件已满足
+						149 文本 3 个输出文件带有 SHA-256 哈希。
+						150 文本 待审查清单
+						151 文本 每次生成独立 manifest，历史版本保持只读；该记录不代表批准。
+						152 文本 manifest_8c993a08-4f8f-4ce4-bb93-74da8a52dcf4
+						153 按钮 询问 manifest_8c993a08-4f8f-4ce4-bb93-74da8a52dcf4 的测量 AI
+						154 container
+							155 text 3 个输出  ·  草案  ·  2026/9/20 10:41:37
+						156 按钮 重新验证成果
+						157 开合三角标记 质检证据保全工作区
+							158 文本 质检证据保全工作区
+						159 文本 审查说明：1 项
+						160 container
+							161 text 待审查状态 当前项目修订 2 可生成待审查清单 清单会记录输出哈希、分析输入哈希、引用和人工处置状态。复核、审核、批准与签名完成前，不得将其表述为已批准交付。 最近 manifest manifest_8c993a08-4f8f-4ce4-bb93-74da8a52dcf4
+	162 关闭按钮
+	163 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	164 最小化按钮
+165 menu bar
+	166 RAILWISE AI Candidate 281dc8767250
+	167 文件
+	168 编辑
+	169 显示
+	170 窗口
+	171 帮助
+
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-281dc87/Applications/RAILWISE%20AI%20Candidate%20281dc8767250.app/Contents/Resources/app.asar/out/renderer/index.html

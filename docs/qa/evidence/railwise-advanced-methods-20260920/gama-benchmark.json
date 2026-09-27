@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "scope": "Independent Gama numerical benchmark only; product free-network method not implemented",
+  "status": "passed",
+  "startedAt": "2026-09-19T18:28:44.944583+00:00",
+  "platform": "macOS-27.0-arm64-arm-64bit",
+  "macOS": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A428\n",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+  "version": "gama-local (GNU Gama) 2.29 / Clang C/C++ 21.0\nCopyright (C) 2021 Ales Cepek et al.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n",
+  "sourceArchiveSha256": "c00fa3c6fff4e777834dfae02afccff2e14884f544f5ac752a0047d56e80b411",
+  "binarySha256": "52100ebb58fabaa8e076e1992cc4583b299d2b03a725657fdafceeee4093308a",
+  "probeBinarySha256": "cab72d5de2980918bfd108d4df56418f840ec4253e71b8c5e1bc6361d0388a1b",
+  "probeSourceSha256": "9ee6ce984482eacc4bb1d317b3fd454bab4f9644f3f4aa9fdde657c41b442d65",
+  "checkerSourceSha256": "3ff04cd41701007c960b965e9d4a668f1b8c6f3fc5b94944aaffe33ddf1a6d27",
+  "comparatorTestSourceSha256": "4483178b4958a48319245deacba9cef11492220db246ed517c88ecf57dc13ccd",
+  "systemInstallPerformed": false,
+  "sourceCodeModified": false,
+  "gpgSignatureVerified": false,
+  "buildFlags": "-O2 -std=c++17 -include sstream",
+  "buildCommands": [
+    "./configure --prefix=/private/tmp/railwise-gama-2.29-uYZ8ys/local --disable-gama-g3 CXX=clang++ CC=clang CXXFLAGS='-O2 -std=c++17 -include sstream'",
+    "make -C lib -j4",
+    "make -C src gama-local -j4",
+    "clang++ -O2 -std=c++17 -include sstream -I /private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/lib /Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-precision-probe.cpp /private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/lib/libgama.a -lsqlite3 -lexpat -o /private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe"
+  ],
+  "resolvedSetupFailures": [
+    "Initial curl archive download timed out after 60 seconds; retry was stopped; Node fetch completed and matched the pinned archive hash.",
+    "Initial stock build failed because deformation.cpp relies on indirect sstream inclusion; compiler flag -include sstream resolved it without changing source files.",
+    "Initial evidence adapter treated qbb as an unwhitened cofactor; analytical Qvv check exposed the unit error. Corrected conversion using sqrt(weight_i*weight_j), consistent with Gama network.cpp's residual cofactor formula."
+  ],
+  "cases": [
+    {
+      "id": "free-leveling-001-svd",
+      "cliCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/src/gama-local",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-001.xml",
+        "--algorithm",
+        "svd",
+        "--iterations",
+        "0",
+        "--cov-band",
+        "-1",
+        "--xml",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-001-svd.xml",
+        "--text",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-001-svd.txt"
+      ],
+      "probeCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-001.xml",
+        "svd"
+      ],
+      "fixtureSha256": "46969995ac214853a0a86286759f4e046ae1ab20267a4d2808643ce37d6408fe",
+      "outputXmlSha256": "bf98d91a778bf4ba2e274a93cae3e7c34352318fbef392a9117c6324c8b0be1d",
+      "outputTextSha256": "e9fbeac59b429d4a69d09afb144ed694a382966b89ef7089d46d5d8f9516bc50",
+      "outputProbeSha256": "6ac0ae20f284b456b4a9e091f6b0aa24882fda7e7d943f4ce4e3df92e206fc25",
+      "status": "passed",
+      "degreesOfFreedom": 1,
+      "datumDefect": 1,
+      "weightedSSE": 0.02999999999999992,
+      "differences": {
+        "heightMaxAbsErrorM": 4.996003610813204e-16,
+        "heightDifferenceMaxAbsErrorM": 8.881784197001252e-16,
+        "residualMaxAbsErrorM": 8.049116928532385e-16,
+        "heightCofactorMaxAbsErrorM2": 3.3306690738754696e-16,
+        "residualCofactorMaxAbsErrorM2": 7.771561172376096e-16,
+        "heightContrastCofactorAbsErrorM2": 8.881784197001252e-16,
+        "weightedSSEAbsError": 7.979727989493313e-17,
+        "cliVsProbeCovarianceMaxAbsErrorM2": 2.2222225448675914e-09,
+        "cliCovarianceRoundingToleranceM2": 5e-09
+      }
+    },
+    {
+      "id": "free-leveling-001-gso",
+      "cliCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/src/gama-local",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-001.xml",
+        "--algorithm",
+        "gso",
+        "--iterations",
+        "0",
+        "--cov-band",
+        "-1",
+        "--xml",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-001-gso.xml",
+        "--text",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-001-gso.txt"
+      ],
+      "probeCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-001.xml",
+        "gso"
+      ],
+      "fixtureSha256": "46969995ac214853a0a86286759f4e046ae1ab20267a4d2808643ce37d6408fe",
+      "outputXmlSha256": "e7403b1b5451e7d5cb9c63fcc7a473e55f3119a47856b51aa8a1c1c5f74f2318",
+      "outputTextSha256": "c1d8eab11af5ee74dfe99bf4539805b827989ef2fb133ecc2fab3218c310fd00",
+      "outputProbeSha256": "ced7a6cf0ceae936e28d19515ed8696f8f339c4fbd12815690ddda4000688e87",
+      "status": "passed",
+      "degreesOfFreedom": 1,
+      "datumDefect": 1,
+      "weightedSSE": 0.029999999999999964,
+      "differences": {
+        "heightMaxAbsErrorM": 4.440892098500626e-16,
+        "heightDifferenceMaxAbsErrorM": 7.771561172376096e-16,
+        "residualMaxAbsErrorM": 5.551115123125783e-17,
+        "heightCofactorMaxAbsErrorM2": 8.326672684688674e-17,
+        "residualCofactorMaxAbsErrorM2": 1.1102230246251565e-16,
+        "heightContrastCofactorAbsErrorM2": 1.1102230246251565e-16,
+        "weightedSSEAbsError": 3.469446951953614e-17,
+        "cliVsProbeCovarianceMaxAbsErrorM2": 2.222222295067411e-09,
+        "cliCovarianceRoundingToleranceM2": 5e-09
+      }
+    },
+    {
+      "id": "free-leveling-translated-svd",
+      "cliCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/src/gama-local",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-translated.xml",
+        "--algorithm",
+        "svd",
+        "--iterations",
+        "0",
+        "--cov-band",
+        "-1",
+        "--xml",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-translated-svd.xml",
+        "--text",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-translated-svd.txt"
+      ],
+      "probeCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-translated.xml",
+        "svd"
+      ],
+      "fixtureSha256": "18e7297e5fef11fdb9c015a45bfcedaa41bf033528880e274c4834a94c1cfaf0",
+      "outputXmlSha256": "fdf15d86e1f9547fb05c17630c042ece7abe230aafa0e17739496ad30989a248",
+      "outputTextSha256": "9efe65e4ae044721edfb12acd55e080ff96d90fc0d821818a660537dc8c37507",
+      "outputProbeSha256": "4435970127c584d409b4c0caa383fd76cd56b4e363a71870987c7638bf3ab07a",
+      "status": "passed",
+      "degreesOfFreedom": 1,
+      "datumDefect": 1,
+      "weightedSSE": 0.02999999999999992,
+      "differences": {
+        "heightMaxAbsErrorM": 0.0,
+        "heightDifferenceMaxAbsErrorM": 1.3633538742396922e-13,
+        "residualMaxAbsErrorM": 8.049116928532385e-16,
+        "heightCofactorMaxAbsErrorM2": 3.3306690738754696e-16,
+        "residualCofactorMaxAbsErrorM2": 7.771561172376096e-16,
+        "heightContrastCofactorAbsErrorM2": 8.881784197001252e-16,
+        "weightedSSEAbsError": 7.979727989493313e-17,
+        "cliVsProbeCovarianceMaxAbsErrorM2": 2.2222225448675914e-09,
+        "cliCovarianceRoundingToleranceM2": 5e-09
+      }
+    },
+    {
+      "id": "free-leveling-translated-gso",
+      "cliCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/src/gama-local",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-translated.xml",
+        "--algorithm",
+        "gso",
+        "--iterations",
+        "0",
+        "--cov-band",
+        "-1",
+        "--xml",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-translated-gso.xml",
+        "--text",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-translated-gso.txt"
+      ],
+      "probeCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-translated.xml",
+        "gso"
+      ],
+      "fixtureSha256": "18e7297e5fef11fdb9c015a45bfcedaa41bf033528880e274c4834a94c1cfaf0",
+      "outputXmlSha256": "9ed72513d6f65a0978afdc47728c2ed8e400642a4bdafa11a978956faeda73f8",
+      "outputTextSha256": "9f0294aafaa60a474ce4d9b5580c60d38ed96b6b305efe141f7c07f0aebfe97c",
+      "outputProbeSha256": "a7fe958281d492c6d05c0ceedb3c3572d77aff5ca98c9ed204f8b60f64fd68c0",
+      "status": "passed",
+      "degreesOfFreedom": 1,
+      "datumDefect": 1,
+      "weightedSSE": 0.029999999999999964,
+      "differences": {
+        "heightMaxAbsErrorM": 0.0,
+        "heightDifferenceMaxAbsErrorM": 1.3633538742396922e-13,
+        "residualMaxAbsErrorM": 5.551115123125783e-17,
+        "heightCofactorMaxAbsErrorM2": 8.326672684688674e-17,
+        "residualCofactorMaxAbsErrorM2": 1.1102230246251565e-16,
+        "heightContrastCofactorAbsErrorM2": 1.1102230246251565e-16,
+        "weightedSSEAbsError": 3.469446951953614e-17,
+        "cliVsProbeCovarianceMaxAbsErrorM2": 2.222222295067411e-09,
+        "cliCovarianceRoundingToleranceM2": 5e-09
+      }
+    },
+    {
+      "id": "free-leveling-reordered-reversed-svd",
+      "cliCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/src/gama-local",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-reordered-reversed.xml",
+        "--algorithm",
+        "svd",
+        "--iterations",
+        "0",
+        "--cov-band",
+        "-1",
+        "--xml",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-reordered-reversed-svd.xml",
+        "--text",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-reordered-reversed-svd.txt"
+      ],
+      "probeCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-reordered-reversed.xml",
+        "svd"
+      ],
+      "fixtureSha256": "f6d09224f0493f96b515e1e5c445c5e894240028e0a7452ae1b6fd1eb9fa172e",
+      "outputXmlSha256": "60d5947a6dc14bb6fa0e87d35b1aea5f247c3d48e7a53cf141c0c699dd8d4930",
+      "outputTextSha256": "79d29ce968cfbdd36989c934dd9e3e44201e9bf02d3d7ed4c10819efda43d43f",
+      "outputProbeSha256": "42e94bf8e4ff4f4399c3cc509b545d1c73d6be29535fe4ddcc831be74e75383c",
+      "status": "passed",
+      "degreesOfFreedom": 1,
+      "datumDefect": 1,
+      "weightedSSE": 0.029999999999999968,
+      "differences": {
+        "heightMaxAbsErrorM": 6.661338147750939e-16,
+        "heightDifferenceMaxAbsErrorM": 9.992007221626409e-16,
+        "residualMaxAbsErrorM": 1.2628786905111156e-15,
+        "heightCofactorMaxAbsErrorM2": 3.3306690738754696e-16,
+        "residualCofactorMaxAbsErrorM2": 7.771561172376096e-16,
+        "heightContrastCofactorAbsErrorM2": 3.3306690738754696e-16,
+        "weightedSSEAbsError": 3.122502256758253e-17,
+        "cliVsProbeCovarianceMaxAbsErrorM2": 2.2222225448675914e-09,
+        "cliCovarianceRoundingToleranceM2": 5e-09
+      }
+    },
+    {
+      "id": "free-leveling-reordered-reversed-gso",
+      "cliCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-2.29/src/gama-local",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-reordered-reversed.xml",
+        "--algorithm",
+        "gso",
+        "--iterations",
+        "0",
+        "--cov-band",
+        "-1",
+        "--xml",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-reordered-reversed-gso.xml",
+        "--text",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-outputs/free-leveling-reordered-reversed-gso.txt"
+      ],
+      "probeCommand": [
+        "/private/tmp/railwise-gama-2.29-uYZ8ys/gama-precision-probe",
+        "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/gama-inputs/free-leveling-reordered-reversed.xml",
+        "gso"
+      ],
+      "fixtureSha256": "f6d09224f0493f96b515e1e5c445c5e894240028e0a7452ae1b6fd1eb9fa172e",
+      "outputXmlSha256": "79e3683ff6d288346035d2d55b62f97e4a65e624da206ab2770c9144181e9b05",
+      "outputTextSha256": "9721f44025dd58e69c70cdb32fc60f2708d4a36b0d8470cfa750e3b5eb1eaca8",
+      "outputProbeSha256": "581894dada62976b612102a753adb6bba567d73dcc8d08b2e831f6c84dafc62e",
+      "status": "passed",
+      "degreesOfFreedom": 1,
+      "datumDefect": 1,
+      "weightedSSE": 0.029999999999999964,
+      "differences": {
+        "heightMaxAbsErrorM": 4.440892098500626e-16,
+        "heightDifferenceMaxAbsErrorM": 2.220446049250313e-16,
+        "residualMaxAbsErrorM": 5.551115123125783e-17,
+        "heightCofactorMaxAbsErrorM2": 8.326672684688674e-17,
+        "residualCofactorMaxAbsErrorM2": 1.1102230246251565e-16,
+        "heightContrastCofactorAbsErrorM2": 0.0,
+        "weightedSSEAbsError": 3.469446951953614e-17,
+        "cliVsProbeCovarianceMaxAbsErrorM2": 2.222222295067411e-09,
+        "cliCovarianceRoundingToleranceM2": 5e-09
+      }
+    }
+  ],
+  "unchangedSourceFilesChecked": 319,
+  "comparatorTests": {
+    "status": "passed",
+    "command": [
+      "/usr/local/bin/python3",
+      "-B",
+      "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-advanced-methods-20260920/test-gama-benchmark.py"
+    ],
+    "scope": "One complete archived XML and seven malformed-result test cases"
+  },
+  "buildLogs": [
+    {
+      "path": "gama-build-logs/configure.txt",
+      "sha256": "56d777f131226074e6da2980b8e2ace8313a6d829b5b238ccc2c6bdb09f7ff51"
+    },
+    {
+      "path": "gama-build-logs/build-lib.txt",
+      "sha256": "bc82b90c45fcbc18b67f7c739d90f9cbd501c25c7cf92643562c8cbcb4c4859d"
+    },
+    {
+      "path": "gama-build-logs/configure-compatible.txt",
+      "sha256": "819ba181807dc8e240ce519416079ad02052c4ccb0cd4c0183d5392f19bb4b30"
+    },
+    {
+      "path": "gama-build-logs/build-lib-compatible.txt",
+      "sha256": "3b7e5778b506528efa6f7d0fa4d28095402693b5731caa494a5d13f73a7c189d"
+    },
+    {
+      "path": "gama-build-logs/build-cli.txt",
+      "sha256": "e8ac96c4b0a44d946cbaa0393dc6342e903d90a21fca7cbe166acd4f5b0f7147"
+    }
+  ],
+  "completedAt": "2026-09-19T18:28:45.307990+00:00"
+}

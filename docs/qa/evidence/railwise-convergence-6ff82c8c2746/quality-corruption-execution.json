@@ -1,0 +1,37 @@
+{
+  "source": "Recorded parent exec_command outputs from actual inject and restore operations",
+  "script": "quality-corruption-control.py",
+  "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+  "recordId": "quality_scoring_5cfda612-87bd-4af1-bb3d-85134623733f",
+  "inject": {
+    "exitCode": 0,
+    "status": "injected",
+    "directUpdateBlocked": true,
+    "singleImmediateTransaction": true,
+    "originalTriggerSqlRestored": true,
+    "allOtherRowsAndFieldsUnchanged": true,
+    "beforeBytes": 4182,
+    "afterBytes": 4183,
+    "beforeSha256": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113",
+    "afterSha256": "08e5ce2a917ecf9465a43d44a0ae889c19e84f9d610c1baebdf50b4aa93787ee"
+  },
+  "restore": {
+    "exitCode": 0,
+    "status": "restored",
+    "directUpdateBlocked": true,
+    "singleImmediateTransaction": true,
+    "originalTriggerSqlRestored": true,
+    "allOtherRowsAndFieldsUnchanged": true,
+    "beforeBytes": 4183,
+    "afterBytes": 4182,
+    "beforeSha256": "08e5ce2a917ecf9465a43d44a0ae889c19e84f9d610c1baebdf50b4aa93787ee",
+    "afterSha256": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113"
+  },
+  "guiEvidence": [
+    "21-quality-corruption-rejected.ax.txt",
+    "22-quality-corrupt-history.ax.txt",
+    "23-quality-healthy-during-corruption.ax.txt",
+    "24-quality-byte-restored.ax.txt"
+  ],
+  "independentPostRestoreEvidence": "independent-quality-restored.json"
+}

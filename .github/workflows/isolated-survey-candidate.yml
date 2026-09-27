@@ -1,0 +1,111 @@
+name: Isolated Survey notarized candidate
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: Isolated macOS arm64 candidate
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
+      WORKWISE_SIDECAR_ARCH: arm64
+      WORKWISE_PYTHON: python
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Packaging verifies specialist assets against their historical source commit.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+          cache: pip
+          cache-dependency-path: sidecars/markitdown/requirements.lock
+      - run: npm ci
+      - name: Build audited document sidecar
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --requirement sidecars/markitdown/requirements.lock
+          npm run build:markitdown-sidecar
+          python sidecars/markitdown/generate_sbom.py build/sidecars/markitdown-darwin-arm64/SBOM-python.json
+          node scripts/verify-document-dependencies.mjs --python-sbom build/sidecars/markitdown-darwin-arm64/SBOM-python.json
+      - name: Prepare exact-source isolated identity
+        run: |
+          set -euo pipefail
+          unset RELEASE_CHANNEL WORKWISE_PUBLIC_BASE_URL WORKWISE_UPDATE_URL WORKWISE_APP_VERSION
+          export WORKWISE_CANDIDATE_ROOT="${RUNNER_TEMP}/survey-candidate"
+          printf 'AUTHORIZE WORKWISE CANDIDATE\n' | bash scripts/authorize-workwise-candidate.sh --prepare
+          source "${WORKWISE_CANDIDATE_ROOT}/candidate.env"
+          npm run build
+      - name: Sign and notarize without publishing
+        env:
+          MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          for name in MAC_CODESIGN_P12_BASE64 CSC_KEY_PASSWORD APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Missing ${name}; unsigned candidates are not accepted here"; exit 1; }
+          done
+          export CSC_LINK="${RUNNER_TEMP}/candidate-signing.p12"
+          export APPLE_API_KEY="${RUNNER_TEMP}/candidate-notary.p8"
+          trap 'rm -f "${CSC_LINK}" "${APPLE_API_KEY}"' EXIT
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs')
+          fs.writeFileSync(process.env.CSC_LINK, Buffer.from(process.env.MAC_CODESIGN_P12_BASE64, 'base64'), { mode: 0o600 })
+          fs.writeFileSync(process.env.APPLE_API_KEY, Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64'), { mode: 0o600 })
+          NODE
+          unset RELEASE_CHANNEL WORKWISE_PUBLIC_BASE_URL WORKWISE_UPDATE_URL WORKWISE_APP_VERSION
+          source "${RUNNER_TEMP}/survey-candidate/candidate.env"
+          node scripts/with-mac-signing-keychain.mjs npx --yes electron-builder@26.8.1 \
+            --config electron-builder.cjs --config.directories.output="${RUNNER_TEMP}/survey-candidate/dist" \
+            --publish never --mac dmg --arm64
+      - name: Verify identity, signature and stapled notarization
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, plistlib, subprocess
+          root = Path(os.environ['RUNNER_TEMP']) / 'survey-candidate'
+          head = os.environ['GITHUB_SHA']
+          dmg, = (root / 'dist').glob('*.dmg')
+          mount = root / 'mount'
+          mount.mkdir()
+          subprocess.run(['hdiutil', 'attach', str(dmg), '-readonly', '-nobrowse', '-mountpoint', str(mount)], check=True)
+          try:
+              app, = mount.glob('*.app')
+              info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+              assert info['CFBundleIdentifier'] == 'com.wangjiawei508.workwise.candidate.head' + head[:12]
+              assert info['CFBundleExecutable'] == 'RailWise AI Candidate ' + head[:12]
+              assert info['CFBundleShortVersionString'] == json.loads(Path('package.json').read_text())['version']
+              for args in [['codesign', '--verify', '--deep', '--strict', str(app)], ['xcrun', 'stapler', 'validate', str(app)], ['spctl', '--assess', '--type', 'execute', str(app)]]:
+                  subprocess.run(args, check=True)
+              updates = (app / 'Contents/Resources/app-update.yml').read_text()
+              assert 'https://127.0.0.1/' in updates
+              asar_hash = hashlib.sha256((app / 'Contents/Resources/app.asar').read_bytes()).hexdigest()
+          finally:
+              subprocess.run(['hdiutil', 'detach', str(mount)], check=True)
+          evidence = {'sourceHead': head, 'version': info['CFBundleShortVersionString'], 'bundleId': info['CFBundleIdentifier'], 'signature': 'passed', 'stapledNotarization': 'passed', 'gatekeeper': 'passed', 'asarSha256': asar_hash, 'dmgSha256': hashlib.sha256(dmg.read_bytes()).hexdigest(), 'published': False, 'updaterRoundTrip': 'not-tested', 'guiAcceptance': 'not-tested'}
+          (root / 'dist/package-evidence.json').write_text(json.dumps(evidence, indent=2))
+          PY
+      - name: Retain authenticated candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-survey-arm64-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/survey-candidate/dist/*.dmg
+            ${{ runner.temp }}/survey-candidate/dist/package-evidence.json

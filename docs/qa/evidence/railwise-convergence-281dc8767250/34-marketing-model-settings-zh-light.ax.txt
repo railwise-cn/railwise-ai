@@ -1,0 +1,66 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 281dc8767250.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-281dc87/Applications/RAILWISE%20AI%20Candidate%20281dc8767250.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 返回
+					6 container
+						7 按钮 通用
+						8 按钮 供应商
+						9 按钮 写作
+						10 按钮 图片生成
+						11 按钮 AI 助手
+						12 按钮 键盘快捷键
+						13 按钮 连接手机
+						14 按钮 帮助
+					15 文本 RAILWISE AI
+					16 文本 偏好设置保存在本地。
+					17 文本 AI API Key 未配置
+					18 文本 当前供应商尚未设置 API Key。
+					19 标题 设置, Value: 1
+						20 文本 设置
+					21 文本 管理 API、界面偏好、默认目录和 AI 助手行为。
+					22 文本 修改会自动生效
+					23 container
+						24 标题 供应商, Value: 2
+							25 文本 供应商
+						26 text 供应商预设 添加已支持的供应商配置。刷新已有预设时会保留已经填写的 Key。
+						27 弹出式按钮 Description: 供应商预设, Value: 请选择供应商预设
+							28 (selected) 请选择供应商预设
+						29 按钮 (disabled) 添加预设
+						30 text 供应商 API Key、服务地址、文本模型和图片能力统一在这里配置。AI 助手、写作和图片生成都会复用这些供应商。
+						31 弹出式按钮 DeepSeek
+							32 (selected) DeepSeek
+						33 按钮 添加供应商
+						34 文本 显示名称
+						35 文本栏 (settable) 显示名称, Value: DeepSeek
+						36 文本 供应商 ID
+						37 文本栏 供应商 ID, Value: deepseek
+						38 文本 API Key
+						39 安全文本栏 (settable) API Key 显示内容, Placeholder: 留空则沿用通用设置
+						40 按钮 显示内容
+						41 文本 Base URL
+						42 文本栏 (settable) Base URL, Value: https://api.deepseek.com, Placeholder: 例如 https://api.deepseek.com
+						43 文本 端点格式
+						44 弹出式按钮 端点格式, Value: /v1/chat/completions
+							45 (selected) /v1/chat/completions
+						46 文本 模型列表（每行一个模型 ID）
+						47 文本输入区 (settable) 模型列表（每行一个模型 ID）, Placeholder: deepseek-flashdeepseek-v4-pro, Value: deepseek-flash
+deepseek-v4-flash
+deepseek-v4-flash-vision-exp
+deepseek-v4-pro
+						48 text 图片生成能力 可选。带图片能力的供应商可以直接被图片生成使用，不需要重复填写密钥。
+						49 按钮 启用图片模型
+	50 关闭按钮
+	51 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	52 最小化按钮
+53 menu bar
+	54 RAILWISE AI Candidate 281dc8767250
+	55 文件
+	56 编辑
+	57 显示
+	58 窗口
+	59 帮助
+
+The focused UI element is 3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-281dc87/Applications/RAILWISE%20AI%20Candidate%20281dc8767250.app/Contents/Resources/app.asar/out/renderer/index.html

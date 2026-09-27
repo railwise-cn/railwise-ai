@@ -3,8 +3,10 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useEngineeringConversationDrafts } from './engineering-conversation-drafts'
 import { SurveyAdjustmentPanel } from './SurveyAdjustmentPanel'
 import i18n from '../../i18n'
+import type { SurveyEvidenceNavigationTarget } from './engineering-evidence-navigation'
 
 let container: HTMLDivElement
 let root: Root
@@ -61,7 +63,7 @@ const network = {
     summary: { pointCount: 2, stationCount: 1, observationCount: 1, recordCount: 1, skippedRecordCount: 0 },
     diagnostics: [
       { code: 'format_detected', severity: 'info', message: '识别为 Leica GSI-8' },
-      { code: 'mapping_required', severity: 'warning', message: '字段映射需要确认。', suggestedAction: '确认字段映射、单位和基准后重新导入。' }
+      { code: 'mapping_required', severity: 'warning', message: '字段映射需要确认。', suggestedAction: '确认字段映射、单位和基准后重新导入。', localized: { en: { message: 'Field mapping requires confirmation for record 19.', suggestedAction: 'Confirm units for record 19 and reimport.' } } }
     ],
     records: [{ id: 'record-1', sourceRecord: 1, rawOffset: 137, rawLength: 29, rawLineNo: 1, line: 1, recordType: 'GSI', section: 'network.observations', rawSnippet: '{"id":"obs-1","value":0.2}' }],
     rawRecordAnchors: [{ id: 'record-1', sourceRecord: 1, rawOffset: 137, rawLength: 29, rawLineNo: 1, line: 1, recordType: 'GSI', section: 'network.observations', rawSnippet: '{"id":"obs-1","value":0.2}' }]
@@ -197,7 +199,7 @@ const adjustment = {
     precision: { maxPointStdDev: 0.0005, passed: true },
     qualityFindings: [],
     covariance: [[0.00000025]],
-    points: [{ id: 'P-01', height: 100.2001, correctionHeight: 0.0001, standardError: 0.0005 }],
+    points: [{ id: 'P-01', height: 100.2001, correctionHeight: 0.0001, standardError: 0.0005 }, { id: 'XY-test', x: 1, y: 2, xyErrorEllipse: { semiMajor: 0.006, semiMinor: 0.003, orientationRad: Math.PI / 6, varianceBasis: 'a-posteriori' } }],
     observations: [
       { observationId: 'obs-1', residual: 0.0001, unit: 'm', standardizedResidual: 0.2, standardizedResidualUnit: 'sigma', sourceRecordId: 'record-1' },
       { observationId: 'obs-without-source', residual: 0.0002, unit: 'm', standardizedResidual: 0.4, standardizedResidualUnit: 'sigma' }
@@ -309,6 +311,398 @@ afterEach(async () => {
 })
 
 describe('SurveyAdjustmentPanel persisted state restoration', () => {
+  it('refreshes external results while preserving the manually selected network and input draft', async () => {
+    const selector = container.querySelector<HTMLSelectElement>('#survey-existing-network')!
+    await act(async () => { selector.value = archiveOnlyNetwork.id; selector.dispatchEvent(new Event('change', { bubbles: true })) })
+    const draft = container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${i18n.t('surveyKnownPointsInput')}"]`)!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(draft, 'BM-DRAFT,123.456')
+      draft.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const renderRefresh = async (refreshToken: number): Promise<void> => {
+      await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, refreshToken })))
+      await settle()
+    }
+    runtimeRequest.mockImplementation(async path => runtimeResponse(path.includes('/survey/networks?')
+      ? { networks: [network, { ...archiveOnlyNetwork, revision: 3, sourceFile: { ...archiveOnlyNetwork.sourceFile, name: 'updated-selected.dat' } }] }
+      : { adjustments: [] }))
+    await renderRefresh(1)
+    expect(selector.value).toBe(archiveOnlyNetwork.id)
+    expect(container.textContent).toContain('updated-selected.dat')
+    expect(container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${i18n.t('surveyKnownPointsInput')}"]`)?.value).toBe('BM-DRAFT,123.456')
+    expect(container.querySelector('[data-evidence-key="survey-selection"]')).toBeNull()
+    expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+    const preserved = container.textContent
+    runtimeRequest.mockRejectedValue(new Error('read unavailable'))
+    await renderRefresh(2)
+    expect(selector.value).toBe(archiveOnlyNetwork.id)
+    expect(container.textContent).toContain('updated-selected.dat')
+    expect(container.textContent).toContain('read unavailable')
+    expect(preserved).toContain('updated-selected.dat')
+  })
+
+  it('reads a completed external adjustment without requiring a selection or remount', async () => {
+    runtimeRequest.mockImplementation(async path => runtimeResponse(path.includes('/survey/networks?')
+      ? { networks: [{ ...network, revision: 3 }] }
+      : { adjustments: [{ ...adjustment, result: { ...adjustment.result, algorithmVersion: 'external-adjustment-v2' } }] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, refreshToken: 1 })))
+    await settle()
+    expect(container.textContent).toContain('external-adjustment-v2')
+    expect(container.querySelector<HTMLSelectElement>('#survey-existing-network')?.value).toBe(network.id)
+  })
+
+  const navigationTarget: SurveyEvidenceNavigationTarget = { kind: 'survey', workspaceRoot: '/survey', projectId: 'project-restored-001', projectRevision: 1, networkId: network.id, networkRevision: network.revision, sourceSha256: network.sourceFile.sha256, adjustmentId: adjustment.run.id, section: 'result', observationId: 'obs-1', sourceRecordId: 'record-1' }
+  async function navigate(target: SurveyEvidenceNavigationTarget) {
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: true, navigationTarget: target })))
+    await settle()
+  }
+
+  it('locates the exact residual and original record without writing data or changing the draft', async () => {
+    const scope = JSON.stringify(['/survey', 'project-restored-001'])
+    useEngineeringConversationDrafts.getState().update(scope, draft => ({ ...draft, input: 'Keep this question', evidenceContext: { ...navigationTarget } }))
+    runtimeRequest.mockClear()
+    await navigate(navigationTarget)
+    expect(document.activeElement?.getAttribute('data-evidence-key')).toBe(JSON.stringify(['observation', 'obs-1']))
+    expect(container.textContent).toContain('{"id":"obs-1","value":0.2}')
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.input).toBe('Keep this question')
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext?.sourceRecordId).toBe('record-1')
+    expect(runtimeRequest.mock.calls.every(([, method]) => method === 'GET')).toBe(true)
+  })
+
+  it('re-reads an already mounted network before locating and rejects a revision changed outside the panel', async () => {
+    runtimeRequest.mockImplementation(async path => runtimeResponse(path.includes('/survey/networks?') ? { networks: [{ ...network, revision: network.revision + 1 }] } : { adjustments: [adjustment] }))
+    await navigate(navigationTarget)
+    expect(container.textContent).toContain(i18n.t('engineeringEvidenceUnavailable'))
+    expect(container.querySelector('[data-evidence-key="survey-selection"]')).toBeNull()
+    expect(runtimeRequest.mock.calls.every(([, method]) => method === 'GET')).toBe(true)
+  })
+
+  it('consumes a navigation request once and preserves a later manual network selection', async () => {
+    await navigate(navigationTarget)
+    const selector = container.querySelector<HTMLSelectElement>('#survey-existing-network')!
+    await act(async () => { selector.value = archiveOnlyNetwork.id; selector.dispatchEvent(new Event('change', { bubbles: true })) })
+    await act(async () => { await i18n.changeLanguage('en') })
+    expect(selector.value).toBe(archiveOnlyNetwork.id)
+    expect(container.querySelector('[data-evidence-key="survey-selection"]')).toBeNull()
+    await navigate({ ...navigationTarget })
+    expect(selector.value).toBe(network.id)
+    expect(container.querySelector('[data-evidence-key="survey-selection"]')).not.toBeNull()
+  })
+
+  it.each([
+    { projectId: 'other-project' }, { workspaceRoot: '/other' }, { projectRevision: 9 },
+    { networkRevision: 99 }, { sourceSha256: 'c'.repeat(64) }, { adjustmentId: 'missing-run' },
+    { observationId: 'missing-observation' }, { sourceRecordId: 'missing-record' },
+    { diagnosticIndex: 99 }, { pointId: 'missing-point' }
+  ])('refuses an unavailable or mismatched navigation binding: %j', async patch => {
+    await navigate({ ...navigationTarget, ...patch })
+    expect(container.textContent).toContain(i18n.t('engineeringEvidenceUnavailable'))
+    expect(container.querySelector('[data-evidence-key="survey-selection"]')).toBeNull()
+  })
+
+  it('locates diagnostics and source anchors beyond the first twenty displayed rows', async () => {
+    const many = { ...network, sourceFile: { ...network.sourceFile,
+      diagnostics: Array.from({ length: 31 }, (_, index) => ({ code: `diagnostic-${index}`, severity: 'warning', message: `Exact diagnostic ${index}` })),
+      records: Array.from({ length: 31 }, (_, index) => ({ ...network.sourceFile.records[0]!, id: `record-${index}`, rawOffset: index, rawLength: 1, rawSnippet: `Exact raw record ${index}` }))
+    } }
+    runtimeRequest.mockImplementation(async path => runtimeResponse(path.includes('/survey/networks?') ? { networks: [many] } : { adjustments: [adjustment] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: false })))
+    await navigate({ ...navigationTarget, section: 'network', adjustmentId: undefined, observationId: undefined, diagnosticIndex: 30, sourceRecordId: 'record-30' })
+    expect(container.textContent).toContain('Exact diagnostic 30')
+    expect(container.textContent).toContain('Exact raw record 30')
+    expect(document.activeElement?.getAttribute('data-evidence-key')).toBe('source-record')
+    expect(runtimeRequest.mock.calls.every(([, method]) => method === 'GET')).toBe(true)
+  })
+
+  it('opens a separate trial entry with explicit constraints and leaves formal operations untouched', async () => {
+    const trialNav = Array.from(container.querySelectorAll('nav button')).find(item => item.textContent?.includes('自由水准试算')) as HTMLButtonElement
+    expect(trialNav).toBeTruthy()
+    const callsBefore = runtimeRequest.mock.calls.length
+    await act(async () => trialNav.click())
+    expect(runtimeRequest.mock.calls).toHaveLength(callsBefore)
+    const strip = container.querySelector('.survey-instrument-strip')!
+    expect(strip.textContent).toContain('Σ(H − H₀) = 0')
+    expect(strip.textContent).toContain('权模型未验证')
+    expect(strip.textContent).toContain('仅供试算 · 未作合格判定')
+    const panel = container.querySelector('section[aria-label="自由水准试算"]')!
+    expect(panel.textContent).toContain('该约束不建立物理高程基准')
+    const run = Array.from(panel.querySelectorAll('button')).find(item => item.textContent === '运行试算')!
+    expect(run.disabled).toBe(true)
+    const resultNav = Array.from(container.querySelectorAll('nav button')).find(item => item.textContent?.includes('平差成果')) as HTMLButtonElement | undefined
+    if (resultNav) await act(async () => resultNav.click())
+    expect(runtimeRequest.mock.calls).toHaveLength(callsBefore)
+  })
+
+  it('connects the leveling precision page to diagnostics using the restored input and source bindings', async () => {
+    const inputHash = 'e'.repeat(64)
+    const baseRequest = runtimeRequest.getMockImplementation() as (path: string, method: string) => Promise<unknown>
+    runtimeRequest.mockImplementation(async (path: string, method: string) => {
+      if (path === '/v1/engineering/adjustments?projectId=project-restored-001') {
+        return runtimeResponse({ adjustments: [{ ...adjustment, result: { ...adjustment.result, inputHash } }] })
+      }
+      if (path.endsWith('/statistical-diagnostics')) return runtimeResponse({
+        schemaVersion: 1, diagnosticsVersion: 'leveling-deleted-t-1', projectId: 'project-restored-001',
+        networkId: network.id, runId: adjustment.run.id, resultId: adjustment.result.id, inputHash,
+        algorithmVersion: adjustment.result.algorithmVersion, sourceSha256: network.sourceFile.sha256,
+        calculationHash: 'f'.repeat(64), status: 'unavailable', reason: 'insufficient-redundancy', decision: 'not-evaluated'
+      })
+      return baseRequest(path, method)
+    })
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'statistics-binding', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'result'
+    })))
+    await settle(); await settle()
+    const panel = container.querySelector('section[aria-label="水准统计诊断"]')!
+    const read = panel.querySelector('button') as HTMLButtonElement
+    expect(read.disabled).toBe(false)
+    await act(async () => read.click())
+    expect(runtimeRequest).toHaveBeenLastCalledWith(`/v1/engineering/projects/project-restored-001/adjustments/${adjustment.run.id}/statistical-diagnostics`, 'GET')
+    expect(panel.textContent).toContain('自由度不足')
+    expect(panel.textContent).toContain('未作统计判定')
+    expect(panel.querySelector('table')).toBeNull()
+  })
+
+  it('prepares a residual question with exact revision and source identity without executing a model or calculation', async () => {
+    const focus = vi.fn()
+    const scope = JSON.stringify(['/acceptance', 'project-restored-001'])
+    useEngineeringConversationDrafts.setState({ drafts: {} })
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1, workspace: '/acceptance' },
+      runtimeReady: true, preferredSection: 'result', onOpenAi: focus
+    })))
+    await settle()
+    runtimeRequest.mockClear()
+    const ask = container.querySelector<HTMLButtonElement>('[aria-label="询问观测 obs-1 的测量 AI"]')!
+    await act(async () => ask.click())
+    expect(focus).toHaveBeenCalledOnce()
+    expect(runtimeRequest).not.toHaveBeenCalled()
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]).toMatchObject({
+      input: '请解释观测 obs-1 的结果、原始依据及需要复核的问题。',
+      viewContext: { networkId: network.id, networkRevision: network.revision, sourceSha256: network.sourceFile.sha256, adjustmentId: adjustment.run.id, algorithmVersion: adjustment.result.algorithmVersion, section: 'result', observationId: 'obs-1', sourceRecordId: 'record-1' }
+    })
+    useEngineeringConversationDrafts.getState().update(scope, (draft) => ({ ...draft, input: 'Keep my question' }))
+    await act(async () => ask.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.input).toBe('Keep my question')
+  })
+
+  it('selects the exact known or unknown point from the original network without carrying the current adjustment', async () => {
+    const focus = vi.fn(), scope = JSON.stringify(['/survey', 'project-restored-001'])
+    useEngineeringConversationDrafts.setState({ drafts: {} })
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: true, preferredSection: 'points', onOpenAi: focus })))
+    await settle(); runtimeRequest.mockClear()
+    for (const [id, collection] of [['BM-01', 'knownPoints'], ['P-01', 'unknownPoints']]) {
+      const ask = container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label: id })}"]`)!
+      expect(ask).not.toBeNull(); await act(async () => ask.click())
+      expect(useEngineeringConversationDrafts.getState().drafts[scope]!.evidenceContext!.typedEvidence).toEqual({ schemaVersion: 1, projectId: 'project-restored-001', projectRevision: 1, kind: 'network', networkId: network.id, networkRevision: network.revision, sourceSha256: network.sourceFile.sha256, selector: { path: [collection, 0], identity: { id } } })
+      expect(useEngineeringConversationDrafts.getState().drafts[scope]!.evidenceContext).not.toHaveProperty('adjustmentId')
+    }
+    expect(runtimeRequest).not.toHaveBeenCalled(); expect(focus).toHaveBeenCalledTimes(2)
+  })
+
+  it('selects deformation points and pairs bound to both epochs, never the currently displayed adjustment', async () => {
+    const focus = vi.fn(), scope = JSON.stringify(['/survey', 'project-restored-001'])
+    const comparison = { id: 'comparison-selected', referenceAdjustmentId: 'epoch-reference', currentAdjustmentId: 'epoch-current', inputHash: 'e'.repeat(64), algorithmVersion: 'survey-deformation-1', durationDays: 1, referenceEpoch: '2026-01-01', currentEpoch: '2026-01-02', points: [{ pointId: 'P-01', significant: false, rates: { spatialPerDay: 0 } }], pairs: [{ id: 'pair-1', kind: 'convergence', firstPointId: 'P-01', secondPointId: 'BM-01' }] }
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<ReturnType<typeof runtimeResponse>>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path === '/v1/engineering/deformations' ? runtimeResponse({ deformation: comparison }) : original(path, method))
+    useEngineeringConversationDrafts.setState({ drafts: {} })
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: true, preferredSection: 'deformation', onOpenAi: focus })))
+    await settle()
+    const compare = [...container.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === i18n.t('surveyCompareEpochs'))!
+    expect(compare.disabled).toBe(false); await act(async () => compare.click()); runtimeRequest.mockClear()
+    for (const [label, collection, identity] of [['P-01', 'points', { pointId: 'P-01' }], ['pair-1', 'pairs', { id: 'pair-1' }]] as const) {
+      await act(async () => container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label })}"]`)!.click())
+      expect(useEngineeringConversationDrafts.getState().drafts[scope]!.evidenceContext!.typedEvidence).toEqual({ schemaVersion: 1, projectId: 'project-restored-001', projectRevision: 1, kind: 'deformation', comparisonId: comparison.id, referenceAdjustmentId: comparison.referenceAdjustmentId, currentAdjustmentId: comparison.currentAdjustmentId, inputHash: comparison.inputHash, algorithmVersion: comparison.algorithmVersion, selector: { path: [collection, 0], identity } })
+      expect(useEngineeringConversationDrafts.getState().drafts[scope]!.evidenceContext).not.toHaveProperty('adjustmentId')
+    }
+    expect(runtimeRequest).not.toHaveBeenCalled(); expect(focus).toHaveBeenCalledTimes(2)
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 2, workspace: '/survey' }, runtimeReady: true, preferredSection: 'deformation', onOpenAi: focus })))
+    expect(container.querySelector(`[aria-label="${i18n.t('surveyAskEvidence', { label: 'pair-1' })}"]`)).toBeNull()
+  })
+
+  it('keeps duplicate point IDs bound to their displayed collection and offset and disables them during project loading', async () => {
+    const focus = vi.fn(), scope = JSON.stringify(['/survey', 'project-restored-001'])
+    const duplicated = { ...network, knownPoints: [{ id: 'DUP', height: 100 }, { id: 'DUP', height: 101 }], unknownPoints: [{ id: 'DUP', height: 102 }] }
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<ReturnType<typeof runtimeResponse>>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path.startsWith('/v1/engineering/survey/networks?') ? runtimeResponse({ networks: [duplicated] }) : original(path, method))
+    useEngineeringConversationDrafts.setState({ drafts: {} })
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { key: 'duplicates', project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: true, preferredSection: 'points', onOpenAi: focus })))
+    await settle(); runtimeRequest.mockClear()
+    const questions = [...container.querySelectorAll<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label: 'DUP' })}"]`)]
+    expect(questions).toHaveLength(3)
+    for (const [index, path] of [['knownPoints', 0], ['knownPoints', 1], ['unknownPoints', 0]].entries()) {
+      await act(async () => questions[index]!.click())
+      expect(useEngineeringConversationDrafts.getState().drafts[scope]!.evidenceContext!.typedEvidence!.selector).toEqual({ path, identity: { id: 'DUP' } })
+    }
+    runtimeRequest.mockImplementation(() => new Promise(() => {}))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { key: 'duplicates', project: { id: 'project-other', revision: 1, workspace: '/survey' }, runtimeReady: true, preferredSection: 'points', onOpenAi: focus })))
+    for (const ask of container.querySelectorAll<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label: 'DUP' })}"]`)) {
+      expect(ask.disabled).toBe(true); await act(async () => ask.click())
+    }
+    expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/survey', 'project-other'])]).toBeUndefined()
+    expect(focus).toHaveBeenCalledTimes(3)
+  })
+
+  it('prepares preflight, observation, closure and precision questions with exact source references', async () => {
+    const focus = vi.fn()
+    const scope = JSON.stringify(['/survey', 'project-restored-001'])
+    const renderSection = async (preferredSection: 'network' | 'observations' | 'result'): Promise<void> => {
+      await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+        project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: true, preferredSection, onOpenAi: focus
+      })))
+      await settle()
+    }
+    await renderSection('network')
+    runtimeRequest.mockClear()
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="询问 mapping_required #2 的测量 AI"]')!.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext).toMatchObject({ networkId: network.id, sourceSha256: network.sourceFile.sha256, diagnosticCode: 'mapping_required', diagnosticIndex: 1, section: 'preflight', parserVersion: network.sourceFile.parserVersion })
+    await renderSection('observations')
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="询问观测 obs-1 的测量 AI"]')!.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext?.observationId).toBe('obs-1')
+    await renderSection('result')
+    for (const metric of ['closure', 'precision']) {
+      const label = i18n.t(metric === 'closure' ? 'surveyClosureReview' : 'surveyMaxPointError')
+      const aria = i18n.t('surveyAskEvidence', { label })
+      const ask = [...container.querySelectorAll<HTMLButtonElement>('button')].find(item => item.getAttribute('aria-label') === aria)!
+      await act(async () => ask.click())
+      expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext).toMatchObject({ metric, adjustmentId: adjustment.run.id, networkRevision: network.revision, algorithmVersion: adjustment.result.algorithmVersion })
+    }
+    expect(focus).toHaveBeenCalledTimes(4)
+    expect(runtimeRequest.mock.calls.filter(([, method]) => method !== 'GET')).toHaveLength(0)
+  })
+
+  it('keeps saved evidence readable but locks all computation entries after Runtime disconnects', async () => {
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1 }, runtimeReady: false, preferredSection: 'network'
+    })))
+    await settle()
+    runtimeRequest.mockClear()
+    for (const label of ['质量校核', '运行平差', '导入结构化网络']) {
+      const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find((item) => item.textContent === label)
+      expect(button, label).toBeDefined()
+      expect(button?.disabled, label).toBe(true)
+      await act(async () => button?.click())
+    }
+    expect(container.textContent).toContain(network.sourceFile.name)
+    const observations = [...container.querySelectorAll<HTMLButtonElement>('button')].find((item) => item.textContent?.startsWith('观测表'))!
+    await act(async () => observations.click())
+    const revalidate = [...container.querySelectorAll<HTMLButtonElement>('button')].find((item) => item.textContent === '重新校核')!
+    expect(revalidate.disabled).toBe(true)
+    await act(async () => revalidate.click())
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
+  it('does not equate residual checks with compliance to an unspecified project tolerance', async () => {
+    expect(container.textContent).toContain('计算校核通过')
+    expect(container.textContent).toContain('项目限差需另行复核')
+    expect(container.textContent).not.toContain('满足项目精度')
+    await act(async () => i18n.changeLanguage('en'))
+    expect(container.textContent).toContain('project tolerance requires separate review')
+    expect(container.textContent).not.toContain('Within project precision')
+  })
+
+  it('uses a keyboard accessible localized file button without exposing the system file-input label', async () => {
+    await act(async () => i18n.changeLanguage('en'))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'network'
+    })))
+    const picker = container.querySelector<HTMLButtonElement>('button[aria-label="Choose survey files"]')!
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    expect(picker.disabled).toBe(false)
+    expect(input.hidden).toBe(true)
+    expect(input.tabIndex).toBe(-1)
+    const open = vi.spyOn(input, 'click').mockImplementation(() => {})
+    await act(async () => picker.click())
+    expect(open).toHaveBeenCalledOnce()
+  })
+
+  it('admits a valid one-off adjustment to delivery without inventing an observation epoch', async () => {
+    const oneOff = { ...adjustment, observationEpoch: undefined }
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => {
+      if (path.includes('/survey/networks?')) return runtimeResponse({ networks: [network] })
+      if (path.includes('/adjustments?')) return runtimeResponse({ adjustments: [oneOff] })
+      if (path === '/v1/engineering/adjustments' && method === 'POST') return runtimeResponse(oneOff)
+      throw new Error(path)
+    })
+    const delivered = vi.fn()
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'one-off', project: { id: 'one-off', revision: 1 }, runtimeReady: true,
+      preferredSection: 'network', onAdjustmentComplete: delivered
+    })))
+    await settle()
+    const run = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '运行平差')!
+    expect(run.disabled).toBe(false)
+    await act(async () => run.click())
+    await settle()
+    expect(delivered).toHaveBeenCalledWith(oneOff.run.id)
+    expect(container.textContent).not.toContain('历史平差结果不可用于新计算')
+    const epoch = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.startsWith('期次变形'))!
+    expect(epoch.textContent).toContain('0')
+  })
+
+  it('opens each requested production section while preserving the current network', async () => {
+    for (const section of ['network', 'points', 'result'] as const) {
+      await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+        project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: section
+      })))
+      await settle()
+      const selected = container.querySelector<HTMLSelectElement>('#survey-existing-network')
+      expect(selected?.value).toBe(network.id)
+      const labels = { network: '网形与基准', points: '点位与坐标', result: '平差结果' }
+      expect(container.querySelector('nav button[aria-current="page"]')?.textContent).toContain(labels[section])
+    }
+  })
+
+  it('requires quality validation before enabling adjustment even when source admission succeeds', async () => {
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [{ ...network, qualityStatus: 'imported' }] })
+      : runtimeResponse({ adjustments: [] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'unvalidated', project: { id: 'unvalidated', revision: 1 }, runtimeReady: true
+    })))
+    await settle()
+    const run = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '运行平差')!
+    const validate = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '质量校核')!
+    expect(run.disabled).toBe(true)
+    expect(validate.disabled).toBe(false)
+  })
+
+  it.each(['archive-only', 'converter-required', 'gnss-processing-required', 'quality-blocked'])('omits the adjustment command for %s', async (state) => {
+    const blocked = state === 'quality-blocked'
+      ? { ...network, qualityStatus: 'blocked', findings: [{ severity: 'blocking', message: 'Declared datum is incomplete.' }] }
+      : { ...archiveOnlyNetwork, sourceFile: { ...archiveOnlyNetwork.sourceFile, disposition: state } }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [blocked] })
+      : runtimeResponse({ adjustments: [] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: state, project: { id: 'blocked', revision: 1 }, runtimeReady: true
+    })))
+    await settle()
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent === '运行平差')).toBe(false)
+    expect(runtimeRequest.mock.calls.some(([path, method]) => path === '/v1/engineering/adjustments' && method === 'POST')).toBe(false)
+  })
+
+  it('retains the blocked source identity when asking AI to plan missing data', async () => {
+    const focus = vi.fn()
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1, workspace: '/blocked-survey' },
+      runtimeReady: true, preferredSection: 'network', onOpenAi: focus
+    })))
+    await settle()
+    const selector = container.querySelector<HTMLSelectElement>('#survey-existing-network')!
+    await act(async () => {
+      selector.value = archiveOnlyNetwork.id
+      selector.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    const ask = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === i18n.t('surveyPlanMissingData'))!
+    await act(async () => ask.click())
+    expect(focus).toHaveBeenCalledOnce()
+    expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/blocked-survey', 'project-restored-001'])]?.evidenceContext).toMatchObject({
+      projectId: 'project-restored-001', networkId: archiveOnlyNetwork.id,
+      networkRevision: archiveOnlyNetwork.revision, sourceSha256: archiveOnlyNetwork.sourceFile.sha256,
+      parserId: archiveOnlyNetwork.sourceFile.parserId, section: 'preflight'
+    })
+  })
+
   it('requires separate mappings for each IN1 attachment and imports the batch only after confirmation', async () => {
     const files = [new File(['K1,10\nK2,11\nK1,P1,0.5,0.1\nP1,K2,0.5,0.1'], 'first.in1'), new File(['second file'], 'second.in1'), new File(['plane file'], 'plane.in2')]
     const removePending = vi.fn()
@@ -355,6 +749,12 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     await act(async () => { await i18n.changeLanguage('en') })
     await settle()
     expect(container.querySelector('h3')?.textContent).toContain('Survey and adjustment console')
+    const networkTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Network and datum'))
+    await act(async () => networkTab?.click())
+    await settle()
+    expect(container.textContent).toContain('Field mapping requires confirmation for record 19.')
+    expect(container.textContent).toContain('Confirm units for record 19 and reimport.')
+    expect(container.textContent).not.toContain('字段映射需要确认。')
     expect(selector?.value).toBe(network.id)
 
     await act(async () => {
@@ -365,14 +765,14 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     })
     await settle()
     const adjustButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Run adjustment'))
-    expect(adjustButton?.disabled).toBe(true)
+    expect(adjustButton).toBeUndefined()
     expect(container.textContent).toContain('Original retained only')
   })
 
   it('advertises P0 COSA and South chooser extensions, while showing only implemented execution semantics', async () => {
     const networkTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('网形与基准'))
     await act(async () => networkTab?.click())
-    const input = container.querySelector<HTMLInputElement>('[aria-label="选择专业测量文件"]')
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="选择专业测量文件"]')
     expect(input?.accept).toContain('.in1')
     expect(input?.accept).toContain('.in2')
     expect(input?.accept).toContain('.net')
@@ -431,6 +831,19 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(container.textContent).toContain('可进入校核与平差')
   })
 
+  it('shows Runtime ellipse axes and conventions in both languages without inventing legacy precision', async () => {
+    expect(container.textContent).toContain('长半轴 0.006 m · 短半轴 0.003 m')
+    expect(container.textContent).toContain('轴向：30°')
+    expect(container.textContent).toContain('不代表置信百分比')
+    const legacyRow = [...container.querySelectorAll('tr')].find(row => row.textContent?.startsWith('P-01'))
+    expect(legacyRow?.lastElementChild?.textContent).toBe('—')
+    await act(async () => { await i18n.changeLanguage('en') })
+    expect(container.textContent).toContain('a = 0.006 m · b = 0.003 m')
+    expect(container.textContent).toContain('Orientation: 30°')
+    expect(container.textContent).toContain('GNSS XY is not local east/north')
+    expect(container.textContent).toContain('Posterior variance')
+  })
+
   it('shows professional source preflight, diagnostics, hashes, filters, and raw anchors', async () => {
     const networkTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('网形与基准'))
     expect(networkTab).toBeDefined()
@@ -462,7 +875,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(container.textContent).toContain('行 1')
     expect(container.textContent).not.toContain('{"id":"obs-1","value":0.2}')
 
-    const input = container.querySelector<HTMLInputElement>('[aria-label="选择专业测量文件"]')
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="选择专业测量文件"]')
     expect(input?.accept).toContain('.gsi')
     expect(input?.accept).toContain('.suc')
     expect(input?.accept).toContain('.t02')
@@ -548,7 +961,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     const validateButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('质量校核'))
     const adjustButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('运行平差'))
     expect(validateButton?.disabled).toBe(true)
-    expect(adjustButton?.disabled).toBe(true)
+    expect(adjustButton).toBeUndefined()
 
     const observationsTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('观测表'))
     await act(async () => observationsTab?.click())
@@ -570,7 +983,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     const validateButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('质量校核'))
     const adjustButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('运行平差'))
     expect(validateButton?.disabled).toBe(true)
-    expect(adjustButton?.disabled).toBe(true)
+    expect(adjustButton).toBeUndefined()
   })
 
   it('keeps a source-revoked historical adjustment readable but excludes it from new period calculations', async () => {

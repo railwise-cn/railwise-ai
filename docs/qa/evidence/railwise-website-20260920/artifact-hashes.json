@@ -1,0 +1,35 @@
+{
+  "sourceSha": "bea9a0484ebbdf4b1abca89220ca45bba2c3eb1f",
+  "previewRun": 35488179105,
+  "deployRun": 35488462995,
+  "files": [
+    {
+      "path": "railwise-website-live-desktop.png",
+      "sha256": "0eabc840e3d09c9811cd07c00c6d20734ec95c1da6cc53a0532cc09953c9dcd8"
+    },
+    {
+      "path": "railwise-website-live-mobile.png",
+      "sha256": "ae184fe18b3a07932adde3792ef1c48cd793156ab6802c668da0afa679079eee"
+    },
+    {
+      "path": "railwise-website-preview-desktop.png",
+      "sha256": "2367991bb595f0ef8497caaca5ef95f88687206f5ab02bff3008a9706a4a1b68"
+    },
+    {
+      "path": "railwise-website-preview-mobile-download.png",
+      "sha256": "7beca88949e937b29258b6ab0cd6eed4175d0a119ee6f04b915f66c31b62532e"
+    },
+    {
+      "path": "railwise-website-preview-mobile-survey.png",
+      "sha256": "7f75b7a9e9a2e8505dfa57e5ce1bb5b405d43e2a5ea2e5a46715cd0647cfdc8b"
+    },
+    {
+      "path": "railwise-website-preview-mobile.png",
+      "sha256": "b934a93243bef692e71f961a098b27ca1625eab07370c66cd562d9740b2e74bb"
+    },
+    {
+      "path": "render-metadata.json",
+      "sha256": "3978fcba7947e91e849a172084054b752c0c2dc54b4c51c308d9ca65a4cd3b3b"
+    }
+  ]
+}

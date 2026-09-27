@@ -1,0 +1,7 @@
+{
+  "passed": 6471,
+  "profileCases": 1016,
+  "finalBatchCases": 5455,
+  "resultSha256": "15b84b7bfab34939a409643ed910828b8a2d42d623e8b74b6cf7fc9574dafafa",
+  "module": "kun/dist/engineering/survey-quality-scoring.js"
+}

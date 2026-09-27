@@ -1,0 +1,145 @@
+{
+  "guiExecuted": false,
+  "scope": "read-only-verifier-development-fixture-only",
+  "passed": true,
+  "checks": [
+    "baseline snapshot",
+    "three-case independent linkage and Fraction scoring",
+    "export equals saved record",
+    "historical prefix remains independently verifiable after GUI-equivalent append",
+    "changed baseline rejected",
+    "changed export rejected"
+  ],
+  "verified": {
+    "verified": true,
+    "guiExecutionVerified": false,
+    "professionalApproval": false,
+    "crossDatabaseAtomicityClaimed": false,
+    "scope": "synthetic-two-unit-final-office-census-full-and-veto-only",
+    "projectId": "project_e1702a06-dfbd-42f7-b065-344acdfd8db0",
+    "planId": "assessment_plan_5968de01-ca29-4588-b0c8-f7959ce6905a",
+    "baselineUnchanged": true,
+    "currentRetentionEvents": 3,
+    "independentScoresChecked": 3,
+    "requiredCasesPresent": true,
+    "nativeExportFilesChecked": 1,
+    "records": [
+      {
+        "id": "assessment_c170a0dc-0541-4b81-96fc-f6e0c277a722",
+        "case": "missing",
+        "recordHash": "11d0303fa6899ecc06142fd65af21e7c6f36c3ac0a3923fbf368e9356b17c829",
+        "counts": {
+          "expectedUnits": 2,
+          "linkedScores": 0,
+          "fullProfileUnits": 0,
+          "requiredMaterialMappings": 2,
+          "satisfiedMaterialMappings": 2,
+          "unresolvedReferences": 0
+        },
+        "currentSourceChanged": false,
+        "retentionEventCount": 3
+      },
+      {
+        "id": "assessment_d5fe1df4-81c5-4c25-808d-cb8d803ab6fe",
+        "case": "complete",
+        "recordHash": "6ad633b9550407a7aeacc282388cdc9b73521eaafa817b1b6b487c1e57dbccab",
+        "counts": {
+          "expectedUnits": 2,
+          "linkedScores": 2,
+          "fullProfileUnits": 2,
+          "requiredMaterialMappings": 2,
+          "satisfiedMaterialMappings": 2,
+          "unresolvedReferences": 0
+        },
+        "currentSourceChanged": false,
+        "retentionEventCount": 3
+      },
+      {
+        "id": "assessment_24b2eba2-7643-4947-8d3e-7faeeeed68da",
+        "case": "veto-with-missing",
+        "recordHash": "7bf48342757e0c10a284e4a59e8626650af06c3048d3aeb8a290ade3596c3d9f",
+        "counts": {
+          "expectedUnits": 2,
+          "linkedScores": 1,
+          "fullProfileUnits": 1,
+          "requiredMaterialMappings": 2,
+          "satisfiedMaterialMappings": 2,
+          "unresolvedReferences": 0
+        },
+        "currentSourceChanged": false,
+        "retentionEventCount": 3
+      }
+    ]
+  },
+  "afterAppend": {
+    "verified": true,
+    "guiExecutionVerified": false,
+    "professionalApproval": false,
+    "crossDatabaseAtomicityClaimed": false,
+    "scope": "synthetic-two-unit-final-office-census-full-and-veto-only",
+    "projectId": "project_e1702a06-dfbd-42f7-b065-344acdfd8db0",
+    "planId": "assessment_plan_5968de01-ca29-4588-b0c8-f7959ce6905a",
+    "baselineUnchanged": true,
+    "currentRetentionEvents": 4,
+    "independentScoresChecked": 3,
+    "requiredCasesPresent": true,
+    "nativeExportFilesChecked": 0,
+    "records": [
+      {
+        "id": "assessment_c170a0dc-0541-4b81-96fc-f6e0c277a722",
+        "case": "missing",
+        "recordHash": "11d0303fa6899ecc06142fd65af21e7c6f36c3ac0a3923fbf368e9356b17c829",
+        "counts": {
+          "expectedUnits": 2,
+          "linkedScores": 0,
+          "fullProfileUnits": 0,
+          "requiredMaterialMappings": 2,
+          "satisfiedMaterialMappings": 2,
+          "unresolvedReferences": 0
+        },
+        "currentSourceChanged": true,
+        "retentionEventCount": 3
+      },
+      {
+        "id": "assessment_d5fe1df4-81c5-4c25-808d-cb8d803ab6fe",
+        "case": "complete",
+        "recordHash": "6ad633b9550407a7aeacc282388cdc9b73521eaafa817b1b6b487c1e57dbccab",
+        "counts": {
+          "expectedUnits": 2,
+          "linkedScores": 2,
+          "fullProfileUnits": 2,
+          "requiredMaterialMappings": 2,
+          "satisfiedMaterialMappings": 2,
+          "unresolvedReferences": 0
+        },
+        "currentSourceChanged": true,
+        "retentionEventCount": 3
+      },
+      {
+        "id": "assessment_24b2eba2-7643-4947-8d3e-7faeeeed68da",
+        "case": "veto-with-missing",
+        "recordHash": "7bf48342757e0c10a284e4a59e8626650af06c3048d3aeb8a290ade3596c3d9f",
+        "counts": {
+          "expectedUnits": 2,
+          "linkedScores": 1,
+          "fullProfileUnits": 1,
+          "requiredMaterialMappings": 2,
+          "satisfiedMaterialMappings": 2,
+          "unresolvedReferences": 0
+        },
+        "currentSourceChanged": true,
+        "retentionEventCount": 3
+      }
+    ]
+  },
+  "rejectedBaseline": {
+    "verified": false,
+    "guiExecutionVerified": false,
+    "error": "Project, draft, output or verification-audit changed since GUI baseline"
+  },
+  "rejectedExport": {
+    "verified": false,
+    "guiExecutionVerified": false,
+    "error": "Native export differs from saved record"
+  }
+}

@@ -32,6 +32,7 @@ export type TurnServiceDeps = {
   ids: IdGenerator
   nowIso: () => string
   tasks?: TaskController
+  resolveModelSelection?: (request: StartTurnRequest, thread: ThreadRecord) => Pick<StartTurnRequest, 'model' | 'providerId'>
   approvalGate?: ApprovalGate
   userInputGate?: UserInputGate
   workspaceReferences?: Pick<WorkspaceReferenceService, 'validateReferences'>
@@ -112,6 +113,8 @@ export class TurnService {
     threadId: string
     request: StartTurnRequest
     engineeringExecution?: boolean
+    engineeringPlanId?: string
+    continuationTaskId?: string
   }): Promise<StartTurnResponse> {
     const previous = this.startQueues.get(input.threadId) ?? Promise.resolve()
     const run = previous.catch(() => undefined).then(() => this.startTurnInternal(input))
@@ -332,6 +335,20 @@ export class TurnService {
         code: 'turn_in_progress'
       })
     }
+    const sourceTurn = thread.turns.find(turn => turn.items.some(item => item.id === input.action.messageId && item.kind === 'assistant_text'))
+    if (!sourceTurn) {
+      throw Object.assign(new Error('UI action source turn not found'), { code: 'ui_action_not_found' })
+    }
+    let taskRequest: StartTurnRequest = {
+      prompt: uiActionTaskLabel(input.action),
+      idempotencyKey,
+      model: sourceTurn.model,
+      providerId: sourceTurn.providerId,
+      reasoningEffort: sourceTurn.reasoningEffort
+    }
+    if (this.deps.resolveModelSelection) {
+      taskRequest = { ...taskRequest, ...this.deps.resolveModelSelection(taskRequest, thread) }
+    }
     const releaseReservation = this.reserveTurnSlot()
     let turnId: string | undefined
     let persisted = false
@@ -344,6 +361,9 @@ export class TurnService {
         threadId: input.threadId,
         prompt: '',
         idempotencyKey,
+        model: taskRequest.model,
+        providerId: taskRequest.providerId,
+        reasoningEffort: taskRequest.reasoningEffort,
         uiAction: input.action
       })
       const actionItem = makeUiActionItem({
@@ -389,7 +409,7 @@ export class TurnService {
         // This is internal task metadata only. The model receives the
         // persisted structured ui_action item, never this label as a user
         // message or turn prompt.
-        request: { prompt: uiActionTaskLabel(input.action), idempotencyKey }
+        request: taskRequest
       })
       return { threadId: input.threadId, turnId, uiActionItemId: actionItem.id }
     } catch (error) {
@@ -406,6 +426,8 @@ export class TurnService {
     threadId: string
     request: StartTurnRequest
     engineeringExecution?: boolean
+    engineeringPlanId?: string
+    continuationTaskId?: string
   }): Promise<StartTurnResponse> {
     const thread = await this.deps.threadStore.get(input.threadId)
     if (!thread) throw new Error(`thread not found: ${input.threadId}`)
@@ -436,6 +458,17 @@ export class TurnService {
         code: 'turn_in_progress'
       })
     }
+    const selection = this.deps.tasks?.continuationSelection(thread, input.request, input.engineeringExecution, input.continuationTaskId)
+    const engineeringPlanId = input.engineeringPlanId ?? selection?.engineeringPlanId
+    input = { ...input, engineeringPlanId, engineeringExecution: input.engineeringExecution || Boolean(engineeringPlanId) }
+    input = { ...input, request: { ...input.request,
+      model: input.request.model ?? selection?.model,
+      providerId: input.request.providerId ?? selection?.providerId,
+      reasoningEffort: input.request.reasoningEffort ?? selection?.reasoningEffort
+    } }
+    if (this.deps.resolveModelSelection) {
+      input = { ...input, request: { ...input.request, ...this.deps.resolveModelSelection(input.request, thread) } }
+    }
     const releaseReservation = this.reserveTurnSlot()
     let turnId: string | undefined
     let persisted = false
@@ -452,7 +485,10 @@ export class TurnService {
       id: turnId,
       threadId: input.threadId,
       prompt: input.request.prompt,
+      engineeringExecution: input.engineeringExecution,
+      engineeringPlanId: input.engineeringPlanId,
       model: input.request.model,
+      providerId: input.request.providerId,
       reasoningEffort: input.request.reasoningEffort,
       attachmentIds: input.request.attachmentIds ?? [],
       workspaceReferences,
@@ -505,7 +541,7 @@ export class TurnService {
       turnId
       })
       this.deps.steering.setTurn(turnId)
-      this.deps.tasks?.ensureTask({ thread, turnId, request: input.request, engineeringExecution: input.engineeringExecution })
+      this.deps.tasks?.ensureTask({ thread, turnId, request: input.request, engineeringExecution: input.engineeringExecution, engineeringPlanId: input.engineeringPlanId, continuationTaskId: input.continuationTaskId })
       return { threadId: input.threadId, turnId, userMessageItemId: userItem.id }
     } catch (error) {
       if (persisted && turnId) {
@@ -943,6 +979,7 @@ function sameIdempotentTurnRequest(
   existing: {
     prompt: string
     model?: string
+    providerId?: string
     reasoningEffort?: string
     attachmentIds: string[]
     workspaceReferences?: unknown
@@ -957,8 +994,9 @@ function sameIdempotentTurnRequest(
   // execute. displayText is intentionally excluded because it is presentation
   // metadata and does not change the requested operation.
   return existing.prompt === request.prompt
-    && (existing.model ?? '') === (request.model ?? '')
-    && (existing.reasoningEffort ?? 'auto') === (request.reasoningEffort ?? 'auto')
+    && (request.model === undefined || existing.model === request.model)
+    && (request.providerId === undefined || existing.providerId === request.providerId)
+    && (request.reasoningEffort === undefined || (existing.reasoningEffort ?? 'auto') === request.reasoningEffort)
     && JSON.stringify(existing.attachmentIds ?? []) === JSON.stringify(request.attachmentIds ?? [])
     && JSON.stringify(existing.workspaceReferences ?? []) === JSON.stringify(request.workspaceReferences ?? [])
     && JSON.stringify(existing.guiPlan ?? null) === JSON.stringify(request.guiPlan ?? null)

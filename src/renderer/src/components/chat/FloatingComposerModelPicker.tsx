@@ -18,12 +18,13 @@ type Props = {
   compact: boolean
   mode: 'select' | 'combobox'
   composerModel: string
+  composerProviderId?: string
   composerPickList: string[]
   composerModelGroups?: ModelProviderModelGroup[]
   canChangeModel: boolean
   stretch?: boolean
   composerReasoningEffort?: string
-  onComposerModelChange: (modelId: string) => void
+  onComposerModelChange: (modelId: string, providerId?: string) => void
   onComposerReasoningEffortChange?: (effort: ComposerReasoningEffort) => void
 }
 
@@ -73,6 +74,7 @@ export function FloatingComposerModelPicker({
   compact,
   mode,
   composerModel,
+  composerProviderId,
   composerPickList,
   composerModelGroups = [],
   canChangeModel,
@@ -104,10 +106,12 @@ export function FloatingComposerModelPicker({
     const seen = new Set<string>()
     const groups = composerModelGroups
       .map((group) => {
+        const groupSeen = new Set<string>()
         const ids = group.modelIds
           .map((id) => id.trim())
           .filter((id) => {
-            if (!id || !isVisibleComposerModelId(id) || seen.has(id)) return false
+            if (!id || !isVisibleComposerModelId(id) || groupSeen.has(id)) return false
+            groupSeen.add(id)
             seen.add(id)
             return true
           })
@@ -133,13 +137,12 @@ export function FloatingComposerModelPicker({
   const currentReasoningLabel = t(reasoningLabelKey(currentReasoning))
   const currentModel = composerModel.trim()
   const visibleCurrentModel = isVisibleComposerModelId(currentModel) ? currentModel : ''
-  const modelLabel = fullModelLabel(visibleCurrentModel, t('autoLabel'))
+  const providerLabel = composerProviderId ? composerModelGroups.find(group => group.providerId === composerProviderId)?.label || composerProviderId : ''
+  const modelLabel = [providerLabel, fullModelLabel(visibleCurrentModel, t('autoLabel'))].filter(Boolean).join(' / ')
   const controlsTitle = reasoningEnabled
     ? `${modelLabel} / ${currentReasoningLabel}`
     : modelLabel
-  const selectedProviderId = providerMenuGroups.find((group) =>
-    group.modelIds.includes(currentModel)
-  )?.providerId ?? null
+  const selectedProviderId = composerProviderId ?? null
   const activeProviderGroup =
     providerMenuGroups.find((group) => group.providerId === activeProviderId) ?? null
   const comboboxWidthClass = stretch
@@ -351,10 +354,10 @@ export function FloatingComposerModelPicker({
             {activeProviderGroup.modelIds.map((id) => (
               <PickerRow
                 key={`${activeProviderGroup.providerId}:${id}`}
-                selected={currentModel === id}
+                selected={currentModel === id && selectedProviderId === activeProviderGroup.providerId}
                 title={id}
                 onClick={() => {
-                  onComposerModelChange(id)
+                  onComposerModelChange(id, activeProviderGroup.providerId === UNGROUPED_MODEL_PROVIDER_ID ? undefined : activeProviderGroup.providerId)
                   setMenuOpen(false)
                 }}
               />
@@ -434,7 +437,7 @@ export function FloatingComposerModelPicker({
         aria-label={t('composerModelControls')}
         title={t('composerModelControls')}
       >
-        <span className="min-w-0 whitespace-nowrap">{modelLabel}</span>
+        <span className="min-w-0 truncate">{modelLabel}</span>
         {reasoningEnabled ? (
           <span className="shrink-0 text-ds-faint">
             {t(reasoningLabelKey(currentReasoning))}

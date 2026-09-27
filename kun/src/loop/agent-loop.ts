@@ -880,6 +880,7 @@ export class AgentLoop {
       items,
       signal,
       reasoningEffort: turn?.reasoningEffort,
+      providerId: turn?.providerId,
       candidates: [turn?.model, thread?.agentProfile?.model, thread?.model, this.opts.model.model]
     })
     await this.recordPipelineStage(threadId, turnId, 'input_routed', {
@@ -1085,6 +1086,7 @@ export class AgentLoop {
     const baseRequest: ModelRequest = {
       threadId,
       turnId,
+      providerId: turn?.providerId,
       model,
       systemPrompt: this.opts.prefix.systemPrompt,
       ...(planTurnActive ? { modeInstruction: PLAN_MODE_INSTRUCTION } : {}),
@@ -2216,6 +2218,7 @@ export class AgentLoop {
       for await (const chunk of this.opts.model.stream({
         threadId: input.threadId,
         turnId: input.turnId,
+        providerId: (await this.opts.threadStore.get(input.threadId))?.turns.find(turn => turn.id === input.turnId)?.providerId,
         model: input.model,
         systemPrompt: this.opts.prefix.systemPrompt,
         contextInstructions: [
@@ -2467,6 +2470,7 @@ export class AgentLoop {
     items: readonly TurnItem[]
     signal: AbortSignal
     reasoningEffort?: string
+    providerId?: string
     candidates: Array<string | undefined>
   }): Promise<{ model: string; reasoningEffort?: string }> {
     const requestedReasoningEffort = normalizeRequestedReasoningEffort(input.reasoningEffort)
@@ -2490,6 +2494,7 @@ export class AgentLoop {
       threadId: input.threadId,
       turnId: input.turnId,
       latestRequest: input.latestRequest,
+      providerId: input.providerId,
       recentContext: recentAutoRouterContext(input.items, input.turnId),
       selectedModelMode: 'auto',
       abortSignal: input.signal

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "candidateSourceHead": "ba3864917e128f7318b88895441b2b632291d564",
+  "checkedAt": "2026-09-19T21:09:29.484307+00:00",
+  "status": "not-evaluated",
+  "assessmentBasis": "independent-python-storage-byte-chain-audit",
+  "readOnlyDatabases": true,
+  "checks": [
+    {
+      "check": "live-databases-present",
+      "status": "verified"
+    },
+    {
+      "check": "object-digests-member-bytes-chain-head-manifest-draft",
+      "status": "verified"
+    },
+    {
+      "check": "all-canonical-hashes",
+      "status": "not-evaluated",
+      "reason": [
+        "manifest-canonical-hash-non-safe-integer-number"
+      ]
+    }
+  ],
+  "counts": {
+    "plans": 2,
+    "artifacts": 2,
+    "evidences": 3,
+    "records": 1,
+    "events": 4,
+    "localHeads": 5,
+    "projects": 1,
+    "recordsWithAllDeclaredChecks": 1,
+    "artifactMemberReferences": 8,
+    "engineeringVerificationAttemptDigests": 1,
+    "projectBlobReferences": 10,
+    "uniqueBlobFiles": 10
+  },
+  "limitations": [
+    "Not Runtime business reverification, numerical replay, or input-validity assessment.",
+    "No authenticated human signature, standard conformity, or independent checkpoint is evaluated.",
+    "Two database snapshots and original files are not one atomic transaction; run after GUI mutations settle.",
+    "Canonical hashes reject floating-point and non-safe-integer JSON numbers instead of assuming JS/Python equivalence."
+  ],
+  "standardConformity": "not-evaluated",
+  "humanSignatureVerification": "not-evaluated",
+  "checkpointTrust": "local-records-only"
+}

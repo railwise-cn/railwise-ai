@@ -1,0 +1,35 @@
+{
+  "status": "compared",
+  "unchanged": true,
+  "changes": [],
+  "beforeSha256": "adc32186545edb404208446a1c46bdf3b147e4bc46f517b35f0cca823a022d89",
+  "afterSha256": "adc32186545edb404208446a1c46bdf3b147e4bc46f517b35f0cca823a022d89",
+  "guiExecutionVerified": false,
+  "professionalApproval": false,
+  "releaseApproval": false,
+  "currentProjectId": "project_e53c6744-12ba-45bf-95f4-860f31b6a49c",
+  "currentLogicalRecordsSha256": "adc32186545edb404208446a1c46bdf3b147e4bc46f517b35f0cca823a022d89",
+  "records": {
+    "sampling_populations": [
+      {
+        "id": "sampling_population_3a984371-a66e-4921-aac3-2a2a5be29547",
+        "logicalRowSha256": "5efb72bdeea0224d4a5f5519d9fbf8751aee1805a4e752c7ed74c1f1973d3e19",
+        "storedRecordHash": "5d2b385b3ee17f6e158d9e0fb93fc862ddf2ad7cae37b7baa8cdc45121aaf964"
+      }
+    ],
+    "sampling_runs": [
+      {
+        "id": "sampling_run_d8581927-2b66-4058-bb09-174e4eedda81",
+        "logicalRowSha256": "657268c3ebc80b27a7b2bc31f78fa942ba45594b4d84d56531c24c72e395295f",
+        "storedRecordHash": "c194faee456f1178798aabf323b02f48e1bdf8cc82fa416cad1b38b1229dc5e1"
+      }
+    ],
+    "quality_scoring_records": [
+      {
+        "id": "quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802",
+        "logicalRowSha256": "29b07ad034d374d4454dd603fbe955fc3ec952bc6a97e08feb85eead6bcb11df",
+        "storedRecordHash": "1cb560ea85a07b4751c0e1e558e064a6c1b07ed04d0e851b60ceb30bdbfc622e"
+      }
+    ]
+  }
+}

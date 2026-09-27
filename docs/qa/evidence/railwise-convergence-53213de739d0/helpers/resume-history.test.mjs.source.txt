@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { verifyResumeHistory } from './verify-resume-history.mjs';
+
+function fixture() {
+  const expected = { projectId: 'project_fixture', networkId: 'network_fixture', threadId: 'thread_fixture', taskId: 'task_fixture', planId: 'plan_fixture', turnId: 'turn_resume', providerId: 'synthetic-provider', model: 'synthetic-model', reasoningEffort: 'high', goalMarker: 'RAILWISE-SYNTHETIC-ACCEPTANCE', previousFailedTurnIds: ['turn_mock'], mockAssistantTextCount: 7, tools: ['survey_network_validate', 'control_network', 'survey_adjustment_read', 'report_export'] };
+  const selection = { model: expected.model, providerId: expected.providerId, reasoningEffort: expected.reasoningEffort, engineeringExecution: true, engineeringPlanId: expected.planId };
+  const thread = { turns: [{ id: 'turn_mock', ...selection, status: 'failed', error: 'engineering_plan_steps_incomplete: inspect, adjust, read, report', finishedAt: '2026-01-01T00:01:00Z' }, { id: 'turn_resume', ...selection, status: 'completed', createdAt: '2026-01-01T00:02:00Z' }] };
+  const mockReport = { ...Object.fromEntries(['projectId', 'networkId', 'threadId'].map(key => [key, expected[key]])), syntheticOnly: true, externalNetwork: false, upstreamCredentialsRead: false, tokenRemoved: true, answer: 'RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete.', requestCount: 7, events: Array.from({ length: 7 }, (_, index) => ({ request: index + 1, route: '/v1/chat/completions', accepted: true })) };
+  const items = Array.from({ length: 7 }, (_, index) => ({ id: `text_${index}`, kind: 'assistant_text', threadId: expected.threadId, turnId: 'turn_mock', text: mockReport.answer }));
+  for (const [index, toolName] of expected.tools.entries()) items.push({ id: `call_${index}`, kind: 'tool_call', threadId: expected.threadId, turnId: 'turn_resume', callId: `call_${index}`, toolName }, { id: `result_${index}`, kind: 'tool_result', threadId: expected.threadId, turnId: 'turn_resume', callId: `call_${index}`, toolName, isError: false });
+  const taskEvents = [{ sequence: 1, kind: 'task_created', payload: {} }, ...Array.from({ length: 7 }, (_, index) => ({ sequence: index + 2, kind: 'attempt_started', payload: { turnId: 'turn_mock' } })), { sequence: 9, kind: 'task_stalled', payload: { reason: thread.turns[0].error } }, { sequence: 10, kind: 'turn_attached', payload: { turnId: 'turn_resume' } }, { sequence: 11, kind: 'attempt_started', payload: { turnId: 'turn_resume' } }];
+  return { expected, thread, items, taskEvents, mockReport, strictExecutionMarkers: true };
+}
+
+test('pure fixture validates seven retained mock texts and four tools in the original Task resume', () => {
+  const result = verifyResumeHistory(fixture());
+  assert.equal(result.checked, true); assert.equal(result.sameOriginalTask, true); assert.equal(result.exactMockAssistantTextCount, 7);
+  assert.equal(result.successfulToolsBelongToResumedTurn, true); assert.match(result.receiptTurnAttribution, /no turnId column/);
+});
+test('legacy inputs without resume history retain their existing audit path', () => {
+  assert.deepEqual(verifyResumeHistory({ expected: {}, strictExecutionMarkers: false }), { checked: false });
+});
+for (const key of ['engineeringExecution', 'engineeringPlanId', 'providerId', 'model', 'reasoningEffort']) {
+  test(`strict resume history rejects missing previous Turn ${key}`, () => {
+    const input = fixture(); delete input.thread.turns[0][key]; assert.throws(() => verifyResumeHistory(input));
+  });
+}
+test('retained assistant text cannot be omitted or altered', () => {
+  const missing = fixture(); missing.items.shift(); assert.throws(() => verifyResumeHistory(missing));
+  const changed = fixture(); changed.items[0].text = 'fabricated'; assert.throws(() => verifyResumeHistory(changed));
+});
+test('an unrelated original Task cannot supply resume attachment or attempts', () => {
+  const input = fixture(); input.taskEvents = input.taskEvents.filter(event => event.kind !== 'turn_attached');
+  assert.throws(() => verifyResumeHistory(input), /not attached/);
+});
+test('successful tools cannot be borrowed from the failed mock Turn', () => {
+  const input = fixture(); input.items.find(item => item.kind === 'tool_result').turnId = 'turn_mock';
+  assert.throws(() => verifyResumeHistory(input), /mock Turn contains tool/);
+});
+test('HTTP or transport failure cannot replace incomplete-step stalled evidence', () => {
+  const input = fixture(); input.thread.turns[0].error = '403 forbidden';
+  assert.throws(() => verifyResumeHistory(input));
+});
+test('mock rejection, leaked token, wrong scope and missing report are rejected', () => {
+  const variants = [input => { input.mockReport.events[0].rejected = true }, input => { input.mockReport.tokenRemoved = false }, input => { input.mockReport.projectId = 'foreign' }, input => { delete input.mockReport }];
+  for (const mutate of variants) { const input = fixture(); mutate(input); assert.throws(() => verifyResumeHistory(input)); }
+});
+test('new resume-history acceptance cannot enable historical compatibility', () => {
+  const input = fixture(); input.strictExecutionMarkers = false;
+  assert.throws(() => verifyResumeHistory(input), /requires strict/);
+});

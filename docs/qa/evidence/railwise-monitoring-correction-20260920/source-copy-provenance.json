@@ -1,0 +1,184 @@
+[
+  {
+    "sourceBasename": "railwise-monitoring-final-desktop-tests.txt",
+    "path": "logs/final-desktop-tests.txt",
+    "sourceSha256": "713d699d10452a85204c39ca89f1cb7fbbd6ebca82d161ab503b836d4e7ee8af",
+    "archiveSha256": "b1caa7e13a7bf9e318ff54e9c6a7a6edd6af42e376c225c01c41bc7f5c883723",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-final-runtime-tests.txt",
+    "path": "logs/final-runtime-tests.txt",
+    "sourceSha256": "003bc94f883653ba9569c6434e0d05f8f98d3ea64e9b999e97f0c2dcb6d80692",
+    "archiveSha256": "55abbbd5ac78cb2ca86e8a479bee24d7d9f80b48ce2a80f4eab2c2c596c6c284",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-desktop-serial-suite.txt",
+    "path": "logs/desktop-serial-suite.txt",
+    "sourceSha256": "8a3b1e687b202360a7d76eba39960865e86611b96f474998189e3f4ef57c9c78",
+    "archiveSha256": "b7fa1ac80c1d3534766f97c8e35095ab67f584753c19dbe9af41f8cfd5c8a17e",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-runtime-frozen-suite.txt",
+    "path": "logs/runtime-frozen-suite.txt",
+    "sourceSha256": "f48af6bd22e09079d693298c4f2df49d614ca4a3d049cc0f6d94e4d7113652dc",
+    "archiveSha256": "8d506c322cd4bf620a794d87e72b00efb89fb3b1171910ce7c2044b3c2254c49",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "synthetic-monitoring-two-points-irregular.csv",
+    "path": "inputs/synthetic-monitoring-two-points-irregular.csv",
+    "sourceSha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+    "archiveSha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "synthetic-monitoring-zero-blank.xlsx",
+    "path": "inputs/synthetic-monitoring-zero-blank.xlsx",
+    "sourceSha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+    "archiveSha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-offset-counterexample.csv",
+    "path": "inputs/monitoring-offset-counterexample.csv",
+    "sourceSha256": "9357f178cbc0f9e6ce7fa22365eab888d1ac80a815cf8097ac8d36ba5a8ffff3",
+    "archiveSha256": "9357f178cbc0f9e6ce7fa22365eab888d1ac80a815cf8097ac8d36ba5a8ffff3",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-audit.py",
+    "path": "tools/monitoring-audit.py",
+    "sourceSha256": "3a3fecc3e1e8aefb9973720456132584294d9f975e662c49fdea0bc17eea48c6",
+    "archiveSha256": "ba559dc0375914dde0d174a62187a34e025b68eca92132235b8947dee28aeafe",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-audit-selftest.py",
+    "path": "tools/monitoring-audit-selftest.py",
+    "sourceSha256": "89a94850dcdb9dc6d61d5f0955996d72ab3446fef65150c7cfbf7171c7b10947",
+    "archiveSha256": "811cdc17a8f3a60c1deb75d6ef7d0827ddf1a41a98f7c556d3aaccc6d4990c25",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-pdf-text.mjs",
+    "path": "tools/monitoring-pdf-text.mjs",
+    "sourceSha256": "3e3029e5f69c7f254f07de04a35bf2606f7871c6baa532fe7e532b845c8fa813",
+    "archiveSha256": "405e05a62ea75f51f2aff0903bad3f6470f4a6a16a363f47f190b52b92de4351",
+    "transformation": "documented-path-redaction-or-localization"
+  },
+  {
+    "sourceBasename": "railwise-277-prepare-monitoring-inputs.py",
+    "path": "tools/original-local-input-preparation.py",
+    "sourceSha256": "2d5e29459bcc07c64fb2455f2d259dd55fdce80a51efaed31cdc00615941d07b",
+    "archiveSha256": "2d5e29459bcc07c64fb2455f2d259dd55fdce80a51efaed31cdc00615941d07b",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "review-manifest.json",
+    "path": "chart-review/review-manifest.json",
+    "sourceSha256": "6f29087e4fcc2e3cad41fcdf84ab1f1d17f159620b0a7d52373c2261bed4c0a3",
+    "archiveSha256": "6f29087e4fcc2e3cad41fcdf84ab1f1d17f159620b0a7d52373c2261bed4c0a3",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "single-series.svg",
+    "path": "chart-review/single-series.svg",
+    "sourceSha256": "c657cbd0c83713378d06bdd1b93280fa3a6396b238f1ab1ede5196a357a3874e",
+    "archiveSha256": "c657cbd0c83713378d06bdd1b93280fa3a6396b238f1ab1ede5196a357a3874e",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "multiple-panels.png",
+    "path": "chart-review/multiple-panels.png",
+    "sourceSha256": "ce9059bbb11fa82686a44ecb877d8b1d4b65d1f166174a73bd0f9f4db4113b27",
+    "archiveSha256": "ce9059bbb11fa82686a44ecb877d8b1d4b65d1f166174a73bd0f9f4db4113b27",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "multiple-panels.svg",
+    "path": "chart-review/multiple-panels.svg",
+    "sourceSha256": "11c5f85a60097f522df90e01f842defe9eefebdd5786a492f4591807a0d8e9b7",
+    "archiveSha256": "11c5f85a60097f522df90e01f842defe9eefebdd5786a492f4591807a0d8e9b7",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "single-series.png",
+    "path": "chart-review/single-series.png",
+    "sourceSha256": "991fe601f8ea9c77d570486da90758d21e25f003563ea345fbefcfe785f5590a",
+    "archiveSha256": "991fe601f8ea9c77d570486da90758d21e25f003563ea345fbefcfe785f5590a",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "single-zero.png",
+    "path": "chart-review/single-zero.png",
+    "sourceSha256": "043016bf102a8446761735ae59219d2e8b54d41526262d112c3d237e14edb07d",
+    "archiveSha256": "043016bf102a8446761735ae59219d2e8b54d41526262d112c3d237e14edb07d",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "single-zero.svg",
+    "path": "chart-review/single-zero.svg",
+    "sourceSha256": "3834e77e9411eb9b5dc88f3e3509d7faebae75a8e899671bac17b2f6d39fcac3",
+    "archiveSha256": "3834e77e9411eb9b5dc88f3e3509d7faebae75a8e899671bac17b2f6d39fcac3",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-chart-preflight.svg",
+    "path": "chart-review/independent-geometry-preflight.svg",
+    "sourceSha256": "4b9d3b645a6a662069e07efdb93b9b4fd666a6f49ece5e1c5c18f22ea1366021",
+    "archiveSha256": "4b9d3b645a6a662069e07efdb93b9b4fd666a6f49ece5e1c5c18f22ea1366021",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-typecheck.txt",
+    "path": "logs/frozen-typecheck.txt",
+    "sourceSha256": "2218b97a1805b6062b84d6487661f455f61f9b44175636d3ba0d1dbffbd24279",
+    "archiveSha256": "2218b97a1805b6062b84d6487661f455f61f9b44175636d3ba0d1dbffbd24279",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-runtime-types-explicit.txt",
+    "path": "logs/frozen-runtime-types-explicit.txt",
+    "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "archiveSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-lint.txt",
+    "path": "logs/frozen-lint.txt",
+    "sourceSha256": "e91a3d46cd9a132a08d5cb52c4fd8b562115c329fa76880910fc8c74785e0f6f",
+    "archiveSha256": "7fd156266df24843849233a45e6db2a74410979499aab0e50a9b02482872c79b",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-build.txt",
+    "path": "logs/frozen-build.txt",
+    "sourceSha256": "d04c513305de365e3a09e7df32e1f580843a6c77cc99f0af46c8490ba1b95cad",
+    "archiveSha256": "d69a6871202f73fffed0607538bd29c91cded467e9ebab738e001a9008225c7b",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-openspec.txt",
+    "path": "logs/frozen-openspec.txt",
+    "sourceSha256": "e6fd08687834b79de3cfb713ad87710425aab27471592cf4298a68dbe8e0db42",
+    "archiveSha256": "e6fd08687834b79de3cfb713ad87710425aab27471592cf4298a68dbe8e0db42",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-workspace-tests.txt",
+    "path": "logs/frozen-workspace-tests.txt",
+    "sourceSha256": "1bff24d4cc553ede59b8212fef93c47c1499b6b4451d10e92b272c0ca6f0cc5d",
+    "archiveSha256": "cca1529bf0b4af8dd5728474827fead582a4d816709f922ea905071800312f88",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  },
+  {
+    "sourceBasename": "railwise-monitoring-frozen-workspace-tests-corrected.txt",
+    "path": "logs/frozen-workspace-tests-corrected.txt",
+    "sourceSha256": "8abc9d924430ccf3476c6ab432543a43a2be39d377517dc6847d0029347b2fbd",
+    "archiveSha256": "9b52e2bb877a7ab93e5f0ceeff9328afabb5e2daa2576c2207f61d470c5045e3",
+    "transformation": "repository-and-system-temp-prefix-redaction"
+  }
+]

@@ -312,7 +312,7 @@ This is an unsigned build. macOS Gatekeeper will block first launch.
 Run this after downloading:
 
 ```sh
-xattr -cr "WorkWise.app"
+xattr -cr "RailWise AI.app"
 # or
 npm run mac:unquarantine
 ```
@@ -361,4 +361,4 @@ green "macOS release ${TAG_NAME} ready (draft)."
 cyan "  Meta: dist/.release-meta.env"
 cyan "  Channel: ${RELEASE_CHANNEL}"
 cyan "  Next on Windows: ./scripts/release-win.sh --tag ${TAG_NAME} --channel ${RELEASE_CHANNEL}"
-cyan "  https://github.com/wangjiawei508/WorkWise/releases/tag/${TAG_NAME}"
+cyan "  https://github.com/railwise-cn/railwise-ai/releases/tag/${TAG_NAME}"

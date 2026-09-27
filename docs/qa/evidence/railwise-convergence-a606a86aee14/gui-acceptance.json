@@ -1,0 +1,45 @@
+{
+  "sourceHead": "a606a86aee144c1c12b4221bde4112e4df9312dd",
+  "version": "0.5.0",
+  "status": "partial",
+  "guiTrialsCreated": 3,
+  "checks": {
+    "confirmationGate": "passed",
+    "keyboardConfirm": "passed",
+    "huberUnique": "passed",
+    "huberFlat": "passed",
+    "fullFamilyDenominator": "passed",
+    "rawAndNormalizedInputs": "passed",
+    "replay": "passed",
+    "nativeSaveCancelAndSuccess": "passed",
+    "exportEqualsDatabase": "passed",
+    "fullExitAndRestartOriginalIds": "passed",
+    "oneByteCorruptionRejected": "passed",
+    "unaffectedHistoryRestores": "passed",
+    "originalBytesRestored": "passed",
+    "independentPythonDatabaseNumerics": "3/3 passed",
+    "chineseLightAndEnglishDark": "observed",
+    "windowZoomAction": "performed; native dimensions not independently measured"
+  },
+  "findings": [
+    {
+      "issue": "statistical family table excessive wrapping in narrow work surface",
+      "status": "source fix adds minimum table width and existing keyboard-scroll region; next package verification required"
+    }
+  ],
+  "notCompleted": [
+    "exact 960x640 acceptance",
+    "full error/loading/offline/stale/project-switch state coverage",
+    "full keyboard and accessibility pass",
+    "human UI/professional confirmation"
+  ],
+  "excludedNewerSource": [
+    "reference workspace",
+    "quality scoring workspace",
+    "static incremental workspace",
+    "V4.1 official search fix"
+  ],
+  "productionRelease": false,
+  "localGatekeeper": "assessments disabled before task; not changed",
+  "cloudGatekeeper": "assessments enabled"
+}

@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "9cf70d71919e997e815a9e55ec4264e01572979c",
+  "sourceArtifacts": [
+    {
+      "file": "installation-context.json",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/installation-context.json",
+      "bytes": 2957,
+      "sha256": "c605c6cd8d8919fef618a7fe10fef2a9111d08ff0540e03a0cfc2c5b72dae45c",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "legacy-completion-copy.json",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/legacy-completion-copy.json",
+      "bytes": 4140,
+      "sha256": "b264d1e9df5cb1ee417f059e77fee891c34837c43fff34e2552a07f2a7a2d12e",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "packaged-text-only-completion-probe-wCtOnp.json",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/packaged-text-only-completion-probe-wCtOnp.json",
+      "bytes": 2790,
+      "sha256": "1dfa903cbc8396db8028e0cdcc31170f10bd4daed17e6c6f81c6c64b9a789e2f",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "packaged-text-only-completion-probe.log",
+      "source": "/private/tmp/railwise-9cf70d7-text-only-probe.log",
+      "bytes": 2790,
+      "sha256": "1dfa903cbc8396db8028e0cdcc31170f10bd4daed17e6c6f81c6c64b9a789e2f",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "CloudQuality.log",
+      "source": "/private/tmp/railwise-9cf70d7-quality.log",
+      "bytes": 1491887,
+      "sha256": "b64ac2c2a039eec510ec05fb739c3bd354df0b764aef6331641a3e2dddcfc566",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "gui/01-legacy-needs-attention.png",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/gui/01-legacy-needs-attention.png",
+      "bytes": 154680,
+      "sha256": "fdc5b576641bb278ff919a3606c7367acd92296dfb0d4be68ba600035a879286",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "gui/01-legacy-needs-attention.txt",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/gui/01-legacy-needs-attention.txt",
+      "bytes": 17433,
+      "sha256": "4a2faf29c15b3aeb5d8335b1136405c27232b60a9ad37e2f7d56a5ba6e5beb67",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "gui/02-legacy-zero-receipts.png",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/gui/02-legacy-zero-receipts.png",
+      "bytes": 156952,
+      "sha256": "ca4e6190c38998c76cacb4f08447b07d7c779dd23dfb30477cea11e8f2bcbfab",
+      "originalBytesPreserved": true
+    },
+    {
+      "file": "gui/03-default-restored.txt",
+      "source": "/private/tmp/railwise-survey-9cf70d7/evidence/gui/03-default-restored.txt",
+      "bytes": 6323,
+      "sha256": "1295c2a93b7176f24b58b8ead8d5f0a0b6e76a33e2bcde3e3028fea23e1fb046",
+      "originalBytesPreserved": true
+    }
+  ],
+  "credentialScans": [
+    {
+      "file": "package-summary.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "private-updater-summary.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "artifact-download-summary.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "installation-context.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "legacy-completion-copy.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "packaged-text-only-completion-probe-wCtOnp.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "packaged-text-only-completion-probe.log",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "CloudQuality.log",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "gui/01-legacy-needs-attention.txt",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "gui/03-default-restored.txt",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    },
+    {
+      "file": "CloudQuality-summary.json",
+      "hits": {
+        "githubToken": 0,
+        "privateKey": 0,
+        "apiToken": 0,
+        "credentialUrl": 0,
+        "unmaskedAuthorization": 0
+      }
+    }
+  ],
+  "screenshotReview": "Both PNGs visually inspected; synthetic project/plan only, no visible credentials.",
+  "omitted": [
+    "Private native updater feed URL",
+    "Application ZIP and app bundle",
+    "User configuration, credentials and raw databases"
+  ]
+}

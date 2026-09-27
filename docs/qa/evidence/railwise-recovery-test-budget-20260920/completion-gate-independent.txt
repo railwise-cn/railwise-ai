@@ -1,0 +1,23 @@
+
+> kun@0.4.2 test
+> vitest run tests/engineering-completion-gate.test.ts --reporter=verbose --maxWorkers=1
+
+
+ RUN  v4.1.8 <repository>/kun
+
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention 901ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention 923ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed 961ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > does not record a successful step receipt when the actual tool fails 982ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step 1752ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes 952ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false) 1654ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true) 1753ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false) 814ms
+ ✓ tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true) 808ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  17:30:43
+   Duration  12.90s (transform 899ms, setup 0ms, import 1.32s, tests 11.50s, environment 0ms)
+

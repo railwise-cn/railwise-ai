@@ -1,0 +1,33 @@
+{
+  "status": "pass",
+  "sourceHashes": {
+    "kun/src/contracts/survey-static-incremental.ts": "2510cd1f7a4772f0cf13583a569d7db6d7de71d2028ed66a1c18fe119175b9c5",
+    "kun/src/engineering/survey-static-incremental.ts": "8a1bc11068eaeb8a95b88ab95d481e1ac22543e7c7b792e9e2c88f5c86c84919",
+    "kun/src/engineering/survey-static-incremental.test.ts": "528abdefa2e86e923ba06575e9dd63cc0ccb400f1753b036f901ee082f1378ad"
+  },
+  "tests": {
+    "static": 152,
+    "adjacentGeneralizedW": 42,
+    "total": 194
+  },
+  "checks": [
+    "kun full typecheck",
+    "kun build",
+    "targeted ESLint",
+    "compiled Node ESM oracle",
+    "portable independent review replay"
+  ],
+  "ownOracle": {
+    "models": 29,
+    "prefixFits": 133,
+    "scalarComparisons": 5041
+  },
+  "independentReview": {
+    "models": 53,
+    "appendedPrefixes": 177,
+    "scalarComparisons": 15806,
+    "boundaryCases": 28,
+    "givensReconstructions": 177
+  },
+  "qualification": "AI software/numerical evidence only; not professional signoff, packaged acceptance or release approval"
+}

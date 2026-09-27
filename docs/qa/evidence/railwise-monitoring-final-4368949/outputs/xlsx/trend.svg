@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="chart-title chart-description">
+<title id="chart-title">监测趋势 / Monitoring trends</title>
+<desc id="chart-description">原始观测值按监测项、单位与测点分组，横轴为实际时间；不同测点不连线。Observation values grouped by item, unit and point; time is proportional. No lines cross point identities.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g font-family="PingFang SC, Microsoft YaHei, sans-serif" fill="#172033" font-variant-numeric="tabular-nums">
+<text x="32" y="29" font-size="20" font-weight="600">监测趋势 / Monitoring trends</text>
+<text x="32" y="53" font-size="13"><title>监测XLSX（合成验收）</title>监测XLSX（合成验收）</text>
+<text x="32" y="77" font-size="11" fill="#526176">6 观测 / observations · 1 分组 / panels · UTC</text>
+<g transform="translate(0,100)" data-panel-index="0">
+<text x="32" y="22" font-size="15" font-weight="600"><title>沉降</title>沉降</text>
+<text x="106" y="89" font-size="11" fill="#526176"><title>mm</title>观测值 / Value (mm)</text>
+<line x1="106" y1="320" x2="924" y2="320" stroke="#e5e7eb"/>
+<text x="94" y="324" text-anchor="end" font-size="11">-1.72</text>
+<line x1="106" y1="265" x2="924" y2="265" stroke="#e5e7eb"/>
+<text x="94" y="269" text-anchor="end" font-size="11">0.71</text>
+<line x1="106" y1="210" x2="924" y2="210" stroke="#e5e7eb"/>
+<text x="94" y="214" text-anchor="end" font-size="11">3.14</text>
+<line x1="106" y1="155" x2="924" y2="155" stroke="#e5e7eb"/>
+<text x="94" y="159" text-anchor="end" font-size="11">5.57</text>
+<line x1="106" y1="100" x2="924" y2="100" stroke="#e5e7eb"/>
+<text x="94" y="104" text-anchor="end" font-size="11">8</text>
+<line x1="106.000" y1="320" x2="106.000" y2="325" stroke="#8a97a8"/>
+<text x="106.000" y="342" text-anchor="middle" font-size="10">2026-08-01</text>
+<text x="106.000" y="357" text-anchor="middle" font-size="10" fill="#526176">00:00:00</text>
+<line x1="310.500" y1="320" x2="310.500" y2="325" stroke="#8a97a8"/>
+<text x="310.500" y="342" text-anchor="middle" font-size="10">2026-08-02</text>
+<text x="310.500" y="357" text-anchor="middle" font-size="10" fill="#526176">00:00:00</text>
+<line x1="515.000" y1="320" x2="515.000" y2="325" stroke="#8a97a8"/>
+<text x="515.000" y="342" text-anchor="middle" font-size="10">2026-08-03</text>
+<text x="515.000" y="357" text-anchor="middle" font-size="10" fill="#526176">00:00:00</text>
+<line x1="719.500" y1="320" x2="719.500" y2="325" stroke="#8a97a8"/>
+<text x="719.500" y="342" text-anchor="middle" font-size="10">2026-08-04</text>
+<text x="719.500" y="357" text-anchor="middle" font-size="10" fill="#526176">00:00:00</text>
+<line x1="924.000" y1="320" x2="924.000" y2="325" stroke="#8a97a8"/>
+<text x="924.000" y="342" text-anchor="middle" font-size="10">2026-08-05</text>
+<text x="924.000" y="357" text-anchor="middle" font-size="10" fill="#526176">00:00:00</text>
+<line x1="106" y1="100" x2="106" y2="320" stroke="#8a97a8"/>
+<line x1="106" y1="320" x2="924" y2="320" stroke="#8a97a8"/>
+<text x="515" y="382" text-anchor="middle" font-size="11">日期与时间 / Date and time (UTC)</text>
+<g data-series-index="0"><title>沉降 / S01 (mm)</title>
+<line x1="32" y1="43" x2="50" y2="43" stroke="#2563eb" stroke-width="2"/>
+<circle cx="41" cy="43" r="3" fill="#2563eb"/>
+<text x="56" y="47" font-size="11"><title>S01</title>S01</text>
+<circle data-role="observation" cx="106.000" cy="281.070" r="3.5" fill="#2563eb" stroke="#fff" stroke-width="1"><title>S01 · 2026-08-01T00:00:00Z · 0 mm</title></circle>
+<circle data-role="observation" cx="310.500" cy="235.802" r="3.5" fill="#2563eb" stroke="#fff" stroke-width="1"><title>S01 · 2026-08-02T00:00:00Z · 2 mm</title></circle>
+<circle data-role="observation" cx="924.000" cy="100.000" r="3.5" fill="#2563eb" stroke="#fff" stroke-width="1"><title>S01 · 2026-08-05T00:00:00Z · 8 mm</title></circle>
+<polyline data-role="trend-line" fill="none" stroke="#2563eb" stroke-width="2" points="106.000,281.070 310.500,235.802 924.000,100.000"/>
+</g>
+<g data-series-index="1"><title>沉降 / S02 (mm)</title>
+<line x1="216" y1="43" x2="234" y2="43" stroke="#dc2626" stroke-width="2"/>
+<circle cx="225" cy="43" r="3" fill="#dc2626"/>
+<text x="240" y="47" font-size="11"><title>S02</title>S02</text>
+<circle data-role="observation" cx="106.000" cy="100.000" r="3.5" fill="#dc2626" stroke="#fff" stroke-width="1"><title>S02 · 2026-08-01T00:00:00Z · 8 mm</title></circle>
+<circle data-role="observation" cx="310.500" cy="167.901" r="3.5" fill="#dc2626" stroke="#fff" stroke-width="1"><title>S02 · 2026-08-02T00:00:00Z · 5 mm</title></circle>
+<circle data-role="observation" cx="924.000" cy="303.704" r="3.5" fill="#dc2626" stroke="#fff" stroke-width="1"><title>S02 · 2026-08-05T00:00:00Z · -1 mm</title></circle>
+<polyline data-role="trend-line" fill="none" stroke="#dc2626" stroke-width="2" points="106.000,100.000 310.500,167.901 924.000,303.704"/>
+</g>
+<text x="32" y="408" font-size="10" fill="#526176">6 条观测 / observations · 同时刻重复记录仅标点 / Duplicate times: markers only</text>
+</g>
+<text x="32" y="545" font-size="10" fill="#526176">原始观测值；不代表累计变化或速率 / Observation values, not cumulative changes or rates.</text>
+</g></svg>

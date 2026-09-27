@@ -1,0 +1,54 @@
+{
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "version": "0.5.0",
+  "appPath": "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head43689493ab58",
+  "asarSha256": "11a060ec6a7c42385eed433a336967a91647251f51a07f0781302420b2f9e20c",
+  "matchesNativeUpdaterInstalledTarget": true,
+  "zipSha256": "f68de842dd36f5d0463c928f53d375607f71b8e1da1608fa8fa88224d1a3679a",
+  "installationSource": "same application ZIP used by private native updater",
+  "checks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app"
+      ],
+      "exitCode": 0,
+      "output": "Processing: <CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app\nThe validate action worked!"
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "<CANDIDATE_ROOT>/Applications/RAILWISE AI Candidate 43689493ab58.app"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ],
+  "guiAcceptance": "not-tested",
+  "userAcceptance": "not-performed"
+}

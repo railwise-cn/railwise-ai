@@ -1,0 +1,76 @@
+{
+  "verified": true,
+  "guiExecutionVerified": false,
+  "professionalApproval": false,
+  "crossDatabaseAtomicityClaimed": false,
+  "scope": "synthetic-two-unit-final-office-census-full-and-veto-only",
+  "projectId": "project_9c8894f5-7683-4b0e-a634-466ffca1dbe0",
+  "planId": "assessment_plan_26588896-1113-4803-89f8-17625e428c1e",
+  "baselineUnchanged": true,
+  "currentRetentionEvents": 5,
+  "independentScoresChecked": 3,
+  "requiredCasesPresent": true,
+  "nativeExportFilesChecked": 1,
+  "records": [
+    {
+      "id": "assessment_07daf090-925b-4093-a010-d012477dac4f",
+      "case": "missing",
+      "recordHash": "ef40567e0c80acc1c92aba08579bf1217d182948e43736b995872b094ba7780b",
+      "counts": {
+        "expectedUnits": 2,
+        "linkedScores": 0,
+        "fullProfileUnits": 0,
+        "requiredMaterialMappings": 2,
+        "satisfiedMaterialMappings": 2,
+        "unresolvedReferences": 0
+      },
+      "currentSourceChanged": true,
+      "retentionEventCount": 4
+    },
+    {
+      "id": "assessment_310839d6-3b44-45a4-8f99-5f44e0d815ed",
+      "case": "complete",
+      "recordHash": "8fbf459fbab30a45c44a40ee240074b3ae2e286b36c5b2860528e270e28335a4",
+      "counts": {
+        "expectedUnits": 2,
+        "linkedScores": 2,
+        "fullProfileUnits": 2,
+        "requiredMaterialMappings": 2,
+        "satisfiedMaterialMappings": 2,
+        "unresolvedReferences": 0
+      },
+      "currentSourceChanged": true,
+      "retentionEventCount": 4
+    },
+    {
+      "id": "assessment_6e4da1bc-bc03-48b3-a9b7-b8817a0e4ee1",
+      "case": "veto-with-missing",
+      "recordHash": "32460af3430882c29946e789c1a67e4474e662a77c42e07f827f93df5ec16268",
+      "counts": {
+        "expectedUnits": 2,
+        "linkedScores": 1,
+        "fullProfileUnits": 1,
+        "requiredMaterialMappings": 2,
+        "satisfiedMaterialMappings": 2,
+        "unresolvedReferences": 0
+      },
+      "currentSourceChanged": true,
+      "retentionEventCount": 4
+    },
+    {
+      "id": "assessment_dd5a9602-8de7-46e0-8800-626ac283ca88",
+      "case": "complete",
+      "recordHash": "49e916a6c654a52f0b0b39dfe3af455f48fa558203b3021fd55fba3d0807c2cb",
+      "counts": {
+        "expectedUnits": 2,
+        "linkedScores": 2,
+        "fullProfileUnits": 2,
+        "requiredMaterialMappings": 2,
+        "satisfiedMaterialMappings": 2,
+        "unresolvedReferences": 0
+      },
+      "currentSourceChanged": false,
+      "retentionEventCount": 5
+    }
+  ]
+}

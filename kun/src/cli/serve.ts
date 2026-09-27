@@ -51,6 +51,8 @@ export function parseServeOptions(
     DEFAULT_SERVE_OPTIONS.tokenEconomyMode
   const merged: ServeOptions = {
     ...DEFAULT_SERVE_OPTIONS,
+    ...(env.WORKWISE_MODEL_PROVIDERS_SECRET ? { modelProviders: parseModelProvidersEnvironment(env.WORKWISE_MODEL_PROVIDERS_SECRET) } : {}),
+    ...(env.WORKWISE_DEFAULT_MODEL_PROVIDER_ID ? { defaultModelProviderId: env.WORKWISE_DEFAULT_MODEL_PROVIDER_ID } : {}),
     ...(loadedConfig ? { configPath: loadedConfig.path } : {}),
     host:
       typeof raw.host === 'string'
@@ -148,6 +150,10 @@ export function parseServeOptions(
  */
 export function validateServeOptions(input: unknown): ServeOptions {
   return ServeOptionsSchema.parse(input)
+}
+
+function parseModelProvidersEnvironment(value: string): ServeOptions['modelProviders'] {
+  try { return JSON.parse(value) } catch { throw new Error('invalid model provider configuration') }
 }
 
 /** Human-readable usage string, used by the CLI when no args are given. */

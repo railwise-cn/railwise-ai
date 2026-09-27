@@ -1,0 +1,57 @@
+[
+  {
+    "name": "desktop-test",
+    "cwd": "/private/tmp/railwise-survey-result-questions",
+    "command": "npm",
+    "args": [
+      "run",
+      "test"
+    ],
+    "startedAt": "2026-09-20T21:42:36.817Z",
+    "finishedAt": "2026-09-20T21:43:13.141Z",
+    "log": "/private/tmp/railwise-result-questions-validation/desktop-test.log",
+    "exitCode": 1,
+    "signal": null
+  },
+  {
+    "name": "desktop-typecheck",
+    "cwd": "/private/tmp/railwise-survey-result-questions",
+    "command": "npm",
+    "args": [
+      "run",
+      "typecheck"
+    ],
+    "startedAt": "2026-09-20T21:43:13.142Z",
+    "finishedAt": "2026-09-20T21:43:24.742Z",
+    "log": "/private/tmp/railwise-result-questions-validation/desktop-typecheck.log",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "name": "desktop-lint",
+    "cwd": "/private/tmp/railwise-survey-result-questions",
+    "command": "npm",
+    "args": [
+      "run",
+      "lint"
+    ],
+    "startedAt": "2026-09-20T21:43:24.742Z",
+    "finishedAt": "2026-09-20T21:43:35.690Z",
+    "log": "/private/tmp/railwise-result-questions-validation/desktop-lint.log",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "name": "desktop-build",
+    "cwd": "/private/tmp/railwise-survey-result-questions",
+    "command": "./node_modules/.bin/electron-vite",
+    "args": [
+      "build"
+    ],
+    "startedAt": "2026-09-20T21:43:35.690Z",
+    "finishedAt": "2026-09-20T21:43:41.320Z",
+    "log": "/private/tmp/railwise-result-questions-validation/desktop-build.log",
+    "exitCode": 0,
+    "signal": null
+  }
+]

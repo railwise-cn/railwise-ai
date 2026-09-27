@@ -68,4 +68,39 @@ describe('COSA OU1 read-only adjusted-height reference', () => {
     ].join('\n')
     expect(compareCosaLevelSourceEvidence(input, parseCosaOu1SourceEvidence(source))).toMatchObject({ status: 'blocked', reason: 'reference-source-count-mismatch' })
   })
+
+  it('enforces character, line count and line length limits in both reference readers', () => {
+    for (const source of [' '.repeat(8 * 1024 * 1024 + 1), '\r\n'.repeat(100_000), ' '.repeat(16_385) + '\n' + table]) {
+      expect(parseCosaOu1Heights(source)).toMatchObject({ state: 'blocked', points: [], reason: 'reference-resource-limit' })
+      expect(parseCosaOu1SourceEvidence(source)).toMatchObject({ state: 'blocked', knownPoints: [], observations: [], reason: 'reference-resource-limit' })
+    }
+    expect(parseCosaOu1Heights(' '.repeat(16_384) + '\n' + table).state).toBe('valid')
+    expect(parseCosaOu1Heights('\n'.repeat(100_000 - table.split('\n').length) + table).state).toBe('valid')
+  })
+
+  it('accepts the reference point limit and rejects an extra point without returning a prefix', () => {
+    const heights = (count: number) => ['高程平差值及其精度', '---', '序号 点号 高程(m) 中误差(mm)', ...Array.from({ length: count }, (_, i) => `${i + 1} P${i} 100.00000 0.50`), '---'].join('\n')
+    expect(parseCosaOu1Heights(heights(10_000)).points).toHaveLength(10_000)
+    expect(parseCosaOu1Heights(heights(10_001))).toMatchObject({ state: 'blocked', points: [], reason: 'reference-point-limit' })
+    const source = (known: number, observations: number) => [
+      '已知点信息', '---', '序号 点号 高程(m)', ...Array.from({ length: known }, (_, i) => `${i + 1} P${i} 100.00000`), '---',
+      '测段实测高差数据统计', '---', '序号 起点 终点 高差(m) 距离(km) 权', ...Array.from({ length: observations }, (_, i) => `${i + 1} A P${i} 0.25000 0.1000 10.000`), '---'
+    ].join('\n')
+    expect(parseCosaOu1SourceEvidence(source(10_000, 10_000))).toMatchObject({ state: 'valid' })
+    for (const text of [source(10_001, 1), source(1, 10_001)]) {
+      expect(parseCosaOu1SourceEvidence(text)).toMatchObject({ state: 'blocked', knownPoints: [], observations: [] })
+    }
+  })
+
+  it('rejects oversized comparison arrays before allocating a least-squares system', () => {
+    const reference = parseCosaOu1Heights(table)
+    expect(compareCosaLevelHeights({ ...input, observations: Array(10_001).fill(input.observations[0]) }, reference)).toMatchObject({ status: 'blocked', reason: 'comparison-dimension-limit' })
+    expect(compareCosaLevelHeights({ ...input, knownPoints: Array(1_001).fill(input.knownPoints[0]) }, reference)).toMatchObject({ status: 'blocked', reason: 'comparison-dimension-limit' })
+    expect(compareCosaLevelHeights(input, { ...reference, points: Array(1_001).fill(reference.points[0]) })).toMatchObject({ status: 'blocked', reason: 'comparison-dimension-limit' })
+    const evidence = parseCosaOu1SourceEvidence(['已知点信息', '---', '序号 点号 高程(m)', '1 A 100.00000', '---', '测段实测高差数据统计', '---', '序号 起点 终点 高差(m) 距离(km) 权', '1 A P 0.25000 0.1000 10.000', '---'].join('\n'))
+    for (const key of ['knownPoints', 'observations'] as const) {
+      expect(compareCosaLevelSourceEvidence({ ...input, [key]: Array(10_001).fill(input[key][0]) }, evidence)).toMatchObject({ status: 'blocked', reason: 'comparison-dimension-limit' })
+      expect(compareCosaLevelSourceEvidence(input, { ...evidence, [key]: Array(10_001).fill(evidence[key][0]) })).toMatchObject({ status: 'blocked', reason: 'comparison-dimension-limit' })
+    }
+  })
 })

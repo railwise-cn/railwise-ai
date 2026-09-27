@@ -1,0 +1,8 @@
+{
+  "targetRun": "sampling_run_5feb6b65-2b31-4dd6-a63a-746658aa92ae",
+  "mutation": "append one ASCII space to data_json without updating record_hash",
+  "originalSha256": "fc49defa14c43695d44c4b5e0499615a0e84f5bcfcc94f48e81462b6485e0b0b",
+  "restored": true,
+  "uiRejected": true,
+  "validCensusHistoryRecovered": true
+}

@@ -1,0 +1,196 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/03-unit-zh-light.ax.txt",
+  "sourceSha256": "21c625d106da38e9c56d9993f87c3b77713915e636432d000420b9d428711537",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 5,
+      "text": "\t\t\t3 HTML 内容 RAILWISE AI, URL: <local-app-url>"
+    },
+    {
+      "originalLine": 7,
+      "text": "\t\t\t\t\t5 按钮 RAILWISE AI"
+    },
+    {
+      "originalLine": 84,
+      "text": "\t\t\t\t\t\t\t82 文本 依据 GB/T 24356—2023 已核查条文，对明确声明的检查记录进行精确评分。选择成果类型和检查阶段，并填写适用依据及原始声明。"
+    },
+    {
+      "originalLine": 86,
+      "text": "\t\t\t\t\t\t\t84 文本 项目 project_e53c6744-12ba-45bf-95f4-860f31b6a49c · 修订 2"
+    },
+    {
+      "originalLine": 93,
+      "text": "\t\t\t\t\t\t\t\t91 弹出式按钮 成果类型, Value: 平面控制测量 · 点（表43/44）"
+    },
+    {
+      "originalLine": 94,
+      "text": "\t\t\t\t\t\t\t\t\t92 (selected) 平面控制测量 · 点（表43/44）"
+    },
+    {
+      "originalLine": 100,
+      "text": "\t\t\t\t\t\t\t\t98 文本输入区 (settable) 检查适用依据与资料说明, Value: 合成 GUI 验收，平面控制点表43/44，完整七子元素声明；仅核对目录关联和精确评分，不代表现场检查或专业批准。"
+    },
+    {
+      "originalLine": 101,
+      "text": "\t\t\t\t\t\t\t99 文本 说明采用的产品表、检查范围、允许中误差来源、缺陷分类依据与检查记录。原文最多 16 KiB；保存不验证引用真实性。"
+    },
+    {
+      "originalLine": 106,
+      "text": "  \"standardCode\": \"GB/T 24356-2023\","
+    },
+    {
+      "originalLine": 107,
+      "text": "  \"sourceDigest\": \"96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487\","
+    },
+    {
+      "originalLine": 109,
+      "text": "  \"productProfileVersion\": \"gbt24356-2023-control-declared-counts-1\","
+    },
+    {
+      "originalLine": 110,
+      "text": "  \"profileWeightTable\": 43,"
+    },
+    {
+      "originalLine": 111,
+      "text": "  \"profileClassificationTable\": 44,"
+    },
+    {
+      "originalLine": 135,
+      "text": "              \"source\": \"caller-declared-error-magnitude-not-derived-from-adjustment-residuals\","
+    },
+    {
+      "originalLine": 277,
+      "text": "\t\t\t\t\t\t\t\t112 text quality_scoring_d20c1d56-0e62-4952-9ace-ed15de36b802  ·  2026-09-20T04:51:01.009Z"
+    },
+    {
+      "originalLine": 279,
+      "text": "\t\t\t\t\t\t\t\t114 text 平面控制测量 · 点（表43/44）  ·  单位成果分层评分  ·  GB/T 24356-2023"
+    },
+    {
+      "originalLine": 283,
+      "text": "\t\t\t\t\t\t\t118 标题 检查适用依据与资料说明, Value: 5"
+    },
+    {
+      "originalLine": 285,
+      "text": "\t\t\t\t\t\t\t120 文本 合成 GUI 验收，平面控制点表43/44，完整七子元素声明；仅核对目录关联和精确评分，不代表现场检查或专业批准。"
+    },
+    {
+      "originalLine": 287,
+      "text": "\t\t\t\t\t\t\t\t122 标题 本次声明评分结果, Value: 5"
+    },
+    {
+      "originalLine": 293,
+      "text": "\t\t\t\t\t\t\t\t128 定义列表"
+    },
+    {
+      "originalLine": 296,
+      "text": "\t\t\t\t\t\t\t\t\t131 文本 9141/100"
+    },
+    {
+      "originalLine": 309,
+      "text": "\t\t\t\t\t\t\t\t\t144 开合三角标记 查看规范依据"
+    },
+    {
+      "originalLine": 310,
+      "text": "\t\t\t\t\t\t\t\t\t\t145 文本 查看规范依据"
+    },
+    {
+      "originalLine": 311,
+      "text": "\t\t\t\t\t\t\t\t\t146 container 本次结果的规范依据"
+    },
+    {
+      "originalLine": 312,
+      "text": "\t\t\t\t\t\t\t\t\t\t147 标题 本次结果的规范依据, Value: 6"
+    },
+    {
+      "originalLine": 313,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t148 文本 本次结果的规范依据"
+    },
+    {
+      "originalLine": 318,
+      "text": "\t\t\t\t\t\t\t\t\t\t153 定义列表"
+    },
+    {
+      "originalLine": 321,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t156 文本 GB/T 24356-2023"
+    },
+    {
+      "originalLine": 328,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t163 text gbt24356-2023.scoring.unit  ·  1"
+    },
+    {
+      "originalLine": 331,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t166 文本 gbt24356-declared-exact-quality-scoring-1"
+    },
+    {
+      "originalLine": 332,
+      "text": "\t\t\t\t\t\t\t\t\t\t167 container 条款与官方原文页码"
+    },
+    {
+      "originalLine": 334,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t169 text 条款 6.2.1.2, 6.2.2, 6.2.3, 6.2.4.4, 6.2.4.5, 6.2.5  · 表 2, 3"
+    },
+    {
+      "originalLine": 335,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t170 文本 式(6)属于6.2.4.5，6.2.5为等级及表3。旧算法trace的6.2.5/formula-6标签保留原样，本目录补正定位；部分声明范围不等于完整验收。"
+    },
+    {
+      "originalLine": 336,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t171 link Description: 印刷第 6 页 · PDF 第 9 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=9"
+    },
+    {
+      "originalLine": 337,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t172 link Description: 印刷第 7 页 · PDF 第 10 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=10"
+    },
+    {
+      "originalLine": 338,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t173 link Description: 印刷第 8 页 · PDF 第 11 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=11"
+    },
+    {
+      "originalLine": 340,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t\t175 text 条款 7.5.1  · 表 43, 44"
+    },
+    {
+      "originalLine": 341,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t176 文本 元素权及错漏分类依据；分类仍由调用方声明，未编码完整自动分类表。"
+    },
+    {
+      "originalLine": 342,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t177 link Description: 印刷第 57 页 · PDF 第 60 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=60"
+    },
+    {
+      "originalLine": 343,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t178 link Description: 印刷第 58 页 · PDF 第 61 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=61"
+    },
+    {
+      "originalLine": 344,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t179 link Description: 印刷第 59 页 · PDF 第 62 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=62"
+    },
+    {
+      "originalLine": 345,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t180 link Description: 印刷第 60 页 · PDF 第 63 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=63"
+    },
+    {
+      "originalLine": 347,
+      "text": "\t\t\t\t\t\t\t\t\t\t182 内容列表"
+    },
+    {
+      "originalLine": 355,
+      "text": "\t\t\t\t\t\t\t\t\t\t190 内容列表"
+    },
+    {
+      "originalLine": 368,
+      "text": "\t\t\t\t\t\t\t\t\t\t203 开合三角标记 来源与目录身份"
+    },
+    {
+      "originalLine": 369,
+      "text": "\t\t\t\t\t\t\t\t\t\t\t204 文本 来源与目录身份"
+    },
+    {
+      "originalLine": 394,
+      "text": "The focused UI element is 144 开合三角标记 查看规范依据"
+    }
+  ]
+}

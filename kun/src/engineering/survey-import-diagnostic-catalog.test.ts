@@ -36,11 +36,16 @@ describe('survey import diagnostic catalogue', () => {
       expect(definition.suggestedAction).toMatch(/[\u3400-\u9fff]/u)
       expect(definition.suggestedAction.trim().length).toBeGreaterThan(0)
       expect(`${definition.title}${definition.message}${definition.suggestedAction}`).not.toContain('未知错误')
+      for (const value of Object.values(definition.english)) {
+        expect(value.trim().length).toBeGreaterThan(0)
+        expect(value).not.toMatch(/[\u3400-\u9fff]/u)
+      }
+      expect(Object.isFrozen(definition.english)).toBe(true)
       expect(Object.isFrozen(definition)).toBe(true)
     }
     expect(ids.size).toBe(SURVEY_IMPORT_DIAGNOSTIC_CODES.length)
     expect(Object.isFrozen(SURVEY_IMPORT_DIAGNOSTIC_CATALOG)).toBe(true)
-    expect(SURVEY_IMPORT_DIAGNOSTIC_CATALOG_VERSION).toBe('workwise-survey-import-diagnostics-1.1.0')
+    expect(SURVEY_IMPORT_DIAGNOSTIC_CATALOG_VERSION).toBe('workwise-survey-import-diagnostics-1.2.0')
   })
 
   it('builds a contract-valid diagnostic with opaque anchor context and stable catalogue copy', () => {

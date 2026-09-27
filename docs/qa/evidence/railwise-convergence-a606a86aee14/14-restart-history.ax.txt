@@ -1,0 +1,34 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++							134 container Trial history
++								135 标题 Trial history, Value: 4
++									136 文本 Trial history
++								137 按钮 Strictly verify and restore · Declared statistical family · Family evaluated; inspect each member advanced_trial_75fae9e2-0cb3-41f9-b5e7-1cab6467670c · 2026-09-20T00:40:36.388Z
++									138 文本 Strictly verify and restore
++									139 文本  · 
++									140 文本 Declared statistical family
++									141 文本  · 
++									142 文本 Family evaluated; inspect each member
++									143 文本 advanced_trial_75fae9e2-0cb3-41f9-b5e7-1cab6467670c
++									144 文本  · 
++									145 文本 2026-09-20T00:40:36.388Z
++								146 按钮 Strictly verify and restore · Fixed-scale Huber trial · Declared stopping conditions met advanced_trial_ba87952f-4585-4156-bf5c-3b3bf9e1efb2 · 2026-09-20T00:39:31.869Z
++									147 文本 Strictly verify and restore
++									148 文本  · 
++									149 文本 Fixed-scale Huber trial
++									150 文本  · 
++									151 文本 Declared stopping conditions met
++									152 文本 advanced_trial_ba87952f-4585-4156-bf5c-3b3bf9e1efb2
++									153 文本  · 
++									154 文本 2026-09-20T00:39:31.869Z
++								155 按钮 Strictly verify and restore · Fixed-scale Huber trial · Declared stopping conditions met advanced_trial_47f90b25-0429-4c00-a7d1-f83f7cb98a9f · 2026-09-20T00:38:03.475Z
++									156 文本 Strictly verify and restore
++									157 文本  · 
++									158 文本 Fixed-scale Huber trial
++									159 文本  · 
++									160 文本 Declared stopping conditions met
++									161 文本 advanced_trial_47f90b25-0429-4c00-a7d1-f83f7cb98a9f
++									162 文本  · 
++									163 文本 2026-09-20T00:38:03.475Z
++								164 按钮 (disabled) Previous page
++								165 按钮 (disabled) Next page
+The focused UI element is 123 标题 Advanced model trials, Value: 3

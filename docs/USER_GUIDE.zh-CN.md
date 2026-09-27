@@ -2,9 +2,9 @@
 
 本文档用于快速上手 WorkWise 桌面端。更多背景、源码和发布包请查看：
 
-- 项目主页：https://github.com/wangjiawei508/WorkWise
+- 项目主页：https://github.com/railwise-cn/railwise-ai
 - 产品与下载：https://www.railwise.cn/products/workwise/
-- 问题反馈：https://github.com/wangjiawei508/WorkWise/issues
+- 问题反馈：https://github.com/railwise-cn/railwise-ai/issues
 - 维护者：https://github.com/wangjiawei508
 
 ## DeepSeek V4 Pro 与 DeepSeek Harness

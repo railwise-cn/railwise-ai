@@ -67,6 +67,8 @@ export class ReviewService {
     try {
       const thread = await this.deps.threadStore.get(input.threadId)
       if (!thread) throw new Error(`thread not found: ${input.threadId}`)
+      const reviewTurn = thread.turns.find(turn => turn.id === input.turnId)
+      if (!reviewTurn) throw new Error(`review turn not found: ${input.turnId}`)
       const resolved = await resolveReviewTargetPrompt({
         target: input.target,
         workspace: thread.workspace ?? ''
@@ -78,7 +80,8 @@ export class ReviewService {
       const rawReviewText = await this.runIsolatedReviewer({
         prompt: resolved.prompt,
         workspace: thread.workspace ?? '',
-        model: input.model?.trim() || thread.model || this.deps.defaultModel,
+        model: reviewTurn.model || input.model?.trim() || thread.model || this.deps.defaultModel,
+        providerId: reviewTurn.providerId,
         signal
       })
       if (signal.aborted) {
@@ -115,6 +118,7 @@ export class ReviewService {
     prompt: string
     workspace: string
     model: string
+    providerId?: string
     signal: AbortSignal
   }): Promise<string> {
     const nowIso = this.deps.nowIso
@@ -194,6 +198,7 @@ export class ReviewService {
       request: {
         prompt: input.prompt,
         model: input.model,
+        providerId: input.providerId,
         mode: 'agent'
       }
     })

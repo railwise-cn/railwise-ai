@@ -1,0 +1,99 @@
+{
+  "checkedAt": "2026-09-20T20:48:54.630Z",
+  "head": "59d2d56c691642a585407698396b41dec65c75e0",
+  "execution": {
+    "node": "v26.8.2",
+    "icu": "78.3",
+    "timezone": "Asia/Shanghai"
+  },
+  "exactPriorV2Comparisons": 1000,
+  "handCheckedBoundaries": 6,
+  "inputFrozen": true,
+  "extractionComparison": "passed",
+  "localeComparisons": [
+    {
+      "environmentLocale": "en_US.UTF-8",
+      "resolved": {
+        "locale": "en-US",
+        "usage": "sort",
+        "sensitivity": "variant",
+        "ignorePunctuation": false,
+        "collation": "default",
+        "numeric": false,
+        "caseFirst": "false"
+      },
+      "cmp": -1
+    },
+    {
+      "environmentLocale": "sv_SE.UTF-8",
+      "resolved": {
+        "locale": "sv-SE",
+        "usage": "sort",
+        "sensitivity": "variant",
+        "ignorePunctuation": false,
+        "collation": "default",
+        "numeric": false,
+        "caseFirst": "false"
+      },
+      "cmp": -1
+    },
+    {
+      "environmentLocale": "en_US@numbers=latn",
+      "resolved": {
+        "locale": "en-US",
+        "usage": "sort",
+        "sensitivity": "variant",
+        "ignorePunctuation": false,
+        "collation": "default",
+        "numeric": false,
+        "caseFirst": "false"
+      },
+      "cmp": -1
+    },
+    {
+      "environmentLocale": "en_US@colNumeric=yes",
+      "resolved": {
+        "locale": "en-US",
+        "usage": "sort",
+        "sensitivity": "variant",
+        "ignorePunctuation": false,
+        "collation": "default",
+        "numeric": false,
+        "caseFirst": "false"
+      },
+      "cmp": -1
+    },
+    {
+      "environmentLocale": "en-US-u-kn-true",
+      "resolved": {
+        "locale": "en-US-u-kn",
+        "usage": "sort",
+        "sensitivity": "variant",
+        "ignorePunctuation": false,
+        "collation": "default",
+        "numeric": true,
+        "caseFirst": "false"
+      },
+      "cmp": 1
+    },
+    {
+      "environmentLocale": "zh_CN.UTF-8",
+      "resolved": {
+        "locale": "zh-CN",
+        "usage": "sort",
+        "sensitivity": "variant",
+        "ignorePunctuation": false,
+        "collation": "pinyin",
+        "numeric": false,
+        "caseFirst": "false"
+      },
+      "cmp": -1
+    }
+  ],
+  "limits": [
+    "Differential comparison against previous implementation, not an independent mathematical oracle.",
+    "The six direct assertions cover specific threshold/trend boundaries only.",
+    "No packaged application, real user data, end-to-end replay or production KPI was tested here.",
+    "Locale probe demonstrates imported ASCII ID grammar alone does not fix numeric collation."
+  ]
+}

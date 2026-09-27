@@ -1,0 +1,37 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++								255 定义列表
++									256 container 尝试编号
++										257 文本 尝试编号
++									258 文本 monitoring_replay_47fb1448-3597-4c9e-88f2-4bfbca451fa3
++									259 container 比较策略版本
++										260 文本 比较策略版本
++									261 文本 monitoring-results-exact-1
++									262 container 执行环境
++										263 文本 执行环境
++									264 文本 {"runtimeVersion":"0.5.0","node":"24.18.0","v8":"15.0.245.15-electron.0","icu":"78.2","platform":"darwin","arch":"arm64","timezone":"Asia/Shanghai","locale":"en-US","timeBasis":"ISO-unzoned-UTC"}
++								265 定义列表
++									266 container 分析编号
++										267 文本 分析编号
++									268 文本 analysis_7eaf009e-5b89-4f3c-b30b-994aef2701f9
++									269 container 数据集编号
++										270 文本 数据集编号
++									271 文本 dataset_b91b3c87-8592-4968-b9e9-31f47bc6720d
++									272 container 记录算法版本
++										273 文本 记录算法版本
++									274 文本 workwise-engineering-2
++									275 container 输入 SHA-256
++										276 文本 输入 SHA-256
++									277 文本 b5825b0c0dcf420e013430b0bbedbd54396fcfc08fec3caf59db4b8de6ec11c3
++									278 container 保留原件 SHA-256
++										279 文本 保留原件 SHA-256
++									280 文本 da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c
++									281 container 导入上下文 SHA-256
++										282 文本 导入上下文 SHA-256
++									283 文本 592ceedd2bfc084808ac584f3e71ab8cd7d12efcc23dddcded3517636a9894e8
++									284 container 已存结果 SHA-256
++										285 文本 已存结果 SHA-256
++									286 文本 b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d
++									287 container 复算结果 SHA-256
++										288 文本 复算结果 SHA-256
++									289 文本 b2f93b553e8125f5197254987dfeab52d528650c390f536542fcc577454b928d
+The focused UI element is 252 开合三角标记 复算证据

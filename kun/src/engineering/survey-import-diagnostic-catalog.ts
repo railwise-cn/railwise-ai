@@ -6,13 +6,13 @@ import {
 /**
  * Versioned, internal presentation and recovery policy for import diagnostics.
  *
- * This catalogue deliberately contains only stable, code-owned Chinese copy.
+ * This catalogue deliberately contains stable, code-owned bilingual copy.
  * Parser input (including raw source text) is never interpolated into a title,
  * message, or suggested action.  Callers may attach an opaque record locator
  * through `SurveyImportDiagnosticAnchorContextV1`, but it is not treated as an
  * instruction or as replacement diagnostic copy.
  */
-export const SURVEY_IMPORT_DIAGNOSTIC_CATALOG_VERSION = 'workwise-survey-import-diagnostics-1.1.0' as const
+export const SURVEY_IMPORT_DIAGNOSTIC_CATALOG_VERSION = 'workwise-survey-import-diagnostics-1.2.0' as const
 
 export type SurveyImportDiagnosticCodeV1 = SurveyImportDiagnostic['code']
 export type SurveyImportDiagnosticSeverityV1 = SurveyImportDiagnostic['severity']
@@ -30,6 +30,7 @@ export type SurveyImportDiagnosticDefinitionV1 = Readonly<{
   severity: SurveyImportDiagnosticSeverityV1
   /** Short Chinese label for compact preflight and diagnostic views. */
   title: string
+  english: Readonly<{ title: string; message: string; suggestedAction: string }>
   /** Stable Chinese explanation that contains no source-file content. */
   message: string
   /** A concrete next step; never an "unknown error" fallback. */
@@ -43,6 +44,79 @@ export type SurveyImportDiagnosticDefinitionFor<Code extends SurveyImportDiagnos
   }
 >
 
+const englishDefinitions = {
+  "format_detected": {
+    "title": "Format recognized",
+    "message": "The bounded detector recognized the format. Source records, diagnostics and disposition still determine whether it can be used for computation.",
+    "suggestedAction": "Check vendor, format and version, then continue import preflight."
+  },
+  "format_conflict": {
+    "title": "Extension/content conflict",
+    "message": "The filename extension conflicts with recognized content or structure. Measurement data cannot be interpreted from the extension alone.",
+    "suggestedAction": "Check the source and filename. Import using the recognized format or supply the original file without renaming."
+  },
+  "unknown_format": {
+    "title": "Format not safely recognized",
+    "message": "The bounded detector cannot safely identify this survey source. It will not fall back to a generic table reader.",
+    "suggestedAction": "Keep the original and provide vendor format documentation, export details or audited conversion results."
+  },
+  "invalid_record": {
+    "title": "Invalid record",
+    "message": "A record violates the format grammar, field types or structural constraints and cannot produce a trustworthy observation.",
+    "suggestedAction": "Use the raw-record anchor to inspect and correct the record. Preserve the original and reimport."
+  },
+  "record_ignored": {
+    "title": "Record excluded from observations",
+    "message": "Some records were not admitted to normalized observations. Original files and record locations remain available for review.",
+    "suggestedAction": "Inspect the record anchor and parsing reason. Supply missing fields or confirm that exclusion is appropriate."
+  },
+  "limit_exceeded": {
+    "title": "Processing limit exceeded",
+    "message": "File size, expanded container size, record count or parsing complexity exceeded a safety limit. Parsing stopped.",
+    "suggestedAction": "Split the source at traceable boundaries or reduce the container size. Preserve provenance for every part before reimporting."
+  },
+  "unsafe_archive": {
+    "title": "Unsafe archive",
+    "message": "The archive has unsafe structure, paths, expansion ratio or member provenance. Its measurement records cannot be admitted safely.",
+    "suggestedAction": "Supply an unencrypted archive without path traversal containing only traceable survey sources, or import the uncompressed originals."
+  },
+  "encoding_detected": {
+    "title": "Text encoding detected",
+    "message": "Encoding detection supports safe decoding; it does not confirm format, units or record semantics.",
+    "suggestedAction": "Check vendor export encoding and displayed characters. Re-export using the correct encoding if text is corrupted."
+  },
+  "gnss_processing_required": {
+    "title": "GNSS post-processing required",
+    "message": "This source lacks a traceable datum, three-dimensional baseline vectors or complete covariance and cannot enter baseline adjustment.",
+    "suggestedAction": "Generate baseline results with a fixed datum and complete covariance using an appropriate GNSS post-processing workflow, then import."
+  },
+  "converter_required": {
+    "title": "Audited converter required",
+    "message": "This proprietary or opaque format requires an allowed local converter. Extension-based guesses cannot replace parsing.",
+    "suggestedAction": "Select an audited local converter and verify its license, version, executable hash and input/output provenance."
+  },
+  "missing_geometry": {
+    "title": "Network geometry missing",
+    "message": "Stations, targets, connections or observation geometry needed to construct and validate the network are missing.",
+    "suggestedAction": "Supply stations, targets and observation connections consistent with the original field records, then reimport."
+  },
+  "missing_datum": {
+    "title": "Datum missing",
+    "message": "The source does not declare or fix the required coordinate, height or GNSS datum. A traceable reference frame is unavailable.",
+    "suggestedAction": "Provide confirmed coordinate and height datums plus fixed control points or equivalent datum constraints, then validate again."
+  },
+  "missing_covariance": {
+    "title": "Covariance missing",
+    "message": "The source lacks covariance or equivalent precision information needed for the stochastic model, weights and uncertainties.",
+    "suggestedAction": "Supply complete covariance or a confirmed equivalent precision model, preserving its source and unit declarations, then reimport."
+  },
+  "mapping_required": {
+    "title": "Confirmed field mapping required",
+    "message": "The CSV/XLSX network has no traceable column mapping, linear units, angular format or filter rules. Table content cannot directly become adjustment observations.",
+    "suggestedAction": "Confirm columns, units, angular format and filters in the F-FMT-10 mapping workflow. Save the mapping and preserve the original before reimporting."
+  }
+} as const satisfies Record<SurveyImportDiagnosticCodeV1, { title: string; message: string; suggestedAction: string }>
+
 function diagnosticDefinition<Code extends SurveyImportDiagnosticCodeV1>(
   code: Code,
   severity: SurveyImportDiagnosticSeverityV1,
@@ -55,6 +129,7 @@ function diagnosticDefinition<Code extends SurveyImportDiagnosticCodeV1>(
     code,
     severity,
     title,
+    english: Object.freeze(englishDefinitions[code]),
     message,
     suggestedAction
   })
@@ -276,6 +351,7 @@ export function createSurveyImportDiagnostic<Code extends SurveyImportDiagnostic
     severity: definition.severity,
     message: definition.message,
     suggestedAction: definition.suggestedAction,
+    localized: { en: { message: definition.english.message, suggestedAction: definition.english.suggestedAction } },
     ...(context.sourceRecord === undefined ? {} : { sourceRecord: context.sourceRecord }),
     ...(context.byteOffset === undefined ? {} : { byteOffset: context.byteOffset }),
     ...(context.recordAnchor === undefined ? {} : { recordAnchor: context.recordAnchor })

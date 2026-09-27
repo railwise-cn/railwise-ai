@@ -125,6 +125,7 @@ export type CosaSourceEvidenceComparison = Readonly<{
 
 export function compareCosaLevelSourceEvidence(input: CosaIn1ParseResult, reference: CosaOu1SourceEvidence): CosaSourceEvidenceComparison {
   if (input.state !== 'valid' || reference.state !== 'valid') return { status: 'blocked', reason: 'invalid-input-or-reference-source' }
+  if ([input.knownPoints, input.observations, reference.knownPoints, reference.observations].some((items) => items.length > 10_000)) return { status: 'blocked', reason: 'comparison-dimension-limit' }
   if (input.knownPoints.length !== reference.knownPoints.length || input.observations.length !== reference.observations.length) return { status: 'blocked', reason: 'reference-source-count-mismatch' }
   const matches = (value: number, printed: PrintedValue): boolean => Number.isFinite(value) && Math.abs(value - printed.value) <= printed.resolution / 2 + 1e-9
   const mismatches: { sourceRecord: number; referenceLine?: number; fields: string[] }[] = []
@@ -160,6 +161,7 @@ export type CosaLevelReferenceComparison = Readonly<{
 /** Research comparison only: no network admission, mutations or deliverables. */
 export function compareCosaLevelHeights(input: CosaIn1ParseResult, reference: CosaOu1Heights): CosaLevelReferenceComparison {
   if (input.state !== 'valid' || reference.state !== 'valid') return { status: 'blocked', reason: 'invalid-input-or-reference' }
+  if (input.knownPoints.length > 1_000 || reference.points.length > 1_000 || input.observations.length > 10_000) return { status: 'blocked', reason: 'comparison-dimension-limit' }
   const known = new Map(input.knownPoints.map((point) => [point.id, point.height]))
   const ids = new Set(known.keys())
   for (const observation of input.observations) { ids.add(observation.from); ids.add(observation.to) }

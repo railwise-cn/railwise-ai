@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "model": "fixed-linear-full-column-rank",
+  "independenceDeclaration": "caller-declared-independent-observations",
+  "residualConvention": "observed-minus-fitted",
+  "observationUnit": "m",
+  "parameterIds": [
+    "position"
+  ],
+  "parameterUnits": [
+    "m"
+  ],
+  "initialParameters": [
+    0
+  ],
+  "scale": {
+    "kind": "fixed-external",
+    "value": 1,
+    "unit": "m",
+    "basisStatement": "Synthetic fixed external scale for acceptance arithmetic only."
+  },
+  "loss": {
+    "kind": "huber",
+    "k": 1
+  },
+  "observations": [
+    {
+      "id": "o0",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o1",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o2",
+      "value": 0,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    },
+    {
+      "id": "o3",
+      "value": 10,
+      "coefficients": [
+        1
+      ],
+      "relativeSigma": 1,
+      "sourceAnchor": "synthetic-acceptance"
+    }
+  ],
+  "stopping": {
+    "maxIterations": 200,
+    "standardizedPredictionStepTolerance": 1e-10,
+    "relativeObjectiveTolerance": 1e-10,
+    "normalizedScoreTolerance": 1e-10
+  }
+}

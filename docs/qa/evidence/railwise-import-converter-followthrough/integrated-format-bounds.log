@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run --run src/engineering/survey-cosa-net.test.ts src/engineering/survey-cosa-ou1.test.ts src/engineering/survey-format-registry.test.ts
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+
+ Test Files  3 passed (3)
+      Tests  156 passed (156)
+   Start at  11:29:14
+   Duration  1.33s (transform 256ms, setup 0ms, import 340ms, tests 1.14s, environment 0ms)
+

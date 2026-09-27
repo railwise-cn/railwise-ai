@@ -1,0 +1,71 @@
+{
+  "reviewedAtUtc": "2026-09-19T23:02:00.842918+00:00",
+  "reviewer": "independent interface_review agent",
+  "sourceBaseHead": "5a49e145dc88a5346f1a4abeb1c52f778aa10233",
+  "sourceHashes": {
+    "kun/src/contracts/survey-advanced-trials-workspace.ts": "9c846e090d0d31efaebe9937e856c3fbd170ba813097c7b66885c22f1fe341fb",
+    "kun/src/engineering/survey-advanced-trials-json.ts": "cfac41f0e8b81d5bc54cd7652a1290902e23f496d4645abff5a0ca11dd8774b1",
+    "kun/src/engineering/survey-advanced-trials-workspace.ts": "237149227429c8d0d354c07f95ca05aa2d60ee3a12ee6ff836709b0d9ba6a76f",
+    "kun/src/server/routes/survey-advanced-trials-workspace.ts": "32d29707da4be9a95fcc96e3bd765e6ec7e2a09eace4c90440ea01fde958e27c",
+    "src/shared/survey-advanced-trials.ts": "f6e906e839c98afd1b8a0d6f3b4cae3743b79383e165e09bc272db6ed1595499",
+    "src/renderer/src/agent/survey-advanced-trials-client.ts": "98bc302066d9877b2a7b826cbe2d6b6c7d48c79ec095a71d3a1258c914310533",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.tsx": "95814b89401898a4bb2f0315202b2b4d12d706f7e45bdcc15a52f7678623e3ef",
+    "src/renderer/src/components/engineering/SurveyAdvancedModelResult.tsx": "ed3e3201788f8dbfa8c4633d6c25adaca8c849d0c99fc20b4e0ed9ba0f107849",
+    "src/renderer/src/locales/en/common.json": "b8c9f614cdd1551dde6dd42e9060e1ab42130ca9a7ee62ee7cfa303058ac9880",
+    "src/renderer/src/locales/zh/common.json": "f1ce1257b4b6fce39543c44e99226d0cec437f2a453cbac9d33b259afeded43b"
+  },
+  "runtime": {
+    "node": "26.8.2",
+    "v8": "14.6.202.34-node.28",
+    "platform": "darwin",
+    "arch": "arm64",
+    "vitest": "4.1.7",
+    "happyDom": "20.11.1",
+    "react": "19.2.6",
+    "betterSqlite3": "12.11.1"
+  },
+  "results": {
+    "passed": 25,
+    "failed": 0,
+    "testFiles": 4,
+    "suites": [
+      {
+        "file": "docs/qa/evidence/railwise-advanced-workspace-review/boundary.test.ts",
+        "status": "passed",
+        "tests": 13
+      },
+      {
+        "file": "docs/qa/evidence/railwise-advanced-workspace-review/client.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "file": "docs/qa/evidence/railwise-advanced-workspace-review/gui-boundaries.test.ts",
+        "status": "passed",
+        "tests": 5
+      },
+      {
+        "file": "docs/qa/evidence/railwise-advanced-workspace-review/http.test.ts",
+        "status": "passed",
+        "tests": 3
+      }
+    ]
+  },
+  "limitations": [
+    "happy-dom is not packaged GUI acceptance",
+    "Registered HTTP handlers are tested without TCP transport",
+    "Native save bridge is mocked; no real file dialog or disk save is claimed",
+    "No human professional signoff or external authenticated custody",
+    "Source hashes identify the reviewed snapshot; subsequent edits require appropriate follow-up verification"
+  ],
+  "finalListCostReview": {
+    "method": "source review and inspection of implementer ten-row maximum-declaration regression test",
+    "baseCharge": 1,
+    "perActualRowCharge": 3,
+    "maximumModelCharge": 20,
+    "maximumTenRowCharge": 231,
+    "perMinuteBudget": 240,
+    "rateLimitPreservedAsTypedFailure": true,
+    "independentMaximumPageProbeAdded": false
+  }
+}

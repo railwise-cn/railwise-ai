@@ -14,7 +14,7 @@ function request() {
 }
 
 describe('DeepSeek Responses web provider', () => {
-  it('uses the official Responses web_search tool and parses URL citations', async () => {
+  it.each(['deepseek-v4-flash', 'deepseek-v4-pro'])('uses the legacy Responses web_search tool with %s and parses URL citations', async model => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
       id: 'resp_1',
       status: 'completed',
@@ -33,7 +33,7 @@ describe('DeepSeek Responses web provider', () => {
     const provider = new DeepSeekResponsesWebProvider({
       baseUrl: 'https://api.deepseek.com/beta',
       apiKey: 'sk-sensitive',
-      model: 'deepseek-v4-pro',
+      model,
       fetchImpl: fetchImpl as typeof fetch,
       nowIso: () => '2026-08-13T00:00:00.000Z'
     })
@@ -45,17 +45,41 @@ describe('DeepSeek Responses web provider', () => {
     const init = fetchImpl.mock.calls[0]?.[1] as RequestInit
     const body = JSON.parse(String(init.body))
     expect(body).toMatchObject({
-      model: 'deepseek-v4-pro',
+      model,
       input: '今天 AI 圈有哪些资讯',
       tools: [{ type: 'web_search' }],
       tool_choice: { type: 'web_search' },
       stream: false
     })
+    expect(init.headers).toMatchObject({ authorization: 'Bearer sk-sensitive' })
     expect(JSON.stringify(body)).not.toContain('sk-sensitive')
     expect(results).toEqual([
       expect.objectContaining({ url: 'https://news.example.com/a', title: '资讯 A', rank: 1 }),
       expect.objectContaining({ url: 'https://news.example.com/b', title: '资讯 B', rank: 2 })
     ])
+  })
+
+  const credentialUrl = new URL('https://api.deepseek.com')
+  credentialUrl.username = 'synthetic'
+  credentialUrl.password = 'test-only'
+
+  it.each([
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'sk-test', model: 'deepseek-flash' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'sk-test', model: 'deepseek/deepseek-flash' },
+    { baseUrl: 'https://third-party.example/v1', apiKey: 'sk-test', model: 'deepseek-flash' },
+    { baseUrl: 'https://api.deepseek.com.attacker.example', apiKey: 'sk-test', model: 'deepseek-flash' },
+    { baseUrl: 'http://api.deepseek.com', apiKey: 'sk-test', model: 'deepseek-flash' },
+    { baseUrl: credentialUrl.href, apiKey: 'sk-test', model: 'deepseek-flash' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: '  ', model: 'deepseek-flash' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'sk-test', model: 'deepseek-chat' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'sk-test', model: 'deepseek-pro' },
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'sk-test', model: 'deepseek-flash-preview' }
+  ])('rejects unsupported official-search configuration before any network request: $baseUrl / $model', async config => {
+    const fetchImpl = vi.fn()
+    expect(isDeepSeekResponsesWebSearchConfig(config)).toBe(false)
+    const provider = new DeepSeekResponsesWebProvider({ ...config, fetchImpl: fetchImpl as typeof fetch })
+    await expect(provider.search(request())).rejects.toThrow('unavailable for this provider or model')
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('rejects unofficial providers, retired models, and uncited responses', async () => {

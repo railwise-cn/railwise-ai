@@ -1,0 +1,125 @@
+import http from 'node:http'
+import assert from 'node:assert/strict'
+import { randomBytes, timingSafeEqual, createHash } from 'node:crypto'
+import { writeFile, unlink, lstat, realpath } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { createGuard, candidateEvidenceLoader } from './railwise-typed-relay-guard.mjs'
+
+export const MOCK_ANSWER = 'RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete.'
+
+export async function startLocalCompletionFixture({ candidateRoot: root, projectId, networkId, threadId,
+  maxRequests = 20, durationMs = 600_000, evidenceLoader: suppliedLoader, tokenUnlink = unlink, onEvent = () => {} }) {
+  assert.match(root || '', /^\/private\/tmp\/railwise-survey-[a-zA-Z0-9-]+$/)
+  assert.equal(await realpath(root), root)
+  assert(Number.isInteger(maxRequests) && maxRequests > 0 && maxRequests <= 20)
+  assert(Number.isInteger(durationMs) && durationMs > 0 && durationMs <= 600_000)
+  for (const id of [projectId, networkId, threadId]) assert.match(id || '', /^[a-zA-Z0-9_-]+$/)
+  const output = join(root, 'evidence')
+  assert.equal(await realpath(output), output)
+  const evidenceLoader = suppliedLoader ?? candidateEvidenceLoader({ candidateRoot: root, projectId, networkId, threadId })
+  await evidenceLoader()
+  const guard = createGuard({ candidateRoot: root, projectId, networkId, threadId, evidenceLoader })
+  const session = randomBytes(8).toString('hex')
+  const token = randomBytes(32).toString('base64url')
+  const tokenPath = join(output, `mock-local-token-${session}.txt`)
+  const reportPath = join(output, `mock-completion-report-${session}.json`)
+  await writeFile(tokenPath, token, { flag: 'wx', mode: 0o600 })
+  const events = []
+  const pending = new Set()
+  let requests = 0
+  let stopPromise
+  let timer
+  const server = http.createServer(async (req, res) => {
+    let markDone
+    const done = new Promise(resolveDone => { markDone = resolveDone })
+    pending.add(done)
+    const request = ++requests
+    const event = { at: new Date().toISOString(), request, route: req.url, accepted: false }
+    events.push(event)
+    const endResponse = (status, contentType, body) => new Promise(resolveEnd => {
+      const finish = () => { res.off('finish', finish); res.off('close', finish); resolveEnd() }
+      res.once('finish', finish)
+      res.once('close', finish)
+      res.writeHead(status, { 'content-type': contentType, 'cache-control': 'no-store' }).end(body)
+    })
+    try {
+      assert(!stopPromise && request <= maxRequests)
+      assert.equal(req.socket.remoteAddress, '127.0.0.1')
+      assert.equal(req.headers.host, `127.0.0.1:${server.address().port}`)
+      assert(!req.headers.origin)
+      const supplied = Buffer.from(req.headers.authorization ?? '')
+      const expected = Buffer.from(`Bearer ${token}`)
+      assert(supplied.length === expected.length && timingSafeEqual(supplied, expected))
+      if (req.method === 'GET' && req.url === '/v1/models') {
+        assert(!req.headers['transfer-encoding'] && Number(req.headers['content-length'] || 0) === 0)
+        event.accepted = true
+        await endResponse(200, 'application/json', JSON.stringify({ object: 'list', data: [{ id: 'deepseek-flash', object: 'model', owned_by: 'synthetic-local-fixture' }] }))
+        return
+      }
+      assert(req.method === 'POST' && req.url === '/v1/chat/completions')
+      assert.equal((req.headers['content-type'] ?? '').split(';')[0].trim(), 'application/json')
+      const chunks = []
+      let bytes = 0
+      for await (const chunk of req) { bytes += chunk.length; assert(bytes <= 262144); chunks.push(chunk) }
+      const body = Buffer.concat(chunks)
+      const checked = await guard.validateRequest(body, 'deepseek-flash')
+      event.accepted = true
+      event.bodySha256 = createHash('sha256').update(body).digest('hex')
+      event.model = checked.model
+      event.modelSettings = {
+        thinkingType: ['enabled', 'disabled'].includes(checked.thinking?.type) ? checked.thinking.type : checked.thinking?.type == null ? null : 'unrecognized',
+        reasoningEffort: ['none', 'off', 'auto', 'minimal', 'low', 'medium', 'high', 'max', 'xhigh'].includes(checked.reasoning_effort) ? checked.reasoning_effort : checked.reasoning_effort == null ? null : 'unrecognized'
+      }
+      await endResponse(200, 'text/event-stream', `data: ${JSON.stringify({ id: `local-fixture-${request}`, choices: [{ index: 0, delta: { content: MOCK_ANSWER }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\ndata: [DONE]\n\n`)
+    } catch {
+      event.rejected = true
+      if (!res.destroyed && !res.headersSent) await endResponse(403, 'application/json', JSON.stringify({ error: 'synthetic_fixture_scope_rejected' }))
+      else if (!res.writableEnded) res.destroy()
+    } finally {
+      pending.delete(done)
+      markDone()
+      if (requests >= maxRequests) setImmediate(() => { void stop('request_budget').catch(() => onEvent({ kind: 'cleanup_failed', code: 'token_cleanup_failed' })) })
+    }
+  })
+  server.requestTimeout = 15_000
+  server.headersTimeout = 10_000
+  server.maxConnections = 4
+  server.maxHeadersCount = 30
+  function stop(reason = 'operator') {
+    if (stopPromise) return stopPromise
+    stopPromise = (async () => {
+      clearTimeout(timer)
+      await new Promise(resolveClose => { server.close(resolveClose); server.closeAllConnections() })
+      await Promise.allSettled([...pending])
+      let tokenCleanupError = false
+      try { await tokenUnlink(tokenPath) } catch (error) { if (error.code !== 'ENOENT') tokenCleanupError = true }
+      let tokenRemoved = false
+      try { await lstat(tokenPath) } catch (error) { if (error.code === 'ENOENT') tokenRemoved = true; else tokenCleanupError = true }
+      if (!tokenRemoved) tokenCleanupError = true
+      const report = { syntheticOnly: true, externalNetwork: false, upstreamCredentialsRead: false, projectId, networkId, threadId, answer: MOCK_ANSWER, port, reason, requestCount: requests, tokenRemoved, ...(tokenCleanupError ? { cleanupError: 'token_cleanup_failed' } : {}), events }
+      await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+      onEvent({ kind: 'stopped', reason, requestCount: requests, tokenRemoved, reportPath })
+      if (tokenCleanupError) throw new Error('token_cleanup_failed')
+      return report
+    })()
+    return stopPromise
+  }
+  try { await new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) }) }
+  catch (error) { try { await tokenUnlink(tokenPath) } catch (cleanup) { if (cleanup.code !== 'ENOENT') throw new Error('token_cleanup_failed') } throw error }
+  const port = server.address().port
+  timer = setTimeout(() => { void stop('duration_budget').catch(() => onEvent({ kind: 'cleanup_failed', code: 'token_cleanup_failed' })) }, durationMs)
+  return { syntheticOnly: true, externalNetwork: false, upstreamCredentialsRead: false, baseUrl: `http://127.0.0.1:${port}/v1`, tokenPath, reportPath, stop }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const [candidateRoot, projectId, networkId, threadId] = process.argv.slice(2)
+  const fixture = await startLocalCompletionFixture({ candidateRoot, projectId, networkId, threadId,
+    onEvent: event => { if (event.kind === 'cleanup_failed') { console.error('Fixture token cleanup failed; inspect the scoped report.'); process.exitCode = 1 } }
+  })
+  const { stop, ...ready } = fixture
+  console.log(JSON.stringify(ready))
+  for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => {
+    void stop(signal).then(() => { process.exitCode = 0 }).catch(() => { console.error('Fixture token cleanup failed; inspect the scoped report.'); process.exitCode = 1 })
+  })
+}

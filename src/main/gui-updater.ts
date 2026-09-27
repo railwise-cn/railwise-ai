@@ -14,6 +14,7 @@ import type {
 } from '../shared/gui-update'
 import { nextGuiUpdateCheckDelay } from '../shared/gui-update-schedule'
 import { DEFAULT_GUI_UPDATE_CHANNEL, normalizeGuiUpdateChannel } from '../shared/gui-update'
+import { configurePrivateUpdaterTls } from './private-updater-tls'
 import {
   legacyDownloadUrl,
   legacyGithubRepo,
@@ -27,7 +28,7 @@ import {
 const DEFAULT_OFFICIAL_RELEASE_PREFIX = 'workwise'
 const DEFAULT_OFFICIAL_UPDATE_BASE_URL = 'https://www.railwise.cn/downloads'
 const DEFAULT_PRODUCT_PAGE_URL = 'https://www.railwise.cn/products/workwise/'
-const DEFAULT_GITHUB_REPO = 'wangjiawei508/WorkWise'
+const DEFAULT_GITHUB_REPO = 'railwise-cn/railwise-ai'
 const UPDATE_REQUEST_HEADERS = {
   'Cache-Control': 'no-cache',
   Pragma: 'no-cache'
@@ -543,6 +544,7 @@ function configureUpdaterChannel(channel: GuiUpdateChannel): void {
     if (!/^https:\/\//i.test(feed.url) && app.isPackaged) {
       throw new Error('Production update feeds must use HTTPS.')
     }
+    configurePrivateUpdaterTls(() => autoUpdater.netSession, feed.url)
     autoUpdater.setFeedURL({ provider: 'generic', url: feed.url })
   } else if (feed.kind === 'github') {
     autoUpdater.setFeedURL({

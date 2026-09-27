@@ -83,7 +83,7 @@ describe('GitHub release asset preparation', () => {
     const latest = JSON.parse(readFileSync(join(output, 'latest.json'), 'utf8'))
     expect(latest).toMatchObject({
       schemaVersion: 1,
-      productName: 'WorkWise',
+      productName: 'RailWise AI',
       channel: 'stable',
       version: '0.2.6',
       tag: 'v0.2.6',

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "verificationScope": "real-PDF-renderer-byte-and-binding-contract-only",
+  "source": {
+    "sha256": "96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487",
+    "byteLength": 27976440,
+    "pageCount": 129,
+    "pdfPage": 6,
+    "printedPage": "3",
+    "clause": "4.2.1"
+  },
+  "rendering": {
+    "renderer": "poppler-pdftoppm-rgb8",
+    "version": "26.05.0",
+    "dpi": 72
+  },
+  "pageImage": {
+    "sha256": "4725a88bdb2c38eec0f6e04f732c946d05e6cc00db44221f5cb80a95c43fb3ee",
+    "widthPixels": 1587,
+    "heightPixels": 2240
+  },
+  "region": {
+    "x": 160,
+    "y": 790,
+    "width": 1270,
+    "height": 100,
+    "sha256": "3034baf3078f7bfc245296d5e745e568e460f2e32e1d8927d1503f0d4f1e71ec"
+  },
+  "transcriptionSha256": "6aa189649a755aae5b3ee683775f26bab56a6db73b73bf580ca1f02273f84803",
+  "transcriptionByteLength": 202,
+  "reviewEvidenceSha256": "e2db30b4191d0d7e540239680ce1c1ff02df0261c2df29f8e2741d673bcd3651",
+  "reviewerKind": "agent",
+  "positiveContractCheck": "passed",
+  "standardConformity": "not-evaluated",
+  "humanSignatureVerification": "not-evaluated",
+  "syntheticTrustOnly": true,
+  "productionRuleRegistered": false,
+  "negativeChecks": {
+    "noTrustedSource": "source-not-independently-trusted",
+    "noReviewedDigest": "exact-rule-not-reviewed",
+    "changedPage": "exact-rule-not-reviewed",
+    "changedTranscription": "exact-rule-not-reviewed",
+    "changedTextWithRecomputedProbeDigest": "scan-transcription-hash-mismatch",
+    "changedRegionWithRecomputedProbeDigest": "scan-region-hash-mismatch",
+    "oversizedRaster": "rejected-before-pdftoppm"
+  },
+  "inputUnchanged": true,
+  "renderCalls": 3,
+  "limits": {
+    "maxPdfBytes": 67108864,
+    "maxReviewBytes": 1048576,
+    "maxPagePixels": 16000000,
+    "maxRgbBytes": 48000000
+  },
+  "hashes": {
+    "scriptSha256": "478ee28a6120ef02493ee008ba4044aa9f87929658c59a8cf441ed792f232c60",
+    "kernelSha256": "e6159e505248ff7a2fe96a2f14d0180546112668f93b36a9c4cacf32192ea2d4",
+    "schemaSha256": "cf2a899b9c312face32a0e726f240bbbb260516c49b004715d015be42060bd2e"
+  }
+}

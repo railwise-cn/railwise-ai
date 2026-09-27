@@ -1,0 +1,112 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/07-keyboard-expand.ax.txt",
+  "sourceSha256": "7db76b7739cf3015a52be664a13ebf8e0f49c9ef5634e4fa888e376fc7c0a431",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 3,
+      "text": "~\t\t\t\t\t\t\t\t\t229 开合三角标记 查看规范依据"
+    },
+    {
+      "originalLine": 4,
+      "text": "+\t\t\t\t\t\t\t\t\t\t230 文本 查看规范依据"
+    },
+    {
+      "originalLine": 5,
+      "text": "+\t\t\t\t\t\t\t\t\t231 container 本次结果的规范依据"
+    },
+    {
+      "originalLine": 6,
+      "text": "+\t\t\t\t\t\t\t\t\t\t232 标题 本次结果的规范依据, Value: 6"
+    },
+    {
+      "originalLine": 7,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t233 文本 本次结果的规范依据"
+    },
+    {
+      "originalLine": 12,
+      "text": "+\t\t\t\t\t\t\t\t\t\t238 定义列表"
+    },
+    {
+      "originalLine": 15,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t241 文本 GB/T 24356-2023"
+    },
+    {
+      "originalLine": 22,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t248 text gbt24356-2023.scoring.unit  ·  1"
+    },
+    {
+      "originalLine": 25,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t251 文本 gbt24356-declared-exact-quality-scoring-1"
+    },
+    {
+      "originalLine": 26,
+      "text": "+\t\t\t\t\t\t\t\t\t\t252 container 条款与官方原文页码"
+    },
+    {
+      "originalLine": 28,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t254 text 条款 6.2.1.2, 6.2.2, 6.2.3, 6.2.4.4, 6.2.4.5, 6.2.5  · 表 2, 3"
+    },
+    {
+      "originalLine": 29,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t255 文本 式(6)属于6.2.4.5，6.2.5为等级及表3。旧算法trace的6.2.5/formula-6标签保留原样，本目录补正定位；部分声明范围不等于完整验收。"
+    },
+    {
+      "originalLine": 30,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t256 link Description: 印刷第 6 页 · PDF 第 9 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=9"
+    },
+    {
+      "originalLine": 31,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t257 link Description: 印刷第 7 页 · PDF 第 10 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=10"
+    },
+    {
+      "originalLine": 32,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t258 link Description: 印刷第 8 页 · PDF 第 11 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=11"
+    },
+    {
+      "originalLine": 34,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t\t260 text 条款 7.5.1  · 表 43, 44"
+    },
+    {
+      "originalLine": 35,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t261 文本 元素权及错漏分类依据；分类仍由调用方声明，未编码完整自动分类表。"
+    },
+    {
+      "originalLine": 36,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t262 link Description: 印刷第 57 页 · PDF 第 60 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=60"
+    },
+    {
+      "originalLine": 37,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t263 link Description: 印刷第 58 页 · PDF 第 61 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=61"
+    },
+    {
+      "originalLine": 38,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t264 link Description: 印刷第 59 页 · PDF 第 62 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=62"
+    },
+    {
+      "originalLine": 39,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t265 link Description: 印刷第 60 页 · PDF 第 63 页, Help: 在浏览器中打开官方 PDF, Value: zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf#page=63"
+    },
+    {
+      "originalLine": 41,
+      "text": "+\t\t\t\t\t\t\t\t\t\t267 内容列表"
+    },
+    {
+      "originalLine": 49,
+      "text": "+\t\t\t\t\t\t\t\t\t\t275 内容列表"
+    },
+    {
+      "originalLine": 62,
+      "text": "+\t\t\t\t\t\t\t\t\t\t288 开合三角标记 来源与目录身份"
+    },
+    {
+      "originalLine": 63,
+      "text": "+\t\t\t\t\t\t\t\t\t\t\t289 文本 来源与目录身份"
+    },
+    {
+      "originalLine": 64,
+      "text": "The focused UI element is 229 开合三角标记 查看规范依据"
+    }
+  ]
+}

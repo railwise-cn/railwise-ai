@@ -1,0 +1,8 @@
+{
+  "description": "n=2 p=1 implies scalar residual space; two disjoint variance components are exactly unidentifiable for every positive covariance ratio.",
+  "counts": {
+    "stochastic-rank-or-conditioning": 4002
+  },
+  "incorrectlyProducedCandidates": 0,
+  "firstFailures": []
+}

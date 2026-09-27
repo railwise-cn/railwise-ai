@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "model": "fixed-linear-full-column-rank",
+  "purpose": "declared-model-readonly-diagnostic",
+  "residualConvention": "observed-minus-adjusted",
+  "observationUnit": "m",
+  "observationIds": [
+    "a",
+    "b",
+    "c"
+  ],
+  "parameterIds": [
+    "mean"
+  ],
+  "parameterUnits": [
+    "m"
+  ],
+  "designMatrix": [
+    [
+      1
+    ],
+    [
+      1
+    ],
+    [
+      1
+    ]
+  ],
+  "observations": [
+    1,
+    2,
+    3
+  ],
+  "covariance": {
+    "kind": "known-apriori-absolute-observation-covariance",
+    "basisStatement": "Synthetic diagonal absolute covariance declared only for acceptance arithmetic.",
+    "matrix": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        3
+      ]
+    ]
+  },
+  "family": {
+    "id": "synthetic-family",
+    "alpha": 0.05,
+    "tail": "two-sided",
+    "declaration": "caller-declared-before-evaluation"
+  },
+  "biasDirections": [
+    {
+      "id": "first-observation",
+      "coefficients": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "common-mode",
+      "coefficients": [
+        1,
+        1,
+        1
+      ]
+    }
+  ]
+}

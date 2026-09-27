@@ -1,0 +1,314 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate 6ff82c8c2746.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-6ff82c8/Applications/RAILWISE%20AI%20Candidate%206ff82c8c2746.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 合成验收·参考与评分与静态追加·6ff82c8 控制网 · m · 9/20
+							26 文本 合成验收·参考与评分与静态追加·6ff82c8
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 合成验收·参考与评分与静态追加·6ff82c8 · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成验收·参考与评分与静态追加·6ff82c8
+							36 文本  · 
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 合成验收·参考与评分与静态追加·6ff82c8
+							49 (selected) 合成验收·参考与评分与静态追加·6ff82c8
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 导入与预检
+							52 (selected) 导入与预检
+						53 按钮 新建工程测量项目
+					54 文本 任务配置已保存。后续计算会使用当前任务配置。
+					55 按钮 关闭提示
+					56 container
+						57 text 任务 合成验收·参考与评分与静态追加·6ff82c8 阶段 导入与预检 数据源 / 格式 —  ·  — 处置状态 未开始 基准 待确认  ·  待确认 点数 — 测站数 — 观测 — 闭合差 — 精度 — 成果 — 网型 — 审查 —
+					58 container Survey AI 会话
+						59 container
+							60 标题 Survey AI 会话, Value: 2
+								61 文本 Survey AI 会话
+							62 文本 合成验收·参考与评分与静态追加·6ff82c8
+							63 按钮 数据资产
+							64 按钮 测量平差
+							65 按钮 刷新上下文
+						66 标题 Survey AI, Value: 2
+							67 文本 Survey AI
+						68 container
+							69 文本输入区 (settable) 向智能体提问…
+							70 按钮 更多操作
+							71 弹出式按钮 模型与推理设置
+							72 按钮 (disabled) 发送
+					73 container
+						74 container 工作视图
+							75 按钮 项目配置
+							76 按钮 数据资产
+							77 按钮 质量校核
+							78 按钮 测量来源与预检
+						79 container 质量评分试算
+							80 标题 质量评分试算, Value: 3
+								81 文本 质量评分试算
+							82 文本 依据 GB/T 24356—2023 已核查条文，对明确声明的检查记录进行精确评分。选择成果类型和检查阶段，并填写适用依据及原始声明。
+							83 文本 本工具仅对声明检查记录试算。证据引用、缺陷分类和既有批合格前提均未验真；试算结果不构成规范符合性认证、工程质量批准或专业人员签字。
+							84 文本 项目 project_9d966747-63bc-4658-9ba6-a8635423a7e0 · 修订 2
+							85 container
+								86 文本 评分阶段
+								87 弹出式按钮 评分阶段, Value: 单位成果分层评分
+									88 (selected) 单位成果分层评分
+							89 container
+								90 文本 成果类型
+								91 弹出式按钮 成果类型, Value: 平面控制测量 · 点（表43/44）
+									92 (selected) 平面控制测量 · 点（表43/44）
+							93 文本 仅支持上述两类成果的声明计数及精度值；不自动认定缺陷，也不从平差残差推导中误差。调整 t≠1、m>m0 的公式分支及多精度项中恰好60分的聚合不在支持范围。
+							94 开合三角标记 查看声明结构模板
+								95 文本 查看声明结构模板
+							96 container
+								97 文本 检查适用依据与资料说明
+								98 文本输入区 (settable) 检查适用依据与资料说明, Value: 合成缺项验收：资料完整性分支明确pending，必须保留待补资料，不得视作不适用或完整评分。仅验证声明计算。
+							99 文本 说明采用的产品表、检查范围、允许中误差来源、缺陷分类依据与检查记录。原文最多 16 KiB；保存不验证引用真实性。
+							100 container
+								101 文本 完整评分声明 JSON
+								102 文本输入区 (settable) 完整评分声明 JSON, Value: {
+  "schemaVersion": 1,
+  "standardCode": "GB/T 24356-2023",
+  "sourceDigest": "96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487",
+  "productProfileId": "planar-control-point",
+  "productProfileVersion": "gbt24356-2023-control-declared-counts-1",
+  "profileWeightTable": 43,
+  "profileClassificationTable": 44,
+  "declaredBasis": "caller-declared-inspection-records-not-authenticated",
+  "evidenceRefs": [
+    "synthetic-inspection-not-production"
+  ],
+  "unitId": "synthetic-point",
+  "unitType": "point",
+  "inspectionStage": "detailed-inspection",
+  "operation": "unit",
+  "declaredScope": "explicit-profile-leaves",
+  "leaves": [
+    {
+      "elementId": "data-quality",
+      "subelementId": "mathematical-accuracy",
+      "state": "checked",
+      "record": {
+        "kind": "accuracy",
+        "model": {
+          "items": [
+            {
+              "id": "accuracy-1",
+              "m": "13/20",
+              "m0": "1",
+              "unit": "mm",
+              "source": "caller-declared-error-magnitude-not-derived-from-adjustment-residuals",
+              "evidenceRefs": [
+                "synthetic-accuracy"
+              ]
+            }
+          ],
+          "aggregation": {
+            "kind": "arithmetic"
+          },
+          "aCount": 0,
+          "aEvidenceRefs": [
+            "synthetic-a-check"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "data-quality",
+      "subelementId": "observation-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 1,
+          "c": 1,
+          "d": 1,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "data-quality",
+      "subelementId": "calculation-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 10,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "point-quality",
+      "subelementId": "selection-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 0,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "point-quality",
+      "subelementId": "marking-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 1,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "material-quality",
+      "subelementId": "presentation-quality",
+      "state": "checked",
+      "record": {
+        "kind": "deduction",
+        "defects": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "d": 2,
+          "t": "1",
+          "classification": "caller-declared-profile-table-counts-not-automatically-classified",
+          "evidenceRefs": [
+            "synthetic-defects"
+          ]
+        }
+      }
+    },
+    {
+      "elementId": "material-quality",
+      "subelementId": "completeness",
+      "state": "pending",
+      "reason": "Synthetic required material still pending",
+      "evidenceRefs": [
+        "synthetic-pending"
+      ]
+    }
+  ]
+}
+
+							103 文本 保留原文，不截断或自动修补。最多 256 KiB UTF-8；当前 3956 字节。
+							104 container
+								105 复选框 我确认保存本次声明检查记录试算，理解资料和分类未验真，结果不作为工程批准或签字。, Value: 0
+								106 文本 我确认保存本次声明检查记录试算，理解资料和分类未验真，结果不作为工程批准或签字。
+							107 按钮 (disabled) 试算并保存声明记录
+							108 按钮 评分记录历史
+							109 标题 已恢复的声明评分记录, Value: 4
+								110 文本 已恢复的声明评分记录
+							111 container
+								112 text quality_scoring_06297786-f6dc-40ef-9404-0ccb5123464a  ·  2026-09-20T01:33:30.077Z
+							113 container
+								114 text 平面控制测量 · 点（表43/44）  ·  单位成果分层评分  ·  GB/T 24356-2023
+							115 文本 已核对原字节、哈希与 Runtime 严格重算结果。这仅证明当前本地记录一致，不证明引用资料、人工分类或既有合格前提真实。
+							116 按钮 重新核验并重放
+							117 按钮 重新核验并导出 JSON
+							118 标题 检查适用依据与资料说明, Value: 5
+								119 文本 检查适用依据与资料说明
+							120 文本 合成缺项验收：资料完整性分支明确pending，必须保留待补资料，不得视作不适用或完整评分。仅验证声明计算。
+							121 container 本次声明评分结果
+								122 标题 本次声明评分结果, Value: 5
+									123 文本 本次声明评分结果
+								124 文本 产品范围有待检查项 · 完整范围结论未完成
+								125 文本 资料不足或分支未支持
+								126 文本 “已计算”或声明条件满足，只说明本次输入在所列范围内的计算结果；部分范围、单项、样本和批次不可互相替代。
+								127 文本 该适用子元素仍待检查，不是范围排除。
+								128 文本 数值按精确“分子/分母”展示；等级判定使用未舍入值。率值为比值，不是已四舍五入的百分数。
+								129 container
+									130 text 已提供检查记录 ： 数学精度 · 观测质量 · 计算质量 · 选点质量 · 埋石质量 · 整饰质量
+								131 container
+									132 text 适用但待检查 ： 资料完整性
+								133 开合三角标记 查看逐项计算及分层权重
+									134 文本 查看逐项计算及分层权重
+							135 开合三角标记 原始 JSON 声明
+								136 文本 原始 JSON 声明
+							137 开合三角标记 计算采用的严格解析声明
+								138 文本 计算采用的严格解析声明
+							139 开合三角标记 完整结果与追溯摘要
+								140 文本 完整结果与追溯摘要
+						141 标题 质量校核与问题处置, Value: 2
+							142 文本 质量校核与问题处置
+						143 文本 阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。
+						144 按钮 (disabled) 重新校核
+						145 标题 请选择或导入数据集, Value: 3
+							146 文本 请选择或导入数据集
+						147 文本 质量校核会检查缺失值、重复测点、非法数值、时间顺序、单位冲突和阈值缺失。
+	148 关闭按钮
+	149 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	150 最小化按钮
+151 menu bar
+	152 RAILWISE AI Candidate 6ff82c8c2746
+	153 文件
+	154 编辑
+	155 显示
+	156 窗口
+	157 帮助
+
+The focused UI element is 80 标题 质量评分试算, Value: 3

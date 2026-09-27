@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile, lstat, realpath } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join, relative, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { scopedDatabase } from '/private/tmp/railwise-typed-relay-guard.mjs';
+
+const root = '/private/tmp/railwise-survey-53213de';
+const runtime = join(root, 'home/.workwise/runtime');
+const expected = {
+  sourceHead: '53213de739d0b1f3f173f883dcdac21cdc4fdfc9',
+  asarSha256: '529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774',
+  projectId: 'project_cb802366-c811-4a2b-90c0-37b310447cfe', threadId: 'thr_wt4kfajs',
+  planId: 'eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3', networkId: 'network_365a0846-01d7-4768-a31c-47545fe23c34',
+  providerId: 'custom-provider-3', model: 'deepseek-flash', reasoningEffort: 'off'
+};
+const answer = 'RAILWISE-SYNTHETIC-ACCEPTANCE: The approved work is complete.';
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const objectHash = value => hash(JSON.stringify(value));
+const readScoped = async path => {
+  const real = await realpath(path), child = relative(root, real);
+  assert(child && child !== '..' && !child.startsWith('../') && !isAbsolute(child));
+  return readFile(real);
+};
+const dbNames = ['engineering/engineering-ai.sqlite3', 'engineering/engineering.sqlite3', 'engineering/survey.sqlite3', 'tasks.sqlite3'];
+const tracked = dbNames.flatMap(path => [path, path + '-wal']).concat([`threads/${expected.threadId}/metadata.jsonl`, `threads/${expected.threadId}/messages.jsonl`]);
+const sourceHashes = async () => {
+  const out = {};
+  for (const path of tracked) {
+    try { out[path] = hash(await readScoped(join(runtime, path))); }
+    catch (error) { if (error.code !== 'ENOENT' || !path.endsWith('-wal')) throw error; out[path] = null; }
+  }
+  return out;
+};
+const before = await sourceHashes();
+const query = async (db, sql, id) => (await scopedDatabase(join(runtime, db), root, sql, id)).value;
+const plan = await query(dbNames[0], 'SELECT data_json FROM engineering_ai_plans WHERE id = ?', expected.planId);
+assert.equal(plan.projectId, expected.projectId); assert.equal(plan.threadId, expected.threadId);
+assert(plan.goal.includes('RAILWISE-SYNTHETIC-ACCEPTANCE')); assert(plan.taskId); assert(plan.executionTurnId);
+const task = await query(dbNames[3], 'SELECT data_json FROM task_runs WHERE id = ?', plan.taskId);
+const receipts = await query(dbNames[0], "SELECT json_group_array(json_object('stepId', step_id, 'parameters', json(parameters_json), 'handles', json(handles_json))) AS data_json FROM engineering_ai_step_evidence WHERE plan_id = ?", expected.planId);
+const project = await query(dbNames[1], 'SELECT data_json FROM engineering_projects WHERE id = ?', expected.projectId);
+const network = await query(dbNames[2], 'SELECT data_json FROM survey_networks WHERE id = ?', expected.networkId);
+const adjustments = await query(dbNames[2], 'SELECT json_group_array(json(data_json)) AS data_json FROM survey_adjustments WHERE project_id = ?', expected.projectId);
+const deliveries = await query(dbNames[1], 'SELECT json_group_array(json(data_json)) AS data_json FROM engineering_runs WHERE project_id = ?', expected.projectId);
+const events = await query(dbNames[3], "SELECT json_group_array(json_object('sequence', sequence, 'kind', kind, 'payload', json(payload_json), 'createdAt', created_at)) AS data_json FROM (SELECT * FROM task_events WHERE task_id = ? ORDER BY sequence)", task.id);
+const jsonl = bytes => bytes.toString('utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+const thread = jsonl(await readScoped(join(runtime, 'threads', expected.threadId, 'metadata.jsonl'))).findLast(item => item.kind === 'thread_metadata').thread;
+const messages = [...new Map(jsonl(await readScoped(join(runtime, 'threads', expected.threadId, 'messages.jsonl'))).map(item => [item.id, item])).values()];
+assert.equal(thread.id, expected.threadId); assert.equal(thread.projectId, expected.projectId); assert.equal(thread.domain, 'engineering');
+const turn = thread.turns.find(item => item.id === plan.executionTurnId); assert(turn);
+assert.equal(task.status, 'stalled'); assert.equal(task.attempts, 7); assert.equal(task.threadId, expected.threadId); assert.equal(task.activeTurnId, turn.id);
+assert.equal(task.engineeringPlanId, expected.planId); assert.equal(turn.engineeringPlanId, expected.planId); assert.equal(turn.engineeringExecution, true);
+assert.equal(turn.status, 'failed'); assert.match(turn.error, /^engineering_plan_steps_incomplete:/);
+for (const record of [task, turn]) for (const key of ['model', 'providerId', 'reasoningEffort']) assert.equal(record[key], expected[key]);
+assert.equal(messages.filter(item => item.kind === 'tool_call' || item.kind === 'tool_result').length, 0);
+const selectedMessages = messages.filter(item => item.turnId === turn.id);
+const texts = selectedMessages.filter(item => item.kind === 'assistant_text'); assert.equal(texts.length, 7); assert(texts.every(item => item.text === answer));
+const allMockTexts = messages.filter(item => item.kind === 'assistant_text' && item.text === answer); assert.equal(allMockTexts.length, 14);
+assert.equal(plan.steps.length, 4); assert(plan.steps.every(step => step.approval === 'approved'));
+assert.deepEqual(receipts, []); assert.deepEqual(adjustments, []); assert.deepEqual(deliveries, []);
+assert.equal(events.filter(event => event.kind === 'attempt_started' && event.payload.turnId === turn.id).length, 7);
+assert(events.some(event => event.kind === 'task_stalled' && /^engineering_plan_steps_incomplete:/.test(event.payload.reason ?? '')));
+assert.equal(network.projectId, expected.projectId); assert.equal(network.sourceFile.sha256, '4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0');
+const previousPath = join(root, 'evidence/failed-real-resume-53213.json'), previousBytes = await readScoped(previousPath), previous = JSON.parse(previousBytes);
+assert.notEqual(task.id, previous.identities.taskId); assert.notEqual(plan.id, previous.identities.planId);
+const previousTask = await query(dbNames[3], 'SELECT data_json FROM task_runs WHERE id = ?', previous.identities.taskId);
+assert.deepEqual(previousTask, previous.records.task, 'first failed Task changed');
+for (const oldTurn of [previous.records.turn, previous.records.previousTurn]) {
+  assert.deepEqual(thread.turns.find(item => item.id === oldTurn.id), oldTurn, 'first scenario Turn changed');
+  assert.deepEqual(messages.filter(item => item.turnId === oldTurn.id), previous.records.messages.filter(item => item.turnId === oldTurn.id), 'first scenario transcript changed');
+}
+assert.deepEqual(network, previous.records.network);
+const reportPath = join(root, 'evidence/mock-completion-report-943a464105dc837f.json');
+const mockBytes = await readScoped(reportPath), mock = JSON.parse(mockBytes);
+for (const key of ['projectId', 'networkId', 'threadId']) assert.equal(mock[key], expected[key]);
+assert.equal(mock.syntheticOnly, true); assert.equal(mock.externalNetwork, false); assert.equal(mock.upstreamCredentialsRead, false);
+assert.equal(mock.tokenRemoved, true); assert.equal(mock.cleanupError, undefined); assert.equal(mock.answer, answer);
+assert(mock.events.every(event => event.accepted && !event.rejected)); assert.equal(mock.requestCount, mock.events.length);
+assert.equal(mock.events.filter(event => event.route === '/v1/chat/completions').length, 7);
+let absent = false;
+try { await lstat(join(root, 'evidence/mock-local-token-943a464105dc837f.txt')); } catch (error) { if (error.code !== 'ENOENT') throw error; absent = true; }
+assert(absent, 'second mock token still exists');
+assert.equal(hash(await readScoped(join(root, 'Applications/RAILWISE AI Candidate 53213de739d0.app/Contents/Resources/app.asar'))), expected.asarSha256);
+assert.deepEqual(await sourceHashes(), before, 'candidate DB/WAL or transcript changed during freeze');
+const identities = { ...expected, taskId: task.id, turnId: turn.id, taskRevision: task.revision, planRevision: plan.revision, workspace: project.workspace };
+const records = { project, network, plan, task, turn, messages: selectedMessages, taskEvents: events, receipts, adjustments, deliveries };
+const result = { status: 'passed', phase: 'second-scenario-before-resume', checkedAt: new Date().toISOString(), candidateRoot: root, identities,
+  verified: { taskStatus: task.status, turnStatus: turn.status, exactMockAssistantTextCount: 7, entireThreadMockTextCount: 14, toolCalls: 0, toolResults: 0, adjustments: 0, deliveries: 0,
+    stepReceipts: plan.steps.map(step => ({ stepId: step.id, tool: step.tool, receipt: null })), mockTokenAbsent: true },
+  previousFailedScenario: { path: previousPath, sha256: hash(previousBytes), taskId: previous.identities.taskId, taskStatus: previousTask.status, recordsUnchanged: true, distinctTaskAndPlan: true },
+  mockReport: { path: reportPath, sha256: hash(mockBytes), requestCount: mock.requestCount, chatCount: 7, tokenRemoved: true },
+  sourceHashes: before, recordHashes: Object.fromEntries(Object.entries(records).map(([key, value]) => [key, objectHash(value)])), records,
+  audit: { sourceDatabaseConnections: 0, sqliteOnlyOnIsolatedCopies: true, sourceBytesUnchanged: true, credentialsRead: false, networkRequests: 0,
+    scriptSha256: hash(await readFile(fileURLToPath(import.meta.url))), snapshotHelperSha256: hash(await readFile('/private/tmp/railwise-typed-relay-guard.mjs')) },
+  limitations: ['This passes only the second scenario before-resume negative probe. The first real-resume failure remains a separate failed scenario.'] };
+const output = join(root, 'evidence/second-before-resume-zero-receipts-53213.json');
+await writeFile(output, JSON.stringify(result, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+console.log(JSON.stringify({ status: result.status, output, outputSha256: hash(await readFile(output)), identities, verified: result.verified }, null, 2));

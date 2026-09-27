@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { runInNewContext } from 'node:vm'
 import YAML from 'yaml'
 // The R2 publisher is an executable ESM module that also exposes side-effect-free
 // validation helpers for release-gate coverage.
@@ -342,6 +343,34 @@ describe('R2 release delivery gates', () => {
     expect(harness).toContain('an updater-disabled candidate cannot be used as a native updater acceptance baseline.')
     expect(harness).toContain('report.userDataPreserved !== true')
     expect(harness).toContain("'user_data_preserved'")
+  })
+
+  it('isolates notarized Survey builds even when other dispatch actions are requested', () => {
+    const release = YAML.parse(readFileSync('.github/workflows/release.yml', 'utf8'))
+    const inputs = Object.fromEntries(Object.entries(release.on.workflow_dispatch.inputs).map(([key, value]) => [key, (value as { default?: unknown }).default]))
+    Object.assign(inputs, { isolated_survey_candidate: true, candidate_only: false, run_updater_acceptance: true,
+      cleanup_acceptance_run_id: '123', repair_website_cache: true, repair_website_cache_mode: 'apply',
+      repair_website_cache_confirmation: 'REPAIR-WORKWISE-METADATA-CACHE', rollback_stable_tag: 'v0.5.0',
+      rollback_stable_confirmation: 'ROLLBACK-STABLE-TO-v0.5.0' })
+    const enabled = (name: string) => runInNewContext(release.jobs[name].if.replace(/^\$\{\{\s*|\s*\}\}$/g, ''), {
+      github: { event_name: 'workflow_dispatch', ref_type: 'branch' }, inputs
+    }, { timeout: 100 })
+    expect(enabled('isolated-survey-candidate')).toBe(true)
+    for (const name of ['native-updater-acceptance', 'cleanup-updater-acceptance', 'repair-website-cache', 'rollback-stable', 'prepare']) {
+      expect(enabled(name), name).toBe(false)
+    }
+    const candidate = YAML.parse(readFileSync('.github/workflows/isolated-survey-candidate.yml', 'utf8'))
+    expect(candidate.permissions).toEqual({ contents: 'read' })
+    expect(release.jobs['isolated-survey-candidate'].permissions).toEqual({ contents: 'read' })
+    const steps = candidate.jobs.candidate.steps as Array<{ run?: string; uses?: string; with?: Record<string, unknown> }>
+    expect(steps.find(step => step.uses?.startsWith('actions/checkout'))?.with?.['fetch-depth']).toBe(0)
+    const commands = steps.map(step => step.run ?? '').join('\n')
+    expect(commands).toContain('authorize-workwise-candidate.sh --prepare')
+    expect(commands).toContain('--publish never')
+    expect(commands).toContain("['xcrun', 'stapler', 'validate', str(app)]")
+    expect(commands).not.toMatch(/publish-r2|deploy-website|gh release|git tag|compute-ci-release-version/)
+    const artifact = steps.find(step => step.uses?.startsWith('actions/upload-artifact'))!
+    expect(artifact.with?.path).not.toMatch(/\.p8|\.p12|candidate\.env|\/home/)
   })
 
   it('dispatches branch-only updater acceptance through the registered release workflow', () => {

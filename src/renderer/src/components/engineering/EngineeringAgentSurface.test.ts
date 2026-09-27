@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { projectAiPlanSteps } from './EngineeringAiCommandCenter'
+import { projectAiPlanStatus, projectAiPlanSteps } from './EngineeringAiCommandCenter'
 import { numberLabel } from './SurveyAdjustmentPanel'
 
 describe('engineering agent surface contract', () => {
@@ -58,7 +58,16 @@ describe('engineering agent surface contract', () => {
       expect.objectContaining({ title: '校核工程数据', state: 'blocked' }),
       expect.objectContaining({ title: '准备报告', state: 'blocked' })
     ])
-    expect(projectAiPlanSteps(plan, 'running').map((step) => step.state)).toEqual(['active', 'ready'])
-    expect(projectAiPlanSteps(plan, 'completed').map((step) => step.state)).toEqual(['done', 'done'])
+    expect(projectAiPlanSteps(plan, 'running').map((step) => step.state)).toEqual(['ready', 'ready'])
+    expect(projectAiPlanSteps(plan, 'completed').map((step) => step.state)).toEqual(['blocked', 'blocked'])
+    expect(projectAiPlanStatus(plan, 'completed')).toBe('needs_attention')
+    const partial = { ...plan, execution: { complete: false, completedStepIds: ['inspect'], pendingStepIds: ['report'] } }
+    expect(projectAiPlanSteps(partial, 'completed').map(step => step.state)).toEqual(['done', 'blocked'])
+    expect(projectAiPlanStatus(partial, 'completed')).toBe('needs_attention')
+    const completed = { ...plan, execution: { complete: true, completedStepIds: ['inspect', 'report'], pendingStepIds: [] } }
+    expect(projectAiPlanSteps(completed, 'completed').map(step => step.state)).toEqual(['done', 'done'])
+    expect(projectAiPlanStatus(completed, 'completed')).toBe('completed')
+    expect(projectAiPlanStatus({ ...partial, status: 'needs_attention' }, 'completed')).toBe('needs_attention')
+    expect(projectAiPlanStatus({ ...partial, execution: { ...partial.execution, complete: true } }, 'completed')).toBe('needs_attention')
   })
 })

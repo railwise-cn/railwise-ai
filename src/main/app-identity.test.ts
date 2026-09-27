@@ -22,14 +22,14 @@ describe('app identity bootstrap', () => {
     configureAppIdentity({})
     expect(setName).toHaveBeenCalledTimes(1)
     expect(setName).toHaveBeenCalledWith(APP_PRODUCT_NAME)
-    expect(APP_PRODUCT_NAME).toBe('WorkWise')
+    expect(APP_PRODUCT_NAME).toBe('RailWise AI')
   })
 
   it('uses an isolated application name for candidate Keychain storage', async () => {
     const { configureAppIdentity, CANDIDATE_APP_PRODUCT_NAME } = await import('./app-identity')
     configureAppIdentity({ WORKWISE_CANDIDATE: '1' })
     expect(setName).toHaveBeenCalledWith(CANDIDATE_APP_PRODUCT_NAME)
-    expect(CANDIDATE_APP_PRODUCT_NAME).toBe('WorkWise IM Candidate')
+    expect(CANDIDATE_APP_PRODUCT_NAME).toBe('RailWise AI Candidate')
   })
 
   it('does not call app.setAppUserModelId (caller responsibility on win32)', async () => {

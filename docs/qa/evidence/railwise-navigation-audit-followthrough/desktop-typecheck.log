@@ -1,0 +1,8 @@
+Command: npm run typecheck
+Exit code: 0
+
+
+> workwise@0.5.0 typecheck
+> tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json
+
+

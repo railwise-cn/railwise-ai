@@ -1,0 +1,47 @@
+{
+  "command": [
+    "/usr/local/bin/python3",
+    "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-static-workspace-acceptance/inspect-packaged-trials.py",
+    "/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-advanced-trials.sqlite3",
+    "--project",
+    "project_9d966747-63bc-4658-9ba6-a8635423a7e0"
+  ],
+  "exitCode": 0,
+  "stdout": "{\n  \"status\": \"passed\",\n  \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\",\n  \"count\": 3,\n  \"records\": [\n    {\n      \"id\": \"advanced_trial_70b02952-0dfb-4390-8161-3e70f8fbf80e\",\n      \"fixture\": \"sample-declaration\",\n      \"outcome\": \"calculated\",\n      \"rawBindings\": \"passed\",\n      \"independentFits\": \"passed\",\n      \"prefixSseChecks\": 2\n    },\n    {\n      \"id\": \"advanced_trial_84c3454b-9201-44ab-b3d1-593adaaaf767\",\n      \"fixture\": \"stale-base-declaration\",\n      \"outcome\": \"unavailable\",\n      \"rawBindings\": \"passed\",\n      \"independentFits\": \"not-applicable-unavailable\",\n      \"prefixSseChecks\": 0\n    },\n    {\n      \"id\": \"advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401\",\n      \"fixture\": \"maximum-declaration\",\n      \"outcome\": \"calculated\",\n      \"rawBindings\": \"passed\",\n      \"independentFits\": \"passed\",\n      \"prefixSseChecks\": 128\n    }\n  ],\n  \"scope\": \"Independent rational fits and prefix SSE plus raw byte/SQL bindings; not GUI, JS canonical replay or professional approval\"\n}\n",
+  "stderr": "",
+  "databaseAccess": "sqlite URI mode=ro; no database mutation",
+  "checkedAt": "2026-09-20T01:31:24.102466+00:00",
+  "status": "passed",
+  "result": {
+    "status": "passed",
+    "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+    "count": 3,
+    "records": [
+      {
+        "id": "advanced_trial_70b02952-0dfb-4390-8161-3e70f8fbf80e",
+        "fixture": "sample-declaration",
+        "outcome": "calculated",
+        "rawBindings": "passed",
+        "independentFits": "passed",
+        "prefixSseChecks": 2
+      },
+      {
+        "id": "advanced_trial_84c3454b-9201-44ab-b3d1-593adaaaf767",
+        "fixture": "stale-base-declaration",
+        "outcome": "unavailable",
+        "rawBindings": "passed",
+        "independentFits": "not-applicable-unavailable",
+        "prefixSseChecks": 0
+      },
+      {
+        "id": "advanced_trial_b797b35a-9048-4c5e-810f-0bd47cce5401",
+        "fixture": "maximum-declaration",
+        "outcome": "calculated",
+        "rawBindings": "passed",
+        "independentFits": "passed",
+        "prefixSseChecks": 128
+      }
+    ],
+    "scope": "Independent rational fits and prefix SSE plus raw byte/SQL bindings; not GUI, JS canonical replay or professional approval"
+  }
+}

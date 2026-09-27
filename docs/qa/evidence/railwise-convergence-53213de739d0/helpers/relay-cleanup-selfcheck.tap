@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: stopped session confirms cleanup and its exact scoped token path is absent
+ok 1 - stopped session confirms cleanup and its exact scoped token path is absent
+  ---
+  duration_ms: 4.051375
+  type: 'test'
+  ...
+# Subtest: cleanup claims cannot bypass residual token entries, cleanup failures or session path scope
+ok 2 - cleanup claims cannot bypass residual token entries, cleanup failures or session path scope
+  ---
+  duration_ms: 2.904375
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50.041209

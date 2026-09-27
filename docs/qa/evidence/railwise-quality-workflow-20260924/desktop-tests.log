@@ -1,0 +1,183 @@
+
+> workwise@0.5.0 test
+> vitest run
+
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+(node:49930) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/schedule-runtime.test.ts (13 tests | 1 failed) 6034ms
+     × rebinds to a changed schedule port instead of reusing the candidate reservation 7ms
+(node:52809) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/skill-service.test.ts (21 tests | 1 failed) 10219ms
+     × installs the bundled PPT Master slim skill with WorkWise overlay files 5188ms
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts (26 tests | 1 failed) 2706ms
+     × prepares a node question from the selected saved score with no new calculation 111ms
+ ❯ src/main/services/agent-pack-service.test.ts (6 tests | 1 failed) 15888ms
+     × updates assets previously installed from the same bundled agent pack 5107ms
+ ❯ src/main/managed-runtime-process.test.ts (30 tests | 2 failed) 2358ms
+     × routes host requests through the ephemeral Runtime port reported by a listening child 304ms
+     × reports a port as unavailable when another listener owns it 8ms
+(node:55379) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55697) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts (12 tests | 2 failed) 618ms
+     × records a failure, issue, changed retained artifact and explicitly unresolved/resolved rechecks 58ms
+     × restores short history pages and uses actual previous offsets 110ms
+(node:55976) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/mcp-config-service.test.ts (15 tests | 4 failed) 894ms
+     × captures a validated loopback callback and completes OAuth without exposing the code to the renderer 19ms
+     × rejects mismatched callback state and supports explicit cancellation 6ms
+     × releases the loopback listener after an authorization timeout 8ms
+     × settles waiting OAuth callers and releases listeners when disposed 15ms
+(node:56066) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56111) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/unlimited-ocr-service.integration.test.ts (1 test | 1 failed) 13ms
+   × runs the complete OCR protocol over a real loopback HTTP connection 12ms
+(node:56151) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56189) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/runtime/managed-runtime-adapter.test.ts (2 tests | 1 failed) 50ms
+     × forwards daily usage requests to the WorkWise Runtime runtime with bearer auth 47ms
+(node:56325) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/claw-runtime.test.ts (95 tests | 1 failed) 35898ms
+     × rebinds to a changed IM port instead of reusing the candidate reservation 6ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > rebinds to a changed IM port instead of reusing the candidate reservation
+ FAIL  src/main/managed-runtime-process.test.ts > reclaimManagedRuntimePort > reports a port as unavailable when another listener owns it
+ FAIL  src/main/schedule-runtime.test.ts > ScheduleRuntime > rebinds to a changed schedule port instead of reusing the candidate reservation
+ FAIL  src/main/runtime/managed-runtime-adapter.test.ts > runtimeRequestViaHost > forwards daily usage requests to the WorkWise Runtime runtime with bearer auth
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > captures a validated loopback callback and completes OAuth without exposing the code to the renderer
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > rejects mismatched callback state and supports explicit cancellation
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > releases the loopback listener after an authorization timeout
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > settles waiting OAuth callers and releases listeners when disposed
+ FAIL  src/main/services/unlimited-ocr-service.integration.test.ts > runs the complete OCR protocol over a real loopback HTTP connection
+Error: listen EPERM: operation not permitted 127.0.0.1
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/18]⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > routes host requests through the ephemeral Runtime port reported by a listening child
+AssertionError: promise rejected "Error: WorkWise Runtime exited during sta…" instead of resolving
+ ❯ src/main/managed-runtime-process.test.ts:147:6
+    145|         skillRoots: []
+    146|       }
+    147|     )).resolves.toBeUndefined()
+       |      ^
+    148|     const actualPort = module.getManagedRuntimeActualPort()
+    149|     expect(actualPort).toEqual(expect.any(Number))
+
+Caused by: Error: WorkWise Runtime exited during startup with code 1
+node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+    at listenInCluster (node:net:2437:12)
+    at node:net:2666:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2416:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v26.9.0
+ ❯ ChildProcess.onExit src/main/managed-runtime-process.ts:1337:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/18]⎯
+
+ FAIL  src/main/runtime/managed-runtime-adapter.test.ts > runtimeRequestViaHost > forwards daily usage requests to the WorkWise Runtime runtime with bearer auth
+Error: Server is not running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/18]⎯
+
+ FAIL  src/main/services/agent-pack-service.test.ts > agent-pack-service > updates assets previously installed from the same bundled agent pack
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/agent-pack-service.test.ts:115:3
+    113|   })
+    114|
+    115|   it('updates assets previously installed from the same bundled agent …
+       |   ^
+    116|     const codexRoot = join(tempRoot, 'codex-update')
+    117|     const firstInstall = await installBundledAgentPack({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/18]⎯
+
+ FAIL  src/main/services/agent-pack-service.test.ts > agent-pack-service > updates assets previously installed from the same bundled agent pack
+Error: ENOTEMPTY: directory not empty, rmdir '/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-agent-pack-B4Jnei/codex-update'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/18]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/skill-service.test.ts:463:3
+    461|   })
+    462|
+    463|   it('installs the bundled PPT Master slim skill with WorkWise overlay…
+       |   ^
+    464|     const workspaceRoot = join(tempRoot, 'workspace-bundled-ppt-master…
+    465|     const skillInstallRoot = join(workspaceRoot, '.agents', 'skills')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/18]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: ENOTEMPTY: directory not empty, rmdir '/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/gui-skills-oQkm1X/workspace-bundled-ppt-master/.agents/skills/.workwise-install-ppt-master-mzIvOs/scripts/image_sources'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/18]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares a node question from the selected saved score with no new calculation
+TypeError: Cannot read properties of undefined (reading 'click')
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts:43:74
+
+ ❯ process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ❯ click src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts:43:51
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts:81:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/18]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts > declared quality workflow desktop > records a failure, issue, changed retained artifact and explicitly unresolved/resolved rechecks
+TypeError: Cannot read properties of undefined (reading 'disabled')
+ ❯ src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts:63:37
+     61|
+     62| describe('declared quality workflow desktop', () => {
+     63|   it('records a failure, issue, changed retained artifact and explicit…
+       |                                     ^
+     64|     await begin()
+     65|     expect(host.textContent).toContain('not professional approval')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/18]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts > declared quality workflow desktop > restores short history pages and uses actual previous offsets
+AssertionError: expected '/v1/engineering/projects/project/qual…' to contain '/workflow-1'
+
+Expected: "/workflow-1"
+Received: "/v1/engineering/projects/project/quality-workflows?limit=20&offset=0"
+
+ ❯ src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts:131:50
+    129|     runtimeRequest.mockResolvedValueOnce(response({ workflows: [], una…
+    130|     await click(button('Read independent workflow history'))
+    131|     expect(host.textContent).toContain('damaged-1')
+       |                                                  ^
+    132|     await click(button('Next page')); expect(runtimeRequest.mock.calls…
+    133|     await click(button('Previous page')); expect(runtimeRequest.mock.c…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/18]⎯
+
+
+ Test Files  10 failed | 324 passed | 2 skipped (336)
+      Tests  15 failed | 2851 passed | 4 skipped (2870)
+   Start at  11:55:12
+   Duration  37.75s (transform 22.01s, setup 0ms, import 56.12s, tests 235.71s, environment 8.91s)
+

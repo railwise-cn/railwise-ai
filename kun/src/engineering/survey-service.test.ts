@@ -695,6 +695,15 @@ describe('SurveyService', () => {
     expect(output.result.solverDiagnostics?.rank).toBe(3)
     expect(output.result.points.find((point) => point.id === 'P')).toMatchObject({ x: expect.closeTo(10.0005, 8), y: expect.closeTo(20.001, 8), height: expect.closeTo(30, 8) })
     expect(output.result.observations.map((item) => item.observationId)).toEqual(['g1:x', 'g1:y', 'g1:z', 'g2:x', 'g2:y', 'g2:z'])
+    const ellipse = output.result.points.find((point) => point.id === 'P')!.xyErrorEllipse!
+    // Two equally weighted independent vector baselines yield C_parameter=C_observation/2.
+    expect(ellipse.covarianceXY[0]).toBeCloseTo(2e-6 * output.result.varianceFactor, 16)
+    expect(ellipse.covarianceXY[1]).toBeCloseTo(0.5e-6 * output.result.varianceFactor, 16)
+    expect(ellipse.covarianceXY[3]).toBeCloseTo(4.5e-6 * output.result.varianceFactor, 16)
+    expect(ellipse.semiMajor ** 2 + ellipse.semiMinor ** 2).toBeCloseTo(6.5e-6 * output.result.varianceFactor, 16)
+    expect(ellipse.coordinatePlane).toBe('solution-xy')
+    expect(output.result.points.find((point) => point.id === 'A')!.xyErrorEllipse).toBeUndefined()
+    expect(service.getAdjustmentForNewUse(output.run.id)?.result?.points).toEqual(output.result.points)
     service.close()
   })
 

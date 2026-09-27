@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "outcome": "failed",
+  "identity": {
+    "app": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app",
+    "executable": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/MacOS/RAILWISE AI Candidate b9ea004b668d",
+    "packageVersion": "0.5.0",
+    "bundleId": "com.wangjiawei508.workwise.candidate.headb9ea004b668d",
+    "expectedSourceHead": "b9ea004b668d68b34a7d82ece6674ef2273a9bc3",
+    "asarPath": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar",
+    "asarSha256": "a8aa1bd0c4a07faf4b5903bd308faf9cd3c849a46e7014497f3ee5bcf49ac71c",
+    "node": "24.18.0",
+    "electron": "43.1.1",
+    "signatureVerification": "codesign --verify --deep --strict passed",
+    "notarization": "not-evaluated-by-this-script",
+    "scriptSha256": "45f531b8b7719542c852f29a54773c0b7988f0ba524c83eb23e1aa2bf74d2e1f",
+    "mode": "packaged-service-audit",
+    "evidenceOrigin": "synthetic-software-audit-not-GUI-not-professional-signoff"
+  },
+  "modules": {
+    "engineering/engineering-service": {
+      "path": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/engineering-service.js",
+      "sha256": "2db61f609341fcf223765355e9b4f5f455e56dfb157c4e9aa8ab3d8720d436e6"
+    },
+    "engineering/survey-service": {
+      "path": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/survey-service.js",
+      "sha256": "9e5e6aee28432b5cabb35b377fbe39d7d6dd9a1c26adbeabfe61e46c80b58140"
+    },
+    "engineering/survey-test-helpers": {
+      "path": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/survey-test-helpers.js",
+      "sha256": "b7efbbd3ccc33dff87fdc1e35d3c5dc474a3dc318c4007f1d3ba9024cc04594f"
+    },
+    "engineering/survey-quality-workspace": {
+      "path": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/survey-quality-workspace.js",
+      "sha256": "8e8ee4326481972abcfcb3c8f0bf3a3b681e7a0b6cf632283e8464755dd3d55b"
+    },
+    "engineering/survey-quality-workflow": {
+      "path": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/survey-quality-workflow.js",
+      "sha256": "d75542fb8396a988668ed4242551be4094c6851c936db0455e0ea38be15f21dc"
+    },
+    "contracts/survey-quality-workflow": {
+      "path": "<isolated-tmp>/Applications/RAILWISE AI Candidate b9ea004b668d.app/Contents/Resources/app.asar.unpacked/kun/dist/contracts/survey-quality-workflow.js",
+      "sha256": "60892dbe8989b18994d1c5caa88279b2e6aa1fa85b401bd2f8518faf364d3ef1"
+    }
+  },
+  "runtime": "<isolated-tmp>/service-audit-001/runtime",
+  "workspace": "<isolated-tmp>/service-audit-001/workspace",
+  "checks": [],
+  "failure": {
+    "name": "AssertionError",
+    "message": "Full DOCX/PDF/XLSX outputs expected\n\n4 !== 3\n",
+    "stack": "AssertionError [ERR_ASSERTION]: Full DOCX/PDF/XLSX outputs expected\n\n4 !== 3\n\n    at makeDelivery (file://<isolated-tmp>/run-packaged-audit.mjs:133:12)\n    at async file://<isolated-tmp>/run-packaged-audit.mjs:144:20"
+  },
+  "boundaries": {
+    "syntheticOnly": true,
+    "guiAcceptance": false,
+    "userAcceptance": false,
+    "professionalSignoff": false,
+    "standardConformity": "not-evaluated",
+    "publicReleaseApproval": false
+  },
+  "finishedAt": "2026-09-24T04:45:28.445Z"
+}

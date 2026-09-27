@@ -55,6 +55,7 @@ export type CosaFileGroupDiagnostic = Readonly<{
   code: 'cosa_orphan_auxiliary' | 'cosa_orphan_result' | 'cosa_duplicate_member'
   severity: 'blocking'
   message: string
+  localized?: { en: { message: string; suggestedAction: string } }
   suggestedAction: string
   groupId: string
   memberKind: CosaFileGroupMemberKind
@@ -167,6 +168,7 @@ function duplicateDiagnostic(group: MutableGroup, groupIdentifier: string, membe
   const suffix = `.${memberKind}`
   return Object.freeze({
     code: 'cosa_duplicate_member',
+    localized: { en: { message: `COSA group “${displayGroupName(group)}” contains ${files.length} ${suffix} members; no unambiguous member can be selected.`, suggestedAction: `Keep one same-stem ${suffix} file per group, or give different networks distinct base names and reimport.` } },
     severity: 'blocking',
     message: `COSA 文件组“${displayGroupName(group)}”包含 ${files.length} 个 ${suffix} 成员，无法安全选择其中之一。`,
     suggestedAction: `仅保留一个同名 ${suffix} 文件，或为不同控制网使用不同主文件名后重新导入。`,
@@ -185,6 +187,7 @@ function orphanAuxiliaryDiagnostic(
   const suffix = `.${memberKind}`
   return Object.freeze({
     code: 'cosa_orphan_auxiliary',
+    localized: { en: { message: `COSA auxiliary ${suffix} has no same-stem .in2 observation file and cannot be linked to a control network.`, suggestedAction: 'Select the same-stem .in2 observation file, or correct the companion/network base names and reimport.' } },
     severity: 'blocking',
     message: `COSA 辅助文件 ${suffix} 没有找到同名 .in2 主观测文件，不能独立关联到控制网。`,
     suggestedAction: '同时选择同名 .in2 主观测文件，或将辅助文件与正确控制网统一命名后重新导入。',
@@ -206,6 +209,7 @@ function orphanResultDiagnostic(
   const primarySuffix = `.${primaryKind}`
   return Object.freeze({
     code: 'cosa_orphan_result',
+    localized: { en: { message: `COSA result ${suffix} has no same-stem ${primarySuffix} observation file; result comparison cannot be linked safely.`, suggestedAction: `Select the same-stem ${primarySuffix} observation file; otherwise retain the original ${suffix} for archive review only.` } },
     severity: 'blocking',
     message: `COSA 成果文件 ${suffix} 没有找到同名 ${primarySuffix} 主观测文件，不能安全建立成果比对关联。`,
     suggestedAction: `同时选择同名 ${primarySuffix} 主观测文件；否则保留 ${suffix} 原件仅供归档审查。`,

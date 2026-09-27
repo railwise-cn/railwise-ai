@@ -3252,7 +3252,7 @@ pre {
   --work-logo-wake-end: 13px, 0;
   --work-logo-ripple-mid: 4px, 0.2px;
   --work-logo-ripple-end: 12px, 0;
-  transform: translateZ(0) scale(2.12);
+  --runtime-logo-width: 64px;
   z-index: 2;
 }
 
@@ -3458,7 +3458,7 @@ pre {
   }
 
   .ds-runtime-wake-logo.ds-work-logo {
-    transform: translateZ(0) scale(1.82);
+    --runtime-logo-width: 52px;
   }
 
   .ds-runtime-wake-nav {

@@ -491,16 +491,26 @@ export function createThreadActions(
       overrides?.model?.trim() ??
       (get().route === 'claw' && clawModel ? clawModel : get().composerModel.trim())
     let composerModel = requestedModel
+    let providerId = queued ? queued.providerId : overrides?.providerId ?? (overrides?.model !== undefined || get().route === 'claw' ? undefined : get().composerProviderId)
+    if (!queued && !providerId) {
+      try {
+        providerId = resolveManagedRuntimeSettings(await rendererRuntimeClient.getSettings()).providerId
+      } catch (error) {
+        set({ error: formatRuntimeError(error) })
+        return false
+      }
+    }
     const attachmentRoutingModel = requestedModel || 'auto'
     if (attachmentRoutingModel === 'auto' && hasImageAttachment(messageAttachments)) {
       try {
         const settings = await rendererRuntimeClient.getSettings()
         const runtime = resolveManagedRuntimeSettings(settings)
-        const provider = getModelProviderProfile(settings, runtime.providerId)
+        const provider = providerId ? settings.provider.providers.find(item => item.id === providerId) : getModelProviderProfile(settings, runtime.providerId)
+        if (!provider) throw new Error(`model_provider_unavailable: ${providerId}`)
         const decision = resolveAttachmentAwareModel({
           selectedModel: attachmentRoutingModel,
           attachments: messageAttachments,
-          activeProvider: { ...provider, baseUrl: runtime.baseUrl },
+          activeProvider: { ...provider, baseUrl: providerId ? provider.baseUrl : runtime.baseUrl },
           modelGroups: get().composerModelGroups
         })
         if (!decision.ok) {
@@ -513,6 +523,7 @@ export function createThreadActions(
           return false
         }
         composerModel = decision.model
+        providerId ??= provider.id
       } catch (error) {
         set({ error: formatRuntimeError(error) })
         return false
@@ -545,6 +556,7 @@ export function createThreadActions(
             ...(displayText ? { displayText } : {}),
             ...(mode ? { mode } : {}),
             ...(composerModel ? { model: composerModel } : {}),
+            ...(providerId ? { providerId } : {}),
             ...(userModelChip ? { modelLabel: userModelChip } : {}),
             ...(reasoningEffort ? { reasoningEffort } : {}),
             ...(overrides?.guiPlan ? { guiPlan: overrides.guiPlan } : {}),
@@ -729,6 +741,7 @@ export function createThreadActions(
       const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
         ...(composerModel ? { model: composerModel } : {}),
+        ...(providerId ? { providerId } : {}),
         ...(reasoningEffort ? { reasoningEffort } : {}),
         ...(runtimeDisplayText ? { displayText: runtimeDisplayText } : {}),
         ...((queued?.guiPlan ?? overrides?.guiPlan) ? { guiPlan: queued?.guiPlan ?? overrides?.guiPlan } : {}),
@@ -910,7 +923,9 @@ export function createThreadActions(
         }))
       }
       const threadSnap = get().threads.find((thread) => thread.id === activeThreadId)
-      const composerModel = get().composerModel.trim()
+      const selection = get()
+      const composerModel = selection.composerModel.trim()
+      const providerId = selection.composerProviderId
       const userModelChip = optimisticUserModelLabel(composerModel, threadSnap?.model)
       const seqAtSend = get().lastSeq
       resetBusyRecoveryAttempts()
@@ -926,7 +941,8 @@ export function createThreadActions(
         currentTurnUserId: null
       })
       const { turnId, userMessageItemId } = await p.reviewThread(activeThreadId, target, {
-        ...(composerModel ? { model: composerModel } : {})
+        ...(composerModel ? { model: composerModel } : {}),
+        ...(providerId ? { providerId } : {})
       })
       if (userMessageItemId && userModelChip) {
         rememberTurnModel(activeThreadId, userMessageItemId, userModelChip)

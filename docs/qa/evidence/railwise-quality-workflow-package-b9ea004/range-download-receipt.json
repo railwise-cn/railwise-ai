@@ -1,0 +1,15 @@
+{
+  "artifactId": "10790138322",
+  "outerArtifactSize": 589611966,
+  "target": {
+    "name": "WorkWise-Candidate-b9ea004b668d-0.5.0-mac-arm64.zip",
+    "method": 8,
+    "compressed": 296397665,
+    "uncompressed": 300873748,
+    "offset": 293213988
+  },
+  "targetZipSha256": "db63b72181d41c2020fd1175201270fd43ac9b73dc8fded041bddfe01f32243b",
+  "path": "<isolated-tmp>/artifacts/private-updater-target-arm64-b9ea004b668d68b34a7d82ece6674ef2273a9bc3/WorkWise-Candidate-b9ea004b668d-0.5.0-mac-arm64.zip",
+  "outcome": "passed",
+  "fullOuterArtifactDownloaded": false
+}

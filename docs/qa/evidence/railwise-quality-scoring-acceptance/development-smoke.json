@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-20T00:47:49.380Z",
+  "scope": "development-compiled-service-real-sqlite-only",
+  "guiExecuted": false,
+  "packagedApplicationExecuted": false,
+  "releaseAuthorizedByThisCheck": false,
+  "professionalApproval": false,
+  "runtime": {
+    "node": "v26.8.2",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "repository": "/Users/wangjiawei/Documents/WorkWise",
+  "database": "/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-quality-development-FkObPX/survey-quality-scoring.sqlite3",
+  "temporaryDatabaseRetained": true,
+  "injectedClockUsedForRateIsolation": true,
+  "compiledSha256": {
+    "kun/dist/engineering/survey-quality-scoring-workspace.js": "2fa16f8329d15f7d7bd56b770992b7c22ec5d22559be1976fd135bc472b80f2b",
+    "kun/dist/contracts/survey-quality-scoring-workspace.js": "1272ab69eff9678b239905c94bc08aa9d723f5089d2c7c1f34901da6cfe804fe",
+    "kun/dist/engineering/survey-quality-scoring.js": "042dec04f9b4faefb665b8350024a13c551bf9099955d023955c284d7bab3845",
+    "kun/dist/engineering/survey-quality-scoring-exact.js": "94b4b818484fc9efee101192eeaa6e82eb5cc4b8ea3c99d0f195f3b6eabced1c",
+    "kun/dist/engineering/survey-quality-scoring-rules.js": "664b66a54b0d0dfe46156ff1378f7bbda5d709f2dbba74de6456f31d2e338014",
+    "kun/dist/contracts/survey-quality-scoring.js": "f6ea236aed31f1799a1fb8d94c0ef4ed08f2ba61f9151b7d6ce1895fb66482ff"
+  },
+  "cases": [
+    {
+      "case": "full",
+      "recordId": "quality_scoring_9a832bd7-ad6a-4f79-875d-2989c912200e",
+      "outcome": "calculated",
+      "scope": "complete-declared-product-profile",
+      "exactScore": {
+        "numerator": "9141",
+        "denominator": "100"
+      },
+      "declarationSha256": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113",
+      "originalBytesPreserved": true,
+      "exactIdempotentRetry": true,
+      "runtimeReverified": true
+    },
+    {
+      "case": "child-veto",
+      "recordId": "quality_scoring_3d3c301f-5a9c-42fc-98b2-983175df8cae",
+      "outcome": "nonconforming",
+      "scope": "complete-declared-product-profile",
+      "exactScore": null,
+      "declarationSha256": "fd6720ebd190a9e7b1a0cd38b75ddd28a7ccece04806126d8adc3a7d76028b82",
+      "originalBytesPreserved": true,
+      "exactIdempotentRetry": true,
+      "runtimeReverified": true
+    },
+    {
+      "case": "pending",
+      "recordId": "quality_scoring_9f06b88a-0e2e-4e81-916c-c108d305c4a4",
+      "outcome": "unavailable",
+      "scope": "unresolved-declared-product-profile",
+      "exactScore": null,
+      "declarationSha256": "895754b81584e3ca12ba869d3cb595d192ab436de004703a3c8ab435903a430f",
+      "originalBytesPreserved": true,
+      "exactIdempotentRetry": true,
+      "runtimeReverified": true
+    },
+    {
+      "case": "multiple-sixty",
+      "recordId": "quality_scoring_7619f262-14e3-4c06-a207-71691e9cceb3",
+      "outcome": "unavailable",
+      "scope": "declared-component-only",
+      "exactScore": null,
+      "declarationSha256": "f309430e4cbca98c732f4b0b33d75d3b78f636f877f527b8ffdebcbdc23c07c0",
+      "originalBytesPreserved": true,
+      "exactIdempotentRetry": true,
+      "runtimeReverified": true
+    }
+  ],
+  "fullServiceRestartSameRecords": true,
+  "independentPythonInspection": {
+    "schemaVersion": 1,
+    "verification": "stdlib-sqlite-and-Fraction-independent-record-check",
+    "guiExecutionVerified": false,
+    "professionalApproval": false,
+    "currentProjectRevisionValidated": false,
+    "storedProjectSnapshotBindingVerified": true,
+    "database": "/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-quality-development-FkObPX/survey-quality-scoring.sqlite3",
+    "projectId": "quality-development-smoke",
+    "recordsChecked": 4,
+    "unmatchedProjectRecordsNotEvaluated": 0,
+    "allFourCasesPresent": true,
+    "results": [
+      {
+        "case": "full",
+        "recordId": "quality_scoring_9a832bd7-ad6a-4f79-875d-2989c912200e",
+        "projectId": "quality-development-smoke",
+        "projectRevision": 1,
+        "requestSha256": "6f577fb9466d186d80bcd81691bd548a16c15517676ac711916536c4885d67f7",
+        "declarationSha256": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113",
+        "recordHash": "1c22605494a15e8c24b17e5ffd54669433dd1ba807681253a461855e5eed2815",
+        "outcome": "calculated",
+        "scope": "complete-declared-product-profile",
+        "exactScore": {
+          "numerator": "9141",
+          "denominator": "100"
+        },
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      },
+      {
+        "case": "child-veto",
+        "recordId": "quality_scoring_3d3c301f-5a9c-42fc-98b2-983175df8cae",
+        "projectId": "quality-development-smoke",
+        "projectRevision": 1,
+        "requestSha256": "e27638ab9e886aaf6335fc5634d82a8d577d6408d3b7dd15ce25e51770897784",
+        "declarationSha256": "fd6720ebd190a9e7b1a0cd38b75ddd28a7ccece04806126d8adc3a7d76028b82",
+        "recordHash": "25b590712f5a7d036b897af659257d4d721c731fe247e1c2d1ff24c590dfbb5c",
+        "outcome": "nonconforming",
+        "scope": "complete-declared-product-profile",
+        "exactScore": null,
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      },
+      {
+        "case": "pending",
+        "recordId": "quality_scoring_9f06b88a-0e2e-4e81-916c-c108d305c4a4",
+        "projectId": "quality-development-smoke",
+        "projectRevision": 1,
+        "requestSha256": "03710a19f5d830394d8b985c804b86b0a954e9e2b4d358270aa519fa5c8120d0",
+        "declarationSha256": "895754b81584e3ca12ba869d3cb595d192ab436de004703a3c8ab435903a430f",
+        "recordHash": "6768e2e4d1adc12a1ace8ebbb413d3c0fcf34bd97d5c1e1ee5edad551bd6c02e",
+        "outcome": "unavailable",
+        "scope": "unresolved-declared-product-profile",
+        "exactScore": null,
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      },
+      {
+        "case": "multiple-sixty",
+        "recordId": "quality_scoring_7619f262-14e3-4c06-a207-71691e9cceb3",
+        "projectId": "quality-development-smoke",
+        "projectRevision": 1,
+        "requestSha256": "cea7229efecc5db4514c5bd5dbd035daa9f3db31c5ae33de64d2220788b6e382",
+        "declarationSha256": "f309430e4cbca98c732f4b0b33d75d3b78f636f877f527b8ffdebcbdc23c07c0",
+        "recordHash": "f66cb38b339f1d2ab476a661404f1ed8f1f98e8aad48c9d8177825643d5b8d39",
+        "outcome": "unavailable",
+        "scope": "declared-component-only",
+        "exactScore": null,
+        "originalBytesVerified": true,
+        "sqlBindingsVerified": true,
+        "independentFractionChecksPassed": true
+      }
+    ]
+  },
+  "independentInspectorNegativeChecks": [
+    {
+      "case": "changed-request-bytes",
+      "rejected": true,
+      "reason": "Stored text does not equal raw BLOB bytes"
+    },
+    {
+      "case": "coherent-wrong-score",
+      "rejected": true,
+      "reason": "Full declared exact score/grade mismatch"
+    },
+    {
+      "case": "missing-required-case",
+      "rejected": true,
+      "reason": "Missing matching acceptance declarations: full"
+    }
+  ]
+}

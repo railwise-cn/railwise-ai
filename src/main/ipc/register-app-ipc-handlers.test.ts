@@ -1029,6 +1029,92 @@ describe('registerAppIpcHandlers', () => {
     }
   })
 
+  it('uses the current settings locale for native JSON save options and preserves exported bytes', async () => {
+    const { dialog } = await import('electron')
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const temp = mkdtempSync(join(tmpdir(), 'workwise-save-locale-'))
+    const target = join(temp, 'selected.json')
+    const bytes = Buffer.from('{"name":"测量记录","value":0.005}\n')
+    const configured = settings()
+    configured.locale = 'zh'
+    const window = {} as Electron.BrowserWindow
+    const showSaveDialog = vi.fn(async () => ({ canceled: false, filePath: target }))
+    ;(dialog as unknown as { showSaveDialog: typeof showSaveDialog }).showSaveDialog = showSaveDialog
+
+    try {
+      registerAppIpcHandlers(registerOptions({
+        store: { load: vi.fn(async () => configured) } as never,
+        getMainWindow: () => window
+      }))
+      const handler = handlers.get('file:save-as')
+      const payload = {
+        suggestedName: '../evidence.json',
+        workspaceRoot: temp,
+        dataBase64: bytes.toString('base64'),
+        mimeType: 'application/json'
+      }
+      await expect(handler?.({}, payload)).resolves.toEqual({ ok: true, path: target })
+      expect(showSaveDialog).toHaveBeenLastCalledWith(window, {
+        title: '保存生成的文件',
+        defaultPath: join(temp, 'evidence.json'),
+        filters: [{ name: 'JSON 文件', extensions: ['json'] }, { name: '所有文件', extensions: ['*'] }]
+      })
+      expect(readFileSync(target)).toEqual(bytes)
+
+      configured.locale = 'en'
+      await expect(handler?.({}, payload)).resolves.toEqual({ ok: true, path: target })
+      expect(showSaveDialog).toHaveBeenLastCalledWith(window, {
+        title: 'Save generated file',
+        defaultPath: join(temp, 'evidence.json'),
+        filters: [{ name: 'JSON file', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
+      })
+      expect(readFileSync(target)).toEqual(bytes)
+    } finally {
+      rmSync(temp, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps JSON save cancellation non-writing and rejects an escaped source before opening the dialog', async () => {
+    const { dialog } = await import('electron')
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const temp = mkdtempSync(join(tmpdir(), 'workwise-save-cancel-'))
+    const workspace = mkdtempSync(join(temp, 'workspace-'))
+    const outsideSource = join(temp, 'outside.json')
+    const target = join(workspace, 'untouched.json')
+    writeFileSync(outsideSource, 'outside-source')
+    writeFileSync(target, 'existing-target')
+    const configured = { ...settings(), locale: 'zh' as const }
+    const showSaveDialog = vi.fn(async () => ({ canceled: true, filePath: target }))
+    ;(dialog as unknown as { showSaveDialog: typeof showSaveDialog }).showSaveDialog = showSaveDialog
+
+    try {
+      registerAppIpcHandlers(registerOptions({ store: { load: vi.fn(async () => configured) } as never }))
+      const handler = handlers.get('file:save-as')
+      await expect(handler?.({}, {
+        workspaceRoot: workspace,
+        suggestedName: 'evidence.json',
+        mimeType: 'application/json',
+        dataBase64: Buffer.from('replacement').toString('base64')
+      })).resolves.toEqual({ ok: false, canceled: true, message: 'Save cancelled.' })
+      expect(showSaveDialog).toHaveBeenCalledWith({
+        title: '保存生成的文件',
+        defaultPath: join(workspace, 'evidence.json'),
+        filters: [{ name: 'JSON 文件', extensions: ['json'] }, { name: '所有文件', extensions: ['*'] }]
+      })
+      expect(readFileSync(target, 'utf8')).toBe('existing-target')
+
+      await expect(handler?.({}, {
+        workspaceRoot: workspace,
+        sourcePath: '../outside.json'
+      })).resolves.toMatchObject({ ok: false })
+      expect(showSaveDialog).toHaveBeenCalledTimes(1)
+      expect(readFileSync(outsideSource, 'utf8')).toBe('outside-source')
+      expect(readFileSync(target, 'utf8')).toBe('existing-target')
+    } finally {
+      rmSync(temp, { recursive: true, force: true })
+    }
+  })
+
   it('opens and reveals verified workspace artifacts', async () => {
     const { shell } = await import('electron')
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')

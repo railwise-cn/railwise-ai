@@ -1,0 +1,60 @@
+
+> kun@0.4.2 test
+> vitest run tests/deepseek-responses-web-provider.test.ts tests/runtime-factory.test.ts --reporter=dot
+
+
+ RUN  v4.1.8 /private/tmp/railwise-static-workspace/kun
+
+x····················x·······
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/deepseek-responses-web-provider.test.ts > DeepSeek Responses web provider > uses the official Responses web_search tool with deepseek-flash and parses URL citations
+Error: DeepSeek Responses web search is unavailable for this provider or model.
+ ❯ DeepSeekResponsesWebProvider.search src/adapters/tool/deepseek-responses-web-provider.ts:41:13
+     39|   async search(request: WebSearchRequest): Promise<WebSearchResult[]> {
+     40|     if (!isDeepSeekResponsesWebSearchConfig(this.options)) {
+     41|       throw new Error('DeepSeek Responses web search is unavailable fo…
+       |             ^
+     42|     }
+     43|     const signal = AbortSignal.any([request.signal, AbortSignal.timeou…
+ ❯ tests/deepseek-responses-web-provider.test.ts:41:36
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes official search for deepseek-flash with the unchanged model ID
+AssertionError: expected [ { id: 'web', enabled: true, …(5) } ] to deeply equal [ ObjectContaining{…} ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "provider": "deepseek-responses",
+-     "searchAvailable": true,
++     "available": false,
++     "enabled": true,
++     "fetchAvailable": false,
++     "id": "web",
++     "provider": "unavailable",
++     "reason": "web provider is unavailable",
++     "searchAvailable": false,
+    },
+  ]
+
+ ❯ tests/runtime-factory.test.ts:231:65
+    229|         capabilities: KunCapabilitiesConfig.parse({ web: { enabled: tr…
+    230|       })
+    231|       expect((await runtime.toolDiagnostics?.())?.webProviders).toEqua…
+       |                                                                 ^
+    232|       expect((await runtime.toolHost!.listTools()).some(tool => tool.n…
+    233|       const result = await runtime.toolHost!.execute({ callId: 'search…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 27 passed (29)
+   Start at  08:58:21
+   Duration  1.85s (transform 733ms, setup 0ms, import 1.02s, tests 813ms, environment 0ms)
+

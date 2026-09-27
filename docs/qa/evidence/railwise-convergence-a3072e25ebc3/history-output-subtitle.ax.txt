@@ -1,0 +1,123 @@
+Window: "RAILWISE AI", App: RAILWISE AI Candidate a3072e25ebc3.
+0 标准窗口 RAILWISE AI, Secondary Actions: Raise
+	1 container RAILWISE AI
+		2 container
+			3 HTML 内容 RAILWISE AI, URL: file:///private/tmp/railwise-survey-a3072e2/Applications/RAILWISE%20AI%20Candidate%20a3072e25ebc3.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RAILWISE AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 1
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 合成抽样验收 · 1001 单位 控制网 · m · 9/20
+							26 文本 合成抽样验收 · 1001 单位
+							27 文本 控制网
+							28 文本  ·
+							29 文本 m
+							30 文本  ·
+							31 文本 9/20
+						32 text Survey AI 会话 1
+						33 按钮 Survey AI · 新建内业任务 合成抽样验收 · 1001 单位 · 0 条消息
+							34 文本 Survey AI · 新建内业任务
+							35 文本 合成抽样验收 · 1001 单位
+							36 文本  ·
+							37 文本 0
+							38 文本 条消息
+						39 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					40 container
+						41 切换按钮 连接手机, Value: 0
+						42 按钮 设置
+					43 container
+						44 按钮 收起侧边栏
+						45 标题 RAILWISE Survey, Value: 1
+							46 文本 RAILWISE Survey
+						47 text 工程测量内业 当前内业任务
+						48 弹出式按钮 当前内业任务, Value: 合成抽样验收 · 1001 单位
+							49 (selected) 合成抽样验收 · 1001 单位
+						50 文本 工作视图
+						51 弹出式按钮 工作视图, Value: 成果与审查
+							52 (selected) 成果与审查
+						53 按钮 新建工程测量项目
+					54 container
+						55 text 任务 合成抽样验收 · 1001 单位 阶段 成果与审查 数据源 / 格式 workwise-network.json  ·  WORKWISE-JSON 处置状态 候选成果 基准 待确认  ·  待确认 点数 3 测站数 0 观测 3 闭合差 0.0003 m 精度 0.0001 m 成果 候选成果 网型 水准 / 高程控制网 审查 草案
+					56 container Survey AI 会话
+						57 container
+							58 标题 Survey AI 会话, Value: 2
+								59 文本 Survey AI 会话
+							60 文本 合成抽样验收 · 1001 单位
+							61 按钮 数据资产
+							62 按钮 测量平差
+							63 按钮 刷新上下文
+						64 标题 Survey AI, Value: 2
+							65 文本 Survey AI
+						66 container
+							67 文本输入区 (settable) 正在准备当前任务的对话，输入草稿会保留。
+							68 按钮 更多操作
+							69 弹出式按钮 模型与推理设置
+							70 按钮 (disabled) 发送
+					71 container
+						72 container 工作视图
+							73 按钮 交付总览
+							74 按钮 成果中心
+							75 按钮 审查归档
+							76 按钮 技能与规范
+						77 标题 成果预览与证据包, Value: 2
+							78 文本 成果预览与证据包
+						79 文本 预览生成 DOCX、PDF、XLSX 和趋势图。预览不等同于归档，最终成果仍需在审查归档中通过门禁。
+						80 按钮 生成预览成果
+						81 文本 预览输出
+						82 文本 最近待审查清单输出 · manifest_9ceb5ee5-4582-49c2-a250-7c312ec31b0f
+						83 文本 .workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/report.docx
+						84 container
+							85 text SHA-256  744fe28f69a32c0e5e7e7015307ccb32a6f883fb4b5df8ca6ccde89db4ec4e7b
+						86 按钮 询问 .workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/report.docx 的测量 AI
+						87 文本 4.1 KB
+						88 文本 .workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/report.pdf
+						89 container
+							90 text SHA-256  2b393e6a9453fd6bb91cd804fdd5a14a65095441e4a5f63e028a35b6d402abb6
+						91 按钮 询问 .workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/report.pdf 的测量 AI
+						92 文本 27.9 KB
+						93 文本 .workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/evidence.xlsx
+						94 container
+							95 text SHA-256  519397534c4283769efadddfa1a45777040688cfb22edf0b9b77f60342f228df
+						96 按钮 询问 .workwise/deliverables/project_5e07e1e2-06cf-4f98-9653-3eb79719a4c5/run_e6440262-8eb3-4218-9a8a-4357e800cb4d/evidence.xlsx 的测量 AI
+						97 文本 31.7 KB
+						98 文本 最近运行
+						99 container
+							100 text run_e6440262-8eb3-4218-9a8a-4357e800cb4d  ·  已完成  ·  2026/9/20 06:28:30
+						101 文本 来源引用
+						102 文本 加入规范、知识库或附件来源。它们将进入报告、XLSX 索引和最终 manifest。
+						103 container
+							104 弹出式按钮 Description: 引用类型, Value: 规范条文
+								105 (selected) 规范条文
+							106 文本栏 (settable) 来源名称或文件路径
+							107 文本栏 (settable) 定位信息，例如第 5.2 条
+							108 按钮 添加引用
+						109 文本 尚未添加引用。
+	110 关闭按钮
+	111 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	112 最小化按钮
+113 menu bar
+	114 RAILWISE AI Candidate a3072e25ebc3
+	115 文件
+	116 编辑
+	117 显示
+	118 窗口
+	119 帮助
+
+The focused UI element is 74 按钮 成果中心

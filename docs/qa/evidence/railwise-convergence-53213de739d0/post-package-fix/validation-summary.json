@@ -1,0 +1,43 @@
+{
+  "scope": "source-only; not included in reviewed 53213 package",
+  "sourceHead": "7d4f454feecb09028007ae9b436a318db6856201",
+  "diffSha256": "67256c293b1c172192c68671f15cc5bae3b636f20b94d30271f8581fc750c434",
+  "sourceFiles": [
+    {
+      "path": "kun/src/services/task-controller.test.ts",
+      "sha256": "3107adc997218d8056b9bc9f3a148ff3dc1619d17516e591db50b363de285c82"
+    },
+    {
+      "path": "kun/src/services/task-controller.ts",
+      "sha256": "1b4f8b5f7b05857ecf602dc5b32b809259c8bec550bdc8727b42bd94cbe343ae"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts",
+      "sha256": "7fb7a2d371eaedf1e84824cf0ab7043350f1862eaf907303c3f7cbe6d91fd516"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx",
+      "sha256": "741e3cf76bab554515c8596e7a2f6b35ccf0d48a96f4b7069eec2559b77afd7e"
+    }
+  ],
+  "desktop": {
+    "passed": 2818,
+    "skipped": 2
+  },
+  "runtime": {
+    "passed": 2821,
+    "skipped": 22
+  },
+  "build": "passed",
+  "lint": {
+    "errors": 0,
+    "existingWarnings": 1
+  },
+  "strictOpenSpec": {
+    "passed": 11,
+    "failed": 0
+  },
+  "typechecks": "both passed earlier in parent session; no separate raw log included here",
+  "independentReview": "no definite regression found; optional reason fields remain serialization-compatible; history events unchanged",
+  "packagedUiAcceptance": "pending-new-signed-candidate"
+}

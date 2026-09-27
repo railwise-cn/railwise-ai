@@ -7,6 +7,9 @@
  */
 export type Matrix = number[][]
 
+/** Relative rounding allowance for symmetric covariance/cofactor matrices. */
+export const SURVEY_COVARIANCE_SYMMETRY_TOLERANCE = 1e-12
+
 export type WeightedEquation = {
   coefficients: number[]
   misclosure: number
@@ -114,7 +117,7 @@ export function choleskyDecompose(source: Matrix): Matrix | null {
   const dimension = source.length
   if (!dimension || source.some((row) => row.length !== dimension || row.some((value) => !Number.isFinite(value)))) return null
   const scale = Math.max(Number.MIN_VALUE, ...source.flatMap((row) => row.map((value) => Math.abs(value))))
-  const symmetryTolerance = scale * 1e-12
+  const symmetryTolerance = scale * SURVEY_COVARIANCE_SYMMETRY_TOLERANCE
   for (let row = 0; row < dimension; row += 1) {
     for (let column = 0; column < row; column += 1) {
       if (Math.abs(source[row]![column]! - source[column]![row]!) > symmetryTolerance) return null

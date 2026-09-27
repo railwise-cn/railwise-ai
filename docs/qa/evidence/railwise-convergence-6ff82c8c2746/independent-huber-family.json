@@ -1,0 +1,49 @@
+{
+  "command": [
+    "/usr/local/bin/python3",
+    "-c",
+    "from pathlib import Path\nimport importlib.util,json,sqlite3,hashlib\nscript=Path('/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-statistical-huber-acceptance/inspect-packaged-trials.py')\nspec=importlib.util.spec_from_file_location('existing_huber_family_oracle',script);oracle=importlib.util.module_from_spec(spec);spec.loader.exec_module(oracle)\ndb=Path('/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-advanced-trials.sqlite3');project='project_9d966747-63bc-4658-9ba6-a8635423a7e0'\nfixtures={p.stem:json.loads(p.read_text())for p in (script.parent/'inputs').glob('*.json')}\nquery=\"SELECT * FROM advanced_trials WHERE project_id=? AND kind IN ('huber','statistical-family') ORDER BY created_at,id\"\nwith sqlite3.connect(db.as_uri()+'?mode=ro',uri=True)as c:\n c.row_factory=sqlite3.Row;c.execute('PRAGMA query_only=ON');c.execute('BEGIN')\n all_count=c.execute('SELECT count(*) FROM advanced_trials WHERE project_id=?',(project,)).fetchone()[0]\n results=[oracle.verify(row,fixtures)for row in c.execute(query,(project,))]\n assert len(results)==3 and {r['fixture']for r in results}==set(fixtures)\nprint(json.dumps({'status':'passed','projectId':project,'count':len(results),'advancedProjectTotal':all_count,'records':results,'existingOracle':str(script),'oracleSha256':hashlib.sha256(script.read_bytes()).hexdigest(),'query':query,'scope':'Unmodified existing verify function with kind-scoped read-only SQL; original raw-byte/SQL bindings and independent numerics; not JS canonical replay or professional approval'}))\n"
+  ],
+  "exitCode": 0,
+  "stdout": "{\"status\": \"passed\", \"projectId\": \"project_9d966747-63bc-4658-9ba6-a8635423a7e0\", \"count\": 3, \"advancedProjectTotal\": 9, \"records\": [{\"id\": \"advanced_trial_09292a30-0537-4e4c-90e8-fba86ec25a3c\", \"fixture\": \"statistical-reversed\", \"requestSha256\": \"c7189dc9a85059b67dd2d4ca94ee4fe522680fcda71873f9c2ea3319e22446ed\", \"declarationSha256\": \"0284950f8077ed3cdce00d68c5c8a8c4e2af2aecddd5b7e5ceaae0edcf02a790\", \"rawBindings\": \"passed\", \"independentNumerics\": \"passed\"}, {\"id\": \"advanced_trial_f27adf75-3b21-4cf0-9c01-7d7953f92559\", \"fixture\": \"huber-unique\", \"requestSha256\": \"af044669ffffe0b8477ee85220cc15b98a1ab95c762c4380c208505dacf76bde\", \"declarationSha256\": \"31ee0fa26c4d2ce34472ba857554660dc73f91c9a47896d8c4fbcf9f7795a404\", \"rawBindings\": \"passed\", \"independentNumerics\": \"passed\"}, {\"id\": \"advanced_trial_e2fe90b3-a804-4022-bc3c-6adea95b76e0\", \"fixture\": \"huber-flat\", \"requestSha256\": \"b7152db8eefa51ce4a6ef17b49ba6d42b163a93f9500fbeb8fc141e546ca69e8\", \"declarationSha256\": \"f8ea21310f9027b037cf93bde68a47d22b9f21173539c6297b6b4b8bfae9aae8\", \"rawBindings\": \"passed\", \"independentNumerics\": \"passed\"}], \"existingOracle\": \"/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-statistical-huber-acceptance/inspect-packaged-trials.py\", \"oracleSha256\": \"be1c6b66bbbedce4df4afb8911565bef6dd5da1ba4a0cf868d3b95537d1616f1\", \"query\": \"SELECT * FROM advanced_trials WHERE project_id=? AND kind IN ('huber','statistical-family') ORDER BY created_at,id\", \"scope\": \"Unmodified existing verify function with kind-scoped read-only SQL; original raw-byte/SQL bindings and independent numerics; not JS canonical replay or professional approval\"}\n",
+  "stderr": "",
+  "checkedAt": "2026-09-20T01:49:29.824067+00:00",
+  "status": "passed",
+  "adaptation": "Existing main selects every project trial; call unchanged verify on only Huber/statistical-family kinds as requested.",
+  "result": {
+    "status": "passed",
+    "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+    "count": 3,
+    "advancedProjectTotal": 9,
+    "records": [
+      {
+        "id": "advanced_trial_09292a30-0537-4e4c-90e8-fba86ec25a3c",
+        "fixture": "statistical-reversed",
+        "requestSha256": "c7189dc9a85059b67dd2d4ca94ee4fe522680fcda71873f9c2ea3319e22446ed",
+        "declarationSha256": "0284950f8077ed3cdce00d68c5c8a8c4e2af2aecddd5b7e5ceaae0edcf02a790",
+        "rawBindings": "passed",
+        "independentNumerics": "passed"
+      },
+      {
+        "id": "advanced_trial_f27adf75-3b21-4cf0-9c01-7d7953f92559",
+        "fixture": "huber-unique",
+        "requestSha256": "af044669ffffe0b8477ee85220cc15b98a1ab95c762c4380c208505dacf76bde",
+        "declarationSha256": "31ee0fa26c4d2ce34472ba857554660dc73f91c9a47896d8c4fbcf9f7795a404",
+        "rawBindings": "passed",
+        "independentNumerics": "passed"
+      },
+      {
+        "id": "advanced_trial_e2fe90b3-a804-4022-bc3c-6adea95b76e0",
+        "fixture": "huber-flat",
+        "requestSha256": "b7152db8eefa51ce4a6ef17b49ba6d42b163a93f9500fbeb8fc141e546ca69e8",
+        "declarationSha256": "f8ea21310f9027b037cf93bde68a47d22b9f21173539c6297b6b4b8bfae9aae8",
+        "rawBindings": "passed",
+        "independentNumerics": "passed"
+      }
+    ],
+    "existingOracle": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-statistical-huber-acceptance/inspect-packaged-trials.py",
+    "oracleSha256": "be1c6b66bbbedce4df4afb8911565bef6dd5da1ba4a0cf868d3b95537d1616f1",
+    "query": "SELECT * FROM advanced_trials WHERE project_id=? AND kind IN ('huber','statistical-family') ORDER BY created_at,id",
+    "scope": "Unmodified existing verify function with kind-scoped read-only SQL; original raw-byte/SQL bindings and independent numerics; not JS canonical replay or professional approval"
+  }
+}

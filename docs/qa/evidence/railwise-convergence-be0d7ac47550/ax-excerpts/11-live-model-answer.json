@@ -1,0 +1,52 @@
+{
+  "kind": "selected-native-AX-lines",
+  "sourceFile": "evidence/11-live-model-answer.ax.txt",
+  "sourceSha256": "f62c14036dfcd7f2aa93dcaee89d70614934f4623c3beb97cf5f7961c7a7553d",
+  "selection": "Evidence identity, labels, PDF page state, focused control and synthetic model prompt/answer only; line numbers reference local original.",
+  "lines": [
+    {
+      "originalLine": 5,
+      "text": "\t\t\t3 HTML 内容 RAILWISE AI, URL: <local-app-url>"
+    },
+    {
+      "originalLine": 7,
+      "text": "\t\t\t\t\t5 按钮 RAILWISE AI"
+    },
+    {
+      "originalLine": 57,
+      "text": "\t\t\t\t\t\t55 text Task 新建内业任务 Stage Import and preflight Source / format —  ·  — Disposition Not started Datum Unconfirmed  ·  Unconfirmed Points — Stations — Observations — Closure — Precision — Deliverable — Network — Review —"
+    },
+    {
+      "originalLine": 67,
+      "text": "\t\t\t\t\t\t\t65 文本 RAILWISE-SYNTHETIC-ACCEPTANCE：这是无实际项目含义的合成验收题。只回答 2+3 的结果，不调用任何工具，不读取文件，不联网检索。"
+    },
+    {
+      "originalLine": 68,
+      "text": "\t\t\t\t\t\t\t66 文本 deepseek-flash"
+    },
+    {
+      "originalLine": 71,
+      "text": "\t\t\t\t\t\t\t69 text 5 Sep 20, 01:07 PM"
+    },
+    {
+      "originalLine": 83,
+      "text": "\t\t\t\t\t\t\t81 按钮 Survey sources and preflight"
+    },
+    {
+      "originalLine": 87,
+      "text": "\t\t\t\t\t\t\t85 文本 Score explicitly declared inspection records with exact arithmetic under the reviewed GB/T 24356—2023 clauses. Select a product and inspection stage, then supply its basis and declaration."
+    },
+    {
+      "originalLine": 89,
+      "text": "\t\t\t\t\t\t\t87 文本 Project project_e53c6744-12ba-45bf-95f4-860f31b6a49c · Revision 2"
+    },
+    {
+      "originalLine": 98,
+      "text": "\t\t\t\t\t\t96 文本 Blocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list."
+    },
+    {
+      "originalLine": 114,
+      "text": "The focused UI element is 3 HTML 内容 RAILWISE AI, URL: <local-app-url>"
+    }
+  ]
+}

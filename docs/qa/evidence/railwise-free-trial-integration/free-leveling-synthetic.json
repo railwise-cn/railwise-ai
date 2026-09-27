@@ -1,0 +1,16 @@
+{
+  "format": "workwise-survey-network",
+  "formatVersion": 1,
+  "network": {
+    "networkType": "leveling",
+    "unit": "m",
+    "knownPoints": [{ "id": "A", "known": true, "pointClass": "known", "height": 0 }],
+    "unknownPoints": [{ "id": "B", "known": false, "height": 0 }, { "id": "C", "known": false, "height": 0 }],
+    "observations": [
+      { "id": "AB", "type": "height-difference", "from": "A", "to": "B", "value": 1, "unit": "m", "sigma": 1, "sigmaUnit": "m" },
+      { "id": "BC", "type": "height-difference", "from": "B", "to": "C", "value": 2, "unit": "m", "sigma": 1, "sigmaUnit": "m" },
+      { "id": "CA", "type": "height-difference", "from": "C", "to": "A", "value": -2.7, "unit": "m", "sigma": 1, "sigmaUnit": "m" }
+    ],
+    "instrumentParameters": {}
+  }
+}

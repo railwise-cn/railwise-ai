@@ -342,6 +342,7 @@ export function Workbench(): ReactElement {
     interrupt,
     probeRuntime,
     composerModel,
+    composerProviderId,
     composerPickList,
     composerModelGroups,
     setComposerModel,
@@ -402,6 +403,7 @@ export function Workbench(): ReactElement {
       interrupt: s.interrupt,
       probeRuntime: s.probeRuntime,
       composerModel: s.composerModel,
+      composerProviderId: s.composerProviderId,
       composerPickList: s.composerPickList,
       composerModelGroups: s.composerModelGroups,
       setComposerModel: s.setComposerModel,
@@ -453,6 +455,7 @@ export function Workbench(): ReactElement {
   const writeAssistantOpen = useWriteWorkspaceStore((s) => s.assistantOpen)
   const setWriteAssistantOpen = useWriteWorkspaceStore((s) => s.setAssistantOpen)
   const writeAssistantModel = useWriteWorkspaceStore((s) => s.assistantModel)
+  const writeAssistantProviderId = useWriteWorkspaceStore((s) => s.assistantProviderId)
   const setWriteAssistantModel = useWriteWorkspaceStore((s) => s.setAssistantModel)
   const activeWriteWorkspaceRoot = useWriteWorkspaceStore((s) => s.workspaceRoot)
   const activeWriteFilePath = useWriteWorkspaceStore((s) => s.activeFilePath)
@@ -1203,6 +1206,7 @@ export function Workbench(): ReactElement {
     const attachmentIds = attachments.map((attachment) => attachment.id)
     const sent = await sendMessage(prompt, mode === 'plan' ? 'plan' : 'agent', {
       ...(model ? { model } : {}),
+      providerId: savedState.assistantProviderId,
       ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(attachmentIds.length ? { attachmentIds, attachments } : {})
     })
@@ -1421,6 +1425,7 @@ export function Workbench(): ReactElement {
     const sent = await sendMessage(prompt, mode === 'plan' ? 'plan' : 'agent', {
       displayText: v,
       ...(model ? { model } : {}),
+      providerId: writeAssistantProviderId,
       ...(reasoningEffort ? { reasoningEffort } : {})
     })
     if (!sent) setInput(v)
@@ -2030,6 +2035,7 @@ export function Workbench(): ReactElement {
           liveReasoning={liveReasoning}
           liveAssistant={liveAssistant}
           composerModel={writeAssistantModel}
+          composerProviderId={writeAssistantProviderId}
           composerPickList={writeAssistantPickList}
           composerModelGroups={composerModelGroups}
           composerReasoningEffort={composerReasoningEffort}
@@ -2065,6 +2071,7 @@ export function Workbench(): ReactElement {
           liveReasoning={liveReasoning}
           liveAssistant={liveAssistant}
           composerModel={writeAssistantModel}
+          composerProviderId={writeAssistantProviderId}
           composerPickList={writeAssistantPickList}
           composerModelGroups={composerModelGroups}
           composerReasoningEffort={composerReasoningEffort}
@@ -2388,16 +2395,17 @@ export function Workbench(): ReactElement {
                     : composerModel
                 }
                 composerPickList={composerPickList}
-                composerModelGroups={composerModelGroups}
+                composerModelGroups={route === 'claw' ? [] : composerModelGroups}
                 composerReasoningEffort={
                   route === 'chat' || route === 'claw' ? composerReasoningEffort : undefined
                 }
-                onComposerModelChange={(modelId) => {
+                composerProviderId={route === 'claw' ? undefined : composerProviderId}
+                onComposerModelChange={(modelId, providerId) => {
                   if (route === 'claw' && activeClawChannelId) {
                     void setClawChannelModel(activeClawChannelId, modelId)
                     return
                   }
-                  setComposerModel(modelId)
+                  setComposerModel(modelId, providerId)
                 }}
                 onComposerReasoningEffortChange={
                   route === 'chat' || route === 'claw' ? setComposerReasoningEffort : undefined

@@ -1,0 +1,33 @@
+{
+  "observationCount": 5,
+  "unknownCount": 3,
+  "degreesOfFreedom": 2,
+  "redundancy": 2,
+  "linearUnit": "m",
+  "angularUnit": "rad",
+  "solverDiagnostics": {
+    "rank": 3
+  },
+  "points": [
+    {
+      "id": "A",
+      "x": 50.0,
+      "y": 150.0
+    },
+    {
+      "id": "B",
+      "x": 150.0,
+      "y": 50.0
+    },
+    {
+      "id": "C",
+      "x": 120.710678,
+      "y": 120.710678
+    },
+    {
+      "id": "S1",
+      "x": 49.99999999284108,
+      "y": 49.99999996371023
+    }
+  ]
+}

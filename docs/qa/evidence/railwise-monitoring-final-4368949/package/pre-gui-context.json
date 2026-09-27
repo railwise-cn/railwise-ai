@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "workflowRunId": 35505966672,
+  "installationReport": "<CANDIDATE_ROOT>/evidence/installation-context.json",
+  "installationReportSha256": "9df0fdb119afad308891fc513c4ee605c5ebae4607f969877bc12d518ede5300",
+  "inputManifest": "/private/tmp/railwise-4368949-monitoring-inputs.json",
+  "inputManifestSha256": "0d6dfdb133c84cfc4b6a96d67b949e8e20f6a641b82487ed6a9327c474747d0a",
+  "syntheticInputFiles": 16,
+  "optionalSyntheticOffsetFiles": 1,
+  "allCopiedInputHashesReverified": true,
+  "emptyCandidateDataDirectoriesVerified": [
+    "home",
+    "user-data",
+    "cache",
+    "logs"
+  ],
+  "databasesCopied": 0,
+  "realP0InputCopies": 0,
+  "guiLaunched": false,
+  "userAcceptance": "not-performed"
+}

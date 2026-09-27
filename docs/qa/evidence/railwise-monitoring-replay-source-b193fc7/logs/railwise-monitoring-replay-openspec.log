@@ -1,0 +1,12 @@
+✓ change/add-builtin-specialist-skills
+✓ spec/chinese-first-product-documentation
+✓ change/complete-design-workspace
+✓ spec/localized-application-shell
+✓ spec/release-integrity
+✓ spec/user-visible-updates
+✓ change/workwise-0-2-5-baseline
+✓ change/workwise-0-3-0-agent-workbench
+✓ change/workwise-0-3-3-critical-workspace-hotfix
+✓ change/workwise-0-3-3-flow-and-delivery
+✓ change/workwise-0-5-0-engineering-delivery
+Totals: 11 passed, 0 failed (11 items)

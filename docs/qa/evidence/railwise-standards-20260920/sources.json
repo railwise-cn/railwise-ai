@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "retrievedOn": "2026-09-20",
+  "standard": "GB/T 24356-2023",
+  "titleZh": "测绘成果质量检查与验收",
+  "researchKind": "agent-source-review-not-professional-acceptance",
+  "sources": [
+    {
+      "id": "samr-metadata",
+      "url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=2874EFAC7523FB293E6AF2E4068CEB02",
+      "publisher": "国家市场监督管理总局国家标准技术审评中心",
+      "kind": "official-metadata",
+      "observedStatus": "现行",
+      "published": "2023-05-23",
+      "effective": "2023-05-23",
+      "fullTextEvidence": false,
+      "verificationMethods": ["https-html-read", "parent-agent-native-chrome-computer-use"]
+    },
+    {
+      "id": "guizhou-publication",
+      "url": "https://zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/t20230829_82109696.html",
+      "publisher": "贵州省自然资源厅",
+      "kind": "official-publication-page",
+      "pagePublished": "2023-08-29",
+      "attachmentHref": "./P020230829590929227708.pdf",
+      "attachmentLabel": "GB_T 24356-2023 测绘成果质量检查与验收.pdf",
+      "verificationMethods": ["https-html-read", "parent-agent-native-chrome-computer-use"]
+    },
+    {
+      "id": "guizhou-full-text",
+      "url": "https://zrzy.guizhou.gov.cn/wzgb/ztzl/lszt/zrzyzljc/202308/P020230829590929227708.pdf",
+      "publisher": "贵州省自然资源厅",
+      "kind": "official-public-full-text-attachment",
+      "linkedFrom": "guizhou-publication",
+      "httpStatus": 200,
+      "mediaType": "application/pdf",
+      "byteLength": 27976440,
+      "sha256": "96a8a6ca677e86292f02ee277f4ca612d5d0a25c532980288a17fa0a92676487",
+      "pdfPageCount": 129,
+      "contentForm": "scanned-pages",
+      "coverMatchesOfficialMetadata": true,
+      "verificationMethod": "rendered-page-visual-reading-by-agent",
+      "reviewedPdfPages": [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 60, 61, 62, 63, 64, 65, 66, 117, 118],
+      "allPagesReviewed": false,
+      "bodyPageMapping": { "pdfPageOneBasedEqualsPrintedPagePlus": 3 },
+      "fullTextCommittedToRepository": false,
+      "redistributionPermissionEstablished": false,
+      "captchaSolvedOrBypassed": false,
+      "loginOrPaywallBypassed": false
+    }
+  ],
+  "clauseReviews": [
+    {
+      "id": "inspection-bases",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["4.1"],
+      "printedPages": [3],
+      "pdfPages": [6],
+      "summary": "检查计划须结合项目标准、批准设计与补充技术文件及委托、合同、任务、验收委托依据。"
+    },
+    {
+      "id": "independent-stage-order",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["4.2.1"],
+      "printedPages": [3],
+      "pdfPages": [6],
+      "shortQuote": "各阶段应独立、按顺序进行",
+      "summary": "过程检查、最终检查和验收检验不能省略、替代或倒序。"
+    },
+    {
+      "id": "stage-responsibilities",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["4.2.2", "4.2.3", "4.2.4"],
+      "printedPages": [3],
+      "pdfPages": [6],
+      "summary": "过程检查由作业部门全数检查；最终检查由质管部门组织，内业全数、野外可抽样；验收由委托方组织或委托有资质机构，并核验最终检查。修改确认后才进入后续环节。"
+    },
+    {
+      "id": "record-signing-retention",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["4.5.1", "4.5.2"],
+      "printedPages": [4],
+      "pdfPages": [7],
+      "shortQuote": "经检查者、复核者签字后一般不得更改",
+      "summary": "全部阶段检查记录应保留，报告完整并随成果归档；哈希链不证明人员已签字。"
+    },
+    {
+      "id": "correction-and-resampling",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["4.6.1", "4.6.2", "4.6.3"],
+      "printedPages": [4],
+      "pdfPages": [7],
+      "summary": "问题需改正；最终检查不合格单位成果处理后重检；验收不合格批退回处理，再次申请验收须重新抽样。"
+    },
+    {
+      "id": "sampling-population",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "5.1"],
+      "printedPages": [1, 5],
+      "pdfPages": [4, 8],
+      "summary": "明确成果类别、单位成果、批及质量元素；不能用观测条数或文件数自动替代批量。"
+    },
+    {
+      "id": "sample-size-and-batching",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["5.2.1", "5.2.2"],
+      "tables": ["1"],
+      "printedPages": [5],
+      "pdfPages": [8],
+      "summary": "按批量区间选择样本量，样本量达到批量时全数检查；单位成果总数达到1001应分批，批次数最小且批量均匀。",
+      "verifiedExamples": [
+        { "lotSizeInclusive": [1, 20], "nominalSampleSize": 3 },
+        { "lotSizeInclusive": [21, 40], "nominalSampleSize": 5 },
+        { "lotSizeInclusive": [687, 1000], "nominalSampleSize": 56 }
+      ],
+      "completeExecutableTableEncoded": false
+    },
+    {
+      "id": "sample-method-and-materials",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["5.3.1", "5.3.2", "5.3.3"],
+      "printedPages": [5, 6],
+      "pdfPages": [8, 9],
+      "summary": "样本均匀分布，宜简单随机或按规定因素分层按比例随机抽样；抽中单位成果包含全部资料和补充依据。"
+    },
+    {
+      "id": "detailed-and-general-inspection",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["6.1.1", "6.1.2", "6.1.3"],
+      "printedPages": [6],
+      "pdfPages": [9],
+      "summary": "样本详查、样本外按需概查；概查单位成果无A类且B类少于4个才合格。该条件不能替代详查评分。"
+    },
+    {
+      "id": "unit-rejection-precedence",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["6.2.1.2", "6.2.5"],
+      "printedPages": [6, 8],
+      "pdfPages": [9, 11],
+      "summary": "A类错漏或任一元素/子元素低于60分直接导致单位成果不合格，不允许平均分抵消。"
+    },
+    {
+      "id": "weights-and-penalties",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["6.2.2", "6.2.3", "6.2.4.1", "6.2.4.2", "6.2.4.3", "6.2.4.4", "6.2.4.5"],
+      "tables": ["2"],
+      "printedPages": [6, 7, 8],
+      "pdfPages": [9, 10, 11],
+      "summary": "采用成果类别对应元素与错漏分类；数学精度有检测评分和扣分路径；B/C/D扣分为12/t、4/t、1/t，t通常为1，调整需委托方批准；聚合有层级和适用范围，A类仍先触发否决。"
+    },
+    {
+      "id": "unit-sample-lot-evaluation",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["6.2.5", "6.3", "6.4.1", "6.4.2"],
+      "tables": ["3"],
+      "printedPages": [8],
+      "pdfPages": [11],
+      "summary": "单位成果达成全部前提后按90/75/60分界评优良合格；样本含不合格单位成果即不合格。最终检查批等级与验收批合格判定不同；伪造成果或重大技术路线偏差导致验收批不合格。"
+    },
+    {
+      "id": "engineering-planar-control",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["7.5.1"],
+      "tables": ["43", "44"],
+      "printedPages": [57, 58, 59, 60],
+      "pdfPages": [60, 61, 62, 63],
+      "unitProduct": "point",
+      "summary": "平面控制测量检查覆盖数据、点位、资料质量；单位为点，完整分类表未编码。"
+    },
+    {
+      "id": "engineering-height-control",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["7.5.2"],
+      "tables": ["45", "46"],
+      "printedPages": [61, 62, 63],
+      "pdfPages": [64, 65, 66],
+      "unitProduct": "survey-section",
+      "summary": "高程控制测量检查覆盖数据、点位、资料质量；单位为测段，原始边数或未知点数不能自动充当批量，完整分类表未编码。"
+    },
+    {
+      "id": "informative-record-format",
+      "sourceId": "guizhou-full-text",
+      "clauses": ["A.1", "A.2"],
+      "printedPages": [114, 115],
+      "pdfPages": [117, 118],
+      "normativeStatus": "informative-annex",
+      "summary": "表式包括处理、修改、复核、错漏类别及检查者/复核者和日期；表式不是身份认证机制。"
+    }
+  ],
+  "unresolvedInterpretations": [
+    {
+      "sourceId": "guizhou-full-text",
+      "clause": "4.3.4",
+      "printedPage": 4,
+      "pdfPage": 7,
+      "boundary": "检测点数恰为20",
+      "observedWording": ["少于20", "大于20"],
+      "resolution": "not-inferred-no-executable-rule-added"
+    }
+  ],
+  "executionReadiness": {
+    "officialFullTextRetrieved": true,
+    "listedPagesVisuallyReviewed": true,
+    "registryRuleRegistered": false,
+    "completeSamplingTableEncoded": false,
+    "completeFaultClassificationEncoded": false,
+    "clauseByteRangeEvidenceEstablished": false,
+    "independentHumanRuleReviewVerified": false,
+    "projectApplicabilityApproved": false,
+    "qualityPersistenceAndApiImplementedByThisResearch": false,
+    "standardConformity": "not-evaluated",
+    "humanSignatureVerification": "not-evaluated"
+  }
+}

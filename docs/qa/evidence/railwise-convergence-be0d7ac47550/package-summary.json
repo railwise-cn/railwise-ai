@@ -1,0 +1,54 @@
+{
+  "sourceHead": "be0d7ac47550d4d178674f63ce4406ee7c614e66",
+  "version": "0.5.0",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headbe0d7ac47550",
+  "asarSha256": "ee13677b587d69f230e60227d9d85a681961323272795e09fbfc6617e1da9209",
+  "zipSha256": "79b5201890d45e8399e902b0312a65c961979bb00a584776feef2cfa08cf671a",
+  "matchesNativeUpdaterInstalledTarget": true,
+  "installationSource": "same application ZIP used by private native updater",
+  "checks": [
+    {
+      "tool": "codesign",
+      "arguments": [
+        "--verify",
+        "--deep",
+        "--strict",
+        "<candidate-app>"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "xcrun",
+      "arguments": [
+        "stapler",
+        "validate",
+        "<candidate-app>"
+      ],
+      "exitCode": 0,
+      "output": "Processing: <local-path-redacted>\nThe validate action worked!"
+    },
+    {
+      "tool": "spctl",
+      "arguments": [
+        "--assess",
+        "--type",
+        "execute",
+        "<candidate-app>"
+      ],
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "spctl",
+      "arguments": [
+        "--status"
+      ],
+      "exitCode": 1,
+      "output": "assessments disabled"
+    }
+  ],
+  "originalPackageRecordGuiState": "not-tested",
+  "originalPackageRecordUserState": "not-performed",
+  "note": "Installation-time GUI state was not-tested; later GUI evidence is recorded separately without rewriting that source record."
+}

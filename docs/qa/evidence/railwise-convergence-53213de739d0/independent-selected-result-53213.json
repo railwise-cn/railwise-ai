@@ -1,0 +1,243 @@
+{
+  "adjustmentId": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2",
+  "databaseRecordSha256": "3fc9b1d51a5b43343fb6167f323ae64c3bb445f7189d76a8b47547730d04e9b0",
+  "sourceDatabaseBytesUnchanged": true,
+  "record": {
+    "run": {
+      "schemaVersion": 1,
+      "id": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2",
+      "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+      "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+      "method": "weighted-least-squares",
+      "constraint": "fixed-known-points",
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "inputHash": "b77b4fae2a18bb746edebe902216f34adf8baccb7c59142ec2a382de2d97a92b",
+      "status": "completed",
+      "revision": 1,
+      "idempotencyKey": "engineering-plan:eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3:adjust-survey-network",
+      "resumeCount": 0,
+      "createdAt": "2026-09-20T08:58:34.769Z",
+      "updatedAt": "2026-09-20T08:58:34.772Z",
+      "completedAt": "2026-09-20T08:58:34.772Z"
+    },
+    "result": {
+      "schemaVersion": 1,
+      "id": "adjustment_result_dfcc032f-8dd4-44f7-af91-90723981c4c7",
+      "runId": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2",
+      "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+      "observationCount": 5,
+      "unknownCount": 3,
+      "redundancy": 2,
+      "degreesOfFreedom": 2,
+      "linearUnit": "m",
+      "angularUnit": "rad",
+      "closure": {
+        "horizontal": 1.3726709029343796e-07,
+        "angular": 3.111529177070756e-10
+      },
+      "closureUnits": {
+        "horizontal": "m",
+        "angular": "rad"
+      },
+      "parameters": {
+        "orientation:S1": 1.5707963269606606
+      },
+      "parameterUnits": {
+        "orientation:S1": "rad"
+      },
+      "unitWeightStdDev": 0.00010671165867325277,
+      "unitWeightStdDevUnit": "dimensionless",
+      "varianceFactor": 1.1387378096796804e-08,
+      "varianceFactorUnit": "dimensionless",
+      "varianceFactorEstimated": true,
+      "points": [
+        {
+          "id": "A",
+          "x": 50,
+          "y": 150
+        },
+        {
+          "id": "B",
+          "x": 150,
+          "y": 50
+        },
+        {
+          "id": "C",
+          "x": 120.710678,
+          "y": 120.710678
+        },
+        {
+          "id": "S1",
+          "x": 49.99999999284098,
+          "y": 49.999999963710295,
+          "correctionX": -1.9446147803137137e-08,
+          "correctionY": 1.95930319080162e-07,
+          "standardError": 1.3592152495710963e-07,
+          "covariance": [
+            6.872084438073081e-07,
+            -6.262705982801717e-07,
+            7.474163269919943e-09,
+            -6.262705982801717e-07,
+            9.351721243643048e-07,
+            -8.88516487243097e-09
+          ],
+          "xyErrorEllipse": {
+            "algorithmVersion": "survey-xy-error-ellipse-1",
+            "coordinatePlane": "solution-xy",
+            "covarianceUnit": "m2",
+            "covarianceXY": [
+              7.825502380945158e-15,
+              -7.131580093523458e-15,
+              -7.131580093523458e-15,
+              1.064915856572102e-14
+            ],
+            "semiMajor": 1.284808010949112e-07,
+            "semiMinor": 4.435475957184348e-08,
+            "axisUnit": "m",
+            "orientationRad": 2.2584737816163187,
+            "orientationConvention": "positive-x-toward-positive-y-mod-pi",
+            "scale": "unit-mahalanobis-radius",
+            "varianceBasis": "a-posteriori"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "observationId": "cosa-in2-6-backsight-reset",
+          "correction": -2.3735413634540237e-10,
+          "residual": -2.3735413634540237e-10,
+          "unit": "rad",
+          "standardizedResidual": 4.895780494523131e-05,
+          "standardizedResidualUnit": "sigma",
+          "outlier": false,
+          "sourceRow": 6,
+          "sourceRecordId": "cosa-in2-record-6"
+        },
+        {
+          "observationId": "cosa-in2-7-direction",
+          "correction": 1.971329766092822e-10,
+          "residual": 1.971329766092822e-10,
+          "unit": "rad",
+          "standardizedResidual": 4.066159522522697e-05,
+          "standardizedResidualUnit": "sigma",
+          "outlier": false,
+          "sourceRow": 7,
+          "sourceRecordId": "cosa-in2-record-7"
+        },
+        {
+          "observationId": "cosa-in2-8-distance",
+          "correction": 7.159016490732029e-09,
+          "residual": 7.159016490732029e-09,
+          "unit": "m",
+          "standardizedResidual": 7.123487653604974e-06,
+          "standardizedResidualUnit": "sigma",
+          "outlier": false,
+          "sourceRow": 8,
+          "sourceRecordId": "cosa-in2-record-8"
+        },
+        {
+          "observationId": "cosa-in2-9-direction",
+          "correction": 4.022115973612017e-11,
+          "residual": 4.022115973612017e-11,
+          "unit": "rad",
+          "standardizedResidual": 8.296209720004341e-06,
+          "standardizedResidualUnit": "sigma",
+          "outlier": false,
+          "sourceRow": 9,
+          "sourceRecordId": "cosa-in2-record-9"
+        },
+        {
+          "observationId": "cosa-in2-10-distance",
+          "correction": -1.3708027779557597e-07,
+          "residual": -1.3708027779557597e-07,
+          "unit": "m",
+          "standardizedResidual": 0.00013639997445091467,
+          "standardizedResidualUnit": "sigma",
+          "outlier": false,
+          "sourceRow": 10,
+          "sourceRecordId": "cosa-in2-record-10"
+        }
+      ],
+      "displacements": [
+        {
+          "pointId": "A",
+          "dX": 0,
+          "dY": 0,
+          "magnitude": 0,
+          "kind": "horizontal"
+        },
+        {
+          "pointId": "B",
+          "dX": 0,
+          "dY": 0,
+          "magnitude": 0,
+          "kind": "horizontal"
+        },
+        {
+          "pointId": "C",
+          "dX": 0,
+          "dY": 0,
+          "magnitude": 0,
+          "kind": "horizontal"
+        },
+        {
+          "pointId": "S1",
+          "dX": -1.9446147803137137e-08,
+          "dY": 1.95930319080162e-07,
+          "magnitude": 1.9689297244755981e-07,
+          "kind": "horizontal"
+        }
+      ],
+      "covariance": [
+        [
+          6.872084438073081e-07,
+          -6.262705982801717e-07,
+          7.474163269919943e-09
+        ],
+        [
+          -6.262705982801717e-07,
+          9.351721243643048e-07,
+          -8.88516487243097e-09
+        ],
+        [
+          7.474163269919945e-09,
+          -8.88516487243097e-09,
+          1.0092521025674865e-10
+        ]
+      ],
+      "precision": {
+        "maxPointStdDev": 1.3592152495710963e-07,
+        "passed": true
+      },
+      "qualityFindings": [
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_b0822e20-e7c4-46ab-8ad3-a1746ae0c102",
+          "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+          "code": "format_detected",
+          "severity": "warning",
+          "message": "COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+          "localized": {
+            "en": {
+              "message": "cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.",
+              "suggestedAction": "Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment."
+            }
+          },
+          "suggestion": "继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。",
+          "status": "open",
+          "createdAt": "2026-09-20T08:58:34.769Z"
+        }
+      ],
+      "inputHash": "b77b4fae2a18bb746edebe902216f34adf8baccb7c59142ec2a382de2d97a92b",
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "validation": "valid",
+      "strategyId": "plane-control",
+      "solverDiagnostics": {
+        "iterations": 2,
+        "rank": 3,
+        "conditionEstimate": 116.49152888654937
+      },
+      "createdAt": "2026-09-20T08:58:34.771Z"
+    }
+  }
+}

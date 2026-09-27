@@ -1,0 +1,123 @@
+name: Private candidate native updater
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  native-macos:
+    name: Private macOS arm64 native updater round-trip
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
+      WORKWISE_SIDECAR_ARCH: arm64
+      WORKWISE_PYTHON: python
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+          cache: pip
+          cache-dependency-path: sidecars/markitdown/requirements.lock
+      - run: npm ci
+      - name: Check private transport and isolation guards
+        run: node --test scripts/private-updater-acceptance.test.mjs
+      - name: Preflight actual Electron HTTPS certificate pinning
+        timeout-minutes: 3
+        run: node scripts/run-private-updater-tls-preflight.mjs --evidence-dir="${RUNNER_TEMP}/private-updater-evidence"
+      - name: Build audited document sidecar
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --requirement sidecars/markitdown/requirements.lock
+          npm run build:markitdown-sidecar
+          python sidecars/markitdown/generate_sbom.py build/sidecars/markitdown-darwin-arm64/SBOM-python.json
+          node scripts/verify-document-dependencies.mjs --python-sbom build/sidecars/markitdown-darwin-arm64/SBOM-python.json
+      - name: Prepare clean-source candidate identity
+        run: |
+          set -euo pipefail
+          unset RELEASE_CHANNEL WORKWISE_PUBLIC_BASE_URL WORKWISE_UPDATE_URL WORKWISE_APP_VERSION
+          export WORKWISE_CANDIDATE_ROOT="${RUNNER_TEMP}/private-updater-build"
+          printf 'AUTHORIZE WORKWISE CANDIDATE\n' | bash scripts/authorize-workwise-candidate.sh --prepare
+          source "${WORKWISE_CANDIDATE_ROOT}/candidate.env"
+          npm run build
+      - name: Sign and notarize isolated baseline and target
+        id: signed
+        env:
+          MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          for name in MAC_CODESIGN_P12_BASE64 CSC_KEY_PASSWORD APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Missing ${name}"; exit 1; }
+          done
+          export CSC_LINK="${RUNNER_TEMP}/private-updater-signing.p12"
+          export APPLE_API_KEY="${RUNNER_TEMP}/private-updater-notary.p8"
+          trap 'rm -f "${CSC_LINK}" "${APPLE_API_KEY}"' EXIT
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs')
+          fs.writeFileSync(process.env.CSC_LINK, Buffer.from(process.env.MAC_CODESIGN_P12_BASE64, 'base64'), { mode: 0o600 })
+          fs.writeFileSync(process.env.APPLE_API_KEY, Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64'), { mode: 0o600 })
+          NODE
+          unset RELEASE_CHANNEL WORKWISE_PUBLIC_BASE_URL WORKWISE_UPDATE_URL WORKWISE_APP_VERSION
+          source "${RUNNER_TEMP}/private-updater-build/candidate.env"
+          target_version="$(node -p 'require("./package.json").version')"
+          for stage in baseline target; do
+            if [[ "$stage" == baseline ]]; then
+              export WORKWISE_APP_VERSION=0.0.0
+            else
+              export WORKWISE_APP_VERSION="$target_version"
+            fi
+            export WORKWISE_DIST_DIR="${RUNNER_TEMP}/private-updater-build/${stage}"
+            node scripts/with-mac-signing-keychain.mjs npx --yes electron-builder@26.8.1 \
+              --config electron-builder.cjs --config.directories.output="${WORKWISE_DIST_DIR}" \
+              --config.extraMetadata.name="workwise-private-updater-${GITHUB_SHA:0:12}" \
+              --publish never --mac dmg --arm64
+            if [[ "$stage" == target ]]; then node scripts/zip-mac-app.cjs arm64; fi
+          done
+          git diff --exit-code -- package.json package-lock.json
+      - name: Exercise actual private HTTPS download and Squirrel relaunch
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          node scripts/run-private-macos-updater-acceptance.mjs \
+            --source-head="${GITHUB_SHA}" \
+            --target-version="$(node -p 'require("./package.json").version')" \
+            --base-dist="${RUNNER_TEMP}/private-updater-build/baseline" \
+            --target-dist="${RUNNER_TEMP}/private-updater-build/target" \
+            --evidence-dir="${RUNNER_TEMP}/private-updater-evidence"
+      - name: Retain native updater evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-updater-arm64-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/private-updater-evidence/private-updater.json
+            ${{ runner.temp }}/private-updater-evidence/native-updater.json
+            ${{ runner.temp }}/private-updater-evidence/tls-preflight.json
+            ${{ runner.temp }}/private-updater-evidence/native-updater.redacted.log
+      - name: Retain authenticated exact target package
+        if: ${{ always() && steps.signed.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-updater-target-arm64-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/private-updater-build/target/*.dmg
+            ${{ runner.temp }}/private-updater-build/target/*.zip

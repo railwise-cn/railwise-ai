@@ -25,7 +25,7 @@ node scripts/deploy-workwise-product-page.mjs rollback --source website --versio
 具备既有授权且完成审查后，可用仓库中已有 SSH secrets 的工作流：
 
 ```sh
-gh workflow run deploy-workwise-product-page.yml -R wangjiawei508/WorkWise --ref main -f version=0.5.0 -f confirmation=DEPLOY-WORKWISE-PRODUCT-PAGE-v0.5.0 -f mode=content-only -f operation=deploy -f source_sha="$SOURCE_SHA"
+gh workflow run deploy-workwise-product-page.yml -R railwise-cn/railwise-ai --ref main -f version=0.5.0 -f confirmation=DEPLOY-WORKWISE-PRODUCT-PAGE-v0.5.0 -f mode=content-only -f operation=deploy -f source_sha="$SOURCE_SHA"
 ```
 
 工作流定义、部署工具和已审查官网内容须先进入 `main`，预览和部署须使用同一精确源提交。不要省略 `-R`：本机 gh 的默认仓库可能指向上游仓库。工作流表单默认 `content-only` / `preview`，不会直接部署。
@@ -37,8 +37,8 @@ gh workflow run deploy-workwise-product-page.yml -R wangjiawei508/WorkWise --ref
 `preview` 复用已固定 SSH host key 的工作流，在真实 PHP 容器中对私有 staging 的候选页面执行 PHP：用 `token_get_all` 仅把 `T_DIR` 替换为真实产品目录，设置公开站点的 `DOCUMENT_ROOT`/`HTTP_HOST`/`REQUEST_URI`，输出已渲染 HTML。模板使用服务器原文件，不覆盖官网文件；artifact 不导出 PHP 源码和配置。PHP warning/exception 会中止，仅输出通用错误摘要。返回 HTML、三张图片、来源 JSON 和含来源 SHA/哈希的 `render-metadata.json`。
 
 ```sh
-gh workflow run deploy-workwise-product-page.yml -R wangjiawei508/WorkWise --ref main -f version=0.5.0 -f confirmation=DEPLOY-WORKWISE-PRODUCT-PAGE-v0.5.0 -f mode=content-only -f operation=preview -f source_sha="$SOURCE_SHA"
-gh run download "$RUN_ID" -R wangjiawei508/WorkWise -n "workwise-content-preview-$SOURCE_SHA" -D "$PREVIEW_DIR"
+gh workflow run deploy-workwise-product-page.yml -R railwise-cn/railwise-ai --ref main -f version=0.5.0 -f confirmation=DEPLOY-WORKWISE-PRODUCT-PAGE-v0.5.0 -f mode=content-only -f operation=preview -f source_sha="$SOURCE_SHA"
+gh run download "$RUN_ID" -R railwise-cn/railwise-ai -n "workwise-content-preview-$SOURCE_SHA" -D "$PREVIEW_DIR"
 node scripts/preview-workwise-content.mjs --directory "$PREVIEW_DIR" --port 4175
 ```
 

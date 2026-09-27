@@ -1,0 +1,55 @@
+{
+  "sourceBaseHead": "5a49e145dc88a5346f1a4abeb1c52f778aa10233",
+  "scope": "Final integrated working tree; subsequent documentation edits do not alter tested source. Not packaged acceptance.",
+  "desktop": {
+    "passed": 2630,
+    "skipped": 2,
+    "filesPassed": 320,
+    "log": "/private/tmp/railwise-round8-desktop.log"
+  },
+  "runtime": {
+    "passed": 1991,
+    "skipped": 3,
+    "filesPassed": 164,
+    "log": "/private/tmp/railwise-round8-runtime-final.log"
+  },
+  "typecheck": "passed",
+  "runtimeTypecheck": "passed (implementer final tsc and build)",
+  "lint": {
+    "errors": 0,
+    "warnings": 1,
+    "existingWarning": "Workbench.tsx useEffect setInput dependency"
+  },
+  "build": "passed",
+  "strictOpenSpec": {
+    "passed": 11,
+    "failed": 0
+  },
+  "independentWorkspaceReview": {
+    "passed": 25,
+    "path": "../railwise-advanced-workspace-review/summary.json"
+  },
+  "locale": {
+    "fixtureFilesAtLeast": 40,
+    "newRejectedInputs": 17,
+    "testsPassed": 4
+  },
+  "developmentOracleSmoke": {
+    "inputs": 3,
+    "passed": 3,
+    "packaged": false
+  },
+  "limitations": [
+    "No signed package or GUI acceptance for this source yet.",
+    "Synthetic development SQLite smoke does not establish production data or professional approval."
+  ],
+  "logSha256": {
+    "railwise-round8-desktop.log": "0aee88af9b6faf2e8f3e4ea7cf1879513970e3b7666ce000fae39143a0023965",
+    "railwise-round8-runtime-final.log": "d92b6cfe2a665446f7664aff1585ecf10c575cc7f10cd46bac18413e76c07f39",
+    "railwise-round8-types.log": "2218b97a1805b6062b84d6487661f455f61f9b44175636d3ba0d1dbffbd24279",
+    "railwise-round8-lint.log": "027a5f1d1a49dd7eaa41ddc95a6b25b05ab4e01e090514ea8cba99bd820fcd77",
+    "railwise-round8-build.log": "1fe67f822c7dfb3d0fde47113493b4fb6462eef7159394f6b715ed58322acbb3",
+    "railwise-round8-spec.log": "e6fd08687834b79de3cfb713ad87710425aab27471592cf4298a68dbe8e0db42",
+    "railwise-round8-locale.log": "fdf7af484120afb3dc78f431b5ee62e06c1823f5a9016dfaf2f9471df67fac5b"
+  }
+}

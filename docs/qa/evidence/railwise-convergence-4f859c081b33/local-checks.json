@@ -1,0 +1,46 @@
+{
+  "sourceHead": "4f859c081b33e6f0f9b8d16f9c046466ccb90e75",
+  "desktop": {
+    "passed": 2558,
+    "skipped": 2
+  },
+  "runtime": {
+    "passed": 1765,
+    "skipped": 3
+  },
+  "checks": {
+    "desktop-final": {
+      "log": "/private/tmp/railwise-round4-desktop-final.log",
+      "sha256": "54acb6031eed19551cb25478c81d2f6cb829fd0fe9ef87e612116f872b9834a7"
+    },
+    "runtime": {
+      "log": "/private/tmp/railwise-round4-runtime.log",
+      "sha256": "eea0fb7ad697f9a066afa0741854a63602d9521464928ab092adfc145aec1f35"
+    },
+    "types-final": {
+      "log": "/private/tmp/railwise-round4-types-final.log",
+      "sha256": "2218b97a1805b6062b84d6487661f455f61f9b44175636d3ba0d1dbffbd24279"
+    },
+    "runtime-types": {
+      "log": "/private/tmp/railwise-round4-runtime-types.log",
+      "sha256": "ab88ecae7431e42c873a6f9f73f86603bb96042ae5a0bd6236f92877aa8dfb1b"
+    },
+    "build": {
+      "log": "/private/tmp/railwise-round4-build.log",
+      "sha256": "f4592e515c85493e24698ccaf824b9cbee93d9f4c35b33b5997f78a8371c9d15"
+    },
+    "lint": {
+      "log": "/private/tmp/railwise-round4-lint.log",
+      "sha256": "027a5f1d1a49dd7eaa41ddc95a6b25b05ab4e01e090514ea8cba99bd820fcd77"
+    },
+    "metrics": {
+      "log": "/private/tmp/railwise-round4-metrics.log",
+      "sha256": "84a14bcc22e4adca76ded4a930a38d5521ff3c8464e7d3b3608a2a833bbeb334"
+    },
+    "openspec": {
+      "log": "/private/tmp/railwise-round4-openspec.log",
+      "sha256": "e6fd08687834b79de3cfb713ad87710425aab27471592cf4298a68dbe8e0db42"
+    }
+  },
+  "packagedUi": "not-tested"
+}

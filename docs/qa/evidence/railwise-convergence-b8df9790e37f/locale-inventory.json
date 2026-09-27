@@ -1,0 +1,86 @@
+{
+  "scope": "source-string-inventory-not-untranslated-issue-count",
+  "exclusions": "Comments and tests excluded. Catalog entries, intentional raw evidence, recognizers and already-bilingual constructors are included; each occurrence needs semantic review before translation.",
+  "files": [
+    {
+      "file": "kun/src/engineering/engineering-ai-orchestrator.ts",
+      "hanStringOccurrences": 16
+    },
+    {
+      "file": "kun/src/engineering/engineering-context-service.ts",
+      "hanStringOccurrences": 6
+    },
+    {
+      "file": "kun/src/engineering/engineering-service.ts",
+      "hanStringOccurrences": 144
+    },
+    {
+      "file": "kun/src/engineering/specialist-skill-provenance.generated.ts",
+      "hanStringOccurrences": 79
+    },
+    {
+      "file": "kun/src/engineering/survey-converter.ts",
+      "hanStringOccurrences": 10
+    },
+    {
+      "file": "kun/src/engineering/survey-coordinate-transform.ts",
+      "hanStringOccurrences": 3
+    },
+    {
+      "file": "kun/src/engineering/survey-cosa-in1.ts",
+      "hanStringOccurrences": 16
+    },
+    {
+      "file": "kun/src/engineering/survey-cosa-net-generator.ts",
+      "hanStringOccurrences": 32
+    },
+    {
+      "file": "kun/src/engineering/survey-cosa-net.ts",
+      "hanStringOccurrences": 16
+    },
+    {
+      "file": "kun/src/engineering/survey-cosa-ou1.ts",
+      "hanStringOccurrences": 3
+    },
+    {
+      "file": "kun/src/engineering/survey-cosa-ou2.ts",
+      "hanStringOccurrences": 1
+    },
+    {
+      "file": "kun/src/engineering/survey-file-groups.ts",
+      "hanStringOccurrences": 6
+    },
+    {
+      "file": "kun/src/engineering/survey-format-catalog.ts",
+      "hanStringOccurrences": 14
+    },
+    {
+      "file": "kun/src/engineering/survey-format-registry.ts",
+      "hanStringOccurrences": 286
+    },
+    {
+      "file": "kun/src/engineering/survey-import-diagnostic-catalog.ts",
+      "hanStringOccurrences": 43
+    },
+    {
+      "file": "kun/src/engineering/survey-leica-gsi-lexer.ts",
+      "hanStringOccurrences": 42
+    },
+    {
+      "file": "kun/src/engineering/survey-service.ts",
+      "hanStringOccurrences": 315
+    },
+    {
+      "file": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.tsx",
+      "hanStringOccurrences": 2
+    },
+    {
+      "file": "src/renderer/src/components/engineering/survey-diagnostic-text.ts",
+      "hanStringOccurrences": 7
+    },
+    {
+      "file": "src/renderer/src/components/engineering/survey-summary.ts",
+      "hanStringOccurrences": 1
+    }
+  ]
+}

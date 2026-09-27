@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "retrievedOn": "2026-09-20",
+  "title": "Leica TPS1200 GeoCOM Reference Manual",
+  "language": "en",
+  "documentVersion": "1.10",
+  "url": "https://www.geometh-data.ethz.ch/student/anleitungen/leicaman/tps1200/TPS1200_GeoCOM_Manual.pdf",
+  "hostClassification": "academic-mirror-of-manufacturer-manual",
+  "sha256": "c73c13226a7b3f20717be232d565a9d145e90ef89f50dc7b033ec581f4f7b66a",
+  "pageCount": 185,
+  "renderedPagesReviewed": [6, 7, 15, 130, 180],
+  "firmwareMapping": {"manualPage": 172, "geocomRelease": "1.10", "tpsFirmwareRelease": "4.0"},
+  "deviceModelVerified": false,
+  "deviceFirmwareVerified": false,
+  "deviceLicenseVerified": false,
+  "hardwareConnected": false,
+  "productionAdapterImplemented": false,
+  "documentRedistributed": false
+}

@@ -7,7 +7,7 @@ WorkWise already has the Electron shell, Kun Runtime, attachments, Flow, Design,
 ## What Changes
 
 - Add an AI-first Engineering session that uses the existing `/v1/threads`, `ChatState`, SSE, attachment store, and message restoration path. Engineering threads carry additive `domain: "engineering"` and `projectId` metadata and are isolated from Code, Write, Design, Flow, and IM threads.
-- Apply D-04 naming at the user-facing boundary: WorkWise remains the platform, Survey/WorkWise Survey names the fifth workbench, and RAILWISE Survey is reserved for commercial-distribution surfaces. Existing package, bundle, updater, API, route, and `domain: "engineering"` identifiers remain unchanged through 0.5.0 so existing records and upgrades remain compatible.
+- Apply the user's consolidated naming baseline: RailWise AI names the platform and RailWise Survey names the professional workbench, with 工程测量内业 / Engineering Survey Processing as its subtitle. Main entries are 编程 / 内业 or Code / Survey. This supersedes the historical D-04 display names; existing package, bundle, updater, API, route, and `domain: "engineering"` identifiers remain unchanged through 0.5.0 so existing records and upgrades remain compatible.
 - Replace the component-local engineering chat shim with a renderer session shell: project/thread sidebar, AI timeline and typed-plan cards in the center, evidence/Copilot inspector on the right, and a clearly labeled classic deterministic console fallback.
 - Add versioned Runtime contracts and local authenticated APIs for context snapshots, typed plans, approvals, TaskRun projection, evidence cards, Watch drafts, deterministic analysis, charts, reports, and immutable manifests.
 - Add one canonical survey-math kernel and independent typed strategies for leveling/height control, traverse, plane control, triangulation, CPIII free-station/resection, GNSS baselines, coordinate transforms, and deformation results. Unsupported or incomplete networks must be blocked instead of being reported through a generic plane-network fallback.
@@ -20,6 +20,8 @@ WorkWise already has the Electron shell, Kun Runtime, attachments, Flow, Design,
 - Preserve existing files, threads, logs, plugins, Skills, MCPs, credentials, attachments, and legacy tool IDs. Migrations are additive, lazy, revision-safe, and reversible via the existing feature-flag/settings path.
 
 ## Capabilities
+
+The P1 quality-chain continuation adds a separate declared correction workflow over exact retained material records. It persists checks, issues, correction targets and rechecks without changing the legacy evidence-retention verification API, draft deliverables, professional identities or release approval gates. Software validation and installed-candidate/human acceptance remain separate tasks.
 
 ### New Capabilities
 
@@ -34,3 +36,8 @@ WorkWise already has the Electron shell, Kun Runtime, attachments, Flow, Design,
 - Adds engineering AI contracts, survey contracts and canonical units, professional source-format contracts and parsers, independent survey strategies, thread metadata and filtering, context/orchestration services, TaskRun projection, authenticated AI routes/events, evidence cards, renderer session components, specialist-Skill provenance, golden fixtures, and tests.
 - Keeps the old seven-page Engineering console available behind an explicit compatibility entry; it is not the default route.
 - Does not change provider credentials, DeepSeek model selection, Electron/Tauri architecture, public version metadata, release feeds, or download pages.
+
+
+## Consolidated plan amendment (2026-09-19)
+
+The user-provided RailWise AI / Survey convergence plan supersedes the older D-04 display-name rule and the AI-only first-screen design above. The platform display name is RailWise AI; Survey is RailWise Survey with Engineering Survey Processing / 工程测量内业. Four production stages share a persistent conversation. Six typed engineering jobs and non-destructive legacy migration replace the monitoring-only assumption. External acquisition, point clouds and long-tail formats remain gated by P0 packaged acceptance. Other P1 work may proceed when its authoritative inputs are available. Technical identifiers, user data and public release gates remain unchanged.

@@ -1,0 +1,5 @@
+{"models": 53, "prefixFits": 230}
+{"models":53,"appendPrefixes":177}
+{"models": 53, "appendPrefixes": 177, "fitComparisons": 531, "scalarComparisons": 15806, "maximumOperationScaledError": "0.00000000000000200390132863889856739809397812098616730505353963417008954908144854443283326931016090792921182623468722186302943785722921", "maximumFractionVs120DigitError": "4.84942164750779787780598964013450254791922617852619576023075162580562673410746949243318696688561066561769514713706481376e-120", "knownPriorNotPosteriorScaled": true, "allPrefixStateHashesReproduced": true}
+{"passed":28,"replayedRotations":177}
+Replay evidence: /var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T//railwise-static-replay.d5V72q

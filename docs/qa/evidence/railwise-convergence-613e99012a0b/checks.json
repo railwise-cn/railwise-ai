@@ -1,0 +1,47 @@
+{
+  "sourceHead": "613e99012a0b004d19e36f626950da0e6745614c",
+  "checks": {
+    "desktop": {
+      "logPath": "/tmp/railwise-delivery-full-tests-rerun.log",
+      "sha256": "d01170fa046d7e592188ed9969d3d13dd1275453bdc0aa89f33996766d8535f5",
+      "summary": [
+        "Test Files  307 passed | 2 skipped (309)",
+        "Tests  2466 passed | 2 skipped (2468)",
+        "Duration  35.21s (transform 3.87s, setup 0ms, import 13.12s, tests 87.72s, environment 1.94s)"
+      ]
+    },
+    "runtime": {
+      "logPath": "/tmp/railwise-delivery-runtime-tests.log",
+      "sha256": "c573a84773b99904f5093111a49b7239b97d55ed5db9bb076b6fabf942650819",
+      "summary": [
+        "Test Files  137 passed | 2 skipped (139)",
+        "Tests  1588 passed | 3 skipped (1591)",
+        "Duration  12.25s (transform 12.67s, setup 0ms, import 29.21s, tests 88.97s, environment 9ms)"
+      ]
+    },
+    "typecheck": {
+      "logPath": "/tmp/railwise-delivery-typecheck.log",
+      "sha256": "2218b97a1805b6062b84d6487661f455f61f9b44175636d3ba0d1dbffbd24279",
+      "summary": []
+    },
+    "lint": {
+      "logPath": "/tmp/railwise-delivery-lint.log",
+      "sha256": "027a5f1d1a49dd7eaa41ddc95a6b25b05ab4e01e090514ea8cba99bd820fcd77",
+      "summary": [
+        "1402:6  warning  React Hook useEffect has a missing dependency: 'setInput'. Either include it or remove the dependency array  react-hooks/exhaustive-deps"
+      ]
+    },
+    "build": {
+      "logPath": "/tmp/railwise-candidate-613e990-build.log",
+      "sha256": "1593609fb7c13e696e2e7caba03790091931ffb0ca70c0513a6e8c713c96c760",
+      "summary": []
+    },
+    "openspec": {
+      "logPath": "/tmp/railwise-delivery-openspec.log",
+      "sha256": "e6fd08687834b79de3cfb713ad87710425aab27471592cf4298a68dbe8e0db42",
+      "summary": [
+        "Totals: 11 passed, 0 failed (11 items)"
+      ]
+    }
+  }
+}

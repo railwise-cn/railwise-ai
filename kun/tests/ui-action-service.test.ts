@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { makeAssistantTextItem } from '../src/domain/item.js'
 import { fingerprintDshUiBlock, parseDshUiBlocks } from '../src/contracts/dsh-ui.js'
 import { UI_ACTION_TTL_MS, UiActionService } from '../src/services/ui-action-service.js'
 import { buildHarness } from './http-server-test-harness.js'
+import { createKunServeRuntime } from '../src/server/runtime-factory.js'
+import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
+import { FileThreadStore } from '../src/adapters/file/file-thread-store.js'
 
 const SELECT_CARD = '```dsh-ui\n{"id":"filters","root":{"id":"layout","type":"col","children":[{"id":"kind","type":"select","label":"Kind","name":"kind","actionId":"choose-kind","options":[{"label":"One","value":"one"},{"label":"Two","value":"two"}]}]}}\n```'
 const PASSWORD_CARD = '```dsh-ui\n{"id":"secret","root":{"id":"layout","type":"col","children":[{"id":"password","type":"input","label":"Password","name":"password","actionId":"set-password","inputType":"password"}]}}\n```'
@@ -45,6 +51,45 @@ async function seededActionCard(card = SELECT_CARD, options: { messageCreatedAt?
 }
 
 describe('UiActionService', () => {
+  it.each(['explicit', 'legacy', 'removed'] as const)('keeps the source model identity for %s UI action turns and tasks', async scenario => {
+    const root = await mkdtemp(join(tmpdir(), 'kun-ui-routing-'))
+    const route = { baseUrl: 'http://127.0.0.1:1/v1', apiKey: '', endpointFormat: 'chat_completions' as const, model: 'provider-default' }
+    const runtime = await createKunServeRuntime({
+      host: '127.0.0.1', port: 0, dataDir: root, runtimeToken: 'synthetic-token', ...route,
+      modelProviders: [{ ...route, id: 'a' }, { ...route, id: 'b' }], defaultModelProviderId: 'a',
+      approvalPolicy: 'on-request', sandboxMode: 'workspace-write', tokenEconomyMode: false,
+      insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({})
+    })
+    try {
+      const store = new FileThreadStore({ dataDir: root })
+      const thread = await runtime.threadService.create({ workspace: root, model: 'legacy-model', mode: 'agent' })
+      const source = await runtime.turnService.startTurn({ threadId: thread.id, request: { prompt: 'Show synthetic controls.', model: 'shared-model', providerId: 'b', reasoningEffort: 'max' } })
+      const [block] = parseDshUiBlocks(SELECT_CARD)
+      await runtime.turnService.applyItem(thread.id, makeAssistantTextItem({ id: 'source-card', threadId: thread.id, turnId: source.turnId, text: 'Choose.', uiBlocks: [block!], status: 'completed' }))
+      await runtime.turnService.finishTurn({ threadId: thread.id, turnId: source.turnId, status: 'completed' })
+      if (scenario !== 'explicit') {
+        const stored = (await store.get(thread.id))!
+        await store.upsert({ ...stored, turns: stored.turns.map(turn => turn.id !== source.turnId ? turn : { ...turn, providerId: scenario === 'removed' ? 'removed-provider' : undefined, model: scenario === 'legacy' ? undefined : turn.model }) })
+      }
+      const request = { messageId: 'source-card', blockId: block!.id, actionId: 'choose-kind', specFingerprint: fingerprintDshUiBlock(block!), value: 'two', idempotencyKey: 'ui-source-selection' }
+      const before = await store.get(thread.id)
+      const execute = () => runtime.uiActionService!.execute({ threadId: thread.id, request })
+      if (scenario === 'removed') {
+        await expect(execute()).rejects.toMatchObject({ code: 'model_provider_unavailable' })
+        expect((await store.get(thread.id))?.turns).toEqual(before?.turns)
+        return
+      }
+      const started = await execute()
+      const expected = { model: scenario === 'legacy' ? 'legacy-model' : 'shared-model', providerId: scenario === 'legacy' ? 'a' : 'b', reasoningEffort: 'max' }
+      expect(await runtime.turnService.getTurn(thread.id, started.turnId)).toMatchObject(expected)
+      expect(runtime.taskRepository?.findActiveByThread(thread.id)).toMatchObject(expected)
+      expect(await execute()).toEqual(started)
+    } finally {
+      await runtime.shutdown?.()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('validates a persisted select action, audits it, and deduplicates concurrent retries', async () => {
     const { h, block, service } = await seededActionCard()
     const request = {

@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run tests/runtime-factory.test.ts
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  11:06:01
+   Duration  2.19s (transform 902ms, setup 0ms, import 1.30s, tests 826ms, environment 0ms)
+

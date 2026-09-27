@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "cohort": "candidate-fixture",
+  "cohortProvenance": "Caller-declared database cohort; not independently certified. Candidate metrics must not be pooled with production.",
+  "period": {
+    "startInclusive": "2026-09-19T00:00:00+00:00",
+    "endExclusive": "2026-09-21T00:00:00+00:00",
+    "timezone": "UTC"
+  },
+  "measurementBoundary": "Snapshot metadata only; no byte verification, recomputation, standards assessment or signature validation.",
+  "counts": {
+    "projectsInSnapshot": 3,
+    "networksInSnapshot": 3,
+    "manifestsInPeriod": 2,
+    "manifestReviewStates": {
+      "draft": 2
+    },
+    "draftManifestsWithConsistentStoredBindings": 2,
+    "projectsWithFirstBoundDraftInPeriod": 2
+  },
+  "importToFirstBoundDraftSeconds": {
+    "value": 66.994,
+    "statistic": "median",
+    "sampleSize": 2,
+    "definition": "Earliest bound network import to first qualifying draft in retained project history, selecting first drafts in period; includes waiting and user interaction. Deleted history cannot be detected.",
+    "status": "measured",
+    "range": [
+      64.024,
+      69.964
+    ]
+  },
+  "approvedTraceableProductionProjects": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Current records lack verifiable human approval and digital signatures; draft counts are separate."
+  },
+  "productionRepresentativeness": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "The cohort label is a caller declaration; collection provenance and population coverage are not recorded."
+  },
+  "firstAttemptImportSuccessRate": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Persisted networks omit rejected attempts and do not identify first attempts; denominator is unavailable."
+  },
+  "mediumLeveling30MinuteTarget": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Medium-network size and representative production cohort have not been defined or collected."
+  },
+  "numericalReproducibilityRate": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Requires explicit strict replay outcomes for every selected run; stored bindings are not replay."
+  },
+  "strictReverificationCoverage": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Current strict validity requires re-reading output/source bytes and live replay. Recorded point-in-time checks are reported separately."
+  },
+  "recordedStrictReverificationCoverage": {
+    "value": 1.0,
+    "numerator": 2,
+    "denominator": 2,
+    "status": "measured",
+    "definition": "Distinct draft manifests created in period whose latest recorded terminal check before period end passed with unchanged metadata bindings; subsequent failure supersedes a previous pass.",
+    "checkedAtRange": [
+      "2026-09-19T20:04:32.521Z",
+      "2026-09-19T20:04:45.760Z"
+    ],
+    "boundary": "Historical checks only; metadata bindings match this database snapshot. Output/source bytes are not re-read, and this is not current validity, human approval or population completeness."
+  },
+  "recordedVerificationAttemptSuccessRate": {
+    "value": 0.8333333333333334,
+    "numerator": 5,
+    "denominator": 6,
+    "status": "measured",
+    "definition": "Recorded terminal attempts completed in period that passed and still match snapshot metadata / all recorded terminal attempts in period, including failures and lookup errors. Crashes or failed audit writes have no event and are not counted.",
+    "outcomes": {
+      "passed": 5,
+      "failed": 1,
+      "error": 0
+    },
+    "boundary": "Historical checks only; metadata bindings match this database snapshot. Output/source bytes are not re-read, and this is not current validity, human approval or population completeness."
+  },
+  "standardsTraceabilityRate": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Free-text citations do not prove authoritative version/clause verification."
+  },
+  "unverifiedNumbersInDeliverables": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Requires complete artifact value provenance checks, not record counts."
+  },
+  "licenseViolations": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Requires an independent license audit for the measured scope."
+  },
+  "englishChineseResidue": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Requires English-rendered state coverage and raw-evidence exclusions."
+  },
+  "oneClickEvidenceQuestionCoverage": {
+    "value": null,
+    "status": "not-measurable",
+    "reason": "Requires an inventory of eligible result surfaces and verified question actions; database counts do not measure UI coverage."
+  },
+  "dataQualityScope": "Manifest timestamps across snapshot; binding and input-time checks for draft history before period end.",
+  "dataQuality": {
+    "invalidManifestTime": 0,
+    "invalidBoundInputTime": 0,
+    "missingOrMismatchedBinding": 0,
+    "nonForwardTime": 0
+  },
+  "snapshotConsistency": "Independent read transactions; cross-database bindings checked. Use stopped-app copies for a common snapshot."
+}

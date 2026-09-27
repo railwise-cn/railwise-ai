@@ -1,0 +1,42 @@
+{
+  "sourceHead": "7d8e92b461b6697cf782d197c05c392b6d62de03",
+  "version": "0.5.0",
+  "overall": "partial",
+  "projectId": "project_7530b2cd-3fa9-4f00-802f-f6e8a83be3c3",
+  "projectRevision": 2,
+  "checks": {
+    "noFormalNetworkRequired": "passed",
+    "emptyDeclarationAndBasisBlocked": "passed",
+    "explicitAcknowledgmentRequired": "passed",
+    "keyboardTabEnterSubmit": "passed",
+    "generalizedWAndCompleteCovariance": "passed",
+    "commonModeUndetectableNotZero": "passed",
+    "singleGroupVceTwoIterations": "passed",
+    "negativeVceRetainedAndStopped": "passed",
+    "nativeSaveCancel": "passed",
+    "nativeSaveFileMatchesSQLiteRecord": "passed",
+    "historyReverification": "passed",
+    "completeQuitAndRestartOriginalIds": "passed",
+    "tamperedDeclarationWhitespaceRejected": "passed",
+    "validHistoryDuringTamper": "passed",
+    "restoredBytesStrictReplay": "passed",
+    "independentRawBytesAndFractionOracle": "passed",
+    "chineseLightRegularAndMaximized": "passed",
+    "englishDarkRegular": "passed"
+  },
+  "notCompleted": [
+    "exact minimum 960x640 bounds and narrow layout in this package",
+    "all keyboard/a11y and offline/stale packaged states",
+    "successful real-model reply",
+    "actual historical user-data migration",
+    "user personal UI/function confirmation",
+    "professional result signoff"
+  ],
+  "observations": [
+    "Initial Computer Use enumeration timed out; native application control recovered.",
+    "Native Go To paste timed out; setValue recovered and saved file matched stored record.",
+    "Edge drag attempts did not resize; no minimum-window pass inferred.",
+    "AX placeholder remained stale while actual screenshot showed ready composer; no stuck-conversation bug reproduced."
+  ],
+  "scope": "packaged GUI checks on three synthetic/public mathematical cases; not production acceptance or release approval"
+}

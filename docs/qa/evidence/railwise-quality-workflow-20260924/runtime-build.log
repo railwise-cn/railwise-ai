@@ -1,0 +1,4 @@
+
+> kun@0.4.2 build
+> tsc -p tsconfig.build.json
+

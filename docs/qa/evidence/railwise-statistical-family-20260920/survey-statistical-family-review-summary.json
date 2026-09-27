@@ -1,0 +1,9 @@
+{
+  "tailCases": 839,
+  "calculated": 705,
+  "correctBelowSupportedRange": 134,
+  "maxAbsoluteLogProbabilityError": 1.2462059719835392e-12,
+  "criticalCases": 45,
+  "nearAndFarThresholdEvaluations": 225,
+  "allTrueQuantilesWithinSoftwareIntervals": true
+}

@@ -1,0 +1,9 @@
+{
+  "pythonOracle": "Fraction and mpmath1.3.0 at 120 digits",
+  "node": "v26.8.2",
+  "cases": 54,
+  "scalarComparisons": 5048,
+  "maxScaledAbsoluteDifference": "3.108624468950438313186168670654296875e-15",
+  "allPassed": true,
+  "scope": "declared synthetic models, no runtime or human engineering acceptance"
+}

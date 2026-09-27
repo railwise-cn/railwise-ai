@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 2,
+  "status": "passed",
+  "checkedAt": "2026-09-20T09:06:20.469Z",
+  "phase": "after-restart",
+  "candidateRoot": "/private/tmp/railwise-survey-53213de",
+  "package": {
+    "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+    "asarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+    "packageVersion": "0.5.0",
+    "bundleIdentifier": "com.wangjiawei508.workwise.candidate.head53213de739d0",
+    "bundleVersion": "0.5.0",
+    "signatureIntegrityVerified": true
+  },
+  "stableIdentity": {
+    "package": {
+      "sourceHead": "53213de739d0b1f3f173f883dcdac21cdc4fdfc9",
+      "asarSha256": "529a0f1364d4e4546eb8058d5dc7e4a0ffccc7cbe41ef95011fc8929f548a774",
+      "packageVersion": "0.5.0",
+      "bundleIdentifier": "com.wangjiawei508.workwise.candidate.head53213de739d0",
+      "bundleVersion": "0.5.0",
+      "signatureIntegrityVerified": true
+    },
+    "selected": {
+      "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+      "threadId": "thr_wt4kfajs",
+      "planId": "eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3",
+      "taskId": "task_05adc31c-0268-4cf7-80b5-7c9b5733faee",
+      "turnId": "turn_hcl2310o",
+      "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+      "adjustmentId": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2",
+      "deliveryRunId": "run_91826eb5-5db0-4088-8696-99cdd4a92406",
+      "providerId": "custom-provider-3",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off"
+    },
+    "sourceRecords": {
+      "project": "23e4e913c6dff342b12c96fb76c8bd032770fd7f4d1c7ad7994a291c1f89e660",
+      "plan": "8c588f9d72b2c05f9c8c40531b0509bf62b06512eec0922319b1ddd9fcf34249",
+      "task": "d5503329456b2dbab07e49e042ac112f118eab1329e2d064b0f53ae9278e062f",
+      "network": "7aab45cc20d5d88a6f6bf64999623971372717d6e8783c0744c58452fa92ebb5",
+      "adjustment": "3fc9b1d51a5b43343fb6167f323ae64c3bb445f7189d76a8b47547730d04e9b0",
+      "delivery": "69dc7cef355a259b8ebf2a8c43d51c2a2134feccae278c9484ead3f46ddc15fa",
+      "turn": "c6318a9d204c8deb7e4d8ab44658892c4e3783378569a89cfe19dfc167c7f594",
+      "executionItems": "7609cd88316874e9eab17b44ad743a2c39f70a435c69eb37b8b87a069cb281e7",
+      "receipts": "485818415ad67ce3066f79ce12d2a88f5d959a86d94dd8f306896c736e32eb4a"
+    },
+    "sourceFileSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+    "files": [
+      {
+        "name": "report.docx",
+        "sizeBytes": 5398,
+        "sha256": "eb2882c9fdc159517d2de7894058ce7f8202d2dad940f7a98c674efb1fe1831d"
+      },
+      {
+        "name": "report.pdf",
+        "sizeBytes": 39621,
+        "sha256": "29096adb8e6e3445290ff794a5c27a663adee5c35568341c9034df48fe4fe622"
+      },
+      {
+        "name": "evidence.xlsx",
+        "sizeBytes": 39084,
+        "sha256": "76f154b54803dff254c5e3109ca096a6c6271650a4234ecac615a2dbc5624241"
+      }
+    ],
+    "resumeHistory": {
+      "checked": true,
+      "sameOriginalTask": true,
+      "mockRequestCount": 10,
+      "mockChatCount": 7,
+      "exactMockAssistantTextCount": 7,
+      "previousFailedTurns": [
+        {
+          "turnId": "turn_80tnsgof",
+          "status": "failed",
+          "exactMockAssistantTextCount": 7,
+          "attemptCount": 7,
+          "turnSha256": "969543dd63c8d7158451d7ea3dfd2f80b97245f4e045a55d5208c52aeac2c129",
+          "transcriptSha256": "38d77c589a7d2d6be92cc449e8f368fca21ca6f7fae348659cc37a64647d99ec"
+        }
+      ],
+      "resumedTurnId": "turn_hcl2310o",
+      "successfulToolsBelongToResumedTurn": true,
+      "taskEventsSha256": "8b7d3f724475ec4fb831a482e42d8759db5978c948b5c0853df4cd444e0206d6",
+      "mockReportSha256": "e9598c9f660bbdcc9defba6f83e3dd08380d9ea701872f1d8c134cf17181b2ef",
+      "receiptTurnAttribution": "Corroborated by zero tool execution in prior failed turns and exact matching resumed tool outputs/parameters. Receipt rows themselves have no turnId column."
+    }
+  },
+  "restart": {
+    "compared": true,
+    "stableRecordsAndFilesUnchanged": true,
+    "baselineCheckedAt": "2026-09-20T09:02:05.471Z"
+  },
+  "resumeHistory": {
+    "checked": true,
+    "sameOriginalTask": true,
+    "mockRequestCount": 10,
+    "mockChatCount": 7,
+    "exactMockAssistantTextCount": 7,
+    "previousFailedTurns": [
+      {
+        "turnId": "turn_80tnsgof",
+        "status": "failed",
+        "exactMockAssistantTextCount": 7,
+        "attemptCount": 7,
+        "turnSha256": "969543dd63c8d7158451d7ea3dfd2f80b97245f4e045a55d5208c52aeac2c129",
+        "transcriptSha256": "38d77c589a7d2d6be92cc449e8f368fca21ca6f7fae348659cc37a64647d99ec"
+      }
+    ],
+    "resumedTurnId": "turn_hcl2310o",
+    "successfulToolsBelongToResumedTurn": true,
+    "taskEventsSha256": "8b7d3f724475ec4fb831a482e42d8759db5978c948b5c0853df4cd444e0206d6",
+    "mockReportSha256": "e9598c9f660bbdcc9defba6f83e3dd08380d9ea701872f1d8c134cf17181b2ef",
+    "receiptTurnAttribution": "Corroborated by zero tool execution in prior failed turns and exact matching resumed tool outputs/parameters. Receipt rows themselves have no turnId column."
+  },
+  "compatibility": {
+    "strictExecutionMarkers": true,
+    "missingHistoricalFields": [],
+    "historicalAcceptanceOnly": false
+  },
+  "execution": {
+    "rawPlanStatus": "started",
+    "computedPlanComplete": true,
+    "completedStepIds": [
+      "inspect-survey-network",
+      "adjust-survey-network",
+      "review-survey-quality",
+      "prepare-survey-report"
+    ],
+    "taskStatus": "completed",
+    "turnStatus": "completed",
+    "attempts": 8,
+    "replans": 2,
+    "selectedProviderId": "custom-provider-3",
+    "selectedModel": "deepseek-flash",
+    "selectedReasoningEffort": "off",
+    "toolCatalogToolCount": 5,
+    "actualToolCalls": 4,
+    "actualToolResults": 4,
+    "typedToolCalls": 4,
+    "unauthorizedToolCount": 0,
+    "fullExportMatchesDeterministicResult": true,
+    "steps": [
+      {
+        "stepId": "inspect-survey-network",
+        "tool": "survey_network_validate",
+        "callId": "call_00_vw6NXw7Epmjg2DJ0vwl19992",
+        "parameters": {
+          "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+          "expectedRevision": 1,
+          "idempotencyKey": "engineering-plan:eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3:inspect-survey-network"
+        },
+        "handles": {
+          "network.id": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+          "network.revision": 2
+        },
+        "argumentsRedacted": true,
+        "outputSha256": "2242aabaee2ab9638d3c6576beb2b3ebe800a8908870ff3832e56e42a432951f",
+        "receiptSha256": "68b4c745db2b86c36e1d19f84b2fa402cab6de197dfd3ef39b535ea319696b85"
+      },
+      {
+        "stepId": "adjust-survey-network",
+        "tool": "control_network",
+        "callId": "call_00_8QkxYNEgQerLOBFJuoLi4412",
+        "parameters": {
+          "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+          "expectedRevision": 2,
+          "idempotencyKey": "engineering-plan:eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3:adjust-survey-network"
+        },
+        "handles": {
+          "run.id": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2"
+        },
+        "argumentsRedacted": true,
+        "outputSha256": "565cddff05fcc9c037251377078edb3abbdc115e2f6d40677c7d7a9669ecbe82",
+        "receiptSha256": "d4d32fc23789e310b61320211f30ae212733ea4916d71dab0d1206cbcb471520"
+      },
+      {
+        "stepId": "review-survey-quality",
+        "tool": "survey_adjustment_read",
+        "callId": "call_00_IeE3g4tk0OhwfBGDftyM1815",
+        "parameters": {
+          "networkId": "network_365a0846-01d7-4768-a31c-47545fe23c34",
+          "adjustmentId": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2",
+          "idempotencyKey": "engineering-plan:eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3:review-survey-quality"
+        },
+        "handles": {
+          "run.id": "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2"
+        },
+        "argumentsRedacted": true,
+        "outputSha256": "565cddff05fcc9c037251377078edb3abbdc115e2f6d40677c7d7a9669ecbe82",
+        "receiptSha256": "9d7dcf264d04267a096ca6ee0599cf8094bfd02febb8b9d205bbdb9869b88607"
+      },
+      {
+        "stepId": "prepare-survey-report",
+        "tool": "report_export",
+        "callId": "call_00_iuuUi22mZA7WybByTlBc9126",
+        "parameters": {
+          "projectId": "project_cb802366-c811-4a2b-90c0-37b310447cfe",
+          "expectedRevision": 2,
+          "adjustmentIds": [
+            "adjustment_ca8d249d-a21f-4d05-80ef-5e8e05e4a4c2"
+          ],
+          "idempotencyKey": "engineering-plan:eplan_86ed3cb7-07c6-46c4-a503-4cae5150ccd3:prepare-survey-report"
+        },
+        "handles": {
+          "run.id": "run_91826eb5-5db0-4088-8696-99cdd4a92406"
+        },
+        "argumentsRedacted": true,
+        "outputSha256": "1978688e0c69813b59eb3d117d592db015b51685d26f0f750ac29332ca15f11a",
+        "receiptSha256": "6e80af679a0abe6d59331b4e713351142ca056d838850b87f9ff4632bb4f825b"
+      }
+    ]
+  },
+  "numericalOracle": {
+    "supplied": true,
+    "comparedLeaves": 19,
+    "referenceSha256": "6e4547f433c490a71d490767c9501720129ae84af45b50e0434c37dac60d685e",
+    "absoluteTolerance": 0.000002
+  },
+  "delivery": {
+    "status": "completed",
+    "files": [
+      {
+        "name": "report.docx",
+        "relativePath": ".workwise/deliverables/project_cb802366-c811-4a2b-90c0-37b310447cfe/run_91826eb5-5db0-4088-8696-99cdd4a92406/report.docx",
+        "sizeBytes": 5398,
+        "sha256": "eb2882c9fdc159517d2de7894058ce7f8202d2dad940f7a98c674efb1fe1831d",
+        "format": {
+          "parser": "unzip",
+          "crc32Verified": true,
+          "requiredContentTypeAndXmlPresent": true
+        }
+      },
+      {
+        "name": "report.pdf",
+        "relativePath": ".workwise/deliverables/project_cb802366-c811-4a2b-90c0-37b310447cfe/run_91826eb5-5db0-4088-8696-99cdd4a92406/report.pdf",
+        "sizeBytes": 39621,
+        "sha256": "29096adb8e6e3445290ff794a5c27a663adee5c35568341c9034df48fe4fe622",
+        "format": {
+          "parser": "pdfinfo",
+          "pages": 2,
+          "parsed": true
+        }
+      },
+      {
+        "name": "evidence.xlsx",
+        "relativePath": ".workwise/deliverables/project_cb802366-c811-4a2b-90c0-37b310447cfe/run_91826eb5-5db0-4088-8696-99cdd4a92406/evidence.xlsx",
+        "sizeBytes": 39084,
+        "sha256": "76f154b54803dff254c5e3109ca096a6c6271650a4234ecac615a2dbc5624241",
+        "format": {
+          "parser": "unzip",
+          "crc32Verified": true,
+          "requiredContentTypeAndXmlPresent": true,
+          "sheetCount": 15
+        }
+      }
+    ]
+  },
+  "relay": {
+    "supplied": true,
+    "reportSha256": "b8684521902756d43bee91f2421b733827e2c95e1ba80847bcc9d1c2a5ba9dd5",
+    "requestCount": 7,
+    "upstreamCount": 7,
+    "byRoute": {
+      "models": 2,
+      "chat_completions": 5
+    },
+    "failedRequests": 0,
+    "reason": "SIGINT",
+    "cleanup": {
+      "tokenRemoved": true,
+      "tokenPathAbsent": true,
+      "tokenRelativePath": "evidence/relay-local-token-43151fd88b293414.txt",
+      "tokenContentsRead": false
+    },
+    "cleanupVerifierSha256": "c1ced7253e8e5a9a09b3f5132594db6a9cbe0cd1c889a1e5bf5162dd492b5fce"
+  },
+  "audit": {
+    "readOnlyDatabases": true,
+    "databaseConnectionsUseIsolatedCopies": true,
+    "sourceDatabaseAndWalHashes": {
+      "engineering/engineering-ai.sqlite3": "81f6c5489afcff562146028d752be70557705cc13fc13f577ac42d98750f723c",
+      "engineering/engineering-ai.sqlite3-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "engineering/engineering.sqlite3": "5dd871e3cff48aa378c1790953676bf522ebb5a4550349d591856edccd45edc9",
+      "engineering/engineering.sqlite3-wal": "798a10aeda0c950c13114c953c15176c82fefbaa2f84af741771654dfc6d221f",
+      "engineering/survey.sqlite3": "555240ce5dddf041735a6ea3070f4f9586f5d7c5b0fb5193b5a0eb344e79dd30",
+      "engineering/survey.sqlite3-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tasks.sqlite3": "3a14d272136cd858e993421aef9763bcbfe6f0d13ce318fc1952ef95a260d51f",
+      "tasks.sqlite3-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "databaseAndWalBytesUnchanged": true,
+    "settingsOrCredentialsRead": false,
+    "networkRequests": 0,
+    "scriptSha256": "c32cb064525b5d0f71aa075998b284c8eb7bc6a23f285ee9d986a9293dba64b9",
+    "resumeVerifierSha256": "0089911d98a7d93932e7ddf3626dbc6931552f028b44a3af9d14259d9feb42f3"
+  },
+  "limitations": [
+    "GUI selection and the real model interaction must be corroborated by separately retained screenshots and provider evidence.",
+    "Exact bound arguments are checked against independent receipt rows because persisted tool-call arguments may be redacted.",
+    "Deterministic result consistency is checked against all exported fields, including fields omitted from bounded model tool output.",
+    "Relay summary was checked; missing original response streams are not reconstructed.",
+    "Code-signature integrity does not establish notarization or user acceptance. This audit is not release approval."
+  ]
+}

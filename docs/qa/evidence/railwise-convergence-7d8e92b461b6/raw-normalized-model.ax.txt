@@ -1,0 +1,65 @@
+The following is a diff from the previous accessibility tree for Window: "RAILWISE AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 162-165
++							178 container
++								179 开合三角标记 Original JSON declaration
++									180 文本 Original JSON declaration
++								181 text The original-text hash and model hash have different meanings: the former preserves whitespace and text order; the latter binds the strictly parsed model. VCE identifiers are trimmed under the contract; compare them with the normalized model. {
+  "schemaVersion": 1,
+  "model": "fixed-linear-independent-disjoint-variance-groups",
+  "unit": "mm",
+  "parameterIds": [
+    "x0"
+  ],
+  "groups": [
+    {
+      "id": "g0",
+      "initialVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    },
+    {
+      "id": "g1",
+      "initialVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    }
+  ],
+  "observations": [
+    {
+      "id": "o0",
+      "value": 1.6,
+      "coefficients": [
+        1
+      ],
+      "groupId": "g0",
+      "relativeV
++							182 container
++								183 开合三角标记 Normalized model used for computation
++									184 文本 Normalized model used for computation
++								185 文本 {
+  "schemaVersion": 1,
+  "model": "fixed-linear-independent-disjoint-variance-groups",
+  "unit": "mm",
+  "parameterIds": [
+    "x0"
+  ],
+  "groups": [
+    {
+      "id": "g0",
+      "initialVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    },
+    {
+      "id": "g1",
+      "initialVariance": 1,
+      "sourceAnchor": "published-example-4.8"
+    }
+  ],
+  "observations": [
+    {
+      "id": "o0",
+      "value": 1.6,
+      "coefficients": [
+        1
+      ],
+      "groupId": "g0",
+      "relativeV
+The focused UI element is 183 开合三角标记 Normalized model used for computation

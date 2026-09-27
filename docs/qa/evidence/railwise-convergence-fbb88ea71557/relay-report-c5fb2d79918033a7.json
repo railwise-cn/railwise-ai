@@ -1,0 +1,177 @@
+{
+  "startedAt": "2026-09-20T06:20:24.627Z",
+  "stoppedAt": "2026-09-20T06:23:11.770Z",
+  "reason": "SIGINT",
+  "model": "deepseek-flash",
+  "requestCount": 8,
+  "upstreamCount": 8,
+  "projectId": "project_50aa4738-da8d-4e87-8fea-7dbbc3f5fd83",
+  "networkId": "network_eb2aeea2-84cc-41ed-984d-db84e49fa5a9",
+  "threadId": "thr_inslys6a",
+  "relayScope": "four typed measurement tools; persisted synthetic thread results; buffered original upstream bytes",
+  "candidateCredentialAccess": "unchanged; require 0",
+  "officialCredentialStoredInCandidate": false,
+  "acceptanceScope": "GUI via loopback relay to official provider; not direct official credential-chain acceptance",
+  "events": [
+    {
+      "at": "2026-09-20T06:20:39.405Z",
+      "requestId": 1,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T06:20:39.621Z",
+      "requestId": 1,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:20:39.625Z",
+      "requestId": 1,
+      "kind": "completed",
+      "status": 200,
+      "model": null
+    },
+    {
+      "at": "2026-09-20T06:20:45.276Z",
+      "requestId": 2,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T06:20:45.396Z",
+      "requestId": 2,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:20:45.396Z",
+      "requestId": 2,
+      "kind": "completed",
+      "status": 200,
+      "model": null
+    },
+    {
+      "at": "2026-09-20T06:20:48.895Z",
+      "requestId": 3,
+      "kind": "upstream_started",
+      "route": "models",
+      "model": null
+    },
+    {
+      "at": "2026-09-20T06:20:49.479Z",
+      "requestId": 3,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:20:49.480Z",
+      "requestId": 3,
+      "kind": "completed",
+      "status": 200,
+      "model": null
+    },
+    {
+      "at": "2026-09-20T06:21:44.070Z",
+      "requestId": 4,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:44.241Z",
+      "requestId": 4,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:21:45.798Z",
+      "requestId": 4,
+      "kind": "completed",
+      "status": 200,
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:46.947Z",
+      "requestId": 5,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:47.068Z",
+      "requestId": 5,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:21:48.513Z",
+      "requestId": 5,
+      "kind": "completed",
+      "status": 200,
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:49.413Z",
+      "requestId": 6,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:49.557Z",
+      "requestId": 6,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:21:51.503Z",
+      "requestId": 6,
+      "kind": "completed",
+      "status": 200,
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:52.996Z",
+      "requestId": 7,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:53.120Z",
+      "requestId": 7,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:21:55.130Z",
+      "requestId": 7,
+      "kind": "completed",
+      "status": 200,
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:56.817Z",
+      "requestId": 8,
+      "kind": "upstream_started",
+      "route": "chat_completions",
+      "model": "deepseek-flash"
+    },
+    {
+      "at": "2026-09-20T06:21:56.981Z",
+      "requestId": 8,
+      "kind": "upstream_status",
+      "status": 200
+    },
+    {
+      "at": "2026-09-20T06:22:06.432Z",
+      "requestId": 8,
+      "kind": "completed",
+      "status": 200,
+      "model": "deepseek-flash"
+    }
+  ]
+}

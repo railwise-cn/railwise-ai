@@ -1,0 +1,10 @@
+import {mkdtempSync,rmSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {Buffer as NodeBuffer} from 'node:buffer'
+import {SurveyAdvancedTrialsWorkspaceService as Service} from '#repo/kun/src/engineering/survey-advanced-trials-workspace.ts'
+import {hashSurveyStaticIncrementalBaseV1} from '#repo/kun/src/engineering/survey-static-incremental.ts'
+import original from './base-model.json'
+export function model(kind='standard'){const data=structuredClone(original);if(kind==='maximum'){data.base.parameterIds=Array.from({length:16},(_,i)=>'p-'+i);const rows=Array.from({length:256},(_,i)=>({id:'obs-'+i,value:i%16,coefficients:Array.from({length:16},(_,j)=>j===i%16?1:0),aprioriVariance:1,sourceAnchor:'synthetic-review-'+i}));data.base.observations=rows.slice(0,128);data.append.observations=rows.slice(128)}const result={schemaVersion:1,operation:'append-independent-observations-only',...data,expectedBaseFingerprint:hashSurveyStaticIncrementalBaseV1(data.base)};if(kind==='stale')result.base.observations[0].value+=1;if(kind==='zero-sse'){for(const x of [...result.base.observations,...result.append.observations])x.value=2;result.expectedBaseFingerprint=hashSurveyStaticIncrementalBaseV1(result.base)}return result}
+export function envelope(declaration=model(),key='independent-static-review'){return{kind:'static-incremental',acknowledged:true,expectedProjectRevision:1,idempotencyKey:key,declarationJson:' \n'+JSON.stringify(declaration,null,2)+'\t',modelBasisStatement:'静态追加独立复核😀\n仅合成声明，并非连续状态验真。  '}}
+export function fixture(q=envelope()){const dir=mkdtempSync(join(tmpdir(),'static-independent-'));const p={id:'independent-static-project',revision:1,workspace:dir+'/workspace'};const s=new Service({rootDir:dir,getProject:(id:string)=>id===p.id?p:null});try{const raw=NodeBuffer.from('\t'+JSON.stringify(q,null,2)+'\r\n');const summary=s.createTrial(p.id,raw),record=s.getTrial(p.id,summary.id);return{q,raw,summary,record,binding:{projectId:p.id,projectRevision:1,workspaceRoot:p.workspace}}}finally{s.close();rmSync(dir,{recursive:true,force:true})}}

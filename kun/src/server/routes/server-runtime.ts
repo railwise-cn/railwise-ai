@@ -1,3 +1,6 @@
+import type { SurveyQualityAssessmentService } from '../../engineering/survey-quality-assessment.js'
+import type { SurveyQualityWorkflowService } from '../../engineering/survey-quality-workflow.js'
+import type { SurveyQualityScoringWorkspaceService } from '../../engineering/survey-quality-scoring-workspace.js'
 import type { ThreadService } from '../../services/thread-service.js'
 import type { TurnService } from '../../services/turn-service.js'
 import type { UsageService } from '../../services/usage-service.js'
@@ -30,6 +33,9 @@ import type { EngineeringService } from '../../engineering/engineering-service.j
 import type { EngineeringContextService } from '../../engineering/engineering-context-service.js'
 import type { EngineeringAiOrchestrator } from '../../engineering/engineering-ai-orchestrator.js'
 import type { SurveyService } from '../../engineering/survey-service.js'
+import type { SurveyAdvancedTrialsWorkspaceService } from '../../engineering/survey-advanced-trials-workspace.js'
+import type { SurveySamplingWorkspaceService } from '../../engineering/survey-sampling-workspace.js'
+import type { SurveyQualityWorkspaceService } from '../../engineering/survey-quality-workspace.js'
 
 export type RuntimeToolDiagnostics = {
   providers: ToolProviderPolicy[]
@@ -76,6 +82,12 @@ export type ServerRuntime = {
   engineeringContext?: EngineeringContextService
   engineeringAi?: EngineeringAiOrchestrator
   surveyService?: SurveyService
+  surveyQualityAssessmentService?: SurveyQualityAssessmentService
+  surveyQualityWorkflowService?: SurveyQualityWorkflowService
+  surveyQualityWorkspaceService?: SurveyQualityWorkspaceService
+  surveyQualityScoringWorkspaceService?: SurveyQualityScoringWorkspaceService
+  surveyAdvancedTrialsWorkspaceService?: SurveyAdvancedTrialsWorkspaceService
+  surveySamplingWorkspaceService?: SurveySamplingWorkspaceService
   runTurn(threadId: string, turnId: string): Promise<'completed' | 'failed' | 'aborted'> | void
   cancelChildRuns?(parentThreadId: string, reason?: string): number
   runReview?(input: {

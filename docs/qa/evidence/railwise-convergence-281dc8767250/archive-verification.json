@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "scope": "archive-integrity-and-redaction-check-not-professional-acceptance",
+  "sourceHead": "281dc87672509de147357efc3aabbeae0eb4dbcb",
+  "rawByteCopiesVerified": 97,
+  "rawByteCopies": [
+    "01-synthetic-deliverables.ax.txt",
+    "01-synthetic-deliverables.jpg",
+    "02-retained-all-three-outputs.ax.txt",
+    "02-retained-all-three-outputs.jpg",
+    "03-complete-first-round-sample.ax.txt",
+    "03-complete-first-round-sample.jpg",
+    "04-score-full-link01.ax.txt",
+    "04-score-full-link01.jpg",
+    "05-score-full-link02.ax.txt",
+    "05-score-full-link02.jpg",
+    "06-score-veto-link01.ax.txt",
+    "06-score-veto-link01.jpg",
+    "07-assessment-plan-before-freeze.ax.txt",
+    "07-assessment-plan-before-freeze.jpg",
+    "08-assessment-missing.ax.txt",
+    "08-assessment-missing.jpg",
+    "09-assessment-complete.ax.txt",
+    "09-assessment-complete.jpg",
+    "10-native-export-before-cancel.ax.txt",
+    "10-native-export-before-cancel.jpg",
+    "11-native-export-cancelled.ax.txt",
+    "11-native-export-cancelled.jpg",
+    "12-native-export-before-save.ax.txt",
+    "12-native-export-before-save.jpg",
+    "13-native-export-saved.ax.txt",
+    "13-native-export-saved.jpg",
+    "14-assessment-veto-missing.ax.txt",
+    "14-assessment-veto-missing.jpg",
+    "15-history-before-restart.ax.txt",
+    "15-history-before-restart.jpg",
+    "16-history-after-restart.ax.txt",
+    "16-history-after-restart.jpg",
+    "17-missing-restored.ax.txt",
+    "17-missing-restored.jpg",
+    "18-veto-restored.ax.txt",
+    "18-veto-restored.jpg",
+    "19-complete-restored.ax.txt",
+    "19-complete-restored.jpg",
+    "20-complete-zh-light-regular.ax.txt",
+    "20-complete-zh-light-regular.jpg",
+    "21-complete-zh-light-maximized.ax.txt",
+    "21-complete-zh-light-maximized.jpg",
+    "22-complete-zh-light-compact.ax.txt",
+    "22-complete-zh-light-compact.jpg",
+    "23-veto-zh-dark-compact.ax.txt",
+    "23-veto-zh-dark-compact.jpg",
+    "24-veto-zh-dark-wide.ax.txt",
+    "24-veto-zh-dark-wide.jpg",
+    "25-veto-en-dark-wide.ax.txt",
+    "25-veto-en-dark-wide.jpg",
+    "26-veto-en-dark-compact.ax.txt",
+    "26-veto-en-dark-compact.jpg",
+    "27-complete-en-light-wide.ax.txt",
+    "27-complete-en-light-wide.jpg",
+    "28-complete-zh-light-final.ax.txt",
+    "28-complete-zh-light-final.jpg",
+    "29-source-event-appended.ax.txt",
+    "29-source-event-appended.jpg",
+    "30-source-changed-rejected.ax.txt",
+    "30-source-changed-rejected.jpg",
+    "31-current-assessment-same-plan.ax.txt",
+    "31-current-assessment-same-plan.jpg",
+    "32-marketing-deliverables-zh-light.ax.txt",
+    "32-marketing-deliverables-zh-light.jpg",
+    "33-marketing-survey-zh-light.ax.txt",
+    "33-marketing-survey-zh-light.jpg",
+    "34-marketing-model-settings-zh-light.ax.txt",
+    "34-marketing-model-settings-zh-light.jpg",
+    "35-current-zh-light-keyboard-export.ax.txt",
+    "35-current-zh-light-keyboard-export.jpg",
+    "36-current-zh-light-keyboard-history.ax.txt",
+    "36-current-zh-light-keyboard-history.jpg",
+    "37-wrong-unit-rejected.ax.txt",
+    "37-wrong-unit-rejected.jpg",
+    "38-healthy-current-after-wrong-unit.ax.txt",
+    "38-healthy-current-after-wrong-unit.jpg",
+    "assessment-baseline.json",
+    "assessment-complete.json",
+    "assessment-verification-initial.stderr.json",
+    "assessment-verification-initial.stdout.json",
+    "assessment-verification.json",
+    "gui-operation-notes.json",
+    "independent-checker/CANONICALIZATION-FIX.md",
+    "independent-checker/canonical-diagnosis.json",
+    "independent-checker/ecmascript-json.mjs",
+    "independent-checker/scoring_oracle.py",
+    "independent-checker/test-canonical.py",
+    "independent-checker/test-verifier.mjs",
+    "independent-checker/verifier-development-test.before-js-canonical.json",
+    "independent-checker/verifier-development-test.json",
+    "independent-checker/verify_records.before-js-canonical.py",
+    "independent-checker/verify_records.py",
+    "inputs.json",
+    "package.json",
+    "private-updater.json",
+    "score-ids.json",
+    "zip-download.json"
+  ],
+  "onlyAlteredOriginal": "native-updater.json feedUrl redacted into native-updater.redacted.json",
+  "newEditorialRecords": [
+    "README.md",
+    "gui-acceptance.json",
+    "archive-verification.json",
+    "manifest-hashes.json"
+  ],
+  "newGeneratedVerification": "independent-checker/canonical-self-tests.json",
+  "packageZipAndAsarBindings": "passed",
+  "privateUpdaterSensitiveFieldAndCredentialPatternScan": "passed",
+  "nativeFeedTokenValuesAbsent": "passed",
+  "nonemptyJsonSyntax": "passed",
+  "emptyOriginalStdoutPreserved": "assessment-verification-initial.stdout.json",
+  "screenshotsManuallyViewed": 38,
+  "screenshotDimensionsAreImagePixelsNotNativeBounds": true,
+  "screenshots": {
+    "01-synthetic-deliverables.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "02-retained-all-three-outputs.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "03-complete-first-round-sample.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "04-score-full-link01.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "05-score-full-link02.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "06-score-veto-link01.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "07-assessment-plan-before-freeze.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "08-assessment-missing.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "09-assessment-complete.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "10-native-export-before-cancel.jpg": {
+      "widthPixels": 364,
+      "heightPixels": 235
+    },
+    "11-native-export-cancelled.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "12-native-export-before-save.jpg": {
+      "widthPixels": 364,
+      "heightPixels": 235
+    },
+    "13-native-export-saved.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "14-assessment-veto-missing.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "15-history-before-restart.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "16-history-after-restart.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "17-missing-restored.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "18-veto-restored.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "19-complete-restored.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "20-complete-zh-light-regular.jpg": {
+      "widthPixels": 1171,
+      "heightPixels": 768
+    },
+    "21-complete-zh-light-maximized.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "22-complete-zh-light-compact.jpg": {
+      "widthPixels": 1163,
+      "heightPixels": 764
+    },
+    "23-veto-zh-dark-compact.jpg": {
+      "widthPixels": 1163,
+      "heightPixels": 764
+    },
+    "24-veto-zh-dark-wide.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "25-veto-en-dark-wide.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "26-veto-en-dark-compact.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "27-complete-en-light-wide.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "28-complete-zh-light-final.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "29-source-event-appended.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "30-source-changed-rejected.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "31-current-assessment-same-plan.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "32-marketing-deliverables-zh-light.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "33-marketing-survey-zh-light.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "34-marketing-model-settings-zh-light.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "35-current-zh-light-keyboard-export.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "36-current-zh-light-keyboard-history.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "37-wrong-unit-rejected.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    },
+    "38-healthy-current-after-wrong-unit.jpg": {
+      "widthPixels": 1490,
+      "heightPixels": 768
+    }
+  },
+  "excluded": [
+    "raw native-updater.json",
+    "native updater and application full logs",
+    "settings and databases",
+    "credentials",
+    "real project inputs or outputs",
+    "private GSI scripts or structured results",
+    "duplicate real-281-verification.json"
+  ],
+  "assessmentVerificationSha256": "9a1200b04cae49275f1e4bfa46a795f36bcf484a38986eca38735249c8778820",
+  "canonicalSelfTests": {
+    "exitCode": 0,
+    "testMethods": 6
+  },
+  "developmentFixtureChecks": 6
+}

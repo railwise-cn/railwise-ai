@@ -1,0 +1,188 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtemp, mkdir, readFile, writeFile, stat, rm, unlink } from 'node:fs/promises'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
+import { scopedDatabase, createGuard } from './railwise-typed-relay-guard.mjs'
+import { startRelay } from './railwise-typed-acceptance-relay.mjs'
+import { startLocalCompletionFixture, MOCK_ANSWER } from './railwise-local-completion-fixture.mjs'
+
+const scope = { projectId: 'project_synthetic', networkId: 'network_synthetic', threadId: 'thread_synthetic' }
+const base = { model: 'deepseek-flash', stream: true, messages: [{ role: 'user', content: 'RAILWISE-SYNTHETIC-ACCEPTANCE: approved synthetic plan' }], thinking: { type: 'enabled' }, reasoning_effort: 'high' }
+const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return { promise, resolve } }
+const bytesAt = async path => { try { return await readFile(path) } catch (error) { if (error.code === 'ENOENT') return null; throw error } }
+const databaseBytes = async path => Object.fromEntries(await Promise.all(['', '-wal', '-shm', '-journal'].map(async suffix => [suffix, await bytesAt(path + suffix)])))
+const json = async path => JSON.parse(await readFile(path, 'utf8'))
+
+async function databaseFixture(t, keepOpen = false) {
+  const root = await mkdtemp('/private/tmp/railwise-survey-snapshot-test-')
+  const path = join(root, 'source.sqlite3')
+  const db = new DatabaseSync(path)
+  db.exec('PRAGMA journal_mode=WAL; CREATE TABLE records(id TEXT PRIMARY KEY, data_json TEXT)')
+  db.prepare('INSERT INTO records VALUES (?, ?)').run('selected', JSON.stringify({ revision: 1 }))
+  if (!keepOpen) db.close()
+  t.after(async () => { if (keepOpen) db.close(); await rm(root, { recursive: true, force: true }) })
+  return { root, path, db }
+}
+
+test('snapshot reads a stopped WAL database without creating source sidecars', async t => {
+  const f = await databaseFixture(t)
+  const before = await databaseBytes(f.path)
+  assert.equal(before['-wal'], null); assert.equal(before['-shm'], null)
+  const result = await scopedDatabase(f.path, f.root, 'SELECT data_json FROM records WHERE id = ?', 'selected')
+  assert.deepEqual(result.value, { revision: 1 })
+  assert.deepEqual(await databaseBytes(f.path), before)
+})
+
+test('snapshot includes active uncheckpointed WAL data without touching source bytes', async t => {
+  const f = await databaseFixture(t, true)
+  f.db.prepare('UPDATE records SET data_json = ? WHERE id = ?').run(JSON.stringify({ revision: 2 }), 'selected')
+  const before = await databaseBytes(f.path)
+  assert(before['-wal'].length > 0); assert(before['-shm'].length > 0)
+  assert.deepEqual((await scopedDatabase(f.path, f.root, 'SELECT data_json FROM records WHERE id = ?', 'selected')).value, { revision: 2 })
+  assert.deepEqual(await databaseBytes(f.path), before)
+})
+
+test('snapshot retries a changed DB/WAL pair and only returns the stable new revision', async t => {
+  const f = await databaseFixture(t, true)
+  let captures = 0
+  const result = await scopedDatabase(f.path, f.root, 'SELECT data_json FROM records WHERE id = ?', 'selected', { afterCapture() {
+    captures++
+    if (captures === 1) f.db.prepare('UPDATE records SET data_json = ? WHERE id = ?').run(JSON.stringify({ revision: 2 }), 'selected')
+  } })
+  assert.equal(captures, 2); assert.deepEqual(result.value, { revision: 2 })
+})
+
+test('snapshot fails closed after three continually changing DB/WAL captures', async t => {
+  const f = await databaseFixture(t, true)
+  let captures = 0
+  await assert.rejects(scopedDatabase(f.path, f.root, 'SELECT data_json FROM records WHERE id = ?', 'selected', { afterCapture() {
+    captures++
+    f.db.prepare('UPDATE records SET data_json = ? WHERE id = ?').run(JSON.stringify({ revision: captures + 1 }), 'selected')
+  } }), /candidate_evidence_busy/)
+  assert.equal(captures, 3)
+})
+
+async function mockFixture(t, config = {}) {
+  const root = await mkdtemp('/private/tmp/railwise-survey-mock-boundary-')
+  await mkdir(join(root, 'evidence'))
+  let fixture
+  t.after(async () => { await fixture?.stop('test-cleanup').catch(() => {}); await rm(root, { recursive: true, force: true }) })
+  fixture = await startLocalCompletionFixture({ ...scope, candidateRoot: root, durationMs: 10_000, evidenceLoader: async () => ({ messages: [] }), ...config })
+  const token = await readFile(fixture.tokenPath, 'utf8')
+  return { ...fixture, root, token, call: () => fetch(`${fixture.baseUrl}/chat/completions`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(base) }) }
+}
+
+test('mock emits actual SSE text, records settings, and accepts that unchanged history after relay switch', async t => {
+  const fixture = await mockFixture(t)
+  const response = await fixture.call()
+  assert.equal(response.status, 200)
+  const raw = await response.text(), frames = raw.split('\n\n').filter(Boolean)
+  assert.equal(frames.at(-1), 'data: [DONE]')
+  const chunk = JSON.parse(frames[0].slice(6))
+  const text = chunk.choices[0].delta.content
+  assert.equal(text, MOCK_ANSWER); assert.equal(chunk.choices[0].delta.tool_calls, undefined)
+  const guard = createGuard({ ...scope, candidateRoot: fixture.root, evidenceLoader: async () => ({ messages: [{ kind: 'assistant_text', text }] }) })
+  const history = { ...base, messages: [...base.messages, { role: 'assistant', content: text }, { role: 'user', content: 'RAILWISE-SYNTHETIC-ACCEPTANCE: continue the approved plan' }] }
+  assert.equal((await guard.validateRequest(Buffer.from(JSON.stringify(history)), base.model)).messages[1].content, text)
+  const report = await fixture.stop()
+  assert.equal(report.tokenRemoved, true)
+  assert.deepEqual(report.events[0].modelSettings, { thinkingType: 'enabled', reasoningEffort: 'high' })
+  assert.equal(report.upstreamCredentialsRead, false)
+})
+
+test('mock request budget drains the final SSE response, stops once, and removes the token', async t => {
+  const stopped = deferred()
+  const fixture = await mockFixture(t, { maxRequests: 2, onEvent: event => { if (event.kind === 'stopped') stopped.resolve(event) } })
+  for (let i = 0; i < 2; i++) { const response = await fixture.call(); assert.equal(response.status, 200); assert((await response.text()).endsWith('data: [DONE]\n\n')) }
+  await stopped.promise
+  const report = await fixture.stop()
+  assert.equal(report.reason, 'request_budget'); assert.equal(report.requestCount, 2); assert.equal(report.tokenRemoved, true)
+  await assert.rejects(stat(fixture.tokenPath), { code: 'ENOENT' })
+  await assert.rejects(fixture.call())
+})
+
+test('concurrent mock stops share a promise and cannot finish before token removal', async t => {
+  const entered = deferred(), release = deferred()
+  let removals = 0
+  const fixture = await mockFixture(t, { async tokenUnlink(path) { removals++; entered.resolve(); await release.promise; await unlink(path) } })
+  const first = fixture.stop('SIGINT')
+  await entered.promise
+  const second = fixture.stop('SIGTERM')
+  assert.equal(first, second)
+  let finished = false
+  second.then(() => { finished = true })
+  await Promise.resolve(); assert.equal(finished, false); assert.equal(removals, 1)
+  release.resolve()
+  const reports = await Promise.all([first, second])
+  assert.equal(reports[0].tokenRemoved, true); assert.deepEqual(reports[0], reports[1]); assert.equal(removals, 1)
+})
+
+test('mock duration budget removes an unused token and records the actual cleanup result', async t => {
+  const stopped = deferred()
+  const fixture = await mockFixture(t, { durationMs: 20, onEvent: event => { if (event.kind === 'stopped') stopped.resolve(event) } })
+  await stopped.promise
+  const report = await fixture.stop()
+  assert.equal(report.reason, 'duration_budget'); assert.equal(report.requestCount, 0); assert.equal(report.tokenRemoved, true)
+  await assert.rejects(stat(fixture.tokenPath), { code: 'ENOENT' })
+})
+
+test('mock cleanup failure rejects and cannot write tokenRemoved true', async t => {
+  const fixture = await mockFixture(t, { tokenUnlink: async () => { throw Object.assign(new Error('synthetic-denial'), { code: 'EACCES' }) } })
+  await assert.rejects(fixture.stop(), /token_cleanup_failed/)
+  const report = await json(fixture.reportPath)
+  assert.equal(report.tokenRemoved, false); assert.equal(report.cleanupError, 'token_cleanup_failed')
+  assert((await stat(fixture.tokenPath)).isFile())
+})
+
+async function relayFixture(t, config = {}) {
+  const root = await mkdtemp('/private/tmp/railwise-survey-relay-boundary-')
+  let keyReads = 0, upstreamRequests = 0, relay
+  t.after(async () => { await relay?.stop('test-cleanup').catch(() => {}); await rm(root, { recursive: true, force: true }) })
+  relay = await startRelay({ ...scope, candidateRoot: root, outputDir: root, durationMs: 10_000, maxRequests: 20,
+    evidenceLoader: async () => ({ messages: [] }), keyLoader: async () => { keyReads++; return 'synthetic-no-permissions' },
+    fetchImpl: async () => { upstreamRequests++; return new Response('data: {"choices":[{"index":0,"delta":{"content":"synthetic"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } }) }, ...config })
+  const token = await readFile(relay.tokenPath, 'utf8')
+  return { ...relay, keyReads: () => keyReads, upstreamRequests: () => upstreamRequests,
+    call: () => fetch(`${relay.origin}/v1/chat/completions`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(base) }) }
+}
+
+test('relay reports and rejects real token deletion failure without loading any key', async t => {
+  const relay = await relayFixture(t, { tokenUnlink: async () => { throw Object.assign(new Error('synthetic-denial'), { code: 'EACCES' }) } })
+  await assert.rejects(relay.stop(), /token_cleanup_failed/)
+  const report = await json(relay.reportPath)
+  assert.equal(report.tokenRemoved, false); assert.equal(report.cleanupError, 'token_cleanup_failed')
+  assert.equal(relay.keyReads(), 0); assert.equal(relay.upstreamRequests(), 0)
+  assert((await stat(relay.tokenPath)).isFile())
+})
+
+test('relay verifies absence independently when a token remover falsely reports success', async t => {
+  const relay = await relayFixture(t, { tokenUnlink: async () => {} })
+  await assert.rejects(relay.stop(), /token_cleanup_failed/)
+  assert.equal((await json(relay.reportPath)).tokenRemoved, false)
+  assert.equal(relay.keyReads(), 0)
+})
+
+test('relay request budget stops with exact observed counts and successful token cleanup', async t => {
+  const stopped = deferred()
+  const relay = await relayFixture(t, { maxRequests: 2, onEvent: event => { if (event.kind === 'stopped') stopped.resolve(event) } })
+  for (let i = 0; i < 2; i++) { const response = await relay.call(); assert.equal(response.status, 200); await response.text() }
+  await stopped.promise
+  const report = await relay.stop()
+  assert.equal(report.reason, 'request_budget'); assert.equal(report.requestCount, 2); assert.equal(report.upstreamCount, 2)
+  assert.equal(report.tokenRemoved, true); assert.equal(relay.upstreamRequests(), 2)
+  await assert.rejects(stat(relay.tokenPath), { code: 'ENOENT' })
+  await assert.rejects(relay.call())
+})
+
+test('both helpers reject limits above 20 requests or 600 seconds before creating a token', async t => {
+  const root = await mkdtemp('/private/tmp/railwise-survey-invalid-limits-')
+  await mkdir(join(root, 'evidence'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  let keyReads = 0
+  for (const limits of [{ maxRequests: 21 }, { durationMs: 600_001 }]) {
+    await assert.rejects(startLocalCompletionFixture({ ...scope, candidateRoot: root, evidenceLoader: async () => ({ messages: [] }), ...limits }))
+    await assert.rejects(startRelay({ ...scope, candidateRoot: root, outputDir: root, evidenceLoader: async () => ({ messages: [] }), keyLoader: () => { keyReads++; return 'synthetic-no-permissions' }, fetchImpl: async () => assert.fail('no request allowed'), ...limits }), /invalid_relay_configuration/)
+  }
+  assert.equal(keyReads, 0)
+})

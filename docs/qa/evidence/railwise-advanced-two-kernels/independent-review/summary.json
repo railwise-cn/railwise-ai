@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-20",
+  "passed": 18,
+  "failed": 0,
+  "files": {
+    "client.test.ts": 7,
+    "service.test.ts": 4,
+    "gui.test.ts": 7
+  },
+  "fixedFindings": [
+    {
+      "priority": "P1",
+      "id": "statistical-unsorted-request-binding",
+      "reproducedBeforeFix": true,
+      "independentlyVerifiedAfterFix": true
+    }
+  ],
+  "unresolvedFindings": [],
+  "scope": [
+    "real algorithms",
+    "SQLite",
+    "renderer validation",
+    "happy-dom",
+    "mocked native save payload"
+  ],
+  "notCovered": [
+    "packaged visual acceptance",
+    "real native save dialog",
+    "production SLA",
+    "release approval"
+  ],
+  "latestGuiFollowup": {
+    "passed": 7,
+    "time": "2026-09-20 07:51:09 Asia/Shanghai",
+    "coverage": [
+      "full double critical intervals",
+      "Huber one expanded state with lazy table",
+      "per-member visible degrees of freedom and declared prior scale/unit"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-09-20T07:54:47.887Z",
+  "syntheticOnly": true,
+  "modelRequestsToRealProvider": 0,
+  "credentialsRead": "local synthetic mock token only",
+  "taskStatus": "stalled",
+  "turnStatus": "failed",
+  "stalledReason": "engineering_plan_steps_incomplete: inspect-survey-network, adjust-survey-network, review-survey-quality, prepare-survey-report",
+  "taskAttempts": 7,
+  "exactPersistedMockAssistantTexts": 7,
+  "actualMockRequests": 7,
+  "allGuardRequestsAccepted": true,
+  "toolCallCount": 0,
+  "toolResultCount": 0,
+  "successfulStepReceiptCount": 0,
+  "adjustmentCount": 0,
+  "tokenRemoved": true
+}

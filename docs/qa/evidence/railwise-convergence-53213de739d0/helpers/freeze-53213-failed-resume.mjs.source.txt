@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile, realpath } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join, relative, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { scopedDatabase } from '/private/tmp/railwise-typed-relay-guard.mjs';
+
+const root = '/private/tmp/railwise-survey-53213de';
+const runtime = join(root, 'home/.workwise/runtime');
+const baselinePath = join(root, 'evidence/before-resume-zero-receipts-53213.json');
+const baselineBytes = await readFile(baselinePath), baseline = JSON.parse(baselineBytes);
+const expected = baseline.identities;
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const objectHash = value => hash(JSON.stringify(value));
+const readScoped = async path => {
+  const real = await realpath(path), child = relative(root, real);
+  assert(child && child !== '..' && !child.startsWith('../') && !isAbsolute(child));
+  return readFile(real);
+};
+const dbNames = ['engineering/engineering-ai.sqlite3', 'engineering/engineering.sqlite3', 'engineering/survey.sqlite3', 'tasks.sqlite3'];
+const tracked = dbNames.flatMap(path => [path, path + '-wal']).concat([`threads/${expected.threadId}/metadata.jsonl`, `threads/${expected.threadId}/messages.jsonl`]);
+const sourceHashes = async () => {
+  const out = {};
+  for (const path of tracked) {
+    try { out[path] = hash(await readScoped(join(runtime, path))); }
+    catch (error) { if (error.code !== 'ENOENT' || !path.endsWith('-wal')) throw error; out[path] = null; }
+  }
+  return out;
+};
+const before = await sourceHashes();
+const query = async (db, sql, id) => (await scopedDatabase(join(runtime, db), root, sql, id)).value;
+const plan = await query(dbNames[0], 'SELECT data_json FROM engineering_ai_plans WHERE id = ?', expected.planId);
+const task = await query(dbNames[3], 'SELECT data_json FROM task_runs WHERE id = ?', expected.taskId);
+const receipts = await query(dbNames[0], "SELECT json_group_array(json_object('stepId', step_id, 'parameters', json(parameters_json), 'handles', json(handles_json))) AS data_json FROM engineering_ai_step_evidence WHERE plan_id = ?", expected.planId);
+const project = await query(dbNames[1], 'SELECT data_json FROM engineering_projects WHERE id = ?', expected.projectId);
+const network = await query(dbNames[2], 'SELECT data_json FROM survey_networks WHERE id = ?', expected.networkId);
+const adjustments = await query(dbNames[2], 'SELECT json_group_array(json(data_json)) AS data_json FROM survey_adjustments WHERE project_id = ?', expected.projectId);
+const deliveries = await query(dbNames[1], 'SELECT json_group_array(json(data_json)) AS data_json FROM engineering_runs WHERE project_id = ?', expected.projectId);
+const events = await query(dbNames[3], "SELECT json_group_array(json_object('sequence', sequence, 'kind', kind, 'payload', json(payload_json), 'createdAt', created_at)) AS data_json FROM (SELECT * FROM task_events WHERE task_id = ? ORDER BY sequence)", task.id);
+const jsonl = bytes => bytes.toString('utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+const thread = jsonl(await readScoped(join(runtime, 'threads', expected.threadId, 'metadata.jsonl'))).findLast(item => item.kind === 'thread_metadata').thread;
+const messages = [...new Map(jsonl(await readScoped(join(runtime, 'threads', expected.threadId, 'messages.jsonl'))).map(item => [item.id, item])).values()];
+const turn = thread.turns.find(item => item.id === plan.executionTurnId); assert(turn);
+const previousTurn = thread.turns.find(item => item.id === expected.turnId); assert(previousTurn);
+assert.notEqual(turn.id, previousTurn.id); assert.equal(task.id, expected.taskId); assert.equal(plan.taskId, task.id);
+assert.equal(task.activeTurnId, turn.id); assert.equal(task.status, 'failed'); assert.equal(task.attempts, 8); assert.equal(turn.status, 'failed');
+assert.equal(task.threadId, expected.threadId); assert.equal(plan.threadId, expected.threadId); assert.equal(plan.projectId, expected.projectId);
+assert.equal(task.engineeringPlanId, expected.planId); assert.equal(turn.engineeringPlanId, expected.planId); assert.equal(turn.engineeringExecution, true);
+for (const record of [task, turn]) for (const key of ['model', 'providerId', 'reasoningEffort']) assert.equal(record[key], expected[key]);
+assert.equal(messages.filter(item => item.kind === 'tool_call' || item.kind === 'tool_result').length, 0);
+assert.deepEqual(receipts, []); assert.deepEqual(adjustments, []); assert.deepEqual(deliveries, []);
+assert.deepEqual(previousTurn, baseline.records.turn, 'original failed mock Turn changed');
+assert.deepEqual(messages.filter(item => item.turnId === previousTurn.id), baseline.records.messages.filter(item => item.turnId === previousTurn.id), 'original mock transcript changed');
+assert.deepEqual(network, baseline.records.network, 'source network changed');
+assert.deepEqual(project, baseline.records.project, 'selected project changed');
+assert(events.some(event => event.kind === 'turn_attached' && event.payload.turnId === turn.id));
+assert.equal(events.filter(event => event.kind === 'attempt_started' && event.payload.turnId === turn.id).length, 1);
+assert.equal(hash(await readScoped(join(root, 'Applications/RAILWISE AI Candidate 53213de739d0.app/Contents/Resources/app.asar'))), expected.asarSha256);
+assert.deepEqual(await sourceHashes(), before, 'source DB/WAL or transcript changed during snapshot');
+const identities = { ...expected, previousFailedTurnId: previousTurn.id, turnId: turn.id, taskRevision: task.revision, planRevision: plan.revision };
+const records = { project, network, plan, task, turn, previousTurn, messages, taskEvents: events, receipts, adjustments, deliveries };
+const result = { status: 'failed-execution-preserved', phase: 'failed-real-resume', checkedAt: new Date().toISOString(), candidateRoot: root, identities,
+  observed: { taskStatus: task.status, turnStatus: turn.status, taskAttempts: task.attempts, turnError: turn.error, taskWaitingReason: task.waitingReason, taskStalledReason: task.stalledReason,
+    toolCalls: 0, toolResults: 0, adjustments: 0, deliveries: 0, sourceNetworkUnchanged: true, previousMockTurnAndTranscriptUnchanged: true,
+    stepReceipts: plan.steps.map(step => ({ stepId: step.id, tool: step.tool, receipt: null })) },
+  baseline: { path: baselinePath, sha256: hash(baselineBytes) }, sourceHashes: before,
+  recordHashes: Object.fromEntries(Object.entries(records).map(([key, value]) => [key, objectHash(value)])), records,
+  audit: { sourceDatabaseConnections: 0, sqliteOnlyOnIsolatedCopies: true, sourceBytesUnchangedDuringAudit: true, credentialsRead: false, networkRequests: 0,
+    scriptSha256: hash(await readFile(fileURLToPath(import.meta.url))), snapshotHelperSha256: hash(await readFile('/private/tmp/railwise-typed-relay-guard.mjs')) },
+  limitations: ['This records a failed execution; it is not acceptance success.', 'The live relay has not stopped. HTTP 503 provenance must be corroborated by its retained log and eventual stopped report.'] };
+const output = join(root, 'evidence/failed-real-resume-53213.json');
+await writeFile(output, JSON.stringify(result, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+console.log(JSON.stringify({ status: result.status, output, outputSha256: hash(await readFile(output)), identities, observed: result.observed }, null, 2));

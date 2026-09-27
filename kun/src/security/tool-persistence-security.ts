@@ -127,14 +127,6 @@ export function sanitizeToolResultOutput(toolName: string, output: unknown): unk
   })
 }
 
-export function modelVisibleToolArguments(
-  item: Extract<TurnItem, { kind: 'tool_call' }>
-): Record<string, unknown> {
-  if (Object.keys(item.arguments).length > 0) return item.arguments
-  const summary = item.argumentSummary?.trim()
-  return summary ? { _workwise_summary: summary } : {}
-}
-
 function sanitizeOutputValue(
   value: unknown,
   context: { communicationTool: boolean; seen: WeakSet<object> },

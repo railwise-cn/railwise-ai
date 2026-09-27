@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "installedAsarSha256": "11a060ec6a7c42385eed433a336967a91647251f51a07f0781302420b2f9e20c",
+  "scope": "Selected synthetic packaged monitoring workflow; not full product acceptance or release approval",
+  "files": {
+    "README.md": {
+      "sizeBytes": 6968,
+      "sha256": "20834848d61ba0dca2422af6cd428fd8a3c71b06a0823f02dfdeead6ef18ec9e"
+    },
+    "audit/afterrestart.json": {
+      "sizeBytes": 9506,
+      "sha256": "04a6fb7c2e6d6d85f1e487bdc6fde76e6546cd7c964372e26371f673f892dc2c"
+    },
+    "audit/before.json": {
+      "sizeBytes": 8576,
+      "sha256": "a1ec51382a2cecb88a74e4d7d182483d713399ae92cfb873ff154c28a6ba6499"
+    },
+    "audit/selftest.txt": {
+      "sizeBytes": 109,
+      "sha256": "8c4b1532288f3c2237a75b4778a19116380135ed2658033225c3d1a1a8446867"
+    },
+    "cloud/cloud-evidence-artifact.json": {
+      "sizeBytes": 761,
+      "sha256": "a06e6e938676567dc4364bbbf0b77f75c6bd11fac0e2c0f4dc79b80b35f31426"
+    },
+    "cloud/cloud-target-artifact.json": {
+      "sizeBytes": 773,
+      "sha256": "69b011667ad117c7eeb2e249eb571af3b14f662c6a10311081788133503979a3"
+    },
+    "cloud/native-updater.json": {
+      "sizeBytes": 1017,
+      "sha256": "475d08bc350749e4269d25f321329d4bf1959bc585189cc8f5975810971ef7cc"
+    },
+    "cloud/nonblocking-log-excerpts.json": {
+      "sizeBytes": 928,
+      "sha256": "ac9a0bfe2d6a16642cea9c9f62c98f2159bb39367c72eb32f6a3e18b63ee0820"
+    },
+    "cloud/private-updater.json": {
+      "sizeBytes": 6772,
+      "sha256": "a4bf09477b3e68e42cede58a452d62434dd34b30d2c2673e459890ca85a6fa92"
+    },
+    "cloud/tls-preflight.json": {
+      "sizeBytes": 1067,
+      "sha256": "b10dca9bb7d0f098c8fe7570f5bf21d5f1bceda1066a722bf7fd9f8d27004e05"
+    },
+    "cloud/workflow-result.json": {
+      "sizeBytes": 7120,
+      "sha256": "5b0f7c19e4024136917d7a45e03470453d72a7e0cf4868cd39ba84552a6332ac"
+    },
+    "gui/01-csv-analysis.ax.txt": {
+      "sizeBytes": 5591,
+      "sha256": "f9fd1f6a8fc4e04f7767e01b976d1c8b70edb31a32774d135b12ac428ba56a94"
+    },
+    "gui/01-csv-analysis.png": {
+      "sizeBytes": 103062,
+      "sha256": "ce885001f88cef04a04f70b8de702e1055624b76ccc8a5555e3b020a22ec7c0e"
+    },
+    "gui/02-csv-manifest.ax.txt": {
+      "sizeBytes": 9709,
+      "sha256": "316982f7abd9dbf92796ae3b114f87e9baef908de6278e0deec76850d799cd33"
+    },
+    "gui/02-csv-manifest.png": {
+      "sizeBytes": 133813,
+      "sha256": "2f411e071390100bc48a5f85a654a366a034e78f7eae1d643d222812d8bb6278"
+    },
+    "gui/03-xlsx-analysis.ax.txt": {
+      "sizeBytes": 6088,
+      "sha256": "50935b79129b7a4bb75449784760f0ff23bfdbb5a2c8f015388f215c1f44b7ab"
+    },
+    "gui/03-xlsx-analysis.png": {
+      "sizeBytes": 108973,
+      "sha256": "d566db2ac654eb38f34b85be8238567a37e8c9a32a0dc676d05caced5e44359f"
+    },
+    "gui/04-xlsx-manifest.ax.txt": {
+      "sizeBytes": 10197,
+      "sha256": "f30a19bf9a52ab966bafea58e38b36fb778a60c5eace9996db6d497d1c82cc05"
+    },
+    "gui/04-xlsx-manifest.png": {
+      "sizeBytes": 140389,
+      "sha256": "bd90ea114f23d3034f485bf51e54538eb3041b4fc926d63fd100fae22dc829a2"
+    },
+    "gui/05-xlsx-wide.png": {
+      "sizeBytes": 141553,
+      "sha256": "4b800b4b357a736814629cc425dc8636f63c9e66bcf5291d4f9f994794b9e9f3"
+    },
+    "gui/06-xlsx-zh-dark.png": {
+      "sizeBytes": 114118,
+      "sha256": "6b482912f5a4c5171f3bec0c80863f79382e540eddc53df211e4929f487ca8ba"
+    },
+    "gui/07-xlsx-zh-dark-verified.ax.txt": {
+      "sizeBytes": 10006,
+      "sha256": "e4b4ba85d7be460edead5b165c80e401276d3c6d9fb675b530d16197fd984a20"
+    },
+    "gui/07-xlsx-zh-dark-verified.png": {
+      "sizeBytes": 135684,
+      "sha256": "ebb16ec150503f58d9ad8b8d91d6aced464074825dad326ad7ee6a61d1e8493f"
+    },
+    "gui/08-xlsx-en-dark.ax.txt": {
+      "sizeBytes": 9911,
+      "sha256": "da1b63d0a0b15eecbe80a2d97f480180b30c8cb2e7f7022d82fa1d0cee6a8d79"
+    },
+    "gui/08-xlsx-en-dark.png": {
+      "sizeBytes": 131343,
+      "sha256": "7bc178aa24b3f59335e36f418340364793f54111404ce2b599ead0d6c75ce0fa"
+    },
+    "gui/09-xlsx-en-light.png": {
+      "sizeBytes": 138166,
+      "sha256": "7095db5e4374e0ce7ee253a80e8971dba014f4bf1fad8d86ad9236e7256c3e01"
+    },
+    "gui/10-xlsx-afterrestart.ax.txt": {
+      "sizeBytes": 10160,
+      "sha256": "da3f9ed760445effaca8f7931ad32a762dea8e18a5fff98f019201844ab80971"
+    },
+    "gui/10-xlsx-afterrestart.png": {
+      "sizeBytes": 133341,
+      "sha256": "12a162fe098b39e968de17d25a093a84c0b129d2b22ab8442331d16374c43be5"
+    },
+    "gui/11-csv-afterrestart.ax.txt": {
+      "sizeBytes": 10173,
+      "sha256": "d36e501678dc213df41f3391d187cf844e91da6824feb909b255fbe73616cc40"
+    },
+    "gui/11-csv-afterrestart.png": {
+      "sizeBytes": 132342,
+      "sha256": "a64e5333797637ad485cb164abbacecb419a4d3e36b9d48840add15c8efdb032"
+    },
+    "gui/csv-report-1.png": {
+      "sizeBytes": 122732,
+      "sha256": "fd02f106430b46ad9047040c07950658f7c6a3ff08907d96b1ebcf947557a225"
+    },
+    "gui/csv-trend.png": {
+      "sizeBytes": 41057,
+      "sha256": "71e030238cfa732064851a5ff11f96c3b60453341f2c67ed8aa1d9eff3c1a3c2"
+    },
+    "gui/xlsx-report-1.png": {
+      "sizeBytes": 126510,
+      "sha256": "80f9bc092c3d1e4f8e8f3143560872b1f22261c0fc2c8dcf120c0aea8e6a3c98"
+    },
+    "gui/xlsx-trend.png": {
+      "sizeBytes": 41131,
+      "sha256": "909a82f705b56f7c7fcd4cc019066d271edd6df17290f64957e472c55a4c4a33"
+    },
+    "inputs/manifest.json": {
+      "sizeBytes": 6022,
+      "sha256": "b4080cdaadda10782e8f271800278650eba8c72d489d869f24c611ac2e6bbfb8"
+    },
+    "inputs/railwise-final-monitoring-offset-counterexample.csv": {
+      "sizeBytes": 132,
+      "sha256": "9357f178cbc0f9e6ce7fa22365eab888d1ac80a815cf8097ac8d36ba5a8ffff3"
+    },
+    "inputs/synthetic-monitoring-two-points-irregular.csv": {
+      "sizeBytes": 261,
+      "sha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c"
+    },
+    "inputs/synthetic-monitoring-zero-blank.xlsx": {
+      "sizeBytes": 1731,
+      "sha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36"
+    },
+    "operator-events.json": {
+      "sizeBytes": 2079,
+      "sha256": "1cc53fac4b36e2ad6bf32c29c280dc429f222ba2af10f881ca7da4b6b03c1fb4"
+    },
+    "outputs/csv/evidence.xlsx": {
+      "sizeBytes": 35944,
+      "sha256": "ac6fb6f475ab30fdfcae887260c0caef0652bf7eec11551d59f44c61de36679f"
+    },
+    "outputs/csv/report.docx": {
+      "sizeBytes": 4501,
+      "sha256": "0db05bb960b600b8e26f4108657baebc968a8cedbd2497093bce88b315db6280"
+    },
+    "outputs/csv/report.pdf": {
+      "sizeBytes": 30376,
+      "sha256": "a955fccccdb6c9ba6d54beaab7f4dacbe96c2c97a3349a75b839145d0f3ce454"
+    },
+    "outputs/csv/trend.svg": {
+      "sizeBytes": 5376,
+      "sha256": "cd245da79f2f4e6ea65aae7c83d779c64f403beee2772ec6ff58705e7463821a"
+    },
+    "outputs/xlsx/evidence.xlsx": {
+      "sizeBytes": 36196,
+      "sha256": "cc74566b490f54dfb57033f3ff10318e45e94ad1a61707756214873973698623"
+    },
+    "outputs/xlsx/report.docx": {
+      "sizeBytes": 4577,
+      "sha256": "554a5bec94248c934b76ad9fe1f5e74f5910b55facc948464a2ada0307e8f1d6"
+    },
+    "outputs/xlsx/report.pdf": {
+      "sizeBytes": 30618,
+      "sha256": "ba45798caf4db703562d52704435813da6909958aff76ba162547bf2a9b80b43"
+    },
+    "outputs/xlsx/trend.svg": {
+      "sizeBytes": 5378,
+      "sha256": "881834e39485e3a3bcb6b677d621d3cf35bc1311bdc2fa71b79deea5014ccdb1"
+    },
+    "package/evidence-download-adjustment.json": {
+      "sizeBytes": 783,
+      "sha256": "38db67aaf128889ac9e160ae494607c3a2beff1ca9892f2ae962fb57f3cc5cc5"
+    },
+    "package/installation-context.json": {
+      "sizeBytes": 4038,
+      "sha256": "2dc8dfc88fa8e66cefb77893cb1c1b0f9a5514f006b841445729b4ef0098d105"
+    },
+    "package/package.json": {
+      "sizeBytes": 1556,
+      "sha256": "f21941afda54e8adecc7ca3123f600fd1d614fba67fb53a58d11e8a3e1977133"
+    },
+    "package/pre-gui-context.json": {
+      "sizeBytes": 784,
+      "sha256": "335528869c07e5b32aa0e1315a5f91028545463153fd6d279dd0b950a72bc2cf"
+    },
+    "source-copy-provenance.json": {
+      "sizeBytes": 15674,
+      "sha256": "6f71f781674ddd6c3fd74bc7331df8b9f37774edc7e1cc0b035a0aa055ff0e21"
+    },
+    "tools/monitoring-audit-selftest.py": {
+      "sizeBytes": 7150,
+      "sha256": "04e9b140d06fc3aefc2c7961c8b62edc9aa5aebab478318525b848057f83fd19"
+    },
+    "tools/monitoring-audit.py": {
+      "sizeBytes": 29060,
+      "sha256": "282e8d46ad4cbba186c74b8297236397fa0cf2e7860a32c8013017612486ae7e"
+    },
+    "tools/monitoring-pdf-text.mjs": {
+      "sizeBytes": 707,
+      "sha256": "405e05a62ea75f51f2aff0903bad3f6470f4a6a16a363f47f190b52b92de4351"
+    },
+    "verify.py": {
+      "sizeBytes": 7121,
+      "sha256": "7f1cdf5f390008b8ec9fbc8ca939dbb8da0b2d52c9653c63bd4cf1ccb2304a50"
+    }
+  }
+}

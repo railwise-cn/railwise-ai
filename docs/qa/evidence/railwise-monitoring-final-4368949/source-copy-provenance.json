@@ -1,0 +1,345 @@
+[
+  {
+    "sourceBasename": "package.json",
+    "path": "package/package.json",
+    "sourceSha256": "2d66f22e1c958dff26689e9ae4ef9f97356ad572234f7e5b4a679befd4c60b35",
+    "archiveSha256": "f21941afda54e8adecc7ca3123f600fd1d614fba67fb53a58d11e8a3e1977133",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "installation-context.json",
+    "path": "package/installation-context.json",
+    "sourceSha256": "9df0fdb119afad308891fc513c4ee605c5ebae4607f969877bc12d518ede5300",
+    "archiveSha256": "2dc8dfc88fa8e66cefb77893cb1c1b0f9a5514f006b841445729b4ef0098d105",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "pre-gui-context.json",
+    "path": "package/pre-gui-context.json",
+    "sourceSha256": "e29043553720f03e51403c69e95b5f4baf205156a031dda4fed334f563b6cd96",
+    "archiveSha256": "335528869c07e5b32aa0e1315a5f91028545463153fd6d279dd0b950a72bc2cf",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "workflow-result.json",
+    "path": "cloud/workflow-result.json",
+    "sourceSha256": "5b0f7c19e4024136917d7a45e03470453d72a7e0cf4868cd39ba84552a6332ac",
+    "archiveSha256": "5b0f7c19e4024136917d7a45e03470453d72a7e0cf4868cd39ba84552a6332ac",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "private-updater.json",
+    "path": "cloud/private-updater.json",
+    "sourceSha256": "a4bf09477b3e68e42cede58a452d62434dd34b30d2c2673e459890ca85a6fa92",
+    "archiveSha256": "a4bf09477b3e68e42cede58a452d62434dd34b30d2c2673e459890ca85a6fa92",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "tls-preflight.json",
+    "path": "cloud/tls-preflight.json",
+    "sourceSha256": "b10dca9bb7d0f098c8fe7570f5bf21d5f1bceda1066a722bf7fd9f8d27004e05",
+    "archiveSha256": "b10dca9bb7d0f098c8fe7570f5bf21d5f1bceda1066a722bf7fd9f8d27004e05",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "native-updater.json",
+    "path": "cloud/native-updater.json",
+    "sourceSha256": "95ccfdf1e4b90ba5375e451358d71ff4a4d58baa9912077c0743209d7c578d2f",
+    "archiveSha256": "475d08bc350749e4269d25f321329d4bf1959bc585189cc8f5975810971ef7cc",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "cloud-evidence-artifact.json",
+    "path": "cloud/cloud-evidence-artifact.json",
+    "sourceSha256": "a06e6e938676567dc4364bbbf0b77f75c6bd11fac0e2c0f4dc79b80b35f31426",
+    "archiveSha256": "a06e6e938676567dc4364bbbf0b77f75c6bd11fac0e2c0f4dc79b80b35f31426",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "cloud-target-artifact.json",
+    "path": "cloud/cloud-target-artifact.json",
+    "sourceSha256": "69b011667ad117c7eeb2e249eb571af3b14f662c6a10311081788133503979a3",
+    "archiveSha256": "69b011667ad117c7eeb2e249eb571af3b14f662c6a10311081788133503979a3",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "evidence-download-adjustment.json",
+    "path": "package/evidence-download-adjustment.json",
+    "sourceSha256": "38db67aaf128889ac9e160ae494607c3a2beff1ca9892f2ae962fb57f3cc5cc5",
+    "archiveSha256": "38db67aaf128889ac9e160ae494607c3a2beff1ca9892f2ae962fb57f3cc5cc5",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "public-summary.json",
+    "path": "audit/before.json",
+    "sourceSha256": "a1ec51382a2cecb88a74e4d7d182483d713399ae92cfb873ff154c28a6ba6499",
+    "archiveSha256": "a1ec51382a2cecb88a74e4d7d182483d713399ae92cfb873ff154c28a6ba6499",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "public-summary.json",
+    "path": "audit/afterrestart.json",
+    "sourceSha256": "04a6fb7c2e6d6d85f1e487bdc6fde76e6546cd7c964372e26371f673f892dc2c",
+    "archiveSha256": "04a6fb7c2e6d6d85f1e487bdc6fde76e6546cd7c964372e26371f673f892dc2c",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "report.docx",
+    "path": "outputs/csv/report.docx",
+    "sourceSha256": "0db05bb960b600b8e26f4108657baebc968a8cedbd2497093bce88b315db6280",
+    "archiveSha256": "0db05bb960b600b8e26f4108657baebc968a8cedbd2497093bce88b315db6280",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "report.pdf",
+    "path": "outputs/csv/report.pdf",
+    "sourceSha256": "a955fccccdb6c9ba6d54beaab7f4dacbe96c2c97a3349a75b839145d0f3ce454",
+    "archiveSha256": "a955fccccdb6c9ba6d54beaab7f4dacbe96c2c97a3349a75b839145d0f3ce454",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "evidence.xlsx",
+    "path": "outputs/csv/evidence.xlsx",
+    "sourceSha256": "ac6fb6f475ab30fdfcae887260c0caef0652bf7eec11551d59f44c61de36679f",
+    "archiveSha256": "ac6fb6f475ab30fdfcae887260c0caef0652bf7eec11551d59f44c61de36679f",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "trend.svg",
+    "path": "outputs/csv/trend.svg",
+    "sourceSha256": "cd245da79f2f4e6ea65aae7c83d779c64f403beee2772ec6ff58705e7463821a",
+    "archiveSha256": "cd245da79f2f4e6ea65aae7c83d779c64f403beee2772ec6ff58705e7463821a",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "report.docx",
+    "path": "outputs/xlsx/report.docx",
+    "sourceSha256": "554a5bec94248c934b76ad9fe1f5e74f5910b55facc948464a2ada0307e8f1d6",
+    "archiveSha256": "554a5bec94248c934b76ad9fe1f5e74f5910b55facc948464a2ada0307e8f1d6",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "report.pdf",
+    "path": "outputs/xlsx/report.pdf",
+    "sourceSha256": "ba45798caf4db703562d52704435813da6909958aff76ba162547bf2a9b80b43",
+    "archiveSha256": "ba45798caf4db703562d52704435813da6909958aff76ba162547bf2a9b80b43",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "evidence.xlsx",
+    "path": "outputs/xlsx/evidence.xlsx",
+    "sourceSha256": "cc74566b490f54dfb57033f3ff10318e45e94ad1a61707756214873973698623",
+    "archiveSha256": "cc74566b490f54dfb57033f3ff10318e45e94ad1a61707756214873973698623",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "trend.svg",
+    "path": "outputs/xlsx/trend.svg",
+    "sourceSha256": "881834e39485e3a3bcb6b677d621d3cf35bc1311bdc2fa71b79deea5014ccdb1",
+    "archiveSha256": "881834e39485e3a3bcb6b677d621d3cf35bc1311bdc2fa71b79deea5014ccdb1",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "01-csv-analysis.ax.txt",
+    "path": "gui/01-csv-analysis.ax.txt",
+    "sourceSha256": "3f5f627e186523e2c499bc90296b1881edc8d3359abacbf0ea69354211a2a7db",
+    "archiveSha256": "f9fd1f6a8fc4e04f7767e01b976d1c8b70edb31a32774d135b12ac428ba56a94",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "01-csv-analysis.png",
+    "path": "gui/01-csv-analysis.png",
+    "sourceSha256": "ce885001f88cef04a04f70b8de702e1055624b76ccc8a5555e3b020a22ec7c0e",
+    "archiveSha256": "ce885001f88cef04a04f70b8de702e1055624b76ccc8a5555e3b020a22ec7c0e",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "02-csv-manifest.ax.txt",
+    "path": "gui/02-csv-manifest.ax.txt",
+    "sourceSha256": "6e6f96775f55450fd56b5832fb09e29d0ec0c007e083f7055bd82bdc2095b682",
+    "archiveSha256": "316982f7abd9dbf92796ae3b114f87e9baef908de6278e0deec76850d799cd33",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "02-csv-manifest.png",
+    "path": "gui/02-csv-manifest.png",
+    "sourceSha256": "2f411e071390100bc48a5f85a654a366a034e78f7eae1d643d222812d8bb6278",
+    "archiveSha256": "2f411e071390100bc48a5f85a654a366a034e78f7eae1d643d222812d8bb6278",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "03-xlsx-analysis.ax.txt",
+    "path": "gui/03-xlsx-analysis.ax.txt",
+    "sourceSha256": "3af8224f89f8fe4483dfaa903f3e04d585ec1ac275a3673390950ac2ba198a21",
+    "archiveSha256": "50935b79129b7a4bb75449784760f0ff23bfdbb5a2c8f015388f215c1f44b7ab",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "03-xlsx-analysis.png",
+    "path": "gui/03-xlsx-analysis.png",
+    "sourceSha256": "d566db2ac654eb38f34b85be8238567a37e8c9a32a0dc676d05caced5e44359f",
+    "archiveSha256": "d566db2ac654eb38f34b85be8238567a37e8c9a32a0dc676d05caced5e44359f",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "04-xlsx-manifest.ax.txt",
+    "path": "gui/04-xlsx-manifest.ax.txt",
+    "sourceSha256": "5f747fa62a4c58af17bac442b0fdf4a852dee28f09f7dafdf7798d000f91ea03",
+    "archiveSha256": "f30a19bf9a52ab966bafea58e38b36fb778a60c5eace9996db6d497d1c82cc05",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "04-xlsx-manifest.png",
+    "path": "gui/04-xlsx-manifest.png",
+    "sourceSha256": "bd90ea114f23d3034f485bf51e54538eb3041b4fc926d63fd100fae22dc829a2",
+    "archiveSha256": "bd90ea114f23d3034f485bf51e54538eb3041b4fc926d63fd100fae22dc829a2",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "05-xlsx-wide.png",
+    "path": "gui/05-xlsx-wide.png",
+    "sourceSha256": "4b800b4b357a736814629cc425dc8636f63c9e66bcf5291d4f9f994794b9e9f3",
+    "archiveSha256": "4b800b4b357a736814629cc425dc8636f63c9e66bcf5291d4f9f994794b9e9f3",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "06-xlsx-zh-dark.png",
+    "path": "gui/06-xlsx-zh-dark.png",
+    "sourceSha256": "6b482912f5a4c5171f3bec0c80863f79382e540eddc53df211e4929f487ca8ba",
+    "archiveSha256": "6b482912f5a4c5171f3bec0c80863f79382e540eddc53df211e4929f487ca8ba",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "07-xlsx-zh-dark-verified.ax.txt",
+    "path": "gui/07-xlsx-zh-dark-verified.ax.txt",
+    "sourceSha256": "83d1f748e62765c23c3a1133acf1f79bd19d66217c9cacde8f8c3dbf031802ad",
+    "archiveSha256": "e4b4ba85d7be460edead5b165c80e401276d3c6d9fb675b530d16197fd984a20",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "07-xlsx-zh-dark-verified.png",
+    "path": "gui/07-xlsx-zh-dark-verified.png",
+    "sourceSha256": "ebb16ec150503f58d9ad8b8d91d6aced464074825dad326ad7ee6a61d1e8493f",
+    "archiveSha256": "ebb16ec150503f58d9ad8b8d91d6aced464074825dad326ad7ee6a61d1e8493f",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "08-xlsx-en-dark.ax.txt",
+    "path": "gui/08-xlsx-en-dark.ax.txt",
+    "sourceSha256": "34e3318f9c20c2bd887513a2623accba4fb934496099e6bdf59ed4d52655ce93",
+    "archiveSha256": "da1b63d0a0b15eecbe80a2d97f480180b30c8cb2e7f7022d82fa1d0cee6a8d79",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "08-xlsx-en-dark.png",
+    "path": "gui/08-xlsx-en-dark.png",
+    "sourceSha256": "7bc178aa24b3f59335e36f418340364793f54111404ce2b599ead0d6c75ce0fa",
+    "archiveSha256": "7bc178aa24b3f59335e36f418340364793f54111404ce2b599ead0d6c75ce0fa",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "09-xlsx-en-light.png",
+    "path": "gui/09-xlsx-en-light.png",
+    "sourceSha256": "7095db5e4374e0ce7ee253a80e8971dba014f4bf1fad8d86ad9236e7256c3e01",
+    "archiveSha256": "7095db5e4374e0ce7ee253a80e8971dba014f4bf1fad8d86ad9236e7256c3e01",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "10-xlsx-afterrestart.ax.txt",
+    "path": "gui/10-xlsx-afterrestart.ax.txt",
+    "sourceSha256": "e5a9904efd819a2f6ab44a3f313823838593e42f3f1b5d3c9a03c4700fc49696",
+    "archiveSha256": "da3f9ed760445effaca8f7931ad32a762dea8e18a5fff98f019201844ab80971",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "10-xlsx-afterrestart.png",
+    "path": "gui/10-xlsx-afterrestart.png",
+    "sourceSha256": "12a162fe098b39e968de17d25a093a84c0b129d2b22ab8442331d16374c43be5",
+    "archiveSha256": "12a162fe098b39e968de17d25a093a84c0b129d2b22ab8442331d16374c43be5",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "11-csv-afterrestart.ax.txt",
+    "path": "gui/11-csv-afterrestart.ax.txt",
+    "sourceSha256": "df88f535cbc3dad1e75b70c2e96160f565a5e6e4fb1d4c6dd836c5112d6e71b4",
+    "archiveSha256": "d36e501678dc213df41f3391d187cf844e91da6824feb909b255fbe73616cc40",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "11-csv-afterrestart.png",
+    "path": "gui/11-csv-afterrestart.png",
+    "sourceSha256": "a64e5333797637ad485cb164abbacecb419a4d3e36b9d48840add15c8efdb032",
+    "archiveSha256": "a64e5333797637ad485cb164abbacecb419a4d3e36b9d48840add15c8efdb032",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "csv-report-1.png",
+    "path": "gui/csv-report-1.png",
+    "sourceSha256": "fd02f106430b46ad9047040c07950658f7c6a3ff08907d96b1ebcf947557a225",
+    "archiveSha256": "fd02f106430b46ad9047040c07950658f7c6a3ff08907d96b1ebcf947557a225",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "csv-trend.png",
+    "path": "gui/csv-trend.png",
+    "sourceSha256": "71e030238cfa732064851a5ff11f96c3b60453341f2c67ed8aa1d9eff3c1a3c2",
+    "archiveSha256": "71e030238cfa732064851a5ff11f96c3b60453341f2c67ed8aa1d9eff3c1a3c2",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "xlsx-report-1.png",
+    "path": "gui/xlsx-report-1.png",
+    "sourceSha256": "80f9bc092c3d1e4f8e8f3143560872b1f22261c0fc2c8dcf120c0aea8e6a3c98",
+    "archiveSha256": "80f9bc092c3d1e4f8e8f3143560872b1f22261c0fc2c8dcf120c0aea8e6a3c98",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "xlsx-trend.png",
+    "path": "gui/xlsx-trend.png",
+    "sourceSha256": "909a82f705b56f7c7fcd4cc019066d271edd6df17290f64957e472c55a4c4a33",
+    "archiveSha256": "909a82f705b56f7c7fcd4cc019066d271edd6df17290f64957e472c55a4c4a33",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "synthetic-monitoring-two-points-irregular.csv",
+    "path": "inputs/synthetic-monitoring-two-points-irregular.csv",
+    "sourceSha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+    "archiveSha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "synthetic-monitoring-zero-blank.xlsx",
+    "path": "inputs/synthetic-monitoring-zero-blank.xlsx",
+    "sourceSha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+    "archiveSha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-offset-counterexample.csv",
+    "path": "inputs/railwise-final-monitoring-offset-counterexample.csv",
+    "sourceSha256": "9357f178cbc0f9e6ce7fa22365eab888d1ac80a815cf8097ac8d36ba5a8ffff3",
+    "archiveSha256": "9357f178cbc0f9e6ce7fa22365eab888d1ac80a815cf8097ac8d36ba5a8ffff3",
+    "transformation": "none"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-audit.py",
+    "path": "tools/monitoring-audit.py",
+    "sourceSha256": "eaf971dff1abca89aa7524c17ff7f688777400a675cb5184dedeb31602588937",
+    "archiveSha256": "282e8d46ad4cbba186c74b8297236397fa0cf2e7860a32c8013017612486ae7e",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-audit-selftest.py",
+    "path": "tools/monitoring-audit-selftest.py",
+    "sourceSha256": "f053c6c3119601d19b1029c6c4bf4a14dfbe3a50ac4ffc05ef53453b146b3b60",
+    "archiveSha256": "04e9b140d06fc3aefc2c7961c8b62edc9aa5aebab478318525b848057f83fd19",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  },
+  {
+    "sourceBasename": "railwise-final-monitoring-pdf-text.mjs",
+    "path": "tools/monitoring-pdf-text.mjs",
+    "sourceSha256": "3e3029e5f69c7f254f07de04a35bf2606f7871c6baa532fe7e532b845c8fa813",
+    "archiveSha256": "405e05a62ea75f51f2aff0903bad3f6470f4a6a16a363f47f190b52b92de4351",
+    "transformation": "documented-redaction-or-tool-path-localization"
+  }
+]

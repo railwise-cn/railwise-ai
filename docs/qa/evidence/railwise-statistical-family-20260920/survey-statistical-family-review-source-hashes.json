@@ -1,0 +1,14 @@
+{
+  "reviewedAtUtc": "2026-09-19T23:27:48.936913+00:00",
+  "sourceHashes": {
+    "kun/src/contracts/survey-statistical-family.ts": "404b88e9f0c3db8fdfff38a8f0f191da66e988aa53caf51a9e4f0a2366e4e139",
+    "kun/src/engineering/survey-statistical-family.ts": "f7dd1ce769e5c2934adb93a0d69e06eef3e8b41a21a1384f1019416a78a4cd82"
+  },
+  "scope": "Independent synthetic pure-kernel numerical review, no human signoff or packaged test",
+  "compiledStatisticalEsmVerification": {
+    "node": "26.8.2",
+    "import": "passed",
+    "normalTwoSidedStatistic": 8,
+    "pValue": 1.244192114854356e-15
+  }
+}

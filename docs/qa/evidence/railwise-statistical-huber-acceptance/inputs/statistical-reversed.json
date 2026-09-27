@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "familyId": "synthetic-complete-family",
+  "declaration": "caller-declared-before-observing-statistics",
+  "statisticPrecision": "caller-declared-exact-scalar-inputs-no-upstream-error-propagation",
+  "correction": "bonferroni",
+  "alpha": 0.05,
+  "members": [
+    {
+      "id": "a-normal",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "normal",
+        "tail": "two-sided",
+        "statisticBasis": "standardized-by-known-prior-scale",
+        "scaleBasis": "caller-declared-known-prior-standard-deviation",
+        "priorStandardDeviation": 1,
+        "scaleUnit": "m"
+      }
+    },
+    {
+      "id": "b-t",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "student-t",
+        "tail": "two-sided",
+        "statisticBasis": "externally-studentized",
+        "degreesOfFreedom": 1
+      }
+    },
+    {
+      "id": "c-chi",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "chi-square",
+        "tail": "upper",
+        "statisticBasis": "quadratic-form-divided-by-known-prior-variance",
+        "degreesOfFreedom": 2,
+        "scaleBasis": "caller-declared-known-prior-standard-deviation",
+        "priorStandardDeviation": 1,
+        "scaleUnit": "m"
+      }
+    },
+    {
+      "id": "d-missing",
+      "sourceAnchor": "synthetic-acceptance",
+      "distribution": {
+        "kind": "normal",
+        "tail": "two-sided",
+        "statisticBasis": "standardized-by-known-prior-scale",
+        "scaleBasis": "caller-declared-known-prior-standard-deviation",
+        "priorStandardDeviation": 1,
+        "scaleUnit": "m"
+      }
+    }
+  ],
+  "statistics": [
+    {
+      "memberId": "c-chi",
+      "status": "available",
+      "value": 4
+    },
+    {
+      "memberId": "b-t",
+      "status": "available",
+      "value": 3
+    },
+    {
+      "memberId": "a-normal",
+      "status": "available",
+      "value": 3
+    }
+  ]
+}

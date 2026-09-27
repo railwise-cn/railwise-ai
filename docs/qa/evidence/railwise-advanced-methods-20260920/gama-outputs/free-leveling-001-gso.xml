@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<gama-local-adjustment xmlns="http://www.gnu.org/software/gama/gama-local-adjustment">
+
+<description>Analytical three-point free leveling benchmark; all heights constrained by minimum correction.</description>
+
+<network-general-parameters
+   gama-local-version="2.29"
+   gama-local-algorithm="gso"
+   gama-local-compiler="Clang C/C++ 21.0"
+   axes-xy="en"
+   angles="left-handed"
+/>
+
+<network-processing-summary>
+
+<coordinates-summary>
+   <coordinates-summary-adjusted>    <count-xyz>0</count-xyz> <count-xy>0</count-xy> <count-z>3</count-z> </coordinates-summary-adjusted>
+   <coordinates-summary-constrained> <count-xyz>0</count-xyz> <count-xy>0</count-xy> <count-z>3</count-z> </coordinates-summary-constrained>
+   <coordinates-summary-fixed>       <count-xyz>0</count-xyz> <count-xy>0</count-xy> <count-z>0</count-z> </coordinates-summary-fixed>
+</coordinates-summary>
+
+<observations-summary>
+   <distances>0</distances>
+   <directions>0</directions>
+   <angles>0</angles>
+   <xyz-coords>0</xyz-coords>
+   <h-diffs>3</h-diffs>
+   <z-angles>0</z-angles>
+   <s-dists>0</s-dists>
+   <vectors>0</vectors>
+   <azimuths>0</azimuths>
+</observations-summary>
+
+<project-equations>
+   <equations>3</equations>
+   <unknowns>3</unknowns>
+   <degrees-of-freedom>1</degrees-of-freedom>
+   <defect>1</defect>
+   <sum-of-squares>3.0000000e-02</sum-of-squares>
+   <connected-network/>
+</project-equations>
+
+<standard-deviation>
+   <apriori>1.0000000e+00</apriori>
+   <aposteriori>1.7320508e-01</aposteriori>
+   <used>apriori</used>
+
+   <probability>0.950</probability>
+   <ratio>0.173</ratio>
+   <lower>0.031</lower>
+   <upper>2.241</upper>
+   <passed/>
+
+   <confidence-scale>1.9599640e+00</confidence-scale>
+</standard-deviation>
+
+</network-processing-summary>
+
+<coordinates>
+
+<fixed>
+</fixed>
+
+<approximate>
+   <point> <id>A</id> <Z>0.000000</Z> </point>
+   <point> <id>B</id> <Z>0.000000</Z> </point>
+   <point> <id>C</id> <Z>0.000000</Z> </point>
+</approximate>
+
+<!-- capital X,Y,Z denote constrained coordinates -->
+<adjusted>
+   <point> <id>A</id> <Z>-1.2333333333333329</Z> </point>
+   <point> <id>B</id> <Z>-0.3333333333333336</Z> </point>
+   <point> <id>C</id> <Z>1.5666666666666667</Z> </point>
+</adjusted>
+
+<std-error-ellipses>
+</std-error-ellipses>
+
+<orientation-shifts>
+</orientation-shifts>
+
+<!-- upper part of symmetric matrix band by rows -->
+<cov-mat>
+<dim>3</dim> <band>2</band>
+<flt>2.2222222e+05</flt> <flt>-1.1111111e+05</flt> <flt>-1.1111111e+05</flt>
+<flt>2.2222222e+05</flt> <flt>-1.1111111e+05</flt> <flt>2.2222222e+05</flt>
+</cov-mat>
+
+<!-- original indexes from the adjustment -->
+<original-index>
+<ind>1</ind>
+<ind>2</ind>
+<ind>3</ind>
+</original-index>
+
+</coordinates>
+
+<observations>
+
+<height-diff> <from>A</from> <to>B</to>
+   <obs>1.0000000000000000</obs> <adj>0.9000000000000000</adj> <stdev>816.4965809277260860</stdev>
+   <qrr>333333.333</qrr> <f>18.350</f> <std-residual>0.173</std-residual>
+   <err-obs>-300.000</err-obs> <err-adj>-200.000</err-adj>
+   </height-diff>
+<height-diff> <from>B</from> <to>C</to>
+   <obs>2.0000000000000000</obs> <adj>1.9000000000000001</adj> <stdev>816.4965809277260860</stdev>
+   <qrr>333333.333</qrr> <f>18.350</f> <std-residual>0.173</std-residual>
+   <err-obs>-300.000</err-obs> <err-adj>-200.000</err-adj>
+   </height-diff>
+<height-diff> <from>C</from> <to>A</to>
+   <obs>-2.7000000000000002</obs> <adj>-2.8000000000000003</adj> <stdev>816.4965809277260860</stdev>
+   <qrr>333333.333</qrr> <f>18.350</f> <std-residual>0.173</std-residual>
+   <err-obs>-300.000</err-obs> <err-adj>-200.000</err-adj>
+   </height-diff>
+
+</observations>
+
+</gama-local-adjustment>

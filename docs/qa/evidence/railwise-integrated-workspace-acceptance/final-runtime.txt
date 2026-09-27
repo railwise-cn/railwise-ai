@@ -1,0 +1,13 @@
+
+> kun@0.4.2 test
+> vitest run
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+
+ Test Files  172 passed | 2 skipped (174)
+      Tests  2713 passed | 3 skipped (2716)
+   Start at  09:00:45
+   Duration  14.18s (transform 11.24s, setup 0ms, import 32.50s, tests 86.26s, environment 9ms)
+

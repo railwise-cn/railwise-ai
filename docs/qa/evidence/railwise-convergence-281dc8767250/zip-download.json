@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "artifactId": 10597351950,
+  "download": "HTTP range extraction of application ZIP only; outer artifact digest not rehashed",
+  "targetZipSha256": "0c1849958d5492ef641560bb9168cd245a3354f62ca8940676f717d38d12d83f",
+  "matchesPrivateUpdaterTargetZip": true,
+  "zipPath": "/private/tmp/railwise-survey-281dc87/cloud-target/WorkWise-Candidate-281dc8767250-0.5.0-mac-arm64.zip"
+}

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "status": "draft-partial-acceptance-not-release-approval",
+  "sourceHead": "6ff82c8c27466ee42f2604b053397fd132d5a0a7",
+  "candidateVersion": "0.5.0",
+  "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+  "packageEvidence": "package.json",
+  "installedGuiExecution": "Parent task performed actual candidate GUI operations; this verifier used read-only stored records and existing independent oracles",
+  "independentChecks": {
+    "reference": { "records": 3, "status": "passed", "evidence": "independent-reference.json" },
+    "static": { "records": 3, "status": "passed", "maximumAppendedPrefixes": 128, "evidence": "independent-static.json" },
+    "huberAndFamily": { "records": 3, "status": "passed", "evidence": "independent-huber-family.json" },
+    "qualityAfterRestoration": { "records": 4, "status": "passed", "evidence": "independent-quality-restored.json" },
+    "nativeExport": { "status": "passed", "fullRecordEquality": true, "exactBytes": "database JSON plus one newline", "evidence": "native-export-verification.json" },
+    "exactPackageP0": {
+      "status": "passed-selected-real-data-workflows-and-restart",
+      "evidence": "p0-summary.json",
+      "projects": 3,
+      "networks": 2,
+      "algorithmVersion": "workwise-survey-adjustment-7",
+      "draftManifests": 2,
+      "outputHashAndSizeChecks": 6,
+      "sourceFileHashChecks": 2,
+      "storedVerificationAttemptsPassed": 4,
+      "checksPerAttempt": 5,
+      "originalByteAnchorsAndObservationLinks": "passed",
+      "independentIn2Ou2PrecisionComparison": "passed-33-points",
+      "independentGsiReferencePrecisionComparison": "passed-seven-unknown-endpoints-six-controls",
+      "independentGsiSameSourceAdjustment": "passed-21-unknown-points",
+      "gsiReferenceConversionProvenance": "unresolved-seven-of-fourteen-route-heights",
+      "privateEvidencePublication": "Do not publish private-p0 files, real source files, coordinates or local source paths."
+    }
+  },
+  "guiEvidenceGroups": {
+    "reference": ["02-reference-gls.ax.txt", "03-reference-gls-zh-light.jpg", "04-reference-singular.ax.txt", "05-reference-equal.ax.txt", "30-restart-reference.ax.txt"],
+    "static": ["06-static-sample.ax.txt", "07-static-stale.ax.txt", "08-static-maximum.ax.txt", "09-static-maximum-zh-light.jpg", "29-restart-static-maximum.ax.txt"],
+    "nativeSaveAs": ["10-native-export-cancel.ax.txt", "11-native-export-success.ax.txt"],
+    "quality": ["12-quality-full.ax.txt", "13-quality-veto.ax.txt", "14-quality-pending.ax.txt", "15-quality-sixty.ax.txt", "17-restart-quality-history.ax.txt", "18-restart-quality-full.ax.txt"],
+    "corruptionAndRecovery": ["21-quality-corruption-rejected.ax.txt", "22-quality-corrupt-history.ax.txt", "23-quality-healthy-during-corruption.ax.txt", "24-quality-byte-restored.ax.txt"],
+    "familyAndHuber": ["31-family-en-dark.ax.txt", "32-family-narrow-en-dark.jpg", "33-family-narrow-scrolled.jpg", "34-family-horizontal-action.jpg", "35-family-keyboard-horizontal.jpg", "36-huber-unique.ax.txt", "37-huber-flat.ax.txt"]
+  },
+  "screenshotBounds": {
+    "nearMinimumImagePixels": { "width": 963, "height": 641 },
+    "nativeWindowBoundsMeasured": false,
+    "preciseSupportedMinimumWindowAcceptance": "not-established",
+    "themesRepresented": ["Chinese light", "English dark"],
+    "note": "Image dimensions do not establish CSS viewport or native window bounds. AX captures can include transient loading states."
+  },
+  "remaining": {
+    "personalUserAcceptance": "not-performed",
+    "realAuthenticatedModelResponse": "not-performed",
+    "liveV41OfficialSearch": "not-performed",
+    "gsiReferenceConversionProvenance": "unresolved-seven-of-fourteen-route-heights",
+    "representativeProductionMetrics": "not-established-by-two-candidate-datasets"
+  },
+  "publicReleaseAuthorizedByThisEvidence": false,
+  "professionalEngineeringApproval": false
+}

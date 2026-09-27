@@ -1,0 +1,60 @@
+{
+  "date": "2026-09-20",
+  "scope": "declared-inspection-scoring-workspace-not-packaged-acceptance",
+  "runtimeTests": {
+    "suites": 7,
+    "testsPassed": 222
+  },
+  "desktopTests": {
+    "suites": 5,
+    "testsPassed": 108
+  },
+  "newWorkspaceTests": {
+    "runtime": 55,
+    "desktop": 28
+  },
+  "checksPassed": [
+    "Runtime typecheck",
+    "web/main typecheck",
+    "changed TypeScript ESLint",
+    "Runtime build",
+    "electron-vite build"
+  ],
+  "coreSourceAndCompiledHashMatches": 9,
+  "sourceSha256": {
+    "kun/src/contracts/survey-quality-scoring-workspace.ts": "82fcfd5c0fd44787bcd664b6095db760d329d1bd9e7f1fe1f224213ee50d2a61",
+    "kun/src/engineering/survey-quality-scoring-test-helpers.ts": "a20ee39e47e147437bf814bc69761312837cdc9cc21a0032a0c6b40456b26927",
+    "kun/src/engineering/survey-quality-scoring-workspace.test.ts": "b7dbd07b1fe75f699f8af6b952d5da24d85f6caf332cb709abbf0f9b762ba3b0",
+    "kun/src/engineering/survey-quality-scoring-workspace.ts": "4020f7fd1f61239474c9bdef1ac741224d83052eec57418018ef760b326818c8",
+    "kun/src/server/routes/index.ts": "2fb7cd9c2c0ae9ded7682f1aae7b7964f6efff09286c52b59c28e9c45d7f5eb0",
+    "kun/src/server/routes/server-runtime.ts": "6eca093de9865e225c67aa3b4772526f9a1cb679d2a64981075d9ffb5f88b23e",
+    "kun/src/server/routes/survey-quality-scoring-workspace.ts": "16330bd354b13f6a2925c362c12db54d6b16344b4205805831d76da1b29316e2",
+    "kun/src/server/runtime-factory.ts": "2490ffbb89b4db3dc648f79c591aa34538a1efcb6167795d9723368b267fc39a",
+    "kun/tests/runtime-quality-scoring-wiring.test.ts": "ad96ad0fe8567e6cfb9efc1e2b5991f87fadfa8d143f64df7976360d61533702",
+    "kun/tests/survey-quality-scoring-workspace-http.test.ts": "f65dcb5abe4cd09e2da164ce758927ac3af7f6f5e35f69c15bd31a3e82bd2724",
+    "src/main/ipc/app-ipc-quality-scoring.test.ts": "afaf3ba65b82fc23e91310318bbf947fef6997cbdc36d5180ad87bff1ec6c7b7",
+    "src/main/ipc/app-ipc-schemas.ts": "0ad313e6f7113326688081ac8daad80db18b80e62421ef3edc00719b3dad648b",
+    "src/renderer/src/agent/survey-quality-scoring-client.ts": "e65b797cddb7760a10674fed2ce92f5f46bbdc83060f7cf9575fdc670de984a9",
+    "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx": "61f2d21d86360aa87b8fa20f39227a290c24ce9b70127d53137bf4fb7560873f",
+    "src/renderer/src/components/engineering/SurveyQualityScoringResult.tsx": "8ae4e699753c8343c967723d4a7ae32eda12f701f7fc02e109c7c0957c1d65fa",
+    "src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts": "0143d285181ba6152e8d6f0666f5096d167436677c3a41577ac9d837b2d60b4a",
+    "src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.tsx": "d2b28f6d3caafb3d903a10e288370986fbaad18c3905265edccf715cfcf5450e",
+    "src/renderer/src/components/engineering/survey-quality-scoring-examples.ts": "689901ce3243eb2172ee57f4eb512ae0433f0d9e924ac4b67fcdecaaabae554a",
+    "src/renderer/src/i18n.ts": "7ee8c1261de382bfdee193454f4213a1b71b9c2c9edc278b7fa24c44b20b7a70",
+    "src/renderer/src/locales/en/quality-scoring.json": "8d0e0100f59515c51a6984fc4b0d06e452336d9cc17472b6d3b35516ca12c108",
+    "src/renderer/src/locales/zh/quality-scoring.json": "0d0717842343ab6637a74847c4b9f1fd7fa035447456b43f592ee00a695e9388",
+    "src/shared/survey-quality-scoring.ts": "20a491748ac811eafaa25c787b1068752fba138ac79885fe23e856f1a8042fbb"
+  },
+  "fixtureSha256": {
+    "quality-pending.json": "895754b81584e3ca12ba869d3cb595d192ab436de004703a3c8ab435903a430f",
+    "quality-multiple-sixty.json": "f309430e4cbca98c732f4b0b33d75d3b78f636f877f527b8ffdebcbdc23c07c0",
+    "quality-full.json": "8217e621b12261741975919b134ec3b44d30789519f5c079fcd3525781bb9113",
+    "quality-child-veto.json": "fd6720ebd190a9e7b1a0cd38b75ddd28a7ccece04806126d8adc3a7d76028b82"
+  },
+  "packagedVisualAcceptance": "delegated-to-main-task-not-claimed-here",
+  "independentIntegrationReview": {
+    "testsPassed": 24,
+    "compiledFixtureCasesPassed": 4,
+    "unresolvedBlockers": 0
+  }
+}

@@ -1,0 +1,9 @@
+# macOS Icon Composer Research (2026-09-24)
+
+The icon package in commit `0878c6cc932c6f7e85855b2ad5be199d7aee67d7` uses a static light ICNS for Finder and the app bundle. Its running Dock code selects a light or dark PNG from the system appearance and listens for appearance updates, but Dock rendering was not visually accepted in the local UI session.
+
+Electron Builder 26.8.1 supports a `mac.icon` `.icon` directory. Its installed `app-builder-lib` implementation calls Xcode `actool` 26 or newer to produce `Assets.car` and a compatibility `Icon.icns`, then sets `CFBundleIconName=Icon`. GitHub's `macos-15` runner image contains Xcode 26 installations, but its default is Xcode 16.4, so a workflow using Icon Composer must select an Xcode 26 toolchain explicitly.
+
+The [Electron Packager fixture](https://github.com/electron/packager/tree/main/test/fixtures/macos-icon-composer-assets/electron.icon) contains `icon.json` and an image, but its JSON content could not be retrieved in this check. [Ghostty's layered icon](https://github.com/ghostty-org/ghostty/blob/main/images/Ghostty.icon/icon.json) was verified and uses `groups[].layers[]`, PNG `image-name` references and layer visibility properties. It contains no default/dark appearance-specific binding. Neither sample provides verified syntax for two appearance variants.
+
+Do not invent appearance fields based on the layered example. The remaining path is to export a real default/dark `.icon` with Icon Composer (or locate a verified fixture), build it with `actool` 26+, inspect the compiled `Assets.car`, and test Finder/Launchpad with macOS icon style set to Default and Dark. Preserve the ICNS fallback. Clear/Tinted artwork has not been researched or validated. See `docs/qa/RAILWISE_ICON_REFRESH_20260924.md` for the current platform behavior and local packaged acceptance boundary.

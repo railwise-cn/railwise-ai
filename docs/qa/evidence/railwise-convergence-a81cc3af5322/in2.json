@@ -1,0 +1,187 @@
+{
+  "scope": "packaged-runtime-not-gui-acceptance",
+  "package": {
+    "asarSha256": "c1678cea4c1600e076a2274cc3eb546333190cbe36926c3537da37c749ee019d",
+    "runtimeModules": [
+      {
+        "name": "engineering-service",
+        "sha256": "390b757ae93c998537b57500f36da3f6ece5331d9c5e81a095290fec00368199"
+      },
+      {
+        "name": "survey-service",
+        "sha256": "75e11ed5182191a6a075c41b7a95d053c708e05647686b0bbb11a566b39e4dd4"
+      },
+      {
+        "name": "survey-adjustment-core",
+        "sha256": "dcb8ba838ed2190a187f422453f58dec550fdb61caf3c1426e6ca76fad155726"
+      },
+      {
+        "name": "survey-cosa-ou1",
+        "sha256": "23860bba69ca8713cd496da3ce1cd49724e1565c1d5df00ba07df420774c6548"
+      },
+      {
+        "name": "survey-cosa-ou2",
+        "sha256": "f098270aabd70a249379c0e5e2928111da0a5107765eaf956918570d3ba4e142"
+      }
+    ],
+    "electron": "43.1.1",
+    "nodeAbi": "148"
+  },
+  "source": {
+    "sha256": "3a01828c195bc6a7cee89d4293f21c1957b51ad150d16066980d1066a2b40500",
+    "bytes": 5238,
+    "format": "cosa-in2",
+    "knownPointCount": 0
+  },
+  "preflight": {
+    "formatId": "cosa-in2",
+    "vendor": "COSA(科傻)",
+    "formatVersion": null,
+    "detectionMethod": "structural-probe",
+    "detectionConfidence": 0.98,
+    "extensionClaimed": ".in2",
+    "extensionContentConflict": false,
+    "matchedSignatures": [
+      "COSA .in2 three-value header + L,0 station block"
+    ],
+    "requiresManualConfirmation": false,
+    "disposition": "adjustment-ready",
+    "dispositionReason": "adjustment-ready: P0 格式目录 workwise-survey-format-catalog-1.7.0 — 严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+    "parserId": "cosa-in2-parser",
+    "parserVersion": "0.3.0",
+    "parserSourceHash": "14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04",
+    "canonicalUnits": {
+      "linear": "m",
+      "angular": "rad"
+    },
+    "declaredDatum": null,
+    "declaredHeightSystem": null,
+    "summary": {
+      "pointCount": 2,
+      "stationCount": 11,
+      "observationCount": 160,
+      "recordCount": 174,
+      "skippedRecordCount": 0
+    },
+    "diagnostics": {
+      "total": 3,
+      "info": 2,
+      "warning": 1,
+      "blocking": 0,
+      "codes": [
+        "encoding_detected",
+        "format_detected"
+      ]
+    },
+    "rawRecordAnchors": {
+      "total": 174,
+      "usable": 174,
+      "linkedObservations": 160
+    },
+    "originalPreserved": true,
+    "eligibility": {
+      "eligible": true,
+      "blockingFindingCodes": []
+    }
+  },
+  "status": "completed",
+  "validation": "valid",
+  "integrity": {
+    "status": "verified",
+    "ledgerEntryCount": 2
+  },
+  "algorithm": "workwise-survey-adjustment-6",
+  "observations": 160,
+  "points": 33,
+  "degreesOfFreedom": 87,
+  "iterations": 3,
+  "precision": {
+    "maxPointStdDev": 0.0008339553114379577,
+    "passed": true,
+    "standardizedResidualGate": {
+      "actualMaximumSigma": 1.93380966877193,
+      "limitSigma": 3,
+      "exceededCount": 0,
+      "comparator": "<=",
+      "passed": true
+    },
+    "maxPointStdDevGate": {
+      "actualMetres": 0.0008339553114379577,
+      "configuredLimitMetres": null,
+      "status": "reported-no-project-limit-configured"
+    }
+  },
+  "closure": {
+    "independentCycles": 0,
+    "horizontalResidualNormMetres": 0.006669814930991744,
+    "angularResidualNormRadians": 1.4972170575382984e-05,
+    "configuredHeightClosureLimitMetres": null
+  },
+  "delivery": {
+    "pdfPageCount": 4,
+    "verifiedPointCount": 33,
+    "outputs": [
+      {
+        "name": "report.docx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "sha256": "c255ada40ed2668dd3a68b9823bc0de744c01bcbf5d9bbec1c60ff11737d3651",
+        "sizeBytes": 13643
+      },
+      {
+        "name": "report.pdf",
+        "mediaType": "application/pdf",
+        "sha256": "716a4585a284863b044b0c29ec54e94e7449068c152b91965ad342f2a0bd6937",
+        "sizeBytes": 40744
+      },
+      {
+        "name": "evidence.xlsx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "sha256": "474ce8abb877b9526f5c12302142cc15ae4fba545cb92baeabac87fce98d72b7",
+        "sizeBytes": 263139
+      }
+    ],
+    "manifest": {
+      "sha256": "3855842a162bee663171f8d11f51c504b8ef6faf37ab2dc1d714c3664a574ba4",
+      "bytes": 730714,
+      "sourceCount": 1,
+      "sourceHashes": [
+        "3a01828c195bc6a7cee89d4293f21c1957b51ad150d16066980d1066a2b40500"
+      ],
+      "adjustmentCount": 1,
+      "adjustmentInputHashes": [
+        "a3ebebe1ab2264d391963f9cf4cc043371f4271b8196197e041bd562c0234d8d"
+      ],
+      "outputCount": 3,
+      "valid": true,
+      "runtimeVersion": "0.5.0"
+    },
+    "reviewStatus": "draft"
+  },
+  "referenceComparison": {
+    "kind": "cosa-ou2-fixed-adjusted-coordinates",
+    "sourceSha256": "5c72252c90038bb3713c3d4bb0834cdd53cc693c3c99810f1b2d8ea6268934b7",
+    "strictPublishedRounding": {
+      "status": "matched",
+      "comparedPointCount": 33,
+      "mismatchCount": 0,
+      "maxPlanarCoordinateDifferenceMetres": 6.341583922171748e-05
+    },
+    "strictToleranceRule": "half-published-X-and-Y-resolution-per-axis-plus-floating-point-slack",
+    "combinedPrecisionEnvelope": {
+      "status": "matched",
+      "comparedPointCount": 33,
+      "fixedPointCount": 2,
+      "precisionPointCount": 31,
+      "mismatchCount": 0,
+      "strictPrintedMismatchCount": 0,
+      "maxPlanarCoordinateDifferenceMetres": 6.341583922171748e-05,
+      "maxCombinedNormalizedDifferenceSigma": 0.08899925199598996,
+      "combinedNormalizedDifferenceLimitSigma": 1,
+      "referenceMaximumPointStdDevMm": 0.83,
+      "adjustedMaximumPointStdDevMm": 0.8339553114379578,
+      "maximumAbsolutePointStdDevDifferenceMm": 0.0048383579900563856
+    },
+    "precisionToleranceRule": "planar-difference-at-most-one-combined-standard-deviation; fixed-points-remain-within-published-rounding",
+    "passed": true
+  }
+}

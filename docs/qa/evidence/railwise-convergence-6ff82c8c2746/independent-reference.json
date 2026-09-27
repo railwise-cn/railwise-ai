@@ -1,0 +1,55 @@
+{
+  "command": [
+    "/usr/local/bin/python3",
+    "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-reference-workspace-acceptance/inspect-packaged-trials.py",
+    "/private/tmp/railwise-survey-6ff82c8/home/.workwise/runtime/engineering/survey-advanced-trials.sqlite3",
+    "--project",
+    "project_9d966747-63bc-4658-9ba6-a8635423a7e0"
+  ],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-reference-workspace-acceptance/inspect-packaged-trials.py\", line 104, in <module>\n    main()\n  File \"/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-reference-workspace-acceptance/inspect-packaged-trials.py\", line 98, in main\n    results = [verify(row, fixtures) for row in rows]\n               ^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-reference-workspace-acceptance/inspect-packaged-trials.py\", line 52, in verify\n    assert name, 'Not one of the three acceptance declarations; no numeric claim made.'\n           ^^^^\nAssertionError: Not one of the three acceptance declarations; no numeric claim made.\n",
+  "databaseAccess": "sqlite URI mode=ro; no database mutation",
+  "checkedAt": "2026-09-20T01:31:18.585620+00:00",
+  "compatibilityAdaptation": {
+    "reason": "Existing reference main selects every project trial, including newly saved static kind. Kept original verify function unchanged and scoped read-only SQL to reference-datum.",
+    "query": "SELECT * FROM advanced_trials WHERE project_id=? AND kind='reference-datum' ORDER BY created_at,id",
+    "parameters": [
+      "project_9d966747-63bc-4658-9ba6-a8635423a7e0"
+    ],
+    "verificationFunction": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-reference-workspace-acceptance/inspect-packaged-trials.py:verify",
+    "result": {
+      "status": "passed",
+      "projectId": "project_9d966747-63bc-4658-9ba6-a8635423a7e0",
+      "count": 3,
+      "records": [
+        {
+          "id": "advanced_trial_032a81b5-45e4-4c23-94f1-755dfb0dbf48",
+          "fixture": "reference-gls",
+          "requestSha256": "d18ec7caf2948959169b809b500d4c8ee397b9f04e1fd84b317c951958d9310a",
+          "declarationSha256": "434077cc961b5a79897f679d6616269f6d1cbee7bc043d6bc1cbc6ffa6411aa0",
+          "rawBindings": "passed",
+          "independentNumerics": "passed"
+        },
+        {
+          "id": "advanced_trial_0f8e9837-50d1-471a-92bf-ceed3514d7cb",
+          "fixture": "reference-singular-gls",
+          "requestSha256": "944ecd581318723e9d8059e4079fff7e98635e67011780bcb5ba8cd7fcf735ac",
+          "declarationSha256": "0d41cf692f6059b26945703e5c661f7c6572d31bc60a43e2389ddcab444bbb09",
+          "rawBindings": "passed",
+          "independentNumerics": "passed"
+        },
+        {
+          "id": "advanced_trial_d61ae2e2-7226-4756-af19-8090e8bb5299",
+          "fixture": "reference-equal",
+          "requestSha256": "986150802a05c316317f68df1c555d55c28f0cc57a57151e4386a262ae116a11",
+          "declarationSha256": "953621efa9fdf15e3249dad81ad3bd129422cb20a6bbb220a10dd91ca654c107",
+          "rawBindings": "passed",
+          "independentNumerics": "passed"
+        }
+      ],
+      "scope": "Original independent reference arithmetic and raw-byte/SQL identity checks; not canonical JS replay or professional approval"
+    }
+  },
+  "status": "passed-with-kind-scoped-existing-oracle"
+}

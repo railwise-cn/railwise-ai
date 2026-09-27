@@ -1,0 +1,16 @@
+{
+  "pythonVersion": "3.12.7",
+  "bunVersion": "1.3.10",
+  "reviewedSourceSha256": {
+    "kun/src/engineering/survey-vce-trial.ts": "593f4c3e5063e71b9d758299bdc3360454292b48fac520e2fc0d8aa472f7f9fa",
+    "kun/src/contracts/survey-vce-trial.ts": "93d1c940c4d7935bb317e9f649e95a885bab4e8782e4d11dfb18819c8128bc3c"
+  },
+  "sourcePdfSha256": "4c4b6311f6da13844f559c48a57a62cd5467434b51d563805ae176a7a4ec9207",
+  "visuallyCheckedPdfPages": [
+    66,
+    67,
+    68,
+    73
+  ],
+  "reviewIdentity": "independent-agent-review-not-professional-signoff"
+}

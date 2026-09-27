@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-09-20T08:03:12.831Z",
+  "status": "passed",
+  "note": "These are expected-failure controls. The provider/effort in the first control are deliberately required test values, not claims about historical selections.",
+  "cases": [
+    {
+      "name": "strict-rejects-missing-legacy-marker",
+      "status": "passed",
+      "auditExitCode": 1,
+      "expectedError": "Task.engineeringPlanId missing or mismatched"
+    },
+    {
+      "name": "new-candidate-rejects-compatibility-mode",
+      "status": "passed",
+      "auditExitCode": 1,
+      "expectedError": "legacy compatibility is forbidden in new candidate acceptance"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "model": "deepseek-flash",
+  "scope": "live compiled adapter, synthetic inputs, no tool executed and no packaged UI acceptance",
+  "credentialCopied": false,
+  "settingsChanged": false,
+  "requests": [
+    {
+      "path": "/v1/chat/completions",
+      "status": 200
+    },
+    {
+      "path": "/v1/chat/completions",
+      "status": 200
+    },
+    {
+      "path": "/v1/chat/completions",
+      "status": 200
+    }
+  ],
+  "results": [
+    {
+      "label": "json",
+      "timestamp": "2026-09-20T03:28:38.282Z",
+      "elapsedMs": 561,
+      "stopReason": "stop",
+      "matched": true,
+      "text": "{\"probe\":\"railwise\",\"value\":7}",
+      "calls": []
+    },
+    {
+      "label": "function",
+      "timestamp": "2026-09-20T03:28:38.843Z",
+      "elapsedMs": 463,
+      "stopReason": "tool_calls",
+      "matched": true,
+      "text": "I'll call the record_echo tool as requested.",
+      "calls": [
+        {
+          "name": "record_echo",
+          "arguments": {
+            "token": "RAILWISE_TOOL_OK"
+          }
+        }
+      ]
+    },
+    {
+      "label": "vision",
+      "timestamp": "2026-09-20T03:28:40.552Z",
+      "elapsedMs": 748,
+      "stopReason": "stop",
+      "matched": true,
+      "text": "{\"blue_circles\": 2, \"red_squares\": 1}",
+      "calls": []
+    }
+  ],
+  "imageSha256": "0f75d13372d0c62a925108ba20a62d2fd24670b58bd7aee891a89000dee74e91"
+}

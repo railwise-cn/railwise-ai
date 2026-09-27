@@ -1,0 +1,32 @@
+{
+  "open": "查看规范依据",
+  "title": "本次结果的规范依据",
+  "boundary": "智能体复核的只读目录。项目适用性、规范符合性与人员签认仍为未评估。",
+  "legacyAssociation": "本说明按结果保留的来源、算法与输入合同匹配，不向原记录补写规则引用或批准状态。",
+  "missingIdentity": "本结果缺少完整来源身份，不关联规范依据。",
+  "offline": "本地 Runtime 暂不可用。",
+  "loading": "正在读取精确版本的规范依据…",
+  "retry": "重试查询",
+  "standard": "标准",
+  "profile": "成果类别",
+  "rule": "目录规则及版本",
+  "algorithm": "结果算法",
+  "clauses": "条款与官方原文页码",
+  "clause": "条款 {{value}}",
+  "table": "表 {{value}}",
+  "officialPdf": "在浏览器中打开官方 PDF",
+  "page": "印刷第 {{printed}} 页 · PDF 第 {{pdf}} 页",
+  "choices": "已实现范围",
+  "exclusions": "未覆盖范围与待解释分支",
+  "digests": "来源与目录身份",
+  "sourceDigest": "来源 PDF SHA-256",
+  "ruleDigest": "目录规则 SHA-256",
+  "profileVersion": "成果类别版本",
+  "errors": {
+    "mismatch": "本结果没有唯一、精确的目录匹配，原记录保持不变。",
+    "invalid-response": "规范依据响应未通过身份或完整性核验，不提供原文链接。",
+    "unavailable": "该规范依据版本不可用，未替换为其他版本。",
+    "request-failed": "规范依据读取失败。",
+    "open-failed": "官方 PDF 未能打开，原结果保持不变。"
+  }
+}

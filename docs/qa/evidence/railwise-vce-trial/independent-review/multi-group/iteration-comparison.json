@@ -1,0 +1,27 @@
+{
+  "count": 32,
+  "outcomes": {
+    "converged": 24,
+    "numerical-boundary": 1,
+    "nonpositive-component": 7
+  },
+  "maxScaledError": 1.2118549016189157e-9,
+  "resolvedMaximumScaledError": 6.2729187184526994e-15,
+  "maximumCase": {
+    "id": "random-44",
+    "field": "stopped-step2theta2",
+    "actual": 8.16663653923862,
+    "expected": 8.166636529341842,
+    "error": 1.2118549016189157e-9
+  },
+  "tolerance": 1e-8,
+  "conservativeStops": [
+    {
+      "id": "random-44",
+      "actual": "numerical-boundary",
+      "decimal": "numerical-boundary",
+      "atIteration": 3
+    }
+  ],
+  "failures": []
+}

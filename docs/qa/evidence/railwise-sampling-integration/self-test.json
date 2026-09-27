@@ -1,0 +1,10 @@
+{
+  "auditVersion": "sampling-independent-python-1",
+  "checkedAt": "2026-09-19T21:33:39.471051+00:00",
+  "implementation": "Python standard library; no product imports",
+  "trust": "Local SHA-256/HMAC consistency is not a signature, independent custody, verified randomness or professional approval.",
+  "snapshot": "Separate read-only SQLite snapshots; run with GUI idle. Commit detection does not make the two snapshots atomic.",
+  "selfTest": "passed",
+  "status": "not-evaluated",
+  "reason": "self-test-only-not-real-candidate-evidence"
+}

@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "status": "passed-selected-monitoring-checks",
+  "sourceHead": "43689493ab586c8d65bae729cfd291f3c813f679",
+  "packageAsarSha256": "11a060ec6a7c42385eed433a336967a91647251f51a07f0781302420b2f9e20c",
+  "phase": "before",
+  "checkedAt": "2026-09-20T11:41:02.196972+00:00",
+  "projects": [
+    {
+      "format": "csv",
+      "ids": {
+        "project": "project_1dece04a-7fb3-496d-acdd-5cc16627c73d",
+        "manifest": "manifest_9fbe14de-b7f2-460d-8e9e-090f0eebb5b6",
+        "dataset": "dataset_deaf5ab2-d56d-4813-9070-97f53f992078",
+        "analysis": "analysis_cd22a287-b24b-4843-a1e9-ef70d7430166",
+        "run": "run_799ff24e-a1f2-4918-a059-e6c92bf8a019"
+      },
+      "sourceSha256": "da806e3ef17a8f95d468e09f16d7f8d8a45983fe2e22b305e260aa39e3e86f3c",
+      "expected": [
+        {
+          "monitoringItem": "沉降",
+          "point": "S01",
+          "currentValue": 8.0,
+          "previousValue": 2.0,
+          "cumulativeChange": 8.0,
+          "changeRate": 2.0,
+          "trend": "rising"
+        },
+        {
+          "monitoringItem": "沉降",
+          "point": "S02",
+          "currentValue": -1.0,
+          "previousValue": 5.0,
+          "cumulativeChange": -9.0,
+          "changeRate": -2.0,
+          "trend": "falling"
+        }
+      ],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_1dece04a-7fb3-496d-acdd-5cc16627c73d/run_799ff24e-a1f2-4918-a059-e6c92bf8a019/report.docx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "sha256": "0db05bb960b600b8e26f4108657baebc968a8cedbd2497093bce88b315db6280",
+          "sizeBytes": 4501
+        },
+        {
+          "path": ".workwise/deliverables/project_1dece04a-7fb3-496d-acdd-5cc16627c73d/run_799ff24e-a1f2-4918-a059-e6c92bf8a019/report.pdf",
+          "mediaType": "application/pdf",
+          "sha256": "a955fccccdb6c9ba6d54beaab7f4dacbe96c2c97a3349a75b839145d0f3ce454",
+          "sizeBytes": 30376
+        },
+        {
+          "path": ".workwise/deliverables/project_1dece04a-7fb3-496d-acdd-5cc16627c73d/run_799ff24e-a1f2-4918-a059-e6c92bf8a019/evidence.xlsx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "sha256": "ac6fb6f475ab30fdfcae887260c0caef0652bf7eec11551d59f44c61de36679f",
+          "sizeBytes": 35944
+        },
+        {
+          "path": ".workwise/deliverables/project_1dece04a-7fb3-496d-acdd-5cc16627c73d/chart_4c91783f-287a-420e-8979-a0d3c7ea88f4/trend.svg",
+          "mediaType": "image/svg+xml",
+          "sha256": "cd245da79f2f4e6ea65aae7c83d779c64f403beee2772ec6ff58705e7463821a",
+          "sizeBytes": 5376
+        }
+      ],
+      "analysisInputHash": "9043adb8dfa831c8e3598e4a97d0288ed95c2233c884211950678c61a3c363ac",
+      "algorithmVersion": "workwise-engineering-2",
+      "chart": {
+        "series": 2,
+        "observations": 6,
+        "timeProportional": true,
+        "pointLinesSeparate": true,
+        "id": "chart_4c91783f-287a-420e-8979-a0d3c7ea88f4",
+        "rendererVersion": "engineering-trend-2",
+        "recordHash": "fe74411e6e91026875460d46a665b48a9de2f76dcc1696fb46e5ef79661ee77c"
+      },
+      "reviewStatus": "draft",
+      "verificationAttempts": [
+        {
+          "id": "verification_31c0dc40-9ad5-4e15-b00c-3deec0c29ac9",
+          "startedAt": "2026-09-20T11:23:50.060Z",
+          "outcome": "passed",
+          "recordHash": "2ba718e1320075a8372de3640202f6433f9269ef93381eacfc51b6df47c20df3",
+          "startedRecordHash": "8fc69b8cfdba786472d11b896398742c34e00b2d2907e30591ad862af28af541",
+          "finishedRecordHash": "c689155afd1eb9c30614d206de5a4e415a8f2e539e154eb932c09878c98abce7"
+        }
+      ],
+      "incompleteStarts": []
+    },
+    {
+      "format": "xlsx",
+      "ids": {
+        "project": "project_b829892d-1b3d-47a9-8426-831a0ed0d3cd",
+        "manifest": "manifest_d8722634-7168-458c-98db-4be01eb081f5",
+        "dataset": "dataset_ae2b41fb-e6d2-42ec-934f-5d2e6b51155d",
+        "analysis": "analysis_a915821e-0eb2-4aea-98c7-8aac4eba70da",
+        "run": "run_f3957fa4-336d-4a72-912a-c2494bfa94fe"
+      },
+      "sourceSha256": "b951a1761ff07a28e228266e48e94de2f9db2521481771ec9b584e74a9ec3e36",
+      "expected": [
+        {
+          "monitoringItem": "沉降",
+          "point": "S01",
+          "currentValue": 8.0,
+          "previousValue": 2.0,
+          "cumulativeChange": 8.0,
+          "changeRate": 2.0,
+          "trend": "rising"
+        },
+        {
+          "monitoringItem": "沉降",
+          "point": "S02",
+          "currentValue": -1.0,
+          "previousValue": 5.0,
+          "cumulativeChange": -9.0,
+          "changeRate": -2.0,
+          "trend": "falling"
+        }
+      ],
+      "outputs": [
+        {
+          "path": ".workwise/deliverables/project_b829892d-1b3d-47a9-8426-831a0ed0d3cd/run_f3957fa4-336d-4a72-912a-c2494bfa94fe/report.docx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "sha256": "554a5bec94248c934b76ad9fe1f5e74f5910b55facc948464a2ada0307e8f1d6",
+          "sizeBytes": 4577
+        },
+        {
+          "path": ".workwise/deliverables/project_b829892d-1b3d-47a9-8426-831a0ed0d3cd/run_f3957fa4-336d-4a72-912a-c2494bfa94fe/report.pdf",
+          "mediaType": "application/pdf",
+          "sha256": "ba45798caf4db703562d52704435813da6909958aff76ba162547bf2a9b80b43",
+          "sizeBytes": 30618
+        },
+        {
+          "path": ".workwise/deliverables/project_b829892d-1b3d-47a9-8426-831a0ed0d3cd/run_f3957fa4-336d-4a72-912a-c2494bfa94fe/evidence.xlsx",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "sha256": "cc74566b490f54dfb57033f3ff10318e45e94ad1a61707756214873973698623",
+          "sizeBytes": 36196
+        },
+        {
+          "path": ".workwise/deliverables/project_b829892d-1b3d-47a9-8426-831a0ed0d3cd/chart_e6065dc9-57fd-43cc-8a43-7090df2272d6/trend.svg",
+          "mediaType": "image/svg+xml",
+          "sha256": "881834e39485e3a3bcb6b677d621d3cf35bc1311bdc2fa71b79deea5014ccdb1",
+          "sizeBytes": 5378
+        }
+      ],
+      "analysisInputHash": "18964a02cf67a062e4c03259d33e56630ca12231219eb4525e943706f7d5be46",
+      "algorithmVersion": "workwise-engineering-2",
+      "chart": {
+        "series": 2,
+        "observations": 6,
+        "timeProportional": true,
+        "pointLinesSeparate": true,
+        "id": "chart_e6065dc9-57fd-43cc-8a43-7090df2272d6",
+        "rendererVersion": "engineering-trend-2",
+        "recordHash": "6a16c12ef943e641e9283a958af347558b1f10b088353e328e3fe20aa9e96318"
+      },
+      "reviewStatus": "draft",
+      "verificationAttempts": [
+        {
+          "id": "verification_d13f4880-f35d-4d21-aafb-013e30abab69",
+          "startedAt": "2026-09-20T11:29:36.616Z",
+          "outcome": "passed",
+          "recordHash": "2cc1675a46751accbbe308ad71263ae0fb60f2ba4dda088a3704bb99207fede3",
+          "startedRecordHash": "292bef10be1cb847e925c7b55d96531a6a7b45fb80342b7b4d2c313c3e755fb0",
+          "finishedRecordHash": "7e3370e0b842855142c1d2fe98f963edd1949eaff6690f39beeca078f71d6c40"
+        },
+        {
+          "id": "verification_27f8360e-cfe5-41a3-93bf-7be87f6dd108",
+          "startedAt": "2026-09-20T11:32:59.279Z",
+          "outcome": "passed",
+          "recordHash": "ec8d0f06c7559321cfcc3f0695de1f618563d9170c7d009f71bef18916384731",
+          "startedRecordHash": "d816d0dace7cd511328d7258a5dce4cb400db0a1fb6ad949ad10e48387944b06",
+          "finishedRecordHash": "d592e6c1e9d6c56009dd842a905248a31ead9489291dd757306bb5b51c216670"
+        },
+        {
+          "id": "verification_f74dbd44-d420-44a9-a521-e83f9e2d61ee",
+          "startedAt": "2026-09-20T11:39:10.415Z",
+          "outcome": "passed",
+          "recordHash": "91aa37593f2872886dc2fafd0aa14a8dd5373823db9f558fcd58c146ce07d0e0",
+          "startedRecordHash": "49da2259f3c6ca18971a171bfb3b97dc6d7e529693619cf645c3b505ab2f5d4e",
+          "finishedRecordHash": "933115120d8067f138ecba265b4b7e2e38e9c827e9198b4986f1fed3f7ba4bd6"
+        }
+      ],
+      "incompleteStarts": []
+    }
+  ],
+  "guiRestartVerifiedByScript": false,
+  "allReadFilesUnchanged": true,
+  "originalFileSetAndClosedStateStable": true,
+  "limitations": [
+    "Selected synthetic records only; no professional approval or production KPI.",
+    "GUI restart and rendered visual checks are separate operator evidence.",
+    "DOCX/PDF numerical text, workbook values and SVG geometry checked; no pixel-based rendering claim."
+  ]
+}

@@ -1,4 +1,5 @@
 import type { ComponentPropsWithRef, MouseEvent, ReactElement } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Streamdown, type AnimateOptions, type StreamdownProps } from 'streamdown'
 import remarkGfm from 'remark-gfm'
 import { harden } from 'rehype-harden'
@@ -150,6 +151,7 @@ type Props = {
 }
 
 export function StreamdownAssistant({ text, streaming, className }: Props): ReactElement {
+  const { t } = useTranslation('common')
   const animated = streaming && shouldAnimateStreamingText(text) ? STREAMING_ANIMATED : false
   const isAnimating = animated !== false
 
@@ -163,6 +165,7 @@ export function StreamdownAssistant({ text, streaming, className }: Props): Reac
       remarkPlugins={[remarkGfm]}
       rehypePlugins={rehypePlugins}
       components={components}
+      translations={{ copyTable: t('markdownCopyTable'), downloadTable: t('markdownDownloadTable'), viewFullscreen: t('markdownViewFullscreen') }}
     >
       {text}
     </Streamdown>
