@@ -3,6 +3,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync
@@ -458,19 +459,8 @@ describe('electron-builder WorkWise packaging', () => {
     expect(builderConfig.mac.entitlementsInherit)
       .toBe(join(process.cwd(), 'build/entitlements.mac.inherit.plist'))
 
-    const entitlements = execFileSync('plutil', [
-      '-convert',
-      'json',
-      '-o',
-      '-',
-      '--',
-      builderConfig.mac.entitlements
-    ], { encoding: 'utf8' })
-    expect(JSON.parse(entitlements)).toMatchObject({
-      'com.apple.security.cs.allow-jit': true,
-      'com.apple.security.cs.allow-unsigned-executable-memory': true,
-      'com.apple.security.cs.disable-library-validation': true
-    })
+    const entitlements = readFileSync(builderConfig.mac.entitlements, 'utf8')
+    expect(macNotarize._internals.missingRuntimeEntitlements(entitlements)).toEqual([])
     expect(afterPack.MAC_ENTITLEMENTS_PATH).toBe(builderConfig.mac.entitlements)
   })
 
