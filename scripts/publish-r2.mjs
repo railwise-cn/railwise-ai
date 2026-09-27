@@ -14,8 +14,13 @@ import { readFileSync, existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
-const PRODUCT_NAME = 'WorkWise'
+// Keep the published manifest identity in lockstep with the packaged app.
+// Artifact filenames intentionally retain the WorkWise prefix for updater
+// compatibility, but latest.json must expose the public RailWise AI name.
+const require = createRequire(import.meta.url)
+const PRODUCT_NAME = require('../src/shared/product-brand.json').platform
 const R2_COPY_CONCURRENCY = 3
 
 function createR2RequestHandler() {
@@ -865,6 +870,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 }
 
 export const _internals = {
+  productName: PRODUCT_NAME,
   normalizeTag,
   normalizeChannel,
   compareReleaseTagsDescending,
