@@ -409,7 +409,7 @@ async function verifyPublic(sourceDirectory, version) {
   const html = await response.text()
   const required = [
     `softwareVersion":"v${version}`,
-    `WorkWise v${version} 已发布`,
+    `${manifest.name || 'WorkWise'} v${version} 已发布`,
     `releases/tag/v${version}`,
     ...manifest.platforms.map((item) => item.url)
   ]
