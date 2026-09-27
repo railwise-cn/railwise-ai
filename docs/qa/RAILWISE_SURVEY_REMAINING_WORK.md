@@ -1,6 +1,6 @@
-# RAILWISE AI / Survey 总计划未完成清单
+# RailWise AI / Survey 总计划未完成清单
 
-原审计日期：2026-09-20；进展更新：2026-09-24。原审计源码：`43689493ab586c8d65bae729cfd291f3c813f679`。依据为用户提供的《RAILWISE AI ｜ Survey 产品收敛与命名迁移总计划》、[OpenSpec 任务](../../openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md)、源码与[执行台账](RAILWISE_SURVEY_CONVERGENCE_STATUS.md)。下表保留原审计任务编号；后续源码进展另列，不追溯改变旧包验收。审查身份为 AI 智能体，不是专业人员签章或用户验收。
+原审计日期：2026-09-20；进展更新：2026-09-24。原审计源码：`43689493ab586c8d65bae729cfd291f3c813f679`。依据为用户提供的《RailWise AI ｜ Survey 产品收敛与命名迁移总计划》、[OpenSpec 任务](../../openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md)、源码与[执行台账](RAILWISE_SURVEY_CONVERGENCE_STATUS.md)。下表保留原审计任务编号；后续源码进展另列，不追溯改变旧包验收。审查身份为 AI 智能体，不是专业人员签章或用户验收。
 
 2026-09-24：[声明整改链](RAILWISE_SURVEY_QUALITY_WORKFLOW.md)的持久化、Runtime/IPC/client 和双语人工界面已通过源码检查，自己的签名包验收未完成。`3f0dbf1` 旧候选已真实进入中文浅色 Survey 并显式发送两次，均因上游 401 鉴权失败，零模型工具调用；精确成果追问的真实读回仍未通过，详见[失败证据](evidence/railwise-result-questions-gui-20260924/README.md)。OpenSpec 当前 107 项、87 项完成、20 项未完成。
 

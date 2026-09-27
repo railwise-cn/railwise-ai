@@ -373,10 +373,10 @@ describe('electron-builder WorkWise packaging', () => {
       updateChannel: 'frontier'
     })
     expect(config.appId).toBe(`com.wangjiawei508.workwise.candidate.head${shortHead}`)
-    expect(config.productName).toBe(`RAILWISE AI Candidate ${shortHead}`)
+    expect(config.productName).toBe(`RailWise AI Candidate ${shortHead}`)
     expect(config.artifactName).toContain(`WorkWise-Candidate-${shortHead}-`)
-    expect(config.nsis.shortcutName).toBe(`RAILWISE AI Candidate ${shortHead}`)
-    expect(config.nsis.uninstallDisplayName).toBe(`RAILWISE AI Candidate ${shortHead}`)
+    expect(config.nsis.shortcutName).toBe(`RailWise AI Candidate ${shortHead}`)
+    expect(config.nsis.uninstallDisplayName).toBe(`RailWise AI Candidate ${shortHead}`)
     expect(config.publish).toEqual([
       { provider: 'generic', url: 'https://127.0.0.1/' }
     ])
@@ -455,8 +455,8 @@ describe('electron-builder WorkWise packaging', () => {
 
   it('checks timestamp candidates across nested macOS signed code', () => {
     const root = tempRoot()
-    const appBundle = join(root, 'WorkWise.app')
-    const mainExecutable = join(appBundle, 'Contents/MacOS/WorkWise')
+    const appBundle = join(root, 'RailWise AI.app')
+    const mainExecutable = join(appBundle, 'Contents/MacOS/RailWise AI')
     const framework = join(appBundle, 'Contents/Frameworks/Electron Framework.framework')
     const nativeAddon = join(
       appBundle,

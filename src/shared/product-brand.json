@@ -1,7 +1,7 @@
 {
-  "platform": "RAILWISE AI",
-  "survey": "RAILWISE Survey",
-  "runtime": "RAILWISE AI Runtime",
+  "platform": "RailWise AI",
+  "survey": "RailWise Survey",
+  "runtime": "RailWise AI Runtime",
   "surveySubtitle": { "zh": "工程测量内业", "en": "Engineering Survey Processing" },
-  "compatibility": { "packageName": "workwise", "productName": "WorkWise", "domain": "engineering" }
+  "compatibility": { "packageName": "workwise", "productName": "RailWise AI", "domain": "engineering" }
 }

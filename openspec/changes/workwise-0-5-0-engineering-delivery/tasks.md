@@ -42,7 +42,7 @@
 
 ## D-04 product naming compatibility
 
-- [x] Apply the WorkWise / Survey / RAILWISE Survey naming boundary to new user-visible workbench and project-thread labels; preserve package, bundle, updater, API, route, storage, and `domain: "engineering"` compatibility identifiers with regression coverage.
+- [x] Apply the WorkWise / Survey / RailWise Survey naming boundary to new user-visible workbench and project-thread labels; preserve package, bundle, updater, API, route, storage, and `domain: "engineering"` compatibility identifiers with regression coverage.
 
 ## Canonical survey adjustment
 
@@ -73,14 +73,14 @@
 - [x] Add the professional import preflight UI, format/readiness filters, raw-record and diagnostic views, accessible recovery actions, and replace the CSV/XLSX/JSON-only survey copy and file picker.
 - [ ] Add redistributable or synthetic format fixtures for every advertised vendor/receiver family, parser golden/negative tests, decompression-bomb and malformed-record limits, Runtime/UI/artifact provenance tests, and real-project production acceptance: at least two P0 measurement formats must run import -> preflight -> deterministic adjustment -> DOCX/PDF/XLSX/manifest in the packaged candidate, with closure/precision comparison evidence. Do not treat a source as accepted merely because its vendor family is named.
 
-## RAILWISE AI / Survey convergence baseline (2026-09-19)
+## RailWise AI / Survey convergence baseline (2026-09-19)
 
 The user-provided consolidated plan supersedes the earlier D-04 platform naming and AI-only first-screen design. Historical checkmarks above describe the earlier scope, not completion of this baseline.
 
 - [x] Complete six typed engineering jobs, non-destructive legacy mapping, editable task context (datum, grade, standard version/clause), and migration integration tests.
 - [ ] Complete four production stages, persistent AI conversation, stage tools, localized summary and readiness-driven actions; never label preview files reviewed.
 - [ ] Verify ordinary questions, modification confirmation cards, typed execution approvals, evidence-to-record navigation and model-offline manual operation.
-- [ ] Centralize RAILWISE AI / RAILWISE Survey display naming, migrate menus/settings/startup/about/candidate display and brand assets; retain technical identifiers and record the migration matrix.
+- [ ] Centralize RailWise AI / RailWise Survey display naming, migrate menus/settings/startup/about/candidate display and brand assets; retain technical identifiers and record the migration matrix.
 - [ ] Complete Survey English/Chinese locale validation, theme/window/accessibility acceptance in the exact packaged candidate.
 - [x] Complete current-head desktop and Runtime tests, lint, typecheck, build and strict specification validation with separate command evidence.
 - [ ] Complete candidate signing/notarization, isolated install, two P0 format GUI delivery runs, restart and real private updater round trip; obtain human UI/professional confirmation.

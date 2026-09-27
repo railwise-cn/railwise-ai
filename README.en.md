@@ -1,10 +1,10 @@
-# RAILWISE AI
+# RailWise AI
 
 [简体中文](./README.md) | English
 
 > Engineering survey processing and coding collaboration.
 
-RAILWISE AI is a local-first desktop platform. Its candidate interface has Code and Survey as the primary workspaces. RAILWISE Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
+RailWise AI is a local-first desktop platform. Its candidate interface has Code and Survey as the primary workspaces. RailWise Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
 
 **Version boundary:** the naming migration, four-stage Survey interface and subsequent professional features are undergoing isolated candidate acceptance. This documentation does not replace the public 0.5.0 installers or change their update channel. The repository is now `railwise-cn/railwise-ai`; WorkWise package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
 
@@ -25,7 +25,7 @@ The current stable release is **[v0.5.0](https://github.com/railwise-cn/railwise
 
 GitHub Releases remains the public release log and manual installer source. Signed updater metadata and platform update artifacts are published through the official `railwise.cn` Stable channel. There is currently no Linux client, portable edition, or activation-code flow.
 
-## RAILWISE Survey
+## RailWise Survey
 
 **Original files → Content detection and preflight → Network and datum confirmation → Deterministic adjustment → Precision review → Deliverables → Human review.**
 
@@ -48,11 +48,11 @@ Quality workspaces provide material retention, complete first-round sampling, li
 
 All three images are actual Chinese light-theme captures from installed candidate `281dc87`, using a synthetic planar network with four points, one station and five observations. The [screenshot manifest](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json) records their provenance and hashes.
 
-![RAILWISE Survey candidate adjustment results in Chinese light mode](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
+![RailWise Survey candidate adjustment results in Chinese light mode](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
 
-![RAILWISE Survey candidate deliverables in Chinese light mode](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
+![RailWise Survey candidate deliverables in Chinese light mode](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
 
-![RAILWISE AI candidate model settings in Chinese light mode](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
+![RailWise AI candidate model settings in Chinese light mode](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
 
 This package completed signing, notarization, a real private updater round trip and limited linked-quality GUI checks. Its [exact-package report](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md) remains partial: full interface coverage, packaged AI workflows, professional review and personal user confirmation are outstanding. Subsequent source fixes are not implicitly included in this package.
 
@@ -66,7 +66,7 @@ The official V4.1 Responses API ignores built-in `web_search`. HTTP 200 does not
 
 The model catalog configures a 1M-token context and up to 384K output, with reasoning, tool-call, compression, cache-usage, JSON and Responses adapter paths. Actual access, limits and billing depend on the service and account. Provider vision capability determines structured `text`/`image` messages; text-only providers use the configured loopback visual-evidence analyzer. Failures remain explicit rather than inserting image Base64 into the model prompt. [Official model documentation](https://api-docs.deepseek.com/updates) remains the source for provider capabilities.
 
-## Why RAILWISE AI
+## Why RailWise AI
 
 AI should do more than answer a one-off prompt. Real work needs project material, files, sessions, methods, and delivery standards to persist together.
 
@@ -134,7 +134,7 @@ Read more: [Local data and security](https://kb.railwise.cn/products/workwise/se
 | Status | Scope |
 | --- | --- |
 | Available now | Code, Write, Design, DeepSeek Harness structured attachment handling, reliable task runs, Agents, MCP V2, general document attachments, indexed retrieval, validated document delivery, and in-app updates |
-| Isolated candidate | RAILWISE naming, four-stage Survey and subsequent advanced/quality workspaces; accepted by exact package, without replacing 0.5.0 downloads |
+| Isolated candidate | RailWise AI naming, four-stage Survey and subsequent advanced/quality workspaces; accepted by exact package, without replacing 0.5.0 downloads |
 | Preview | Flow canvas, typed nodes, mock and single-node tests, publish validation, run history, approval, and failure recovery |
 | Optional | Local MinerU parsing, online Skill updates, mobile connection, and companion command-line tools |
 | Direction | More multimodal generation nodes, industry nodes, and enterprise integrations |

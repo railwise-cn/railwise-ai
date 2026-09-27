@@ -312,7 +312,7 @@ This is an unsigned build. macOS Gatekeeper will block first launch.
 Run this after downloading:
 
 ```sh
-xattr -cr "WorkWise.app"
+xattr -cr "RailWise AI.app"
 # or
 npm run mac:unquarantine
 ```

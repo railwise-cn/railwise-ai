@@ -6,7 +6,7 @@ WorkWise 的正式版本变更记录。各版本的完整说明同时保存在 `
 
 ### Changed
 
-- 平台显示品牌统一为 RAILWISE AI，Survey 提供导入与预检、建网与平差、分析与精度、成果与审查四阶段工作区。
+- 平台显示品牌统一为 RailWise AI，Survey 提供导入与预检、建网与平差、分析与精度、成果与审查四阶段工作区。
 - 仓库迁移至 `railwise-cn/railwise-ai`，同步帮助、插件来源、更新器后备地址、发布流程和官网源码链接。
 - 更换品牌图标；macOS 运行中 Dock 根据系统主题选择深浅图标，Windows 使用深色图标。
 - DeepSeek 默认模型使用 `deepseek-flash`，保留已有显式模型配置，并修正自动选模与失败回退。

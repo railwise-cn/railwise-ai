@@ -1,4 +1,4 @@
-RAILWISE AI — CLEAN ASSET PACK v2
+RailWise AI — CLEAN ASSET PACK v2
 
 This pack replaces the previous asset package.
 
@@ -16,7 +16,7 @@ Included:
 - Transparent PNG: 1024, 512, 256, 128, 64, 48, 32, 24, 16
 - Light / dark / brand app icons at all sizes
 - Micro icons: 32, 24, 16
-- Horizontal RAILWISE AI lockup SVG + PNG master
+- Horizontal RailWise AI lockup SVG + PNG master
 - Windows ICO
 - QA report
 

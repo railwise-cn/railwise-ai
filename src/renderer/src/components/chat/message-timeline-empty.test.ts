@@ -37,7 +37,7 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
 
   it('uses the waking title when no runtime error is available', () => {
     const html = renderOfflineHero(null)
-    expect(html).toContain('RAILWISE AI Runtime is waking the local agent')
+    expect(html).toContain('RailWise AI Runtime is waking the local agent')
     expect(html).not.toContain('Cannot connect to the local runtime')
   })
 
@@ -47,7 +47,7 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
     // New error title should appear (so users see the failure immediately)
     expect(html).toContain('Cannot connect to the local runtime')
     // The old "waking" title must NOT appear — that's the bug we're fixing
-    expect(html).not.toContain('RAILWISE AI Runtime is waking the local agent')
+    expect(html).not.toContain('RailWise AI Runtime is waking the local agent')
     // The specific localized port-conflict message should appear in the body
     expect(html).toContain(portConflict)
   })
@@ -55,7 +55,7 @@ describe('MessageTimelineEmptyHero — runtime offline hero (issue #78)', () => 
   it('treats whitespace-only runtimeError as no error', () => {
     const html = renderOfflineHero('   \n  ')
     // Falls back to the generic waking hero
-    expect(html).toContain('RAILWISE AI Runtime is waking the local agent')
+    expect(html).toContain('RailWise AI Runtime is waking the local agent')
     expect(html).not.toContain('Cannot connect to the local runtime')
   })
 

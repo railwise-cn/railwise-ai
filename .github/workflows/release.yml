@@ -822,7 +822,7 @@ jobs:
           if [[ "${MAC_SIGNED}" == "true" ]]; then
             mac_line="- macOS: Developer ID signed and notarized"
           else
-            mac_line="- macOS: UNSIGNED build — run \`xattr -dr com.apple.quarantine /Applications/WorkWise.app\` (or scripts/mac-unquarantine.sh) before first launch"
+            mac_line="- macOS: UNSIGNED build — run \`xattr -dr com.apple.quarantine /Applications/RailWise AI.app\` (or scripts/mac-unquarantine.sh) before first launch"
           fi
 
           {

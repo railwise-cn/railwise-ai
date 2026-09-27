@@ -12,8 +12,8 @@ import { app } from 'electron'
  * installations can upgrade in place. It is a platform compatibility value,
  * not a product name and is allowlisted by the brand-boundary check.
  */
-export const APP_PRODUCT_NAME = 'WorkWise'
-export const CANDIDATE_APP_PRODUCT_NAME = 'WorkWise IM Candidate'
+export const APP_PRODUCT_NAME = 'RailWise AI'
+export const CANDIDATE_APP_PRODUCT_NAME = 'RailWise AI Candidate'
 
 /**
  * 在 main 进程最早期调用,把 app 的对外名称设好。

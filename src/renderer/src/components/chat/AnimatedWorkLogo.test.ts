@@ -10,7 +10,7 @@ describe('AnimatedWorkLogo', () => {
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
     const logoSvg = await readFile(new URL('../../../../asset/img/workwise.svg', import.meta.url), 'utf8')
 
-    expect(logoSvg).toContain('RAILWISE AI')
+    expect(logoSvg).toContain('RailWise AI')
     expect(logoSvg).not.toContain('WorkWise')
     expect(logoSvg).toContain('viewBox="0 0 1024 1024"')
     expect(logoSvg).not.toContain('Layer_2')

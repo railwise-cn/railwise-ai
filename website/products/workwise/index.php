@@ -5,9 +5,9 @@ $workwiseManifest = rw_workwise_manifest();
 $workwiseDocs = rw_workwise_docs();
 $currentPage = 'products';
 $bodyClass = 'page-product page-product-workwise';
-$pageTitle = 'RAILWISE AI · Survey 工程测量内业';
-$pageDesc = 'RAILWISE Survey 将原始测量资料处理为可审查、可追溯的成果：导入预检、建网平差、精度分析与待审查成果包。新版候选正在验收，正式下载仍为 WorkWise 0.5.0。';
-$pageKeywords = 'WorkWise,WorkWise 0.5.0,工程测量工作台,DeepSeek V4.1-Flash,deepseek-flash,统一插件市场,Codex 插件,DeepSeek Harness,结构化视觉,应用内更新,Skills,MCP,AI 工作台';
+$pageTitle = 'RailWise AI · Survey 工程测量内业';
+$pageDesc = 'RailWise Survey 将原始测量资料处理为可审查、可追溯的成果：导入预检、建网平差、精度分析与待审查成果包。新版候选正在验收，正式下载仍为 RailWise AI 0.5.0。';
+$pageKeywords = 'RailWise AI,RailWise AI 0.5.0,工程测量工作台,DeepSeek V4.1-Flash,deepseek-flash,统一插件市场,Codex 插件,DeepSeek Harness,结构化视觉,应用内更新,Skills,MCP,AI 工作台';
 $pageHeroVisualKey = 'product-workwise';
 $pageOgImage = 'https://www.railwise.cn/products/screenshots/workwise/04-survey-candidate-zh-light.jpg';
 $workwiseReleaseUrl = (string)$workwiseManifest['releaseUrl'];
@@ -40,7 +40,7 @@ $workwiseCapabilities = [
   ['title' => '平台辅助工具', 'desc' => '编程与内业是主入口；写作、设计、Flow、插件及定时任务提供辅助。Survey 与这些工具的深度专业联动属于后续计划。', 'icon' => 'fas fa-layer-group', 'tone' => 'workwise-plugin'],
 ];
 $workwiseStatus = [
-  ['label' => '正式下载', 'title' => 'WorkWise 0.5.0', 'text' => '下方下载沿用已发布版本；本页新命名与四阶段界面为候选预览。', 'icon' => 'fas fa-download'],
+  ['label' => '正式下载', 'title' => 'RailWise AI 0.5.0', 'text' => '下方下载沿用已发布版本；本页新命名与四阶段界面为候选预览。', 'icon' => 'fas fa-download'],
   ['label' => '候选验收', 'title' => '材料、抽样与评分关联', 'text' => '本页为 281dc87 已安装候选的中文浅色实拍。两单位合成案例已检查完整、缺失和否决并存结果，以及导出、重启恢复和来源变化；整体验收仍为部分完成。', 'icon' => 'fas fa-flask'],
   ['label' => '后续计划', 'title' => '专业可信度与生态扩展', 'text' => '完整界面覆盖、真实模型回合、专业复核与用户确认继续推进。完整规范评定、人员签认、外业采集和点云仍在计划中。', 'icon' => 'fas fa-route'],
 ];
@@ -70,7 +70,7 @@ $pageJsonLd = [
   [
     '@context' => 'https://schema.org',
     '@type' => 'SoftwareApplication',
-    'name' => 'WorkWise',
+    'name' => 'RailWise AI',
     'alternateName' => '桌面端 AI 工作台',
     'applicationCategory' => 'BusinessApplication',
     'operatingSystem' => 'Windows, macOS',
@@ -93,15 +93,15 @@ $pageJsonLd = [
     'itemListElement' => [
       ['@type' => 'ListItem', 'position' => 1, 'name' => '首页', 'item' => 'https://www.railwise.cn/'],
       ['@type' => 'ListItem', 'position' => 2, 'name' => '产品矩阵', 'item' => 'https://www.railwise.cn/products'],
-      ['@type' => 'ListItem', 'position' => 3, 'name' => 'WorkWise', 'item' => 'https://www.railwise.cn/products/workwise/'],
+      ['@type' => 'ListItem', 'position' => 3, 'name' => 'RailWise AI', 'item' => 'https://www.railwise.cn/products/workwise/'],
     ],
   ],
 ];
 $rwConversionDock = [
   'eyebrow' => 'WORKWISE DEMO',
-  'title' => '预约 RAILWISE AI 场景演示',
+  'title' => '预约 RailWise AI 场景演示',
   'description' => '围绕工程测量内业、代码协作或文档编排，演示从资料处理到可复核成果的工作流程。',
-  'subject' => 'WorkWise 产品演示',
+  'subject' => 'RailWise AI 产品演示',
   'product' => 'workwise',
   'source' => 'product',
   'primary_label' => '预约演示',
@@ -119,20 +119,20 @@ require_once __DIR__ . '/../../includes/header.php';
       <i class="fas fa-chevron-right"></i>
       <a href="/products">产品矩阵</a>
       <i class="fas fa-chevron-right"></i>
-      <span>RAILWISE AI</span>
+      <span>RailWise AI</span>
     </div>
     <div class="pd-hero-grid">
       <div class="pd-hero-text">
-        <div class="pd-eyebrow"><span class="dot"></span> DeepSeek V4.1-Flash 原生默认支持 <span class="pd-product-badge brand-workwise">RAILWISE AI</span></div>
-        <h1 class="pd-title">RAILWISE Survey</h1>
-        <p class="pd-subtitle">RAILWISE AI 平台 · 工程测量内业</p>
+        <div class="pd-eyebrow"><span class="dot"></span> DeepSeek V4.1-Flash 原生默认支持 <span class="pd-product-badge brand-workwise">RailWise AI</span></div>
+        <h1 class="pd-title">RailWise Survey</h1>
+        <p class="pd-subtitle">RailWise AI 平台 · 工程测量内业</p>
         <p class="pd-desc">面向内业计算员，在同一工程任务中完成导入与预检、建网与平差、分析与精度、成果与审查。AI 持续协助理解问题、解释证据和规划步骤；坐标、高程、闭合差与精度由确定性计算服务生成。</p>
-        <p class="pd-desc"><strong>新版候选预览：</strong>本页四阶段界面正在安装包验收，尚未作为正式版本发布。下方下载仍对应已发布的 WorkWise 0.5.0；候选成果需人工审查，不等于已批准交付。</p>
+        <p class="pd-desc"><strong>新版候选预览：</strong>本页四阶段界面正在安装包验收，尚未作为正式版本发布。下方下载仍对应已发布的 RailWise AI 0.5.0；候选成果需人工审查，不等于已批准交付。</p>
         <div class="pd-cta-row">
-          <a href="#download" class="pd-btn primary" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'WorkWise 站内下载', 'product' => 'workwise', 'source' => 'product', 'destination' => 'local_mirror']); ?>>站内下载 <i class="fas fa-download"></i></a>
-          <a href="https://kb.railwise.cn/products/workwise/" class="pd-btn ghost" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'WorkWise 知识库', 'product' => 'workwise', 'source' => 'product', 'destination' => 'knowledge_base']); ?>>知识库文档 <i class="fas fa-book-open"></i></a>
-          <a href="<?php echo htmlspecialchars($workwiseReleaseUrl); ?>" target="_blank" rel="noopener" class="pd-btn ghost" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'WorkWise Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>查看 Release <i class="fas fa-arrow-up-right-from-square"></i></a>
-          <a href="/contact?subject=<?php echo urlencode('WorkWise 产品演示'); ?>&product=workwise&source=product" class="pd-btn ghost" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'WorkWise 预约演示', 'product' => 'workwise', 'source' => 'product', 'destination' => 'contact']); ?>>预约演示 <i class="fas fa-comments"></i></a>
+          <a href="#download" class="pd-btn primary" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'RailWise AI 站内下载', 'product' => 'workwise', 'source' => 'product', 'destination' => 'local_mirror']); ?>>站内下载 <i class="fas fa-download"></i></a>
+          <a href="https://kb.railwise.cn/products/workwise/" class="pd-btn ghost" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'RailWise AI 知识库', 'product' => 'workwise', 'source' => 'product', 'destination' => 'knowledge_base']); ?>>知识库文档 <i class="fas fa-book-open"></i></a>
+          <a href="<?php echo htmlspecialchars($workwiseReleaseUrl); ?>" target="_blank" rel="noopener" class="pd-btn ghost" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'RailWise AI Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>查看 Release <i class="fas fa-arrow-up-right-from-square"></i></a>
+          <a href="/contact?subject=<?php echo urlencode('RailWise AI 产品演示'); ?>&product=workwise&source=product" class="pd-btn ghost" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_hero', 'label' => 'RailWise AI 预约演示', 'product' => 'workwise', 'source' => 'product', 'destination' => 'contact']); ?>>预约演示 <i class="fas fa-comments"></i></a>
         </div>
         <div class="pd-stack">
           <span>Survey 工程测量</span>
@@ -157,9 +157,9 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="pd-screenshot featured">
           <div class="pd-browser-bar">
             <span></span><span></span><span></span>
-            <div class="pd-url">RAILWISE Survey · 中文浅色候选界面 · 演示数据</div>
+            <div class="pd-url">RailWise Survey · 中文浅色候选界面 · 演示数据</div>
           </div>
-          <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/04-survey-candidate-zh-light.jpg')); ?>" alt="RAILWISE Survey 中文浅色候选界面，使用合成演示数据" fetchpriority="high" decoding="async">
+          <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/04-survey-candidate-zh-light.jpg')); ?>" alt="RailWise Survey 中文浅色候选界面，使用合成演示数据" fetchpriority="high" decoding="async">
         </div>
       </div>
     </div>
@@ -181,7 +181,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <span class="pd-eyebrow dark">WORKWISE <?php echo htmlspecialchars($workwiseVersion); ?> · AVAILABLE NOW</span>
             <h3>统一默认模型 deepseek-flash</h3>
             <p>首次启动只需配置 DeepSeek API Key 和可选服务地址。0.5.0 的主 Agent、Write、定时任务和其他 Agent 默认使用官方模型 ID <code>deepseek-flash</code>；<code>deepseek-v4-pro</code> 可作为显式兼容选择，旧 Flash ID 仅为迁移保留。</p>
-            <a href="https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md" target="_blank" rel="noopener" class="cli-inline-link">查看 WorkWise 软件介绍 <i class="fas fa-arrow-up-right-from-square"></i></a>
+            <a href="https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md" target="_blank" rel="noopener" class="cli-inline-link">查看 RailWise AI 软件介绍 <i class="fas fa-arrow-up-right-from-square"></i></a>
           </div>
         </div>
       </article>
@@ -202,7 +202,7 @@ require_once __DIR__ . '/../../includes/header.php';
           <div>
             <span class="pd-eyebrow dark">2026-09-14 · DEEPSEEK-FLASH</span>
             <h3>V4.1-Flash 已接入默认运行时</h3>
-            <p>WorkWise 0.5.0 使用官方基础地址 <code>https://api.deepseek.com</code> 与模型 ID <code>deepseek-flash</code>。视觉附件按模型能力发送结构化 text/image 部分；不支持的 Provider 会明确报告，不把图片退化为 Base64 文本。</p>
+            <p>RailWise AI 0.5.0 使用官方基础地址 <code>https://api.deepseek.com</code> 与模型 ID <code>deepseek-flash</code>。视觉附件按模型能力发送结构化 text/image 部分；不支持的 Provider 会明确报告，不把图片退化为 Base64 文本。</p>
             <a href="https://api-docs.deepseek.com/updates" target="_blank" rel="noopener" class="cli-inline-link">查看 DeepSeek 官方更新日志 <i class="fas fa-arrow-up-right-from-square"></i></a>
           </div>
         </div>
@@ -220,8 +220,8 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
     <div class="ww-advantage-layout">
       <div class="ww-advantage-visual">
-        <div class="ww-visual-tag">RAILWISE Survey · 候选预览</div>
-        <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/04-survey-candidate-zh-light.jpg')); ?>" alt="RAILWISE Survey 中文浅色候选界面，使用合成演示数据" loading="lazy" decoding="async">
+        <div class="ww-visual-tag">RailWise Survey · 候选预览</div>
+        <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/04-survey-candidate-zh-light.jpg')); ?>" alt="RailWise Survey 中文浅色候选界面，使用合成演示数据" loading="lazy" decoding="async">
         <div class="ww-visual-points">
           <span><i class="fas fa-layer-group"></i> Skills</span>
           <span><i class="fas fa-file-word"></i> DOCX</span>
@@ -285,13 +285,13 @@ require_once __DIR__ . '/../../includes/header.php';
     <div class="pd-section-head">
       <div class="pd-eyebrow dark">DOWNLOAD</div>
       <h2>下载与安装</h2>
-      <p class="pd-section-sub">WorkWise <?php echo htmlspecialchars($workwiseVersion); ?> 已发布。选择与你的设备匹配的客户端，站内镜像优先下载。</p>
+      <p class="pd-section-sub">RailWise AI <?php echo htmlspecialchars($workwiseVersion); ?> 已发布。选择与你的设备匹配的客户端，站内镜像优先下载。</p>
     </div>
     <div class="cli-release-grid">
       <div class="cli-release-card">
         <span>当前版本</span>
         <strong><?php echo htmlspecialchars($workwiseVersion); ?></strong>
-        <p>WorkWise <?php echo htmlspecialchars($workwiseVersion); ?> stable 的站内安装包已同步到下载目录。</p>
+        <p>RailWise AI <?php echo htmlspecialchars($workwiseVersion); ?> stable 的站内安装包已同步到下载目录。</p>
       </div>
       <div class="cli-release-card">
         <span>安装包</span>
@@ -303,7 +303,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <strong><?php echo htmlspecialchars($workwiseReleaseDate); ?></strong>
         <p>精选插件市场、特色 Skills、应用内更新修复和高可读桌面界面进入稳定版本。</p>
       </div>
-      <a href="<?php echo htmlspecialchars($workwiseReleaseUrl); ?>" target="_blank" rel="noopener" class="cli-release-card" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'download_release', 'label' => 'WorkWise GitHub Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>
+      <a href="<?php echo htmlspecialchars($workwiseReleaseUrl); ?>" target="_blank" rel="noopener" class="cli-release-card" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'download_release', 'label' => 'RailWise AI GitHub Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>
         <span>Release</span>
         <strong>查看 GitHub Release</strong>
         <p>适合核对上游说明、问题反馈和历史版本。</p>
@@ -315,9 +315,9 @@ require_once __DIR__ . '/../../includes/header.php';
         <div>
           <span class="ww-download-picker__eyebrow">CHOOSE YOUR PLATFORM</span>
           <h3>选择适合你的客户端</h3>
-          <p>macOS 按芯片选择，Windows 提供 x64 安装包。三个版本均来自 WorkWise <?php echo htmlspecialchars($workwiseVersion); ?> 正式 Release。</p>
+          <p>macOS 按芯片选择，Windows 提供 x64 安装包。三个版本均来自 RailWise AI <?php echo htmlspecialchars($workwiseVersion); ?> 正式 Release。</p>
         </div>
-        <a href="<?php echo htmlspecialchars($workwiseReleaseUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener" class="ww-download-picker__release" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'download_platforms', 'label' => 'WorkWise GitHub Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>查看完整 Release <i class="fas fa-arrow-up-right-from-square"></i></a>
+        <a href="<?php echo htmlspecialchars($workwiseReleaseUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener" class="ww-download-picker__release" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'download_platforms', 'label' => 'RailWise AI GitHub Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>查看完整 Release <i class="fas fa-arrow-up-right-from-square"></i></a>
       </div>
       <div class="ww-download-grid">
         <?php foreach ($workwiseDownloads as $download): ?>
@@ -440,7 +440,7 @@ require_once __DIR__ . '/../../includes/header.php';
     <div class="pd-section-head">
       <div class="pd-eyebrow dark">FEEDBACK</div>
       <h2>反馈与发布规则</h2>
-      <p class="pd-section-sub">WorkWise <?php echo htmlspecialchars($workwiseVersion); ?> 的 macOS 安装包已完成 Developer ID 签名与公证；已安装 0.3.5 的用户可通过稳定更新入口升级。</p>
+      <p class="pd-section-sub">RailWise AI <?php echo htmlspecialchars($workwiseVersion); ?> 的 macOS 安装包已完成 Developer ID 签名与公证；已安装 0.3.5 的用户可通过稳定更新入口升级。</p>
     </div>
     <div class="pd-faq-grid">
       <div class="pd-faq-card">
@@ -457,9 +457,9 @@ require_once __DIR__ . '/../../includes/header.php';
       </div>
     </div>
     <div class="pd-cta-actions" style="margin-top:2rem;">
-      <a href="<?php echo htmlspecialchars($workwiseReleaseUrl); ?>" target="_blank" rel="noopener" class="pd-btn primary large" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_cta', 'label' => 'WorkWise Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>查看 Release <i class="fas fa-arrow-up-right-from-square"></i></a>
-      <a href="https://kb.railwise.cn/products/workwise/" class="pd-btn ghost large" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_cta', 'label' => 'WorkWise 知识库', 'product' => 'workwise', 'source' => 'product', 'destination' => 'knowledge_base']); ?>>查看知识库 <i class="fas fa-book-open"></i></a>
-      <a href="/contact?subject=<?php echo urlencode('WorkWise 产品演示'); ?>&product=workwise&source=product" class="pd-btn ghost large" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_cta', 'label' => 'WorkWise 联系支持', 'product' => 'workwise', 'source' => 'product', 'destination' => 'contact']); ?>>联系支持 <i class="fas fa-comments"></i></a>
+      <a href="<?php echo htmlspecialchars($workwiseReleaseUrl); ?>" target="_blank" rel="noopener" class="pd-btn primary large" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_cta', 'label' => 'RailWise AI Release', 'product' => 'workwise', 'source' => 'product', 'destination' => 'github_release']); ?>>查看 Release <i class="fas fa-arrow-up-right-from-square"></i></a>
+      <a href="https://kb.railwise.cn/products/workwise/" class="pd-btn ghost large" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_cta', 'label' => 'RailWise AI 知识库', 'product' => 'workwise', 'source' => 'product', 'destination' => 'knowledge_base']); ?>>查看知识库 <i class="fas fa-book-open"></i></a>
+      <a href="/contact?subject=<?php echo urlencode('RailWise AI 产品演示'); ?>&product=workwise&source=product" class="pd-btn ghost large" <?php echo rw_tracking_attrs('conversion_click', ['location' => 'product_cta', 'label' => 'RailWise AI 联系支持', 'product' => 'workwise', 'source' => 'product', 'destination' => 'contact']); ?>>联系支持 <i class="fas fa-comments"></i></a>
     </div>
   </div>
 </section>

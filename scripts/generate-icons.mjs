@@ -78,14 +78,14 @@ if (right < left || bottom < top) throw new Error('Selected symbol is empty')
 left = Math.max(0, left - 2); top = Math.max(0, top - 2)
 right = Math.min(master.width - 1, right + 2); bottom = Math.min(master.height - 1, bottom + 2)
 const markWidth = right - left + 1, markHeight = bottom - top + 1
-const symbolSvg = symbolSvgSource.replace(/<svg\b[^>]*>/, `<svg xmlns="http://www.w3.org/2000/svg" width="${markWidth}" height="${markHeight}" viewBox="${left} ${top} ${markWidth} ${markHeight}"><title>RAILWISE AI</title>`)
+const symbolSvg = symbolSvgSource.replace(/<svg\b[^>]*>/, `<svg xmlns="http://www.w3.org/2000/svg" width="${markWidth}" height="${markHeight}" viewBox="${left} ${top} ${markWidth} ${markHeight}"><title>RailWise AI</title>`)
 const symbolPng = Buffer.from(new Resvg(symbolSvg, { fitTo: { mode: 'width', value: 1024 }, font: { loadSystemFonts: false } }).render().asPng())
 const symbolData = symbolPng.toString('base64')
 
 function appTile(theme) {
   const background = theme === 'light' ? '#F7FAFC' : '#06152D'
   const width = 832, height = width * markHeight / markWidth
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024"><title>RAILWISE AI</title><desc>User-selected clean v2 ribbon; canvas whitespace removed.</desc><rect width="1024" height="1024" rx="230" fill="${background}"/><image x="${(1024-width)/2}" y="${(1024-height)/2}" width="${width}" height="${height}" xlink:href="data:image/png;base64,${symbolData}"/></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024"><title>RailWise AI</title><desc>User-selected clean v2 ribbon; canvas whitespace removed.</desc><rect width="1024" height="1024" rx="230" fill="${background}"/><image x="${(1024-width)/2}" y="${(1024-height)/2}" width="${width}" height="${height}" xlink:href="data:image/png;base64,${symbolData}"/></svg>`
 }
 
 const light = appTile('light')

@@ -18,7 +18,7 @@ describe.skipIf(process.platform !== 'darwin')('private updater certificate pinn
   const feedUrl = `https://127.0.0.1:49999/private-${'c'.repeat(64)}/`
   beforeAll(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-private-updater-')))
-    const name = `RAILWISE AI Candidate ${head.slice(0, 12)}`
+    const name = `RailWise AI Candidate ${head.slice(0, 12)}`
     executable = join(root, 'Applications', `${name}.app`, 'Contents/MacOS', name)
     mkdirSync(dirname(executable), { recursive: true }); writeFileSync(executable, '')
     mkdirSync(join(root, 'user-data'))

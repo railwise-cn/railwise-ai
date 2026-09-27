@@ -1,10 +1,10 @@
-# RAILWISE Survey 精确结果追问源码验收
+# RailWise Survey 精确结果追问源码验收
 
 日期：2026-09-21。范围：独立工作树 `codex/survey-result-questions`，基线提交 `b193fc70d6363dc768e715087ca9c0d9975158c9` 之上的增量，已以 `353d407` 提交并合入主任务分支。本记录证明引用合同、只读工具、桌面接线及自动化验证；签名候选的包内审计已另行完成，但真实模型 GUI 读回和用户确认仍未完成，不能据此公开发布。
 
 ## 2026-09-21 精确 0.5.0 候选包审计
 
-工作流 `35540198977` 对源码 HEAD `3f0dbf1024577b5d28db1fe1570fe2e3173ae52a` 的私有 macOS arm64 候选通过。该流程只执行隔离私有 updater，公开 Release、stable/frontier feed 和官网发布 job 均跳过。目标 ZIP SHA-256 为 `a9569e9e712c16bb6abda1dd506eb041b942f4f7da4bc23415dee2c4d05aa4ff`，安装后 ASAR SHA-256 为 `0be93bf52ea87fe3b413a97e52674608156a53eceb4050ce504aa221a80bb744`；候选路径为 `/private/tmp/railwise-survey-3f0dbf1/Applications/RAILWISE AI Candidate 3f0dbf102457.app`。`codesign --verify --deep --strict`、`xcrun stapler validate`、`spctl --assess --type execute` 均通过；本机 `spctl --status` 仍为 `assessments disabled`，未被改动。私有 updater 六阶段 `base_started -> update_available -> download_completed -> install_requested -> target_relaunched -> user_data_preserved` 通过，TLS pin、manifest、ZIP 和用户数据哨兵均通过。完整安装与云证据见 `/private/tmp/railwise-survey-3f0dbf1/evidence/package.json`、`/private/tmp/railwise-survey-3f0dbf1/evidence/installation-context.json`。
+工作流 `35540198977` 对源码 HEAD `3f0dbf1024577b5d28db1fe1570fe2e3173ae52a` 的私有 macOS arm64 候选通过。该流程只执行隔离私有 updater，公开 Release、stable/frontier feed 和官网发布 job 均跳过。目标 ZIP SHA-256 为 `a9569e9e712c16bb6abda1dd506eb041b942f4f7da4bc23415dee2c4d05aa4ff`，安装后 ASAR SHA-256 为 `0be93bf52ea87fe3b413a97e52674608156a53eceb4050ce504aa221a80bb744`；候选路径为 `/private/tmp/railwise-survey-3f0dbf1/Applications/RailWise AI Candidate 3f0dbf102457.app`。`codesign --verify --deep --strict`、`xcrun stapler validate`、`spctl --assess --type execute` 均通过；本机 `spctl --status` 仍为 `assessments disabled`，未被改动。私有 updater 六阶段 `base_started -> update_available -> download_completed -> install_requested -> target_relaunched -> user_data_preserved` 通过，TLS pin、manifest、ZIP 和用户数据哨兵均通过。完整安装与云证据见 `/private/tmp/railwise-survey-3f0dbf1/evidence/package.json`、`/private/tmp/railwise-survey-3f0dbf1/evidence/installation-context.json`。
 
 使用该候选自身 Electron 可执行文件和 ASAR 完成包内精确审计：26 项通过，覆盖 17 类引用、精确 selector、跨项目/过期/错误哈希拒绝、大型 Huber 结果的 `selector-required`、实际只读 `survey_read_evidence` 工具调用及业务数据库/工作区前后快照不变。报告为 `/private/tmp/railwise-exact-questions-package-audit/run-001/audit-report.json`。这是合成数据的包内工具审计，不是 GUI 或真实模型验收。
 

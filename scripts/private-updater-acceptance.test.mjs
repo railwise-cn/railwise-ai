@@ -34,7 +34,7 @@ test('baseline install scope requires a dedicated runner directory and candidate
 
 test('isolated package identity rejects public app, stale head and wrong version', () => {
   const head = 'a'.repeat(40)
-  const info = { CFBundleIdentifier: `com.wangjiawei508.workwise.candidate.head${head.slice(0, 12)}`, CFBundleExecutable: `RAILWISE AI Candidate ${head.slice(0, 12)}`, CFBundleShortVersionString: '0.5.0' }
+  const info = { CFBundleIdentifier: `com.wangjiawei508.workwise.candidate.head${head.slice(0, 12)}`, CFBundleExecutable: `RailWise AI Candidate ${head.slice(0, 12)}`, CFBundleShortVersionString: '0.5.0' }
   assert.doesNotThrow(() => validateBundleIdentity(info, head, '0.5.0'))
   for (const patch of [{ CFBundleIdentifier: 'com.example.unrelated' }, { CFBundleExecutable: 'WorkWise' }, { CFBundleShortVersionString: '0.0.0' }]) assert.throws(() => validateBundleIdentity({ ...info, ...patch }, head, '0.5.0'))
   assert.throws(() => validateBundleIdentity(info, 'b'.repeat(40), '0.5.0'))

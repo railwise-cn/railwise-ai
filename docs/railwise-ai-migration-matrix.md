@@ -1,19 +1,19 @@
-# RAILWISE AI / Survey 迁移矩阵
+# RailWise AI / Survey 迁移矩阵
 
-基线：用户提供的《RAILWISE AI ｜ Survey 产品收敛与命名迁移总计划》。
+基线：用户提供的《RailWise AI ｜ Survey 产品收敛与命名迁移总计划》。
 本轮改显示名称、品牌图标、增量任务合同与专业导航；不授权任何公开版本发布。
 
 | 旧项目 | 新状态 | 原因 | 数据保留 | 用户操作 |
 | --- | --- | --- | --- | --- |
-| WorkWise 平台显示名 | RAILWISE AI；菜单、启动页、设置页、关于页共用品牌配置 | 平台命名统一 | 不调用 app.setName，不改正式安装目录和用户数据路径 | 无 |
-| WorkWise / W 图标 | RAILWISE 的 R 字形、平行轨线和基准点；统一 SVG、PNG、Dock、托盘、ICO、ICNS | 显示品牌迁移 | 保留 workwise.* 路径及所有包/数据标识；Git 保留旧资源 | 候选包中确认显示效果 |
-| Survey 工作台 | RAILWISE Survey / 工程测量内业 | 明确当前专业边界 | engineering 路由、线程 domain 和 projectId 不变 | 无 |
+| WorkWise 平台显示名 | RailWise AI；菜单、启动页、设置页、关于页共用品牌配置 | 平台命名统一 | 不调用 app.setName，不改正式安装目录和用户数据路径 | 无 |
+| WorkWise / W 图标 | RailWise AI 的 R 字形、平行轨线和基准点；统一 SVG、PNG、Dock、托盘、ICO、ICNS | 显示品牌迁移 | 保留 workwise.* 路径及所有包/数据标识；Git 保留旧资源 | 候选包中确认显示效果 |
+| Survey 工作台 | RailWise Survey / 工程测量内业 | 明确当前专业边界 | engineering 路由、线程 domain 和 projectId 不变 | 无 |
 | monitoringType=deformation | 读取为变形监测 taskType | 兼容旧监测项目 | 不重写数据库；旧字段、单位、阈值原样保留 | 可显式修改任务类型 |
 | 旧控制网/水准/导线/设站/GNSS 类型 | 映射到对应 taskType | 避免全部错误归为变形监测 | 只读推导；未知自定义类型原样保留 | 未识别类型由用户选择 |
 | 新建项目默认监测类型 | 新建控制网任务；UI 明示类型选择 | 通用内业入口 | 不改变已有项目默认值 | 确认类型、基准与规范 |
 | 十个平级视图与独立 AI 阶段 | 四个生产阶段，阶段内工具，持续对话 | 跟随生产链 | 保留旧 Tab ID 与 AI 线程恢复路径 | 无 |
 | 有输出即显示已审查 | 仅有效且 approved 的 manifest 显示已审查 | 防止候选成果误交付 | 历史文件、manifest 与哈希不修改 | 仍须专业复核 |
-| 候选包显示名 | RAILWISE AI Candidate + 源码摘要 | 使测试包体现新品牌 | 旧候选名称、独立数据及正式更新源保持隔离；已有真实私有 HTTPS 更新流程，仍须逐精确候选留证 | 仅安装隔离候选 |
+| 候选包显示名 | RailWise AI Candidate + 源码摘要 | 使测试包体现新品牌 | 旧候选名称、独立数据及正式更新源保持隔离；已有真实私有 HTTPS 更新流程，仍须逐精确候选留证 | 仅安装隔离候选 |
 | npm/package、bundle ID、下载源、更新通道 | 保持现有技术标识 | 升级与数据兼容 | 原值不变 | 无 |
 | 插件、Skill、MCP、凭据、用户目录 | 保留全部 | 无目录/许可迁移 | 本轮不增删、不搬迁、不读取凭据 | 无 |
 

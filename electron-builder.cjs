@@ -123,7 +123,7 @@ const candidateSourceHead = (
 const candidateIdentitySuffix = candidateSourceHead ? `head${candidateSourceHead.slice(0, 12)}` : ''
 const packagedProductName = isCandidateBuild
   ? `${productBrand.platform} Candidate ${candidateSourceHead.slice(0, 12)}`
-  : 'WorkWise'
+  : productBrand.platform
 const artifactVersion = releaseAppVersion || '${version}'
 const packagedUpdateProvider = isCandidateBuild ? 'generic' : updateProvider
 const packagedGenericUpdateUrl = isCandidateBuild

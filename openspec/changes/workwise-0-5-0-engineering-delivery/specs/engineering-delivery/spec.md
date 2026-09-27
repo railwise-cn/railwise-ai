@@ -64,9 +64,9 @@ The Runtime and renderer MUST provide one primary Engineering AI thread per `wor
 - **WHEN** an old thread has no `domain` or `projectId` fields
 - **THEN** it remains readable through the existing detail path and is not silently migrated into an Engineering project list
 
-### Requirement: RAILWISE AI and Survey display naming
+### Requirement: RailWise AI and Survey display naming
 
-The renderer MUST use `RAILWISE AI` for platform references, `RAILWISE Survey` for the professional workbench, and `工程测量内业` / `Engineering Survey Processing` as its subtitle. Main entry labels MUST be 编程 / 内业 or Code / Survey. Shared display branding MUST NOT rename persisted technical identifiers. Existing persisted titles and records MUST remain unchanged unless a user explicitly edits them.
+The renderer MUST use `RailWise AI` for platform references, `RailWise Survey` for the professional workbench, and `工程测量内业` / `Engineering Survey Processing` as its subtitle. Main entry labels MUST be 编程 / 内业 or Code / Survey. Shared display branding MUST NOT rename persisted technical identifiers. Existing persisted titles and records MUST remain unchanged unless a user explicitly edits them.
 
 The D-04 naming boundary MUST NOT rename the package name, bundle ID, updater/feed, Runtime API paths, route IDs, storage locations, or thread `domain: "engineering"` discriminator during 0.5.0.
 

@@ -58,10 +58,10 @@ function installMac(installer, root, candidateHead = '') {
   try {
     const appName = readdirSync(mount).find((name) => name.endsWith('.app'))
     if (!appName) throw new Error('DMG does not contain an application bundle.')
-    if (candidateHead && appName !== `RAILWISE AI Candidate ${candidateHead.slice(0, 12)}.app`) {
+    if (candidateHead && appName !== `RailWise AI Candidate ${candidateHead.slice(0, 12)}.app`) {
       throw new Error('Private acceptance installer has an unexpected candidate identity.')
     }
-    const destination = join(applications, candidateHead ? appName : 'WorkWise.app')
+    const destination = join(applications, appName)
     run('ditto', [join(mount, appName), destination])
     run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', destination])
     run('spctl', ['--assess', '--type', 'execute', '--verbose=2', destination])
@@ -84,8 +84,9 @@ function installWindows(installer, root) {
   mkdirSync(destination, { recursive: true })
   // NSIS requires /D to be the final argument and does not accept quotes around it.
   run(installer, ['/S', `/D=${destination}`])
-  const executable = join(destination, 'WorkWise.exe')
-  if (!existsSync(executable)) throw new Error(`NSIS did not install ${executable}`)
+  const executableName = readdirSync(destination).find((name) => name.endsWith('.exe'))
+  const executable = executableName ? join(destination, executableName) : ''
+  if (!executable || !existsSync(executable)) throw new Error(`NSIS did not install an executable in ${destination}`)
   return executable
 }
 

@@ -1727,7 +1727,7 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
     '来源引用',
     ...(citations.length ? citations.map((citation) => `${citation.id}: ${citation.sourceType} ${citation.source}${citation.page ? ` 第 ${citation.page} 页` : ''}${citation.worksheet ? ` 工作表 ${citation.worksheet}` : ''}${citation.row ? ` 第 ${citation.row} 行` : ''}${citation.locator ? ` (${citation.locator})` : ''}`) : ['无']),
     '',
-    '审查记录：本报告由 RAILWISE AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签名。'
+    '审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签名。'
   ].join('\n')
 }
 async function fileOutput(path: string, mediaType: string, workspace: string): Promise<{ path: string; mediaType: string; sha256: string; sizeBytes: number }> { const data = await readFile(path); return { path: relative(workspace, path), mediaType, sha256: createHash('sha256').update(data).digest('hex'), sizeBytes: data.byteLength } }

@@ -1,8 +1,8 @@
-# RAILWISE AI 与 RAILWISE Survey
+# RailWise AI 与 RailWise Survey
 
 > 工程测量内业与编程协作。
 
-RAILWISE AI 是本地优先的桌面工作平台。候选界面以“编程 / 内业”为主入口；RAILWISE Survey 面向工程测量内业，将原始测量资料处理为可复核的计算结果和可追溯的候选成果。写作、设计、Flow、插件与定时任务继续提供辅助工具。
+RailWise AI 是本地优先的桌面工作平台。候选界面以“编程 / 内业”为主入口；RailWise Survey 面向工程测量内业，将原始测量资料处理为可复核的计算结果和可追溯的候选成果。写作、设计、Flow、插件与定时任务继续提供辅助工具。
 
 **已发布与候选分开说明：**公开版本仍为 [WorkWise 0.5.0](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.0)，提供工程测量工作台、统一插件市场、Codex 插件兼容及结构化附件处理。新的命名、四阶段 Survey 界面和后续专业功能仍在隔离候选包中验收，不因本文更新而替换正式安装包或更新渠道。下载 0.5.0 后按该版本已有入口操作，不要求出现候选中的新菜单。
 
@@ -10,7 +10,7 @@ RAILWISE AI 是本地优先的桌面工作平台。候选界面以“编程 / �
 
 ## 产品定位
 
-工程任务不仅包含一次问答，还需要原始资料、坐标与高程基准、计算历史、质量证据和交付文件。RAILWISE Survey 把这些内容保留在同一工程上下文中；AI 负责解释、诊断和编排，数值计算由确定性 Runtime 执行。
+工程任务不仅包含一次问答，还需要原始资料、坐标与高程基准、计算历史、质量证据和交付文件。RailWise Survey 把这些内容保留在同一工程上下文中；AI 负责解释、诊断和编排，数值计算由确定性 Runtime 执行。
 
 它适合以下用户：
 
@@ -49,11 +49,11 @@ XY 标准误差椭圆半轴采用单位马氏半径，不代表 95% 等置信区
 
 以下为 `281dc87` 已安装候选的中文浅色实拍，使用合成平面控制网（4 点、1 测站、5 观测），依次展示平差结果、成果中心与模型设置。原图来源与哈希见[截图清单](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json)。
 
-![RAILWISE Survey 候选平差结果](../website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
+![RailWise Survey 候选平差结果](../website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
 
-![RAILWISE Survey 候选成果中心](../website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
+![RailWise Survey 候选成果中心](../website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
 
-![RAILWISE AI 候选模型设置](../website/products/screenshots/workwise/06-candidate-model-settings.jpg)
+![RailWise AI 候选模型设置](../website/products/screenshots/workwise/06-candidate-model-settings.jpg)
 
 该包已完成签名、公证、真实私有 updater 往返及本机同包安装。限定实机检查覆盖质量关联的完整、缺失与否决案例、原生导出、重启恢复和来源变化复验。完整界面覆盖、精确包内 AI 流程、用户本人确认与专业复核尚未闭合，整体验收仍为部分完成。见[281dc87 精确包记录](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md)；后续源码修复不自动算入本包。
 

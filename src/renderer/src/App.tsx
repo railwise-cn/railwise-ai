@@ -4,7 +4,7 @@ import { AppErrorBoundary } from './components/AppErrorBoundary'
 const AppShell = lazy(() => import('./AppShell'))
 
 export function startupShellLabel(locale: 'en' | 'zh'): string {
-  return locale === 'zh' ? '正在打开 RAILWISE AI 工作台…' : 'Opening RAILWISE AI workbench…'
+  return locale === 'zh' ? '正在打开 RailWise AI 工作台…' : 'Opening RailWise AI workbench…'
 }
 
 function StartupShell(): React.ReactElement {

@@ -3,6 +3,7 @@
 const { createHash } = require('node:crypto')
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } = require('node:fs')
 const { basename, join, resolve } = require('node:path')
+const productBrand = require('../src/shared/product-brand.json')
 
 function usage() {
   console.error('Usage: node scripts/prepare-website-release-assets.cjs <inputDir> <outputDir> <version> [--channel stable|frontier] [--release-prefix workwise[/acceptance/RUN_ID]] [--public-base-url HTTPS_URL]')
@@ -57,7 +58,7 @@ function writeLatestJson(outputDir, version, options) {
     }))
   const manifest = {
     schemaVersion: 1,
-    productName: 'WorkWise',
+    productName: productBrand.platform,
     channel: options.channel,
     version,
     tag: `v${version}`,

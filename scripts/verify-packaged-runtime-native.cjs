@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process')
 const { existsSync, readdirSync } = require('node:fs')
 const { join, resolve } = require('node:path')
+const productBrand = require('../src/shared/product-brand.json')
 
 const root = resolve(process.argv[2] || 'dist')
 const target = process.argv[3]
@@ -45,8 +46,8 @@ if (target === 'win') {
 function resolveMacAppName(directory) {
   const outputDirectory = join(root, directory)
   if (!existsSync(outputDirectory)) return null
-  const productionName = join(outputDirectory, 'WorkWise.app')
-  if (existsSync(productionName)) return 'WorkWise.app'
+  const productionName = join(outputDirectory, `${productBrand.platform}.app`)
+  if (existsSync(productionName)) return `${productBrand.platform}.app`
   const candidates = readdirSync(outputDirectory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.endsWith('.app'))
     .map((entry) => entry.name)

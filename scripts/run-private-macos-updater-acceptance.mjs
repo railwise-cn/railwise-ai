@@ -80,7 +80,7 @@ function soleFile(directory, predicate) {
 export function validateBundleIdentity(info, head, version) {
   if (!/^[a-f0-9]{40}$/.test(head)
     || info.CFBundleIdentifier !== `com.wangjiawei508.workwise.candidate.head${head.slice(0, 12)}`
-    || info.CFBundleExecutable !== `RAILWISE AI Candidate ${head.slice(0, 12)}`
+    || info.CFBundleExecutable !== `RailWise AI Candidate ${head.slice(0, 12)}`
     || info.CFBundleShortVersionString !== version) {
     throw new Error('Candidate bundle identity, source HEAD or version mismatch.')
   }

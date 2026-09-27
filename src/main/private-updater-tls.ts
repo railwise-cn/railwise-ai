@@ -26,7 +26,7 @@ export function validatePrivateUpdaterTls(
     throw new Error('Private updater certificate pin requires an isolated hosted candidate acceptance run.')
   }
   const root = realpathSync(env.WORKWISE_CANDIDATE_ROOT)
-  const name = `RAILWISE AI Candidate ${input.sourceHead.slice(0, 12)}`
+  const name = `RailWise AI Candidate ${input.sourceHead.slice(0, 12)}`
   if (dirname(root) !== realpathSync(env.RUNNER_TEMP) || !/\/workwise-private-updater-[A-Za-z0-9]+$/.test(root)
     || realpathSync(userDataPath) !== join(root, 'user-data')
     || realpathSync(executable) !== join(root, 'Applications', `${name}.app`, 'Contents/MacOS', name)) {

@@ -130,7 +130,7 @@ describe('InitialSessionUsageHeatmap', () => {
     expect(html).toContain('Models')
     expect(html).toContain('All')
     expect(html).toContain('90d')
-    expect(html).toContain('Daily RAILWISE AI Runtime usage calendar')
+    expect(html).toContain('Daily RailWise AI Runtime usage calendar')
     expect(html).toContain('Sessions')
     expect(html).toContain('Messages')
     expect(html).toContain('Current streak')
@@ -225,7 +225,7 @@ describe('InitialSessionUsageHeatmap', () => {
     expect(loadingHtml).toContain('Preparing your usage calendar')
     expect(loadingHtml).toContain('Checking history')
     expect(loadingHtml).toContain('Collapse calendar')
-    expect(loadingHtml).not.toContain('Daily RAILWISE AI Runtime usage calendar')
+    expect(loadingHtml).not.toContain('Daily RailWise AI Runtime usage calendar')
     expect(loadingHtml).not.toContain('Explain this project&#x27;s structure')
 
     const emptyHtml = render(state({ usage: usage([bucket('2026-05-01', 0, 0)]), loaded: true }))
@@ -240,14 +240,14 @@ describe('InitialSessionUsageHeatmap', () => {
     expect(errorHtml).not.toContain('Explain this project&#x27;s structure')
   })
 
-  it('renders the RAILWISE AI Runtime hero with a collapsed calendar card', () => {
+  it('renders the RailWise AI Runtime hero with a collapsed calendar card', () => {
     const html = render(state({ usage: usage(), loaded: true }), { initialCollapsed: true })
 
     expect(html).toContain('Expand calendar')
     expect(html).toContain('ds-runtime-wake-stage')
     expect(html).toContain('ds-work-logo')
     expect(html).not.toContain('Keep the canvas clear')
-    expect(html).not.toContain('Daily RAILWISE AI Runtime usage calendar')
+    expect(html).not.toContain('Daily RailWise AI Runtime usage calendar')
   })
 
   it('uses turns as the intensity fallback when token totals are unavailable', () => {

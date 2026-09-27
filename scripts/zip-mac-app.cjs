@@ -12,6 +12,7 @@ if (arch !== 'arm64' && arch !== 'x64') {
 
 const root = resolve(__dirname, '..')
 const pkg = require(join(root, 'package.json'))
+const productBrand = require(join(root, 'src', 'shared', 'product-brand.json'))
 const version = (process.env.WORKWISE_APP_VERSION || pkg.version || '').trim()
 if (!version) {
   console.error('[zip-mac-app] Could not resolve package version.')
@@ -31,7 +32,7 @@ if (isCandidate && candidateApps.length !== 1) {
   console.error(`[zip-mac-app] Expected exactly one candidate app bundle in ${appOutDir}, found ${candidateApps.length}.`)
   process.exit(1)
 }
-const appName = isCandidate ? candidateApps[0] : 'WorkWise.app'
+const appName = isCandidate ? candidateApps[0] : `${productBrand.platform}.app`
 const appPath = join(appOutDir, appName)
 const artifactPrefix = isCandidate && /^[0-9a-f]{12,40}$/.test(candidateHead)
   ? `WorkWise-Candidate-${candidateHead.slice(0, 12)}`

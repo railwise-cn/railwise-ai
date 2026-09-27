@@ -88,7 +88,7 @@ jobs:
               app, = mount.glob('*.app')
               info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
               assert info['CFBundleIdentifier'] == 'com.wangjiawei508.workwise.candidate.head' + head[:12]
-              assert info['CFBundleExecutable'] == 'RAILWISE AI Candidate ' + head[:12]
+              assert info['CFBundleExecutable'] == 'RailWise AI Candidate ' + head[:12]
               assert info['CFBundleShortVersionString'] == json.loads(Path('package.json').read_text())['version']
               for args in [['codesign', '--verify', '--deep', '--strict', str(app)], ['xcrun', 'stapler', 'validate', str(app)], ['spctl', '--assess', '--type', 'execute', str(app)]]:
                   subprocess.run(args, check=True)

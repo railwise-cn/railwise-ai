@@ -35,7 +35,7 @@ const USER_DATA_ARG = '--user-data-dir='
 const CANDIDATE_ENV_FILE_ARG = '--workwise-candidate-env-file='
 const CANDIDATE_BUNDLE_IDENTIFIER = 'com.wangjiawei508.workwise.imcandidate.recovery'
 const CANDIDATE_BUNDLE_NAME = 'WorkWise IM Recovery Candidate.app'
-const SOURCE_HEAD_CANDIDATE_BUNDLE_PATTERN = /^(?:WorkWise|RAILWISE AI) Candidate [0-9a-f]{12}\.app$/i
+const SOURCE_HEAD_CANDIDATE_BUNDLE_PATTERN = /^(?:WorkWise|RailWise AI) Candidate [0-9a-f]{12}\.app$/i
 const SOURCE_HEAD_CANDIDATE_IDENTIFIER_PATTERN = /^com\.wangjiawei508\.workwise\.candidate\.head[0-9a-f]{12}$/i
 const CANDIDATE_ENV_KEYS = new Set([
   'WORKWISE_CANDIDATE',
@@ -201,8 +201,8 @@ function isRecoveryCandidateExecutable(
   resourcesPath: string | undefined = process.resourcesPath
 ): boolean {
   if (/^WorkWise IM Recovery Candidate(?:\.exe)?$/i.test(basename(executablePath))) return true
-  if (/^(?:WorkWise|RAILWISE AI) Candidate [0-9a-f]{12}(?:\.exe)?$/i.test(basename(executablePath))) return true
-  if (/\/(?:WorkWise|RAILWISE AI) Candidate [0-9a-f]{12}\.app(?:\/|$)/i.test(executablePath)) return true
+  if (/^(?:WorkWise|RailWise AI) Candidate [0-9a-f]{12}(?:\.exe)?$/i.test(basename(executablePath))) return true
+  if (/\/(?:WorkWise|RailWise AI) Candidate [0-9a-f]{12}\.app(?:\/|$)/i.test(executablePath)) return true
   const bundleName = basename(resolve(resourcesPath ?? '', '..', '..'))
   if (bundleName !== CANDIDATE_BUNDLE_NAME && !SOURCE_HEAD_CANDIDATE_BUNDLE_PATTERN.test(bundleName)) return false
   const identifier = recoveryCandidateBundleIdentifier(resourcesPath)

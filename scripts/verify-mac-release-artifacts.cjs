@@ -4,6 +4,7 @@ const { execFileSync } = require('node:child_process')
 const { existsSync, mkdtempSync, readdirSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { basename, join, resolve } = require('node:path')
+const productBrand = require('../src/shared/product-brand.json')
 
 function usage() {
   console.error('Usage: node scripts/verify-mac-release-artifacts.cjs <distDir> [--dmg-only] <arm64|x64> [<arm64|x64> ...]')
@@ -31,7 +32,7 @@ function normalizeLipoArchitecture(architecture) {
 function assertAppArchitecture(appPath, expectedArch) {
   const architectures = run(
     'lipo',
-    ['-archs', join(appPath, 'Contents', 'MacOS', 'WorkWise')],
+    ['-archs', join(appPath, 'Contents', 'MacOS', basename(appPath, '.app'))],
     { stdio: 'pipe' }
   ).trim().split(/\s+/).filter(Boolean).map(normalizeLipoArchitecture)
   if (architectures.length !== 1 || architectures[0] !== expectedArch) {
@@ -72,7 +73,7 @@ function verifyDmg(dmgPath, expectedArch, expectedVersion) {
   try {
     run('hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mountPoint, dmgPath])
     attached = true
-    verifyApp(join(mountPoint, 'WorkWise.app'), expectedArch, expectedVersion, basename(dmgPath))
+    verifyApp(join(mountPoint, `${productBrand.platform}.app`), expectedArch, expectedVersion, basename(dmgPath))
   } finally {
     if (attached) {
       try {

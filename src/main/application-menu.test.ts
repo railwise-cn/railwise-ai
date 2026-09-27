@@ -21,12 +21,12 @@ describe('application menu localization', () => {
   it('builds a fully localized Chinese macOS menu', () => {
     const template = buildApplicationMenuTemplate('zh', 'darwin', actions())
     const labels = template.map((item) => item.label)
-    expect(labels).toEqual(['RAILWISE AI', '文件', '编辑', '显示', '窗口', '帮助'])
+    expect(labels).toEqual(['RailWise AI', '文件', '编辑', '显示', '窗口', '帮助'])
 
     const help = template.at(-1)?.submenu
     expect(Array.isArray(help) ? help.map((item) => item.label).filter(Boolean) : []).toEqual([
       '帮助中心',
-      'RAILWISE AI 主页',
+      'RailWise AI 主页',
       '个人主页',
       '软件介绍',
       'GitHub 项目',
