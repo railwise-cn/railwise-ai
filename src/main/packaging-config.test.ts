@@ -453,6 +453,41 @@ describe('electron-builder WorkWise packaging', () => {
     expect(signedConfig.mac.signIgnore).toBeUndefined()
   })
 
+  it('uses absolute Electron entitlements paths and keeps the V8 runtime permissions', () => {
+    expect(builderConfig.mac.entitlements).toBe(join(process.cwd(), 'build/entitlements.mac.plist'))
+    expect(builderConfig.mac.entitlementsInherit)
+      .toBe(join(process.cwd(), 'build/entitlements.mac.inherit.plist'))
+
+    const entitlements = execFileSync('plutil', [
+      '-convert',
+      'json',
+      '-o',
+      '-',
+      '--',
+      builderConfig.mac.entitlements
+    ], { encoding: 'utf8' })
+    expect(JSON.parse(entitlements)).toMatchObject({
+      'com.apple.security.cs.allow-jit': true,
+      'com.apple.security.cs.allow-unsigned-executable-memory': true,
+      'com.apple.security.cs.disable-library-validation': true
+    })
+    expect(afterPack.MAC_ENTITLEMENTS_PATH).toBe(builderConfig.mac.entitlements)
+  })
+
+  it('rejects a signed runtime that lost any required Electron/V8 entitlement', () => {
+    const complete = `<?xml version="1.0"?><plist><dict>
+      <key>com.apple.security.cs.allow-jit</key><true/>
+      <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+      <key>com.apple.security.cs.disable-library-validation</key><true/>
+    </dict></plist>`
+    expect(macNotarize._internals.missingRuntimeEntitlements(complete)).toEqual([])
+
+    const missingJit = complete.replace('<key>com.apple.security.cs.allow-jit</key><true/>', '')
+    expect(macNotarize._internals.missingRuntimeEntitlements(missingJit)).toEqual([
+      'com.apple.security.cs.allow-jit'
+    ])
+  })
+
   it('checks timestamp candidates across nested macOS signed code', () => {
     const root = tempRoot()
     const appBundle = join(root, 'RailWise AI.app')

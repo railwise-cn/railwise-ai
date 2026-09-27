@@ -5,6 +5,7 @@ const { existsSync, mkdtempSync, readdirSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { basename, join, resolve } = require('node:path')
 const productBrand = require('../src/shared/product-brand.json')
+const { verifyMacRuntimeEntitlements } = require('./mac-notarize.cjs')._internals
 
 function usage() {
   console.error('Usage: node scripts/verify-mac-release-artifacts.cjs <distDir> [--dmg-only] <arm64|x64> [<arm64|x64> ...]')
@@ -54,6 +55,7 @@ function verifyApp(appPath, expectedArch, expectedVersion, label) {
   assertAppArchitecture(appPath, expectedArch)
   assertAppVersion(appPath, expectedVersion)
   run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
+  verifyMacRuntimeEntitlements(appPath)
   run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath])
   run('xcrun', ['stapler', 'validate', appPath])
   console.log(`Verified signed and notarized macOS app: ${label}`)

@@ -15,6 +15,9 @@ const {
   verifyMarkItDownSidecar
 } = require('./verify-packaged-markitdown.cjs')
 const { verifyCandidateSourceTree } = require('./candidate-source-provenance.cjs')
+const { verifyMacRuntimeEntitlements } = require('./mac-notarize.cjs')._internals
+
+const MAC_ENTITLEMENTS_PATH = join(__dirname, '..', 'build', 'entitlements.mac.plist')
 
 const MANAGED_RUNTIME_REQUIRED_PATHS = [
   'kun/dist/cli/serve-entry.js',
@@ -178,9 +181,19 @@ function maybeAdhocSignMacApp(context) {
 
   execFileSync(
     'codesign',
-    ['--force', '--deep', '--sign', '-', '--timestamp=none', appBundle],
+    [
+      '--force',
+      '--deep',
+      '--sign',
+      '-',
+      '--timestamp=none',
+      '--entitlements',
+      MAC_ENTITLEMENTS_PATH,
+      appBundle
+    ],
     { stdio: 'inherit' }
   )
+  verifyMacRuntimeEntitlements(appBundle)
 }
 
 async function afterPack(context) {
@@ -219,3 +232,4 @@ module.exports._internals = {
   converterDirNameForContext,
   normalizeArch
 }
+module.exports.MAC_ENTITLEMENTS_PATH = MAC_ENTITLEMENTS_PATH

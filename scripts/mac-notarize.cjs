@@ -96,6 +96,73 @@ function readCodeSignatureDetails(path) {
   return details
 }
 
+const REQUIRED_RUNTIME_ENTITLEMENTS = [
+  'com.apple.security.cs.allow-jit',
+  'com.apple.security.cs.allow-unsigned-executable-memory',
+  'com.apple.security.cs.disable-library-validation'
+]
+
+function collectRuntimeExecutables(appBundle) {
+  const executables = []
+  const stack = [appBundle]
+
+  while (stack.length) {
+    const current = stack.pop()
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name)
+      const info = lstatSync(path)
+      if (info.isSymbolicLink()) continue
+      if (info.isDirectory()) {
+        stack.push(path)
+        continue
+      }
+      if (path.includes('/Contents/MacOS/') && (info.mode & 0o111) !== 0) {
+        executables.push(path)
+      }
+    }
+  }
+
+  return executables.sort()
+}
+
+function readEntitlements(path) {
+  const result = spawnSync('codesign', ['--display', '--entitlements', ':-', path], {
+    encoding: 'utf8'
+  })
+  if (result.error) throw result.error
+  const details = `${result.stdout || ''}${result.stderr || ''}`
+  if (result.status !== 0) {
+    throw new Error(`codesign entitlement inspection failed for ${path} with status ${result.status}\n${details}`)
+  }
+  return result.stdout || ''
+}
+
+function missingRuntimeEntitlements(entitlements) {
+  return REQUIRED_RUNTIME_ENTITLEMENTS.filter((key) => {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return !new RegExp(`<key>${escaped}</key>\\s*<true\\s*/>`, 's').test(entitlements)
+  })
+}
+
+function verifyMacRuntimeEntitlements(appBundle) {
+  const executables = collectRuntimeExecutables(appBundle)
+  if (!executables.length) {
+    throw new Error(`No macOS runtime executables found under ${appBundle}`)
+  }
+
+  for (const executable of executables) {
+    const entitlements = readEntitlements(executable)
+    const missing = missingRuntimeEntitlements(entitlements)
+    if (missing.length) {
+      throw new Error(
+        `macOS runtime signature is missing required Electron/V8 entitlements (${missing.join(', ')}): ${executable}`
+      )
+    }
+  }
+
+  console.log(`[mac-notarize] Verified Electron/V8 entitlements on ${executables.length} macOS runtime executable(s).`)
+}
+
 function verifySecureTimestamps(appBundle) {
   execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appBundle], {
     stdio: 'inherit'
@@ -118,15 +185,20 @@ exports.default = async function afterSign(context) {
     return
   }
 
+  const appBundle = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`)
+  if (!existsSync(appBundle)) {
+    throw new Error(`App bundle not found for notarization: ${appBundle}`)
+  }
+
+  // Validate the runtime signature even when notarization credentials are not
+  // present. A bad hardened-runtime signature crashes Electron/V8 before JS
+  // starts, so allowing the build to continue would produce an unusable app.
+  verifyMacRuntimeEntitlements(appBundle)
+
   const creds = getNotaryCredentials()
   if (!creds) {
     console.log('[mac-notarize] No Apple notary credentials found, skipping notarization.')
     return
-  }
-
-  const appBundle = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`)
-  if (!existsSync(appBundle)) {
-    throw new Error(`App bundle not found for notarization: ${appBundle}`)
   }
 
   const zipPath = join(context.appOutDir, `${context.packager.appInfo.productFilename}-notary.zip`)
@@ -186,5 +258,10 @@ exports._internals = {
   collectSignedCodeCandidates,
   isBundleLike,
   isLikelySignedFile,
-  readCodeSignatureDetails
+  readCodeSignatureDetails,
+  collectRuntimeExecutables,
+  readEntitlements,
+  missingRuntimeEntitlements,
+  verifyMacRuntimeEntitlements,
+  REQUIRED_RUNTIME_ENTITLEMENTS
 }

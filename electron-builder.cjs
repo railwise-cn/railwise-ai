@@ -5,6 +5,12 @@ const { verifyCandidateSourceTree } = require('./scripts/candidate-source-proven
 const { markitdownResourceFilter } = require('./scripts/markitdown-packaging-policy.cjs')
 const { agentPackResourceFilter, asarBlockedSkillFilters } = require('./scripts/specialist-skill-audit.cjs')
 
+// Keep these paths absolute. electron-builder resolves hook configuration from
+// its own process context, and a relative entitlements path can silently fall
+// back to a hardened-runtime signature with no V8 JIT permissions.
+const macEntitlementsPath = join(__dirname, 'build', 'entitlements.mac.plist')
+const macEntitlementsInheritPath = join(__dirname, 'build', 'entitlements.mac.inherit.plist')
+
 function loadLocalReleaseEnv() {
   const candidates = [
     process.env.WORKWISE_RELEASE_ENV,
@@ -274,8 +280,8 @@ const builderConfig = {
     forceCodeSigning: hasExplicitMacSigningIdentity,
     timestamp: hasExplicitMacSigningIdentity ? 'http://timestamp.apple.com/ts01' : null,
     gatekeeperAssess: false,
-    entitlements: 'build/entitlements.mac.plist',
-    entitlementsInherit: 'build/entitlements.mac.inherit.plist',
+    entitlements: macEntitlementsPath,
+    entitlementsInherit: macEntitlementsInheritPath,
     icon: './src/asset/img/workwise.icns',
     // arm64 (Apple Silicon) + x64 (Intel). On M 系列 Mac 本地打包会各出一组 dmg/zip。
     target: [
