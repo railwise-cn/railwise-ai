@@ -47,7 +47,7 @@ XY 标准误差椭圆半轴采用单位马氏半径，不代表 95% 等置信区
 
 ### 当前截图与验收范围
 
-以下为最终 0.5.1 安装包的中文浅色实拍，使用公开合成平面控制网（4 点、1 测站、5 观测），依次展示平差结果、成果中心与通用设置。[截图清单](../website/products/screenshots/workwise/release-051-screenshots.json)保留包来源及哈希。
+以下为最终 0.5.1 候选包的中文浅色实拍，界面文件与正式版逐字节一致，使用公开合成平面控制网（4 点、1 测站、5 观测），依次展示平差结果、成果中心与通用设置。[截图清单](../website/products/screenshots/workwise/release-051-screenshots.json)保留包来源及哈希。
 
 ![RailWise Survey 0.5.1 平差结果](../website/products/screenshots/workwise/07-survey-051-zh-light.jpg)
 

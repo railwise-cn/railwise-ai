@@ -47,7 +47,7 @@
 
 2026-09-28 07:35（北京时间）从官网下载的正式 Apple Silicon DMG 回装至 `/Applications/RailWise AI.app`。旧候选应用保留为独立备份；安装前、正常退出后、回装后和启动后，9 个工程数据库的逻辑 SHA-256 均一致。
 
-- 安装版本为 `0.5.1`，arm64，兼容 bundle ID `com.wangjiawei508.workgpt`，Team `R35G7F4A9U`；深度严格签名、stapled 公证和 5 个 Electron/V8 运行权限检查通过。主机原有 Gatekeeper 状态未变。
+- 安装版本为 `0.5.1`，arm64，保留[迁移矩阵](../railwise-ai-migration-matrix.md)中的兼容 bundle ID，Team `R35G7F4A9U`；深度严格签名、stapled 公证和 5 个 Electron/V8 运行权限检查通过。主机原有 Gatekeeper 状态未变。
 - 官方 ASAR SHA-256 为 `8992d72a1b4bbe624145729447bafaedb2cad696c165c7a58c3d3126f74d1028`。与最终候选逐项比较 17,330 个打包条目，唯一文件差异是 `package.json` 的 `updateChannel` 从 `frontier` 改为 `stable`；454 个 renderer 文件及 4 个重点 Runtime 模块与已验收内容相同。原生解包二进制不包含在此 ASAR 比较中。
 - 正常启动后点击“内业”，公开合成项目、4 条历史消息与平差记录恢复，Runtime 在线。保留跟随系统主题和常规窗口。
 - 正式配置指向 `https://www.railwise.cn/downloads/workwise/channels/stable/latest/`；在设置中手动检查更新，界面显示“已是最新版本：0.5.1”。此检查与此前真实 updater 往返各自记录，不混作同一次测试。
