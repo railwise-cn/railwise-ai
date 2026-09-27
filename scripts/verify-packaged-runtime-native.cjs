@@ -35,11 +35,30 @@ function smoke(executable, modulePath) {
 
 if (target === 'win') {
   const appRoot = join(root, 'win-unpacked')
+  // electron-builder derives the Windows executable from the packaged
+  // product name.  Older WorkWise builds used `WorkWise.exe`, while the
+  // public RailWise AI identity produces `RailWise AI.exe`; keep the legacy
+  // name as a compatibility fallback for existing local/upgrade builds.
+  const executableCandidates = [
+    `${productBrand.platform}.exe`,
+    'WorkWise.exe',
+    `${productBrand.compatibility?.productName || ''}.exe`,
+    `${productBrand.compatibility?.packageName || ''}.exe`
+  ].filter((candidate, index, all) => candidate !== '.exe' && all.indexOf(candidate) === index)
+  const executable = executableCandidates
+    .map((candidate) => join(appRoot, candidate))
+    .find((candidate) => existsSync(candidate))
+  if (!executable) {
+    throw new Error(
+      `Packaged Windows executable is missing under ${appRoot}; ` +
+      `checked ${executableCandidates.join(', ')}`
+    )
+  }
   const output = smoke(
-    join(appRoot, 'WorkWise.exe'),
+    executable,
     join(appRoot, 'resources', 'app.asar.unpacked', 'node_modules', 'better-sqlite3')
   )
-  console.log(`Verified packaged WorkWise Runtime native dependency on Windows: ${output}`)
+  console.log(`Verified packaged ${productBrand.runtime} native dependency on Windows: ${output}`)
   process.exit(0)
 }
 
@@ -85,7 +104,7 @@ for (const candidate of macTargets) {
 
   const output = smoke(executable, modulePath)
   executed += 1
-  console.log(`Verified packaged WorkWise Runtime native dependency on macOS ${candidate.arch}: ${output}`)
+  console.log(`Verified packaged ${productBrand.runtime} native dependency on macOS ${candidate.arch}: ${output}`)
 }
 
 if (executed === 0) {
