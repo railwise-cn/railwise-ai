@@ -4,9 +4,9 @@
 
 > Engineering survey processing and coding collaboration.
 
-RailWise AI is a local-first desktop platform. Its candidate interface has Code and Survey as the primary workspaces. RailWise Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
+RailWise AI is a local-first desktop platform. Version 0.5.1 has Code and Survey as the primary workspaces. RailWise Survey connects original observations, deterministic adjustment, precision evidence and reviewable deliverables. Write, Design, Flow, plugins and schedules remain supporting tools.
 
-**Version boundary:** the naming migration, four-stage Survey interface and subsequent professional features are undergoing isolated candidate acceptance. This documentation does not replace the public 0.5.0 installers or change their update channel. The repository is now `railwise-cn/railwise-ai`; WorkWise package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
+**Version boundary:** 0.5.1 releases the RailWise AI branding and four-stage Survey workspace. Advanced trials and declared quality records retain their documented limits and do not replace professional acceptance. The repository is now `railwise-cn/railwise-ai`; WorkWise package, storage and update identifiers remain compatible; see the [migration matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md).
 
 - Product page: [www.railwise.cn/products/workwise](https://www.railwise.cn/products/workwise/)
 - Direct mirror downloads: [Download and installation](https://www.railwise.cn/products/workwise/#download)
@@ -15,7 +15,7 @@ RailWise AI is a local-first desktop platform. Its candidate interface has Code 
 
 ## Current release
 
-The current stable release is **[v0.5.0](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.0)**. It adds the engineering survey workbench, unified plugin market, verifiable installation, Codex plugin compatibility, cross-platform glass window chrome, and structured attachment vision handling. Installed 0.4.2 clients can update in the application. Public releases have three user-facing installers:
+The current stable release is **[v0.5.1](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)**. It provides the four-stage Survey workspace, exact evidence questions and declared review records, with fixes for macOS startup, persisted tool-argument summaries and variance-scale explanations. Existing clients can check for updates in the application. Public releases have three user-facing installers:
 
 | Platform | Installer | Download |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ GitHub Releases remains the public release log and manual installer source. Sign
 
 **Original files → Content detection and preflight → Network and datum confirmation → Deterministic adjustment → Precision review → Deliverables → Human review.**
 
-| Production stage | Current candidate capabilities |
+| Production stage | Current workspace functions |
 | --- | --- |
 | Import and preflight | Content detection, source hashes, diagnostics, original-record anchors and explicit file dispositions |
 | Network and adjustment | Confirm network type, control points, units and datum before validated local computation |
@@ -40,25 +40,25 @@ AI conversation continues across stages. Calculations, project changes and expor
 
 COSA IN1/IN2 and Leica GSI leveling inputs must pass the applicable unit, datum and topology checks. Column mappings require explicit confirmation. OU1/OU2 currently remain archival review material, not an accepted automatic comparison workflow. Some formats, including RW5, support inspection or archiving only; receiver observations and RTKLIB-related sources require post-processing and cannot directly substitute for baseline-adjustment inputs. See the [current format matrix](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md).
 
-Candidate workspaces include free leveling, generalized w, grouped VCE, fixed external-scale Huber, statistical families, explicit-reference two-epoch comparison and static independent-observation additions. They retain model declarations, history and strict replay without automatically deleting observations, changing formal weights or declaring reference points stable.
+Advanced trial workspaces include free leveling, generalized w, grouped VCE, fixed external-scale Huber, statistical families, explicit-reference two-epoch comparison and static independent-observation additions. They retain model declarations, history and strict replay without automatically deleting observations, changing formal weights or declaring reference points stable.
 
-Quality workspaces provide material retention, complete first-round sampling, limited declared-record scoring and linked assessments for up to eight sample units. Missing evidence and vetoes remain separate; these features do not authenticate evidence, resampling, professional signatures or full standards conformity. See the [implementation and acceptance ledger](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md) and [advanced-trial contracts](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md). These candidate capabilities are not all part of the published 0.5.0 release.
+Quality workspaces provide material retention, complete first-round sampling, limited declared-record scoring and linked assessments for up to eight sample units. Missing evidence and vetoes remain separate; these features do not authenticate evidence, resampling, professional signatures or full standards conformity. See the [implementation and acceptance ledger](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md) and [advanced-trial contracts](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_ADVANCED_TRIALS_BACKEND.md). Publication does not establish complete cross-feature coverage, production certification or professional sign-off.
 
-## Candidate interface
+## 0.5.1 interface
 
-All three images are actual Chinese light-theme captures from installed candidate `281dc87`, using a synthetic planar network with four points, one station and five observations. The [screenshot manifest](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/website/products/screenshots/workwise/candidate-screenshots.json) records their provenance and hashes.
+These Chinese light-theme images were captured from the final 0.5.1 candidate, whose renderer is byte-for-byte identical to the formal release using a public synthetic network with four points, one station and five observations. The [screenshot manifest](./website/products/screenshots/workwise/release-051-screenshots.json) records package provenance and hashes.
 
-![RailWise Survey candidate adjustment results in Chinese light mode](./website/products/screenshots/workwise/04-survey-candidate-zh-light.jpg)
+![RailWise Survey 0.5.1 adjustment results](./website/products/screenshots/workwise/07-survey-051-zh-light.jpg)
 
-![RailWise Survey candidate deliverables in Chinese light mode](./website/products/screenshots/workwise/05-survey-candidate-delivery.jpg)
+![RailWise Survey 0.5.1 deliverables](./website/products/screenshots/workwise/08-survey-051-delivery.jpg)
 
-![RailWise AI candidate model settings in Chinese light mode](./website/products/screenshots/workwise/06-candidate-model-settings.jpg)
+![RailWise AI 0.5.1 general settings](./website/products/screenshots/workwise/09-survey-051-settings.jpg)
 
-This package completed signing, notarization, a real private updater round trip and limited linked-quality GUI checks. Its [exact-package report](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/evidence/railwise-convergence-281dc8767250/README.md) remains partial: full interface coverage, packaged AI workflows, professional review and personal user confirmation are outstanding. Subsequent source fixes are not implicitly included in this package.
+The final candidate passed the full two-hour stability gate and all three client builds. Local acceptance covered signing, notarization, real-model evidence questions, restart/data preservation and DOCX/PDF/XLSX export. A same-source isolated updater completed real download, installation, relaunch and data preservation; it does not certify historical-version migration. See the [0.5.1 release acceptance record](./docs/qa/RAILWISE_0.5.1_RELEASE_ACCEPTANCE.md).
 
 ## DeepSeek V4.1
 
-The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`; existing explicit model selections remain unchanged. Candidate `281dc87` includes this default, while later automatic-routing and fallback fixes belong to subsequent source changes.
+The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`; existing explicit model selections remain unchanged. Version 0.5.1 includes the automatic-routing and fallback fixes while preserving explicit saved model choices.
 
 On September 20, 2026, real official-service calls through the product adapter passed conversation, JSON output, declared function-name/argument return and synthetic-image recognition checks. The function check did not execute a tool. These checks do not replace acceptance of the complete packaged AI conversation, approval, tool and vision workflows.
 
@@ -134,7 +134,7 @@ Read more: [Local data and security](https://kb.railwise.cn/products/workwise/se
 | Status | Scope |
 | --- | --- |
 | Available now | Code, Write, Design, DeepSeek Harness structured attachment handling, reliable task runs, Agents, MCP V2, general document attachments, indexed retrieval, validated document delivery, and in-app updates |
-| Isolated candidate | RailWise AI naming, four-stage Survey and subsequent advanced/quality workspaces; accepted by exact package, without replacing 0.5.0 downloads |
+| Survey | Four-stage workspace, exact evidence questions, bounded advanced trials and declared quality records; professional applicability, signatures and full standards certification remain separate |
 | Preview | Flow canvas, typed nodes, mock and single-node tests, publish validation, run history, approval, and failure recovery |
 | Optional | Local MinerU parsing, online Skill updates, mobile connection, and companion command-line tools |
 | Direction | More multimodal generation nodes, industry nodes, and enterprise integrations |
@@ -146,7 +146,7 @@ Preview and directional items are not described as stable released features.
 1. Download the installer that matches your device and install it.
 2. Configure DeepSeek, Agnes AI, or another OpenAI-compatible service in Settings.
 3. Choose a local project or source-material directory as a workspace.
-4. Use the released version's Code, Write or engineering survey entry, or attach business files to a conversation. The new Code/Survey navigation and four-stage layout are candidate previews, not required menus in 0.5.0.
+4. Start in Code or Survey. Engineering tasks use the four-stage Survey workspace; Write, Design and Flow Preview remain available as supporting tools.
 5. Open Flow Preview when automation is useful, then review content, images, tables, and layout before formal delivery.
 
 - [Quick start](https://kb.railwise.cn/products/workwise/quickstart/)
@@ -161,7 +161,7 @@ Preview and directional items are not described as stable released features.
 
 ### In-app updates
 
-WorkWise 0.5.0 checks the official `railwise.cn` Stable channel at startup and every 24 hours. The blue update icon first downloads in the background; after completion it changes to **Restart and update**. Before restarting, WorkWise saves edits and reports active Agent, Flow, and scheduled runs. The platform updater then replaces and relaunches the application without opening a browser or requiring another drag-and-drop installation.
+RailWise AI 0.5.1 checks the official `railwise.cn` Stable channel at startup and every 24 hours. The blue update icon first downloads in the background; after completion it changes to **Restart and update**. Before restarting, WorkWise saves edits and reports active Agent, Flow, and scheduled runs. The platform updater then replaces and relaunches the application without opening a browser or requiring another drag-and-drop installation.
 
 Version 0.3.2 and earlier did not include the trusted production update channel, so those users need one final manual installation of 0.3.3. Subsequent stable releases can update in the application.
 
