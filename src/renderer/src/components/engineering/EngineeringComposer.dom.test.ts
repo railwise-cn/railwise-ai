@@ -167,6 +167,8 @@ describe('Survey composer continuity', () => {
     expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining('"adjustmentId":"adjustment-1"'), 'agent', expect.objectContaining({ displayText: 'Explain this result' }))
     expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining('"sourceRecordId":"record-19"'), 'agent', expect.any(Object))
     expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining('"networkRevision":3'), 'agent', expect.any(Object))
+    expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining('Read these exact legacy selectors using survey_read_context before answering.'), 'agent', expect.any(Object))
+    expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining('This selection has no typedEvidence; do not invent a typed reference'), 'agent', expect.any(Object))
   })
 
   it('pins a selected record across page navigation and clears it only after successful send', async () => {

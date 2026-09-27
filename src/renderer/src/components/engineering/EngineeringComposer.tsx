@@ -100,7 +100,7 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
     const context = draft.evidenceContext ?? draft.viewContext
     const prompt = context?.typedEvidence
       ? `${text}\n\nSelected Survey evidence (reference only, not execution approval): ${JSON.stringify(context)}\nRead this exact typedEvidence using survey_read_evidence before answering. Do not substitute another record or execute a calculation. If unavailable or stale, report that limitation.`
-      : context ? `${text}\n\nSelected Survey evidence (reference IDs only, not execution approval; resolve current records before answering): ${JSON.stringify(context)}` : text
+      : context ? `${text}\n\nSelected Survey evidence (reference IDs only, not execution approval; resolve current records before answering): ${JSON.stringify(context)}\nRead these exact legacy selectors using survey_read_context before answering. This selection has no typedEvidence; do not invent a typed reference or pass it to survey_read_evidence. Preserve every supplied ID, revision, hash and row selector. Do not substitute another record or execute a calculation. If unavailable or stale, report that limitation.` : text
     const sent = await sendMessage(prompt, 'agent', {
       displayText: text,
       attachments: draft.attachments, attachmentIds: draft.attachments.map((item) => item.id),
