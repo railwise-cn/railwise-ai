@@ -13,9 +13,9 @@ if (!function_exists('rw_workwise_manifest')) {
 
         $fallback = [
             'name' => 'RailWise AI',
-            'version' => '0.5.0',
-            'publishedAt' => '2026-09-14',
-            'releaseUrl' => 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.0',
+            'version' => '0.5.1',
+            'publishedAt' => '2026-09-28',
+            'releaseUrl' => 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1',
             'repositoryUrl' => 'https://github.com/railwise-cn/railwise-ai',
             'platforms' => [],
             'docs' => [],

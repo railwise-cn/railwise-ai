@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "version": "0.5.1",
+  "capturedAt": "2026-09-28",
+  "releaseTag": "v0.5.1",
+  "releaseCommit": "4bcc09fee46dfa4231a0b53905ffa2068c3f88c1",
+  "capturePackage": {
+    "workflow": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275",
+    "applicationSource": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+    "dmgSha256": "74678d53e37ffdc0a9599fb28ae353238c01c84865c18b98e66596b1421282ad",
+    "rendererManifestSha256": "84734b64d58d4352ee389a3e30122da60681be5620aaa8a9dff85af11b508959"
+  },
+  "data": "Repository public synthetic golden-plane-control-e2e.in2 fixture; no production project data or credentials.",
+  "files": [
+    {
+      "name": "07-survey-051-zh-light.jpg",
+      "sha256": "f5f334002aa229c9992b6ef7769f6607597038613505bb2fdda443e8a77a9f4b"
+    },
+    {
+      "name": "08-survey-051-delivery.jpg",
+      "sha256": "291b1f2d198e05f8a8daafc020baf00a3a62d7e65c19e82b5958c383e801c0da"
+    },
+    {
+      "name": "09-survey-051-settings.jpg",
+      "sha256": "0c277a9fd82e937aab37763830ebf4b3c6be4c47a36d7f5da67c11bed127b5bf"
+    }
+  ],
+  "formalPackageComparison": {
+    "workflow": "https://github.com/railwise-cn/railwise-ai/actions/runs/36355577889",
+    "dmgSha256": "81c6d25ae853cf29a4271911cb4dc8333a09bde2e80c89dab5f06d9d23e2fe9a",
+    "rendererFilesCompared": 454,
+    "rendererIdentical": true,
+    "note": "Screenshots captured in final candidate #166; formal stable renderer is byte-for-byte identical."
+  }
+}
