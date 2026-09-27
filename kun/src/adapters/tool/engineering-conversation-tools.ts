@@ -33,7 +33,9 @@ export function buildEngineeringConversationTools(
         name: 'survey_read_evidence',
         shouldAdvertise: context => context.allowedToolNames?.includes('survey_read_evidence') === true,
         description: 'Read the exact selected typed Survey evidence reference. Copy its kind, IDs, revisions, hashes and selector. No latest fallback, new calculation, write, verification attempt or approval. Existing strict readers may replay saved calculations for integrity. Nested selectors use exact own JSON fields and array indices; object rows require identity fields. Output-limit returns selector-required, never a partial result. Trial and caller-declared evidence remain unauthenticated; receipt reads are historical, not fresh verification.',
-        inputSchema: z.toJSONSchema(SurveyEvidenceReferenceV1), policy: 'auto',
+        // Zod emits a bare oneOf for this object-only union. Model providers
+        // require an explicit object root even though each branch has one.
+        inputSchema: { ...z.toJSONSchema(SurveyEvidenceReferenceV1), type: 'object' }, policy: 'auto',
         execute: async (args, context) => {
           const thread = await threadStore.get(context.threadId)
           if (thread?.domain !== 'engineering' || !thread.projectId) throw new Error('an engineering project thread is required')
