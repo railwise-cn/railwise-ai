@@ -56,6 +56,13 @@ describe('Survey continuous conversation capabilities', () => {
     expect(calculate).not.toHaveBeenCalled()
   })
 
+  it('instructs the model to distinguish variance and standard-deviation orders of magnitude', async () => {
+    const policy = await orchestrator.conversationPolicy('survey-thread', projectId, 'question-turn')
+    expect(policy.instruction).toContain('varianceFactor is a variance (a squared scale)')
+    expect(policy.instruction).toContain('1.14e-8 is about 8 orders below 1 as a variance')
+    expect(policy.instruction).toContain('Never describe the standard-deviation order as a variance order')
+  })
+
   it('persists project suggestions without writes or token exposure and applies only after confirmation', async () => {
     const result = await host.execute({ callId: 'suggest', toolName: 'survey_propose_project_change', arguments: { reason: 'Use the reviewed vertical datum', patch: { taskContext: { verticalDatum: 'Synthetic datum' } } } }, context)
     expect(result.item).toMatchObject({ output: { applied: false, confirmationRequired: true } })
