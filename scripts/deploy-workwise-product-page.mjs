@@ -240,6 +240,20 @@ case "$stage" in /tmp/workwise-product-deploy-*/payload) ;; *) exit 64 ;; esac
 
 discover_runtime
 verify_live_targets
+python3 - "$web_container" <<'PY'
+import re, subprocess, sys
+result = subprocess.run(['docker', 'exec', '-u', '0', sys.argv[1], 'nginx', '-T'], capture_output=True, text=True)
+if result.returncode:
+    raise SystemExit('Could not inspect effective website routing')
+parts = re.split(r'^# configuration file (.+):\s*$', result.stdout + result.stderr, flags=re.M)
+for index in range(1, len(parts), 2):
+    source, content = parts[index:index+2]
+    if re.search(r'\bserver_name\s+[^;]*\bwww[.]railwise[.]cn\b[^;]*;', content):
+        print('Website routing source:', source)
+        for line in content.splitlines():
+            if re.match(r'\s*(?:root|alias|fastcgi_cache|fastcgi_cache_valid|fastcgi_cache_key|try_files|fastcgi_param\s+SCRIPT_FILENAME)\s', line):
+                print('Website routing:', line.strip())
+PY
 backup="$(dirname "$site_root")/.workwise-product-backups/$deploy_id"
 case "$backup" in /www/sites/www.railwise.cn/.workwise-product-backups/*) ;; *) exit 64 ;; esac
 
