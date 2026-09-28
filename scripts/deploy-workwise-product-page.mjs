@@ -318,11 +318,9 @@ done
 printf '%b' "$screenshot_names" | container_write "$backup/deployed-screenshots.txt"
 
 restore_screenshots() {
-  [ -f "$backup/deployed-screenshots.txt" ] || return 0
+  container_run test -f "$backup/deployed-screenshots.txt" || return 0
   if container_run test -d "$backup/screenshots"; then
     container_run install -d -m 755 "$site_root/products/screenshots/workwise"
-  else
-    container_run rmdir "$site_root/products/screenshots/workwise" 2>/dev/null || true
   fi
   while IFS= read -r image; do
     [[ "$image" =~ ^[A-Za-z0-9._-]+\.(png|jpe?g|webp)$ ]] || continue
@@ -457,8 +455,6 @@ container_run cp -p "$backup/workwise_product.php" "$include_path"
 container_run cp -p "$backup/workwise-product.json" "$json_path"
 if container_run test -d "$backup/screenshots"; then
   container_run install -d -m 755 "$site_root/products/screenshots/workwise"
-else
-  container_run rmdir "$site_root/products/screenshots/workwise" 2>/dev/null || true
 fi
 container_run test -f "$backup/deployed-screenshots.txt"
 while IFS= read -r image; do

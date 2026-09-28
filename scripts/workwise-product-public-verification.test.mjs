@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NGINX_VHOST_ROOTS_PYTHON, verifyProductPublication } from './workwise-product-public-verification.mjs'
@@ -14,6 +14,55 @@ const goodResponse = (url) => {
   if (String(url).includes('/releases/')) return new Response('data', { status: 206, headers: { 'content-range': 'bytes 0-3/100' } })
   return new Response(html)
 }
+
+test('failure rollback reads the screenshot inventory inside the web container', () => {
+  const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')
+  const restore = source.match(/restore_screenshots\(\) \{[\s\S]*?\n\}/)?.[0]
+  assert.ok(restore)
+  for (const hadScreenshots of [true, false]) {
+    const directory = mkdtempSync(join(tmpdir(), 'workwise-rollback-'))
+    try {
+      const backup = join(directory, 'backup')
+      const images = join(directory, 'site/products/screenshots/workwise')
+      mkdirSync(backup, { recursive: true })
+      mkdirSync(images, { recursive: true })
+      writeFileSync(join(backup, 'deployed-screenshots.txt'), 'existing.jpg\nintroduced.jpg\n')
+      writeFileSync(join(images, 'existing.jpg'), 'new existing image')
+      writeFileSync(join(images, 'introduced.jpg'), 'introduced image')
+      writeFileSync(join(images, 'unrelated.jpg'), 'preserve this image')
+      if (hadScreenshots) {
+        mkdirSync(join(backup, 'screenshots'))
+        writeFileSync(join(backup, 'screenshots/existing.jpg'), 'original image')
+      }
+      // /container-only has no host-side files; every container operation is
+      // redirected into a fixture filesystem, reproducing the mount boundary.
+      execFileSync('bash', ['-s'], { encoding: 'utf8', env: { ...process.env, FIXTURE_ROOT: directory }, input: `
+set -euo pipefail
+backup=/container-only/backup
+site_root=/container-only/site
+container_run() {
+  local arg
+  local args=()
+  for arg in "$@"; do
+    case "$arg" in
+      /container-only/*) args+=("$FIXTURE_ROOT/\${arg#/container-only/}") ;;
+      *) args+=("$arg") ;;
+    esac
+  done
+  "\${args[@]}"
+}
+${restore}
+restore_screenshots
+` })
+      assert.equal(existsSync(join(images, 'introduced.jpg')), false)
+      assert.equal(readFileSync(join(images, 'unrelated.jpg'), 'utf8'), 'preserve this image')
+      if (hadScreenshots) assert.equal(readFileSync(join(images, 'existing.jpg'), 'utf8'), 'original image')
+      else assert.equal(existsSync(join(images, 'existing.jpg')), false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+})
 
 test('discovers only direct roots from the exact active www.railwise.cn server', () => {
   const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
