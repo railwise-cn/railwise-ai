@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { verifyProductPublication } from './workwise-product-public-verification.mjs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { NGINX_VHOST_ROOTS_PYTHON, verifyProductPublication } from './workwise-product-public-verification.mjs'
 
 const manifest = JSON.parse(readFileSync(new URL('../website/data/workwise-product.json', import.meta.url)))
 const html = `"softwareVersion":"v${manifest.version}" ${manifest.name} v${manifest.version} 已发布 releases/tag/v${manifest.version} ${manifest.platforms.map((item) => item.url).join(' ')}`
@@ -11,6 +14,57 @@ const goodResponse = (url) => {
   if (String(url).includes('/releases/')) return new Response('data', { status: 206, headers: { 'content-range': 'bytes 0-3/100' } })
   return new Response(html)
 }
+
+test('discovers only direct roots from the exact active www.railwise.cn server', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
+  const dumpPath = join(directory, 'nginx-dump.txt')
+  try {
+    writeFileSync(dumpPath, String.raw`# configuration file /etc/nginx/nginx.conf:
+http {
+  server {
+    server_name railwise.cn www.railwise.cn;
+    root "/www/audit-releases/audit-20260924-final/site";
+    location /legacy/ { root /www/audit-releases/audit-old/site; }
+  }
+  server {
+    server_name www.other.example;
+    root /www/audit-releases/audit-other/site;
+  }
+  server {
+    server_name www.railwise.cn;
+    location / { root /www/audit-releases/audit-nested/site; }
+  }
+  server {
+    server_name www.railwise.cn;
+    root /www/audit-releases/../escaped/site;
+  }
+}
+`)
+    const roots = execFileSync('python3', ['-c', NGINX_VHOST_ROOTS_PYTHON, dumpPath], { encoding: 'utf8' })
+    assert.deepEqual(roots.trim().split('\n'), ['/www/audit-releases/audit-20260924-final/site'])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('keeps conflicting active host roots visible so deployment fails closed', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
+  const dumpPath = join(directory, 'nginx-dump.txt')
+  try {
+    writeFileSync(dumpPath, String.raw`http {
+  server { server_name www.railwise.cn; root /www/audit-releases/audit-one/site; }
+  server { server_name www.railwise.cn; root /www/audit-releases/audit-two/site; }
+}
+`)
+    const roots = execFileSync('python3', ['-c', NGINX_VHOST_ROOTS_PYTHON, dumpPath], { encoding: 'utf8' })
+    assert.deepEqual(roots.trim().split('\n'), [
+      '/www/audit-releases/audit-one/site',
+      '/www/audit-releases/audit-two/site'
+    ])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('retries a stale normal page and verifies both URLs, manifest and all installers', async () => {
   const calls = []

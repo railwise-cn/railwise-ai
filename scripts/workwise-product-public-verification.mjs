@@ -3,6 +3,70 @@ import { setTimeout } from 'node:timers/promises'
 
 const PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
 
+export const NGINX_VHOST_ROOTS_PYTHON = String.raw`import re,shlex,sys
+
+def directives(text):
+    value=[]
+    quote=None
+    escaped=False
+    comment=False
+    for char in text:
+        if comment:
+            if char=='\n':
+                comment=False
+                value.append(' ')
+            continue
+        if quote:
+            value.append(char)
+            if escaped: escaped=False
+            elif char=='\\': escaped=True
+            elif char==quote: quote=None
+            continue
+        if escaped:
+            value.append(char)
+            escaped=False
+        elif char=='\\':
+            value.append(char)
+            escaped=True
+        elif char in (chr(39),chr(34)):
+            quote=char
+            value.append(char)
+        elif char=='#':
+            comment=True
+        elif char in '{};':
+            yield ''.join(value).strip(),char
+            value=[]
+        else:
+            value.append(char)
+
+roots=set()
+stack=[]
+server=None
+for value,separator in directives(open(sys.argv[1],encoding='utf-8',errors='replace').read()):
+    try:
+        words=shlex.split(value)
+    except ValueError:
+        words=[]
+    if separator=='{':
+        if server is None and words and words[0]=='server':
+            server={'depth':len(stack),'names':[],'roots':[]}
+        stack.append(words[0] if words else '')
+    elif separator==';' and server is not None and len(stack)==server['depth']+1 and words:
+        if words[0]=='server_name':
+            server['names'].extend(words[1:])
+        elif words[0]=='root' and len(words)==2:
+            server['roots'].append(words[1])
+    elif separator=='}':
+        if server is not None and len(stack)==server['depth']+1:
+            if 'www.railwise.cn' in server['names']:
+                for root in server['roots']:
+                    if re.fullmatch(r'/www/audit-releases/audit-[A-Za-z0-9_-]+/site',root):
+                        roots.add(root)
+            server=None
+        if stack:
+            stack.pop()
+print('\n'.join(sorted(roots)))`
+
 export async function verifyProductPublication(manifest, {
   fetcher = fetch,
   attempts = 10,
