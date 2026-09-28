@@ -110,6 +110,8 @@ jobs:
         env:
           WORKWISE_CONTENT_PHP_TEST: php
         run: node --test scripts/workwise-content-deploy.test.mjs
+      - name: Test public version and download guards
+        run: node --test scripts/workwise-product-public-verification.test.mjs
       - name: Verify official Stable version
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
