@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { runContentCommand } from './workwise-content-deploy.mjs'
-import { verifyProductPublication } from './workwise-product-public-verification.mjs'
+import { NGINX_VHOST_ROOTS_PYTHON, verifyProductPublication } from './workwise-product-public-verification.mjs'
 
 const SAFE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 const RELEASE_ROOT_SUFFIX = '/downloads/workwise'
@@ -180,8 +180,6 @@ discover_runtime() {
     *) fail 'website release root is not the approved railwise.cn document root' ;;
   esac
 
-  site_root='/www/sites/www.railwise.cn/index'
-
   web_container=''
   web_count=0
   for candidate in $(docker ps -q); do
@@ -207,6 +205,31 @@ discover_runtime() {
     esac
   done
   [ "$php_count" -eq 1 ] || fail "expected one website PHP runtime, found $php_count"
+
+nginx_dump="$(mktemp)"
+docker exec -u 0 "$web_container" nginx -T > "$nginx_dump" 2>&1 || fail 'could not inspect the active WorkWise website document root'
+roots="$(python3 - "$nginx_dump" <<'PY'
+${NGINX_VHOST_ROOTS_PYTHON}
+PY
+)"
+rm -f "$nginx_dump"
+[ -n "$roots" ] || fail 'could not discover the active WorkWise website document root'
+  site_root=''
+  root_count=0
+  while IFS= read -r candidate_root; do
+    [ -n "$candidate_root" ] || continue
+    if docker exec -u 0 "$web_container" test -f "$candidate_root/products/workwise/index.php" \
+      && docker exec -u 0 "$web_container" test -f "$candidate_root/includes/workwise_product.php" \
+      && docker exec -u 0 "$web_container" test -f "$candidate_root/data/workwise-product.json" \
+      && docker exec "$php_container" test -f "$candidate_root/products/workwise/index.php"; then
+      site_root="$candidate_root"
+      root_count=$((root_count + 1))
+    fi
+  done <<EOF_ROOTS
+$roots
+EOF_ROOTS
+  [ "$root_count" -eq 1 ] || fail "expected one active www.railwise.cn document root, found $root_count"
+  printf 'Selected active www.railwise.cn document root: %s\n' "$site_root"
 
   page_path="$site_root/products/workwise/index.php"
   include_path="$site_root/includes/workwise_product.php"
@@ -250,12 +273,24 @@ for index in range(1, len(parts), 2):
     source, content = parts[index:index+2]
     if re.search(r'\bserver_name\s+[^;]*\bwww[.]railwise[.]cn\b[^;]*;', content):
         print('Website routing source:', source)
+        depth = 0
+        in_target_server = False
+        for line in content.splitlines():
+            if depth == 0 and re.match(r'\s*server\s*\{', line):
+                in_target_server = False
+            if re.search(r'\bserver_name\s+[^;]*\bwww[.]railwise[.]cn\b[^;]*;', line):
+                in_target_server = True
+            if in_target_server and re.match(r'\s*(?:server_name|root|alias|location|fastcgi_pass|fastcgi_cache|fastcgi_cache_valid|try_files|fastcgi_param\s+SCRIPT_FILENAME)\b', line):
+                print('Active host directive:', line.strip())
+            depth += line.count('{') - line.count('}')
+            if depth == 0:
+                in_target_server = False
         for line in content.splitlines():
             if re.match(r'\s*(?:root|alias|fastcgi_cache|fastcgi_cache_valid|fastcgi_cache_key|try_files|fastcgi_param\s+SCRIPT_FILENAME)\s', line):
                 print('Website routing:', line.strip())
 PY
 backup="$(dirname "$site_root")/.workwise-product-backups/$deploy_id"
-case "$backup" in /www/sites/www.railwise.cn/.workwise-product-backups/*) ;; *) exit 64 ;; esac
+case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
 
 test -s "$stage/products/workwise/index.php" || fail 'missing staged product page'
 test -s "$stage/includes/workwise_product.php" || fail 'missing staged product include'
@@ -275,6 +310,29 @@ container_run cp -p "$json_path" "$backup/workwise-product.json" || fail 'could 
 if container_run test -d "$site_root/products/screenshots/workwise"; then
   container_run cp -R "$site_root/products/screenshots/workwise" "$backup/screenshots" || fail 'could not back up product screenshots'
 fi
+screenshot_names=''
+for encoded in "$stage"/products/screenshots/workwise/*.json; do
+  [ -f "$encoded" ] || continue
+  screenshot_names="$screenshot_names$(basename "$encoded" .json)\n"
+done
+printf '%b' "$screenshot_names" | container_write "$backup/deployed-screenshots.txt"
+
+restore_screenshots() {
+  [ -f "$backup/deployed-screenshots.txt" ] || return 0
+  if container_run test -d "$backup/screenshots"; then
+    container_run install -d -m 755 "$site_root/products/screenshots/workwise"
+  else
+    container_run rmdir "$site_root/products/screenshots/workwise" 2>/dev/null || true
+  fi
+  while IFS= read -r image; do
+    [[ "$image" =~ ^[A-Za-z0-9._-]+\.(png|jpe?g|webp)$ ]] || continue
+    if container_run test -f "$backup/screenshots/$image"; then
+      container_run cp -p "$backup/screenshots/$image" "$site_root/products/screenshots/workwise/$image"
+    elif container_run test -f "$site_root/products/screenshots/workwise/$image"; then
+      container_run rm -f "$site_root/products/screenshots/workwise/$image"
+    fi
+  done < <(container_run cat "$backup/deployed-screenshots.txt")
+}
 
 stage_replacement() {
   live="$1"
@@ -296,8 +354,8 @@ rollback() {
     if container_run test -f "$backup/workwise-product.json"; then container_run cp -p "$backup/workwise-product.json" "$json_path"; fi
     if container_run test -d "$backup/screenshots"; then
       container_run install -d -m 755 "$site_root/products/screenshots/workwise"
-      container_run cp -R "$backup/screenshots/." "$site_root/products/screenshots/workwise/"
     fi
+    restore_screenshots
     container_run rm -f "$page_path.workwise-next" "$include_path.workwise-next" "$json_path.workwise-next"
   fi
 }
@@ -349,6 +407,35 @@ discover_web_container() {
     fi
   done
   [ "$web_count" -eq 1 ] || fail "expected one writable railwise.cn web mount, found $web_count"
+  php_container=''
+  php_count=0
+  for candidate in $(docker ps -q); do
+    image="$(docker inspect --format '{{.Config.Image}}' "$candidate" 2>/dev/null || true)"
+    case "$image" in 1panel-php-fpm:*|*/1panel-php-fpm:*) php_container="$candidate"; php_count=$((php_count + 1)) ;; esac
+  done
+  [ "$php_count" -eq 1 ] || fail "expected one website PHP runtime, found $php_count"
+  nginx_dump="$(mktemp)"
+  docker exec -u 0 "$web_container" nginx -T > "$nginx_dump" 2>&1 || fail 'could not inspect the active WorkWise website document root'
+  roots="$(python3 - "$nginx_dump" <<'PY'
+${NGINX_VHOST_ROOTS_PYTHON}
+PY
+)"
+  rm -f "$nginx_dump"
+  [ -n "$roots" ] || fail 'could not discover the active WorkWise website document root'
+  site_root=''
+  root_count=0
+  while IFS= read -r candidate_root; do
+    [ -n "$candidate_root" ] || continue
+    if docker exec -u 0 "$web_container" test -f "$candidate_root/products/workwise/index.php" \
+      && docker exec -u 0 "$web_container" test -f "$candidate_root/includes/workwise_product.php" \
+      && docker exec -u 0 "$web_container" test -f "$candidate_root/data/workwise-product.json" \
+      && docker exec "$php_container" test -f "$candidate_root/products/workwise/index.php"; then
+      site_root="$candidate_root"; root_count=$((root_count + 1))
+    fi
+  done <<EOF_ROOTS
+$roots
+EOF_ROOTS
+  [ "$root_count" -eq 1 ] || fail "expected one active www.railwise.cn document root, found $root_count"
 }
 container_run() {
   docker exec -u 0 "$web_container" "$@"
@@ -357,18 +444,31 @@ release_root="$1"
 deploy_id="$2"
 case "$release_root" in /*/downloads/workwise) ;; *) exit 64 ;; esac
 discover_web_container
-site_root='/www/sites/www.railwise.cn/index'
 page_path="$site_root/products/workwise/index.php"
 include_path="$site_root/includes/workwise_product.php"
 json_path="$site_root/data/workwise-product.json"
-backup='/www/sites/www.railwise.cn/.workwise-product-backups/'"$deploy_id"
-case "$backup" in /www/sites/www.railwise.cn/.workwise-product-backups/*) ;; *) exit 64 ;; esac
+backup="$(dirname "$site_root")/.workwise-product-backups/$deploy_id"
+case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
 container_run test -s "$backup/product-page.php"
 container_run test -s "$backup/workwise_product.php"
 container_run test -s "$backup/workwise-product.json"
 container_run cp -p "$backup/product-page.php" "$page_path"
 container_run cp -p "$backup/workwise_product.php" "$include_path"
 container_run cp -p "$backup/workwise-product.json" "$json_path"
+if container_run test -d "$backup/screenshots"; then
+  container_run install -d -m 755 "$site_root/products/screenshots/workwise"
+else
+  container_run rmdir "$site_root/products/screenshots/workwise" 2>/dev/null || true
+fi
+container_run test -f "$backup/deployed-screenshots.txt"
+while IFS= read -r image; do
+  [[ "$image" =~ ^[A-Za-z0-9._-]+\.(png|jpe?g|webp)$ ]] || continue
+  if container_run test -f "$backup/screenshots/$image"; then
+    container_run cp -p "$backup/screenshots/$image" "$site_root/products/screenshots/workwise/$image"
+  elif container_run test -f "$site_root/products/screenshots/workwise/$image"; then
+    container_run rm -f "$site_root/products/screenshots/workwise/$image"
+  fi
+done < <(container_run cat "$backup/deployed-screenshots.txt")
 printf 'Rolled back WorkWise product page from the server-side backup.\n'
 `
 
