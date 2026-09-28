@@ -59,7 +59,7 @@ $workwiseExportFeatures = [
 ];
 $workwiseUseCases = [
   ['title' => '控制网与水准网内业', 'desc' => '导入原始观测，检查控制点、单位和几何条件，完成平差与精度复核。', 'icon' => 'fas fa-compass'],
-  ['title' => '工程成果复核', 'desc' => '把残差、闭合差、点位精度与原始记录对应起来，形成待审查证据包。', 'icon' => 'fas fa-file-check'],
+  ['title' => '工程成果复核', 'desc' => '把残差、闭合差、点位精度与原始记录对应起来，形成待审查证据包。', 'icon' => 'fas fa-file-circle-check'],
   ['title' => '长文档写作', 'desc' => '从 Markdown 到 Word / PDF，减少反复搬运。', 'icon' => 'fas fa-file-export'],
   ['title' => '桌面端 AI 工作区', 'desc' => '用图形化界面管理会话、模板、Skills 和项目资料。', 'icon' => 'fas fa-desktop'],
   ['title' => '项目资料整理', 'desc' => '把资料、会话和成果放进同一个工作区。', 'icon' => 'fas fa-folder-tree'],
@@ -99,7 +99,7 @@ $pageJsonLd = [
   ],
 ];
 $rwConversionDock = [
-  'eyebrow' => 'WORKWISE DEMO',
+  'eyebrow' => 'RAILWISE AI DEMO',
   'title' => '预约 RailWise AI 场景演示',
   'description' => '围绕工程测量内业、代码协作或文档编排，演示从资料处理到可复核成果的工作流程。',
   'subject' => 'RailWise AI 产品演示',
@@ -179,7 +179,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="pd-cap-head">
           <span class="pd-cap-ico workwise-code"><i class="fas fa-bolt"></i></span>
           <div>
-            <span class="pd-eyebrow dark">WORKWISE <?php echo htmlspecialchars($workwiseVersion); ?> · AVAILABLE NOW</span>
+            <span class="pd-eyebrow dark">RAILWISE AI <?php echo htmlspecialchars($workwiseVersion); ?> · AVAILABLE NOW</span>
             <h3>统一默认模型 deepseek-flash</h3>
             <p>首次启动只需配置 DeepSeek API Key 和可选服务地址。主 Agent、Write、定时任务和其他 Agent 默认使用官方模型 ID <code>deepseek-flash</code>；<code>deepseek-v4-pro</code> 可作为显式兼容选择，旧 Flash ID 仅为迁移保留。</p>
             <a href="https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md" target="_blank" rel="noopener" class="cli-inline-link">查看 RailWise AI 软件介绍 <i class="fas fa-arrow-up-right-from-square"></i></a>
