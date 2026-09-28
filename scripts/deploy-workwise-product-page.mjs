@@ -4,10 +4,10 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { runContentCommand } from './workwise-content-deploy.mjs'
+import { verifyProductPublication } from './workwise-product-public-verification.mjs'
 
 const SAFE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 const RELEASE_ROOT_SUFFIX = '/downloads/workwise'
-const PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
 
 function parseArgs(argv) {
   const command = argv[0]
@@ -297,6 +297,17 @@ for encoded in "$stage"/products/screenshots/workwise/*.json; do
   image_name="$(basename "$encoded" .json)"
   container_decode "$encoded" "$site_root/products/screenshots/workwise/$image_name"
 done
+for relative in products/workwise/index.php includes/workwise_product.php data/workwise-product.json; do
+  expected="$(sha256sum "$stage/$relative" | cut -d ' ' -f 1)"
+  actual="$(container_run sha256sum "$site_root/$relative" | cut -d ' ' -f 1)"
+  php_actual="$(docker exec "$php_container" sha256sum "$site_root/$relative" | cut -d ' ' -f 1)"
+  [ "$actual" = "$expected" ] || fail "web file digest mismatch: $relative"
+  [ "$php_actual" = "$expected" ] || fail "PHP file digest mismatch: $relative"
+  printf 'Verified web/PHP file SHA-256: %s %s\n' "$relative" "$actual"
+done
+actual_version="$(docker exec "$php_container" php -r 'require $argv[1]; echo rw_workwise_manifest()["version"];' -- "$include_path")"
+[ "$actual_version" = "$version" ] || fail "PHP manifest returned version $actual_version, expected $version"
+printf 'Verified PHP manifest version: %s\n' "$actual_version"
 committed=1
 trap - EXIT HUP INT TERM
 printf 'Deployed WorkWise product page %s with a server-side backup.\n' "$version"
@@ -400,36 +411,7 @@ function rollback(deployId) {
 
 async function verifyPublic(sourceDirectory, version) {
   const { manifest } = validateSource(sourceDirectory, version)
-  const response = await fetch(`${PRODUCT_URL}?release=${encodeURIComponent(version)}&t=${Date.now()}`, {
-    redirect: 'follow',
-    cache: 'no-store',
-    signal: AbortSignal.timeout(30_000)
-  })
-  if (!response.ok) throw new Error(`Product page returned HTTP ${response.status}.`)
-  const html = await response.text()
-  const required = [
-    `softwareVersion":"v${version}`,
-    `${manifest.name || 'WorkWise'} v${version} 已发布`,
-    `releases/tag/v${version}`,
-    ...manifest.platforms.map((item) => item.url)
-  ]
-  for (const text of required) {
-    if (!html.includes(text)) throw new Error(`Product page is missing expected content: ${text}`)
-  }
-  for (const item of manifest.platforms) {
-    const url = new URL(item.url, PRODUCT_URL)
-    const range = await fetch(url, {
-      headers: { Range: 'bytes=0-1023' },
-      redirect: 'follow',
-      cache: 'no-store',
-      signal: AbortSignal.timeout(30_000)
-    })
-    if (range.status !== 206 || !/^bytes 0-\d+\/\d+$/i.test(range.headers.get('content-range') || '')) {
-      throw new Error(`Installer Range verification failed for ${basename(url.pathname)}.`)
-    }
-    await range.arrayBuffer()
-  }
-  console.log(`Verified public WorkWise product page and three immutable ${version} installers.`)
+  await verifyProductPublication(manifest)
 }
 
 const { command, flags } = parseArgs(process.argv.slice(2))
