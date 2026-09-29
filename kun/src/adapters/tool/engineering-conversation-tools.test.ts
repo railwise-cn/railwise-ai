@@ -124,6 +124,57 @@ describe('Survey continuous conversation capabilities', () => {
     expect(turns.startTurn).toHaveBeenCalledWith(expect.objectContaining({ engineeringExecution: true }))
   })
 
+  it('reports the real invalid-model plan and accepts a corrected draft in the same turn without rewriting history', async () => {
+    const network = survey.listNetworks(projectId)[0]!
+    const goal = 'Validate, adjust and export a public synthetic network'
+    const invalidSteps = [
+      { tool: 'survey_network_validate', title: 'Validate', parameters: { networkId: network.id, expectedRevision: 1, sourceSha256: 'not-a-tool-parameter' } },
+      { tool: 'control_network', title: 'Adjust', parameters: { networkId: network.id }, parameterBindings: [{ parameter: 'expectedRevision', stepId: 'step-1', output: 'network.revision' }] },
+      { tool: 'report_export', title: 'Export', parameters: { format: 'docx', draft: true }, parameterBindings: [{ parameter: 'adjustmentIds', stepId: 'step-2', output: 'run.id', asArray: true }] }
+    ]
+    const invalid = await host.execute({ callId: 'invalid-plan', toolName: 'survey_request_plan', arguments: { goal, steps: invalidSteps } }, context)
+    expect(invalid.item).toMatchObject({ isError: true, output: { readyForApproval: false, executed: false, parameterIssues: [
+      { stepId: 'step-1', code: 'invalid-parameters', fields: ['sourceSha256'] },
+      { stepId: 'step-3', code: 'invalid-parameters', fields: expect.arrayContaining(['projectId', 'expectedRevision', 'format', 'draft']) }
+    ] } })
+    const blocked = repository.latestPlan('survey-thread', projectId)!
+    const original = JSON.stringify(blocked)
+    expect(orchestrator.getPlan(blocked.id)?.parameterIssues).toHaveLength(2)
+    const approval = repository.approvalForPlan(blocked.id, blocked.revision)!
+    expect(() => orchestrator.approvePlan(blocked.id, { expectedRevision: 1, contextHash: blocked.contextHash, stepIds: approval.stepIds, token: approval.token, idempotencyKey: 'blocked-approval' })).toThrow(/incomplete/)
+
+    const steps = [
+      { ...invalidSteps[0], parameters: { networkId: network.id, expectedRevision: 1 } },
+      invalidSteps[1],
+      { ...invalidSteps[2], parameters: { projectId, expectedRevision: 1 } }
+    ]
+    const repaired = await host.execute({ callId: 'corrected-plan', toolName: 'survey_request_plan', arguments: { goal, steps } }, context)
+    expect(repaired.item).not.toMatchObject({ isError: true })
+    expect(repaired.item).toMatchObject({ output: { readyForApproval: true, executed: false, parameterIssues: [], plan: { status: 'awaiting_approval' } } })
+    const next = repository.latestPlan('survey-thread', projectId)!
+    expect(next.id).not.toBe(blocked.id)
+    expect(JSON.stringify(repository.getPlan(blocked.id))).toBe(original)
+    const replay = await host.execute({ callId: 'retry-corrected', toolName: 'survey_request_plan', arguments: { steps: steps.map(step => ({ ...step, parameters: Object.fromEntries(Object.entries(step!.parameters).reverse()) })), goal } }, context)
+    expect(replay.item).toMatchObject({ output: { plan: { id: next.id } } })
+    expect(JSON.stringify([invalid, repaired, replay])).not.toContain(approval.token)
+    expect(runTurn).not.toHaveBeenCalled()
+    expect(survey.getNetwork(network.id)?.revision).toBe(network.revision)
+  })
+
+  it('advertises distinct tool literal fields and supports binding required values', async () => {
+    const planTool = (await host.listTools(context)).find(tool => tool.name === 'survey_request_plan')!
+    const schema = planTool.inputSchema as { properties: { steps: { items: { anyOf: Array<{ properties: { tool: { const: string }; parameters: { properties: Record<string, unknown>; additionalProperties: boolean; required?: string[] } } }> } } } }
+    const variants = schema.properties.steps.items.anyOf
+    const validate = variants.find(item => item.properties.tool.const === 'survey_network_validate')!.properties.parameters
+    expect(Object.keys(validate.properties).sort()).toEqual(['expectedRevision', 'networkId'])
+    expect(validate.additionalProperties).toBe(false)
+    expect(validate.required).toBeUndefined()
+    const report = variants.find(item => item.properties.tool.const === 'report_export')!.properties.parameters
+    expect(Object.keys(report.properties)).toEqual(expect.arrayContaining(['projectId', 'expectedRevision', 'adjustmentIds']))
+    expect(report.properties).not.toHaveProperty('format')
+    expect(report.properties).not.toHaveProperty('draft')
+  })
+
   it.each(['domain', 'projectId', 'workspace'])('rejects mismatched %s before accessing project data', async (field) => {
     thread[field as 'domain' | 'projectId' | 'workspace'] = 'other'
     await expect(orchestrator.readConversationContext('survey-thread', projectId)).rejects.toThrow(/thread|scoped/)

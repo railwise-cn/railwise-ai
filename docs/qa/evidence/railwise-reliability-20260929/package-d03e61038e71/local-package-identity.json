@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-09-29T01:35:42.477549+00:00",
+  "sourceHead": "d03e61038e71314bab2aefad50428dbfc771db86",
+  "app": "/private/tmp/railwise-reliability-d03e6103/local/RailWise AI Candidate d03e61038e71.app",
+  "version": "0.5.1",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headd03e61038e71",
+  "asarSha256": "2283918ced8e7669701df843dd951d9e02d6c11040089a7a8db882a4e5e5e494",
+  "dmgSha256": "80993e28cec02fcc92a7c90e7ad776c541b1b9ec4e6661486d44e989ec9d18f2",
+  "checks": {
+    "signature": {
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "notarization": {
+      "exitCode": 0,
+      "stdout": "Processing: /private/tmp/railwise-reliability-d03e6103/local/RailWise AI Candidate d03e61038e71.app\nThe validate action worked!\n",
+      "stderr": ""
+    },
+    "identity": {
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "Executable=/private/tmp/railwise-reliability-d03e6103/local/RailWise AI Candidate d03e61038e71.app/Contents/MacOS/RailWise AI Candidate d03e61038e71\nIdentifier=com.wangjiawei508.workwise.candidate.headd03e61038e71\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=673 flags=0x10000(runtime) hashes=9+7 location=embedded\nVersionPlatform=1\nVersionMin=786432\nVersionSDK=1704960\nHash type=sha256 size=32\nCandidateCDHash sha256=f1d1eebd4cad0547dfca8bf787c6131f41e2fab5\nCandidateCDHashFull sha256=f1d1eebd4cad0547dfca8bf787c6131f41e2fab598fecefacec5a04f8819d5be\nHash choices=sha256\nCMSDigest=f1d1eebd4cad0547dfca8bf787c6131f41e2fab598fecefacec5a04f8819d5be\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=16384\nExecutable Segment flags=0x1\nPage size=4096\nCDHash=f1d1eebd4cad0547dfca8bf787c6131f41e2fab5\nSignature size=9112\nAuthority=Developer ID Application: Ningbo Ruiwei Engineering Technology Co., Ltd. (R35G7F4A9U)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTimestamp=Sep 29, 2026 at 09:15:51\nNotarization Ticket=stapled\nInfo.plist entries=32\nTeamIdentifier=R35G7F4A9U\nRuntime Version=26.4.0\nSealed Resources version=2 rules=13 files=9228\nInternal requirements count=1 size=216\nTotal signatures=1\nChosen signature=1\n"
+    },
+    "architecture": {
+      "exitCode": 0,
+      "stdout": "arm64\n",
+      "stderr": ""
+    },
+    "gatekeeperMode": {
+      "exitCode": 1,
+      "stdout": "assessments disabled\n",
+      "stderr": ""
+    },
+    "gatekeeperAssessment": {
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "/private/tmp/railwise-reliability-d03e6103/local/RailWise AI Candidate d03e61038e71.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+    }
+  },
+  "updateConfiguration": "provider: generic\nurl: https://127.0.0.1/\nupdaterCacheDirName: workwise-updater\n",
+  "runtimeEntitlements": "passed"
+}

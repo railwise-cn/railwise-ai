@@ -1,0 +1,496 @@
+Window: "RailWise AI", App: RailWise AI Candidate d03e61038e71.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-reliability-d03e6103/local/RailWise%20AI%20Candidate%20d03e61038e71.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RailWise AI
+					6 container
+						7 container Code / Survey
+							8 按钮 Code
+							9 按钮 Survey
+						10 切换 Description: Focus mode, Value: off
+						11 container Workspace tools
+							12 按钮 Write
+							13 按钮 Plugins
+							14 按钮 Scheduled tasks
+							15 按钮 Flow
+							16 按钮 Design
+						17 按钮 New Survey project
+					18 container
+						19 text Survey projects 1
+						20 按钮 New Survey project
+						21 切换按钮 Description: Refresh Survey projects, Value: 0
+						22 按钮 Survey AI desk Goals, plans, evidence, delivery
+							23 文本 Survey AI desk
+							24 文本 Goals, plans, evidence, delivery
+						25 按钮 P0 IN2 public synthetic acceptance Control network · m · 9/29
+							26 文本 P0 IN2 public synthetic acceptance
+							27 文本 Control network
+							28 文本  ·
+							29 文本 m
+							30 文本  ·
+							31 文本 9/29
+						32 text Survey AI sessions 1
+						33 按钮 Survey AI · New Survey job P0 IN2 public synthetic acceptance · 3 messages
+							34 文本 Survey AI · New Survey job
+							35 文本 P0 IN2 public synthetic acceptance
+							36 文本  ·
+							37 文本 3
+							38 文本 messages
+						39 文本 Survey jobs, datasets, runs, and deliverables stay separate from Code and Design sessions.
+					40 container
+						41 切换按钮 Connect phone, Value: 0
+						42 按钮 Settings
+					43 container
+						44 按钮 Collapse sidebar
+						45 标题 RailWise Survey, Value: 1
+							46 文本 RailWise Survey
+						47 text Engineering Survey Processing Current Survey job
+						48 弹出式按钮 Current Survey job, Value: P0 IN2 public synthetic acceptance
+							49 (selected) P0 IN2 public synthetic acceptance
+						50 文本 Work view
+						51 弹出式按钮 Work view, Value: Import and preflight
+							52 (selected) Import and preflight
+						53 按钮 New Survey project
+					54 文本 Task configuration saved. Subsequent calculations will use the current task configuration.
+					55 按钮 Close notice
+					56 container
+						57 text Task P0 IN2 public synthetic acceptance Stage Import and preflight Source / format
+						58 按钮 Ask Survey AI about golden-plane-control-e2e.in2
+						59 text golden-plane-control-e2e.in2  ·  COSA-IN2 Disposition Needs confirmation Datum Unconfirmed  ·  Unconfirmed Points 4 Stations 1 Observations 5 Closure — Precision — Deliverable — Network Plane control Review —
+					60 container Survey AI session
+						61 container
+							62 标题 Survey AI session, Value: 2
+								63 文本 Survey AI session
+							64 文本 P0 IN2 public synthetic acceptance
+							65 按钮 Data assets
+							66 按钮 Survey adjustment
+							67 按钮 Refresh context
+						68 container
+							69 文本 This is a public synthetic acceptance test. Use the imported COSA-IN2 source golden-plane-control-e2e.in2 in this project. Prepare the typed plan to validate the network, run deterministic adjustment, and generate draft DOCX, PDF, XLSX and manifest. Wait for my approval before executing. Preserve original bytes and all records. Do not invent measurements or claim standards compliance. After execution explain the actual residual method, weight scale, testability and separately the variance and standard devia
+							70 文本 deepseek-flash
+							71 按钮 Copy message
+							72 text Creating the typed execution plan as an unexecuted draft for your approval — nothing runs before approval. Sep 29, 10:33 AM
+							73 按钮 Copy message
+							74 text Draft plan saved — nothing has executed; it is waiting for your approval in the UI. Plan ID:
+							75 文本 eplan_72bd707b-4354-4ebe-8967-810a46981375
+							76 文本  — status
+							77 文本 needs_attention
+							78 文本 ,
+							79 文本 executed: false
+							80 文本 ,
+							81 文本 approvalRequired: true
+							82 文本 ; all six steps show
+							83 文本 approval: pending
+							84 text . What the draft plan will do (in order)
+							85 内容列表
+								86 container
+									87 AXListMarker 1.
+									88 text Validate  the imported COSA-IN2 network  network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6  — pinned to  expectedRevision: 1  and  sourceSha256: 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0 . (The legacy selector resolved cleanly via  survey_read_context  — current, not stale; no typed evidence exists for this selection, and none was invented.)
+								89 container
+									90 AXListMarker 2.
+									91 text Deterministic adjustment  via  control_network , with  expectedRevision  bound to step-1's validated  network.revision .
+								92 container
+									93 AXListMarker 3.
+									94 text Draft DOCX  report ( report_export ).
+								95 container
+									96 AXListMarker 4.
+									97 text Draft PDF  report ( report_export ).
+								98 container
+									99 AXListMarker 5.
+									100 text Draft XLSX  workbook ( excel_export ).
+								101 container
+									102 AXListMarker 6.
+									103 text Draft deliverables manifest  (modeled as a  report_export  step — there is no dedicated manifest tool in the current toolset).
+							104 文本 Steps 3–6 bind
+							105 文本 adjustmentIds
+							106 文本  ← step-2's
+							107 文本 run.id
+							108 文本  (
+							109 文本 asArray: true
+							110 text ), so the deliverable steps reference exactly the adjustment run produced by step 2 — no substitution of other records or results. Holds preserved in the draft
+							111 内容列表
+								112 container
+									113 AXListMarker •
+									114 文本 Original source bytes and imported records are not modified — the runtime classified the steps as revisioned-write (validation) and append-only (adjustment and exports); nothing is edited in place.
+								115 container
+									116 AXListMarker •
+									117 文本 All outputs are drafts only; no standards-compliance claim is made (synthetic COSA-IN2 import; legacy semantics and datum/coordinate-system fields remain as imported).
+								118 container
+									119 AXListMarker •
+									120 文本 No measurements are invented.
+							121 text Next  Review and approve — or send back changes — in the UI; execution starts only after your approval, and I make no claim that anything has run. After execution I will explain, strictly from the runtime's deterministic outputs (statistical summary and per-row residual statistics): the actual residual method, the weight scale, testability (any not-testable component will be reported as not-testable, never as zero or a pass), and — separately — the variance vs standard-deviation scale facts (
+							122 文本 varianceFactor
+							123 文本  compared to 1 directly as a variance;
+							124 文本 sqrt(varianceFactor)
+							125 text  as the corresponding standard-deviation scale). If you want any step adjusted before approval (formats, ordering, or the manifest modeling), tell me and I'll revise the draft plan. Standing by. Sep 29, 10:34 AM
+							126 按钮 Copy message
+						127 container Typed Plan
+							128 按钮 Typed Plan Needs attention
+								129 文本 Typed Plan
+								130 文本 Needs attention
+							131 文本 Validate the imported COSA-IN2 source golden-plane-control-e2e.in2 plane-control network (network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6, revision 1, source sha256 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0) and run the deterministic control-network adjustment without modifying original bytes or imported records; then generate draft deliverables for human review: DOCX report, PDF report, XLSX workbook and deliverables manifest. All outputs are unapproved drafts pending human confirmation
+							132 container
+								133 text Validate imported COSA-IN2 plane-control network (golden-plane-control-e2e.in2, revision 1) Approval required
+							134 文本 Execution receipt missing
+							135 定义列表
+								136 container
+									137 container Tool:
+										138 text Tool :
+									139 文本 survey_network_validate
+								140 container Approved parameters and result bindings
+									141 文本 Approved parameters and result bindings
+								142 文本 {
+  "networkId": "network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6",
+  "expectedRevision": 1,
+  "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+}
+								143 container
+									144 container Expected outputs:
+										145 text Expected outputs :
+									146 文本 Network validation revision
+								147 container
+									148 container Reversibility:
+										149 text Reversibility :
+									150 文本 Updates validation state with a new revision; original files remain unchanged. No automatic undo.
+							151 按钮 Locate evidence
+							152 container
+								153 text Run deterministic control-network adjustment on the validated network Approval required
+							154 文本 Execution receipt missing
+							155 定义列表
+								156 container
+									157 container Tool:
+										158 text Tool :
+									159 文本 control_network
+								160 container Approved parameters and result bindings
+									161 文本 Approved parameters and result bindings
+								162 container
+									163 text {
+  "networkId": "network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6"
+} expectedRevision  ←  step-1 . network.revision
+								164 container
+									165 container Expected outputs:
+										166 text Expected outputs :
+									167 文本 Adjustment run · Residuals, closure and precision
+								168 container
+									169 container Reversibility:
+										170 text Reversibility :
+									171 文本 Adds computation or candidate files; earlier evidence is retained. No automatic undo.
+							172 按钮 (disabled) Locate evidence, Help: The exact evidence binding is missing, ambiguous, or outdated. Refresh the evidence before locating it.
+							173 container
+								174 text Generate draft DOCX report from the adjustment run Approval required
+							175 文本 Execution receipt missing
+							176 定义列表
+								177 container
+									178 container Tool:
+										179 text Tool :
+									180 文本 report_export
+								181 container Approved parameters and result bindings
+									182 文本 Approved parameters and result bindings
+								183 container
+									184 text {
+  "format": "docx",
+  "draft": true
+} adjustmentIds  ←  step-2 . run.id  []
+								185 container
+									186 container Expected outputs:
+										187 text Expected outputs :
+									188 文本 Candidate DOCX · Candidate PDF · XLSX evidence
+								189 container
+									190 container Reversibility:
+										191 text Reversibility :
+									192 文本 Adds computation or candidate files; earlier evidence is retained. No automatic undo.
+							193 按钮 (disabled) Locate evidence, Help: The exact evidence binding is missing, ambiguous, or outdated. Refresh the evidence before locating it.
+							194 container
+								195 text Generate draft PDF report from the adjustment run Approval required
+							196 文本 Execution receipt missing
+							197 定义列表
+								198 container
+									199 container Tool:
+										200 text Tool :
+									201 文本 report_export
+								202 container Approved parameters and result bindings
+									203 文本 Approved parameters and result bindings
+								204 container
+									205 text {
+  "format": "pdf",
+  "draft": true
+} adjustmentIds  ←  step-2 . run.id  []
+								206 container
+									207 container Expected outputs:
+										208 text Expected outputs :
+									209 文本 Candidate DOCX · Candidate PDF · XLSX evidence
+								210 container
+									211 container Reversibility:
+										212 text Reversibility :
+									213 文本 Adds computation or candidate files; earlier evidence is retained. No automatic undo.
+							214 按钮 (disabled) Locate evidence, Help: The exact evidence binding is missing, ambiguous, or outdated. Refresh the evidence before locating it.
+							215 container
+								216 text Generate draft XLSX workbook from the adjustment run Approval required
+							217 文本 Execution receipt missing
+							218 定义列表
+								219 container
+									220 container Tool:
+										221 text Tool :
+									222 文本 excel_export
+								223 container Approved parameters and result bindings
+									224 文本 Approved parameters and result bindings
+								225 container
+									226 text {
+  "format": "xlsx",
+  "draft": true
+} adjustmentIds  ←  step-2 . run.id  []
+								227 container
+									228 container Expected outputs:
+										229 text Expected outputs :
+									230 文本 Candidate DOCX · Candidate PDF · XLSX evidence
+								231 container
+									232 container Reversibility:
+										233 text Reversibility :
+									234 文本 Adds computation or candidate files; earlier evidence is retained. No automatic undo.
+							235 按钮 (disabled) Locate evidence, Help: The exact evidence binding is missing, ambiguous, or outdated. Refresh the evidence before locating it.
+							236 container
+								237 text Generate draft deliverables manifest for the exported artifacts Approval required
+							238 文本 Execution receipt missing
+							239 定义列表
+								240 container
+									241 container Tool:
+										242 text Tool :
+									243 文本 report_export
+								244 container Approved parameters and result bindings
+									245 文本 Approved parameters and result bindings
+								246 container
+									247 text {
+  "format": "manifest",
+  "draft": true
+} adjustmentIds  ←  step-2 . run.id  []
+								248 container
+									249 container Expected outputs:
+										250 text Expected outputs :
+									251 文本 Candidate DOCX · Candidate PDF · XLSX evidence
+								252 container
+									253 container Reversibility:
+										254 text Reversibility :
+									255 文本 Adds computation or candidate files; earlier evidence is retained. No automatic undo.
+							256 按钮 (disabled) Locate evidence, Help: The exact evidence binding is missing, ambiguous, or outdated. Refresh the evidence before locating it.
+							257 文本 Execution evidence is incomplete: 0 of 6 steps verified. Check the results before deciding whether to continue.
+							258 container
+								259 text eplan_72bd707b-4354-4ebe-8967-810a46981375  ·  sha256-ca54946212c4e12
+							260 按钮 Regenerate plan from current context
+						261 container
+							262 文本输入区 (settable) Keep typing; sends wait and go out after the current reply finishes…
+							263 按钮 More actions
+							264 弹出式按钮 Model and reasoning settings
+							265 按钮 (disabled) Send
+					266 container
+						267 container Work view
+							268 按钮 Project setup
+							269 按钮 Data assets
+							270 按钮 Quality checks
+							271 按钮 Survey sources and preflight
+						272 container Survey and adjustment console
+							273 标题 Survey and adjustment console, Value: 3
+								274 文本 Survey and adjustment console
+							275 文本 Runtime deterministic computation
+							276 按钮 Ask Survey AI
+							277 文本 Existing survey network
+							278 弹出式按钮 Description: Existing survey network, Value: cosa-in2 · Ready for validation and adjustment · b2a8bff6
+								279 (selected) cosa-in2 · Ready for validation and adjustment · b2a8bff6
+							280 文本 Network type
+							281 弹出式按钮 Description: Network type, Value: Plane control
+								282 (selected) Plane control
+							283 文本 Runtime online
+							284 container Survey computation status
+								285 文本 NETWORK
+								286 文本 Plane control
+								287 container
+									288 文本 CONSTRAINT
+									289 container Description: Current Runtime constraint, Help: Only fixed known points are currently supported. Minimum-constraint and free networks are unavailable.
+										290 文本 Fixed known points
+								291 container
+									292 文本 METHOD / WEIGHT MODEL
+									293 container Description: Current Runtime method, Help: Conditional adjustment is unavailable. Coordinate / height transformations use the selected type.
+										294 文本 Weighted least squares
+								295 文本 SOLVABILITY
+								296 文本 Not validated
+							297 container Adjustment navigation
+								298 按钮 Network and datum
+								299 按钮 Observations 5
+									300 文本 Observations
+									301 文本 5
+								302 按钮 Points and coordinates 4
+									303 文本 Points and coordinates
+									304 文本 4
+								305 按钮 Adjustment results
+								306 按钮 Free leveling trial
+								307 按钮 Epoch deformation 0
+									308 文本 Epoch deformation
+									309 文本 0
+							310 文本 Import survey files
+							311 文本 Instrument, GNSS and exchange formats. Recognition does not imply adjustment readiness.
+							312 按钮 Choose survey files
+							313 按钮 Import structured network
+							314 按钮 Advanced JSON
+							315 文本 Original retained by SHA-256. Validation and adjustment require verified source eligibility.
+							316 文本 Project datum
+							317 定义列表
+								318 container Network type
+									319 文本 Network type
+								320 文本 Plane control
+								321 container Coordinate system
+									322 文本 Coordinate system
+								323 文本 Unconfirmed
+								324 container Height datum
+									325 文本 Height datum
+								326 文本 Unconfirmed
+								327 container Input revision
+									328 文本 Input revision
+								329 文本 1
+							330 container
+								331 文本 Known control points for import (optional)
+								332 文本输入区 (settable) Description: Known control points for import (optional), Placeholder: BM-01,100.000
+								333 文本 One point per line: ID,height[,X,Y], in metres. Enter before choosing files. Explicit mappings are preserved with the import; conflicts block import and never replace source coordinates.
+							334 container COSA file-group preflight
+								335 文本 COSA matching file groups
+								336 文本 Files are matched by directory and stem. Grouping supports preflight and comparison, not permission to adjust.
+								337 文本 1 file group(s) linked
+								338 文本 cosa:golden-plane-control-e2e
+								339 text Linked . IN1 Not selected . IN2
+								340 文本 golden-plane-control-e2e.in2
+								341 text . NET Not selected . XYO Not selected . OU1 Not selected . OU2 Not selected
+							342 container Survey source filters
+								343 文本 Existing source filter
+								344 文本 Format
+								345 弹出式按钮 Description: Filter by source format, Value: All formats (1)
+									346 (selected) All formats (1)
+								347 文本 Readiness
+								348 弹出式按钮 Description: Filter by adjustment readiness, Value: All statuses
+									349 (selected) All statuses
+								350 文本 Showing 1 / 1
+							351 文本 Original source identity verified: SHA-256 and source ledger checked (1 records). Quality review, signatures, standards compliance and final delivery are not implied.
+							352 container Survey source preflight
+								353 文本 golden-plane-control-e2e.in2
+								354 文本 Ready for validation and adjustment
+								355 container
+									356 text COSA  ·  cosa-in2  ·  Confidence 98%
+								357 文本 10 recognized records · 0.1 KiB
+								358 container
+									359 text Original  Preserved
+								360 container Source provenance
+									361 定义列表
+										362 container Declared extension
+											363 文本 Declared extension
+										364 文本 .in2
+										365 container Vendor / detected format
+											366 文本 Vendor / detected format
+										367 container
+											368 text COSA  ·  cosa-in2  ·  Version Undeclared
+										369 container Detection method / confidence
+											370 文本 Detection method / confidence
+										371 container
+											372 text Structural probe  ·  98%
+										373 container Extension consistency / confirmation
+											374 文本 Extension consistency / confirmation
+										375 container
+											376 text No conflict detected  ·  No manual confirmation required
+										377 container Disposition / next step
+											378 文本 Disposition / next step
+										379 container
+											380 text Ready for validation and adjustment  ·  adjustment-ready: P0 format catalog workwise-survey-format-catalog-1.7.0 — Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment. Confirm units, datum and point roles before validation.
+										381 container Linear units (raw → canonical)
+											382 文本 Linear units (raw → canonical)
+										383 container
+											384 text m  →  m
+										385 container Angular units (raw → canonical)
+											386 文本 Angular units (raw → canonical)
+										387 container
+											388 text cosa-degree-dot-mmss  →  rad
+										389 container Horizontal / vertical datum
+											390 文本 Horizontal / vertical datum
+										391 container
+											392 text Undeclared  /  Undeclared
+										393 container Points / stations
+											394 文本 Points / stations
+										395 container
+											396 text 3  /  1
+										397 container Observations / records / skipped
+											398 文本 Observations / records / skipped
+										399 container
+											400 text 5  /  10  /  0
+										401 container Parser source hash
+											402 文本 Parser source hash
+										403 文本 14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04
+										404 container Converter identity / binary hash
+											405 文本 Converter identity / binary hash
+										406 文本 No converter used
+								407 定义列表
+									408 container SHA-256
+										409 文本 SHA-256
+									410 文本 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0
+									411 container Parser
+										412 文本 Parser
+									413 container
+										414 text cosa-in2-parser  ·  0.3.0
+									415 container Content signature
+										416 文本 Content signature
+									417 文本 COSA .in2 three-value header + L,0 station block
+									418 container Extension consistency
+										419 文本 Extension consistency
+									420 container
+										421 text .in2  ·  No conflict detected
+								422 文本 Parser diagnostics
+								423 text 0 blocking · 1 warning(s) ENCODING_DETECTED
+								424 按钮 Ask Survey AI about encoding_detected #1
+								425 text Text encoding: utf-8 FORMAT_DETECTED
+								426 按钮 Ask Survey AI about format_detected #2
+								427 text Detected cosa-in2; confidence 98% FORMAT_DETECTED
+								428 按钮 Ask Survey AI about format_detected #3
+								429 text cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment. Next step:  Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment.
+								430 container
+									431 文本 Raw record anchors
+									432 按钮 View 10
+									433 文本 Anchors link normalized observations to instrument records; original bytes are unchanged.
+							434 文本 Points
+							435 文本 4
+							436 文本 3 known · 1 unknown
+							437 文本 Observations
+							438 文本 5
+							439 文本 Units and weights retained
+							440 文本 Quality status
+							441 文本 Imported
+							442 文本 Not validated
+							443 文本 Run status
+							444 文本 —
+							445 文本 Not adjusted
+							446 按钮 Quality checks
+							447 按钮 (disabled) Run adjustment
+							448 container
+								449 text QUALITY GATE cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment. Current input
+								450 定义列表
+									451 container Source
+										452 文本 Source
+									453 文本 golden-plane-control-e2e.in2
+									454 container Format
+										455 文本 Format
+									456 文本 cosa-in2
+									457 container Readiness
+										458 文本 Readiness
+									459 文本 Ready for validation and adjustment
+									460 container Blockers
+										461 文本 Blockers
+									462 文本 0
+								463 文本 Traceability
+							464 文本 Source preflight completed for 1 file(s); Checked matching groups for 1 COSA file(s)
+	465 关闭按钮
+	466 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	467 最小化按钮
+468 menu bar
+	469 RailWise AI Candidate d03e61038e71
+	470 File
+	471 Edit
+	472 View
+	473 Window
+	474 Help
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-reliability-d03e6103/local/RailWise%20AI%20Candidate%20d03e61038e71.app/Contents/Resources/app.asar/out/renderer/index.html

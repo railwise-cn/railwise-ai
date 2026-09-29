@@ -162,7 +162,14 @@ export const EngineeringPlanExecutionEvidenceV1 = z.object({
   pendingStepIds: z.array(z.string().min(1)).max(32)
 }).strict()
 export type EngineeringPlanExecutionEvidenceV1 = z.infer<typeof EngineeringPlanExecutionEvidenceV1>
-export type EngineeringRunPlanViewV1 = EngineeringRunPlanV1 & { execution: EngineeringPlanExecutionEvidenceV1 }
+/** Derived from current tool contracts; never backfilled into historical plans. */
+export const EngineeringPlanParameterIssueV1 = z.object({
+  stepId: z.string().min(1).max(80),
+  code: z.enum(['review-details', 'invalid-binding', 'invalid-parameters']),
+  fields: z.array(z.string().max(80)).max(200)
+}).strict()
+export type EngineeringPlanParameterIssueV1 = z.infer<typeof EngineeringPlanParameterIssueV1>
+export type EngineeringRunPlanViewV1 = EngineeringRunPlanV1 & { execution: EngineeringPlanExecutionEvidenceV1; parameterIssues: EngineeringPlanParameterIssueV1[] }
 
 export const EngineeringApprovalV1 = z.object({
   schemaVersion: z.literal(EngineeringAiSchemaVersion),

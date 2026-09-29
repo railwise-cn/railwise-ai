@@ -90,6 +90,31 @@ afterEach(async () => {
 })
 
 describe('Engineering AI session recovery states', () => {
+  it.each(['en', 'zh'])('shows blocked draft fields instead of missing execution receipts and prepares a scoped repair in %s', async language => {
+    await i18n.changeLanguage(language)
+    const parameterIssues = [{ stepId: 'adjust', code: 'invalid-parameters', fields: ['sourceSha256', 'projectId'] }]
+    const plan = { ...refreshedPlan, status: 'needs_attention', parameterIssues, execution: { complete: false, completedStepIds: [], pendingStepIds: ['adjust'] } }
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
+    await render(); await settle()
+    const diagnostics = container.querySelector('[data-testid="engineering-plan-parameter-issues"]')!
+    expect(diagnostics.textContent).toContain(i18n.t('engineeringPlanParametersBlocked'))
+    expect(diagnostics.textContent).toContain('sourceSha256, projectId')
+    expect(container.querySelector('[data-testid="engineering-plan-incomplete-evidence"]')).toBeNull()
+    expect(container.querySelector('[data-testid="engineering-replan"]')).toBeNull()
+    expect(container.textContent).not.toContain(i18n.t('engineeringPlanStepReceiptMissing'))
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0)
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-repair-plan"]')!.click())
+    const scope = JSON.stringify([workspaceRoot, project.id])
+    const draft = useEngineeringConversationDrafts.getState().drafts[scope]!
+    expect(draft.input).toContain(plan.id)
+    expect(draft.input).toContain(plan.goal)
+    expect(draft.evidenceContext?.projectId).toBe(project.id)
+    useEngineeringConversationDrafts.getState().update(scope, current => ({ ...current, input: 'Keep my existing question' }))
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-repair-plan"]')!.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.input).toBe('Keep my existing question')
+    expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+  })
+
   it('allows explicit typed continuation after zero-tool stalling without inventing completed receipts', async () => {
     const plan = { ...resumablePlan, execution: { complete: false, completedStepIds: [], pendingStepIds: resumablePlan.steps.map(step => step.id) } }
     Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status: 'stalled' })) })

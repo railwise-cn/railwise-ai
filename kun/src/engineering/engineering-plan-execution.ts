@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { EngineeringContextSnapshotV1, EngineeringPlanStepV1, EngineeringRunPlanV1 } from '../contracts/engineering-ai.js'
+import type { EngineeringContextSnapshotV1, EngineeringPlanStepV1, EngineeringRunPlanV1, EngineeringPlanParameterIssueV1 } from '../contracts/engineering-ai.js'
 import { EngineeringPlanParametersV1 } from '../contracts/engineering-ai.js'
 import { engineeringPlanToolRisk } from './engineering-plan-tools.js'
 
@@ -24,6 +24,15 @@ const definitions: Record<string, { schema: z.ZodType; outputs: string[]; revers
 for (const tool of ['survey_calculator', 'control_network', 'cpiii_adjustment', 'coord_transform', 'distance_calculator', 'angle_convert']) definitions[tool] = { schema: network, outputs: ['adjustment-run', 'deterministic-adjustment-evidence'], reversibility: 'append-only' }
 export const planToolName = (name: string): string => name.startsWith('railwise.') ? name.slice(9) : name
 const definition = (tool: string) => engineeringPlanToolRisk(tool) ? definitions[planToolName(tool)] : undefined
+
+/** Advertise the same literals checked at approval. Required values can also be bound to predecessor outputs. */
+export function planToolParameterSchema(tool: string): Record<string, unknown> {
+  const def = definition(tool)
+  if (!def) throw new Error('Unknown engineering plan tool')
+  const { $schema: _schema, required, ...schema } = z.toJSONSchema(def.schema)
+  const delivery = ['report_export', 'excel_export'].includes(planToolName(tool))
+  return { ...schema, description: `Required after resolving predecessor bindings: ${(required as string[] | undefined)?.join(', ') || 'none'}.${delivery ? ' Also select datasetId or nonempty adjustmentIds. expectedRevision is the project revision for survey-only exports, or the dataset revision for monitoring exports. One call generates DOCX, PDF and XLSX; no per-format or manifest operation.' : ''}` }
+}
 
 /** Compile exact literals and explicit result bindings; never select the first of several inputs. */
 export function compilePlanSteps(steps: Step[], context: Context): Step[] {
@@ -83,23 +92,28 @@ const outputTools: Record<string, string[]> = {
   'analysis.id': ['deformation_rate'], 'run.id': ['survey_calculator', 'control_network', 'cpiii_adjustment', 'coord_transform', 'distance_calculator', 'angle_convert', 'survey_adjustment_read', 'report_export', 'excel_export']
 }
 
-export function planParameterIssues(steps: Step[]): string[] {
-  const issues: string[] = []
+export function planParameterDiagnostics(steps: Step[]): EngineeringPlanParameterIssueV1[] {
+  const issues: EngineeringPlanParameterIssueV1[] = []
   for (const step of steps) {
     const def = definition(step.tool)
-    if (!def || !step.parameters || !step.parameterBindings || !step.expectedOutputs || step.reversibility !== def.reversibility || JSON.stringify(step.expectedOutputs) !== JSON.stringify(def.outputs)) { issues.push(`${step.id}: review details missing or outdated`); continue }
+    if (!def || !step.parameters || !step.parameterBindings || !step.expectedOutputs || step.reversibility !== def.reversibility || JSON.stringify(step.expectedOutputs) !== JSON.stringify(def.outputs)) { issues.push({ stepId: step.id, code: 'review-details', fields: [] }); continue }
     const args: Record<string, unknown> = { ...step.parameters }
     const ancestors = new Set<string>()
     const visit = (id: string): void => { if (ancestors.has(id)) return; ancestors.add(id); steps.find(item => item.id === id)?.dependsOn.forEach(visit) }
     step.dependsOn.forEach(visit)
     for (const binding of step.parameterBindings) {
       const source = steps.find(item => item.id === binding.stepId)
-      if (Object.prototype.hasOwnProperty.call(args, binding.parameter) || !source || !ancestors.has(binding.stepId) || !outputTools[binding.output]?.includes(planToolName(source.tool))) issues.push(`${step.id}: invalid parameter binding ${binding.parameter}`)
+      if (Object.prototype.hasOwnProperty.call(args, binding.parameter) || !source || !ancestors.has(binding.stepId) || !outputTools[binding.output]?.includes(planToolName(source.tool))) issues.push({ stepId: step.id, code: 'invalid-binding', fields: [binding.parameter] })
       args[binding.parameter] = binding.asArray ? [sampleOutputs[binding.output]] : sampleOutputs[binding.output]
     }
-    if (!def.schema.safeParse(args).success) issues.push(`${step.id}: required tool parameters are missing or invalid`)
+    const parsed = def.schema.safeParse(args)
+    if (!parsed.success) issues.push({ stepId: step.id, code: 'invalid-parameters', fields: [...new Set(parsed.error.issues.flatMap(issue => issue.code === 'unrecognized_keys' ? issue.keys : issue.path.length ? [String(issue.path[0])] : ['inputs']))].slice(0, 200) })
   }
   return issues
+}
+
+export function planParameterIssues(steps: Step[]): string[] {
+  return planParameterDiagnostics(steps).map(issue => `${issue.stepId}: ${issue.code === 'review-details' ? 'review details missing or outdated' : issue.code === 'invalid-binding' ? 'invalid parameter binding' : 'required tool parameters are missing or invalid'}${issue.fields.length ? ` (${issue.fields.join(', ')})` : ''}`)
 }
 
 export function assertPlanParameterScope(parameters: Record<string, unknown>, context: Context): void {

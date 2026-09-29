@@ -21,7 +21,7 @@ import type { TaskController, TaskControllerDeps } from '../services/task-contro
 import type { RuntimeEventRecorder } from '../services/runtime-event-recorder.js'
 import type { EngineeringAiRepository } from './engineering-ai-repository.js'
 import { engineeringPlanToolRisk } from './engineering-plan-tools.js'
-import { assertPlanParameterScope, assertPlanReviewable, compilePlanSteps, planParameterIssues, planResultHandles, resolvedStepParameters } from './engineering-plan-execution.js'
+import { assertPlanParameterScope, assertPlanReviewable, compilePlanSteps, planParameterDiagnostics, planParameterIssues, planResultHandles, resolvedStepParameters } from './engineering-plan-execution.js'
 
 export const EngineeringPlanDraftRequest = z.object({
   threadId: z.string().min(1),
@@ -228,7 +228,7 @@ export class EngineeringAiOrchestrator {
     const claimedComplete = task?.status === 'completed' || plan.status === 'completed'
     const status = claimedComplete && !['stale', 'cancelled', 'failed', 'needs_attention'].includes(plan.status)
       ? execution.complete ? 'completed' : 'needs_attention' : plan.status
-    return { ...plan, status, execution }
+    return { ...plan, status, execution, parameterIssues: planParameterDiagnostics(plan.steps) }
   }
 
   private async executionPlan(threadId: string, turnId: string): Promise<EngineeringRunPlan | null> {
@@ -363,6 +363,7 @@ export class EngineeringAiOrchestrator {
         'Answer ordinary questions directly. Explain existing results using survey_read_context; do not create a plan for a question or explanation.',
         'For requests to compute, adjust, analyze data or generate deliverables, use survey_request_plan and wait for the user to approve it in the UI. Never claim a draft has executed.',
         'Plans must include concrete tool parameters from the current context. Bind later values only to explicit predecessor outputs. Missing or ambiguous inputs require clarification and replanning. Never change approved arguments during execution.',
+        'Use only the per-tool parameter fields advertised by survey_request_plan. report_export and excel_export each generate the same DOCX/PDF/XLSX draft bundle in one call, without format or draft flags. Manifest creation remains a separate human action in the Review UI; there is no manifest export tool. A plan with parameterIssues is blocked, not ready for approval: correct the reported fields and request a new draft. Never execute or alter the blocked draft.',
         'For parameter recommendations or requested project edits, use survey_propose_project_change. The UI shows before/after values for human confirmation. This does not execute computations, change network observations or transform existing coordinates. Never claim a suggestion was applied.',
         'If intent is ambiguous, ask a concise question in the conversation. Do not silently expand the requested operations.',
         'All numerical results, units, precision decisions and source references come from the deterministic Runtime. Never invent or recompute production results yourself.',

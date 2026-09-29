@@ -1,5 +1,6 @@
 import { EngineeringEvidenceSelectionV1, EngineeringPlanParametersV1, EngineeringPlanParameterBindingV1, EngineeringProjectSuggestionRequestV1 } from '../../contracts/engineering-ai.js'
 import { z } from 'zod'
+import { createHash } from 'node:crypto'
 import type { ThreadStore } from '../../ports/thread-store.js'
 import type { EngineeringAiOrchestrator } from '../../engineering/engineering-ai-orchestrator.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
@@ -7,6 +8,7 @@ import { LocalToolHost } from './local-tool-host.js'
 import { engineeringPlanToolRisks } from '../../engineering/engineering-plan-tools.js'
 import { SurveyEvidenceReferenceV1 } from '../../contracts/survey-evidence-reference.js'
 import type { SurveyEvidenceReader } from '../../engineering/survey-evidence-reader.js'
+import { planParameterDiagnostics, planToolParameterSchema } from '../../engineering/engineering-plan-execution.js'
 
 const operationRisks = engineeringPlanToolRisks
 const operationNames = Object.keys(operationRisks) as [keyof typeof operationRisks, ...Array<keyof typeof operationRisks>]
@@ -15,6 +17,22 @@ const draftSchema = z.object({
   goal: z.string().trim().min(1).max(4_000),
   steps: z.array(z.object({ tool: z.enum(operationNames), title: z.string().min(1).max(200), parameters: EngineeringPlanParametersV1.optional(), parameterBindings: z.array(EngineeringPlanParameterBindingV1).max(32).optional() }).strict()).min(1).max(32)
 }).strict()
+
+const draftInputSchema = z.toJSONSchema(draftSchema)
+// Parameters may be supplied as literals or bindings; actual required-field
+// checks run after compilation. Unknown literal fields remain disallowed.
+const planStepSchema = (draftInputSchema.properties!.steps as { items: Record<string, unknown> }).items
+;(draftInputSchema.properties!.steps as { items: unknown }).items = {
+  anyOf: operationNames.map(tool => ({ ...planStepSchema, properties: {
+    ...(planStepSchema.properties as Record<string, unknown>), tool: { type: 'string', const: tool }, parameters: planToolParameterSchema(tool)
+  } }))
+}
+
+function draftFingerprint(value: unknown): string {
+  const canonical = (item: unknown): unknown => Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object'
+    ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, canonical(child)])) : item
+  return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
+}
 
 export function buildEngineeringConversationTools(
   threadStore: ThreadStore,
@@ -54,8 +72,8 @@ export function buildEngineeringConversationTools(
       LocalToolHost.defineTool({
         name: 'survey_request_plan',
         shouldAdvertise: (context) => context.allowedToolNames?.includes('survey_request_plan') === true,
-        description: 'Propose a typed Survey execution plan ONLY for requested computation, analysis or deliverables. Include concrete parameters from survey_read_context. Steps get IDs step-1, step-2, etc. Later parameters may bind to an earlier step output, e.g. expectedRevision from step-1 network.revision, or adjustmentIds from step-2 run.id with asArray:true. Include only requested operations, in dependency order. Runtime fixes risk, expected outputs and reversibility. Missing or ambiguous parameters block approval. This saves an unexecuted draft; human approval is required. Never request or return approval tokens.',
-        inputSchema: z.toJSONSchema(draftSchema),
+        description: 'Propose a typed Survey execution plan ONLY for requested computation, analysis or deliverables. Use the per-tool parameter fields below, with exact IDs and revisions from survey_read_context. Required values can be literals or bindings. Steps get IDs step-1, step-2, etc.; bind expectedRevision to step-1 network.revision, or adjustmentIds to step-2 run.id with asArray:true. report_export or excel_export produces all three draft files (DOCX, PDF, XLSX) in one step; neither accepts format or draft. The manifest is created separately in the human Review UI, not by an export step. Include only requested operations in dependency order. Runtime fixes risk, outputs and reversibility. If parameterIssues are returned, correct them and request a new draft in this turn; the previous draft remains blocked. No work executes until UI approval. Never request or return approval tokens.',
+        inputSchema: draftInputSchema,
         policy: 'auto',
         execute: async (args, context) => {
           const draft = draftSchema.parse(args)
@@ -67,9 +85,10 @@ export function buildEngineeringConversationTools(
               parameters: step.parameters, parameterBindings: step.parameterBindings,
               dependsOn: index ? [`step-${index}`] : [], inputHash: 'server-resolved', approval: 'pending'
             })),
-            idempotencyKey: `survey-conversation-plan:${context.turnId}`
+            idempotencyKey: `survey-conversation-plan:${context.turnId}:${draftFingerprint(draft)}`
           }, { conversationTurnId: context.turnId })
-          return { output: { plan, executed: false, approvalRequired: true } }
+          const parameterIssues = planParameterDiagnostics(plan.steps)
+          return { output: { plan, parameterIssues, readyForApproval: parameterIssues.length === 0, executed: false, approvalRequired: true }, ...(parameterIssues.length ? { isError: true } : {}) }
         }
       }),
       LocalToolHost.defineTool({

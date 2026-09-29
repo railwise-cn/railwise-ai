@@ -2296,6 +2296,15 @@
   "engineeringPlanStepReceiptConfirmed": "Execution receipt verified",
   "engineeringPlanStepReceiptPending": "Awaiting execution receipt",
   "engineeringPlanStepReceiptMissing": "Execution receipt missing",
+  "engineeringPlanNotExecuted": "Not executed",
+  "engineeringPlanParametersBlocked": "This plan has invalid or missing parameters. Correct them before approval or execution; existing records are preserved.",
+  "engineeringPlanParameterIssue": {
+    "review-details": "Required review details are missing or outdated.",
+    "invalid-binding": "Invalid predecessor binding: {{fields}}.",
+    "invalid-parameters": "Invalid or missing fields: {{fields}}."
+  },
+  "engineeringPlanRepair": "Prepare a plan correction request",
+  "engineeringPlanRepairQuestion": "Correct the parameters of blocked plan {{id}} while preserving this goal: {{goal}}. Reported issues: {{issues}}. Read current context and existing receipts, use only the advertised tool parameters, then request a new draft for my approval. Do not execute it, repeat existing effects or alter the previous record.",
   "engineeringPlanExecutionIncomplete": "Execution evidence is incomplete: {{completed}} of {{total}} steps verified. Check the results before deciding whether to continue.",
   "runtimeEngineeringPlanStepsIncomplete": "Some plan steps do not have verified execution receipts. Check the results before continuing.",
   "runtimeEngineeringPlanBindingMissing": "The plan could not be linked to this execution. Check the plan and its approval records.",

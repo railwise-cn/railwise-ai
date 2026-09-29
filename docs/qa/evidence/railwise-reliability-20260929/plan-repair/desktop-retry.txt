@@ -1,0 +1,12 @@
+
+> workwise@0.5.1 test
+> vitest run --run src/main/claw-runtime.test.ts src/main/managed-runtime-process.test.ts src/main/schedule-runtime.test.ts src/main/runtime/managed-runtime-adapter.test.ts src/main/services/mcp-config-service.test.ts src/main/services/unlimited-ocr-service.integration.test.ts src/main/services/skill-service.test.ts
+
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+
+ Test Files  7 passed (7)
+      Tests  177 passed (177)
+   Start at  10:49:44
+   Duration  35.38s (transform 1.44s, setup 0ms, import 1.95s, tests 43.38s, environment 0ms)
