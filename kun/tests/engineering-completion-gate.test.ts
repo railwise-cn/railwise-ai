@@ -119,13 +119,23 @@ describe('Engineering successful-step completion gate', () => {
     expect(f.runtime.surveyService!.listAdjustments(f.project.id)).toHaveLength(1)
   })
 
-  it('does not record a successful step receipt when the actual tool fails', async () => {
+  it('stops automatic continuation at the first failed step and permits explicit recovery', async () => {
     const f = await fixture('partial')
     vi.spyOn(f.runtime.surveyService!, 'validateNetwork').mockImplementation(() => { throw new Error('Synthetic validation failure') })
     const { plan } = await f.start()
     expect(f.repository.stepEvidence(plan.id, plan.steps[0]!.id)).toBeNull()
-    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('stalled')
-    expect(f.runtime.engineeringAi!.getPlan(plan.id)?.execution.completedStepIds).toEqual([])
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('waiting_user')
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.attempts).toBe(1)
+    expect(f.calledSteps).toEqual([plan.steps[0]!.id])
+    expect(f.runtime.engineeringAi!.getPlan(plan.id)).toMatchObject({ status: 'needs_attention', execution: { completedStepIds: [] } })
+    vi.mocked(f.runtime.surveyService!.validateNetwork).mockRestore()
+    f.setMode('all')
+    const blocked = f.runtime.engineeringAi!.getPlan(plan.id)!
+    const resumed = await f.runtime.engineeringAi!.resumePlan(plan.id, { expectedRevision: blocked.revision, contextHash: blocked.contextHash, idempotencyKey: 'explicit-error-recovery' })
+    await f.waitTurn(resumed.turn.turnId)
+    expect(resumed.plan.taskId).toBe(plan.taskId)
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('completed')
+    expect(f.runtime.engineeringAi!.getPlan(plan.id)?.execution.complete).toBe(true)
   })
 
   it('resumes the same task with persisted receipts and idempotently replays a successful step', async () => {

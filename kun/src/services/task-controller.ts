@@ -47,7 +47,7 @@ export type TaskControllerDeps = {
   nowIso: () => string
   ownerId?: string
   spans?: RuntimeSpanService
-  completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string } | null
+  completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string; retryable?: boolean } | null
 }
 
 export class TaskController {
@@ -223,7 +223,9 @@ export class TaskController {
     const pendingReason = pendingWorkReason(turnItems)
     if (pendingReason) return this.retry(task, pendingReason, fingerprint(turnItems), turnId)
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
-    if (blocked) return this.retry(task, blocked.reason, blocked.fingerprint, turnId)
+    if (blocked) return blocked.retryable === false
+      ? this.waitForUser(task, blocked.reason, latestAssistantText(turn, turnItems), blocked.fingerprint, turnId)
+      : this.retry(task, blocked.reason, blocked.fingerprint, turnId)
 
     const finalResponse = latestAssistantText(turn, turnItems)
     if (task.acceptance.requireFinalResponse && !finalResponse.trim()) {

@@ -129,7 +129,7 @@ describe('Survey continuous conversation capabilities', () => {
     const goal = 'Validate, adjust and export a public synthetic network'
     const invalidSteps = [
       { tool: 'survey_network_validate', title: 'Validate', parameters: { networkId: network.id, expectedRevision: 1, sourceSha256: 'not-a-tool-parameter' } },
-      { tool: 'control_network', title: 'Adjust', parameters: { networkId: network.id }, parameterBindings: [{ parameter: 'expectedRevision', stepId: 'step-1', output: 'network.revision' }] },
+      { tool: 'survey_calculator', title: 'Adjust', parameters: { networkId: network.id }, parameterBindings: [{ parameter: 'expectedRevision', stepId: 'step-1', output: 'network.revision' }] },
       { tool: 'report_export', title: 'Export', parameters: { format: 'docx', draft: true }, parameterBindings: [{ parameter: 'adjustmentIds', stepId: 'step-2', output: 'run.id', asArray: true }] }
     ]
     const invalid = await host.execute({ callId: 'invalid-plan', toolName: 'survey_request_plan', arguments: { goal, steps: invalidSteps } }, context)
@@ -159,6 +159,32 @@ describe('Survey continuous conversation capabilities', () => {
     expect(JSON.stringify([invalid, repaired, replay])).not.toContain(approval.token)
     expect(runTurn).not.toHaveBeenCalled()
     expect(survey.getNetwork(network.id)?.revision).toBe(network.revision)
+  })
+
+  it.each([false, true])('blocks a leveling plan using control_network before approval (bound network: %s)', async bound => {
+    const network = survey.listNetworks(projectId)[0]!
+    const validate = { tool: 'survey_network_validate', title: 'Validate', parameters: { networkId: network.id, expectedRevision: 1 } }
+    const wrong = { tool: 'control_network', title: 'Leveling', parameters: { ...(bound ? {} : { networkId: network.id }), method: 'leveling' }, parameterBindings: [
+      { parameter: 'expectedRevision', stepId: 'step-1', output: 'network.revision' },
+      ...(bound ? [{ parameter: 'networkId', stepId: 'step-1', output: 'network.id' }] : [])
+    ] }
+    const result = await host.execute({ callId: 'gsi-invalid', toolName: 'survey_request_plan', arguments: { goal: 'Synthetic GSI leveling', steps: [validate, wrong] } }, context)
+    expect(result.item).toMatchObject({ isError: true, output: { readyForApproval: false, parameterIssues: expect.arrayContaining([
+      { stepId: 'step-2', code: 'invalid-parameters', fields: ['method'] },
+      { stepId: 'step-2', code: 'invalid-parameters', fields: ['networkId'] }
+    ]) } })
+    const blocked = repository.latestPlan('survey-thread', projectId)!
+    const original = JSON.stringify(blocked)
+    const approval = repository.approvalForPlan(blocked.id, blocked.revision)!
+    expect(() => orchestrator.approvePlan(blocked.id, { expectedRevision: 1, contextHash: blocked.contextHash, stepIds: approval.stepIds, token: approval.token, idempotencyKey: 'gsi-blocked' })).toThrow(/incomplete/)
+    // Removing the invalid method does not make the wrong tool admissible.
+    const mismatch = await host.execute({ callId: 'gsi-mismatch', toolName: 'survey_request_plan', arguments: { goal: 'Synthetic GSI leveling', steps: [validate, { ...wrong, parameters: bound ? {} : { networkId: network.id } }] } }, context)
+    expect(mismatch.item).toMatchObject({ isError: true, output: { readyForApproval: false, parameterIssues: [{ stepId: 'step-2', code: 'invalid-parameters', fields: ['networkId'] }] } })
+    const repaired = await host.execute({ callId: 'gsi-repaired', toolName: 'survey_request_plan', arguments: { goal: 'Synthetic GSI leveling', steps: [validate, { ...wrong, tool: 'survey_calculator', parameters: bound ? {} : { networkId: network.id } }] } }, context)
+    expect(repaired.item).toMatchObject({ output: { readyForApproval: true, parameterIssues: [] } })
+    expect(JSON.stringify(repository.getPlan(blocked.id))).toBe(original)
+    expect(runTurn).not.toHaveBeenCalled()
+    expect(survey.getNetwork(network.id)?.revision).toBe(1)
   })
 
   it('advertises distinct tool literal fields and supports binding required values', async () => {

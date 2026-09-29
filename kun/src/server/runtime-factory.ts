@@ -1,4 +1,5 @@
 import { SurveyQualityAssessmentService } from '../engineering/survey-quality-assessment.js'
+import { RUNTIME_VERSION } from '../runtime-version.js'
 import { SurveyEvidenceReader } from '../engineering/survey-evidence-reader.js'
 import { SurveyQualityScoringWorkspaceService } from '../engineering/survey-quality-scoring-workspace.js'
 import { mkdir } from 'node:fs/promises'
@@ -326,7 +327,7 @@ export async function createKunServeRuntime(
   const engineeringService = new EngineeringService({
     rootDir: join(options.dataDir, 'engineering'),
     ...(attachmentStore ? { attachmentStore } : {}),
-    runtimeVersion: '0.5.0',
+    runtimeVersion: RUNTIME_VERSION,
     getAdjustments: (projectId, ids) => ids.flatMap((id) => {
       const stored = surveyService.getAdjustmentForProjectNewUse(projectId, id)
       if (!stored || !stored.result) return []

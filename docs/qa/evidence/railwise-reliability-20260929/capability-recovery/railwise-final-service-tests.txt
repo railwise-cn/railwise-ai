@@ -1,0 +1,11 @@
+> kun@0.5.1 test
+> vitest run src/engineering/engineering-service.test.ts
+
+
+ RUN  v4.1.8 <repo>/kun
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  12:28:18
+   Duration  1.24s (transform 88ms, setup 0ms, import 196ms, tests 930ms, environment 0ms)

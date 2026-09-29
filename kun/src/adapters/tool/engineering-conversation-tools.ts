@@ -8,7 +8,7 @@ import { LocalToolHost } from './local-tool-host.js'
 import { engineeringPlanToolRisks } from '../../engineering/engineering-plan-tools.js'
 import { SurveyEvidenceReferenceV1 } from '../../contracts/survey-evidence-reference.js'
 import type { SurveyEvidenceReader } from '../../engineering/survey-evidence-reader.js'
-import { planParameterDiagnostics, planToolParameterSchema } from '../../engineering/engineering-plan-execution.js'
+import { planToolParameterSchema } from '../../engineering/engineering-plan-execution.js'
 
 const operationRisks = engineeringPlanToolRisks
 const operationNames = Object.keys(operationRisks) as [keyof typeof operationRisks, ...Array<keyof typeof operationRisks>]
@@ -87,7 +87,7 @@ export function buildEngineeringConversationTools(
             })),
             idempotencyKey: `survey-conversation-plan:${context.turnId}:${draftFingerprint(draft)}`
           }, { conversationTurnId: context.turnId })
-          const parameterIssues = planParameterDiagnostics(plan.steps)
+          const parameterIssues = getOrchestrator().getPlan(plan.id)!.parameterIssues
           return { output: { plan, parameterIssues, readyForApproval: parameterIssues.length === 0, executed: false, approvalRequired: true }, ...(parameterIssues.length ? { isError: true } : {}) }
         }
       }),

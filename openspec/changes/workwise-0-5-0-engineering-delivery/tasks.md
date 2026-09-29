@@ -20,6 +20,16 @@ P0 candidate interruption: the installed d03e61038e71 candidate failed default d
 - [x] Advertise the actual per-tool parameter contracts, return bounded step/field diagnostics, allow corrected drafts within the same model turn with content-based idempotency, and preserve invalid historical records without executing them or exposing approval tokens. Show bilingual parameter diagnostics and prepare an explicit-send correction request without replacing existing draft text/attachments.
 - [ ] Verify that repair in the next frozen signed package with the real default model, including original invalid draft readback, corrected draft approval and execution. Use the retained private-updater target package for UI acceptance to bind both checks to the same target bytes.
 
+## P0 capability, interruption and evidence readback follow-through
+
+The e3abafc46514 private-updater target passed the synthetic IN2 default-Flash flow and exact evidence question. Its first explicit-Pro GSI plan incorrectly selected `control_network(method: leveling)` and continued after the executor rejected that capability. A separately approved corrected draft completed adjustment and three exports, but does not erase the first failure. Both synthetic manifests passed their five technical rechecks. The same package still misreported persisted AI exports as absent and recorded Runtime 0.5.0 instead of its bundled 0.5.1. Aggregate package gates remain open.
+
+- [x] Share actual survey tool/network capabilities between planning and execution, validate solver-method enums and predecessor network bindings before approval, and preserve invalid historical drafts.
+- [x] Persist an authorized step failure as needing attention, retain successful receipts and stop automatic Task continuation; permit explicit recovery through the existing TaskRun.
+- [x] Restore recorded AI export descriptors read-only after restart and bind questions to their exact run/path/hash without claiming fresh file verification.
+- [x] Record the bundled Runtime package version in new evidence without rewriting historical manifests or changing public versions.
+- [ ] Verify these repairs in the next frozen private-updater target package, including unaided real-model GSI planning, failed-step recovery, restored outputs, versions, restart and supported UI states.
+
 ## P1 declared correction workflow follow-through
 
 - [x] Persist caller-declared checks, issues, corrections and rechecks in a separate bounded append-only workspace, binding real retained materials and exact project/retention heads; verify idempotency, stale sources, corruption, restart and unchanged legacy retention semantics.

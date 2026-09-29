@@ -48,6 +48,7 @@ function runtimeErrorCode(payload: RuntimeErrorPayload | null, raw: string): str
   const fromError = typeof payload?.error === 'string' ? payload.error.trim() : ''
   if (fromError) return fromError.toLowerCase()
   const lowered = stripIpcPrefix(payloadMessage(payload) || raw).toLowerCase()
+  if (/^engineering_plan_execution_failed(?::|$)/.test(lowered)) return 'engineering_plan_execution_failed'
   if (/^engineering_plan_steps_incomplete(?::|$)/.test(lowered)) return 'engineering_plan_steps_incomplete'
   if (/^engineering_plan_binding_missing(?::|$)/.test(lowered)) return 'engineering_plan_binding_missing'
   if (lowered.includes('model_provider_unavailable')) return 'model_provider_unavailable'
@@ -88,6 +89,7 @@ function detailString(value: unknown): string {
 function localizedRuntimeSummary(code: string | null, text: string): string | null {
   const lowered = text.toLowerCase()
   if (code === 'engineering_plan_stale') return i18n.t('common:runtimeEngineeringPlanStale')
+  if (code === 'engineering_plan_execution_failed') return i18n.t('common:runtimeEngineeringPlanExecutionFailed')
   if (code === 'engineering_plan_steps_incomplete') return i18n.t('common:runtimeEngineeringPlanStepsIncomplete')
   if (code === 'engineering_plan_binding_missing') return i18n.t('common:runtimeEngineeringPlanBindingMissing')
   if (code === 'engineering_plan_typed_resume_required') return i18n.t('common:runtimeEngineeringPlanTypedResumeRequired')

@@ -1,0 +1,62 @@
+[
+  {
+    "file": "railwise-capability-runtime-full.txt",
+    "sha256": "0c9753c376f93cd8d2d369409ecbae67914342aa314f694b32f9340050b2ff84",
+    "sourceSha256": "e11dd302a2e1e1c6702708d984447c3f132eada3518e4e46c3ff2aac27dbe1d0"
+  },
+  {
+    "file": "railwise-capability-desktop-full.txt",
+    "sha256": "52e1a756eedc04ddb5d636b38e0e5082396bff7ead903193079303e65e2508e8",
+    "sourceSha256": "977647796993392f6c32e7b0281e2b56e1f77ceaccea75c6f8e3acee3cc54dbb"
+  },
+  {
+    "file": "railwise-capability-desktop-full-rerun.txt",
+    "sha256": "92a0c050903a54a487412f893d7de022947a9b08b97779ff482820b93f056fb4",
+    "sourceSha256": "3f16630a07ae0e8d09f4aa3a4610442f520f5e7b797a8e624190704e7c8db599"
+  },
+  {
+    "file": "railwise-capability-desktop-typecheck.txt",
+    "sha256": "53d704fa57e1456eb36bc4e6ec976aa0647ee64e37d4b44d6d8160758c5b1d83",
+    "sourceSha256": "f744765af35238ad654659dba6072dfabded31ccff9590b64f5dd6281d4426a3"
+  },
+  {
+    "file": "railwise-final-runtime-typecheck.txt",
+    "sha256": "1baaa4f26cb2ff40fa2c85f0fe13936131a65ed68a723ad161d69b5dd7197cc0",
+    "sourceSha256": "369fb1b91d4bc5be75374f253acfa1ccd86ab16e2a1c4ddce423943f6f1d18b6"
+  },
+  {
+    "file": "railwise-capability-lint.txt",
+    "sha256": "1ff1ee03f9baf25f2614665533031f9413aaefc2e4fa588b29f7f698f9881fe9",
+    "sourceSha256": "2196bfe1fe979974deedb967ac9b52339d93dd5d690d8f1ab4de135d0844fe68"
+  },
+  {
+    "file": "railwise-capability-brand.txt",
+    "sha256": "fc93c430098ad788385a3edb15da2a9efd8c0974da4fffcbd220d5bcc1427cd3",
+    "sourceSha256": "8b3ccd88d2f155ea768fa7732796424138cdfd4a741a49004ee38f77e1d97095"
+  },
+  {
+    "file": "railwise-capability-build.txt",
+    "sha256": "75021655f62b2e82a51e494ceb16a2237ed0ae2c19d1e662bad73ec41b60495d",
+    "sourceSha256": "31a334f1f34e3d6abf2e62ec0cdd2bc14524ef2044191198b46c9573d9ef5194"
+  },
+  {
+    "file": "railwise-capability-openspec.txt",
+    "sha256": "368c28fcbf2c744ae4e7f52c1ec13cd84eec7851e710a4c7c0007db7b430ecf2",
+    "sourceSha256": "7e22ad0c7015c312e59ea5e06d40fd192b47d6bdaf43761c4d9dd574f4247357"
+  },
+  {
+    "file": "railwise-final-service-tests.txt",
+    "sha256": "b9dfea0f4882415739f0e8c58872eb36493a89c7852d7f5f19c6284307386476",
+    "sourceSha256": "4d1dcc8fe4bb92e206e66f8113354cbbe476854386ecc7092931b152601c280c"
+  },
+  {
+    "file": "railwise-stop-failed-step-tests.txt",
+    "sha256": "706aed9e9dc2dde2e60798db0e57dda7f8fec256e271d3fdd1d019de73da5476",
+    "sourceSha256": "2a2b8f5a24267641f7035d6267eb5a5df5f72e31c7f1bac523c1fbe6d421eeb7"
+  },
+  {
+    "file": "railwise-runtime-version-dom-test.txt",
+    "sha256": "b61f55e75f040819eaf91a99dd719c30d4ac8b46236d642b25f3456e2a121eb6",
+    "sourceSha256": "da8dde44a52752d6fae290e28fb9105930494833cfb55db3e8db0fe3b07476aa"
+  }
+]

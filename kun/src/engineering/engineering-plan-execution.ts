@@ -1,14 +1,15 @@
 import { z } from 'zod'
 import type { EngineeringContextSnapshotV1, EngineeringPlanStepV1, EngineeringRunPlanV1, EngineeringPlanParameterIssueV1 } from '../contracts/engineering-ai.js'
 import { EngineeringPlanParametersV1 } from '../contracts/engineering-ai.js'
-import { engineeringPlanToolRisk } from './engineering-plan-tools.js'
+import { engineeringPlanToolRisk, surveyAdjustmentToolNetworks } from './engineering-plan-tools.js'
+import { AdjustmentRequestV1 } from '../contracts/survey.js'
 
 type Step = EngineeringPlanStepV1
 type Context = EngineeringContextSnapshotV1
 type Parameters = NonNullable<Step['parameters']>
 const id = z.string().min(1).max(200)
 const revision = z.number().int().positive()
-const network = z.object({ networkId: id, expectedRevision: revision, method: z.string().min(1).max(100).optional() }).strict()
+const network = z.object({ networkId: id, expectedRevision: revision, method: AdjustmentRequestV1.shape.method }).strict()
 const report = z.object({ projectId: id, expectedRevision: revision, datasetId: id.optional(), analysisId: id.optional(), adjustmentIds: z.array(id).min(1).max(200).optional(), deformationIds: z.array(id).min(1).max(200).optional() }).strict().refine(value => Boolean(value.datasetId || value.adjustmentIds?.length || value.deformationIds?.length), 'select delivery inputs')
 const definitions: Record<string, { schema: z.ZodType; outputs: string[]; reversibility: NonNullable<Step['reversibility']> }> = {
   survey_network_validate: { schema: z.object({ networkId: id, expectedRevision: revision }).strict(), outputs: ['network-validation'], reversibility: 'revisioned-write' },
@@ -31,7 +32,8 @@ export function planToolParameterSchema(tool: string): Record<string, unknown> {
   if (!def) throw new Error('Unknown engineering plan tool')
   const { $schema: _schema, required, ...schema } = z.toJSONSchema(def.schema)
   const delivery = ['report_export', 'excel_export'].includes(planToolName(tool))
-  return { ...schema, description: `Required after resolving predecessor bindings: ${(required as string[] | undefined)?.join(', ') || 'none'}.${delivery ? ' Also select datasetId or nonempty adjustmentIds. expectedRevision is the project revision for survey-only exports, or the dataset revision for monitoring exports. One call generates DOCX, PDF and XLSX; no per-format or manifest operation.' : ''}` }
+  const networkTypes = surveyAdjustmentToolNetworks[planToolName(tool)]
+  return { ...schema, description: `Required after resolving predecessor bindings: ${(required as string[] | undefined)?.join(', ') || 'none'}.${networkTypes ? ` Supported network types only: ${networkTypes.join(', ')}. Select the matching tool; method is a solver method, not a network type.` : ''}${delivery ? ' Also select datasetId or nonempty adjustmentIds. expectedRevision is the project revision for survey-only exports, or the dataset revision for monitoring exports. One call generates DOCX, PDF and XLSX; no per-format or manifest operation.' : ''}` }
 }
 
 /** Compile exact literals and explicit result bindings; never select the first of several inputs. */
@@ -92,7 +94,7 @@ const outputTools: Record<string, string[]> = {
   'analysis.id': ['deformation_rate'], 'run.id': ['survey_calculator', 'control_network', 'cpiii_adjustment', 'coord_transform', 'distance_calculator', 'angle_convert', 'survey_adjustment_read', 'report_export', 'excel_export']
 }
 
-export function planParameterDiagnostics(steps: Step[]): EngineeringPlanParameterIssueV1[] {
+export function planParameterDiagnostics(steps: Step[], context?: Context): EngineeringPlanParameterIssueV1[] {
   const issues: EngineeringPlanParameterIssueV1[] = []
   for (const step of steps) {
     const def = definition(step.tool)
@@ -108,12 +110,25 @@ export function planParameterDiagnostics(steps: Step[]): EngineeringPlanParamete
     }
     const parsed = def.schema.safeParse(args)
     if (!parsed.success) issues.push({ stepId: step.id, code: 'invalid-parameters', fields: [...new Set(parsed.error.issues.flatMap(issue => issue.code === 'unrecognized_keys' ? issue.keys : issue.path.length ? [String(issue.path[0])] : ['inputs']))].slice(0, 200) })
+    if (context) {
+      const networkId = (source: Step, visited = new Set<string>()): unknown => {
+        if (visited.has(source.id)) return undefined
+        visited.add(source.id)
+        if (source.parameters?.networkId !== undefined) return source.parameters.networkId
+        const binding = source.parameterBindings?.find(item => item.parameter === 'networkId' && item.output === 'network.id' && !item.asArray)
+        const parent = binding && steps.find(item => item.id === binding.stepId && planToolName(item.tool) === 'survey_network_validate')
+        return parent ? networkId(parent, visited) : undefined
+      }
+      const allowed = surveyAdjustmentToolNetworks[planToolName(step.tool)]
+      const selected = allowed && context.surveyNetworks.find(item => item.id === networkId(step))
+      if (allowed && (!selected || !allowed.includes(selected.networkType))) issues.push({ stepId: step.id, code: 'invalid-parameters', fields: ['networkId'] })
+    }
   }
   return issues
 }
 
-export function planParameterIssues(steps: Step[]): string[] {
-  return planParameterDiagnostics(steps).map(issue => `${issue.stepId}: ${issue.code === 'review-details' ? 'review details missing or outdated' : issue.code === 'invalid-binding' ? 'invalid parameter binding' : 'required tool parameters are missing or invalid'}${issue.fields.length ? ` (${issue.fields.join(', ')})` : ''}`)
+export function planParameterIssues(steps: Step[], context?: Context): string[] {
+  return planParameterDiagnostics(steps, context).map(issue => `${issue.stepId}: ${issue.code === 'review-details' ? 'review details missing or outdated' : issue.code === 'invalid-binding' ? 'invalid parameter binding' : 'required tool parameters or selected network capability are missing or invalid'}${issue.fields.length ? ` (${issue.fields.join(', ')})` : ''}`)
 }
 
 export function assertPlanParameterScope(parameters: Record<string, unknown>, context: Context): void {
@@ -155,7 +170,7 @@ export function planResultHandles(output: unknown): Record<string, unknown> {
   return handles
 }
 
-export function assertPlanReviewable(plan: EngineeringRunPlanV1): void {
-  const issues = planParameterIssues(plan.steps)
+export function assertPlanReviewable(plan: EngineeringRunPlanV1, context?: Context): void {
+  const issues = planParameterIssues(plan.steps, context)
   if (issues.length) throw new Error(`engineering_plan_incomplete: ${issues.join('; ')}`)
 }

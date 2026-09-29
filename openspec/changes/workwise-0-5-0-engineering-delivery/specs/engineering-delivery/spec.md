@@ -110,6 +110,12 @@ The Runtime MUST turn a non-empty Engineering goal into a bounded, versioned `En
 - **WHEN** an approval token is replayed, expired, or references a previous plan/context revision
 - **THEN** the Runtime rejects it with a stable approval error and leaves all side effects untouched
 
+#### Scenario: A plan selects the wrong survey capability
+
+- **WHEN** a plan selects an unsupported tool for a literal or predecessor-bound network, or supplies a network type as a solver method
+- **THEN** the draft remains non-executable with bounded parameter diagnostics before approval
+- **AND** a corrected draft preserves the original history and uses the same capability table as execution
+
 ### Requirement: TaskRun is the only execution carrier
 
 Engineering AI MUST enqueue approved work through `TaskController`, persist status in `TaskRunRepository`, and execute through `AgentLoop`. `EngineeringService` MUST remain deterministic data/artifact logic and MUST NOT create a second queue or mark an AI run completed outside TaskRun terminal handling.
@@ -123,6 +129,12 @@ Engineering AI MUST enqueue approved work through `TaskController`, persist stat
 
 - **WHEN** the same `inputHash + planHash + idempotencyKey` is submitted twice
 - **THEN** the original TaskRun and outputs are returned without duplicate work or files
+
+#### Scenario: An approved deterministic step fails
+
+- **WHEN** an authorized tool returns an error or throws during execution
+- **THEN** the plan needs attention and Task continuation waits for explicit recovery
+- **AND** existing successful receipts remain available without claiming the failed step succeeded
 
 ### Requirement: Deterministic monitoring dataset import
 The Runtime MUST import CSV and XLSX attachments through the managed Attachment Store, support canonical RailWise fields and explicit user mappings, preserve unknown columns, and return source hashes and row provenance.
@@ -176,6 +188,14 @@ Opaque vendor formats including Trimble T00/T01/T02/T04/JOB, Leica DBX/MDB, and 
 
 ### Requirement: Reviewable analysis and deliverables
 The Runtime MUST produce deterministic analysis, chart artifacts, DOCX/PDF reports, XLSX evidence packages, citations, and an immutable manifest tied to input hashes.
+
+Recorded AI export descriptors MUST remain visible after reload without recalculation or an implied new verification. New evidence MUST record the bundled Runtime package version; historical versions and output bytes MUST remain unchanged.
+
+#### Scenario: Restore a recorded AI export
+
+- **WHEN** a completed export has retained output descriptors and the desktop reloads its project
+- **THEN** the UI restores their recorded paths and hashes and binds evidence questions to the exact run
+- **AND** damaged descriptors remain unavailable without replacing them or hiding the rest of the project
 
 #### Scenario: Finalize reviewed report
 - **WHEN** blocking findings are resolved and warnings are acknowledged

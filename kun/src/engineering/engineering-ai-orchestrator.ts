@@ -182,16 +182,17 @@ export class EngineeringAiOrchestrator {
   }
 
   /** Completion is based on successful reviewed step receipts, never answer text. */
-  assessCompletion({ thread, turn, task }: Parameters<NonNullable<TaskControllerDeps['completionGuard']>>[0]): { reason: string; fingerprint: string } | null {
+  assessCompletion({ thread, turn, task }: Parameters<NonNullable<TaskControllerDeps['completionGuard']>>[0]): { reason: string; fingerprint: string; retryable?: boolean } | null {
     if (thread?.domain !== 'engineering' && !turn?.engineeringExecution && !task.engineeringPlanId) return null
     const planId = turn?.engineeringPlanId ?? task.engineeringPlanId
     const plan = planId ? this.deps.repository.getPlan(planId)
       : this.deps.repository.planForTurn(task.threadId, turn?.id ?? '') ?? this.deps.repository.planForTask(task.threadId, task.id)
     if (!plan && !turn?.engineeringExecution && !planId) return null
     if (!plan || !thread || !turn || thread.domain !== 'engineering' || plan.threadId !== thread.id || plan.projectId !== thread.projectId || plan.taskId !== task.id || task.activeTurnId !== turn.id ||
-      (turn.engineeringPlanId && turn.engineeringPlanId !== plan.id) || (task.engineeringPlanId && task.engineeringPlanId !== plan.id) || !['started', 'running', 'queued'].includes(plan.status)) {
+      (turn.engineeringPlanId && turn.engineeringPlanId !== plan.id) || (task.engineeringPlanId && task.engineeringPlanId !== plan.id) || !['started', 'running', 'queued', 'needs_attention'].includes(plan.status)) {
       return { reason: 'engineering_plan_binding_missing', fingerprint: `engineering-plan-binding:${planId ?? 'missing'}` }
     }
+    if (plan.status === 'needs_attention') return { reason: 'engineering_plan_execution_failed', fingerprint: `engineering-plan-failed:${plan.id}:${plan.revision}`, retryable: false }
     const execution = this.executionEvidence(plan)
     return execution.complete ? null : {
       reason: `engineering_plan_steps_incomplete: ${execution.pendingStepIds.join(', ')}`,
@@ -228,7 +229,7 @@ export class EngineeringAiOrchestrator {
     const claimedComplete = task?.status === 'completed' || plan.status === 'completed'
     const status = claimedComplete && !['stale', 'cancelled', 'failed', 'needs_attention'].includes(plan.status)
       ? execution.complete ? 'completed' : 'needs_attention' : plan.status
-    return { ...plan, status, execution, parameterIssues: planParameterDiagnostics(plan.steps) }
+    return { ...plan, status, execution, parameterIssues: planParameterDiagnostics(plan.steps, this.deps.context.snapshot(plan.projectId)) }
   }
 
   private async executionPlan(threadId: string, turnId: string): Promise<EngineeringRunPlan | null> {
@@ -342,7 +343,7 @@ export class EngineeringAiOrchestrator {
     validateSteps(steps)
     for (const step of steps) assertPlanParameterScope(step.parameters ?? {}, context)
     const now = this.deps.nowIso?.() ?? new Date().toISOString()
-    const plan = EngineeringRunPlanV1.parse({ schemaVersion: 1, id: `eplan_${randomUUID()}`, threadId: input.threadId, projectId: input.projectId, contextHash: context.contextHash, requestHash, revision: 1, goal: input.goal, steps, status: planParameterIssues(steps).length ? 'needs_attention' : 'awaiting_approval', createdAt: now, updatedAt: now })
+    const plan = EngineeringRunPlanV1.parse({ schemaVersion: 1, id: `eplan_${randomUUID()}`, threadId: input.threadId, projectId: input.projectId, contextHash: context.contextHash, requestHash, revision: 1, goal: input.goal, steps, status: planParameterIssues(steps, context).length ? 'needs_attention' : 'awaiting_approval', createdAt: now, updatedAt: now })
     const approval = this.issueApproval(plan, plan.steps.map((step) => step.id))
     const result = { plan, approval }
     this.deps.repository.createPlan(plan, approval, input.idempotencyKey, result)
@@ -354,7 +355,7 @@ export class EngineeringAiOrchestrator {
   async conversationPolicy(threadId: string, projectId: string, turnId: string): Promise<{ instruction: string; allowedToolNames: string[] }> {
     await this.mustScopedThread(threadId, projectId)
     const plan = await this.executionPlan(threadId, turnId)
-    const executable = plan && plan.projectId === projectId && plan.status === 'started' && !planParameterIssues(plan.steps).length && plan.steps.every((step) => step.approval === 'approved' && step.risk === engineeringPlanToolRisk(step.tool))
+    const executable = plan && plan.projectId === projectId && plan.status === 'started' && !planParameterIssues(plan.steps, this.deps.context.snapshot(projectId)).length && plan.steps.every((step) => step.approval === 'approved' && step.risk === engineeringPlanToolRisk(step.tool))
     const execution = executable ? this.executionEvidence(plan) : null
     const verifiedReceipts = execution?.completedStepIds.map(stepId => ({ stepId, handles: this.deps.repository.stepEvidence(plan!.id, stepId)!.handles })) ?? []
     return {
@@ -363,7 +364,7 @@ export class EngineeringAiOrchestrator {
         'Answer ordinary questions directly. Explain existing results using survey_read_context; do not create a plan for a question or explanation.',
         'For requests to compute, adjust, analyze data or generate deliverables, use survey_request_plan and wait for the user to approve it in the UI. Never claim a draft has executed.',
         'Plans must include concrete tool parameters from the current context. Bind later values only to explicit predecessor outputs. Missing or ambiguous inputs require clarification and replanning. Never change approved arguments during execution.',
-        'Use only the per-tool parameter fields advertised by survey_request_plan. report_export and excel_export each generate the same DOCX/PDF/XLSX draft bundle in one call, without format or draft flags. Manifest creation remains a separate human action in the Review UI; there is no manifest export tool. A plan with parameterIssues is blocked, not ready for approval: correct the reported fields and request a new draft. Never execute or alter the blocked draft.',
+        'Use survey_calculator for leveling/height-control, control_network for traverse/plane-control/triangulation/GNSS, cpiii_adjustment for CPIII, and coord_transform for coordinate-transform. Never use the network type as method; omit method to use the deterministic default. Use only the per-tool parameter fields advertised by survey_request_plan. report_export and excel_export each generate the same DOCX/PDF/XLSX draft bundle in one call, without format or draft flags. Manifest creation remains a separate human action in the Review UI; there is no manifest export tool. A plan with parameterIssues is blocked, not ready for approval: correct the reported fields and request a new draft. Never execute or alter the blocked draft.',
         'For parameter recommendations or requested project edits, use survey_propose_project_change. The UI shows before/after values for human confirmation. This does not execute computations, change network observations or transform existing coordinates. Never claim a suggestion was applied.',
         'If intent is ambiguous, ask a concise question in the conversation. Do not silently expand the requested operations.',
         'All numerical results, units, precision decisions and source references come from the deterministic Runtime. Never invent or recompute production results yourself.',
@@ -392,7 +393,7 @@ export class EngineeringAiOrchestrator {
     const plan = await this.executionPlan(threadId, turnId)
     if (!plan || plan.projectId !== thread.projectId || plan.status !== 'started' || plan.steps.some(step => step.approval !== 'approved')) throw new EngineeringAiError('engineering_approval_required', 'this engineering turn has no executable approved plan')
     this.assertCurrentToolRisks(plan)
-    assertPlanReviewable(plan)
+    assertPlanReviewable(plan, this.deps.context.snapshot(plan.projectId))
     const candidates = plan.steps.filter(step => step.tool === tool)
     const ordered = [...candidates.filter(step => !this.deps.repository.stepEvidence(plan.id, step.id)), ...candidates.filter(step => this.deps.repository.stepEvidence(plan.id, step.id))]
     for (const step of ordered) {
@@ -407,6 +408,15 @@ export class EngineeringAiOrchestrator {
 
   recordToolResult(authorization: { planId: string; stepId: string; parameters: Record<string, unknown> }, output: unknown): void {
     this.deps.repository.recordStepEvidence(authorization.planId, authorization.stepId, authorization.parameters, planResultHandles(output))
+  }
+
+  /** Stop automatic continuation after an authorized step fails; retain successful receipts. */
+  recordToolFailure(authorization: { planId: string; stepId: string }): void {
+    const plan = this.mustPlan(authorization.planId)
+    if (plan.status !== 'started' || !plan.steps.some(step => step.id === authorization.stepId)) return
+    const failed = EngineeringRunPlanV1.parse({ ...plan, status: 'needs_attention', revision: plan.revision + 1, updatedAt: this.deps.nowIso?.() ?? new Date().toISOString() })
+    this.deps.repository.saveTransition({ plan: failed, idempotencyKey: `engineering-step-failure:${plan.id}:${plan.revision}:${authorization.stepId}`, result: failed })
+    this.emit(failed, 'step-failed', plan.executionTurnId)
   }
 
   validatePlan(planId: string, input: EngineeringPlanValidateRequest): EngineeringRunPlan {
@@ -438,7 +448,7 @@ export class EngineeringAiOrchestrator {
     const plan = this.mustPlan(planId)
     if (input.expectedRevision !== plan.revision || input.contextHash !== plan.contextHash) throw new EngineeringAiError('engineering_approval_stale', 'approval does not match the current plan revision or context')
     this.assertCurrentToolRisks(plan)
-    assertPlanReviewable(plan)
+    assertPlanReviewable(plan, this.deps.context.snapshot(plan.projectId))
     const approval = input.token ? this.deps.repository.getApproval(input.token) : null
     if (!approval || approval.planId !== plan.id || approval.planRevision !== plan.revision || approval.contextHash !== plan.contextHash || Date.parse(approval.expiresAt) <= Date.now() || input.stepIds.some((id) => !approval.stepIds.includes(id))) throw new EngineeringAiError('engineering_approval_invalid', 'approval token is missing, expired, or already scoped to another plan')
     const now = this.deps.nowIso?.() ?? new Date().toISOString()
@@ -455,7 +465,7 @@ export class EngineeringAiOrchestrator {
     if (input.expectedRevision !== plan.revision || input.contextHash !== plan.contextHash) throw new EngineeringAiError('engineering_plan_stale', 'plan is stale; refresh context and replan')
     if (plan.status !== 'approved' || plan.steps.some((step) => step.approval !== 'approved')) throw new EngineeringAiError('engineering_approval_required', 'all plan steps require approval before execution')
     this.assertCurrentToolRisks(plan)
-    assertPlanReviewable(plan)
+    assertPlanReviewable(plan, this.deps.context.snapshot(plan.projectId))
     await this.mustScopedThread(plan.threadId, plan.projectId)
     const context = this.deps.context.snapshot(plan.projectId)
     if (context.contextHash !== plan.contextHash) {
@@ -500,7 +510,7 @@ export class EngineeringAiOrchestrator {
     const plan = this.mustPlan(planId)
     if (input.expectedRevision !== plan.revision || input.contextHash !== plan.contextHash) throw new EngineeringAiError('engineering_plan_stale', 'plan is stale; refresh context and replan')
     this.assertCurrentToolRisks(plan)
-    assertPlanReviewable(plan)
+    assertPlanReviewable(plan, this.deps.context.snapshot(plan.projectId))
     const before = await this.deps.threadStore.get(plan.threadId)
     const previousTurnIds = new Set(before?.turns.map(turn => turn.id))
     const task = this.deps.tasks?.activeTask(plan.threadId)

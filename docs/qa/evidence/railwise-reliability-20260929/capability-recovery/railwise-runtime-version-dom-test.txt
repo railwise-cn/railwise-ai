@@ -1,0 +1,11 @@
+> workwise@0.5.1 test
+> vitest run src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts
+
+
+ RUN  v4.1.7 <repo>
+
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  12:18:48
+   Duration  3.92s (transform 251ms, setup 0ms, import 437ms, tests 3.29s, environment 79ms)
