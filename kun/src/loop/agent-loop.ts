@@ -391,7 +391,7 @@ export function allowedToolNamesWithGuiStateTools(
 }
 
 export type AgentLoopOptions = {
-  engineeringTurnPolicy?: (threadId: string, projectId: string, turnId: string) => Promise<{ instruction: string; allowedToolNames: string[] }>
+  engineeringTurnPolicy?: (threadId: string, projectId: string, turnId: string) => Promise<{ instruction: string; allowedToolNames: string[]; executionPaused?: boolean }>
   threadStore: ThreadStore
   sessionStore: SessionStore
   approvalGate: ApprovalGate
@@ -565,6 +565,11 @@ export class AgentLoop {
             return 'failed'
           }
         } else if (outcome.kind === 'retryable' && this.opts.tasks) {
+          const blocked = await this.opts.tasks.assessNonRetryableBlock?.(threadId, turnId)
+          if (blocked?.kind === 'waiting_user') {
+            await this.opts.turns.finishTurn({ threadId, turnId, status: 'completed' })
+            return 'completed'
+          }
           const decision = this.opts.tasks.recordAttemptFailure(
             threadId,
             turnId,
@@ -937,7 +942,7 @@ export class AgentLoop {
     const requiredFileExtensions = requiredFileExtensionsForPrompt(workflowPrompt)
     const hasFileDeliverable = hasSuccessfulFileDeliverable(healed.items, turnId, workflowPrompt)
     const userInputDisabled = turn?.disableUserInput === true
-    const completionRecoveryInstruction = stepIndex > 0
+    const completionRecoveryInstruction = stepIndex > 0 && !engineeringPolicy?.executionPaused
       ? incompleteTurnContinuationInstruction({
           requiresFileDeliverable,
           hasFileDeliverable,
@@ -1355,6 +1360,9 @@ export class AgentLoop {
     if (stopReason === 'error') return 'failed'
     if (stopReason === 'length') return 'max_tokens'
     if (completedToolCalls.length === 0) {
+      // A paused typed execution must reach TaskController's waiting-user gate,
+      // even if its failure explanation happens to match progress-only prose.
+      if (engineeringPolicy?.executionPaused && stopReason === 'stop') return 'stop'
       if (request.requiredToolName) {
         if (
           request.requiredToolName === CREATE_PLAN_TOOL_NAME &&

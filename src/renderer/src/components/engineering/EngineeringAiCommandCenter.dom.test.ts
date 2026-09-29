@@ -115,9 +115,30 @@ describe('Engineering AI session recovery states', () => {
     expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
   })
 
-  it('allows explicit typed continuation after zero-tool stalling without inventing completed receipts', async () => {
-    const plan = { ...resumablePlan, execution: { complete: false, completedStepIds: [], pendingStepIds: resumablePlan.steps.map(step => step.id) } }
-    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status: 'stalled' })) })
+  it('restores a failed approved plan from history and resumes that exact Task without approving the newer draft', async () => {
+    const old = { ...resumablePlan, id: 'original-failed', status: 'needs_attention', revision: 4 }
+    const history = [refreshedPlan, old].map(plan => ({ id: plan.id, goal: plan.goal, createdAt: '2026-09-29T00:00:00Z' }))
+    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: old.taskId, threadId: 'thread-a', status: 'waiting_user' })) })
+    runtimeRequest.mockImplementation(async path => {
+      if (path.endsWith('/resume')) return response(202, { plan: { ...old, status: 'started', revision: 5 } })
+      if (path.startsWith('/v1/engineering/ai/plans?')) return response(200, { plan: path.includes('planId=original-failed') ? old : refreshedPlan, history })
+      return response(200, { cards: [] })
+    })
+    await render(); await settle()
+    const select = container.querySelector<HTMLSelectElement>(`[aria-label="${i18n.t('engineeringPlanHistory')}"]`)!
+    expect(select).not.toBeNull()
+    await act(async () => { select.value = old.id; select.dispatchEvent(new Event('change', { bubbles: true })) }); await settle()
+    expect(container.textContent).toContain(old.id)
+    expect([...container.querySelectorAll('[data-step-state]')].map(node => node.getAttribute('data-step-state'))).toEqual(['done', 'blocked'])
+    const resume = container.querySelector<HTMLButtonElement>('[data-testid="engineering-resume"]')!
+    expect(resume).not.toBeNull()
+    await act(async () => resume.click()); await settle()
+    expect(runtimeRequest.mock.calls.filter(([, method]) => method === 'POST').map(([path]) => path)).toEqual([`/v1/engineering/ai/plans/${old.id}/resume`])
+  })
+
+  it.each(['started', 'needs_attention'])('allows explicit typed continuation of a %s plan without inventing completed receipts', async status => {
+    const plan = { ...resumablePlan, status, execution: { complete: false, completedStepIds: [], pendingStepIds: resumablePlan.steps.map(step => step.id) } }
+    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status: status === 'needs_attention' ? 'waiting_user' : 'stalled' })) })
     runtimeRequest.mockImplementation(async (path, method) => path.endsWith('/resume') && method === 'POST'
       ? response(202, { plan: { ...plan, revision: 4, executionTurnId: 'continued-zero-receipt' } })
       : response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))

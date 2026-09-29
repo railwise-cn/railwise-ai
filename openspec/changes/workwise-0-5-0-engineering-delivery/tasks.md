@@ -30,6 +30,11 @@ The e3abafc46514 private-updater target passed the synthetic IN2 default-Flash f
 - [x] Record the bundled Runtime package version in new evidence without rewriting historical manifests or changing public versions.
 - [ ] Verify these repairs in the next frozen private-updater target package, including unaided real-model GSI planning, failed-step recovery, restored outputs, versions, restart and supported UI states.
 
+The 7fc5b9206057 signed target passed first-plan default-Flash GSI and explicit-Pro IN2 flows, both three-format manifests and five technical rechecks, bundled Runtime version recording, independent IN2 geometry/residual comparison and exact-rational GSI closure distribution. A synthetic export failure preserved earlier receipts and waited after one Task attempt, but generic progress-text continuation exposed consultation tools, created a replacement draft and left the original needs-attention plan without a resume action. That package fails aggregate recovery acceptance.
+
+- [x] Prevent generic progress or explanatory-model errors from continuing a paused execution, deny in-turn replacement plans/project changes, expose typed needs-attention continuation and bounded scoped plan history, and route monitoring stage actions to monitoring data/trends. Source/DOM/HTTP regression checks remain distinct from installed acceptance.
+- [ ] Verify this interruption/history/navigation repair in its exact frozen private target, including restoring the original failed plan obscured by an unapproved later draft; retain both records.
+
 ## P1 declared correction workflow follow-through
 
 - [x] Persist caller-declared checks, issues, corrections and rechecks in a separate bounded append-only workspace, binding real retained materials and exact project/retention heads; verify idempotency, stale sources, corruption, restart and unchanged legacy retention semantics.

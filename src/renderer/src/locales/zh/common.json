@@ -616,6 +616,8 @@
   "engineeringGeneratePreview": "生成预览成果",
   "engineeringDeliverablesEmptyDetail": "请导入监测数据集或完成测量平差。只有准入通过的确定性结果才能进入证据包。",
   "engineeringPreviewOutput": "预览输出",
+  "engineeringPlanHistory": "计划历史（最近 50 项）",
+  "engineeringPlanLatest": "最新计划",
   "engineeringRecordedPreviewRun": "已记录草稿导出 · {{id}}（尚未重新核验文件）",
   "engineeringRecordedPreviewUnavailable": "无法读取已保存的导出描述。请保留原文件并检查运行记录，再决定是否生成新草稿。",
   "engineeringPreviewNotGenerated": "尚未生成预览",

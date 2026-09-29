@@ -75,6 +75,17 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('Survey delivery without a monitoring dataset', () => {
+  it('opens monitoring data and trend analysis from stage navigation when a dataset is selected', async () => {
+    datasets = [{ id: 'data', sourceFileName: 'monitor.csv', sourceFileHash: 'a'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2, columnCount: 3, observationCount: 2, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    const stage = container.querySelector<HTMLSelectElement>('#engineering-view-select')!
+    await act(async () => { stage.value = 'import'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(i18n.t('engineeringTabData'))
+    await act(async () => { stage.value = 'analysis'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(i18n.t('engineeringTabAnalysis'))
+    expect(container.textContent).toContain(i18n.t('engineeringRunDeterministicAnalysis'))
+  })
+
   it('refreshes overview and the mounted survey panel after AI execution without replacing the project draft', async () => {
     adjustments = []
     await act(async () => root.render(createElement(EngineeringWorkspaceView, { workspaceRoot: '/test', runtimeReady: true })))

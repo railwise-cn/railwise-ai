@@ -134,6 +134,9 @@ Engineering AI MUST enqueue approved work through `TaskController`, persist stat
 
 - **WHEN** an authorized tool returns an error or throws during execution
 - **THEN** the plan needs attention and Task continuation waits for explicit recovery
+- **AND** generic progress wording or a failed explanatory model call cannot restart it; this execution turn cannot create a replacement plan or project suggestion
+- **AND** the UI offers continuation of the same bound approved Task with pending receipts after the user addresses the failure
+- **AND** a bounded scoped history selector can restore the exact original plan even when a later unapproved draft exists; a missing or cross-scope ID never substitutes the latest plan
 - **AND** existing successful receipts remain available without claiming the failed step succeeded
 
 ### Requirement: Deterministic monitoring dataset import

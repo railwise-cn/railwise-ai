@@ -616,6 +616,8 @@
   "engineeringGeneratePreview": "Generate preview",
   "engineeringDeliverablesEmptyDetail": "Import a monitoring dataset or complete a survey adjustment. Only eligible deterministic results can be included in the evidence package.",
   "engineeringPreviewOutput": "Preview output",
+  "engineeringPlanHistory": "Plan history (last 50)",
+  "engineeringPlanLatest": "Latest plan",
   "engineeringRecordedPreviewRun": "Recorded draft export · {{id}} (files have not been reverified)",
   "engineeringRecordedPreviewUnavailable": "The saved export descriptors could not be read. Keep the original files and inspect the run before generating another draft.",
   "engineeringPreviewNotGenerated": "Preview not generated",

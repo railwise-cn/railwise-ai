@@ -220,12 +220,11 @@ export class TaskController {
     ])
     const turn = thread?.turns.find((candidate) => candidate.id === turnId)
     const turnItems = items.filter((item) => item.turnId === turnId)
+    const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
+    if (blocked?.retryable === false) return this.waitForUser(task, blocked.reason, latestAssistantText(turn, turnItems), blocked.fingerprint, turnId)
     const pendingReason = pendingWorkReason(turnItems)
     if (pendingReason) return this.retry(task, pendingReason, fingerprint(turnItems), turnId)
-    const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
-    if (blocked) return blocked.retryable === false
-      ? this.waitForUser(task, blocked.reason, latestAssistantText(turn, turnItems), blocked.fingerprint, turnId)
-      : this.retry(task, blocked.reason, blocked.fingerprint, turnId)
+    if (blocked) return this.retry(task, blocked.reason, blocked.fingerprint, turnId)
 
     const finalResponse = latestAssistantText(turn, turnItems)
     if (task.acceptance.requireFinalResponse && !finalResponse.trim()) {
@@ -307,6 +306,18 @@ export class TaskController {
       attributes: { attempts: completed.attempts, artifactCount: artifacts.length }
     })
     return { kind: 'completed', task: completed }
+  }
+
+  /** A terminal execution block also wins when the explanatory model call fails. */
+  async assessNonRetryableBlock(threadId: string, turnId: string): Promise<TaskCandidateDecision | null> {
+    const task = this.repository.findActiveByThread(threadId)
+    if (!task || task.activeTurnId !== turnId) return null
+    const thread = await this.threadStore.get(threadId)
+    const turn = thread?.turns.find(candidate => candidate.id === turnId)
+    const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
+    if (blocked?.retryable !== false) return null
+    const items = (await this.sessionStore.loadItems(threadId)).filter(item => item.turnId === turnId)
+    return this.waitForUser(task, blocked.reason, latestAssistantText(turn, items), blocked.fingerprint, turnId)
   }
 
   recordAttemptFailure(threadId: string, turnId: string, code: string, message: string): TaskCandidateDecision | null {
