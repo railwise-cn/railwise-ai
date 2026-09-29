@@ -23,6 +23,7 @@ let adjustments: unknown[]
 let datasets: unknown[]
 let analyses: unknown[]
 let manifests: unknown[]
+let latestPreview: unknown
 let container: HTMLDivElement
 let root: Root
 const file = { path: 'new-preview/report.pdf', mediaType: 'application/pdf', sha256: 'a'.repeat(64), sizeBytes: 100 }
@@ -55,14 +56,14 @@ beforeEach(async () => {
   Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) } })
 
   await i18n.changeLanguage('en')
-  adjustments = [adjustment]; datasets = []; analyses = []; manifests = []
+  adjustments = [adjustment]; datasets = []; analyses = []; manifests = []; latestPreview = undefined
   navigationFixture.target = null
   useEngineeringConversationDrafts.setState({ drafts: {} })
   request.mockReset()
   request.mockImplementation(async (path: string) => {
     let body: unknown
     if (path === '/v1/engineering/projects') body = { projects: [project] }
-    else if (path.endsWith('/overview')) body = { project, datasets, analyses, runs: [], manifests }
+    else if (path.endsWith('/overview')) body = { project, datasets, analyses, runs: [], manifests, latestPreview }
     else if (path.includes('/survey/networks?')) body = { networks: [network] }
     else if (path.includes('/adjustments?')) body = { adjustments }
     else if (path.endsWith('/reports/preview')) body = { run: { id: 'preview' }, files: [file], charts: [], citations: [] }
@@ -74,6 +75,17 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('Survey delivery without a monitoring dataset', () => {
+  it('opens monitoring data and trend analysis from stage navigation when a dataset is selected', async () => {
+    datasets = [{ id: 'data', sourceFileName: 'monitor.csv', sourceFileHash: 'a'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2, columnCount: 3, observationCount: 2, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    const stage = container.querySelector<HTMLSelectElement>('#engineering-view-select')!
+    await act(async () => { stage.value = 'import'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(i18n.t('engineeringTabData'))
+    await act(async () => { stage.value = 'analysis'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(i18n.t('engineeringTabAnalysis'))
+    expect(container.textContent).toContain(i18n.t('engineeringRunDeterministicAnalysis'))
+  })
+
   it('refreshes overview and the mounted survey panel after AI execution without replacing the project draft', async () => {
     adjustments = []
     await act(async () => root.render(createElement(EngineeringWorkspaceView, { workspaceRoot: '/test', runtimeReady: true })))
@@ -596,6 +608,23 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(container.textContent).toContain('Completed deterministic Survey results')
     expect(button('Generate review list').disabled).toBe(false)
     expect(container.textContent).not.toContain('Run trend and threshold analysis first')
+  })
+
+  it.each(['en', 'zh'])('restores an AI export as recorded draft evidence without a new export (%s)', async language => {
+    latestPreview = { run: { id: 'ai-export', status: 'completed' }, files: [file] }
+    await renderDelivery()
+    await act(async () => button('Deliverables').click())
+    await act(async () => { await i18n.changeLanguage(language) })
+    expect(container.textContent).toContain(language === 'en' ? 'Recorded draft export · ai-export (files have not been reverified)' : '已记录草稿导出 · ai-export（尚未重新核验文件）')
+    expect(container.textContent).toContain(file.path)
+    expect(container.textContent).toContain(file.sha256)
+    expect(request.mock.calls.some(([path]) => path.endsWith('/reports/preview'))).toBe(false)
+    const ask = container.querySelector<HTMLButtonElement>(language === 'en' ? '[aria-label="Ask Survey AI about new-preview/report.pdf"]' : '[aria-label="询问 new-preview/report.pdf 的测量 AI"]')!
+    await act(async () => ask.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/test', 'job'])]?.evidenceContext).toMatchObject({ runId: 'ai-export', outputPath: file.path, outputSha256: file.sha256 })
+    await act(async () => { await i18n.changeLanguage('en') })
+    await act(async () => button('Review and archive').click())
+    expect(container.textContent).toContain('1 output file(s) include SHA-256 hashes.')
   })
 
   it('distinguishes restored manifest outputs from a session preview in both languages', async () => {

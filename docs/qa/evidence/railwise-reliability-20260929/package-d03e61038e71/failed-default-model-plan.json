@@ -1,0 +1,185 @@
+{
+  "sourceHead": "d03e61038e71314bab2aefad50428dbfc771db86",
+  "fixtureOnly": true,
+  "realModel": "deepseek-flash",
+  "reasoningEffort": "ultra",
+  "executed": false,
+  "plans": [
+    {
+      "schemaVersion": 1,
+      "id": "eplan_72bd707b-4354-4ebe-8967-810a46981375",
+      "threadId": "thr_l3xu42ka",
+      "projectId": "project_a8d369ca-d5cb-41bc-9293-a309ea6ff85a",
+      "contextHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+      "requestHash": "c037f59e86eda67ceab310c91ef56643f9e584bc113cb6cb1f29c32e321c748b",
+      "revision": 1,
+      "goal": "Validate the imported COSA-IN2 source golden-plane-control-e2e.in2 plane-control network (network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6, revision 1, source sha256 4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0) and run the deterministic control-network adjustment without modifying original bytes or imported records; then generate draft deliverables for human review: DOCX report, PDF report, XLSX workbook and deliverables manifest. All outputs are unapproved drafts pending human confirmation; no measurements are invented and no standards-compliance claim is made. Do not execute before approval. After execution, the residual method, weight scale, testability, and variance vs standard-deviation scale must be explained only from deterministic runtime results.",
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Validate imported COSA-IN2 plane-control network (golden-plane-control-e2e.in2, revision 1)",
+          "tool": "survey_network_validate",
+          "risk": "write",
+          "dependsOn": [],
+          "inputHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+          "parameters": {
+            "networkId": "network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6",
+            "expectedRevision": 1,
+            "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+          },
+          "parameterBindings": [],
+          "expectedOutputs": [
+            "network-validation"
+          ],
+          "reversibility": "revisioned-write",
+          "approval": "pending"
+        },
+        {
+          "id": "step-2",
+          "title": "Run deterministic control-network adjustment on the validated network",
+          "tool": "control_network",
+          "risk": "write",
+          "dependsOn": [
+            "step-1"
+          ],
+          "inputHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+          "parameters": {
+            "networkId": "network_bbe5449c-88e9-48c2-8d52-b074b2a8bff6"
+          },
+          "parameterBindings": [
+            {
+              "parameter": "expectedRevision",
+              "stepId": "step-1",
+              "output": "network.revision"
+            }
+          ],
+          "expectedOutputs": [
+            "adjustment-run",
+            "deterministic-adjustment-evidence"
+          ],
+          "reversibility": "append-only",
+          "approval": "pending"
+        },
+        {
+          "id": "step-3",
+          "title": "Generate draft DOCX report from the adjustment run",
+          "tool": "report_export",
+          "risk": "export",
+          "dependsOn": [
+            "step-2"
+          ],
+          "inputHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+          "parameters": {
+            "format": "docx",
+            "draft": true
+          },
+          "parameterBindings": [
+            {
+              "parameter": "adjustmentIds",
+              "stepId": "step-2",
+              "output": "run.id",
+              "asArray": true
+            }
+          ],
+          "expectedOutputs": [
+            "candidate-docx",
+            "candidate-pdf",
+            "evidence-xlsx"
+          ],
+          "reversibility": "append-only",
+          "approval": "pending"
+        },
+        {
+          "id": "step-4",
+          "title": "Generate draft PDF report from the adjustment run",
+          "tool": "report_export",
+          "risk": "export",
+          "dependsOn": [
+            "step-3"
+          ],
+          "inputHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+          "parameters": {
+            "format": "pdf",
+            "draft": true
+          },
+          "parameterBindings": [
+            {
+              "parameter": "adjustmentIds",
+              "stepId": "step-2",
+              "output": "run.id",
+              "asArray": true
+            }
+          ],
+          "expectedOutputs": [
+            "candidate-docx",
+            "candidate-pdf",
+            "evidence-xlsx"
+          ],
+          "reversibility": "append-only",
+          "approval": "pending"
+        },
+        {
+          "id": "step-5",
+          "title": "Generate draft XLSX workbook from the adjustment run",
+          "tool": "excel_export",
+          "risk": "export",
+          "dependsOn": [
+            "step-4"
+          ],
+          "inputHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+          "parameters": {
+            "format": "xlsx",
+            "draft": true
+          },
+          "parameterBindings": [
+            {
+              "parameter": "adjustmentIds",
+              "stepId": "step-2",
+              "output": "run.id",
+              "asArray": true
+            }
+          ],
+          "expectedOutputs": [
+            "candidate-docx",
+            "candidate-pdf",
+            "evidence-xlsx"
+          ],
+          "reversibility": "append-only",
+          "approval": "pending"
+        },
+        {
+          "id": "step-6",
+          "title": "Generate draft deliverables manifest for the exported artifacts",
+          "tool": "report_export",
+          "risk": "export",
+          "dependsOn": [
+            "step-5"
+          ],
+          "inputHash": "sha256-ca54946212c4e12f4754bef20910bb7112f704bc8014c69ea2c857a22e3886f7",
+          "parameters": {
+            "format": "manifest",
+            "draft": true
+          },
+          "parameterBindings": [
+            {
+              "parameter": "adjustmentIds",
+              "stepId": "step-2",
+              "output": "run.id",
+              "asArray": true
+            }
+          ],
+          "expectedOutputs": [
+            "candidate-docx",
+            "candidate-pdf",
+            "evidence-xlsx"
+          ],
+          "reversibility": "append-only",
+          "approval": "pending"
+        }
+      ],
+      "status": "needs_attention",
+      "createdAt": "2026-09-29T02:33:23.845Z",
+      "updatedAt": "2026-09-29T02:33:23.845Z"
+    }
+  ]
+}

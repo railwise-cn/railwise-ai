@@ -13,7 +13,7 @@ import { EngineeringComposer } from './EngineeringComposer'
 import { composerReasoningEffortRequestValue } from '../chat/FloatingComposerModelPicker'
 import { EngineeringProjectSuggestions } from './EngineeringProjectSuggestions'
 import { engineeringPlanTranscriptText } from './engineering-plan-transcript'
-import { useEngineeringConversationDrafts } from './engineering-conversation-drafts'
+import { prepareEngineeringQuestion, useEngineeringConversationDrafts } from './engineering-conversation-drafts'
 import { evidenceCardNavigationTarget, planStepNavigationTarget, surveyNavigationTarget, type EngineeringEvidenceNavigationTarget, type EngineeringNavigationContext } from './engineering-evidence-navigation'
 
 type Project = { id: string; name: string; taskType?: string; monitoringType: string; unit: string; revision: number; reportPeriod: { start?: string; end?: string } }
@@ -25,6 +25,7 @@ type AiPlan = {
   steps: Array<{ id: string; title: string; tool: string; risk: string; approval: string; parameters?: Record<string, unknown>; parameterBindings?: Array<{ parameter: string; stepId: string; output: string; asArray?: boolean }>; expectedOutputs?: string[]; reversibility?: string }>
   approval?: { token: string; stepIds: string[]; expiresAt: string }
   execution?: { complete: boolean; completedStepIds: string[]; pendingStepIds: string[] }
+  parameterIssues?: Array<{ stepId: string; code: 'review-details' | 'invalid-binding' | 'invalid-parameters'; fields: string[] }>
 }
 type Props = {
   workspaceRoot: string; runtimeReady: boolean; project: Project | null; dataset: Dataset | null; analysis: Analysis | null
@@ -78,7 +79,7 @@ export function projectAiPlanSteps(plan: AiPlan, taskStatus?: TaskRunStatus, t?:
   }))
 }
 
-export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, project, compact = false, onCreateProject, onImportData, onSurveyFiles, onOpenTab, onRefresh, onExecutionSettled, navigationContext, onNavigateEvidence }: Props): ReactElement {
+export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, project, dataset, compact = false, onCreateProject, onImportData, onSurveyFiles, onOpenTab, onRefresh, onExecutionSettled, navigationContext, onNavigateEvidence }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const { activeThreadId, threads, blocks, liveReasoning, liveAssistant, busy, runtimeConnection, error, lastSeq, refreshThreads, selectThread, probeRuntime, openSettings, composerModel } = useChatStore(useShallow((state) => ({
     activeThreadId: state.activeThreadId, threads: state.threads, blocks: state.blocks,
@@ -91,6 +92,8 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   const [evidenceCards, setEvidenceCards] = useState<EvidenceCard[]>([])
   const [aiPlan, setAiPlan] = useState<AiPlan | null>(null)
   const [planThreadId, setPlanThreadId] = useState<string | null>(null)
+  const [planHistory, setPlanHistory] = useState<Array<{ id: string; goal: string; createdAt: string }>>([])
+  const [planSelection, setPlanSelection] = useState<{ scope: string; id: string } | null>(null)
   const [taskRun, setTaskRun] = useState<TaskRunV1 | null>(null)
   const [planReadState, setPlanReadState] = useState<SessionResourceState>(IDLE_RESOURCE_STATE)
   const [evidenceReadState, setEvidenceReadState] = useState<SessionResourceState>(IDLE_RESOURCE_STATE)
@@ -99,6 +102,8 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   const [showPlan, setShowPlan] = useState(true)
   const [approvedSteps, setApprovedSteps] = useState<string[]>([])
   const projectId = project?.id ?? ''
+  const computationTab = dataset || project?.taskType === 'deformation-monitoring' ? 'analysis' : 'survey'
+  const computationLabel = computationTab === 'analysis' ? 'engineeringTabAnalysis' : 'engineeringTabSurvey'
   const selectedEvidence = useEngineeringConversationDrafts(state => state.drafts[JSON.stringify([workspaceRoot, projectId])]?.evidenceContext)
   const reasoningEffort = useEngineeringConversationDrafts(state => state.drafts[JSON.stringify([workspaceRoot, projectId])]?.reasoningEffort ?? 'max')
   const selectedTarget = navigationContext && selectedEvidence ? surveyNavigationTarget(navigationContext, selectedEvidence) : null
@@ -124,6 +129,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   const timelineHasActivity = timelineBlocks.length > 0 || (engineeringThreadActive && (busy || Boolean(liveReasoning || liveAssistant)))
   const scopedPlan = aiPlan?.projectId === projectId && planThreadId === timelineThreadId ? aiPlan : null
   const actionScope = JSON.stringify([workspaceRoot, projectId, timelineThreadId])
+  const selectedPlanId = planSelection?.scope === actionScope ? planSelection.id : ''
   const actionScopeRef = useRef(actionScope)
   actionScopeRef.current = actionScope
   const currentPlanRef = useRef(scopedPlan)
@@ -132,7 +138,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   const setGoal = (input: string): void => useEngineeringConversationDrafts.getState().update(JSON.stringify([workspaceRoot, projectId]), (draft) => ({ ...draft, input }))
 
   useEffect(() => {
-    setNotice(null); setAiPlan(null); setPlanThreadId(null); setTaskRun(null); setEvidenceCards([]); setPlanBusy(false)
+    setNotice(null); setAiPlan(null); setPlanThreadId(null); setTaskRun(null); setEvidenceCards([]); setPlanBusy(false); setPlanHistory([]); setPlanSelection(null)
     setPlanReadState(IDLE_RESOURCE_STATE); setEvidenceReadState(IDLE_RESOURCE_STATE)
   }, [workspaceRoot, projectId, activeThreadId])
   useEffect(() => { setApprovedSteps([]) }, [scopedPlan?.id, scopedPlan?.revision])
@@ -140,6 +146,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
     let cancelled = false
     if (!connected || !projectId || !timelineThreadId || busy) return
     const query = new URLSearchParams({ threadId: timelineThreadId, projectId })
+    if (selectedPlanId) query.set('planId', selectedPlanId)
     setPlanReadState({ status: 'loading' })
     setEvidenceReadState({ status: 'loading' })
     void rendererRuntimeClient.runtimeRequest(`/v1/engineering/ai/plans?${query.toString()}`).then((response) => {
@@ -147,9 +154,11 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
       if (response.status === 404) { setAiPlan(null); setPlanReadState({ status: 'empty' }); return }
       if (!response.ok) throw new Error(readRuntimeMessage(response.body, t('engineeringPlanReadFailed')))
       try {
-        const parsed = JSON.parse(response.body) as { plan: AiPlan | null; approval?: AiPlan['approval'] }
+        const parsed = JSON.parse(response.body) as { plan: AiPlan | null; approval?: AiPlan['approval']; history?: typeof planHistory }
         if (!parsed.plan) { setAiPlan(null); setPlanReadState({ status: 'empty' }); return }
+        if (parsed.plan.projectId !== projectId || (selectedPlanId && parsed.plan.id !== selectedPlanId)) throw new Error('engineering plan scope mismatch')
         setAiPlan({ ...parsed.plan, approval: parsed.approval })
+        setPlanHistory(parsed.history ?? [])
         setPlanThreadId(timelineThreadId)
         setPlanReadState({ status: 'ready' })
         notifyExecutionSettled(parsed.plan, parsed.plan.status)
@@ -169,7 +178,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
       if (!cancelled) setEvidenceReadState({ status: 'error', error: formatRuntimeError(cause, t('engineeringEvidenceReadFailed')) })
     })
     return () => { cancelled = true }
-  }, [busy, connected, lastSeq, projectId, sessionReadRevision, timelineThreadId, t, notifyExecutionSettled])
+  }, [busy, connected, lastSeq, projectId, sessionReadRevision, timelineThreadId, selectedPlanId, t, notifyExecutionSettled])
 
   useEffect(() => {
     let cancelled = false
@@ -190,7 +199,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   }, [connected, scopedPlan, busy, notifyExecutionSettled])
 
   const approveAndStartPlan = async (): Promise<void> => {
-    if (!scopedPlan || !scopedPlan.steps.every(step => step.parameters && step.parameterBindings && step.expectedOutputs?.length && step.reversibility) || !connected || !engineeringThreadActive || busy || planBusy) return
+    if (!scopedPlan || scopedPlan.parameterIssues?.length || !scopedPlan.steps.every(step => step.parameters && step.parameterBindings && step.expectedOutputs?.length && step.reversibility) || !connected || !engineeringThreadActive || busy || planBusy) return
     setPlanBusy(true); setNotice(null)
     const selection = { model: useChatStore.getState().composerModel || undefined, providerId: useChatStore.getState().composerProviderId, reasoningEffort: composerReasoningEffortRequestValue(reasoningEffort) }
     try {
@@ -276,14 +285,16 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
     : undefined
   const planSteps = scopedPlan ? projectAiPlanSteps(scopedPlan, scopedTaskStatus, t) : []
   const completedStepCount = planSteps.filter(step => step.state === 'done').length
-  const planReviewComplete = scopedPlan?.steps.every(step => step.parameters && step.parameterBindings && step.expectedOutputs?.length && step.reversibility)
+  const parameterIssues = scopedPlan?.parameterIssues ?? []
+  const planReviewComplete = !parameterIssues.length && scopedPlan?.steps.every(step => step.parameters && step.parameterBindings && step.expectedOutputs?.length && step.reversibility)
+  const executionAttempted = Boolean(scopedPlan?.taskId || scopedPlan?.executionTurnId || ['started', 'running', 'queued', 'completed', 'failed', 'cancelled'].includes(scopedPlan?.status ?? ''))
   const canResumePlan = Boolean(connected && engineeringThreadActive && !busy && scopedPlan && planReviewComplete
-    && ['started', 'running', 'queued'].includes(scopedPlan.status)
+    && ['started', 'running', 'queued', 'needs_attention'].includes(scopedPlan.status)
     && taskRun?.id === scopedPlan.taskId && taskRun?.threadId === timelineThreadId
     && ['stalled', 'waiting_user', 'waiting_approval'].includes(taskRun?.status ?? '')
     && scopedPlan.execution && !scopedPlan.execution.complete && scopedPlan.execution.pendingStepIds.length > 0
     && scopedPlan.steps.every(step => step.approval === 'approved'))
-  const canReplan = Boolean(scopedPlan && (!planReviewComplete || ['stale', 'needs_attention'].includes(planStatus ?? scopedPlan.status)
+  const canReplan = Boolean(scopedPlan && !canResumePlan && !parameterIssues.length && (!planReviewComplete || ['stale', 'needs_attention'].includes(planStatus ?? scopedPlan.status)
     || (taskRun?.id === scopedPlan.taskId && taskRun?.threadId === timelineThreadId && ['failed', 'cancelled'].includes(taskRun?.status ?? ''))))
   const needsApproval = scopedPlan?.status === 'awaiting_approval' && planReviewComplete
   const riskConfirmed = scopedPlan?.steps.every((step) => step.risk === 'read' || approvedSteps.includes(step.id))
@@ -303,7 +314,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
       <MessageSquareText className="h-4 w-4 shrink-0 text-accent" />
       <div className="min-w-0 flex-1"><h2 className="truncate text-[13px] font-semibold">{t('engineeringSession')}</h2><p className="truncate text-[11px] text-ds-muted">{project?.name ?? t('engineeringWorkbenchTitle')}</p></div>
       <button type="button" className={iconButton} title={t('engineeringTabData')} aria-label={t('engineeringTabData')} disabled={!connected} onClick={onImportData}><Upload className="h-4 w-4" /></button>
-      <button type="button" className={iconButton} title={t('engineeringTabSurvey')} aria-label={t('engineeringTabSurvey')} onClick={() => onOpenTab('survey')}><Compass className="h-4 w-4" /></button>
+      <button type="button" className={iconButton} title={t(computationLabel)} aria-label={t(computationLabel)} onClick={() => onOpenTab(computationTab)}><Compass className="h-4 w-4" /></button>
       <button type="button" className={iconButton} title={t('engineeringRefreshContext')} aria-label={t('engineeringRefreshContext')} onClick={onRefresh}><RefreshCw className="h-4 w-4" /></button>
     </header>
     {!connected || notice || error ? <div role="status" className="shrink-0 border-b border-ds-border-muted px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
@@ -329,6 +340,9 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
         </div>}
     </div>
     <EngineeringProjectSuggestions key={`${projectId}:${timelineThreadId}`} projectId={projectId} threadId={timelineThreadId} connected={connected} busy={busy} refreshKey={lastSeq} onRefresh={onRefresh} />
+    {(planThreadId === timelineThreadId && planHistory.length > 1) || selectedPlanId ? <label className="flex shrink-0 items-center gap-2 border-t border-ds-border-muted px-3 py-2 text-[11px] text-ds-muted">{t('engineeringPlanHistory')}<select aria-label={t('engineeringPlanHistory')} value={selectedPlanId} disabled={!connected || busy || planBusy} onChange={event => {
+      setPlanSelection({ scope: actionScope, id: event.target.value }); setAiPlan(null); setTaskRun(null); setApprovedSteps([]); setNotice(null)
+    }} className="h-8 min-w-0 flex-1 rounded border border-ds-border bg-ds-card px-2 text-ds-ink"><option value="">{t('engineeringPlanLatest')}</option>{planHistory.map(plan => <option key={plan.id} value={plan.id}>{plan.id} · {plan.goal.slice(0, 100)}</option>)}</select></label> : null}
     {scopedPlan ? <section className="max-h-[35%] shrink-0 overflow-y-auto border-t border-ds-border-muted" aria-label={t('engineeringTypedPlan')}>
       <button type="button" aria-expanded={showPlan} onClick={() => setShowPlan(!showPlan)} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-[12px]"><ClipboardList className="h-4 w-4 shrink-0 text-accent" /><span className="min-w-0 flex-1 truncate">{t('engineeringTypedPlan')}</span><span className="text-ds-muted">{phaseLabel(planStatus ?? scopedPlan.status, t)}</span><ChevronDown className={`h-4 w-4 ${showPlan ? 'rotate-180' : ''}`} /></button>
       {showPlan ? <div className="space-y-2 px-3 pb-3">
@@ -340,7 +354,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
           </label>
           <p className={`mt-1 flex items-center gap-1 text-[11px] ${planSteps[index]?.state === 'done' ? 'text-green-700 dark:text-green-300' : planSteps[index]?.state === 'blocked' ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'}`}>
             {planSteps[index]?.state === 'done' ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : planSteps[index]?.state === 'blocked' ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> : <Circle className="h-3.5 w-3.5 shrink-0" />}
-            {t(planSteps[index]?.state === 'done' ? 'engineeringPlanStepReceiptConfirmed' : planSteps[index]?.state === 'blocked' ? 'engineeringPlanStepReceiptMissing' : 'engineeringPlanStepReceiptPending')}
+            {t(planSteps[index]?.state === 'done' ? 'engineeringPlanStepReceiptConfirmed' : !executionAttempted ? 'engineeringPlanNotExecuted' : planSteps[index]?.state === 'blocked' ? 'engineeringPlanStepReceiptMissing' : 'engineeringPlanStepReceiptPending')}
           </p>
           <dl className="mt-2 space-y-1 break-words text-[11px]">
             <div><dt className="inline text-ds-muted">{t('engineeringPlanTool')}: </dt><dd className="inline font-mono">{step.tool}</dd></div>
@@ -350,8 +364,8 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
           </dl>
           {navigationButton(navigationContext && scopedPlan.status !== 'stale' ? planStepNavigationTarget(navigationContext, scopedPlan.projectId, step) : null)}
         </div>)}
-        {!planReviewComplete ? <p role="status" className="text-[11px] text-amber-700 dark:text-amber-300">{t('engineeringPlanDetailsMissing')}</p> : null}
-        {planStatus === 'needs_attention' && !hasCompleteExecutionEvidence(scopedPlan) ? <p role="status" data-testid="engineering-plan-incomplete-evidence" className="text-[11px] text-amber-700 dark:text-amber-300">{t('engineeringPlanExecutionIncomplete', { completed: completedStepCount, total: scopedPlan.steps.length })}</p> : null}
+        {parameterIssues.length ? <div role="status" data-testid="engineering-plan-parameter-issues" className="text-[11px] text-amber-700 dark:text-amber-300"><p>{t('engineeringPlanParametersBlocked')}</p><ul>{parameterIssues.map((issue, index) => <li key={index}>{issue.stepId}: {t(`engineeringPlanParameterIssue.${issue.code}`, { fields: issue.fields.join(', ') })}</li>)}</ul><button type="button" data-testid="engineering-repair-plan" disabled={busy || !engineeringThreadActive} onClick={() => prepareEngineeringQuestion(workspaceRoot, projectId, t('engineeringPlanRepairQuestion', { id: scopedPlan.id, goal: scopedPlan.goal, issues: parameterIssues.map(issue => `${issue.stepId}: ${issue.code} (${issue.fields.join(', ')})`).join('; ') }), { projectId, projectRevision: project?.revision, section: 'plan' })} className="mt-2 min-h-8 text-accent disabled:opacity-50">{t('engineeringPlanRepair')}</button></div> : !planReviewComplete ? <p role="status" className="text-[11px] text-amber-700 dark:text-amber-300">{t('engineeringPlanDetailsMissing')}</p> : null}
+        {planStatus === 'needs_attention' && !parameterIssues.length && !hasCompleteExecutionEvidence(scopedPlan) ? <p role="status" data-testid="engineering-plan-incomplete-evidence" className="text-[11px] text-amber-700 dark:text-amber-300">{t('engineeringPlanExecutionIncomplete', { completed: completedStepCount, total: scopedPlan.steps.length })}</p> : null}
         <p className="break-all font-mono text-[10px] text-ds-faint">{scopedPlan.id} · {scopedPlan.contextHash.slice(0, 22)}</p>
         {taskDiagnostic ? <p data-testid="engineering-task-diagnostic" className="break-words text-[11px] text-amber-700 dark:text-amber-300">{formatRuntimeError(new Error(taskDiagnostic), t('engineeringStatusNeedsAttention'))}</p> : null}
         {planReviewComplete && (needsApproval || scopedPlan.status === 'approved') ? <button type="button" onClick={() => void approveAndStartPlan()} disabled={planBusy || busy || !connected || !engineeringThreadActive || (needsApproval && !riskConfirmed)} className="inline-flex h-8 items-center gap-2 rounded-md bg-accent px-3 text-[12px] font-medium text-white disabled:opacity-50">{planBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}{t('engineeringApproveAndStart')}</button> : null}

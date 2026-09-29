@@ -1,0 +1,120 @@
+
+> workwise@0.5.1 test
+> vitest run
+
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+(node:65542) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/schedule-runtime.test.ts (13 tests | 1 failed) 6041ms
+     × rebinds to a changed schedule port instead of reusing the candidate reservation 7ms
+ ❯ src/main/managed-runtime-process.test.ts (30 tests | 2 failed) 2783ms
+     × routes host requests through the ephemeral Runtime port reported by a listening child 280ms
+     × reports a port as unavailable when another listener owns it 23ms
+(node:68599) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71000) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71480) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/mcp-config-service.test.ts (15 tests | 4 failed) 970ms
+     × captures a validated loopback callback and completes OAuth without exposing the code to the renderer 8ms
+     × rejects mismatched callback state and supports explicit cancellation 17ms
+     × releases the loopback listener after an authorization timeout 38ms
+     × settles waiting OAuth callers and releases listeners when disposed 13ms
+(node:71998) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/skill-service.test.ts (21 tests | 1 failed) 10069ms
+     × installs the bundled PPT Master slim skill with WorkWise overlay files 5136ms
+(node:72107) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72145) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/services/unlimited-ocr-service.integration.test.ts (1 test | 1 failed) 44ms
+   × runs the complete OCR protocol over a real loopback HTTP connection 44ms
+(node:72259) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/runtime/managed-runtime-adapter.test.ts (2 tests | 1 failed) 24ms
+     × forwards daily usage requests to the WorkWise Runtime runtime with bearer auth 22ms
+(node:72435) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72595) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/claw-runtime.test.ts (95 tests | 1 failed) 35732ms
+     × rebinds to a changed IM port instead of reusing the candidate reservation 6ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > rebinds to a changed IM port instead of reusing the candidate reservation
+ FAIL  src/main/managed-runtime-process.test.ts > reclaimManagedRuntimePort > reports a port as unavailable when another listener owns it
+ FAIL  src/main/schedule-runtime.test.ts > ScheduleRuntime > rebinds to a changed schedule port instead of reusing the candidate reservation
+ FAIL  src/main/runtime/managed-runtime-adapter.test.ts > runtimeRequestViaHost > forwards daily usage requests to the WorkWise Runtime runtime with bearer auth
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > captures a validated loopback callback and completes OAuth without exposing the code to the renderer
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > rejects mismatched callback state and supports explicit cancellation
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > releases the loopback listener after an authorization timeout
+ FAIL  src/main/services/mcp-config-service.test.ts > McpConfigService > settles waiting OAuth callers and releases listeners when disposed
+ FAIL  src/main/services/unlimited-ocr-service.integration.test.ts > runs the complete OCR protocol over a real loopback HTTP connection
+Error: listen EPERM: operation not permitted 127.0.0.1
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > routes host requests through the ephemeral Runtime port reported by a listening child
+AssertionError: promise rejected "Error: WorkWise Runtime exited during sta…" instead of resolving
+ ❯ src/main/managed-runtime-process.test.ts:147:6
+    145|         skillRoots: []
+    146|       }
+    147|     )).resolves.toBeUndefined()
+       |      ^
+    148|     const actualPort = module.getManagedRuntimeActualPort()
+    149|     expect(actualPort).toEqual(expect.any(Number))
+
+Caused by: Error: WorkWise Runtime exited during startup with code 1
+node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+    at listenInCluster (node:net:2437:12)
+    at node:net:2666:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2416:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v26.9.0
+ ❯ ChildProcess.onExit src/main/managed-runtime-process.ts:1337:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  src/main/runtime/managed-runtime-adapter.test.ts > runtimeRequestViaHost > forwards daily usage requests to the WorkWise Runtime runtime with bearer auth
+Error: Server is not running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/services/skill-service.test.ts:463:3
+    461|   })
+    462|
+    463|   it('installs the bundled PPT Master slim skill with WorkWise overlay…
+       |   ^
+    464|     const workspaceRoot = join(tempRoot, 'workspace-bundled-ppt-master…
+    465|     const skillInstallRoot = join(workspaceRoot, '.agents', 'skills')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  src/main/services/skill-service.test.ts > skill-service > installs the bundled PPT Master slim skill with WorkWise overlay files
+Error: ENOTEMPTY: directory not empty, rmdir '/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/gui-skills-00ACSK/workspace-bundled-ppt-master/.agents/skills/.workwise-install-ppt-master-XV08xW/scripts/docs'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+
+ Test Files  7 failed | 328 passed | 2 skipped (337)
+      Tests  11 failed | 2863 passed | 4 skipped (2878)
+   Start at  10:45:09
+   Duration  37.18s (transform 18.85s, setup 0ms, import 57.78s, tests 210.94s, environment 8.73s)

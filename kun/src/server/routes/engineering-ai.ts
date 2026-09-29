@@ -89,7 +89,9 @@ export async function latestPlan(runtime: ServerRuntime, request: Request): Prom
   const projectId = query.get('projectId')?.trim() ?? ''
   if (!threadId || !projectId) return ERRORS.validation('threadId and projectId are required')
   try {
-    const result = await runtime.engineeringAi.latestPlan({ threadId, projectId })
+    const planId = query.get('planId')?.trim()
+    if (planId && planId.length > 200) return ERRORS.validation('invalid planId')
+    const result = await runtime.engineeringAi.latestPlan({ threadId, projectId, ...(planId ? { planId } : {}) })
     return result ? jsonResponse(result) : ERRORS.notFound('engineering plan not found for thread')
   } catch (error) {
     return mapError(error)

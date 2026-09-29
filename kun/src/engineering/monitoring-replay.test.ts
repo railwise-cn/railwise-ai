@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -204,12 +205,17 @@ it('rechecks project bindings after asynchronous original parsing', async () => 
   expect(result.analyses[0]!.status).toBe('failed')
 })
 
-it('rejects output changes before and during replay', async () => {
+it.each(['before', 'during'] as const)('rejects output changes %s replay', async when => {
   const f = await fixture()
-  const pending = f.replay()
-  await writeFile(join(f.root, f.manifest.outputs[0]!.path), 'altered output')
-  expect(await pending).toMatchObject({ status: 'failed', reasonCode: 'prerequisite-failed' })
-  expect(await f.replay()).toMatchObject({ status: 'failed', reasonCode: 'prerequisite-failed' })
+  // Replay reaches its initial byte check synchronously, then yields while
+  // parsing. Complete this write before its continuation can recheck outputs;
+  // async writeFile races the continuation and can mutate only after it passed.
+  const pending = when === 'during' ? f.replay() : undefined
+  writeFileSync(join(f.root, f.manifest.outputs[0]!.path), 'altered output')
+  const result = await (pending ?? f.replay())
+  expect(result).toMatchObject({ status: 'failed', reasonCode: 'prerequisite-failed' })
+  expect(result.analyses).toHaveLength(when === 'during' ? 1 : 0)
+  expect(f.events().map(event => event.phase)).toEqual(['started', 'finished'])
 })
 
 it('keeps source and replay rows append-only, including INSERT OR REPLACE', async () => {

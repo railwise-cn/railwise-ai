@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +21,7 @@ const PERSISTENCE_TEST_TIMEOUT_MS = 15_000
 const RESTART_TEST_TIMEOUT_MS = 30_000
 afterEach(async () => { vi.restoreAllMocks(); while (cleanup.length) await cleanup.pop()!() })
 
-async function fixture(initialMode: 'text' | 'partial' | 'all') {
+async function fixture(initialMode: 'text' | 'partial' | 'all', failureReply?: string) {
   const root = await mkdtemp(join(tmpdir(), 'engineering-completion-gate-'))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const runs = new Map<string, ReturnType<AgentLoop['runTurn']>>()
@@ -36,16 +36,30 @@ async function fixture(initialMode: 'text' | 'partial' | 'all') {
   let repository: EngineeringAiRepository
   let modelCalls = 0
   let repeatCompleted = false
+  let pausedProbe: (() => Promise<void>) | undefined
   const calledSteps: string[] = []
+  const pausedRequests: Array<{ tools?: Array<{ function: { name: string } }>; messages?: unknown[] }> = []
   const server = createServer(async (request, response) => {
-    for await (const _ of request) { /* Consume the actual local HTTP request. */ }
+    const chunks: Buffer[] = []
+    for await (const chunk of request) chunks.push(Buffer.from(chunk))
+    const paused = Boolean(failureReply && plan && repository.getPlan(plan.id)?.status === 'needs_attention')
+    if (paused) {
+      pausedRequests.push(JSON.parse(Buffer.concat(chunks).toString()))
+      await pausedProbe?.()
+      if (failureReply === '#unavailable') {
+        response.writeHead(400, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: { message: 'Synthetic model unavailable after export failure', type: 'invalid_request_error' } }))
+        return
+      }
+    }
     modelCalls += 1
     let step = mode === 'all' && plan ? plan.steps.find(item => !repository.stepEvidence(plan!.id, item.id))
       : mode === 'partial' && !calledSteps.length ? plan?.steps[0] : undefined
     if (repeatCompleted && plan) { step = plan.steps[0]; repeatCompleted = false }
+    if (paused) step = undefined
     const delta = step && plan ? { tool_calls: [{ index: 0, id: `call-${modelCalls}`, type: 'function', function: { name: step.tool,
       arguments: JSON.stringify(resolvedStepParameters(step, id => repository.stepEvidence(plan!.id, id)?.handles ?? null)) } }] }
-      : { content: 'The approved survey work is complete. All observations have been processed and the results are ready.' }
+      : { content: paused ? failureReply : 'The approved survey work is complete. All observations have been processed and the results are ready.' }
     if (step) calledSteps.push(step.id)
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     response.end(`data: ${JSON.stringify({ id: `fixture-${modelCalls}`, choices: [{ index: 0, delta, finish_reason: step ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\ndata: [DONE]\n\n`)
@@ -73,8 +87,8 @@ async function fixture(initialMode: 'text' | 'partial' | 'all') {
     await runs.get(turnId)
     return runtime.turnService.getTurn(thread.id, turnId)
   }
-  return { get runtime() { return runtime }, repository, root, project, network, thread, calledSteps,
-    get plan() { return plan! }, setMode(value: typeof mode) { mode = value }, repeatCompleted() { repeatCompleted = true },
+  return { get runtime() { return runtime }, repository, root, project, network, thread, calledSteps, pausedRequests,
+    get plan() { return plan! }, setMode(value: typeof mode) { mode = value }, repeatCompleted() { repeatCompleted = true }, setPausedProbe(probe: () => Promise<void>) { pausedProbe = probe },
     async start() { const started = await runtime.engineeringAi!.startPlan(plan!.id, { expectedRevision: plan!.revision, contextHash: plan!.contextHash, model: 'synthetic-model', idempotencyKey: 'fixture-start' }); plan = started.plan; await waitTurn(started.turn.turnId); return started }, waitTurn,
     async restartInterruptedTask(legacy: boolean) {
       const task = runtime.taskRepository!.get(plan!.taskId!)!
@@ -119,14 +133,73 @@ describe('Engineering successful-step completion gate', () => {
     expect(f.runtime.surveyService!.listAdjustments(f.project.id)).toHaveLength(1)
   })
 
-  it('does not record a successful step receipt when the actual tool fails', async () => {
+  it('stops automatic continuation at the first failed step and permits explicit recovery', async () => {
     const f = await fixture('partial')
     vi.spyOn(f.runtime.surveyService!, 'validateNetwork').mockImplementation(() => { throw new Error('Synthetic validation failure') })
     const { plan } = await f.start()
     expect(f.repository.stepEvidence(plan.id, plan.steps[0]!.id)).toBeNull()
-    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('stalled')
-    expect(f.runtime.engineeringAi!.getPlan(plan.id)?.execution.completedStepIds).toEqual([])
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('waiting_user')
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.attempts).toBe(1)
+    expect(f.calledSteps).toEqual([plan.steps[0]!.id])
+    expect(f.runtime.engineeringAi!.getPlan(plan.id)).toMatchObject({ status: 'needs_attention', execution: { completedStepIds: [] } })
+    vi.mocked(f.runtime.surveyService!.validateNetwork).mockRestore()
+    f.setMode('all')
+    const blocked = f.runtime.engineeringAi!.getPlan(plan.id)!
+    const resumed = await f.runtime.engineeringAi!.resumePlan(plan.id, { expectedRevision: blocked.revision, contextHash: blocked.contextHash, idempotencyKey: 'explicit-error-recovery' })
+    await f.waitTurn(resumed.turn.turnId)
+    expect(resumed.plan.taskId).toBe(plan.taskId)
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('completed')
+    expect(f.runtime.engineeringAi!.getPlan(plan.id)?.execution.complete).toBe(true)
   })
+
+  it.each(['progress', 'unavailable'] as const)('keeps an ENOTDIR export failure paused when its explanatory model is %s', async mode => {
+    const f = await fixture('all', mode === 'unavailable' ? '#unavailable' : '导出失败，暂存路径不是目录。环境恢复后，我会继续执行原计划；目前等待人工处理。')
+    const rejectedMutations: string[] = []
+    f.setPausedProbe(async () => {
+      const turnId = f.repository.getPlan(f.plan.id)!.executionTurnId!
+      for (const mutation of [
+        () => f.runtime.engineeringAi!.createPlan({ threadId: f.thread.id, projectId: f.project.id, goal: 'unsolicited replacement', idempotencyKey: 'forbidden-recovery-draft' }, { conversationTurnId: turnId }),
+        () => f.runtime.engineeringAi!.proposeProjectChange(f.thread.id, turnId, { reason: 'unsolicited change', patch: { name: 'Replacement' } })
+      ]) {
+        try { await mutation(); rejectedMutations.push('unexpected success') } catch (error) { rejectedMutations.push((error as Error).message) }
+      }
+    })
+    const staging = join(f.root, '.workwise', '.staging', 'deliverables')
+    await mkdir(staging, { recursive: true })
+    const blocker = join(staging, f.project.id)
+    await writeFile(blocker, 'synthetic export failure')
+    const { plan, turn } = await f.start()
+    const failed = f.runtime.engineeringAi!.getPlan(plan.id)!
+    expect(failed).toMatchObject({ status: 'needs_attention', execution: { completedStepIds: plan.steps.slice(0, -1).map(step => step.id), pendingStepIds: [plan.steps.at(-1)!.id] } })
+    expect(f.runtime.taskRepository!.get(plan.taskId!)).toMatchObject({ status: 'waiting_user', attempts: 1, waitingReason: 'engineering_plan_execution_failed' })
+    expect(f.pausedRequests).toHaveLength(1)
+    const pausedToolNames = f.pausedRequests[0]!.tools?.map(tool => tool.function.name) ?? []
+    expect(pausedToolNames).not.toContain('survey_request_plan')
+    expect(pausedToolNames).not.toContain('survey_propose_project_change')
+    expect(rejectedMutations).toHaveLength(2)
+    expect(rejectedMutations.every(message => message.includes('execution turns cannot'))).toBe(true)
+    expect(JSON.stringify(f.pausedRequests[0]!.messages)).not.toContain('Continue executing the task now')
+    expect((await f.runtime.engineeringAi!.latestPlan({ threadId: f.thread.id, projectId: f.project.id }))?.plan.id).toBe(plan.id)
+    await expect(f.runtime.engineeringAi!.createPlan({ threadId: f.thread.id, projectId: f.project.id, goal: 'unsolicited replacement', idempotencyKey: 'forbidden-recovery-draft' }, { conversationTurnId: turn.turnId })).rejects.toThrow()
+    const receipts = plan.steps.slice(0, -1).map(step => f.repository.stepEvidence(plan.id, step.id))
+    // A separately requested draft must not remove access to the original task.
+    const replacement = await f.runtime.engineeringAi!.createPlan({ threadId: f.thread.id, projectId: f.project.id, goal: plan.goal, replanOf: plan.id, idempotencyKey: 'separate-consultation-draft' })
+    const savedPlan = f.repository.getPlan(plan.id)
+    const restored = await f.runtime.engineeringAi!.latestPlan({ threadId: f.thread.id, projectId: f.project.id, planId: plan.id })
+    expect(restored?.plan.id).toBe(plan.id)
+    expect(restored?.history.map(item => item.id)).toEqual(expect.arrayContaining([plan.id, replacement.plan.id]))
+    expect(f.repository.getPlan(plan.id)).toEqual(savedPlan)
+    expect(await f.runtime.engineeringAi!.latestPlan({ threadId: f.thread.id, projectId: f.project.id, planId: 'missing-original' })).toBeNull()
+    await unlink(blocker)
+    const resumed = await f.runtime.engineeringAi!.resumePlan(plan.id, { expectedRevision: failed.revision, contextHash: failed.contextHash, idempotencyKey: 'enotdir-explicit-resume' })
+    await f.waitTurn(resumed.turn.turnId)
+    expect(resumed.plan.taskId).toBe(plan.taskId)
+    expect(f.runtime.taskRepository!.get(plan.taskId!)?.status).toBe('completed')
+    expect(f.calledSteps).toEqual([...plan.steps.map(step => step.id), plan.steps.at(-1)!.id])
+    expect(plan.steps.slice(0, -1).map(step => f.repository.stepEvidence(plan.id, step.id))).toEqual(receipts)
+    expect(f.runtime.surveyService!.listAdjustments(f.project.id)).toHaveLength(1)
+    expect(f.repository.getPlan(replacement.plan.id)?.status).toBe('awaiting_approval')
+  }, PERSISTENCE_TEST_TIMEOUT_MS)
 
   it('resumes the same task with persisted receipts and idempotently replays a successful step', async () => {
     const f = await fixture('partial')

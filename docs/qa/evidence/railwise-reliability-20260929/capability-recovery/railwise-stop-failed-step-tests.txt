@@ -1,0 +1,11 @@
+> kun@0.5.1 test
+> vitest run tests/engineering-completion-gate.test.ts
+
+
+ RUN  v4.1.8 <repo>/kun
+
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  12:14:55
+   Duration  14.40s (transform 817ms, setup 0ms, import 1.16s, tests 13.13s, environment 0ms)

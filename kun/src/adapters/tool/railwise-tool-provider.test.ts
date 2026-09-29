@@ -78,7 +78,9 @@ describe('RailWise survey tool bridge', () => {
         strategyId: 'leveling',
         unitWeightStdDevUnit: 'dimensionless',
         varianceFactorUnit: 'dimensionless',
-        observations: expect.arrayContaining([expect.objectContaining({ standardizedResidualUnit: 'sigma' })])
+        statisticalSummary: expect.objectContaining({ numericalStatus: 'clear', availableCount: 2, standardsConformity: 'not-evaluated' }),
+        observations: expect.arrayContaining([expect.objectContaining({ standardizedResidualUnit: 'sigma',
+          residualStatistic: expect.objectContaining({ method: 'weight-normalized-residual', scaleBasis: 'relative-weight', significance: 'not-evaluated' }) })])
       },
       boundedOutput: { observationsReturned: 2, observationsTotal: 2, covarianceStored: true }
     })

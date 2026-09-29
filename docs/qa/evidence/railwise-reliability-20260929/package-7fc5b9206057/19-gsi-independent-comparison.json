@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "runId": "adjustment_fd4f93a1-ef8d-4821-b283-304f5c90f432",
+  "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+  "method": "exact rational route-length closure distribution from original fixture heights/distances; no product solver imported",
+  "closure": "1/2500",
+  "expectedHeights": {
+    "BM": "100",
+    "gsi-block-1:Z01": "1496999/15000",
+    "P1": "502999/5000",
+    "gsi-block-1:Z02": "2993993/30000"
+  },
+  "expectedResiduals": [
+    "-1/15000",
+    "-1/7500",
+    "-1/7500",
+    "-1/15000"
+  ],
+  "varianceFactor": "1/3750000000",
+  "heightAbsoluteDifferences": [
+    0.0,
+    1.4210854715202004e-14,
+    0.0,
+    0.0
+  ],
+  "residualAbsoluteDifferences": [
+    1.199775413567028e-14,
+    4.4262011590634476e-15,
+    4.4262011590634476e-15,
+    2.2131005795317238e-15
+  ],
+  "toleranceM": 1e-10,
+  "syntheticOnly": true,
+  "professionalAcceptance": false
+}

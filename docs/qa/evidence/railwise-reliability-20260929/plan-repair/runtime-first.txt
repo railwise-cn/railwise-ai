@@ -1,0 +1,300 @@
+
+> kun@0.5.1 test
+> vitest run
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ❯ src/engineering/engineering-ai-orchestrator.test.ts (10 tests | 1 failed) 472ms
+     × restores an awaiting-approval plan, token and idempotent result after restart 16ms
+ ❯ tests/model-provider-routing.test.ts (6 tests | 4 failed) 20019ms
+     × routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers 5004ms
+     × keeps the saved default after restart and replays omitted model continuation idempotently 5002ms
+     × carries identity through Auto and child requests while Flow internal requests retain the default 5003ms
+     × preserves saved provider and effort in generic resume and retry routes 5001ms
+ ❯ src/server/routes/engineering-monitoring-replay.test.ts (10 tests | 1 failed) 50ms
+   × enforces the real registered HTTP route bearer gate before replay and admits the authenticated request 39ms
+ ❯ tests/engineering-completion-gate.test.ts (10 tests | 10 failed) 110071ms
+     × rejects text-only completion and projects an old false-completed task as needs_attention 5019ms
+     × rejects partial-only completion and projects an old false-completed task as needs_attention 5011ms
+     × completes only after all four real tools succeed 5011ms
+     × does not record a successful step receipt when the actual tool fails 5004ms
+     × resumes the same task with persisted receipts and idempotently replays a successful step 15003ms
+     × fails closed for an execution turn without its plan binding, while ordinary consultation still completes 5003ms
+     × recovers the same task after a real Runtime restart (legacy binding: false) 30005ms
+     × recovers the same task after a real Runtime restart (legacy binding: true) 30005ms
+     × rejects generic HTTP resume and retry for engineering execution (legacy binding: false) 5004ms
+     × rejects generic HTTP resume and retry for engineering execution (legacy binding: true) 5004ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:97:39
+     95|
+     96| describe('Engineering successful-step completion gate', () => {
+     97|   it.each(['text', 'partial'] as const)('rejects %s-only completion an…
+       |                                       ^
+     98|     const f = await fixture(mode)
+     99|     const { plan, turn } = await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:113:3
+    111|   })
+    112|
+    113|   it('completes only after all four real tools succeed', async () => {
+       |   ^
+    114|     const f = await fixture('all')
+    115|     const { plan } = await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > does not record a successful step receipt when the actual tool fails
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:122:3
+    120|   })
+    121|
+    122|   it('does not record a successful step receipt when the actual tool f…
+       |   ^
+    123|     const f = await fixture('partial')
+    124|     vi.spyOn(f.runtime.surveyService!, 'validateNetwork').mockImplemen…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+Error: Test timed out in 15000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:131:3
+    129|   })
+    130|
+    131|   it('resumes the same task with persisted receipts and idempotently r…
+       |   ^
+    132|     const f = await fixture('partial')
+    133|     const started = await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:147:3
+    145|   }, PERSISTENCE_TEST_TIMEOUT_MS)
+    146|
+    147|   it('fails closed for an execution turn without its plan binding, whi…
+       |   ^
+    148|     const f = await fixture('text')
+    149|     const broken = await f.runtime.turnService.startTurn({ threadId: f…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:156:24
+    154|   })
+    155|
+    156|   it.each([false, true])('recovers the same task after a real Runtime …
+       |                        ^
+    157|     const f = await fixture('partial')
+    158|     await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/16]⎯
+
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+ FAIL  tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/engineering-completion-gate.test.ts:171:24
+    169|   }, RESTART_TEST_TIMEOUT_MS)
+    170|
+    171|   it.each([false, true])('rejects generic HTTP resume and retry for en…
+       |                        ^
+    172|     const f = await fixture('text')
+    173|     await f.start()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/16]⎯
+
+ FAIL  tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/model-provider-routing.test.ts:88:3
+     86|     expect(expected!.costUsd).not.toBe(estimateDeepseekCost({ model: '…
+     87|   })
+     88|   it('routes duplicate model IDs to the selected endpoint, pins defaul…
+       |   ^
+     89|     const a = await endpoint('a'); const b = await endpoint('b')
+     90|     vi.stubEnv('WORKWISE_MODEL_PROVIDERS_SECRET', 'synthetic-private-k…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
+
+ FAIL  tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/model-provider-routing.test.ts:113:3
+    111|   })
+    112|
+    113|   it('keeps the saved default after restart and replays omitted model …
+       |   ^
+    114|     const a = await endpoint('a'); const b = await endpoint('b')
+    115|     const first = await runtimeFor([a.route, b.route])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/16]⎯
+
+ FAIL  tests/model-provider-routing.test.ts > configured provider identity over real HTTP > carries identity through Auto and child requests while Flow internal requests retain the default
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/model-provider-routing.test.ts:131:3
+    129|   })
+    130|
+    131|   it('carries identity through Auto and child requests while Flow inte…
+       |   ^
+    132|     const a = await endpoint('a'); const b = await endpoint('b')
+    133|     const router = new ProviderRoutingModelClient(new DeepseekCompatMo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯
+
+ FAIL  tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/model-provider-routing.test.ts:152:3
+    150|   })
+    151|
+    152|   it('preserves saved provider and effort in generic resume and retry …
+       |   ^
+    153|     const a = await endpoint('a'); const b = await endpoint('b')
+    154|     const { runtime, root } = await runtimeFor([a.route, b.route])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯
+
+ FAIL  src/engineering/engineering-ai-orchestrator.test.ts > Engineering AI orchestration > restores an awaiting-approval plan, token and idempotent result after restart
+AssertionError: expected { schemaVersion: 1, …(13) } to deeply equal { schemaVersion: 1, …(12) }
+
+- Expected
++ Received
+
+@@ -11,10 +11,34 @@
+        "prepare-report",
+      ],
+    },
+    "goal": "生成只读复核计划",
+    "id": "eplan_48c8e7f0-3311-4d65-aa60-da7b73021f13",
++   "parameterIssues": [
++     {
++       "code": "invalid-parameters",
++       "fields": [
++         "datasetId",
++         "expectedRevision",
++       ],
++       "stepId": "inspect-data",
++     },
++     {
++       "code": "invalid-parameters",
++       "fields": [
++         "datasetId",
++       ],
++       "stepId": "analyse-trend",
++     },
++     {
++       "code": "invalid-parameters",
++       "fields": [
++         "expectedRevision",
++       ],
++       "stepId": "prepare-report",
++     },
++   ],
+    "projectId": "project_03cdf5e6-e132-4912-b701-bda193752f2c",
+    "requestHash": "dafe3acb5d6bf6204778f044910f43e81e3a8579b16555693f67511a1f730092",
+    "revision": 1,
+    "schemaVersion": 1,
+    "status": "needs_attention",
+
+ ❯ src/engineering/engineering-ai-orchestrator.test.ts:265:28
+    263|     const replay = await reopened.createPlan({ threadId: 'restart-thre…
+    264|
+    265|     expect(restored?.plan).toEqual({ ...created.plan, execution: { com…
+       |                            ^
+    266|     expect(restored?.approval?.token).toBe(created.approval.token)
+    267|     expect(replay).toEqual(created)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯
+
+ FAIL  src/server/routes/engineering-monitoring-replay.test.ts > enforces the real registered HTTP route bearer gate before replay and admits the authenticated request
+Error: listen EPERM: operation not permitted 127.0.0.1
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/16]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 4 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 127.0.0.1
+ ❯ Server.setupListenHandle [as _listen2] node:net:2306:21
+ ❯ listenInCluster node:net:2437:12
+ ❯ node:net:2666:7
+ ❯ processTicksAndRejections node:internal/process/task_queues:90:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '127.0.0.1' }
+This error originated in "tests/model-provider-routing.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 127.0.0.1
+ ❯ Server.setupListenHandle [as _listen2] node:net:2306:21
+ ❯ listenInCluster node:net:2437:12
+ ❯ node:net:2666:7
+ ❯ processTicksAndRejections node:internal/process/task_queues:90:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '127.0.0.1' }
+This error originated in "tests/model-provider-routing.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "keeps the saved default after restart and replays omitted model continuation idempotently". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 127.0.0.1
+ ❯ Server.setupListenHandle [as _listen2] node:net:2306:21
+ ❯ listenInCluster node:net:2437:12
+ ❯ node:net:2666:7
+ ❯ processTicksAndRejections node:internal/process/task_queues:90:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '127.0.0.1' }
+This error originated in "tests/model-provider-routing.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "carries identity through Auto and child requests while Flow internal requests retain the default". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+Error: listen EPERM: operation not permitted 127.0.0.1
+ ❯ Server.setupListenHandle [as _listen2] node:net:2306:21
+ ❯ listenInCluster node:net:2437:12
+ ❯ node:net:2666:7
+ ❯ processTicksAndRejections node:internal/process/task_queues:90:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'EPERM', errno: -1, syscall: 'listen', address: '127.0.0.1' }
+This error originated in "tests/model-provider-routing.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "preserves saved provider and effort in generic resume and retry routes". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  4 failed | 192 passed | 2 skipped (198)
+      Tests  16 failed | 2937 passed | 22 skipped (2975)
+     Errors  4 errors
+   Start at  10:45:07
+   Duration  113.10s (transform 12.80s, setup 0ms, import 62.92s, tests 318.77s, environment 32ms)

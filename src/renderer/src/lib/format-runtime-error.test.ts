@@ -19,6 +19,7 @@ describe('format runtime error', () => {
   it.each(['en', 'zh'])('localizes incomplete plan reasons without exposing internal step identifiers in %s', async language => {
     await i18n.changeLanguage(language)
     for (const [code, key] of [
+      ['engineering_plan_execution_failed', 'runtimeEngineeringPlanExecutionFailed'],
       ['engineering_plan_steps_incomplete', 'runtimeEngineeringPlanStepsIncomplete'],
       ['engineering_plan_binding_missing', 'runtimeEngineeringPlanBindingMissing']
     ]) {

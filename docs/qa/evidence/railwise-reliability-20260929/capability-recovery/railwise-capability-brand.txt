@@ -1,0 +1,4 @@
+> workwise@0.5.1 verify:brand-boundary
+> node ./scripts/verify-brand-boundary.mjs
+
+WorkWise brand boundary passed (2478 files scanned).

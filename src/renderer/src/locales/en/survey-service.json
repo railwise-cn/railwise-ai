@@ -278,5 +278,11 @@
   "选择受支持的测量网型或补充适配策略": "Select a supported survey network type or supply an adapter strategy.",
   "平差失败": "Adjustment failed.",
   "修正输入后重试": "Correct the input, then retry.",
-  "历史平差 {0} 的原始资料不再满足可平差门禁：{1}": "The original source for historical adjustment {0} no longer passes adjustment admission: {1}"
+  "历史平差 {0} 的原始资料不再满足可平差门禁：{1}": "The original source for historical adjustment {0} no longer passes adjustment admission: {1}",
+  "观测 {0} 的残差筛查比值超过 3（非显著性判定）": "The residual screening ratio of observation {0} exceeds 3 (not a significance decision).",
+  "GNSS 基线 {0} 的残差筛查比值超过 3（非显著性判定）": "The residual screening ratio of GNSS baseline {0} exceeds 3 (not a significance decision).",
+  "平面控制观测 {0} 的残差筛查比值超过 3（非显著性判定）": "The residual screening ratio of planar control observation {0} exceeds 3 (not a significance decision).",
+  "导线观测 {0} 的残差筛查比值超过 3（非显著性判定）": "The residual screening ratio of traverse observation {0} exceeds 3 (not a significance decision).",
+  "三角网观测 {0} 的残差筛查比值超过 3（非显著性判定）": "The residual screening ratio of triangulation observation {0} exceeds 3 (not a significance decision).",
+  "CPIII 观测 {0} 的残差筛查比值超过 3（非显著性判定）": "The residual screening ratio of CPIII observation {0} exceeds 3 (not a significance decision)."
 }

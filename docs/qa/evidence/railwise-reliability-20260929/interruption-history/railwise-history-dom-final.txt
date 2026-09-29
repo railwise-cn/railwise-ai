@@ -1,0 +1,15 @@
+
+> workwise@0.5.1 test
+> vitest run src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts
+
+
+ RUN  v4.1.7 <repo>
+
+(node:76072) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  54 passed (54)
+   Start at  16:30:42
+   Duration  1.34s (transform 311ms, setup 0ms, import 472ms, tests 612ms, environment 78ms)
+

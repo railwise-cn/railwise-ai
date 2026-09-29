@@ -239,7 +239,7 @@ describe('Engineering AI orchestration', () => {
     engineering.close()
   })
 
-  it('restores an awaiting-approval plan, token and idempotent result after restart', async () => {
+  it('restores a blocked draft and token after restart with derived diagnostics and unchanged stored history', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-engineering-restart-'))
     const runtimeRoot = join(root, 'runtime')
     const engineering = new EngineeringService({ rootDir: runtimeRoot })
@@ -262,7 +262,12 @@ describe('Engineering AI orchestration', () => {
     const restored = await reopened.latestPlan({ threadId: 'restart-thread', projectId: project.id })
     const replay = await reopened.createPlan({ threadId: 'restart-thread', projectId: project.id, goal: '生成只读复核计划', idempotencyKey: 'restart-plan-001' })
 
-    expect(restored?.plan).toEqual({ ...created.plan, execution: { complete: false, completedStepIds: [], pendingStepIds: created.plan.steps.map(step => step.id) } })
+    expect(restored?.plan).toEqual({ ...created.plan, execution: { complete: false, completedStepIds: [], pendingStepIds: created.plan.steps.map(step => step.id) }, parameterIssues: [
+      { stepId: 'inspect-data', code: 'invalid-parameters', fields: ['datasetId', 'expectedRevision'] },
+      { stepId: 'analyse-trend', code: 'invalid-parameters', fields: ['datasetId'] },
+      { stepId: 'prepare-report', code: 'invalid-parameters', fields: ['expectedRevision'] }
+    ] })
+    expect(reopenedRepository.getPlan(created.plan.id)).toEqual(created.plan)
     expect(restored?.approval?.token).toBe(created.approval.token)
     expect(replay).toEqual(created)
     reopenedRepository.close()

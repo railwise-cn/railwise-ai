@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { RUNTIME_VERSION } from '../runtime-version.js'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -8,6 +9,7 @@ import { atomicWriteFile, drainAtomicWrites } from '../adapters/file/atomic-writ
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import type { SurveySourceEligibility } from './survey-service.js'
 import { makeReportPdf } from './engineering-report-pdf.js'
+import { statisticalEvidenceSheets, statisticalReportLines } from './survey-statistical-semantics.js'
 import { monitoringTrendInstant, renderMonitoringTrendChart } from './engineering-trend-chart.js'
 import { EngineeringVerificationAudit, EngineeringVerificationAuditError } from './engineering-verification-audit.js'
 import { calculateMonitoringAnalysisV2 } from './monitoring-analysis.js'
@@ -311,7 +313,7 @@ export class EngineeringService {
     this.remember(req.idempotencyKey, next)
     return next
   }
-  getProjectOverview(id: string): { project: RailwiseProjectV1; datasets: Array<Omit<StoredDataset, 'observations'>>; analyses: MonitoringAnalysisV1[]; runs: StoredRun[]; manifests: DeliverableManifestV1[] } {
+  getProjectOverview(id: string): { project: RailwiseProjectV1; datasets: Array<Omit<StoredDataset, 'observations'>>; analyses: MonitoringAnalysisV1[]; runs: StoredRun[]; manifests: DeliverableManifestV1[]; latestPreview?: { run: StoredRun; files: DeliverableManifestV1['outputs'] }; latestPreviewUnavailable?: boolean } {
     const project = this.mustProject(id)
     const datasets = (this.db.prepare('SELECT data_json FROM engineering_datasets WHERE project_id = ? ORDER BY updated_at DESC').all(project.id) as Array<{ data_json: string }>).map((row) => {
       const { observations: _observations, ...dataset } = this.mustStoredDataset(row.data_json)
@@ -320,7 +322,15 @@ export class EngineeringService {
     const analyses = (this.db.prepare('SELECT data_json FROM engineering_analyses WHERE project_id = ? ORDER BY created_at DESC').all(project.id) as Array<{ data_json: string }>).map((row) => MonitoringAnalysisV1.parse(JSON.parse(row.data_json)))
     const runs = (this.db.prepare('SELECT data_json FROM engineering_runs WHERE project_id = ? ORDER BY updated_at DESC').all(project.id) as Array<{ data_json: string }>).map((row) => JSON.parse(row.data_json) as StoredRun)
     const manifests = (this.db.prepare('SELECT data_json FROM engineering_manifests WHERE project_id = ? ORDER BY created_at DESC').all(project.id) as Array<{ data_json: string }>).map((row) => DeliverableManifestV1.parse(JSON.parse(row.data_json)))
-    return { project, datasets, analyses, runs, manifests }
+    // Restore recorded output descriptors for AI exports and application restart.
+    // This does not reread files, recompute results or claim current verification.
+    let latestPreview: ReturnType<EngineeringService['getPreviewEvidence']> = null
+    let latestPreviewUnavailable = false
+    if (runs[0]?.status === 'completed') {
+      try { latestPreview = this.getPreviewEvidence(project.id, runs[0].id) }
+      catch { latestPreviewUnavailable = true }
+    }
+    return { project, datasets, analyses, runs, manifests, ...(latestPreview ? { latestPreview } : {}), ...(latestPreviewUnavailable ? { latestPreviewUnavailable } : {}) }
   }
   createProject(input: unknown): RailwiseProjectV1 {
     const parsed = EngineeringProjectCreateRequest.parse(input)
@@ -533,7 +543,7 @@ export class EngineeringService {
         const text = reportText(project, dataset, analysis, req.citations, adjustments, deformations, surveySources)
         await stageOutput('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', await makeDocx(text))
         await stageOutput('report.pdf', 'application/pdf', await makeReportPdf(text))
-        await stageOutput('evidence.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', await makeXlsx(project, dataset, analysis, req.citations, adjustments, deformations, surveySources, this.options.runtimeVersion ?? '0.5.0'))
+        await stageOutput('evidence.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', await makeXlsx(project, dataset, analysis, req.citations, adjustments, deformations, surveySources, this.options.runtimeVersion ?? RUNTIME_VERSION))
         if (chart) {
           const chartPath = resolve(project.workspace, chart.relativePath)
           if (await readFile(chartPath).then(() => true).catch(() => false)) outputs.push(await fileOutput(chartPath, 'image/svg+xml', project.workspace))
@@ -589,7 +599,7 @@ export class EngineeringService {
   /** A separate numerical audit; never writes old verification or analysis records. */
   async replayMonitoringDeliverable(projectId: string, manifestId: string): Promise<MonitoringReplayVerificationV1> {
     const attempt = this.monitoringReplayAudit.begin(projectId, manifestId)
-    const execution = { runtimeVersion: this.options.runtimeVersion ?? 'unknown', node: process.versions.node, v8: process.versions.v8,
+    const execution = { runtimeVersion: this.options.runtimeVersion ?? RUNTIME_VERSION, node: process.versions.node, v8: process.versions.v8,
       icu: process.versions.icu ?? 'unknown', platform: process.platform, arch: process.arch,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: Intl.DateTimeFormat().resolvedOptions().locale, timeBasis: 'ISO-unzoned-UTC' as const }
     const analyses: MonitoringReplayVerificationV1['analyses'] = []
@@ -770,7 +780,7 @@ export class EngineeringService {
       const timeValid = Number.isFinite(Date.parse(startedAt)) && Number.isFinite(Date.parse(completedAt)) && Date.parse(completedAt) >= Date.parse(startedAt)
       const event = {
         schemaVersion: 1, id: attempt.id, projectId, manifestId,
-        startedAt, completedAt, runtimeVersion: this.options.runtimeVersion ?? 'unknown',
+        startedAt, completedAt, runtimeVersion: this.options.runtimeVersion ?? RUNTIME_VERSION,
         outcome: failure ? 'error' : result?.valid ? 'passed' : 'failed',
         bindingStable: bindingStable && timeValid, bindings: before,
         verification: result ?? null,
@@ -982,7 +992,7 @@ export class EngineeringService {
         // F-QC-21/22 are not implemented yet.  A materialized manifest is a
         // review candidate, never evidence of an approval that did not occur.
         reviewStatus: 'draft',
-        runtimeVersion: this.options.runtimeVersion ?? '0.5.0',
+        runtimeVersion: this.options.runtimeVersion ?? RUNTIME_VERSION,
         createdAt: this.nowIso(),
         finalizedAt: this.nowIso()
       })
@@ -1704,6 +1714,7 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
     ...(adjustments.length ? adjustments.flatMap((adjustment) => [
       `平差运行 ${adjustment.runId}：网络=${adjustment.networkId}，策略=${adjustment.strategyId ?? 'legacy'}${adjustment.transformType ? `/${adjustment.transformType}` : ''}，观测=${adjustment.observationCount}，未知数=${adjustment.unknownCount}，多余观测=${adjustment.redundancy}`,
       `单位权中误差=${adjustment.unitWeightStdDev}（${statisticalUnit(adjustment.unitWeightStdDevUnit)}）；方差因子=${adjustment.varianceFactor}（${statisticalUnit(adjustment.varianceFactorUnit)}，${adjustment.varianceFactorEstimated ? '后验估计' : '先验值'}），最大点位中误差=${adjustment.precision.maxPointStdDev} ${adjustment.linearUnit}，状态=${adjustment.validation}，输入 SHA-256=${adjustment.inputHash}`,
+      ...statisticalReportLines(adjustment),
       `闭合量=${Object.entries(adjustment.closure).map(([key, value]) => `${key}:${value} ${adjustment.closureUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       `解算参数=${Object.entries(adjustment.parameters).map(([key, value]) => `${key}:${value} ${adjustment.parameterUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       ...(adjustment.points.length ? adjustment.points.map((point) => `点位 ${point.id}: X=${measurement(point.x, adjustment.linearUnit)} Y=${measurement(point.y, adjustment.linearUnit)} H=${measurement(point.height, adjustment.linearUnit)}${point.latitude === undefined ? '' : ` B=${point.latitude}°`}${point.longitude === undefined ? '' : ` L=${point.longitude}°`}`) : ['点位成果：无']),
@@ -1759,6 +1770,7 @@ async function makeXlsx(project: RailwiseProjectV1, dataset: StoredDataset | und
     { name: 'citations', rows: [['id', 'sourceType', 'source', 'page', 'worksheet', 'row', 'url', 'locator'], ...citations.map((c) => [c.id, c.sourceType, c.source, String(c.page ?? ''), c.worksheet ?? '', String(c.row ?? ''), c.url ?? '', c.locator ?? ''])] },
     { name: 'manifest_summary', rows: [['schemaVersion', 'projectId', 'datasetId', 'sourceFileHash', 'analysisId', 'analysisInputHash', 'adjustmentIds', 'deformationIds', 'surveySourceHashes', 'runtimeVersion', 'generatedAt'], ['1', project.id, dataset?.id ?? '', dataset?.sourceFileHash ?? '', analysis?.id ?? '', analysis?.inputHash ?? '', adjustments.map((a) => a.id).join(','), deformations.map((item) => item.id).join(','), surveySources.map((item) => item.source.sha256).join(','), runtimeVersion, new Date().toISOString()]] }
   ]
+  sheets.push(...statisticalEvidenceSheets(adjustments))
   const xmlEscape = (value: string): string => escapeXml(value)
   const sheetXml = (rows: string[][]): string => `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((row, ri) => `<row r="${ri + 1}">${row.map((value, ci) => `<c r="${columnName(ci)}${ri + 1}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`
   zip.file('[Content_Types].xml', `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`)

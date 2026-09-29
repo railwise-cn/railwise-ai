@@ -17,6 +17,14 @@ export const engineeringPlanToolRisks = {
   tool_norm_cite: 'read'
 } as const
 
+/** Shared by plan review and the executor; aliases retain the same capability. */
+export const surveyAdjustmentToolNetworks: Readonly<Record<string, readonly string[]>> = {
+  survey_calculator: ['leveling', 'height-control'],
+  control_network: ['traverse', 'plane-control', 'triangulation', 'gnss'],
+  cpiii_adjustment: ['cpiii-free-station', 'cpiii-resection'],
+  coord_transform: ['coordinate-transform']
+}
+
 export function engineeringPlanToolRisk(tool: string): 'read' | 'write' | 'export' | undefined {
   const name = tool.startsWith('railwise.') ? tool.slice('railwise.'.length) : tool
   if (tool.startsWith('railwise.') && ['standard_query', 'tool_norm_cite'].includes(name)) return undefined

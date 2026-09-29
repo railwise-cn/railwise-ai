@@ -21,6 +21,8 @@ WorkWise already has the Electron shell, Kun Runtime, attachments, Flow, Design,
 
 ## Capabilities
 
+The approved 2026-09-29 continuation prioritizes statistical interpretation, one exact-package/default-model acceptance matrix, recoverable workflow states and website source governance. It then proceeds through independently compared formats and explicit tabular mapping, evidence-bound quality workflows and source-derived advanced models, followed by cross-module reuse and gated MCP/acquisition/spatial work. This continuation does not authorize a public version or release operation.
+
 The P1 quality-chain continuation adds a separate declared correction workflow over exact retained material records. It persists checks, issues, correction targets and rechecks without changing the legacy evidence-retention verification API, draft deliverables, professional identities or release approval gates. Software validation and installed-candidate/human acceptance remain separate tasks.
 
 ### New Capabilities
