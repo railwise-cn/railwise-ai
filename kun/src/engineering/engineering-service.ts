@@ -8,6 +8,7 @@ import { atomicWriteFile, drainAtomicWrites } from '../adapters/file/atomic-writ
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import type { SurveySourceEligibility } from './survey-service.js'
 import { makeReportPdf } from './engineering-report-pdf.js'
+import { statisticalEvidenceSheets, statisticalReportLines } from './survey-statistical-semantics.js'
 import { monitoringTrendInstant, renderMonitoringTrendChart } from './engineering-trend-chart.js'
 import { EngineeringVerificationAudit, EngineeringVerificationAuditError } from './engineering-verification-audit.js'
 import { calculateMonitoringAnalysisV2 } from './monitoring-analysis.js'
@@ -1704,6 +1705,7 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
     ...(adjustments.length ? adjustments.flatMap((adjustment) => [
       `平差运行 ${adjustment.runId}：网络=${adjustment.networkId}，策略=${adjustment.strategyId ?? 'legacy'}${adjustment.transformType ? `/${adjustment.transformType}` : ''}，观测=${adjustment.observationCount}，未知数=${adjustment.unknownCount}，多余观测=${adjustment.redundancy}`,
       `单位权中误差=${adjustment.unitWeightStdDev}（${statisticalUnit(adjustment.unitWeightStdDevUnit)}）；方差因子=${adjustment.varianceFactor}（${statisticalUnit(adjustment.varianceFactorUnit)}，${adjustment.varianceFactorEstimated ? '后验估计' : '先验值'}），最大点位中误差=${adjustment.precision.maxPointStdDev} ${adjustment.linearUnit}，状态=${adjustment.validation}，输入 SHA-256=${adjustment.inputHash}`,
+      ...statisticalReportLines(adjustment),
       `闭合量=${Object.entries(adjustment.closure).map(([key, value]) => `${key}:${value} ${adjustment.closureUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       `解算参数=${Object.entries(adjustment.parameters).map(([key, value]) => `${key}:${value} ${adjustment.parameterUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       ...(adjustment.points.length ? adjustment.points.map((point) => `点位 ${point.id}: X=${measurement(point.x, adjustment.linearUnit)} Y=${measurement(point.y, adjustment.linearUnit)} H=${measurement(point.height, adjustment.linearUnit)}${point.latitude === undefined ? '' : ` B=${point.latitude}°`}${point.longitude === undefined ? '' : ` L=${point.longitude}°`}`) : ['点位成果：无']),
@@ -1759,6 +1761,7 @@ async function makeXlsx(project: RailwiseProjectV1, dataset: StoredDataset | und
     { name: 'citations', rows: [['id', 'sourceType', 'source', 'page', 'worksheet', 'row', 'url', 'locator'], ...citations.map((c) => [c.id, c.sourceType, c.source, String(c.page ?? ''), c.worksheet ?? '', String(c.row ?? ''), c.url ?? '', c.locator ?? ''])] },
     { name: 'manifest_summary', rows: [['schemaVersion', 'projectId', 'datasetId', 'sourceFileHash', 'analysisId', 'analysisInputHash', 'adjustmentIds', 'deformationIds', 'surveySourceHashes', 'runtimeVersion', 'generatedAt'], ['1', project.id, dataset?.id ?? '', dataset?.sourceFileHash ?? '', analysis?.id ?? '', analysis?.inputHash ?? '', adjustments.map((a) => a.id).join(','), deformations.map((item) => item.id).join(','), surveySources.map((item) => item.source.sha256).join(','), runtimeVersion, new Date().toISOString()]] }
   ]
+  sheets.push(...statisticalEvidenceSheets(adjustments))
   const xmlEscape = (value: string): string => escapeXml(value)
   const sheetXml = (rows: string[][]): string => `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((row, ri) => `<row r="${ri + 1}">${row.map((value, ci) => `<c r="${columnName(ci)}${ri + 1}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`
   zip.file('[Content_Types].xml', `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`)

@@ -29,7 +29,6 @@ describe('engineering agent surface contract', () => {
     expect(source).toContain("t('surveyWeightedLeastSquares')")
     expect(source).toContain("t('surveySigma0')")
     expect(source).toContain("t('surveyVarianceFactor',")
-    expect(source).toContain("t('surveyStandardizedResidual')")
     expect(source).toContain("measurementLabel(t, residual.residual, residual.unit")
   })
 

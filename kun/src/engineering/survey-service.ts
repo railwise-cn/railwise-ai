@@ -37,6 +37,7 @@ import { isGnssSurveyFormat, SurveyFormatRegistry, type SurveySourceEnvelope } f
 import type { CosaIn1Mapping } from './survey-cosa-in1.js'
 import { levelingNetworkClosures } from './survey-leveling-closure.js'
 import { surveyErrorEllipse } from './survey-error-ellipse.js'
+import { residualStatistic, SEMANTIC_ADJUSTMENT_VERSION, withStatisticalSemantics } from './survey-statistical-semantics.js'
 import { SurveyStatisticalDiagnosticsV1 } from '../contracts/survey-statistics.js'
 import { diagnoseDeletedResiduals } from './survey-statistical-diagnostics.js'
 import { SurveyFreeLevelingTrialRequestV1, SurveyFreeLevelingTrialV1, SurveyFreeLevelingTrialSummaryV1, type SurveyFreeLevelingTrialListV1 } from '../contracts/survey-free-leveling.js'
@@ -250,7 +251,8 @@ export type RecordTrustedSurveyDerivedObservationValueCorrection = Readonly<{
   expectedCorrectionHeadHash: string
 }>
 
-const ALGORITHM_VERSION = 'workwise-survey-adjustment-7'
+const ALGORITHM_VERSION = SEMANTIC_ADJUSTMENT_VERSION
+const LEGACY_STATISTICS_ALGORITHM = 'workwise-survey-adjustment-7'
 const LEGACY_ELLIPSE_FREE_ALGORITHM = 'workwise-survey-adjustment-6'
 
 function pointErrorEllipse(run: AdjustmentRunV1, solved: { covariance: Matrix; varianceFactor: number; varianceFactorEstimated: boolean }, x: number, y: number) {
@@ -1535,6 +1537,16 @@ function buildGnssResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso:
       residual,
       unit: 'm' as const,
       standardizedResidual: residualVariances[component]! > 1e-24 ? Math.abs(residual) / Math.sqrt(residualVariances[component]!) : 0,
+      ...(run.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION ? { residualStatistic: residualStatistic(
+        { method: 'residual-sigma-ratio', scaleBasis: solved.varianceFactorEstimated ? 'estimated-posterior' : 'declared-prior' },
+        residualVariances[component]! > 1e-24 ? Math.abs(residual) / Math.sqrt(residualVariances[component]!) : undefined,
+        solved.dof,
+        // Do not interpret cancellation, negative covariance or a zero fitted
+        // variance as a perfectly screened component.
+        block.covariance[component]![component]! - propagated[component]![component]!
+          <= 64 * Number.EPSILON * Math.max(block.covariance[component]![component]!, Math.abs(propagated[component]![component]!))
+          || residualVariances[component]! <= 1e-24 ? 'residual-variance-unresolved' : undefined
+      ) } : {}),
       outlier: residualVariances[component]! > 1e-24 && Math.abs(residual) / Math.sqrt(residualVariances[component]!) > 3,
       sourceRow: block.observation.sourceRow
     }))
@@ -3107,7 +3119,7 @@ export class SurveyService {
     } else {
       result = invalidAdjustmentResult(solverNetwork, run, [finding(solverNetwork.id, 'invalid_observation', 'blocking', `暂不支持网型 ${solverNetwork.networkType} 的确定性平差`, '选择受支持的测量网型或补充适配策略', undefined, this.nowIso)], this.nowIso)
     }
-    return retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType }))
+    return withStatisticalSemantics(solverNetwork, retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType })))
   }
 
   createAdjustment(input: unknown): { run: AdjustmentRunV1; result: AdjustmentResultV1 } {
@@ -3237,7 +3249,7 @@ export class SurveyService {
       || stored.result.networkId !== network.id
       || stored.run.inputHash !== inputHash
       || stored.result.inputHash !== inputHash
-      || ![ALGORITHM_VERSION, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
+      || ![ALGORITHM_VERSION, LEGACY_STATISTICS_ALGORITHM, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
       || stored.result.algorithmVersion !== stored.run.algorithmVersion
       || stored.run.status !== 'completed'
       || stored.result.validation !== 'valid') {

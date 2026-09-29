@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SurveyResidualStatisticV1, SurveyStatisticalSummaryV1 } from './survey-statistical-semantics.js'
 
 /** Versioned contracts for deterministic engineering-survey processing. */
 export const SURVEY_SCHEMA_VERSION = 1 as const
@@ -836,6 +837,8 @@ export const AdjustmentObservationResultV1 = z.object({
   unit: z.enum(['m', 'rad']).optional(),
   standardizedResidual: z.number().finite().optional(),
   standardizedResidualUnit: z.literal('sigma').default('sigma'),
+  /** Algorithm 8+ only; never default/backfill into hashed historical results. */
+  residualStatistic: SurveyResidualStatisticV1.optional(),
   outlier: z.boolean().default(false),
   sourceRow: z.number().int().positive().optional(),
   /** Immutable source-record anchor inherited from the adjusted observation. */
@@ -884,6 +887,7 @@ export const AdjustmentResultV1 = z.object({
    * has no redundancy; older records default to false rather than claiming
    * a posterior estimate. */
   varianceFactorEstimated: z.boolean().default(false),
+  statisticalSummary: SurveyStatisticalSummaryV1.optional(),
   points: z.array(AdjustmentPointResultV1),
   observations: z.array(AdjustmentObservationResultV1),
   displacements: z.array(AdjustmentDisplacementV1).default([]),

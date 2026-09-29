@@ -1,5 +1,21 @@
 ## ADDED Requirements
 
+### Requirement: Explicit residual interpretation and scale facts
+
+New adjustment results MUST carry versioned per-row statistic method, scale basis, availability and descriptive scope, plus a deterministic numerical summary. They MUST distinguish observation-sigma ratios, relative-weight normalization and posterior residual-sigma ratios. No redundancy or unresolved residual variance MUST NOT appear as a zero-valued passing statistic. UI, reports and AI MUST retain these distinctions and keep significance and standards conformity unevaluated. Runtime MUST provide separate variance and standard-deviation log10 ratios to its nominal unit scale when estimable. Algorithm 6/7 historical reads and exact replay MUST preserve their original payloads and hashes.
+
+#### Scenario: A GNSS component has zero estimated residual variance
+
+- **WHEN** a new adjustment cannot resolve a positive residual variance or has no redundant observations
+- **THEN** the component is not-testable with an explicit reason and no numeric screening value
+- **AND** it is not counted as a passing statistical or engineering check
+
+#### Scenario: Explain an older result
+
+- **WHEN** a historical result lacks the versioned statistical fields
+- **THEN** its original numbers remain readable and its recorded algorithm is replayed unchanged
+- **AND** consumers show an unknown historical statistical basis rather than inferring conformance from precision.passed
+
 ### Requirement: Retained-material declared correction workflow
 
 The Runtime SHALL persist caller-declared quality checks, opened issues, corrections and rechecks separately from legacy technical retention checks. Creation SHALL freeze the exact project revision/workspace, retention plan, record, head and artifact. Every event SHALL reference an actually retained same-project evidence member. Correction and recheck targets SHALL be resolved from retained records rather than accepted as unverified hash strings. The service SHALL generate chain metadata, enforce bounded append-only storage, head concurrency and payload-bound idempotency, and revalidate sources and the complete chain when reading. No declaration SHALL grant delivery approval, authenticate a professional signature, assert standard conformity or rewrite an existing deliverable.

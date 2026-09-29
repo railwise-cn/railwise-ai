@@ -1,3 +1,18 @@
+## Approved optimization sequence (2026-09-29)
+
+Historical checks below do not certify later source or packages. The user approved all three tracks, executed in dependency order. No new public release/version is authorized by this plan.
+
+- [x] P0 source implementation: Version residual semantics and deterministic scale facts through Runtime, UI, reports and AI; preserve exact algorithm-6/7 replay and distinguish unavailable screening from numerical checks and standards conformity. Installed UI and real-model acceptance remain separate below.
+- [ ] P0: Freeze and install one private signed candidate; verify default deepseek-flash and explicit deepseek-v4-pro, IN2/GSI and monitoring CSV/XLSX, three exports, restart, exact questions, approvals, recovery and full correction/recheck flow.
+- [ ] P0: Verify scope changes, offline/stale/cancel/retry/recovery, bilingual themes, minimum windows and keyboard operation in that exact package.
+- [ ] P0: Record application/website ownership and add read-only drift and whole-site menu/font/image/download acceptance tooling before any separately authorized deployment.
+- [ ] P1 formats: Close independent COSA/GSI comparisons, add explicit survey-network CSV/XLSX mapping with units and reusable profiles, then admit M5 against real evidence; preserve South DAT blockers without a confirmed mapping.
+- [ ] P1 quality: Bind classified defects/evidence, correction/resampling, organizational roles and rule applicability/revocation; keep professional signatures and formal delivery blocked until real identity verification.
+- [ ] P1 algorithms: Derive traceable fixed models/covariance from admitted networks before connecting existing w/VCE/Huber/free-leveling/reference/static-append trials; extend general free/quasi-stable networks only within validated assumptions.
+- [ ] P2 collaboration: Reuse exact result references in Write, typed approvals/exports in Flow, and charts in Design; editing creates a new draft without inherited verification.
+- [ ] P2 acquisition/spatial: Verify local read-only MCP transport and revocable project grants, then one real GeoCOM model/firmware chain, coordinate datum, DXF and later point clouds/3D.
+- [ ] Cross-cutting: Split large files along implemented features, measure performance before optimization, and retain actual first-start/failure/interruption denominators without claiming synthetic production KPIs.
+
 ## P1 declared correction workflow follow-through
 
 - [x] Persist caller-declared checks, issues, corrections and rechecks in a separate bounded append-only workspace, binding real retained materials and exact project/retention heads; verify idempotency, stale sources, corruption, restart and unchanged legacy retention semantics.

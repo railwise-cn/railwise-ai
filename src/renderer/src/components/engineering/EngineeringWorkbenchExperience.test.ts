@@ -82,7 +82,6 @@ describe('engineering workbench experience contract', () => {
     expect(source).toContain('grid gap-3 2xl:grid-cols-[minmax(0,1fr)_260px]')
     expect(source).toContain('survey-instrument-strip')
     expect(source).toContain("t('surveyPointSummary')")
-    expect(source).toContain('标准化残差 > 3σ')
     expect(source).toContain("t('surveyAdjustedX', { unit: linearUnit })")
     expect(source).toContain("t('surveyPointError', { unit: linearUnit })")
     expect(source).toContain("t('surveyAngularNorm')")

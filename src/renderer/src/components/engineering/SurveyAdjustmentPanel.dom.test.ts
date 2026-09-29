@@ -592,7 +592,8 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
   })
 
   it('does not equate residual checks with compliance to an unspecified project tolerance', async () => {
-    expect(container.textContent).toContain('计算校核通过')
+    expect(container.textContent).toContain('历史记录未保存统计口径，待核查')
+    expect(container.textContent).not.toContain('数值筛查未发现超限')
     expect(container.textContent).toContain('项目限差需另行复核')
     expect(container.textContent).not.toContain('满足项目精度')
     await act(async () => i18n.changeLanguage('en'))
