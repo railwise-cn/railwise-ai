@@ -141,6 +141,7 @@ export async function auditWebsitePage(page, { origin = 'https://www.railwise.cn
   }
   for (const img of document.images) {
     if (!img.declaredSource) { unknown.push('Image has no declared source'); continue }
+    if (!img.loaded && img.deferred) unknown.push(`Deferred image not yet decoded: ${img.url}`)
     if (!img.loaded && !img.deferred) failures.push(`Image failed to decode: ${img.url}`)
     if (!own(img.url)) { unknown.push(`External image: ${img.url}`); continue }
     try {

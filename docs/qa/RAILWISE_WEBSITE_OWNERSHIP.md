@@ -19,6 +19,6 @@
 - `fontHasCodePoint(bytes, codePoint)`：有界读取 TTF Unicode cmap 4/12，能识别 CSS 定义存在但字体文件实际缺字的情况。字体字形轮廓和最终视觉仍需截图实看。
 - `compareWebsiteSources(baseline, snapshot)`：按已确认源码的文件摘要比较唯一生效根目录；漂移只出报告，不自动覆盖、更新基线或发布。
 
-在 ego-browser 已有 TaskSpace 中复用页面，导入脚本后调用 `await auditWebsitePage(page)`。共享 `cache: new Map()` 可避免全站重复读取同一字体和图片。巡检首页、产品列表、各产品页、服务、帮助、关于、联系和兼容下载入口；桌面/移动端菜单仍需分别打开。懒加载图片应滚动后再次观察，不把尚未加载当作解码成功。下载校验继续复用 `verifyProductPublication`，不可用首页 HTTP 200 替代三端下载链接检查。
+在 ego-browser 已有 TaskSpace 中复用页面，执行序列化的 `inspectWebsiteDocument` 探针，然后在宿主 Node 调用 `auditWebsitePage`，以 `evaluate: async () => collectedDocument` 传入本轮真实观察。本机 Ego Node 的外部模块/文件 I/O 出现无响应，已停止挂起 CLI；不要把这个环境问题记成网站通过。共享 `cache: new Map()` 可避免全站重复读取同一字体和图片。巡检首页、产品列表、各产品页、服务、帮助、关于、联系和兼容下载入口；桌面/移动端菜单仍需分别打开。懒加载图片应滚动后再次观察，尚未解码返回 incomplete。下载校验继续复用 `verifyProductPublication`，不可用首页 HTTP 200 替代三端下载链接检查。
 
 CI 使用离线夹具运行 `node --test scripts/website-surface-audit.test.mjs`，覆盖缺字、缺图、旧品牌、未知字体、越界字体和部署漂移；CI 夹具通过不等于线上巡检通过。本轮不修改官网或公开下载页。
