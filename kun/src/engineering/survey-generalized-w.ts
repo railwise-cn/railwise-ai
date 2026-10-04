@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { SurveyGeneralizedWRequestV1, SurveyGeneralizedWResultV1 } from '../contracts/survey-generalized-w.js'
+import { unverifiedSurveyStatisticalDeclarationV1 } from '../contracts/survey-statistical-declaration.js'
 import { choleskyDecompose, solveLowerTriangular, surveyMatrix, type Matrix } from './survey-adjustment-core.js'
 
 const RANK_TOLERANCE = 1e-10
@@ -77,6 +78,10 @@ function solveUpper(upper: Matrix, values: number[]): number[] {
  * distribution functions, multiple testing, deletion, or approval are implied. */
 export function diagnoseGeneralizedW(input: unknown): SurveyGeneralizedWResultV1 {
   const request = SurveyGeneralizedWRequestV1.parse(input), n = request.observations.length, p = request.parameterIds.length
+  const statisticalDeclaration = request.statisticalDeclaration ?? unverifiedSurveyStatisticalDeclarationV1({
+    scope: 'per-bias-direction', modelVersion: 'fixed-linear-known-covariance-generalized-w-1', covarianceModelVersion: 'caller-declared-known-apriori-absolute-observation-covariance',
+    testFamily: { id: request.family.id, declaration: request.family.declaration, source: 'survey/generalized-w/family', alpha: request.family.alpha, correction: 'not-applied' }
+  })
   const common = {
     schemaVersion: 1, diagnosticsVersion: 'fixed-linear-known-covariance-generalized-w-1', request,
     requestHash: createHash('sha256').update(JSON.stringify(request)).digest('hex'),
@@ -85,6 +90,7 @@ export function diagnoseGeneralizedW(input: unknown): SurveyGeneralizedWResultV1
       url: 'https://resolver.tudelft.nl/uuid:bc7f8919-1baf-4f02-b115-dc926c5ec090',
       provenance: 'previously-recorded-method-source-not-a-new-reading-or-signoff' },
     covarianceComputation: 'diagonal-equilibrated-cholesky-whitening', projectionComputation: 'column-scaled-pivoted-householder-qr',
+    statisticalDeclaration,
     relativeRankTolerance: RANK_TOLERANCE, relativeDetectabilityTolerance: DETECTABILITY_TOLERANCE,
     statisticErrorPolicy: 'conservative-condition-based-budget-1', relativeStatisticErrorBudget: STATISTIC_ERROR_BUDGET,
     assumptionsVerified: false, familyDeclarationVerified: false, distributionEvaluation: 'not-performed', multipleComparisonAdjustment: 'not-performed',

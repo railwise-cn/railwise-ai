@@ -19,7 +19,7 @@ export function EngineeringManifestVerification({ projectId, manifestId, reviewS
   const activeScope = useRef(scope)
   activeScope.current = scope
   const [stored, setStored] = useState<{ scope: string; result: DeliverableVerificationV1 } | null>(null)
-  const [error, setError] = useState<{ scope: string; key: string; detail: string } | null>(null)
+  const [error, setError] = useState<{ scope: string; key: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const generation = useRef(0)
   const inFlight = useRef(false)
@@ -43,24 +43,23 @@ export function EngineeringManifestVerification({ projectId, manifestId, reviewS
       setStored({ scope, result })
     } catch (failure) {
       if (stillCurrent()) {
-        const detail = (failure instanceof Error ? failure.message : String(failure)).slice(0, 4096)
-        setError({ scope, key: failure instanceof InvalidVerificationResponse ? 'engineeringVerifyInvalidResponse' : verificationFailureKey(detail), detail })
+        const reason = failure instanceof Error ? failure.message : String(failure)
+        setError({ scope, key: failure instanceof InvalidVerificationResponse ? 'engineeringVerifyInvalidResponse' : verificationFailureKey(reason) })
       }
     } finally { if (stillCurrent()) { inFlight.current = false; setBusy(false) } }
   }
   const result = runtimeReady && stored?.scope === scope ? stored.result : null
   const currentError = runtimeReady && error?.scope === scope ? error : null
-  const technicalDetail = (detail: string): React.JSX.Element => <details className="mt-1 min-w-0 text-ds-muted"><summary className="cursor-pointer">{t('engineeringVerifyTechnicalDetails')}</summary><p className="mt-1 whitespace-pre-wrap break-all">{detail.slice(0, 4096)}</p></details>
   return <div className="mt-2 min-w-0 space-y-2 text-[11px]">
     <button type="button" disabled={!runtimeReady || busy} onClick={() => void verify()} className="rounded border border-ds-border-muted px-2 py-1 text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50">{t(busy ? 'engineeringVerifying' : 'engineeringVerifyDelivery')}</button>
     <div role="status" aria-live="polite">
-      {currentError ? <><p className="text-red-700 dark:text-red-300">{t(currentError.key)}</p>{technicalDetail(currentError.detail)}</> : null}
+      {currentError ? <p className="text-red-700 dark:text-red-300">{t(currentError.key)}</p> : null}
       {result ? <>
         <p className={result.valid ? 'text-ds-ink' : 'text-red-700 dark:text-red-300'}>{t(result.valid ? 'engineeringVerifySucceeded' : 'engineeringVerifyFailed')} · <time dateTime={result.checkedAt}>{new Date(result.checkedAt).toLocaleString(i18n.language)}</time></p>
         <ul className="mt-1 space-y-1">{result.checks.map((check, index) => <li key={check.id}>
           {t(checkKeys[check.id])}: {t(statusKeys[check.status])}
           <EngineeringEvidenceQuestion label={t(checkKeys[check.id])} reference={{ kind: 'deliverable-verification', manifestId: result.manifestId, checkedAt: result.checkedAt, selector: { path: ['checks', index], identity: { id: check.id } } }} />
-          {check.detail ? <><p className="break-words text-ds-muted">{t(verificationFailureKey(check.detail))}</p>{technicalDetail(check.detail)}</> : null}
+          {check.detail ? <p className="break-words text-ds-muted">{t(verificationFailureKey(check.detail))}</p> : null}
         </li>)}</ul>
         <p className="mt-2 text-ds-muted">{t('engineeringVerifyBoundary')}</p>
       </> : null}

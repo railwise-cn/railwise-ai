@@ -104,7 +104,23 @@ export const SurveyQualityEventV1 = z.object({
     z.object({ kind: z.literal('correction-recorded'), issueId: identity, correctionId: identity,
       correctedArtifactSha256: digest, evidenceSha256: digest }).strict(),
     z.object({ kind: z.literal('issue-rechecked'), issueId: identity, correctionId: identity,
-      recheckedArtifactSha256: digest, outcome: z.enum(['resolved', 'unresolved']), evidenceSha256: digest }).strict()
+      recheckedArtifactSha256: digest, outcome: z.enum(['resolved', 'unresolved']), evidenceSha256: digest }).strict(),
+    // Versioned quality lifecycle events. These are recorded declarations and
+    // do not authenticate a rule, organisation, signer or approval.
+    z.object({ kind: z.literal('stage-started'), stageId: identity,
+      stageKind: z.enum(['planning', 'process', 'final', 'acceptance']), policyVersion: identity,
+      checkedScope: identity, evidenceSha256: digest }).strict(),
+    z.object({ kind: z.literal('stage-completed'), stageId: identity,
+      stageKind: z.enum(['planning', 'process', 'final', 'acceptance']), outcome: z.enum(['completed', 'blocked']),
+      evidenceSha256: digest }).strict(),
+    z.object({ kind: z.literal('rule-applicability'), declarationId: identity, rule: SurveyStandardRuleRefV1,
+      status: z.enum(['applicable', 'not-applicable', 'pending']), rationale: identity, evidenceSha256: digest }).strict(),
+    z.object({ kind: z.literal('rule-revoked'), declarationId: identity, reason: identity, evidenceSha256: digest }).strict(),
+    z.object({ kind: z.literal('signoff-declared'), signoffId: identity,
+      purpose: z.enum(['quality-review', 'delivery-approval']), actorKey: identity, evidenceSha256: digest }).strict(),
+    z.object({ kind: z.literal('signoff-revoked'), signoffId: identity, reason: identity, evidenceSha256: digest }).strict(),
+    z.object({ kind: z.literal('delivery-approval-requested'), approvalId: identity,
+      requiredSignoffIds: z.array(identity).min(1).max(32).refine(ids => new Set(ids).size === ids.length, 'Duplicate signoff ID'), evidenceSha256: digest }).strict()
   ])
 }).strict()
 export type SurveyQualityEventV1 = z.infer<typeof SurveyQualityEventV1>

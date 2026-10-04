@@ -1,0 +1,26 @@
+{
+  "recordedAt": "2026-09-27T12:08:34.914491+00:00",
+  "latestCrashFiles": [
+    {
+      "name": "RailWise AI-2026-09-27-160241.ips",
+      "modifiedAt": "2026-09-27T08:02:41.269898+00:00"
+    },
+    {
+      "name": "RailWise AI-2026-09-27-160149.ips",
+      "modifiedAt": "2026-09-27T08:01:49.848057+00:00"
+    },
+    {
+      "name": "RailWise AI-2026-09-27-160139.ips",
+      "modifiedAt": "2026-09-27T08:01:39.442705+00:00"
+    },
+    {
+      "name": "RailWise AI Candidate d28aafe16b82-2026-09-27-154511.ips",
+      "modifiedAt": "2026-09-27T07:45:11.063046+00:00"
+    },
+    {
+      "name": "RailWise AI-2026-09-27-154336.ips",
+      "modifiedAt": "2026-09-27T07:43:36.453164+00:00"
+    }
+  ],
+  "theme": "system"
+}

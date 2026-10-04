@@ -1,0 +1,11 @@
+{
+  "version": "0.5.1",
+  "installed": "/Applications/RailWise AI.app",
+  "asarSha256": "35d087051b52bbf89014089d2e7300503ddd247e480faf39607a377b796f4063",
+  "runtimeDistTreeSha256": "b19afa1b8453daa29761fdb0a35a186f7347198b3e4f2f8f715f240688011dd7",
+  "signature": "ad hoc; strict deep verification passed",
+  "notarized": false,
+  "publish": "never",
+  "updateProvider": "none",
+  "computerUse": "blocked: CUA returned SyntaxError/Transport closed before fresh final screenshots"
+}

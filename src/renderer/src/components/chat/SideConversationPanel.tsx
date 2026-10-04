@@ -26,6 +26,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useChatStore } from '../../store/chat-store'
 import type { ChatBlock } from '../../agent/types'
+import { engineeringProfessionalAnswerText, engineeringProfessionalUserSurfaceText } from '../engineering/engineering-professional-text'
+import { isProfessionalSurveyThread } from './side-conversation-professional'
 
 type Props = {
   className?: string
@@ -112,29 +114,34 @@ function SideChatComposer({
   )
 }
 
-function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null {
+function SideMessageBubble({ block, professional = false }: { block: ChatBlock; professional?: boolean }): ReactElement | null {
   if (block.kind === 'user') {
+    const text = professional ? engineeringProfessionalUserSurfaceText(block.text) : block.text
+    if (!text.trim()) return null
     return (
       <div className="flex justify-end">
         <div className="max-w-[86%] rounded-[14px] bg-ds-card px-3 py-2 text-[13px] leading-5 text-ds-ink shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-          <div className="ds-markdown whitespace-pre-wrap break-words">{block.text}</div>
+          <div className="ds-markdown whitespace-pre-wrap break-words">{text}</div>
         </div>
       </div>
     )
   }
   if (block.kind === 'assistant') {
     const streaming = block.id === 'live-assistant'
+    const text = professional ? engineeringProfessionalAnswerText(block.text) : block.text
+    if (!text.trim()) return null
     return (
       <div className="ds-markdown ds-chat-answer min-w-0 max-w-full text-[13px] leading-5 text-ds-ink">
         {streaming ? (
-          <span>{block.text}</span>
+          <span>{text}</span>
         ) : (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
         )}
       </div>
     )
   }
   if (block.kind === 'reasoning') {
+    if (professional) return null
     return (
       <div className="rounded-[12px] border border-ds-border-muted bg-ds-card/55 px-2.5 py-2 text-[12px] leading-5 text-ds-muted">
         <div className="ds-markdown">
@@ -144,6 +151,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
     )
   }
   if (block.kind === 'tool') {
+    if (professional) return null
     return (
       <div className="flex items-center gap-2 rounded-full border border-ds-border-muted bg-ds-card/70 px-3 py-1.5 text-[12px] text-ds-muted">
         <Wrench className="h-3 w-3 shrink-0" strokeWidth={1.9} />
@@ -157,6 +165,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
     )
   }
   if (block.kind === 'approval' || block.kind === 'compaction') {
+    if (professional) return null
     return (
       <div className="rounded-full border border-ds-border-muted bg-ds-card/60 px-3 py-1.5 text-[12px] text-ds-muted">
         {block.summary}
@@ -164,6 +173,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
     )
   }
   if (block.kind === 'user_input') {
+    if (professional) return null
     return (
       <div className="rounded-full border border-ds-border-muted bg-ds-card/60 px-3 py-1.5 text-[12px] text-ds-muted">
         {block.questions.map((q) => q.question).join(' · ') || 'user input'}
@@ -171,6 +181,7 @@ function SideMessageBubble({ block }: { block: ChatBlock }): ReactElement | null
     )
   }
   if (block.kind === 'system') {
+    if (professional) return null
     return (
       <div className="rounded-[12px] border border-ds-border-muted bg-ds-card/55 px-3 py-2 text-[12px] text-ds-muted">
         {block.text}
@@ -228,6 +239,7 @@ export function SideConversationPanel({
   const parentThread = sideData.parentThreadId
     ? sideData.threads.find((thread) => thread.id === sideData.parentThreadId) ?? null
     : null
+  const professionalSurface = isProfessionalSurveyThread(parentThread)
   const runningCount = currentSides.reduce((count, side) => count + (side.busy ? 1 : 0), 0)
   const shouldRender = Boolean(sideData.parentThreadId && sideData.panel.open)
   const showDraft = shouldRender && !activeSide
@@ -462,7 +474,7 @@ export function SideConversationPanel({
           {activeSide ? (
             <>
               <div className="text-[11.5px] leading-4 text-ds-faint">
-                {t('sidePanelInheritedAt', {
+                {t(professionalSurface ? 'sidePanelProfessionalInheritedAt' : 'sidePanelInheritedAt', {
                   time: formatInheritedTime(activeSide.inheritedAt, i18n.language)
                 })}
               </div>
@@ -473,7 +485,7 @@ export function SideConversationPanel({
                 </div>
               ) : null}
               {activeSide.blocks.map((block) => (
-                <SideMessageBubble key={block.id} block={block} />
+                <SideMessageBubble key={block.id} block={block} professional={professionalSurface} />
               ))}
               {activeSide.liveReasoning ? (
                 <SideMessageBubble
@@ -482,6 +494,7 @@ export function SideConversationPanel({
                     id: `live-reasoning-${activeSide.lastSeq || Date.now()}`,
                     text: activeSide.liveReasoning
                   }}
+                  professional={professionalSurface}
                 />
               ) : null}
               {activeSide.liveAssistant ? (
@@ -491,6 +504,7 @@ export function SideConversationPanel({
                     id: 'live-assistant',
                     text: activeSide.liveAssistant
                   }}
+                  professional={professionalSurface}
                 />
               ) : null}
               {activeSide.busy ? (
@@ -501,7 +515,7 @@ export function SideConversationPanel({
               ) : null}
               {activeSide.error ? (
                 <div className="rounded-[12px] border border-red-300/70 bg-red-500/10 px-3 py-2 text-[12px] text-red-700 dark:border-red-800/60 dark:bg-red-950/35 dark:text-red-200">
-                  {activeSide.error}
+                  {professionalSurface ? engineeringProfessionalAnswerText(activeSide.error) || t('sidePanelProfessionalError') : activeSide.error}
                 </div>
               ) : null}
             </>

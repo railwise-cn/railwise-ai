@@ -1,0 +1,20 @@
+{
+  "id": 10931083889,
+  "node_id": "MDg6QXJ0aWZhY3QxMDkzMTA4Mzg4OQ==",
+  "name": "candidate-installers-0.5.1-158",
+  "size_in_bytes": 839833294,
+  "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/10931083889",
+  "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/10931083889/zip",
+  "expired": false,
+  "digest": "sha256:935a072e88aab412aedab51cdccfc39363c6b1eb6ba50f2237c26e3a6878eca0",
+  "created_at": "2026-09-27T12:11:46Z",
+  "updated_at": "2026-09-27T12:11:46Z",
+  "expires_at": "2026-10-04T12:11:20Z",
+  "workflow_run": {
+    "id": 36316718463,
+    "repository_id": 1268259206,
+    "head_repository_id": 1268259206,
+    "head_branch": "codex/railwise-survey-convergence",
+    "head_sha": "9a7cd6c394d0f796ccb28f06f694439bf280227d"
+  }
+}

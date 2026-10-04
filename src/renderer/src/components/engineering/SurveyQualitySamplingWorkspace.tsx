@@ -86,7 +86,7 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
       <h4 ref={heading} tabIndex={-1} className="font-semibold">{t('samplingWorkspaceOpen')}</h4>
       <p className="leading-5 text-amber-900 dark:text-amber-200">{t('samplingWorkspaceBoundary')}</p>
       <p className="leading-5 text-ds-muted">{t('samplingWorkspaceExcluded')}</p>
-      <p className="break-all text-ds-muted">{t('samplingWorkspaceBinding', { id: binding.projectId, revision: binding.projectRevision })}</p>
+      <p className="text-ds-muted">{t('samplingProfessionalScope')}</p>
       <div className="space-y-3">
         <p className="leading-5 text-ds-muted">{t('samplingInputHint')}</p>
         <label className="block space-y-1"><span>{t('samplingProductType')}</span><input className={inputClass} value={productType} disabled={!ready || !!retry.current} onChange={event => { setProductType(event.target.value); setFreezeAck(false) }} /></label>
@@ -107,10 +107,9 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
       {error ? <div role="alert"><p>{t(errorKeys[error] ?? 'samplingFailed')}</p>{retry.current ? <button type="button" className={`${buttonClass} mt-2`} disabled={!ready} onClick={() => { if (retry.current) void execute(retry.current) }}>{t('samplingRetry')}</button> : null}</div> : null}
       {population ? <div className="space-y-3 border-t border-ds-border-muted pt-3">
         <h5 className="font-medium">{t('samplingFrozen')}<EngineeringEvidenceQuestion label={t('samplingFrozen')} reference={populationEvidence} disabled={!ready} /></h5>
-        <p className="break-all font-mono text-[11px]">{population.id} · {population.createdAt}</p>
+        <p className="text-ds-muted">{t('samplingPopulationSummary', { date: new Date(population.createdAt).toLocaleString() })}</p>
         <p className="break-all">{population.productType} · {population.unitProductType} · {t('samplingCount', { count: population.unitCount })}</p>
         <p className="whitespace-pre-wrap break-words">{population.definitionStatement}</p>
-        <details><summary className="cursor-pointer">{t('samplingRecordDetails')}</summary><p className="break-all font-mono text-[10px]">{population.populationHash}</p></details>
         <button type="button" className={buttonClass} disabled={!ready} onClick={() => loadUnits(population)}>{t('samplingViewUnits')}</button>
         <label className="block space-y-1"><span>{t('samplingStage')}</span><select className={inputClass} value={stage} disabled={!ready || !!retry.current} onChange={event => { setStage(event.target.value as SamplingStage | ''); setMode(''); setDrawAck(false) }}><option value="">{t('samplingChoose')}</option>{Object.entries(stageKeys).map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</select></label>
         <label className="block space-y-1"><span>{t('samplingMode')}</span><select className={inputClass} value={mode} disabled={!ready || !stage || !!retry.current} onChange={event => { setMode(event.target.value as SamplingMode | ''); setDrawAck(false) }}><option value="">{t('samplingChoose')}</option><option value="census">{t('samplingCensus')}</option>{!censusOnly ? <option value="table-1-simple-random">{t('samplingRandom')}</option> : null}</select></label>
@@ -120,9 +119,8 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
       </div> : null}
       {run ? <div className="space-y-3 border-t border-ds-border-muted pt-3">
         <h5 className="font-medium">{t('samplingRun')}<EngineeringEvidenceQuestion label={t('samplingRun')} reference={runEvidence} disabled={!ready} /></h5>
-        <p className="break-all font-mono text-[11px]">{run.id} · {run.createdAt}</p>
+        <p className="text-ds-muted">{t('samplingRunSummary', { date: new Date(run.createdAt).toLocaleString(), count: run.sampleSize })}</p>
         <p>{t(stageKeys[run.stage])} · {t(run.inspectionMode === 'census' ? 'samplingCensus' : 'samplingRandom')} · {t('samplingSelectedCount', { count: run.sampleSize })}</p>
-        <p className="break-all font-mono text-[11px]">{run.populationId}</p>
         <p className="leading-5 text-ds-muted">{t(run.randomSource === 'not-applicable' ? 'samplingSourceCensus' : 'samplingSourceRuntime')}</p>
         <div className="space-y-2" aria-label={t('samplingBatches')}><h6 className="font-medium">{t('samplingBatches')}</h6><ol className="space-y-2">{run.batches.map((batch, index) => <li key={batch.batchIndex} className="border border-ds-border-muted p-2"><p>{t('samplingBatch', { index: batch.batchIndex + 1, total: batch.batchSize, selected: batch.sampleSize })}<EngineeringEvidenceQuestion label={t('samplingBatch', { index: batch.batchIndex + 1, total: batch.batchSize, selected: batch.sampleSize })} reference={runEvidence} selector={{ path: ['batches', index], identity: { batchIndex: batch.batchIndex } }} disabled={!ready} /></p><p className="mt-1 leading-5 text-ds-muted">{t(run.inspectionMode === 'census' ? 'samplingBatchCensusMode' : batch.census ? 'samplingBatchCensusSmall' : 'samplingBatchRandom', { count: batch.nominalTableSampleSize })}</p></li>)}</ol></div>
         <p className="leading-5 text-ds-muted">{t('samplingSourceTable')}</p>
@@ -133,9 +131,9 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
       {current?.units ? pageView(current.units, 'units') : null}
       {current?.samples ? pageView(current.samples, 'samples') : null}
       {history ? <div className="space-y-2" aria-label={t(history.kind === 'populations' ? 'samplingPopulationHistory' : 'samplingRunHistory')}>
-        {history.page.unavailable.length ? <div role="status"><p>{t('samplingUnrestorable')}</p><ul className="mt-2 space-y-1">{history.page.unavailable.map(item => <li key={item.id} className="break-all">{item.id} · {t(item.reason === 'stale' ? 'samplingStale' : 'samplingIntegrity')}</li>)}</ul></div> : null}
+        {history.page.unavailable.length ? <div role="status"><p>{t('samplingUnrestorable')}</p><ul className="mt-2 space-y-1">{history.page.unavailable.map(item => <li key={item.id}>{t(item.reason === 'stale' ? 'samplingStale' : 'samplingIntegrity')}</li>)}</ul></div> : null}
         {!history.page.items.length ? <p>{t('samplingNoHistory')}</p> : null}
-        {history.kind === 'populations' ? history.page.items.map(item => <button key={item.id} type="button" className={`${buttonClass} block w-full break-all`} disabled={!ready} onClick={() => { setStage(''); setMode(''); void execute(async () => ({ population: await readSamplingPopulation(binding, item) })) }}>{t('samplingRestorePopulation')} · {item.id} · {item.createdAt}</button>) : history.page.items.map(item => <button key={item.id} type="button" className={`${buttonClass} block w-full break-all`} disabled={!ready} onClick={() => void execute(async () => ({ run: await readSamplingRun(binding, item) }))}>{t('samplingRestoreRun')} · {item.id} · {item.createdAt}</button>)}
+        {history.kind === 'populations' ? history.page.items.map(item => <button key={item.id} type="button" className={`${buttonClass} block w-full`} disabled={!ready} onClick={() => { setStage(''); setMode(''); void execute(async () => ({ population: await readSamplingPopulation(binding, item) })) }}>{t('samplingRestorePopulation')} · {t('samplingCreatedDate', { date: new Date(item.createdAt).toLocaleString() })}</button>) : history.page.items.map(item => <button key={item.id} type="button" className={`${buttonClass} block w-full`} disabled={!ready} onClick={() => void execute(async () => ({ run: await readSamplingRun(binding, item) }))}>{t('samplingRestoreRun')} · {t('samplingCreatedDate', { date: new Date(item.createdAt).toLocaleString() })}</button>)}
         <div className="flex flex-wrap gap-2">{history.page.offset > 0 ? <button type="button" className={buttonClass} disabled={!ready} onClick={() => loadHistory(history.kind, Math.max(0, history.page.offset - 20))}>{t('samplingPrevious')}</button> : null}{history.page.nextOffset !== null ? <button type="button" className={buttonClass} disabled={!ready} onClick={() => loadHistory(history.kind, history.page.nextOffset!)}>{t('samplingNext')}</button> : null}</div>
       </div> : null}
     </section> : null}

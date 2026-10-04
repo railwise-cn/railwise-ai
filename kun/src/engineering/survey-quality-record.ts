@@ -28,6 +28,10 @@ export function verifySurveyQualityRecord(inputs: readonly unknown[], checkpoint
   const originalRules = new Map<string, string>()
   const issues = new Map<string, { correctionId?: string; correctedArtifactSha256?: string; resolved: boolean }>()
   const corrections = new Set<string>()
+  const stages = new Map<string, { stageKind: 'planning' | 'process' | 'final' | 'acceptance'; status: 'started' | 'completed' | 'blocked' }>()
+  const applicability = new Map<string, { status: 'applicable' | 'not-applicable' | 'pending'; revoked: boolean }>()
+  const signoffs = new Map<string, { purpose: 'quality-review' | 'delivery-approval'; revoked: boolean }>()
+  const approvals = new Set<string>()
   let previousHash = SURVEY_QUALITY_CHAIN_GENESIS
   let previousTime = -Infinity
   let binding: { projectId: string; artifactSha256: string } | undefined
@@ -68,11 +72,49 @@ export function verifySurveyQualityRecord(inputs: readonly unknown[], checkpoint
         issue.correctionId = event.correctionId
         issue.correctedArtifactSha256 = event.correctedArtifactSha256
       }
-    } else {
+    } else if (event.kind === 'issue-rechecked') {
       const issue = issues.get(event.issueId)
       if (!issue || issue.resolved || issue.correctionId !== event.correctionId
         || issue.correctedArtifactSha256 !== event.recheckedArtifactSha256) error('recheck-without-current-correction')
       else issue.resolved = event.outcome === 'resolved'
+    } else if (event.kind === 'stage-started') {
+      if (stages.has(event.stageId)) error('duplicate-stage-id')
+      const order = ['planning', 'process', 'final', 'acceptance'].indexOf(event.stageKind)
+      const prior = order > 0 && [...stages.values()].some(stage => stage.stageKind === ['planning', 'process', 'final'][order - 1] && stage.status === 'completed')
+      if (order > 0 && !prior) error('stage-out-of-order')
+      if (!stages.has(event.stageId)) stages.set(event.stageId, { stageKind: event.stageKind, status: 'started' })
+    } else if (event.kind === 'stage-completed') {
+      const stage = stages.get(event.stageId)
+      if (!stage || stage.stageKind !== event.stageKind || stage.status !== 'started') error('stage-completion-without-start')
+      else stage.status = event.outcome === 'completed' ? 'completed' : 'blocked'
+    } else if (event.kind === 'rule-applicability') {
+      if (applicability.has(event.declarationId)) error('duplicate-applicability-id')
+      else applicability.set(event.declarationId, { status: event.status, revoked: false })
+    } else if (event.kind === 'rule-revoked') {
+      const declaration = applicability.get(event.declarationId)
+      if (!declaration || declaration.revoked) error('rule-revocation-without-active-declaration')
+      else declaration.revoked = true
+    } else if (event.kind === 'signoff-declared') {
+      if (signoffs.has(event.signoffId)) error('duplicate-signoff-id')
+      else signoffs.set(event.signoffId, { purpose: event.purpose, revoked: false })
+    } else if (event.kind === 'signoff-revoked') {
+      const signoff = signoffs.get(event.signoffId)
+      if (!signoff || signoff.revoked) error('signoff-revocation-without-active-signoff')
+      else signoff.revoked = true
+    } else {
+      if (approvals.has(event.approvalId)) error('duplicate-approval-id')
+      const acceptanceComplete = [...stages.values()].some(stage => stage.stageKind === 'acceptance' && stage.status === 'completed')
+      const unresolved = [...issues.values()].some(issue => !issue.resolved)
+      const declarations = [...applicability.values()].filter(declaration => !declaration.revoked)
+      const activeApplicable = declarations.filter(declaration => declaration.status === 'applicable')
+      const pending = declarations.some(declaration => declaration.status === 'pending')
+      const requiredSignoffs = new Set(event.requiredSignoffIds)
+      const activeDeliverySignoffs = [...signoffs.entries()].filter(([id, signoff]) => requiredSignoffs.has(id) && signoff.purpose === 'delivery-approval' && !signoff.revoked)
+      if (unresolved) error('approval-with-open-issues')
+      if (!acceptanceComplete) error('approval-before-acceptance')
+      if (!activeApplicable.length || pending) error('approval-without-applicable-rules')
+      if (activeDeliverySignoffs.length !== requiredSignoffs.size) error('approval-without-active-signoff')
+      approvals.add(event.approvalId)
     }
     previousHash = item.thisHash
     previousTime = Date.parse(item.occurredAt)
@@ -87,6 +129,97 @@ export function verifySurveyQualityRecord(inputs: readonly unknown[], checkpoint
   }
   return { valid: errors.length === 0, errors, openIssueCount: [...issues.values()].filter(issue => !issue.resolved).length,
     recordedCheckCount: checks.size, standardConformity: 'not-evaluated', humanSignatureVerification: 'not-evaluated' }
+}
+
+export type SurveyQualityGateSnapshot = {
+  schemaVersion: 1
+  status: 'not-evaluated' | 'blocked' | 'ready-for-external-approval'
+  reasons: Array<'versioned-stage-record-missing' | 'acceptance-stage-incomplete' | 'open-issues' | 'blocking-stage'
+    | 'applicability-not-evaluated' | 'rule-revoked' | 'signoff-missing' | 'signoff-revoked'
+    | 'approval-request-missing' | 'approval-request-incomplete' | 'record-integrity-failed'
+    | 'failed-quality-check' | 'quality-check-not-evaluated'>
+  completedStageKinds: Array<'planning' | 'process' | 'final' | 'acceptance'>
+  activeApplicableRuleIds: string[]
+  revokedRuleIds: string[]
+  activeSignoffIds: string[]
+  revokedSignoffIds: string[]
+  approvalRequestIds: string[]
+}
+
+/**
+ * Derives a conservative delivery gate from the append-only declarations.
+ * "ready-for-external-approval" is eligibility only; it never grants approval
+ * and cannot change a draft manifest's review status.
+ */
+export function evaluateSurveyQualityGate(inputs: readonly unknown[]): SurveyQualityGateSnapshot {
+  const integrity = verifySurveyQualityRecord(inputs)
+  const reasons = new Set<SurveyQualityGateSnapshot['reasons'][number]>()
+  const stages = new Map<string, { kind: 'planning' | 'process' | 'final' | 'acceptance'; status: 'started' | 'completed' | 'blocked' }>()
+  const rules = new Map<string, { status: 'applicable' | 'not-applicable' | 'pending'; revoked: boolean }>()
+  const signoffs = new Map<string, { purpose: 'quality-review' | 'delivery-approval'; revoked: boolean }>()
+  const requests = new Map<string, string[]>()
+  const checks = new Map<string, 'passed' | 'failed' | 'not-evaluated'>()
+  let hasVersionedLifecycle = false
+  for (const input of inputs) {
+    const parsed = SurveyQualityEventV1.safeParse(input)
+    if (!parsed.success) continue
+    const event = parsed.data.event
+    if (event.kind === 'stage-started') {
+      hasVersionedLifecycle = true
+      stages.set(event.stageId, { kind: event.stageKind, status: 'started' })
+    } else if (event.kind === 'stage-completed') {
+      hasVersionedLifecycle = true
+      const stage = stages.get(event.stageId)
+      if (stage) stage.status = event.outcome === 'completed' ? 'completed' : 'blocked'
+    } else if (event.kind === 'rule-applicability') {
+      hasVersionedLifecycle = true
+      rules.set(event.declarationId, { status: event.status, revoked: false })
+    } else if (event.kind === 'rule-revoked') {
+      hasVersionedLifecycle = true
+      const rule = rules.get(event.declarationId)
+      if (rule) rule.revoked = true
+    } else if (event.kind === 'signoff-declared') {
+      hasVersionedLifecycle = true
+      signoffs.set(event.signoffId, { purpose: event.purpose, revoked: false })
+    } else if (event.kind === 'signoff-revoked') {
+      hasVersionedLifecycle = true
+      const signoff = signoffs.get(event.signoffId)
+      if (signoff) signoff.revoked = true
+    } else if (event.kind === 'delivery-approval-requested') {
+      hasVersionedLifecycle = true
+      requests.set(event.approvalId, event.requiredSignoffIds)
+    } else if (event.kind === 'check' || event.kind === 'artifact-check') {
+      // An artifact-check is the latest explicit outcome for the same logical
+      // check and may move it back to passed after a correction.
+      checks.set(event.checkId, event.outcome)
+    }
+  }
+  const completedStageKinds = [...new Set([...stages.values()].filter(stage => stage.status === 'completed').map(stage => stage.kind))]
+  const activeApplicableRuleIds = [...rules.entries()].filter(([, rule]) => !rule.revoked && rule.status === 'applicable').map(([id]) => id)
+  const revokedRuleIds = [...rules.entries()].filter(([, rule]) => rule.revoked).map(([id]) => id)
+  const activeSignoffIds = [...signoffs.entries()].filter(([, signoff]) => !signoff.revoked && signoff.purpose === 'delivery-approval').map(([id]) => id)
+  const revokedSignoffIds = [...signoffs.entries()].filter(([, signoff]) => signoff.revoked).map(([id]) => id)
+  const approvalRequestIds = [...requests.keys()]
+  if (!integrity.valid) reasons.add('record-integrity-failed')
+  if (!hasVersionedLifecycle) reasons.add('versioned-stage-record-missing')
+  if (!completedStageKinds.includes('acceptance')) reasons.add('acceptance-stage-incomplete')
+  if (integrity.openIssueCount > 0) reasons.add('open-issues')
+  if ([...stages.values()].some(stage => stage.status === 'blocked')) reasons.add('blocking-stage')
+  if ([...checks.values()].some(outcome => outcome === 'failed')) reasons.add('failed-quality-check')
+  if ([...checks.values()].some(outcome => outcome === 'not-evaluated')) reasons.add('quality-check-not-evaluated')
+  if (!rules.size || [...rules.values()].some(rule => !rule.revoked && rule.status === 'pending')) reasons.add('applicability-not-evaluated')
+  if (revokedRuleIds.length) reasons.add('rule-revoked')
+  if (!activeApplicableRuleIds.length) reasons.add('applicability-not-evaluated')
+  if (!activeSignoffIds.length) reasons.add('signoff-missing')
+  if (revokedSignoffIds.length && !activeSignoffIds.length) reasons.add('signoff-revoked')
+  if (!approvalRequestIds.length) reasons.add('approval-request-missing')
+  for (const required of requests.values()) {
+    if (required.some(id => !activeSignoffIds.includes(id))) reasons.add('approval-request-incomplete')
+  }
+  const outputReasons = [...reasons]
+  const eligible = integrity.valid && hasVersionedLifecycle && outputReasons.length === 0
+  return { schemaVersion: 1, status: !hasVersionedLifecycle ? 'not-evaluated' : eligible ? 'ready-for-external-approval' : 'blocked',
+    reasons: outputReasons, completedStageKinds, activeApplicableRuleIds, revokedRuleIds, activeSignoffIds, revokedSignoffIds, approvalRequestIds }
 }
 
 /** Creates a new array; rejects broken history and invalid transitions before returning. */

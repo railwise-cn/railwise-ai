@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SurveyQualityEventV1 } from '../contracts/survey-standard-quality.js'
-import { appendSurveyQualityEvent, evaluateSurveyFinalArtifactCoverage, verifySurveyQualityRecord } from './survey-quality-record.js'
+import { appendSurveyQualityEvent, evaluateSurveyFinalArtifactCoverage, evaluateSurveyQualityGate, verifySurveyQualityRecord } from './survey-quality-record.js'
 
 type Input = Omit<SurveyQualityEventV1, 'sequence' | 'previousHash' | 'thisHash'>
 const sha = '1'.repeat(64)
@@ -223,5 +223,55 @@ describe('final artifact recorded check coverage', () => {
     expect(evaluateSurveyFinalArtifactCoverage(history, { ...request, projectId: 'other' })).toMatchObject({
       coverageStatus: 'not-evaluated', reasons: ['requested-project-mismatch']
     })
+  })
+})
+
+describe('versioned quality lifecycle gate', () => {
+  const rule = { standardCode: 'TEST-ONLY', standardVersion: '2026', ruleId: 'height-closure', ruleVersion: '1' }
+  const append = (history: SurveyQualityEventV1[], event: Input['event']) => appendSurveyQualityEvent(history,
+    input(`lifecycle-${history.length + 1}`, event))
+  const completeStage = (history: SurveyQualityEventV1[], stageId: string, stageKind: 'planning' | 'process' | 'final' | 'acceptance') => {
+    let next = append(history, { kind: 'stage-started', stageId, stageKind, policyVersion: 'quality-stage-v1', checkedScope: `${stageKind}-scope`, evidenceSha256: sha })
+    return append(next, { kind: 'stage-completed', stageId, stageKind, outcome: 'completed', evidenceSha256: sha })
+  }
+  it('requires ordered stages and keeps legacy records unevaluated', () => {
+    expect(evaluateSurveyQualityGate([])).toMatchObject({ status: 'not-evaluated', reasons: expect.arrayContaining(['versioned-stage-record-missing']) })
+    expect(() => appendSurveyQualityEvent([], input('lifecycle-1', {
+      kind: 'stage-started', stageId: 'process', stageKind: 'process', policyVersion: 'quality-stage-v1', checkedScope: 'process-scope', evidenceSha256: sha
+    }))).toThrow('stage-out-of-order')
+    let history: SurveyQualityEventV1[] = []
+    history = completeStage(history, 'planning', 'planning')
+    history = completeStage(history, 'process', 'process')
+    expect(evaluateSurveyQualityGate(history)).toMatchObject({ status: 'blocked', completedStageKinds: ['planning', 'process'] })
+  })
+  it('tracks applicability and revocation without turning a declaration into approval', () => {
+    let history: SurveyQualityEventV1[] = []
+    for (const [id, kind] of [['planning', 'planning'], ['process', 'process'], ['final', 'final'], ['acceptance', 'acceptance']] as const)
+      history = completeStage(history, id, kind)
+    history = append(history, { kind: 'rule-applicability', declarationId: 'rule-declaration', rule, status: 'applicable', rationale: 'project-scope', evidenceSha256: sha })
+    history = append(history, { kind: 'signoff-declared', signoffId: 'delivery-signoff', purpose: 'delivery-approval', actorKey: 'reviewer-key', evidenceSha256: sha })
+    history = append(history, { kind: 'delivery-approval-requested', approvalId: 'approval-1', requiredSignoffIds: ['delivery-signoff'], evidenceSha256: sha })
+    expect(evaluateSurveyQualityGate(history)).toMatchObject({ status: 'ready-for-external-approval', activeApplicableRuleIds: ['rule-declaration'], activeSignoffIds: ['delivery-signoff'], approvalRequestIds: ['approval-1'] })
+    history = append(history, { kind: 'rule-revoked', declarationId: 'rule-declaration', reason: 'basis-expired', evidenceSha256: sha })
+    expect(evaluateSurveyQualityGate(history)).toMatchObject({ status: 'blocked', reasons: expect.arrayContaining(['rule-revoked', 'applicability-not-evaluated']), revokedRuleIds: ['rule-declaration'] })
+    expect(evaluateSurveyQualityGate(history)).not.toMatchObject({ deliveryApproval: 'granted' })
+  })
+  it('requires an active delivery signoff and acceptance before recording an approval request', () => {
+    let history: SurveyQualityEventV1[] = []
+    history = append(history, { kind: 'rule-applicability', declarationId: 'rule-declaration', rule, status: 'applicable', rationale: 'project-scope', evidenceSha256: sha })
+    expect(() => append(history, { kind: 'delivery-approval-requested', approvalId: 'approval-early', requiredSignoffIds: ['missing-signoff'], evidenceSha256: sha })).toThrow('approval-before-acceptance')
+  })
+
+  it('blocks external-approval eligibility on the latest failed or unevaluated quality check', () => {
+    let history: SurveyQualityEventV1[] = []
+    for (const [id, kind] of [['planning', 'planning'], ['process', 'process'], ['final', 'final'], ['acceptance', 'acceptance']] as const)
+      history = completeStage(history, id, kind)
+    history = append(history, { kind: 'rule-applicability', declarationId: 'rule-declaration', rule, status: 'applicable', rationale: 'project-scope', evidenceSha256: sha })
+    history = append(history, { kind: 'signoff-declared', signoffId: 'delivery-signoff', purpose: 'delivery-approval', actorKey: 'reviewer-key', evidenceSha256: sha })
+    history = append(history, { kind: 'delivery-approval-requested', approvalId: 'approval-1', requiredSignoffIds: ['delivery-signoff'], evidenceSha256: sha })
+    history = append(history, { kind: 'check', checkId: 'final-precision', outcome: 'failed', evidenceSha256: sha })
+    expect(evaluateSurveyQualityGate(history)).toMatchObject({ status: 'blocked', reasons: expect.arrayContaining(['failed-quality-check']) })
+    history = append(history, { kind: 'artifact-check', checkId: 'final-precision', checkedArtifactSha256: sha, outcome: 'passed', evidenceSha256: sha })
+    expect(evaluateSurveyQualityGate(history).reasons).not.toContain('failed-quality-check')
   })
 })

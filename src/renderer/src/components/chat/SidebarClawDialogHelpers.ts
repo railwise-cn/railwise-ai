@@ -8,6 +8,7 @@ import type {
   ClawImProvider
 } from '@shared/app-settings'
 import { DEFAULT_PHONE_AGENT_NAME } from '@shared/app-settings'
+import brand from '@shared/product-brand.json'
 
 export type ClawImDialogMode = 'add' | 'edit'
 export type ClawConnectionMode = 'official-install-qr'
@@ -63,7 +64,7 @@ export function formatClawInstallError(
 ): string {
   const value = message.trim()
   if (/Protected IM credential storage must be authorized/i.test(value)) {
-    return t('connectPhoneCredentialStorageRequired')
+    return t('connectPhoneCredentialStorageRequired', { productName: brand.platform })
   }
   if (/IM_INSTALL_POLL_TIMEOUT/i.test(value)) {
     return t('clawAddImOfficialQrPollRetrying')

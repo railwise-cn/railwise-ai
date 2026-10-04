@@ -1,0 +1,50 @@
+[
+  {
+    "name": "legacy",
+    "source": "static fabricated QA data only; no saved history or business records read",
+    "calls": [
+      {
+        "toolName": "survey_read_context",
+        "arguments": {
+          "networkId": "qa-network",
+          "networkRevision": 2,
+          "pointId": "S1",
+          "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "validSchema": true,
+        "exactReference": true
+      }
+    ],
+    "errors": []
+  },
+  {
+    "name": "typed",
+    "source": "static fabricated QA data only; no saved history or business records read",
+    "calls": [
+      {
+        "toolName": "survey_read_evidence",
+        "arguments": {
+          "kind": "network",
+          "projectId": "qa-project",
+          "projectRevision": 2,
+          "networkId": "qa-network",
+          "networkRevision": 2,
+          "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "selector": {
+            "path": [
+              "unknownPoints",
+              0
+            ],
+            "identity": {
+              "id": "S1"
+            }
+          },
+          "schemaVersion": 1
+        },
+        "validSchema": true,
+        "exactReference": true
+      }
+    ],
+    "errors": []
+  }
+]

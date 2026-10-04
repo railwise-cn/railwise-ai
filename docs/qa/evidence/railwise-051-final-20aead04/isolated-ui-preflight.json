@@ -1,0 +1,45 @@
+{
+  "01-isolated-typed-after-restart.jpg": {
+    "screenshotPixels": [
+      2560,
+      1680
+    ]
+  },
+  "02-isolated-correct-quantity.jpg": {
+    "screenshotPixels": [
+      2560,
+      1680
+    ]
+  },
+  "03-isolated-light-deliverables.jpg": {
+    "screenshotPixels": [
+      2560,
+      1680
+    ]
+  },
+  "04-resize-attempt-unchanged.jpg": {
+    "screenshotPixels": [
+      2560,
+      1680
+    ]
+  },
+  "05-isolated-light-960x840.jpg": {
+    "screenshotPixels": [
+      1920,
+      1680
+    ]
+  },
+  "06-isolated-system-wide.jpg": {
+    "screenshotPixels": [
+      3840,
+      1970
+    ]
+  },
+  "07-resize-attempt-wide-unchanged.jpg": {
+    "screenshotPixels": [
+      3840,
+      1970
+    ]
+  },
+  "note": "CUA native captures at 2x scale. Width 960x840, normal 1280x840 and zoom 1920x985 checked; 960x640 attempts did not resize successfully and are not counted. Theme restored to system. Final #166 matrix still pending."
+}

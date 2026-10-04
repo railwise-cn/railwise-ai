@@ -1,0 +1,1073 @@
+{
+  "conclusion": "success",
+  "headSha": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+  "jobs": [
+    {
+      "completedAt": "2026-09-27T19:22:46Z",
+      "conclusion": "success",
+      "databaseId": 108689758389,
+      "name": "Prepare release version",
+      "startedAt": "2026-09-27T19:22:35Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T19:22:36Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T19:22:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:22:41Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T19:22:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:22:44Z",
+          "conclusion": "success",
+          "name": "Compute release version from tag",
+          "number": 3,
+          "startedAt": "2026-09-27T19:22:41Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:22:44Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 6,
+          "startedAt": "2026-09-27T19:22:44Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:22:44Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 7,
+          "startedAt": "2026-09-27T19:22:44Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689758389"
+    },
+    {
+      "completedAt": "2026-09-27T19:22:33Z",
+      "conclusion": "skipped",
+      "databaseId": 108689758932,
+      "name": "Cleanup updater acceptance",
+      "startedAt": "2026-09-27T19:22:33Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689758932"
+    },
+    {
+      "completedAt": "2026-09-27T19:22:33Z",
+      "conclusion": "skipped",
+      "databaseId": 108689758949,
+      "name": "private-updater-acceptance",
+      "startedAt": "2026-09-27T19:22:33Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689758949"
+    },
+    {
+      "completedAt": "2026-09-27T19:22:33Z",
+      "conclusion": "skipped",
+      "databaseId": 108689759023,
+      "name": "Repair website updater metadata cache",
+      "startedAt": "2026-09-27T19:22:33Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689759023"
+    },
+    {
+      "completedAt": "2026-09-27T19:22:33Z",
+      "conclusion": "skipped",
+      "databaseId": 108689759139,
+      "name": "Native updater acceptance",
+      "startedAt": "2026-09-27T19:22:33Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689759139"
+    },
+    {
+      "completedAt": "2026-09-27T19:22:33Z",
+      "conclusion": "skipped",
+      "databaseId": 108689759467,
+      "name": "Roll back WorkWise Stable pointers",
+      "startedAt": "2026-09-27T19:22:33Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689759467"
+    },
+    {
+      "completedAt": "2026-09-27T19:22:33Z",
+      "conclusion": "skipped",
+      "databaseId": 108689776424,
+      "name": "isolated-survey-candidate",
+      "startedAt": "2026-09-27T19:22:39Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689776424"
+    },
+    {
+      "completedAt": "2026-09-27T21:23:26Z",
+      "conclusion": "success",
+      "databaseId": 108689793171,
+      "name": "Two-hour pre-release stability",
+      "startedAt": "2026-09-27T19:22:48Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T19:22:49Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T19:22:48Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:22:52Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T19:22:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:22:58Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-27T19:22:52Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T19:23:24Z",
+          "conclusion": "success",
+          "name": "Run npm ci",
+          "number": 4,
+          "startedAt": "2026-09-27T19:22:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:24Z",
+          "conclusion": "success",
+          "name": "Run npm run test:stability",
+          "number": 5,
+          "startedAt": "2026-09-27T19:23:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:24Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 9,
+          "startedAt": "2026-09-27T21:23:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:24Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 10,
+          "startedAt": "2026-09-27T21:23:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:24Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-09-27T21:23:24Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108689793171"
+    },
+    {
+      "completedAt": "2026-09-27T21:26:11Z",
+      "conclusion": "success",
+      "databaseId": 108711060705,
+      "name": "MarkItDown darwin arm64",
+      "startedAt": "2026-09-27T21:23:34Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:23:36Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:23:34Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:43Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T21:23:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:24:02Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-27T21:23:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:24:07Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-python@v5",
+          "number": 4,
+          "startedAt": "2026-09-27T21:24:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:24:26Z",
+          "conclusion": "success",
+          "name": "Install audited sidecar dependencies",
+          "number": 5,
+          "startedAt": "2026-09-27T21:24:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:22Z",
+          "conclusion": "success",
+          "name": "Build native onedir sidecar",
+          "number": 6,
+          "startedAt": "2026-09-27T21:24:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:24Z",
+          "conclusion": "success",
+          "name": "Generate and verify dependency SBOM",
+          "number": 7,
+          "startedAt": "2026-09-27T21:25:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:35Z",
+          "conclusion": "success",
+          "name": "Install PPT Master verifier dependencies",
+          "number": 8,
+          "startedAt": "2026-09-27T21:25:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:40Z",
+          "conclusion": "success",
+          "name": "Verify native PPT Master export/import roundtrip",
+          "number": 9,
+          "startedAt": "2026-09-27T21:25:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:57Z",
+          "conclusion": "success",
+          "name": "Archive macOS sidecar with framework links and permissions",
+          "number": 10,
+          "startedAt": "2026-09-27T21:25:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:06Z",
+          "conclusion": "success",
+          "name": "Upload archived macOS sidecar",
+          "number": 11,
+          "startedAt": "2026-09-27T21:25:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:06Z",
+          "conclusion": "skipped",
+          "name": "Upload native Windows sidecar",
+          "number": 12,
+          "startedAt": "2026-09-27T21:26:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:06Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-python@v5",
+          "number": 22,
+          "startedAt": "2026-09-27T21:26:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:07Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 23,
+          "startedAt": "2026-09-27T21:26:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:07Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 24,
+          "startedAt": "2026-09-27T21:26:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:08Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 25,
+          "startedAt": "2026-09-27T21:26:07Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108711060705"
+    },
+    {
+      "completedAt": "2026-09-27T21:26:16Z",
+      "conclusion": "success",
+      "databaseId": 108711060751,
+      "name": "MarkItDown win32 x64",
+      "startedAt": "2026-09-27T21:23:28Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:23:30Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:23:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:40Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T21:23:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:24:09Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-27T21:23:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:24:14Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-python@v5",
+          "number": 4,
+          "startedAt": "2026-09-27T21:24:09Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:02Z",
+          "conclusion": "success",
+          "name": "Install audited sidecar dependencies",
+          "number": 5,
+          "startedAt": "2026-09-27T21:24:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:44Z",
+          "conclusion": "success",
+          "name": "Build native onedir sidecar",
+          "number": 6,
+          "startedAt": "2026-09-27T21:25:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:45Z",
+          "conclusion": "success",
+          "name": "Generate and verify dependency SBOM",
+          "number": 7,
+          "startedAt": "2026-09-27T21:25:44Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:59Z",
+          "conclusion": "success",
+          "name": "Install PPT Master verifier dependencies",
+          "number": 8,
+          "startedAt": "2026-09-27T21:25:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:03Z",
+          "conclusion": "success",
+          "name": "Verify native PPT Master export/import roundtrip",
+          "number": 9,
+          "startedAt": "2026-09-27T21:25:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:03Z",
+          "conclusion": "skipped",
+          "name": "Archive macOS sidecar with framework links and permissions",
+          "number": 10,
+          "startedAt": "2026-09-27T21:26:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:03Z",
+          "conclusion": "skipped",
+          "name": "Upload archived macOS sidecar",
+          "number": 11,
+          "startedAt": "2026-09-27T21:26:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:12Z",
+          "conclusion": "success",
+          "name": "Upload native Windows sidecar",
+          "number": 12,
+          "startedAt": "2026-09-27T21:26:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:12Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-python@v5",
+          "number": 22,
+          "startedAt": "2026-09-27T21:26:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:12Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 23,
+          "startedAt": "2026-09-27T21:26:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:14Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 24,
+          "startedAt": "2026-09-27T21:26:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:14Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 25,
+          "startedAt": "2026-09-27T21:26:14Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108711060751"
+    },
+    {
+      "completedAt": "2026-09-27T21:26:50Z",
+      "conclusion": "success",
+      "databaseId": 108711060753,
+      "name": "MarkItDown darwin x64",
+      "startedAt": "2026-09-27T21:23:28Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:23:30Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:23:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:37Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T21:23:30Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:51Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-27T21:23:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:23:54Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-python@v5",
+          "number": 4,
+          "startedAt": "2026-09-27T21:23:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:24:33Z",
+          "conclusion": "success",
+          "name": "Install audited sidecar dependencies",
+          "number": 5,
+          "startedAt": "2026-09-27T21:23:54Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:25:59Z",
+          "conclusion": "success",
+          "name": "Build native onedir sidecar",
+          "number": 6,
+          "startedAt": "2026-09-27T21:24:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:02Z",
+          "conclusion": "success",
+          "name": "Generate and verify dependency SBOM",
+          "number": 7,
+          "startedAt": "2026-09-27T21:25:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:18Z",
+          "conclusion": "success",
+          "name": "Install PPT Master verifier dependencies",
+          "number": 8,
+          "startedAt": "2026-09-27T21:26:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:23Z",
+          "conclusion": "success",
+          "name": "Verify native PPT Master export/import roundtrip",
+          "number": 9,
+          "startedAt": "2026-09-27T21:26:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:37Z",
+          "conclusion": "success",
+          "name": "Archive macOS sidecar with framework links and permissions",
+          "number": 10,
+          "startedAt": "2026-09-27T21:26:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:46Z",
+          "conclusion": "success",
+          "name": "Upload archived macOS sidecar",
+          "number": 11,
+          "startedAt": "2026-09-27T21:26:37Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:46Z",
+          "conclusion": "skipped",
+          "name": "Upload native Windows sidecar",
+          "number": 12,
+          "startedAt": "2026-09-27T21:26:46Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:46Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-python@v5",
+          "number": 22,
+          "startedAt": "2026-09-27T21:26:46Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:46Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 23,
+          "startedAt": "2026-09-27T21:26:46Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:47Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 24,
+          "startedAt": "2026-09-27T21:26:46Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:26:48Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 25,
+          "startedAt": "2026-09-27T21:26:47Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108711060753"
+    },
+    {
+      "completedAt": "2026-09-27T21:50:16Z",
+      "conclusion": "success",
+      "databaseId": 108711668314,
+      "name": "Build macOS",
+      "startedAt": "2026-09-27T21:26:59Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:27:01Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:26:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:09Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T21:27:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:26Z",
+          "conclusion": "success",
+          "name": "Set up Node.js",
+          "number": 3,
+          "startedAt": "2026-09-27T21:27:09Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:28:00Z",
+          "conclusion": "success",
+          "name": "Install dependencies",
+          "number": 4,
+          "startedAt": "2026-09-27T21:27:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:28:03Z",
+          "conclusion": "success",
+          "name": "Prepare checksummed Electron runtime",
+          "number": 5,
+          "startedAt": "2026-09-27T21:28:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:28:16Z",
+          "conclusion": "success",
+          "name": "Download Apple Silicon MarkItDown sidecar",
+          "number": 6,
+          "startedAt": "2026-09-27T21:28:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:28:32Z",
+          "conclusion": "success",
+          "name": "Download Intel MarkItDown sidecar",
+          "number": 7,
+          "startedAt": "2026-09-27T21:28:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:28:35Z",
+          "conclusion": "success",
+          "name": "Restore macOS sidecars with framework links and permissions",
+          "number": 8,
+          "startedAt": "2026-09-27T21:28:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:29:18Z",
+          "conclusion": "success",
+          "name": "Verify both macOS sidecars",
+          "number": 9,
+          "startedAt": "2026-09-27T21:28:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:29:32Z",
+          "conclusion": "success",
+          "name": "Verify managed CLI upstreams on macOS",
+          "number": 10,
+          "startedAt": "2026-09-27T21:29:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:29:32Z",
+          "conclusion": "success",
+          "name": "Resolve signing mode",
+          "number": 11,
+          "startedAt": "2026-09-27T21:29:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:29:32Z",
+          "conclusion": "success",
+          "name": "Decode Apple signing credentials",
+          "number": 12,
+          "startedAt": "2026-09-27T21:29:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:29:37Z",
+          "conclusion": "success",
+          "name": "Verify Apple signing credentials",
+          "number": 13,
+          "startedAt": "2026-09-27T21:29:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:46:59Z",
+          "conclusion": "success",
+          "name": "Build signed macOS packages",
+          "number": 14,
+          "startedAt": "2026-09-27T21:29:37Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:46:59Z",
+          "conclusion": "skipped",
+          "name": "Build unsigned macOS packages",
+          "number": 15,
+          "startedAt": "2026-09-27T21:46:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:47:40Z",
+          "conclusion": "success",
+          "name": "Verify MarkItDown is packaged in both macOS applications",
+          "number": 16,
+          "startedAt": "2026-09-27T21:46:59Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:48:42Z",
+          "conclusion": "success",
+          "name": "Verify packaged macOS Runtime native dependency",
+          "number": 17,
+          "startedAt": "2026-09-27T21:47:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:48:45Z",
+          "conclusion": "success",
+          "name": "Generate macOS update metadata",
+          "number": 18,
+          "startedAt": "2026-09-27T21:48:42Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:49:30Z",
+          "conclusion": "success",
+          "name": "Verify final signed macOS artifacts",
+          "number": 19,
+          "startedAt": "2026-09-27T21:48:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:50:11Z",
+          "conclusion": "success",
+          "name": "Upload macOS installers",
+          "number": 20,
+          "startedAt": "2026-09-27T21:49:30Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:50:12Z",
+          "conclusion": "success",
+          "name": "Post Set up Node.js",
+          "number": 39,
+          "startedAt": "2026-09-27T21:50:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:50:13Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 40,
+          "startedAt": "2026-09-27T21:50:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:50:13Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 41,
+          "startedAt": "2026-09-27T21:50:13Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108711668314"
+    },
+    {
+      "completedAt": "2026-09-27T21:33:01Z",
+      "conclusion": "success",
+      "databaseId": 108711668379,
+      "name": "Build Windows",
+      "startedAt": "2026-09-27T21:26:52Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:26:53Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:26:52Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:02Z",
+          "conclusion": "success",
+          "name": "Check out tag",
+          "number": 2,
+          "startedAt": "2026-09-27T21:26:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:20Z",
+          "conclusion": "success",
+          "name": "Set up Node.js",
+          "number": 3,
+          "startedAt": "2026-09-27T21:27:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:48Z",
+          "conclusion": "success",
+          "name": "Install dependencies",
+          "number": 4,
+          "startedAt": "2026-09-27T21:27:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:51Z",
+          "conclusion": "success",
+          "name": "Prepare checksummed Electron runtime",
+          "number": 5,
+          "startedAt": "2026-09-27T21:27:48Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:53Z",
+          "conclusion": "success",
+          "name": "Download Windows MarkItDown sidecar",
+          "number": 6,
+          "startedAt": "2026-09-27T21:27:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:27:55Z",
+          "conclusion": "success",
+          "name": "Verify Windows sidecar",
+          "number": 7,
+          "startedAt": "2026-09-27T21:27:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:28:08Z",
+          "conclusion": "success",
+          "name": "Verify managed CLI upstreams on Windows",
+          "number": 8,
+          "startedAt": "2026-09-27T21:27:55Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:32:49Z",
+          "conclusion": "success",
+          "name": "Build Windows installer",
+          "number": 9,
+          "startedAt": "2026-09-27T21:28:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:32:50Z",
+          "conclusion": "success",
+          "name": "Verify MarkItDown is packaged in the Windows application",
+          "number": 10,
+          "startedAt": "2026-09-27T21:32:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:32:51Z",
+          "conclusion": "success",
+          "name": "Verify packaged Windows Runtime native dependency",
+          "number": 11,
+          "startedAt": "2026-09-27T21:32:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:32:58Z",
+          "conclusion": "success",
+          "name": "Upload Windows installer",
+          "number": 12,
+          "startedAt": "2026-09-27T21:32:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:32:58Z",
+          "conclusion": "success",
+          "name": "Post Set up Node.js",
+          "number": 23,
+          "startedAt": "2026-09-27T21:32:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:33:00Z",
+          "conclusion": "success",
+          "name": "Post Check out tag",
+          "number": 24,
+          "startedAt": "2026-09-27T21:32:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:33:00Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 25,
+          "startedAt": "2026-09-27T21:33:00Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108711668379"
+    },
+    {
+      "completedAt": "2026-09-27T21:51:43Z",
+      "conclusion": "success",
+      "databaseId": 108715617691,
+      "name": "Verify three-client candidate",
+      "startedAt": "2026-09-27T21:50:18Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:50:21Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:50:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:50:26Z",
+          "conclusion": "success",
+          "name": "Check out candidate",
+          "number": 2,
+          "startedAt": "2026-09-27T21:50:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:51:06Z",
+          "conclusion": "success",
+          "name": "Download candidate artifacts",
+          "number": 3,
+          "startedAt": "2026-09-27T21:50:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:51:15Z",
+          "conclusion": "success",
+          "name": "Verify update metadata and select three clients",
+          "number": 4,
+          "startedAt": "2026-09-27T21:51:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:51:42Z",
+          "conclusion": "success",
+          "name": "Upload verified three-client candidate",
+          "number": 5,
+          "startedAt": "2026-09-27T21:51:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:51:42Z",
+          "conclusion": "success",
+          "name": "Post Check out candidate",
+          "number": 10,
+          "startedAt": "2026-09-27T21:51:42Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:51:42Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-09-27T21:51:42Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108715617691"
+    },
+    {
+      "completedAt": "2026-09-27T21:50:16Z",
+      "conclusion": "skipped",
+      "databaseId": 108715618452,
+      "name": "Publish GitHub Release",
+      "startedAt": "2026-09-27T21:50:16Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108715618452"
+    },
+    {
+      "completedAt": "2026-09-27T21:53:18Z",
+      "conclusion": "success",
+      "databaseId": 108715858603,
+      "name": "Verify final candidate on macOS",
+      "startedAt": "2026-09-27T21:51:49Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-27T21:51:51Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-27T21:51:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:51:57Z",
+          "conclusion": "success",
+          "name": "Check out candidate",
+          "number": 2,
+          "startedAt": "2026-09-27T21:51:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:52:30Z",
+          "conclusion": "success",
+          "name": "Download final candidate installers",
+          "number": 3,
+          "startedAt": "2026-09-27T21:51:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:53:15Z",
+          "conclusion": "success",
+          "name": "Verify final candidate DMGs",
+          "number": 4,
+          "startedAt": "2026-09-27T21:52:30Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:53:16Z",
+          "conclusion": "success",
+          "name": "Post Check out candidate",
+          "number": 8,
+          "startedAt": "2026-09-27T21:53:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-27T21:53:17Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-09-27T21:53:16Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275/job/108715858603"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275"
+}

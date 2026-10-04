@@ -1,0 +1,12 @@
+{
+  "sourceHead": "d31f03d0f85e91a6197ac0502aa35a41af1c1a57",
+  "version": "0.5.1",
+  "app": "/private/tmp/railwise-professional-candidate/installed/RailWise AI Candidate d31f03d0f85e.app",
+  "asarSha256": "8ec7b90a242bbd0df806846e12a3d0b0d0982602acf619e6ee0786dabd8b85ba",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headd31f03d0f85e",
+  "signature": "ad-hoc; codesign --verify --deep --strict passed",
+  "notarized": false,
+  "updaterRoundTrip": "not performed for this increment",
+  "publicRelease": false,
+  "signatureOutput": ""
+}

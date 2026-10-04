@@ -2,10 +2,42 @@ import { useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SurveyGeneralizedWResultV1, SurveyVceTrialOutputV1, SurveyHuberTrialOutputV1, SurveyStatisticalFamilyOutputV1 } from '@shared/survey-advanced-trials'
 import { EngineeringEvidenceQuestion } from './EngineeringEvidenceQuestion'
+import { engineeringProfessionalAnswerText } from './engineering-professional-text'
 
 const number = (value: number): string => Number(value.toPrecision(12)).toString()
 const cell = 'break-words border-b border-ds-border-muted px-2 py-2 text-left align-top'
 const scroll = 'max-h-96 max-w-full overflow-auto rounded border border-ds-border-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent'
+function StatisticalDeclaration({ declaration }: { declaration: SurveyGeneralizedWResultV1['statisticalDeclaration'] }): ReactElement | null {
+  const { t, i18n } = useTranslation('common')
+  if (!declaration) return null
+  const hypotheses: Record<string, string> = {
+    'H0: each declared bias component is zero under the supplied stochastic model.': 'advancedDeclarationBiasH0',
+    'H1: at least one declared bias component is non-zero under the supplied stochastic model.': 'advancedDeclarationBiasH1',
+    'H0: each declared member statistic is consistent with its supplied null distribution.': 'advancedDeclarationMemberH0',
+    'H1: at least one declared member statistic is inconsistent with its supplied null distribution.': 'advancedDeclarationMemberH1'
+  }
+  const hypothesis = (text: string): string => hypotheses[text] ? t(hypotheses[text]) : engineeringProfessionalAnswerText(text, i18n.language).replace(/^H[01]\s*[:：]\s*/i, '') || t('advancedDeclarationHypothesisUnavailable')
+  const modelKeys: Record<string, string> = { 'fixed-linear-known-covariance-generalized-w-1': 'advancedDeclarationWModel', 'declared-statistical-family-1': 'advancedDeclarationFamilyModel' }
+  const model = t(modelKeys[declaration.modelVersion] ?? 'advancedDeclarationSuppliedModel')
+  const covariance = declaration.covarianceModelVersion === null ? t('advancedNotRecorded') : t(declaration.covarianceModelVersion === 'caller-declared-known-apriori-absolute-observation-covariance' ? 'advancedDeclarationPriorCovariance' : 'advancedDeclarationSuppliedCovariance')
+  const sourceKeys: Record<string, string> = { 'survey/generalized-w/family': 'advancedDeclarationBiasSource', 'survey/statistical-family/members': 'advancedDeclarationMemberSource' }
+  const source = sourceKeys[declaration.testFamily.source] ? t(sourceKeys[declaration.testFamily.source]) : t('advancedDeclarationSuppliedSource')
+  const reviewKeys = { 'not-evaluated': 'advancedDeclarationReviewUnverified', 'not-recorded': 'advancedDeclarationReviewUnrecorded', pending: 'advancedDeclarationReviewPending', confirmed: 'advancedDeclarationReviewConfirmed' }
+  const corrections = { 'not-applied': 'advancedDeclarationCorrectionNone', bonferroni: 'advancedDeclarationCorrectionBonferroni', holm: 'advancedDeclarationCorrectionHolm' }
+  const review = declaration.humanReview.declaration === 'No human engineering review or professional sign-off is recorded by this trial.'
+    ? t('advancedDeclarationNoSignoff')
+    : engineeringProfessionalAnswerText(declaration.humanReview.declaration, i18n.language) || t('advancedDeclarationNoSignoff')
+  return <details className="rounded border border-ds-border-muted">
+    <summary className="cursor-pointer px-3 py-2">{t('advancedStatisticalDeclaration')}</summary>
+    <div className="space-y-1 px-3 pb-3 text-xs text-ds-muted">
+      <p>{t('advancedHypotheses', { h0: hypothesis(declaration.hypotheses.h0), h1: hypothesis(declaration.hypotheses.h1) })}</p>
+      <p>{t('advancedStatisticalModel', { model, covariance })}</p>
+      <p>{t('advancedDeclarationFamily', { source, alpha: number(declaration.testFamily.alpha), correction: t(corrections[declaration.testFamily.correction]) })}</p>
+      <p>{t('advancedHumanReview', { status: t(reviewKeys[declaration.humanReview.status]), declaration: review })}</p>
+      <p>{t('advancedDeclarationBoundary')}</p>
+    </div>
+  </details>
+}
 export const advancedOutcomeKeys: Record<string, string> = {
   calculated: 'advancedCalculated', stationary: 'advancedStationary', evaluated: 'advancedEvaluated', 'rank-or-conditioning': 'advancedFunctionalRank',
   resolved: 'advancedResolved', unavailable: 'advancedUnresolved', converged: 'advancedConverged',
@@ -28,6 +60,7 @@ export function GeneralizedWResult({ result }: { result: SurveyGeneralizedWResul
     <h4 className="font-semibold">{t('advancedWResults')}</h4>
     <p role="status">{t(result.modelStatus === 'resolved' ? 'advancedResolved' : advancedOutcomeKeys[result.reason])}</p>
     <p className="leading-5 text-ds-muted">{t('advancedWNoDecision')}</p>
+    <StatisticalDeclaration declaration={result.statisticalDeclaration} />
     {result.modelStatus === 'resolved' ? <>
       <p>{t('advancedRankDf', { rank: result.rank, df: result.degreesOfFreedom })} · {t('advancedEnergy')}: {number(result.aprioriWeightedResidualSum)}</p>
       <div className={scroll} role="region" aria-label={t('advancedDirections')} tabIndex={0}><table className="w-full text-[11px]"><caption className="px-2 py-2 text-left font-medium">{t('advancedDirections')}</caption><thead><tr>{['advancedDirection', 'advancedStatus', 'advancedSignedW', 'advancedDetectability', 'advancedStatisticError'].map(key => <th scope="col" className={cell} key={key}>{t(key)}</th>)}</tr></thead><tbody>{result.diagnostics.map((direction, index) => <tr key={direction.id}><th scope="row" className={cell}>{direction.id}<EngineeringEvidenceQuestion label={direction.id} selector={{ path: ['result', 'diagnostics', index], identity: { id: direction.id } }} /></th><td className={cell}>{t(direction.status === 'resolved' ? 'advancedResolved' : 'advancedUndetectable')}</td><td className={`${cell} font-mono`}>{direction.generalizedW === null ? t('advancedNotComputed') : number(direction.generalizedW)}</td><td className={`${cell} font-mono`}>{number(direction.detectabilityRatio)}</td><td className={`${cell} font-mono`}>{direction.status === 'resolved' ? number(direction.statisticErrorEstimate) : '—'}</td></tr>)}</tbody></table></div>
@@ -96,6 +129,7 @@ export function StatisticalFamilyResult({ result }: { result: SurveyStatisticalF
   return <section className="min-w-0 space-y-3" aria-label={t('advancedStatisticalResults')}>
     <h4 className="font-semibold">{t('advancedStatisticalResults')}</h4><p role="status">{t(advancedOutcomeKeys[result.outcome])}</p>
     <p className="leading-5 text-ds-muted">{t('advancedStatisticalNoDecision')}</p>
+    <StatisticalDeclaration declaration={result.statisticalDeclaration} />
     {result.outcome === 'evaluated' ? <><p>{t('advancedStatisticalFamily', { id: result.request.familyId, count: result.denominator, alpha: number(result.request.alpha), memberAlpha: number(result.memberAlpha) })}</p>
       <div className={scroll} role="region" aria-label={t('advancedStatisticalMembers')} tabIndex={0}><table className="w-full min-w-[64rem] text-[11px]"><thead><tr>{['advancedStatisticalMember', 'advancedStatus', 'advancedDeclaredStatistic', 'advancedStatisticalP', 'advancedStatisticalAdjustedP', 'advancedStatisticalCritical', 'advancedStatisticalComparison'].map(key => <th scope="col" className={cell} key={key}>{t(key)}</th>)}</tr></thead><tbody>{result.results.map((member, i) => { const distribution = result.request.members[i]!.distribution; return <tr key={member.memberId}>
         <th scope="row" className={`${cell} min-w-44`}>{member.memberId}<EngineeringEvidenceQuestion label={member.memberId} selector={{ path: ['result', 'results', i], identity: { memberId: member.memberId } }} /><span className="block font-normal">{t(distributions[distribution.kind])} · {result.request.members[i]!.sourceAnchor}</span>{'degreesOfFreedom' in distribution ? <span className="block font-normal">{t('advancedDistributionDf', { df: distribution.degreesOfFreedom })}</span> : null}{'priorStandardDeviation' in distribution ? <span className="block font-normal">{t('advancedDistributionPriorScale', { sigma: String(distribution.priorStandardDeviation), unit: distribution.scaleUnit })}</span> : null}</th><td className={cell}>{t(statuses[member.status])}{member.status !== 'calculated' ? <span className="block break-all">{'reason' in member ? member.reason === 'not-supplied' ? t('advancedStatisticalNotSupplied') : member.reason : t(failureKeys[member.code])}</span> : null}</td>

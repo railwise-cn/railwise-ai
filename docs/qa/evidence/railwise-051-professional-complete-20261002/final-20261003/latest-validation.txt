@@ -1,0 +1,20 @@
+RailWise Survey 0.5.1 professional-surface follow-up
+Date: 2026-10-03 (Asia/Shanghai)
+
+Source-level and DOM review:
+- SurveyAdjustmentPanel format-catalog and compact needs-attention regressions passed.
+- engineeringProfessionalText historical-answer regression passed; measured values, units, source locations, restrictions and review limits remain visible.
+- Advanced quality-gate findings now use surveySourceDiagnosticText, matching the compact work surface.
+- Independent AI review (simulated survey-practice + software + product-design perspective) confirmed the screenshot wording is reduced to professional survey actions. This is not human signoff, regulatory certification, or vendor interoperability evidence.
+
+Final package:
+- Version 0.5.1.
+- ASAR SHA-256 35d087051b52bbf89014089d2e7300503ddd247e480faf39607a377b796f4063.
+- /Applications and dist/mac-arm64 packages match the build staging package.
+- codesign deep strict verification passed; ad hoc signature; notarization not performed.
+- Update provider none; no public release operation.
+
+Computer Use limitation:
+- Fresh final-window capture was attempted after launching the package.
+- The CUA channel returned SyntaxError: Unexpected token ':' and, after process reset, Transport closed.
+- Existing pre-fix screenshots remain labeled as historical defects and are not final-pass evidence.

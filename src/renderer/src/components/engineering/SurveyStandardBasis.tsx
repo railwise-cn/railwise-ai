@@ -59,8 +59,6 @@ export function SurveyStandardBasis({ context, runtimeReady = true, parent }: { 
         <dl className="grid min-w-0 gap-2 sm:grid-cols-2">
           <div><dt className="text-ds-muted">{t('standard')}</dt><dd>{value.reference.standardCode}</dd></div>
           <div><dt className="text-ds-muted">{t('profile')}</dt><dd>{value.profile.label[language]}</dd></div>
-          <div><dt className="text-ds-muted">{t('rule')}</dt><dd className="break-all font-mono">{value.reference.ruleId} · {value.reference.ruleVersion}</dd></div>
-          <div><dt className="text-ds-muted">{t('algorithm')}</dt><dd className="break-all font-mono">{value.reference.algorithmVersion}</dd></div>
         </dl>
         <div className="space-y-3" aria-label={t('clauses')}>
           {locators.map(({ locator, path }, index) => <div key={index} className="space-y-1">
@@ -73,11 +71,6 @@ export function SurveyStandardBasis({ context, runtimeReady = true, parent }: { 
         </div>
         <div><p className="font-medium">{t('choices')}</p><ul className="list-disc space-y-1 pl-5">{value.entry.rule.implementationChoices.map((text, index) => <li key={index} className="leading-5">{text[language]}</li>)}</ul></div>
         <div><p className="font-medium">{t('exclusions')}</p><ul className="list-disc space-y-1 pl-5">{value.entry.rule.exclusions.map((text, index) => <li key={index} className="leading-5">{text[language]}</li>)}</ul></div>
-        <details><summary className="cursor-pointer py-2">{t('digests')}</summary><dl className="space-y-2 break-all font-mono text-[11px]">
-          <div><dt>{t('sourceDigest')}</dt><dd>{value.reference.sourceSha256}</dd></div>
-          <div><dt>{t('ruleDigest')}</dt><dd>{value.entry.ruleDigest}</dd></div>
-          <div><dt>{t('profileVersion')}</dt><dd>{value.reference.profileVersion}</dd></div>
-        </dl></details>
       </EngineeringSelectedEvidence> : null}
     </section> : null}
   </details>

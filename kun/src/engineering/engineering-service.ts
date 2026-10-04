@@ -8,11 +8,16 @@ import JSZip from 'jszip'
 import { atomicWriteFile, drainAtomicWrites } from '../adapters/file/atomic-write.js'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import type { SurveySourceEligibility } from './survey-service.js'
-import { makeReportPdf } from './engineering-report-pdf.js'
+import { makeReportPdf, makeProfessionalReportPdf } from './engineering-report-pdf.js'
+import { buildProfessionalReportModel, makeProfessionalDocx, makeProfessionalXlsx } from './survey-professional-report.js'
+import { buildSurveyProfessionalReview } from './survey-professional-review.js'
+import { SurveyProfessionalReviewV1 } from '../contracts/survey-professional.js'
+import { SurveySegmentComparisonV1, SurveySegmentContinuityV1 } from '../contracts/survey-monitoring.js'
 import { statisticalEvidenceSheets, statisticalReportLines } from './survey-statistical-semantics.js'
 import { monitoringTrendInstant, renderMonitoringTrendChart } from './engineering-trend-chart.js'
 import { EngineeringVerificationAudit, EngineeringVerificationAuditError } from './engineering-verification-audit.js'
 import { calculateMonitoringAnalysisV2 } from './monitoring-analysis.js'
+import { buildMonitoringProfessionalReport } from './engineering-monitoring-report.js'
 import { MonitoringReplayAudit } from './monitoring-replay-audit.js'
 import {
   AnalysisRequest, ChartArtifactV1, ChartRequest, DatasetImportRequest, DatasetValidateRequest, ENGINEERING_TREND_RENDERER_VERSION, ENGINEERING_ANALYSIS_ALGORITHM_VERSION,
@@ -154,9 +159,16 @@ function canonicalDeliveryJson(value: unknown): string {
   throw new Error(`unsupported delivery idempotency value: ${typeof value}`)
 }
 
+function parseSegmentComparisons(value: unknown): SurveySegmentComparisonV1[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error('malformed segment comparison evidence')
+  return value.map(item => SurveySegmentComparisonV1.parse(item))
+}
+
 function deliveryRequestFingerprint(operation: DeliveryIdempotencyOperation, request: DeliveryIdempotencyRequest): string {
   const payload = { ...(request as Record<string, unknown>) }
   delete payload.idempotencyKey
+  if (Array.isArray(payload.segmentComparisonIds) && !payload.segmentComparisonIds.length) delete payload.segmentComparisonIds
   return createHash('sha256').update(canonicalDeliveryJson({ operation, payload })).digest('hex')
 }
 
@@ -227,7 +239,7 @@ export class EngineeringService {
   private readonly nowIso: () => string
   private readonly idempotencyLocks = new Map<string, Promise<void>>()
   private readonly pendingMetadataWrites = new Set<Promise<void>>()
-  constructor(private readonly options: { rootDir: string; attachmentStore?: AttachmentStore; runtimeVersion?: string; nowIso?: () => string; getAdjustments?: SurveyAdjustmentLookup; getAdjustmentEvidence?: SurveyAdjustmentEvidenceLookup; getDeformations?: SurveyDeformationLookup; getSurveySources?: SurveySourceLookup; getSurveyNetworkSnapshot?: (projectId: string, networkId: string) => SurveyNetworkV1 | null }) {
+  constructor(private readonly options: { rootDir: string; attachmentStore?: AttachmentStore; runtimeVersion?: string; nowIso?: () => string; getAdjustments?: SurveyAdjustmentLookup; getAdjustmentEvidence?: SurveyAdjustmentEvidenceLookup; getDeformations?: SurveyDeformationLookup; getSurveySources?: SurveySourceLookup; getSurveyNetworkSnapshot?: (projectId: string, networkId: string) => SurveyNetworkV1 | null; getProfessionalReview?: (projectId: string, adjustmentId: string) => SurveyProfessionalReviewV1 | null; getSegmentComparison?: (projectId: string, comparisonId: string) => SurveySegmentComparisonV1 | null; getSegmentContinuity?: (projectId: string, comparisonIds: readonly string[]) => SurveySegmentContinuityV1 | null }) {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString())
     mkdirSync(resolve(options.rootDir), { recursive: true })
     this.db = new Database(resolve(options.rootDir, 'engineering.sqlite3'))
@@ -313,7 +325,7 @@ export class EngineeringService {
     this.remember(req.idempotencyKey, next)
     return next
   }
-  getProjectOverview(id: string): { project: RailwiseProjectV1; datasets: Array<Omit<StoredDataset, 'observations'>>; analyses: MonitoringAnalysisV1[]; runs: StoredRun[]; manifests: DeliverableManifestV1[]; latestPreview?: { run: StoredRun; files: DeliverableManifestV1['outputs'] }; latestPreviewUnavailable?: boolean } {
+  getProjectOverview(id: string): { project: RailwiseProjectV1; datasets: Array<Omit<StoredDataset, 'observations'>>; analyses: MonitoringAnalysisV1[]; runs: StoredRun[]; manifests: DeliverableManifestV1[]; latestPreview?: NonNullable<ReturnType<EngineeringService['getPreviewEvidence']>>; latestPreviewUnavailable?: boolean } {
     const project = this.mustProject(id)
     const datasets = (this.db.prepare('SELECT data_json FROM engineering_datasets WHERE project_id = ? ORDER BY updated_at DESC').all(project.id) as Array<{ data_json: string }>).map((row) => {
       const { observations: _observations, ...dataset } = this.mustStoredDataset(row.data_json)
@@ -458,7 +470,7 @@ export class EngineeringService {
     })
   }
 
-  async previewReport(input: unknown): Promise<{ run: StoredRun; files: Array<{ path: string; mediaType: string; sha256: string; sizeBytes: number }>; charts: ChartArtifactV1[]; citations: KnowledgeCitationV1[]; adjustments: AdjustmentResultV1[]; deformations: DeformationComparisonV1[]; surveySources: SurveySourceEvidenceV1[] }> {
+  async previewReport(input: unknown): Promise<{ run: StoredRun; files: Array<{ path: string; mediaType: string; sha256: string; sizeBytes: number }>; charts: ChartArtifactV1[]; citations: KnowledgeCitationV1[]; adjustments: AdjustmentResultV1[]; deformations: DeformationComparisonV1[]; segmentComparisons?: SurveySegmentComparisonV1[]; segmentContinuity?: SurveySegmentContinuityV1; surveySources: SurveySourceEvidenceV1[] }> {
     const req = ReportPreviewRequest.parse(input)
     return this.withIdempotencyLock(req.idempotencyKey, async () => {
       const project = this.mustProject(req.projectId)
@@ -471,6 +483,8 @@ export class EngineeringService {
         citations: KnowledgeCitationV1[]
         adjustments?: AdjustmentResultV1[]
         deformations?: DeformationComparisonV1[]
+        segmentComparisons?: SurveySegmentComparisonV1[]
+        segmentContinuity?: SurveySegmentContinuityV1
         surveySources?: SurveySourceEvidenceV1[]
       }>('report-preview', req)
       // A bound replay keeps its original analysis; a new automatic request uses the current algorithm.
@@ -483,6 +497,8 @@ export class EngineeringService {
       const inputSnapshotHash = deliveryInputSnapshotHash(project, dataset, analysis)
       const adjustments = this.lookupAdjustments(project.id, req.adjustmentIds)
       const deformations = this.lookupDeformations(project.id, req.deformationIds)
+      const segmentComparisons = this.lookupSegmentComparisons(project.id, req.segmentComparisonIds, adjustments)
+      const segmentContinuity = this.lookupSegmentContinuity(project.id, req.segmentComparisonIds, segmentComparisons)
       this.assertDeformationEpochEvidence(project.id, deformations)
       // A preview is a newly generated computational artifact, not merely a
       // read of its historical inputs. Check current source admission before
@@ -511,12 +527,14 @@ export class EngineeringService {
           throw new EngineeringIdempotencyError(replay, 'stored preview has malformed deformation evidence')
         }
         this.assertReplayDeformationsMatchLive('stored preview', deformations, replayDeformations)
+        this.assertSegmentComparisonsMatch('stored preview', segmentComparisons, replay.segmentComparisons)
+        this.assertSegmentContinuityMatch('stored preview', segmentContinuity, replay.segmentContinuity)
         this.assertDeformationEpochEvidence(project.id, deformations)
         this.assertSurveySourcesAdmissible(project.id, adjustments, deformations)
         // Re-read source evidence from the replay's own bound inputs.  Never
         // pair an old report file with provenance from a new request.
         const replaySurveySources = this.lookupSurveySources(project.id, this.requiredSurveyNetworkIds(adjustments, deformations))
-        return { ...replay, adjustments, deformations, surveySources: replaySurveySources }
+        return { ...replay, adjustments, deformations, ...(segmentComparisons.length ? { segmentComparisons } : {}), ...(segmentContinuity ? { segmentContinuity } : {}), surveySources: replaySurveySources }
       }
       const surveySources = this.lookupSurveySources(project.id, this.requiredSurveyNetworkIds(adjustments, deformations))
       const runId = `run_${randomUUID()}`
@@ -541,9 +559,17 @@ export class EngineeringService {
           outputs.push({ ...recorded, path: relative(project.workspace, join(outDir, name)) })
         }
         const text = reportText(project, dataset, analysis, req.citations, adjustments, deformations, surveySources)
-        await stageOutput('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', await makeDocx(text))
-        await stageOutput('report.pdf', 'application/pdf', await makeReportPdf(text))
+        const professionalReviews = adjustments.map(adjustment => this.reportProfessionalReview(project.id, adjustment))
+        const monitoringReport = dataset ? buildMonitoringProfessionalReport({ project, dataset, analysis, generatedAt: this.nowIso() }) : undefined
+        const hasProfessionalProjection = professionalReviews.length > 0 || deformations.length > 0 || segmentComparisons.length > 0 || segmentContinuity !== undefined || monitoringReport !== undefined
+        const professionalModel = hasProfessionalProjection ? buildProfessionalReportModel({ project, reviews: professionalReviews.map((review, index) => ({ review, adjustment: adjustments[index], source: surveySources.find(item => item.networkId === review.networkId) })), segmentComparisons, deformations, ...(segmentContinuity ? { segmentContinuity } : {}), ...(monitoringReport ? { monitoringReport } : {}), generatedAt: this.nowIso(), appendix: text.split('\n') }) : undefined
+        await stageOutput('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', professionalModel ? await makeProfessionalDocx(professionalModel) : await makeDocx(text))
+        await stageOutput('report.pdf', 'application/pdf', professionalModel ? await makeProfessionalReportPdf(professionalModel) : await makeReportPdf(text))
         await stageOutput('evidence.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', await makeXlsx(project, dataset, analysis, req.citations, adjustments, deformations, surveySources, this.options.runtimeVersion ?? RUNTIME_VERSION))
+        if (professionalModel) {
+          await stageOutput('professional.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', await makeProfessionalXlsx(professionalModel))
+          await stageOutput('professional-review.json', 'application/json', JSON.stringify({ model: professionalModel, reviews: professionalReviews, ...(segmentComparisons.length ? { segmentComparisons } : {}), ...(deformations.length ? { deformations } : {}), ...(segmentContinuity ? { segmentContinuity } : {}), ...(monitoringReport ? { monitoringReport } : {}) }, null, 2))
+        }
         if (chart) {
           const chartPath = resolve(project.workspace, chart.relativePath)
           if (await readFile(chartPath).then(() => true).catch(() => false)) outputs.push(await fileOutput(chartPath, 'image/svg+xml', project.workspace))
@@ -556,12 +582,20 @@ export class EngineeringService {
         let completedAdjustments!: AdjustmentResultV1[]
         let completedDeformations!: DeformationComparisonV1[]
         let completedSurveySources!: SurveySourceEvidenceV1[]
+        let completedSegmentComparisons!: SurveySegmentComparisonV1[]
+        let completedSegmentContinuity!: SurveySegmentContinuityV1 | undefined
         this.publishStagedDeliveryDirectory(stagingDir, outDir, () => {
           this.assertDeliveryInputsCurrent(project, dataset, analysis, inputSnapshotHash)
           completedAdjustments = this.lookupAdjustments(project.id, req.adjustmentIds)
           completedDeformations = this.lookupDeformations(project.id, req.deformationIds)
+          completedSegmentComparisons = this.lookupSegmentComparisons(project.id, req.segmentComparisonIds, completedAdjustments)
+          completedSegmentContinuity = this.lookupSegmentContinuity(project.id, req.segmentComparisonIds, completedSegmentComparisons)
           this.assertReplayAdjustmentsMatchLive('preview publication', completedAdjustments, adjustments)
           this.assertReplayDeformationsMatchLive('preview publication', completedDeformations, deformations)
+          this.assertSegmentComparisonsMatch('preview publication', completedSegmentComparisons, segmentComparisons)
+          this.assertSegmentContinuityMatch('preview publication', completedSegmentContinuity, segmentContinuity)
+          const currentReviews = completedAdjustments.map(adjustment => this.reportProfessionalReview(project.id, adjustment))
+          if (canonicalDeliveryJson(currentReviews) !== canonicalDeliveryJson(professionalReviews)) throw new Error('professional report projection changed while exporting; refresh the evidence and generate a new report')
           this.assertDeformationEpochEvidence(project.id, completedDeformations)
           this.assertSurveySourcesAdmissible(project.id, completedAdjustments, completedDeformations)
           completedSurveySources = this.lookupSurveySources(project.id, this.requiredSurveyNetworkIds(completedAdjustments, completedDeformations))
@@ -573,7 +607,7 @@ export class EngineeringService {
         published = true
         this.assertDeliveryOutputsCurrent(project, outputs)
         const run: StoredRun = { id: runId, projectId: project.id, datasetId: dataset?.id, analysisId: analysis?.id, deliveryInputHash: inputSnapshotHash, status: 'completed', revision: 1, idempotencyKey: req.idempotencyKey, createdAt: this.nowIso(), updatedAt: this.nowIso() }
-        const result = { run, files: outputs, charts: chart ? [chart] : [], citations: req.citations, adjustments: completedAdjustments, deformations: completedDeformations, surveySources: completedSurveySources }
+        const result = { run, files: outputs, charts: chart ? [chart] : [], citations: req.citations, adjustments: completedAdjustments, deformations: completedDeformations, ...(completedSegmentComparisons.length ? { segmentComparisons: completedSegmentComparisons } : {}), ...(completedSegmentContinuity ? { segmentContinuity: completedSegmentContinuity } : {}), surveySources: completedSurveySources }
         // If another Runtime has claimed the idempotency key while this one
         // was rendering, roll back our run rather than leaving a second
         // public directory that is not the replayed delivery.
@@ -594,6 +628,58 @@ export class EngineeringService {
         throw error
       }
     })
+  }
+
+  private reportProfessionalReview(projectId: string, result: AdjustmentResultV1): SurveyProfessionalReviewV1 {
+    const review = SurveyProfessionalReviewV1.parse(this.options.getProfessionalReview?.(projectId, result.runId)
+      ?? buildSurveyProfessionalReview({ projectId, result, network: this.options.getSurveyNetworkSnapshot?.(projectId, result.networkId), sourceIntegrity: 'not-verified' }))
+    if (review.projectId !== projectId || review.networkId !== result.networkId || review.runId !== result.runId
+      || review.resultId !== result.id || review.inputHash !== result.inputHash || review.algorithmVersion !== result.algorithmVersion
+      || review.resultHash !== createHash('sha256').update(canonicalDeliveryJson(result)).digest('hex')) {
+      throw new Error('professional report projection does not match the selected immutable adjustment result')
+    }
+    if (review.source.status === 'mismatch' || review.source.integrity === 'failed') throw new Error('professional report source binding failed; refresh the original observations before exporting')
+    return review
+  }
+
+  private lookupSegmentComparisons(projectId: string, ids: readonly string[], adjustments: readonly AdjustmentResultV1[]): SurveySegmentComparisonV1[] {
+    if (!ids.length) return []
+    if (!this.options.getSegmentComparison) throw new Error('survey segment comparison lookup is unavailable')
+    if (new Set(ids).size !== ids.length) throw new Error('duplicate selected segment comparisons')
+    return ids.map(id => {
+      const stored = this.options.getSegmentComparison!(projectId, id)
+      if (!stored) throw new Error('selected segment comparison is unavailable')
+      const comparison = SurveySegmentComparisonV1.parse(stored)
+      if (comparison.id !== id || comparison.projectId !== projectId) throw new Error('segment comparison does not match its selected project/identity')
+      for (const period of ['reference', 'current'] as const) {
+        const matches = adjustments.filter(result => result.runId === comparison[`${period}AdjustmentId`])
+        if (matches.length !== 1) throw new Error('segment comparison requires both exact adjustment runs in the selected report inputs')
+        const review = this.reportProfessionalReview(projectId, matches[0]!)
+        if (review.resultHash !== comparison[`${period}ResultHash`] || review.projectionHash !== comparison[`${period}ProjectionHash`]) {
+          throw new Error('segment comparison no longer matches the selected result/projection')
+        }
+      }
+      return comparison
+    })
+  }
+
+  private lookupSegmentContinuity(projectId: string, ids: readonly string[], comparisons: readonly SurveySegmentComparisonV1[]): SurveySegmentContinuityV1 | undefined {
+    if (ids.length <= 1) return undefined
+    if (comparisons.length !== ids.length || !this.options.getSegmentContinuity) throw new Error('multi-period continuity lookup is unavailable')
+    const continuity = this.options.getSegmentContinuity(projectId, ids)
+    if (!continuity) throw new Error('selected segment comparison continuity is unavailable')
+    const parsed = SurveySegmentContinuityV1.parse(continuity)
+    if (parsed.projectId !== projectId || canonicalDeliveryJson(parsed.comparisonIds) !== canonicalDeliveryJson(ids)) throw new Error('segment continuity does not match selected comparisons')
+    return parsed
+  }
+
+  private assertSegmentComparisonsMatch(label: string, live: readonly SurveySegmentComparisonV1[], stored: readonly SurveySegmentComparisonV1[] = []): void {
+    const parsed = stored.map(value => SurveySegmentComparisonV1.parse(value))
+    if (canonicalDeliveryJson(live) !== canonicalDeliveryJson(parsed)) throw new Error(`${label} segment comparison evidence no longer matches the selected immutable record`)
+  }
+
+  private assertSegmentContinuityMatch(label: string, live: SurveySegmentContinuityV1 | undefined, stored: SurveySegmentContinuityV1 | undefined): void {
+    if (canonicalDeliveryJson(live ?? null) !== canonicalDeliveryJson(stored ?? null)) throw new Error(`${label} segment continuity evidence no longer matches the selected immutable record`)
   }
 
   /** A separate numerical audit; never writes old verification or analysis records. */
@@ -874,8 +960,12 @@ export class EngineeringService {
         // which recomputes with the recorded algorithm and checks its exact hash.
         const adjustments = this.lookupAdjustments(projectId, manifest.adjustments.map(item => item.id))
         const deformations = this.lookupDeformations(projectId, manifest.deformations.map(item => item.id))
+        const segmentComparisons = this.lookupSegmentComparisons(projectId, (manifest.segmentComparisons ?? []).map(item => item.id), adjustments)
+        const segmentContinuity = this.lookupSegmentContinuity(projectId, (manifest.segmentContinuity?.comparisonIds ?? []), segmentComparisons)
         this.assertReplayAdjustmentsMatchLive('deliverable verification', adjustments, manifest.adjustments)
         this.assertReplayDeformationsMatchLive('deliverable verification', deformations, manifest.deformations)
+        this.assertSegmentComparisonsMatch('deliverable verification', segmentComparisons, manifest.segmentComparisons)
+        this.assertSegmentContinuityMatch('deliverable verification', segmentContinuity, manifest.segmentContinuity)
         this.assertDeformationEpochEvidence(projectId, deformations)
       })
       check('sources', () => {
@@ -898,6 +988,8 @@ export class EngineeringService {
       this.assertDeliveryRevision(project, dataset, req.expectedRevision)
       const requestedAdjustments = this.lookupAdjustments(project.id, req.adjustmentIds)
       const requestedDeformations = this.lookupDeformations(project.id, req.deformationIds)
+      const requestedSegmentComparisons = this.lookupSegmentComparisons(project.id, req.segmentComparisonIds, requestedAdjustments)
+      const requestedSegmentContinuity = this.lookupSegmentContinuity(project.id, req.segmentComparisonIds, requestedSegmentComparisons)
       this.assertDeformationEpochEvidence(project.id, requestedDeformations)
       // Review current evidence before consulting the idempotency store. A
       // successful historical manifest remains readable in its table/files,
@@ -926,6 +1018,8 @@ export class EngineeringService {
         this.assertPublishedManifestCurrent(project, manifest)
         this.assertReplayAdjustmentsMatchLive('stored deliverable manifest', requestedAdjustments, manifest.adjustments)
         this.assertReplayDeformationsMatchLive('stored deliverable manifest', requestedDeformations, manifest.deformations)
+        this.assertSegmentComparisonsMatch('stored deliverable manifest', requestedSegmentComparisons, manifest.segmentComparisons)
+        this.assertSegmentContinuityMatch('stored deliverable manifest', requestedSegmentContinuity, manifest.segmentContinuity)
         this.assertDeformationEpochEvidence(project.id, requestedDeformations)
         this.assertSurveySourcesAdmissible(project.id, requestedAdjustments, requestedDeformations)
         return manifest
@@ -944,6 +1038,7 @@ export class EngineeringService {
         citations: req.citations,
         adjustmentIds: req.adjustmentIds,
         deformationIds: req.deformationIds,
+        segmentComparisonIds: req.segmentComparisonIds,
         ...(req.analysisId ? { analysisId: req.analysisId } : {})
       })
       const previewAnalysis = preview.run.analysisId ? this.getAnalysis(preview.run.analysisId) ?? undefined : undefined
@@ -959,8 +1054,12 @@ export class EngineeringService {
       // adjustment in the manifest.
       const completedAdjustments = this.lookupAdjustments(project.id, req.adjustmentIds)
       const completedDeformations = this.lookupDeformations(project.id, req.deformationIds)
+      const completedSegmentComparisons = this.lookupSegmentComparisons(project.id, req.segmentComparisonIds, completedAdjustments)
+      const completedSegmentContinuity = this.lookupSegmentContinuity(project.id, req.segmentComparisonIds, completedSegmentComparisons)
       this.assertReplayAdjustmentsMatchLive('finalize before manifest', completedAdjustments, preview.adjustments)
       this.assertReplayDeformationsMatchLive('finalize before manifest', completedDeformations, preview.deformations)
+      this.assertSegmentComparisonsMatch('finalize before manifest', completedSegmentComparisons, preview.segmentComparisons)
+      this.assertSegmentContinuityMatch('finalize before manifest', completedSegmentContinuity, preview.segmentContinuity)
       this.assertDeformationEpochEvidence(project.id, completedDeformations)
       const sourceReview = this.assertSurveySourcesAdmissible(project.id, completedAdjustments, completedDeformations)
       const completedSurveySources = this.lookupSurveySources(project.id, this.requiredSurveyNetworkIds(completedAdjustments, completedDeformations))
@@ -976,6 +1075,8 @@ export class EngineeringService {
         analyses: previewAnalysis ? [previewAnalysis.id] : [],
         adjustments: completedAdjustments,
         deformations: completedDeformations,
+        ...(completedSegmentComparisons.length ? { segmentComparisons: completedSegmentComparisons } : {}),
+        ...(completedSegmentContinuity ? { segmentContinuity: completedSegmentContinuity } : {}),
         surveySources: completedSurveySources,
         charts: preview.charts,
         citations: req.citations,
@@ -1010,8 +1111,12 @@ export class EngineeringService {
           this.assertDeliveryOutputsCurrent(project, manifest.outputs)
           const persistedAdjustments = this.lookupAdjustments(project.id, req.adjustmentIds)
           const persistedDeformations = this.lookupDeformations(project.id, req.deformationIds)
+          const persistedSegmentComparisons = this.lookupSegmentComparisons(project.id, req.segmentComparisonIds, persistedAdjustments)
+          const persistedSegmentContinuity = this.lookupSegmentContinuity(project.id, req.segmentComparisonIds, persistedSegmentComparisons)
           this.assertReplayAdjustmentsMatchLive('manifest publication', persistedAdjustments, manifest.adjustments)
           this.assertReplayDeformationsMatchLive('manifest publication', persistedDeformations, manifest.deformations)
+          this.assertSegmentComparisonsMatch('manifest publication', persistedSegmentComparisons, manifest.segmentComparisons)
+          this.assertSegmentContinuityMatch('manifest publication', persistedSegmentContinuity, manifest.segmentContinuity)
           this.assertDeformationEpochEvidence(project.id, persistedDeformations)
           this.assertSurveySourcesAdmissible(project.id, persistedAdjustments, persistedDeformations)
           this.assertDeliveryInputsCurrent(project, dataset, previewAnalysis, preview.run.deliveryInputHash!)
@@ -1035,14 +1140,18 @@ export class EngineeringService {
   }
   getRun(id: string): StoredRun | null { const row = this.db.prepare('SELECT data_json FROM engineering_runs WHERE id = ?').get(id) as { data_json: string } | undefined; return row ? JSON.parse(row.data_json) as StoredRun : null }
   /** Historical descriptors only: this read does not reissue or approve artifacts. */
-  getPreviewEvidence(projectId: string, runId: string): { run: StoredRun; files: DeliverableManifestV1['outputs'] } | null {
+  getPreviewEvidence(projectId: string, runId: string): { run: StoredRun; files: DeliverableManifestV1['outputs']; segmentComparisons?: SurveySegmentComparisonV1[]; segmentContinuity?: SurveySegmentContinuityV1; adjustments?: AdjustmentResultV1[] } | null {
     const run = this.getRun(runId)
     if (!run || run.projectId !== projectId) return null
     const row = this.db.prepare('SELECT result_json FROM engineering_delivery_idempotency WHERE key = ? AND operation = ?').get(run.idempotencyKey, 'report-preview') as { result_json: string } | undefined
     if (!row) return null
-    const stored = JSON.parse(row.result_json) as { run?: StoredRun; files?: unknown }
+    const stored = JSON.parse(row.result_json) as { run?: StoredRun; files?: unknown; segmentComparisons?: unknown; segmentContinuity?: unknown; adjustments?: unknown }
     if (stored.run?.id !== run.id || stored.run.projectId !== projectId) throw new Error('preview evidence does not match its project/run')
-    return { run, files: DeliverableManifestV1.shape.outputs.parse(stored.files) }
+    const segmentComparisons = parseSegmentComparisons(stored.segmentComparisons)
+    if (segmentComparisons.some(item => item.projectId !== projectId)) throw new Error('preview comparison evidence project mismatch')
+    const segmentContinuity = stored.segmentContinuity === undefined ? undefined : SurveySegmentContinuityV1.parse(stored.segmentContinuity)
+    if (segmentContinuity && segmentContinuity.projectId !== projectId) throw new Error('preview continuity evidence project mismatch')
+    return { run, files: DeliverableManifestV1.shape.outputs.parse(stored.files), ...(segmentComparisons.length ? { segmentComparisons, adjustments: (stored.adjustments as unknown[] ?? []).map(item => AdjustmentResultV1.parse(item)) } : {}), ...(segmentContinuity ? { segmentContinuity } : {}) }
   }
   cancelRun(id: string, input?: unknown): StoredRun { const mutation = input ? RunMutationRequest.parse(input) : undefined; const replay = mutation ? this.replay(mutation.idempotencyKey) : null; if (replay) return replay as StoredRun; const run = this.getRun(id); if (!run) throw new Error('run not found'); if (mutation && mutation.expectedRevision !== 0 && mutation.expectedRevision !== run.revision) throw new EngineeringRevisionConflictError(`run revision conflict: expected ${mutation.expectedRevision}, actual ${run.revision}`); const next = { ...run, status: 'cancelled' as const, revision: run.revision + 1, updatedAt: this.nowIso() }; this.saveRun(next); if (mutation) this.remember(mutation.idempotencyKey, next); return next }
   resumeRun(id: string, input?: unknown): StoredRun { const mutation = input ? RunMutationRequest.parse(input) : undefined; const replay = mutation ? this.replay(mutation.idempotencyKey) : null; if (replay) return replay as StoredRun; const run = this.getRun(id); if (!run) throw new Error('run not found'); if (mutation && mutation.expectedRevision !== 0 && mutation.expectedRevision !== run.revision) throw new EngineeringRevisionConflictError(`run revision conflict: expected ${mutation.expectedRevision}, actual ${run.revision}`); if (run.status === 'completed') return run; const next = { ...run, status: 'queued' as const, revision: run.revision + 1, updatedAt: this.nowIso(), error: undefined }; this.saveRun(next); if (mutation) this.remember(mutation.idempotencyKey, next); return next }
@@ -1674,6 +1783,7 @@ function decodeCodePoint(entity: string, codePoint: number): string {
     : entity
 }
 function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefined, analysis: MonitoringAnalysisV1 | undefined, citations: KnowledgeCitationV1[] = [], adjustments: AdjustmentResultV1[] = [], deformations: DeformationComparisonV1[] = [], surveySources: SurveySourceEvidenceV1[] = []): string {
+  const monitoringReport = dataset ? buildMonitoringProfessionalReport({ project, dataset, analysis, generatedAt: new Date().toISOString() }) : undefined
   const period = project.reportPeriod.start || project.reportPeriod.end
     ? `${project.reportPeriod.start ?? '-'} ~ ${project.reportPeriod.end ?? '-'}`
     : `${dataset?.timeRange.start ?? '-'} ~ ${dataset?.timeRange.end ?? '-'}`
@@ -1705,17 +1815,18 @@ function reportText(project: RailwiseProjectV1, dataset: StoredDataset | undefin
     ...(thresholdLines.length ? thresholdLines : ['待确认']),
     '',
     '分析结果',
-    ...analysis.results.map((r) => `${r.monitoringItem} / ${r.point}: 当前=${measurement(r.currentValue, project.unit)} 上期=${measurement(r.previousValue, project.unit)} 累计=${measurement(r.cumulativeChange, project.unit)} 速率=${measurement(r.changeRate, `${project.unit}/d`)} 趋势=${trendLabels[r.trend]} 异常=${r.anomaly ? '是' : '否'} 阈值=${thresholdLabels[r.thresholdStatus]}`),
+    ...analysis.results.map((r) => { const unit = r.unit ?? project.unit; const unitStatus = r.unitStatus === 'source-differs' ? '来源单位与项目单位不一致' : r.unitStatus === 'conflict' ? '历史记录单位冲突' : r.unitStatus === 'aligned' ? '已与项目单位统一' : '单位状态未记录'; const historicalSuffix = r.unitStatus === undefined ? '；历史分析未记录单位状态，结论待复核' : ''; return `${r.monitoringItem} / ${r.point}: 当前=${measurement(r.currentValue, unit)} 上期=${measurement(r.previousValue, unit)} 累计=${measurement(r.cumulativeChange, unit)} 速率=${measurement(r.changeRate, `${unit}/d`)} 趋势=${trendLabels[r.trend]} 异常=${r.anomaly ? '是' : '否'} 阈值=${thresholdLabels[r.thresholdStatus]} 单位状态=${unitStatus}${historicalSuffix}` }),
     `分析输入 SHA-256：${analysis.inputHash}`,
     `算法版本：${analysis.algorithmVersion}`,
     ] : []),
+    ...(monitoringReport ? ['', '监测日报专业表', '监测项 | 测点 | 初始期/值 | 上期/值 | 本期/值 | 本次变化 | 累计变化 | 累计口径 | 速率 | 阈值状态 | 连续性 | 来源/项目单位 | 单位状态 | 原始行', ...monitoringReport.rows.map((row) => [row.monitoringItem, row.point, `${row.initialTimestamp} / ${row.initialValue} ${row.initialUnit ?? row.unit}`, row.previousTimestamp ? `${row.previousTimestamp} / ${row.previousValue} ${row.previousUnit ?? row.unit}` : '不可用', `${row.currentTimestamp} / ${row.currentValue} ${row.unit}`, row.periodChange === undefined ? '不可用' : `${row.periodChange} ${row.unit}`, row.cumulativeChange === undefined ? '不可用' : `${row.cumulativeChange} ${row.unit}`, row.cumulativeBasis === 'source-cumulative' ? '来源累计字段' : row.cumulativeBasis === 'observed-value' ? '观测值首末差' : row.cumulativeBasis === 'mixed-unavailable' ? '累计字段混用，待确认' : '未记录', row.ratePerDay === undefined ? '不可用' : `${row.ratePerDay} ${row.unit}/d`, row.thresholdStatus, row.continuity, row.unitAlignment === 'source-differs' ? `来源≠项目（${row.unit}/${row.projectUnit ?? '未记录'}）` : row.unitAlignment === 'not-declared' ? '来源未声明' : row.unitAlignment === 'aligned' ? '一致' : '未记录', row.unitStatus === 'conflict' ? `冲突（${row.unitConflictUnits?.join('/') ?? '待确认'}）` : '一致', row.sourceRows.join(',')].join(' | '))] : []),
     '',
     '测量平差结果',
     ...(adjustments.length ? adjustments.flatMap((adjustment) => [
       `平差运行 ${adjustment.runId}：网络=${adjustment.networkId}，策略=${adjustment.strategyId ?? 'legacy'}${adjustment.transformType ? `/${adjustment.transformType}` : ''}，观测=${adjustment.observationCount}，未知数=${adjustment.unknownCount}，多余观测=${adjustment.redundancy}`,
       `单位权中误差=${adjustment.unitWeightStdDev}（${statisticalUnit(adjustment.unitWeightStdDevUnit)}）；方差因子=${adjustment.varianceFactor}（${statisticalUnit(adjustment.varianceFactorUnit)}，${adjustment.varianceFactorEstimated ? '后验估计' : '先验值'}），最大点位中误差=${adjustment.precision.maxPointStdDev} ${adjustment.linearUnit}，状态=${adjustment.validation}，输入 SHA-256=${adjustment.inputHash}`,
       ...statisticalReportLines(adjustment),
-      `闭合量=${Object.entries(adjustment.closure).map(([key, value]) => `${key}:${value} ${adjustment.closureUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
+      `历史结果量=${Object.entries(adjustment.closure).map(([key, value]) => `${key}:${value} ${adjustment.closureUnits[key] ?? '单位未记录'}`).join('；') || '无'}（独立闭合检核见专业成果表；残差范数不等同闭合差）`,
       `解算参数=${Object.entries(adjustment.parameters).map(([key, value]) => `${key}:${value} ${adjustment.parameterUnits[key] ?? '单位未记录'}`).join('；') || '无'}`,
       ...(adjustment.points.length ? adjustment.points.map((point) => `点位 ${point.id}: X=${measurement(point.x, adjustment.linearUnit)} Y=${measurement(point.y, adjustment.linearUnit)} H=${measurement(point.height, adjustment.linearUnit)}${point.latitude === undefined ? '' : ` B=${point.latitude}°`}${point.longitude === undefined ? '' : ` L=${point.longitude}°`}`) : ['点位成果：无']),
       ...adjustment.points.flatMap((point) => point.xyErrorEllipse ? [`点位 ${point.id} XY 标准误差椭圆：长半轴=${point.xyErrorEllipse.semiMajor} m；短半轴=${point.xyErrorEllipse.semiMinor} m；轴向=${point.xyErrorEllipse.orientationRad === null ? '无唯一轴向' : `${point.xyErrorEllipse.orientationRad} rad`}（+X 转向 +Y，模 π）；${point.xyErrorEllipse.varianceBasis === 'a-posteriori' ? '后验方差' : '先验方差'}；单位马氏半径，非置信百分比；解算 XY 平面，GNSS 不代表当地东/北；算法=${point.xyErrorEllipse.algorithmVersion}`] : []),
@@ -1747,11 +1858,12 @@ async function makeXlsx(project: RailwiseProjectV1, dataset: StoredDataset | und
   const zip = new JSZip()
   const sheets: Array<{ name: string; rows: string[][] }> = [
     ...(dataset && analysis ? [
+    { name: 'monitoring_daily', rows: [['monitoringItem', 'point', 'initialTimestamp', 'previousTimestamp', 'currentTimestamp', 'initialValue', 'previousValue', 'currentValue', 'periodChange', 'cumulativeChange', 'cumulativeBasis', 'ratePerDay', 'unit', 'projectUnit', 'unitAlignment', 'threshold', 'thresholdStatus', 'continuity', 'unitStatus', 'unitConflictUnits', 'sourceRows', 'sourceFileHash', 'initialUnit', 'previousUnit'], ...buildMonitoringProfessionalReport({ project, dataset, analysis, generatedAt: new Date().toISOString() }).rows.map((row) => [row.monitoringItem, row.point, row.initialTimestamp, row.previousTimestamp ?? '', row.currentTimestamp, String(row.initialValue), String(row.previousValue ?? ''), String(row.currentValue), String(row.periodChange ?? ''), String(row.cumulativeChange ?? ''), row.cumulativeBasis ?? 'legacy-not-recorded', String(row.ratePerDay ?? ''), row.unit, row.projectUnit ?? project.unit, row.unitAlignment ?? 'not-declared', String(row.threshold ?? ''), row.thresholdStatus, row.continuity, row.unitStatus ?? 'consistent', row.unitConflictUnits?.join(',') ?? '', row.sourceRows.join(','), row.sourceFileHash, row.initialUnit ?? row.unit, row.previousUnit ?? row.unit])] },
     { name: 'field_mapping', rows: [['canonical_field', 'source_column'], ...Object.entries(dataset.fieldMapping).map(([key, value]) => [key, value ?? ''])] },
     { name: 'normalized_data', rows: [['id', 'monitoringItem', 'point', 'timestamp', 'value', 'unit', 'cumulative', 'rate', 'sourceRow', 'sourceFileHash'], ...dataset.observations.map((o) => [o.id, o.monitoringItem, o.point, o.timestamp, String(o.value), o.unit ?? '', String(o.cumulative ?? ''), String(o.rate ?? ''), String(o.sourceRow), dataset.sourceFileHash])] },
     { name: 'quality_findings', rows: [['id', 'severity', 'code', 'row', 'status', 'message', 'suggestion'], ...dataset.findings.map((f) => [f.id, f.severity, f.code, String(f.row ?? ''), f.status, f.message, f.suggestion])] },
-    { name: 'analysis_results', rows: [['monitoringItem', 'point', 'currentValue', 'previousValue', 'cumulativeChange', 'changeRate', 'trend', 'anomaly', 'thresholdStatus', 'inputHash'], ...analysis.results.map((r) => [r.monitoringItem, r.point, String(r.currentValue ?? ''), String(r.previousValue ?? ''), String(r.cumulativeChange ?? ''), String(r.changeRate ?? ''), r.trend, String(r.anomaly), r.thresholdStatus, analysis.inputHash])] },
-    { name: 'threshold_status', rows: [['monitoringItem', 'point', 'thresholdStatus', 'configuredThreshold', 'unit'], ...analysis.results.map((r) => [r.monitoringItem, r.point, r.thresholdStatus, String(project.thresholds[r.monitoringItem] ?? project.thresholds.default ?? ''), project.unit])] },
+    { name: 'analysis_results', rows: [['monitoringItem', 'point', 'currentValue', 'previousValue', 'cumulativeChange', 'cumulativeBasis', 'changeRate', 'trend', 'anomaly', 'thresholdStatus', 'unit', 'unitStatus', 'inputHash'], ...analysis.results.map((r) => [r.monitoringItem, r.point, String(r.currentValue ?? ''), String(r.previousValue ?? ''), String(r.cumulativeChange ?? ''), r.cumulativeBasis ?? 'legacy-not-recorded', String(r.changeRate ?? ''), r.trend, String(r.anomaly), r.thresholdStatus, r.unit ?? project.unit, r.unitStatus ?? 'legacy-not-recorded', analysis.inputHash])] },
+    { name: 'threshold_status', rows: [['monitoringItem', 'point', 'thresholdStatus', 'configuredThreshold', 'unit', 'unitStatus', 'interpretation'], ...analysis.results.map((r) => [r.monitoringItem, r.point, r.thresholdStatus, r.unitStatus === 'aligned' || r.unitStatus === undefined ? String(project.thresholds[r.monitoringItem] ?? project.thresholds.default ?? '') : '', r.unit ?? project.unit, r.unitStatus ?? 'legacy-not-recorded', r.unitStatus === undefined ? 'legacy-unverified' : 'current'])] },
     { name: 'chart_data', rows: [['monitoringItem', 'point', 'observationTimestamp', 'observationValue', 'unit', 'timestampUtc', 'timestampBasis', 'observationId', 'sourceRow', 'sourceFileHash'], ...dataset.observations.map(observation => ({ observation, time: monitoringTrendInstant(observation.timestamp) })).sort((a, b) => JSON.stringify([a.observation.monitoringItem, a.observation.unit || project.unit, a.observation.point]).localeCompare(JSON.stringify([b.observation.monitoringItem, b.observation.unit || project.unit, b.observation.point])) || a.time.instant - b.time.instant || a.observation.id.localeCompare(b.observation.id)).map(({ observation: o, time }) => [o.monitoringItem, o.point, o.timestamp, String(o.value), o.unit?.trim() ? o.unit : project.unit, new Date(time.instant).toISOString(), time.assumedUtc ? 'unzoned-as-UTC' : 'explicit-offset-to-UTC', o.id, String(o.sourceRow), dataset.sourceFileHash])] },
     ] : []),
     { name: 'survey_adjustments', rows: [['runId', 'networkId', 'resultId', 'strategyId', 'transformType', 'algorithmVersion', 'observationCount', 'unknownCount', 'redundancy', 'unitWeightStdDev', 'unitWeightStdDevUnit', 'varianceFactor', 'varianceFactorUnit', 'varianceFactorEstimated', 'maxPointStdDev', 'maxPointStdDevUnit', 'validation', 'inputHash'], ...adjustments.map((a) => [a.runId, a.networkId, a.id, a.strategyId ?? '', a.transformType ?? '', a.algorithmVersion, String(a.observationCount), String(a.unknownCount), String(a.redundancy), String(a.unitWeightStdDev), a.unitWeightStdDevUnit, String(a.varianceFactor), a.varianceFactorUnit, String(a.varianceFactorEstimated), String(a.precision.maxPointStdDev), a.linearUnit, a.validation, a.inputHash])] },

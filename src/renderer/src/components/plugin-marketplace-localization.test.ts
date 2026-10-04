@@ -16,7 +16,7 @@ describe('plugin marketplace localization fallbacks', () => {
     expect(marketplaceText(missing, 'pluginCommercialLicenseRequired')).toBe('Commercial license required')
     expect(marketplaceText(missing, 'pluginNoRedistributionLicense')).toBe('No redistribution license')
     expect(marketplaceText(missing, 'pluginDetailExternalProject'))
-      .toBe('External project · not installed by WorkWise')
+      .toBe('External project · not installed by RailWise AI')
   })
 
   it('turns technical Skill and network failures into concise messages', () => {

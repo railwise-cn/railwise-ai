@@ -14,3 +14,8 @@ const instrumentExtensions = new Set(SURVEY_FILE_EXTENSIONS.filter((extension) =
 export function isSurveyInstrumentFile(file: Pick<File, 'name'>): boolean {
   return instrumentExtensions.has(file.name.slice(file.name.lastIndexOf('.')).toLowerCase())
 }
+
+/** Computation files from the AI composer use the shared processing entry. */
+export function isSurveyImportFile(file: Pick<File, 'name'>): boolean {
+  return isSurveyInstrumentFile(file) || /\.(csv|xlsx)$/i.test(file.name)
+}

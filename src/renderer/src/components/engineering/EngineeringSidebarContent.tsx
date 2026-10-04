@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { Bot, Database, FolderKanban, HardHat, MessageSquareText, Plus, RefreshCw } from 'lucide-react'
+import { Bot, Database, FolderKanban, MessageSquareText, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { engineeringTaskLabel } from './engineering-task-types'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
@@ -32,13 +32,7 @@ type Props = {
 async function loadEngineeringProjects(translate: (key: string, options?: Record<string, unknown>) => string): Promise<EngineeringProject[]> {
   const response = await rendererRuntimeClient.runtimeRequest('/v1/engineering/projects')
   if (!response.ok) {
-    let detail = response.body
-    try {
-      detail = (JSON.parse(response.body) as { message?: string }).message ?? detail
-    } catch {
-      /* Preserve plain Runtime errors. */
-    }
-    throw new Error(detail || translate('engineeringProjectsReadError', { status: response.status }))
+    throw new Error(translate('engineeringProjectsReadError', { status: response.status }))
   }
   return (JSON.parse(response.body) as { projects?: EngineeringProject[] }).projects ?? []
 }
@@ -93,8 +87,8 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
       const next = await loadEngineeringProjects(t)
       setProjects(next)
       setActiveProjectId(activeEngineeringProjectId())
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+    } catch {
+      setError(t('engineeringProjectsReadError', { status: 'unknown' }))
     } finally {
       setLoading(false)
     }
@@ -137,41 +131,24 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
     <div className="ds-no-drag flex min-h-0 flex-1 flex-col px-1">
       <div className="flex min-h-[38px] items-center justify-between px-2 pb-1 pt-2">
         <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-ds-faint">
-          <HardHat className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.8} />
+          <FolderKanban className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.8} />
           <span className="truncate">{t('engineeringProjects')}</span>
           <span className="tabular-nums text-[11px] text-ds-faint">{workspaceProjects.length}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <SidebarIconButton
-            onClick={runtimeReady ? dispatchEngineeringProjectCreate : undefined}
-            disabled={!runtimeReady}
-            className="h-7 w-7"
-            title={t('engineeringNewProject')}
-            ariaLabel={t('engineeringNewProject')}
-          >
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.9} />
-          </SidebarIconButton>
-          <SidebarIconButton
             onClick={() => void refresh()}
             disabled={!runtimeReady}
             active={loading}
-            className="h-7 w-7"
+            className="min-h-11 min-w-11"
             title={t('engineeringRefreshProjects')}
             ariaLabel={t('engineeringRefreshProjects')}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.8} />
           </SidebarIconButton>
+
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={dispatchEngineeringAiOpen}
-        className="mx-1 mb-2 flex min-h-[48px] w-[calc(100%-8px)] items-center gap-2 rounded-lg border border-accent/20 bg-accent/[0.07] px-2.5 py-2 text-left transition hover:border-accent/40 hover:bg-accent/10"
-      >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent"><Bot className="h-3.5 w-3.5" strokeWidth={1.8} /></span>
-        <span className="min-w-0"><span className="block truncate text-[12px] font-semibold text-ds-ink">{t('engineeringAiDesk')}</span><span className="mt-0.5 block truncate text-[10.5px] text-ds-muted">{t('engineeringAiDeskSubtitle')}</span></span>
-      </button>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
         {error ? (
@@ -199,8 +176,7 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
           {workspaceProjects.map((project) => {
             const active = project.id === activeProjectId
             return (
-              <button
-                key={project.id}
+              <div key={project.id}><button
                 type="button"
                 onClick={() => dispatchEngineeringProjectOpen(project.id)}
                 className={`group flex min-h-[52px] w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
@@ -220,18 +196,20 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
                   </span>
                 </span>
               </button>
+              {active ? <div className="ml-5 border-l border-ds-border-muted pl-2">{engineeringThreads.filter(thread => thread.projectId === project.id).map(thread => <button key={thread.id} type="button" onClick={() => { setRoute('engineering'); void selectThread(thread.id); dispatchEngineeringProjectOpen(project.id); dispatchEngineeringAiOpen() }} className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12px] text-ds-muted hover:bg-ds-hover" aria-current={thread.id === activeThreadId ? 'page' : undefined}><MessageSquareText className="h-3.5 w-3.5 shrink-0" /><span className="min-w-0 truncate">{thread.title && !thread.title.startsWith('Survey AI ·') ? thread.title : t('engineeringContinueConversation')}</span></button>)}</div> : null}
+              </div>
             )
           })}
         </div>
-        {engineeringThreads.length > 0 ? (
-          <div className="mt-4 border-t border-ds-border-muted pt-3">
+        {engineeringThreads.some(thread => !workspaceProjects.some(project => project.id === thread.projectId)) ? (
+          <details className="mt-4 border-t border-ds-border-muted pt-3"><summary className="min-h-11 cursor-pointer px-2 text-[12px] text-ds-muted">{t('engineeringHistoricalConversations')}</summary>
             <div className="flex items-center gap-1.5 px-2 text-[11px] font-medium text-ds-faint">
               <MessageSquareText className="h-3.5 w-3.5" strokeWidth={1.7} />
               <span>{t('engineeringAiSessions')}</span>
               <span className="tabular-nums">{engineeringThreads.length}</span>
             </div>
             <div className="mt-1 space-y-0.5">
-              {engineeringThreads.map((thread) => {
+              {engineeringThreads.filter(thread => !workspaceProjects.some(project => project.id === thread.projectId)).map((thread) => {
                 const active = thread.id === activeThreadId
                 const projectName = workspaceProjects.find((project) => project.id === thread.projectId)?.name
                 return (
@@ -257,11 +235,8 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
                 )
               })}
             </div>
-          </div>
+          </details>
         ) : null}
-      </div>
-      <div className="mx-2 mb-2 rounded-lg bg-ds-main px-2.5 py-2 text-[10.5px] leading-4 text-ds-faint">
-        {t('engineeringIsolationHint')}
       </div>
     </div>
   )

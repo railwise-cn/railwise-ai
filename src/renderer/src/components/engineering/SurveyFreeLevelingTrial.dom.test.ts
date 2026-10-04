@@ -57,6 +57,19 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
 describe('free leveling desktop trial', () => {
+  it('keeps run fingerprints and algorithm internals out of the default and expanded result UI', async () => {
+    await render(); await acknowledge(); await click(button('Run trial'))
+    const internals = [fixture.id, fixture.algorithmVersion, fixture.inputHash, fixture.sourceAdmissionHash,
+      fixture.requestHash, fixture.outputHash, fixture.recordHash, binding.networkId, binding.projectId, binding.sourceSha256]
+    expect(host.textContent).not.toContain('Advanced traceability')
+    for (const value of internals) expect(host.textContent).not.toContain(value)
+
+    for (const details of host.querySelectorAll('details')) {
+      await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')) })
+    }
+    for (const value of internals) expect(host.textContent).not.toContain(value)
+  })
+
   it('pins the trial point and observation using their stored record hash without inheriting a fixed-datum result', async () => {
     const focus = vi.fn(), key = JSON.stringify(['/survey', binding.projectId])
     useEngineeringConversationDrafts.setState({ drafts: {} })
@@ -85,7 +98,7 @@ describe('free leveling desktop trial', () => {
     expect(host.textContent).toContain('Missing height: zero initial approximation')
     expect(host.textContent).toContain('Engineering decision not evaluated')
     for (const region of host.querySelectorAll('[role="region"]')) expect(region.getAttribute('tabindex')).toBe('0')
-    await click(button('Locate obs-1'))
+    await click(button('Locate A → B · Height difference · observation 1'))
     expect(sourceRenderer).toHaveBeenCalledWith('raw-1', expect.any(Function))
     expect(document.activeElement?.textContent).toContain('source-anchor:raw-1')
     await act(async () => { await i18n.changeLanguage('zh') })
@@ -110,7 +123,7 @@ describe('free leveling desktop trial', () => {
 
   it('returns keyboard focus to the exact source locator after closing its record', async () => {
     await render(); await acknowledge(); await click(button('Run trial'))
-    const locator = button('Locate obs-2')
+    const locator = button('Locate A → B · Height difference · observation 2')
     locator.focus(); await click(locator)
     expect(document.activeElement?.textContent).toContain('source-anchor:raw-2')
     const close = button('Close source'); close.focus(); await click(close)
@@ -155,13 +168,13 @@ describe('free leveling desktop trial', () => {
 
   it('ignores an obsolete source dismissal after the scope changes and does not focus hidden controls', async () => {
     await render(); await acknowledge(); await click(button('Run trial'))
-    await click(button('Locate obs-1'))
+    await click(button('Locate A → B · Height difference · observation 1'))
     const dismiss = sourceRenderer.mock.calls.at(-1)![1]
     await render({ binding: { ...binding, projectId: 'other' } })
     const outside = document.createElement('button'); document.body.append(outside); outside.focus()
     await act(async () => dismiss())
     expect(document.activeElement).toBe(outside)
-    await render(); await acknowledge(); await click(button('Run trial')); await click(button('Locate obs-1'))
+    await render(); await acknowledge(); await click(button('Run trial')); await click(button('Locate A → B · Height difference · observation 1'))
     host.style.display = 'none'; outside.focus()
     await act(async () => sourceRenderer.mock.calls.at(-1)![1]())
     expect(document.activeElement).toBe(outside)
@@ -197,7 +210,7 @@ describe('free leveling desktop trial', () => {
     { binding: { ...binding, networkId: 'other' } }, { binding: { ...binding, sourceSha256: 'c'.repeat(64) } }
   ])('clears completed and pending results when scope changes: %o', async overrides => {
     await render(); await acknowledge(); await click(button('Run trial'))
-    await click(button('Locate obs-1'))
+    await click(button('Locate A → B · Height difference · observation 1'))
     let complete!: (value: unknown) => void
     runtimeRequest.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
     await click(button('Run trial')); expect(host.querySelector('table')).toBeNull()

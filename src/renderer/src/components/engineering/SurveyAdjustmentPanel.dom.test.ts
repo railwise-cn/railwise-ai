@@ -19,6 +19,12 @@ async function settle(): Promise<void> {
   })
 }
 
+function visibleText(element: HTMLElement): string {
+  const visible = element.cloneNode(true) as HTMLElement
+  visible.querySelectorAll('details:not([open])').forEach((details) => details.remove())
+  return visible.textContent ?? ''
+}
+
 function runtimeResponse(body: unknown): { ok: true; status: 200; body: string } {
   return { ok: true, status: 200, body: JSON.stringify(body) }
 }
@@ -70,6 +76,18 @@ const network = {
   },
   qualityStatus: 'validated',
   findings: []
+}
+
+const xlsxNetwork = {
+  ...network,
+  id: 'network-xlsx-source-009',
+  sourceFile: {
+    ...network.sourceFile,
+    name: 'survey.xlsx',
+    formatId: 'xlsx',
+    records: [{ ...network.sourceFile.records[0]!, rawOffset: 180, rawLength: 76, containerMember: { path: 'xl/worksheets/observation-data.xml', sha256: 'e'.repeat(64), byteOffset: 318, byteLength: 57, row: 2 } }],
+    rawRecordAnchors: [{ ...network.sourceFile.rawRecordAnchors[0]!, rawOffset: 180, rawLength: 76, containerMember: { path: 'xl/worksheets/observation-data.xml', sha256: 'e'.repeat(64), byteOffset: 318, byteLength: 57, row: 2 } }]
+  }
 }
 
 const archiveOnlyNetwork = {
@@ -264,16 +282,22 @@ const wholeFileAnchorAdjustment = {
     observations: [{ observationId: 'obs-1', residual: 0.0001, unit: 'm', standardizedResidual: 0.2, standardizedResidualUnit: 'sigma', sourceRecordId: 'record-1' }]
   }
 }
+const xlsxAdjustment = {
+  ...adjustment,
+  run: { ...adjustment.run, id: 'adjustment-xlsx-009', networkId: xlsxNetwork.id },
+  result: { ...adjustment.result, id: 'result-xlsx-009', observations: [{ ...adjustment.result.observations[0]!, sourceRecordId: 'record-1' }] }
+}
 
 beforeEach(async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   await i18n.changeLanguage('zh')
   validationResponse = undefined
   runtimeRequest = vi.fn(async (path: string, method?: string) => {
     if (path === '/v1/engineering/survey/networks?projectId=project-restored-001' && method === 'GET') {
-      return runtimeResponse({ networks: [network, archiveOnlyNetwork, legacyNetwork, pendingEligibilityNetwork, historicalIneligibleNetwork, outOfRangeNetwork, wholeFileAnchorNetwork] })
+      return runtimeResponse({ networks: [network, xlsxNetwork, archiveOnlyNetwork, legacyNetwork, pendingEligibilityNetwork, historicalIneligibleNetwork, outOfRangeNetwork, wholeFileAnchorNetwork] })
     }
     if (path === '/v1/engineering/adjustments?projectId=project-restored-001' && method === 'GET') {
-      return runtimeResponse({ adjustments: [adjustment, historicalIneligibleAdjustment, outOfRangeAdjustment, wholeFileAnchorAdjustment] })
+      return runtimeResponse({ adjustments: [adjustment, xlsxAdjustment, historicalIneligibleAdjustment, outOfRangeAdjustment, wholeFileAnchorAdjustment] })
     }
     if (path === `/v1/engineering/survey/networks/${network.id}/validate` && method === 'POST') {
       return runtimeResponse({ network: validationResponse ?? network })
@@ -311,6 +335,153 @@ afterEach(async () => {
 })
 
 describe('SurveyAdjustmentPanel persisted state restoration', () => {
+  it('names COSA sources and their degree-minute-second format without internal format codes', async () => {
+    const cosaNetwork = { ...network, sourceFile: { ...network.sourceFile, formatId: 'cosa-in2', detection: { ...network.sourceFile.detection, format: 'cosa-in2' }, angularUnitRaw: 'cosa-degree-dot-mmss' } }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [cosaNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { key: 'cosa-format', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'network' })))
+    await settle()
+    expect(container.textContent).toContain('COSA IN2')
+    expect(container.textContent).toContain('度.分秒（DDD.MMSS） → rad')
+    expect(container.textContent).not.toContain('cosa-degree-dot-mmss')
+    expect(container.textContent).not.toContain('未知格式')
+    await act(async () => i18n.changeLanguage('en'))
+    expect(container.textContent).toContain('Degrees.minutes-seconds (DDD.MMSS) → rad')
+  })
+
+  it('keeps the survey workbench focused on instrument sources instead of the internal JSON contract', async () => {
+    const legacyInternalNetwork = {
+      ...network,
+      sourceFile: {
+        ...network.sourceFile,
+        formatId: 'workwise-survey-network',
+        detection: { ...network.sourceFile.detection, format: 'workwise-survey-network' }
+      }
+    }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [legacyInternalNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'internal-network-format', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true
+    })))
+    await settle()
+
+    expect(container.querySelector('#survey-network-json')).toBeNull()
+    expect(container.textContent).not.toMatch(/JSON|formatVersion|workwise-survey-network|RailWise JSON/i)
+    expect(container.textContent).toContain('原始仪器文件')
+    expect(container.textContent).toContain('来源核验')
+  })
+
+  it('probes and confirms each measurement table before sequential batch import', async () => {
+    const files = [new File(['from,to,value\nBM01,P01,200'], 'first.csv'), new File(['workbook bytes'], 'second.xlsx')]
+    const removePending = vi.fn()
+    const base = runtimeRequest.getMockImplementation() as (path: string, method: string, body?: string) => Promise<unknown>
+    let activeImports = 0
+    runtimeRequest.mockImplementation(async (path: string, method: string, body?: string) => {
+      if (path === '/v1/engineering/survey/tabular/probe') {
+        const input = JSON.parse(body!)
+        return runtimeResponse({ probe: { formatId: input.name.endsWith('.xlsx') ? 'xlsx' : 'delimited-text', sourceSha256: (input.name === 'first.csv' ? 'a' : 'b').repeat(64), tables: [{ id: input.name.endsWith('.xlsx') ? 'xl/worksheets/observation-data.xml' : 'csv', name: 'Observations', visibility: 'visible', importable: true, columns: ['from', 'to', 'value'], previewRows: [['BM01', 'P01', '200']], rowCount: 1, headerRow: 1 }], requiresMapping: true } })
+      }
+      if (path === '/v1/engineering/survey/networks/import') {
+        const input = JSON.parse(body!)
+        expect(activeImports).toBe(0)
+        activeImports += 1
+        await new Promise(resolve => setTimeout(resolve, 0))
+        activeImports -= 1
+        return runtimeResponse({ network: { ...network, id: `imported-${input.name}`, sourceFile: { ...network.sourceFile, name: input.name } } })
+      }
+      return base(path, method, body)
+    })
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, pendingFiles: files, onRemovePendingFile: removePending })))
+    const imports = (): Record<string, unknown>[] => runtimeRequest.mock.calls.filter(([path]) => path === '/v1/engineering/survey/networks/import').map(([, , body]) => JSON.parse(body as string))
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('导入预检'))?.click()); await settle()
+    expect(imports()).toHaveLength(0)
+    for (const fileName of ['first.csv', 'second.xlsx']) {
+      expect(container.querySelector('form')?.textContent).toContain(fileName)
+      const fill = async (label: string, value: string): Promise<void> => {
+        const wrapper = Array.from(container.querySelectorAll('form label')).find(item => item.textContent?.startsWith(label))!
+        const control = wrapper.querySelector('select,input,textarea') as HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement
+        await act(async () => { const prototype = control.tagName === 'SELECT' ? HTMLSelectElement.prototype : control.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(control, value); control.dispatchEvent(new Event(control.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })) })
+      }
+      await fill('起点 / 测站', '0'); await fill('终点 / 目标', '1'); await fill('观测值', '2'); await fill('平面坐标系', 'LOCAL'); await fill('高程基准', 'PROJECT'); await fill('已知点', 'BM01, 100')
+      await act(async () => container.querySelector<HTMLButtonElement>('form button[type="submit"]')!.click()); await settle()
+      if (fileName === 'first.csv') expect(imports()).toHaveLength(0)
+    }
+    for (let attempt = 0; attempt < 10 && removePending.mock.calls.length < 2; attempt += 1) await settle()
+    expect(imports().map(input => input.name)).toEqual(['first.csv', 'second.xlsx'])
+    expect(imports()[0].tabularMapping).toMatchObject({ confirmed: true, sourceSha256: 'a'.repeat(64), knownPoints: [{ id: 'BM01', height: 100 }], coordinateSystem: 'LOCAL' })
+    expect(imports()[1].tabularMapping).toMatchObject({ confirmed: true, sourceSha256: 'b'.repeat(64), tableId: 'xl/worksheets/observation-data.xml' })
+    expect(removePending).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps datum, network geometry and known points visible in the compact processing flow', async () => {
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1, workspace: '/survey' }, runtimeReady: true,
+      compact: true, preferredSection: 'network'
+    })))
+    await settle()
+    expect(container.querySelector('[aria-label="网形、基准与已知点"]')).not.toBeNull()
+    expect(container.querySelector('svg[role="img"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="专业检查"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="survey-professional-check-network"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="survey-professional-check-observations"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="survey-professional-check-points"]')).not.toBeNull()
+    expect(container.textContent).toContain('BM-01')
+    expect(container.textContent).toContain('1985 国家高程基准')
+    const datumSummary = Array.from(container.querySelectorAll('p')).find(item => item.textContent === i18n.t('surveyBaseAndUnit'))?.parentElement
+    expect(datumSummary?.textContent).toContain('1985 国家高程基准')
+    expect(datumSummary?.textContent).not.toContain('工程独立坐标系')
+    expect(datumSummary?.textContent).not.toContain('rad')
+    expect(container.textContent).toContain('可计算')
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(container.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('surveyNetworkType')}"]`)?.value).toBe('leveling')
+    expect(container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${i18n.t('surveyKnownPointsInput')}"]`)).not.toBeNull()
+  })
+
+  it('uses the visible import controls for a compact instrument reimport', async () => {
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, compact: true, preferredSection: 'network'
+    })))
+    await settle()
+    const type = container.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('surveyNetworkType')}"]`)!
+    const controls = container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${i18n.t('surveyKnownPointsInput')}"]`)!
+    await act(async () => {
+      type.value = 'leveling'; type.dispatchEvent(new Event('change', { bubbles: true }))
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(controls, 'BM,100.000')
+      controls.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const picker = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    Object.defineProperty(picker, 'files', { configurable: true, value: [new File(['GSI source'], 'survey.gsi')] })
+    await act(async () => picker.dispatchEvent(new Event('change', { bubbles: true })))
+    for (let attempt = 0; attempt < 10 && !runtimeRequest.mock.calls.some(([path]) => path === '/v1/engineering/survey/networks/import'); attempt += 1) await settle()
+    const imported = runtimeRequest.mock.calls.find(([path]) => path === '/v1/engineering/survey/networks/import')
+    expect(JSON.parse(imported![2] as string)).toMatchObject({ networkType: 'leveling', knownPoints: [{ id: 'BM', height: 100 }] })
+  })
+
+  it('keeps the compact results page when closing a drawer on epoch deformation', async () => {
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'compact-results-drawer', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, compact: true, preferredSection: 'result'
+    })))
+    await settle()
+    const review = container.querySelector('.survey-professional-review')
+    expect(review).not.toBeNull()
+    const open = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === i18n.t('surveyOpenAdvanced'))!
+    await act(async () => open.click())
+    const drawer = container.querySelector<HTMLDialogElement>('dialog')!
+    expect(drawer.open).toBe(true)
+    const deformation = Array.from(drawer.querySelectorAll<HTMLButtonElement>('.survey-workbench-nav button')).find(button => button.textContent?.startsWith(i18n.t('surveyNavDeformation')))!
+    await act(async () => deformation.click())
+    expect(deformation.getAttribute('aria-current')).toBe('page')
+    expect(drawer.querySelector(`[aria-label="${i18n.t('surveyPeriodComparisonTitle')}"]`)).not.toBeNull()
+    await act(async () => drawer.querySelector<HTMLButtonElement>(`button[aria-label="${i18n.t('engineeringCloseDetails')}"]`)!.click())
+    expect(drawer.open).toBe(false)
+    expect(container.querySelector('.survey-professional-review')).toBe(review)
+    expect(Array.from(container.querySelectorAll('h3')).some(heading => heading.textContent === i18n.t('surveySimpleTitle'))).toBe(false)
+  })
+
   it('refreshes external results while preserving the manually selected network and input draft', async () => {
     const selector = container.querySelector<HTMLSelectElement>('#survey-existing-network')!
     await act(async () => { selector.value = archiveOnlyNetwork.id; selector.dispatchEvent(new Event('change', { bubbles: true })) })
@@ -337,7 +508,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     await renderRefresh(2)
     expect(selector.value).toBe(archiveOnlyNetwork.id)
     expect(container.textContent).toContain('updated-selected.dat')
-    expect(container.textContent).toContain('read unavailable')
+    expect(container.textContent).toContain(i18n.t('runtimeRequestFailed', { ns: 'common' }))
     expect(preserved).toContain('updated-selected.dat')
   })
 
@@ -347,7 +518,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
       : { adjustments: [{ ...adjustment, result: { ...adjustment.result, algorithmVersion: 'external-adjustment-v2' } }] }))
     await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, refreshToken: 1 })))
     await settle()
-    expect(container.textContent).toContain('external-adjustment-v2')
+    expect(container.textContent).not.toContain('external-adjustment-v2')
     expect(container.querySelector<HTMLSelectElement>('#survey-existing-network')?.value).toBe(network.id)
   })
 
@@ -472,12 +643,12 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     })))
     await settle()
     runtimeRequest.mockClear()
-    const ask = container.querySelector<HTMLButtonElement>('[aria-label="询问观测 obs-1 的测量 AI"]')!
+    const ask = container.querySelector<HTMLButtonElement>('[aria-label="询问观测 BM-01 → P-01 · 高差 · 来源第 1 行 的测量 AI"]')!
     await act(async () => ask.click())
     expect(focus).toHaveBeenCalledOnce()
     expect(runtimeRequest).not.toHaveBeenCalled()
     expect(useEngineeringConversationDrafts.getState().drafts[scope]).toMatchObject({
-      input: '请解释观测 obs-1 的结果、原始依据及需要复核的问题。',
+      input: '请解释观测 BM-01 → P-01 · 高差 · 来源第 1 行 的结果、原始依据及需要复核的问题。',
       viewContext: { networkId: network.id, networkRevision: network.revision, sourceSha256: network.sourceFile.sha256, adjustmentId: adjustment.run.id, algorithmVersion: adjustment.result.algorithmVersion, section: 'result', observationId: 'obs-1', sourceRecordId: 'record-1' }
     })
     useEngineeringConversationDrafts.getState().update(scope, (draft) => ({ ...draft, input: 'Keep my question' }))
@@ -509,6 +680,13 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     await settle()
     const compare = [...container.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === i18n.t('surveyCompareEpochs'))!
     expect(compare.disabled).toBe(false); await act(async () => compare.click()); runtimeRequest.mockClear()
+    const shown = visibleText(container)
+    expect(shown).toContain('P-01')
+    expect(shown).not.toContain(comparison.id)
+    expect(shown).not.toContain(comparison.inputHash)
+    expect(shown).not.toContain(comparison.algorithmVersion)
+    expect([...container.querySelectorAll('details')].some(item => item.textContent?.includes(comparison.inputHash))).toBe(false)
+    expect(shown).not.toMatch(/survey-deformation|input hash|algorithm version/i)
     for (const [label, collection, identity] of [['P-01', 'points', { pointId: 'P-01' }], ['pair-1', 'pairs', { id: 'pair-1' }]] as const) {
       await act(async () => container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label })}"]`)!.click())
       expect(useEngineeringConversationDrafts.getState().drafts[scope]!.evidenceContext!.typedEvidence).toEqual({ schemaVersion: 1, projectId: 'project-restored-001', projectRevision: 1, kind: 'deformation', comparisonId: comparison.id, referenceAdjustmentId: comparison.referenceAdjustmentId, currentAdjustmentId: comparison.currentAdjustmentId, inputHash: comparison.inputHash, algorithmVersion: comparison.algorithmVersion, selector: { path: [collection, 0], identity } })
@@ -517,6 +695,108 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(runtimeRequest).not.toHaveBeenCalled(); expect(focus).toHaveBeenCalledTimes(2)
     await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project: { id: 'project-restored-001', revision: 2, workspace: '/survey' }, runtimeReady: true, preferredSection: 'deformation', onOpenAi: focus })))
     expect(container.querySelector(`[aria-label="${i18n.t('surveyAskEvidence', { label: 'pair-1' })}"]`)).toBeNull()
+  })
+
+  it('uses structured survey controls for deformation segments instead of JSON input', async () => {
+    const comparison = { id: 'comparison-form', referenceAdjustmentId: adjustment.run.id, currentAdjustmentId: xlsxAdjustment.run.id, inputHash: 'e'.repeat(64), algorithmVersion: 'survey-deformation-1', durationDays: 1, referenceEpoch: '2026-08-22', currentEpoch: '2026-08-23', points: [{ pointId: 'P-01', significant: false, rates: { spatialPerDay: 0 } }], pairs: [{ id: 'pair-1', kind: 'convergence', firstPointId: 'P-01', secondPointId: 'BM-01' }] }
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path === '/v1/engineering/deformations' ? runtimeResponse({ deformation: comparison }) : path.includes('/survey/networks?') ? runtimeResponse({ networks: [network] }) : runtimeResponse({ adjustments: [adjustment, xlsxAdjustment] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'structured-deformation-pairs', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, preferredSection: 'deformation'
+    })))
+    await settle()
+    const pairForm = container.querySelector<HTMLFieldSetElement>(`fieldset[aria-label="${i18n.t('surveyPairsTitle')}"]`)!
+    expect(pairForm).not.toBeNull()
+    expect(pairForm.querySelector('textarea')).toBeNull()
+    const addPair = pairForm.querySelector<HTMLButtonElement>('button')!
+    expect(addPair.disabled).toBe(false)
+    await act(async () => addPair.click())
+    const setValue = async (control: HTMLInputElement | HTMLSelectElement, value: string): Promise<void> => act(async () => {
+      const prototype = control.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(control, value)
+      control.dispatchEvent(new Event(control.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
+    })
+    await setValue(container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('surveyFirstPoint', { number: 1 })}"]`)!, 'P-01')
+    await setValue(container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('surveySecondPoint', { number: 1 })}"]`)!, 'P-02')
+    const name = container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('surveyPairName', { number: 1 })}"]`)!
+    name.focus()
+    await setValue(name, '桥墩左侧')
+    expect(document.activeElement).toBe(name)
+    expect(container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('surveyPairName', { number: 1 })}"]`)).toBe(name)
+    const compare = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes(i18n.t('surveyCompareEpochs')))
+    expect(compare).toBeDefined()
+    if (compare) await act(async () => compare.click())
+    await settle()
+    const call = runtimeRequest.mock.calls.find(([path, method]) => path === '/v1/engineering/deformations' && method === 'POST')
+    expect(call).toBeDefined()
+    expect(JSON.parse(call?.[2] as string).pairs).toEqual([{ id: '桥墩左侧', firstPointId: 'P-01', secondPointId: 'P-02', kind: 'convergence', distanceMode: 'horizontal' }])
+    expect(container.textContent).not.toMatch(/JSON|survey-deformation-1|[a-f]{64}/)
+  })
+
+  it('preserves an approved physical tilt baseline and ignores a comparison finishing after a project switch', async () => {
+    let resolveComparison!: (value: ReturnType<typeof runtimeResponse>) => void
+    const comparisonRequest = new Promise<ReturnType<typeof runtimeResponse>>(resolve => { resolveComparison = resolve })
+    const onComplete = vi.fn()
+    const original = runtimeRequest.getMockImplementation() as unknown as (path: string, method?: string) => Promise<unknown>
+    runtimeRequest.mockImplementation((path: string, method?: string) => path === '/v1/engineering/deformations' ? comparisonRequest : original(path, method))
+    const render = async (projectId: string, ready = true): Promise<void> => {
+      await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+        project: { id: projectId, revision: 1, workspace: '/survey' }, runtimeReady: ready,
+        preferredSection: 'deformation', onDeformationComplete: onComplete
+      })))
+      await settle()
+    }
+    await render('project-restored-001')
+    const pairForm = (): HTMLFieldSetElement => container.querySelector(`fieldset[aria-label="${i18n.t('surveyPairsTitle')}"]`)!
+    await act(async () => pairForm().querySelector<HTMLButtonElement>('button')!.click())
+    const setValue = async (label: string, value: string): Promise<void> => act(async () => {
+      const control = pairForm().querySelector<HTMLInputElement | HTMLSelectElement>(`input[aria-label="${label}"],select[aria-label="${label}"]`)!
+      const prototype = control.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(control, value)
+      control.dispatchEvent(new Event(control.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
+    })
+    await setValue(i18n.t('surveyFirstPoint'), 'BM-01')
+    await setValue(i18n.t('surveySecondPoint'), 'P-01')
+    await setValue(i18n.t('surveyPairType'), 'tilt')
+    const compare = (): HTMLButtonElement => [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === i18n.t('surveyCompareEpochs'))!
+    expect(pairForm().querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('surveyDistanceMode')}"]`)!.disabled).toBe(true)
+    await setValue(i18n.t('surveyPairBaseline'), '0')
+    expect(compare().disabled).toBe(true)
+    expect(pairForm().textContent).toContain(i18n.t('surveyPairsArrayRequired'))
+    await setValue(i18n.t('surveyPairBaseline'), '12.5')
+    await render('project-restored-001', false)
+    expect(pairForm().disabled).toBe(true)
+    expect(compare().disabled).toBe(true)
+    await render('project-restored-001')
+    expect(compare().disabled).toBe(false)
+    await act(async () => compare().click())
+    expect(pairForm().disabled).toBe(true)
+    expect(container.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('surveyReferenceEpochAria')}"]`)!.disabled).toBe(true)
+    const call = runtimeRequest.mock.calls.find(([path, method]) => path === '/v1/engineering/deformations' && method === 'POST')!
+    expect(JSON.parse(call[2] as string).pairs).toEqual([{ id: i18n.t('surveyPairName', { number: 1 }), firstPointId: 'BM-01', secondPointId: 'P-01', kind: 'tilt', distanceMode: 'horizontal', baselineM: 12.5 }])
+    await render('project-other')
+    expect(pairForm().querySelector('input')).toBeNull()
+    await act(async () => resolveComparison(runtimeResponse({ deformation: { id: 'old-comparison' } })))
+    expect(onComplete).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain(i18n.t('surveyComparisonComplete'))
+    expect(pairForm().querySelector('input')).toBeNull()
+  })
+
+  it('keeps adjustment and source identity details out of the default professional result view', async () => {
+    const inputHash = 'd'.repeat(64)
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<unknown>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path === '/v1/engineering/adjustments?projectId=project-restored-001'
+      ? runtimeResponse({ adjustments: [{ ...adjustment, result: { ...adjustment.result, inputHash } }, xlsxAdjustment, historicalIneligibleAdjustment, outOfRangeAdjustment, wholeFileAnchorAdjustment] })
+      : original(path, method))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'result'
+    })))
+    await settle()
+    const shown = visibleText(container)
+    expect(shown).toContain('0.0005')
+    for (const internalValue of [adjustment.run.id, adjustment.run.networkId, adjustment.result.strategyId, adjustment.result.algorithmVersion, inputHash, network.sourceFile.sha256]) {
+      expect(shown).not.toContain(internalValue!)
+    }
   })
 
   it('keeps duplicate point IDs bound to their displayed collection and offset and disables them during project loading', async () => {
@@ -553,10 +833,12 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     }
     await renderSection('network')
     runtimeRequest.mockClear()
-    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="询问 mapping_required #2 的测量 AI"]')!.click())
+    const diagnosticQuestion = [...container.querySelectorAll<HTMLButtonElement>('button[aria-label]')].find(button => /资料诊断 2|诊断项 2/.test(button.getAttribute('aria-label') ?? ''))
+    expect(diagnosticQuestion).toBeDefined()
+    await act(async () => diagnosticQuestion?.click())
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext).toMatchObject({ networkId: network.id, sourceSha256: network.sourceFile.sha256, diagnosticCode: 'mapping_required', diagnosticIndex: 1, section: 'preflight', parserVersion: network.sourceFile.parserVersion })
     await renderSection('observations')
-    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="询问观测 obs-1 的测量 AI"]')!.click())
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="询问观测 BM-01 → P-01 · 高差 · 观测 1 的测量 AI"]')!.click())
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext?.observationId).toBe('obs-1')
     await renderSection('result')
     for (const metric of ['closure', 'precision']) {
@@ -576,7 +858,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     })))
     await settle()
     runtimeRequest.mockClear()
-    for (const label of ['质量校核', '运行平差', '导入结构化网络']) {
+    for (const label of ['质量校核', '运行平差', '批量选择专业测量文件']) {
       const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find((item) => item.textContent === label)
       expect(button, label).toBeDefined()
       expect(button?.disabled, label).toBe(true)
@@ -786,8 +1068,8 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(container.querySelector('#survey-adjustment-method')?.textContent).toContain('平差方法 / 权模型')
     expect(container.querySelector('#survey-adjustment-method')?.textContent).toContain('加权最小二乘')
     expect(container.querySelector('#survey-constraint-mode')?.textContent).toContain('固定已知点')
-    expect(container.querySelector('[aria-label="当前 Runtime 约束"]')?.textContent).toContain('固定已知点')
-    expect(container.querySelector('[aria-label="当前 Runtime 执行方式"]')?.textContent).toContain('加权最小二乘')
+    expect(container.querySelector('[aria-label="平差约束"]')?.textContent).toContain('固定已知点')
+    expect(container.querySelector('[aria-label="平差方法"]')?.textContent).toContain('加权最小二乘')
 
     const adjustButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('运行平差'))
     await act(async () => adjustButton?.click())
@@ -798,6 +1080,169 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     const requestBody = JSON.parse(String(adjustmentCall?.[2])) as Record<string, unknown>
     expect(requestBody).not.toHaveProperty('method')
     expect(requestBody).not.toHaveProperty('constraint')
+  })
+
+  it('renders format admission as a professional action instead of exposing catalog internals', async () => {
+    const catalogMessage = 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断平差。'
+    const catalogNetwork = {
+      ...network,
+      id: 'network-catalog-copy-001',
+      sourceFile: {
+        ...network.sourceFile,
+        dispositionReason: catalogMessage,
+        dispositionReasonEn: 'cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: strict structure parsing and unit conversion are required before policy checks.',
+        diagnostics: [{
+          code: 'format_detected', severity: 'warning' as const, message: catalogMessage,
+          localized: { en: { message: 'cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: strict structure parsing and unit conversion are required before policy checks.' } }
+        }]
+      }
+    }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [catalogNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { key: 'catalog-copy', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'network' })))
+    await settle()
+
+    expect(container.textContent).toContain('资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。')
+    expect(container.textContent).not.toContain('P0 格式目录')
+    expect(container.textContent).not.toContain('解析对象')
+    expect(container.textContent).not.toContain('策略校验')
+    expect(container.textContent).not.toContain('workwise-survey-format-catalog')
+  })
+
+  it('keeps the compact needs-attention summary free of format-catalog implementation language', async () => {
+    const intermediateMessage = 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 当前资料可进入计算前检查：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断平差。'
+    const compactNetwork = {
+      ...network,
+      id: 'network-compact-catalog-copy-001',
+      findings: [{ code: 'format_detected', severity: 'warning' as const, message: intermediateMessage }]
+    }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [compactNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'compact-catalog-copy', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, compact: true, preferredSection: 'network'
+    })))
+    await settle()
+
+    const needsAttention = Array.from(container.querySelectorAll('p')).find(item => item.textContent === '需要处理')?.parentElement
+    expect(needsAttention?.textContent).toContain('资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。')
+    expect(needsAttention?.textContent).not.toMatch(/P0|格式目录|解析对象|策略校验|解析器|记录锚点|adjustment-ready|archive-only|converter-required|gnss-processing-required|workwise-survey-format-catalog/)
+  })
+
+  it('shows professional source facts and actionable checks without parser, signature, converter, or hash internals', async () => {
+    const sourceFile = {
+      ...network.sourceFile,
+      parserId: 'private-survey-parser-9',
+      parserVersion: 'internal-build-x',
+      parserSourceHash: 'f'.repeat(64),
+      detection: { ...network.sourceFile.detection, matchedSignatures: ['PRIVATE_SIGNATURE_TOKEN'] },
+      converterId: 'private-converter-id',
+      converterVersion: 'internal-converter-build',
+      converterBinaryHash: 'b'.repeat(64),
+      converter: {
+        id: 'private-converter-id', version: 'internal-converter-build', license: 'private-license',
+        executableHash: 'c'.repeat(64), inputHash: 'd'.repeat(64), networkAccess: 'none' as const,
+        arguments: ['--internal-flag'], status: 'blocked' as const
+      },
+      diagnostics: [
+        network.sourceFile.diagnostics[0]!,
+        { ...network.sourceFile.diagnostics[1]!, sourceRecord: 19, byteOffset: 777 }
+      ]
+    }
+    const preflightNetwork = { ...network, id: 'network-professional-preflight-012', sourceFile }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [preflightNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'professional-source-preflight', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, preferredSection: 'network'
+    })))
+    await settle()
+    const anchorsSection = Array.from(container.querySelectorAll('p')).find(item => item.textContent === '原始记录定位')?.parentElement
+    await act(async () => anchorsSection?.querySelector('button')?.click())
+
+    const shown = container.textContent ?? ''
+    expect(shown).toContain('level.gsi')
+    expect(shown).toContain('Leica GSI-8')
+    expect(shown).toContain('CGCS2000')
+    expect(shown).toContain('1985 国家高程基准')
+    expect(shown).toContain('2 / 1')
+    expect(shown).toContain('字段映射需要确认。')
+    expect(shown).toContain('下一步：确认字段映射、单位和基准后重新导入。')
+    expect(shown).toContain('记录 19')
+    expect(shown).toContain('行 1')
+    expect(shown).not.toMatch(/private-survey-parser-9|internal-build-x|PRIVATE_SIGNATURE_TOKEN|private-converter-id|internal-converter-build|private-license|internal-flag|SHA-256|[a-f]{64}/)
+    expect(container.querySelector('[aria-label="残差原始记录定位"]')).toBeNull()
+  })
+
+  it('lets current source eligibility override a ready-sounding catalog warning', async () => {
+    const catalogMessage = 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 当前资料可进入计算前检查：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断平差。'
+    const deniedNetwork = {
+      ...network,
+      id: 'network-denied-catalog-copy-001',
+      sourceEligibility: { eligible: false, findings: [{ code: 'source_not_eligible', severity: 'blocking' as const, message: '原始资料尚未通过平差准入检查。' }] },
+      sourceFile: { ...network.sourceFile, disposition: 'archive-only' as const },
+      findings: [{ code: 'format_detected', severity: 'warning' as const, message: catalogMessage }]
+    }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [deniedNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'denied-catalog-copy', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, compact: true, preferredSection: 'network'
+    })))
+    await settle()
+
+    const needsAttention = Array.from(container.querySelectorAll('p')).find(item => item.textContent === '需要处理')?.parentElement
+    expect(needsAttention?.textContent).toContain('此格式当前仅支持查看与质量检查，不能直接用于平差。')
+    expect(needsAttention?.textContent).not.toMatch(/可进入计算前检查|可计算|开始计算前/)
+  })
+
+  it('uses a professional accessible label for source diagnostics', async () => {
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'diagnostic-accessible-label', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, preferredSection: 'network'
+    })))
+    await settle()
+
+    const labels = Array.from(container.querySelectorAll('button[aria-label]')).map(button => button.getAttribute('aria-label') ?? '')
+    expect(labels.some(label => /mapping_required/i.test(label))).toBe(false)
+    expect(labels.some(label => /资料诊断 2|诊断项 2|diagnostic 2/i.test(label))).toBe(true)
+  })
+
+  it.each(['zh', 'en'])('keeps non-catalog source blockers in professional language in the default view (%s)', async language => {
+    await act(async () => { await i18n.changeLanguage(language) })
+    const envelope = 'archive-only: unknown_format — 无法通过内容签名安全识别测量文件；不会回退为通用 CSV'
+    const deniedNetwork = {
+      ...network,
+      id: `network-unknown-format-${language}`,
+      findings: [{ code: 'unknown_format', severity: 'blocking' as const, message: envelope }],
+      sourceEligibility: { eligible: false, findings: [{ code: 'unknown_format', severity: 'blocking' as const, message: envelope }] },
+      sourceFile: {
+        ...network.sourceFile,
+        disposition: 'archive-only' as const,
+        dispositionReason: envelope,
+        dispositionReasonEn: 'archive-only: unknown_format — The source format cannot be safely identified from its content signature; generic CSV fallback is disabled.'
+      }
+    }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [deniedNetwork] })
+      : runtimeResponse({ adjustments: [] }))
+
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: `unknown-format-${language}`, project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, preferredSection: 'network'
+    })))
+    await settle()
+
+    const shown = visibleText(container)
+    expect(shown).toContain(language === 'en' ? 'This format can be reviewed but not adjusted directly.' : '此格式当前仅支持查看与质量检查，不能直接用于平差。')
+    expect(shown).not.toMatch(/archive-only|unknown_format|content signature|CSV fallback|source eligibility|server source|source ledger|sha-256|来源资格|服务端|内容签名|原始台账|P0 格式目录|P0 admission catalog|本地计算服务\s*当前实现/i)
   })
 
   it('does not label a validation replay as passed after current source eligibility is revoked', async () => {
@@ -814,7 +1259,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     await act(async () => validateButton?.click())
     await settle()
 
-    expect(container.textContent).toContain('当前来源资格已失效；结果仅可审计查看，不能运行平差。')
+    expect(container.textContent).toContain('校核完成，但原始资料已发生变化。结果仅供查看，请重新核验资料后再平差。')
     expect(container.textContent).not.toContain('质量校核通过，可以运行平差。')
   })
 
@@ -826,7 +1271,6 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(container.textContent).toContain('观测 / 未知数')
     expect(container.textContent).toContain('1 / 1')
     expect(container.textContent).toContain('2e-7')
-    expect(container.textContent).toContain('adjustment-restored-001')
     expect(container.textContent).toContain('点位成果与复核摘要')
     expect(container.textContent).toContain('Leica GSI-8')
     expect(container.textContent).toContain('可进入校核与平差')
@@ -845,36 +1289,38 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(container.textContent).toContain('Posterior variance')
   })
 
-  it('shows professional source preflight, diagnostics, hashes, filters, and raw anchors', async () => {
+  it('shows professional source preflight, diagnostics, filters, and raw anchors without implementation trace data', async () => {
     const networkTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('网形与基准'))
     expect(networkTab).toBeDefined()
     await act(async () => networkTab?.click())
 
     expect(container.querySelector('[aria-label="专业测量来源预检"]')).not.toBeNull()
-    expect(container.querySelector('[aria-label="来源合同明细"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="原始资料与处理说明"]')).not.toBeNull()
     expect(container.querySelector('[aria-label="按来源格式筛选"]')).not.toBeNull()
     expect(container.querySelector('[aria-label="按平差就绪状态筛选"]')).not.toBeNull()
-    expect(container.textContent).toContain('survey-format-registry')
-    expect(container.textContent).toContain('a'.repeat(64))
     expect(container.textContent).toContain('声明扩展名')
     expect(container.textContent).toContain('内容探测格式')
     expect(container.textContent).toContain('GSI 米制末位 1 mm → m')
     expect(container.textContent).toContain('gon → rad')
     expect(container.textContent).toContain('CGCS2000 / 1985 国家高程基准')
     expect(container.textContent).toContain('内容签名、记录结构和单位声明均已通过预检。')
-    expect(container.textContent).toContain('p'.repeat(64))
+    expect(container.textContent).not.toContain('survey-format-registry')
+    expect(container.textContent).not.toContain('workwise-survey-formats-1')
+    expect(container.textContent).not.toContain('a'.repeat(64))
+    expect(container.textContent).not.toContain('p'.repeat(64))
     expect(container.textContent).toContain('2 / 1')
     expect(container.textContent).toContain('1 / 1 / 0')
-    expect(container.textContent).toContain('未使用转换器')
     expect(container.textContent).toContain('识别为 Leica GSI-8')
     expect(container.textContent).toContain('下一步：确认字段映射、单位和基准后重新导入。')
-    expect(container.textContent).toContain('原始资料身份已验证')
+    expect(container.textContent).toContain('原始资料完整性已核验')
+    const shown = visibleText(container)
+    expect(shown).not.toContain('GSI word index/sign/value')
+    expect(container.textContent).not.toContain('GSI word index/sign/value')
 
     const recordsButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('查看 1'))
     await act(async () => recordsButton?.click())
-    expect(container.textContent).toContain('GSI')
+    expect(container.textContent).toContain('原始记录定位')
     expect(container.textContent).toContain('行 1')
-    expect(container.textContent).not.toContain('{"id":"obs-1","value":0.2}')
 
     const input = container.querySelector<HTMLInputElement>('input[aria-label="选择专业测量文件"]')
     expect(input?.accept).toContain('.gsi')
@@ -890,24 +1336,59 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(input?.accept).toContain('.rtcm3')
   })
 
-  it('links a residual to its exact raw-source anchor and keeps missing source IDs explicit', async () => {
+  it('does not expose unknown internal format detector names', async () => {
+    const unknownDetector = 'private-signature-detector-v9'
+    const unknownMethodNetwork = {
+      ...network,
+      sourceFile: {
+        ...network.sourceFile,
+        detectionMethod: unknownDetector,
+        detection: { ...network.sourceFile.detection, method: unknownDetector }
+      }
+    }
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<unknown>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path === '/v1/engineering/survey/networks?projectId=project-restored-001'
+      ? runtimeResponse({ networks: [unknownMethodNetwork] })
+      : original(path, method))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { key: 'unknown-detector', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true })))
+    await settle()
+    const networkTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('网形与基准'))
+    await act(async () => networkTab?.click())
+
+    expect(container.textContent).toContain('未记录')
+    expect(container.textContent).not.toContain(unknownDetector)
+    expect(container.textContent).not.toContain('private-signature-detector-v9')
+  })
+
+  it('links a residual to its source record number and original excerpt without exposing its internal record ID', async () => {
     expect(container.textContent).toContain('原始记录')
-    expect(container.textContent).toContain('record-1')
     expect(container.textContent).toContain('未关联原始记录')
 
-    const locateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 obs-1 的原始记录 record-1"]')
+    const locateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 BM-01 → P-01 · 高差 · 来源第 1 行 的原始记录 1"]')
     expect(locateButton).not.toBeNull()
     await act(async () => locateButton?.click())
 
     const locator = container.querySelector('[aria-label="残差原始记录定位"]')
     expect(locator).not.toBeNull()
     expect(locator?.textContent).toContain('原始记录定位')
-    expect(locator?.textContent).toContain('record-1')
-    expect(locator?.textContent).toContain('network.observations')
-    expect(locator?.textContent).toContain('字节偏移')
-    expect(locator?.textContent).toContain('137')
-    expect(locator?.textContent).toContain('字节长度')
-    expect(locator?.textContent).toContain('29')
+    expect(locator?.textContent).toContain('记录1')
+    expect(locator?.textContent).toContain('行 1')
+    expect(locator?.textContent).not.toMatch(/record-1|network\.observations|字节偏移|字节长度|137|29/)
+    expect(locator?.textContent).toContain('{"id":"obs-1","value":0.2}')
+  })
+
+  it('shows the workbook row locator without ZIP internals or package member details', async () => {
+    const selector = container.querySelector<HTMLSelectElement>('#survey-existing-network')!
+    await act(async () => { selector.value = xlsxNetwork.id; selector.dispatchEvent(new Event('change', { bubbles: true })) })
+    await settle()
+    const locateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 BM-01 → P-01 · 高差 · 来源第 2 行 的原始记录 1"]')
+    await act(async () => locateButton?.click())
+    const locator = container.querySelector('[aria-label="残差原始记录定位"]')
+    expect(locator?.textContent).toContain('原始记录定位')
+    expect(locator?.textContent).toContain('记录1')
+    expect(locator?.textContent).toContain('工作表行号')
+    expect(locator?.textContent).toContain('2')
+    expect(locator?.textContent).not.toMatch(/record-1|OOXML|ZIP|xl\/worksheets|SHA-256|偏移|字节|180|76|318|57|e{64}/)
     expect(locator?.textContent).toContain('{"id":"obs-1","value":0.2}')
   })
 
@@ -920,11 +1401,11 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
       selector.value = outOfRangeNetwork.id
       selector.dispatchEvent(new Event('change', { bubbles: true }))
     })
-    const firstLocateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 obs-1 的原始记录 record-1"]')
+    const firstLocateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 BM-01 → P-01 · 高差 · 来源第 1 行 的原始记录 1"]')
     await act(async () => firstLocateButton?.click())
     let locator = container.querySelector('[aria-label="残差原始记录定位"]')
     expect(locator?.textContent).toContain('原始记录不可定位')
-    expect(locator?.textContent).toContain('超出保留源文件边界')
+    expect(locator?.textContent).toContain('原始记录的位置与已保存文件不一致')
     expect(locator?.textContent).not.toContain('字节偏移')
 
     await act(async () => {
@@ -932,11 +1413,11 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
       selector.value = wholeFileAnchorNetwork.id
       selector.dispatchEvent(new Event('change', { bubbles: true }))
     })
-    const secondLocateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 obs-1 的原始记录 record-1"]')
+    const secondLocateButton = container.querySelector<HTMLButtonElement>('[aria-label="定位 BM-01 → P-01 · 高差 · 来源第 1 行 的原始记录 1"]')
     await act(async () => secondLocateButton?.click())
     locator = container.querySelector('[aria-label="残差原始记录定位"]')
     expect(locator?.textContent).toContain('原始记录不可定位')
-    expect(locator?.textContent).toContain('覆盖整份源文件')
+    expect(locator?.textContent).toContain('当前资料只能定位到整份文件')
     expect(locator?.textContent).not.toContain('字节长度')
   })
 
@@ -954,10 +1435,9 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(container.textContent).toContain('Trimble T02')
     expect(container.textContent).toContain('与内容冲突')
     expect(container.textContent).toContain('需要人工确认')
-    expect(container.textContent).toContain('converter-required: 未安装经审计的本地转换器。')
-    expect(container.textContent).toContain('下一步：安装并授权受审计的本地转换器后重新导入。')
-    expect(container.textContent).toContain('fixture-trimble-converter 1.0.0')
-    expect(container.textContent).toContain('c'.repeat(64))
+    expect(container.textContent).toContain('需先转换格式')
+    expect(container.textContent).toContain('下一步：请从仪器厂商软件导出为受支持的交换格式，再重新导入。')
+    expect(container.textContent).not.toMatch(/converter-required|fixture-trimble-converter|[a-f]{64}|解析器源哈希|转换器身份|二进制哈希|访问网络/i)
 
     const validateButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('质量校核'))
     const adjustButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('运行平差'))
@@ -968,7 +1448,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     await act(async () => observationsTab?.click())
     const revalidateButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('重新校核'))
     expect(revalidateButton?.disabled).toBe(true)
-    expect(revalidateButton?.title).toContain('未安装经审计的本地转换器')
+    expect(revalidateButton?.title).toContain('请从仪器厂商软件导出为受支持的交换格式')
   })
 
   it('fails closed while source eligibility is absent, even when the source disposition is adjustment-ready', async () => {
@@ -980,7 +1460,7 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
       selector.dispatchEvent(new Event('change', { bubbles: true }))
     })
 
-    expect(container.textContent).toContain('正在核验来源资格 / 请重新加载。')
+    expect(container.textContent).toContain('正在检查测量资料，请稍候。')
     const validateButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('质量校核'))
     const adjustButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('运行平差'))
     expect(validateButton?.disabled).toBe(true)

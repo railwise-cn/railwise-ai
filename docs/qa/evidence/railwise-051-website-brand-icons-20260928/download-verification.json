@@ -1,0 +1,36 @@
+{
+  "version": "0.5.1",
+  "passed": true,
+  "requests": [
+    {
+      "url": "https://www.railwise.cn/products/workwise/",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "url": "https://www.railwise.cn/products/workwise/?release=0.5.1&t=1790562910380",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "url": "https://www.railwise.cn/data/workwise-product.json",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.1/WorkWise-0.5.1-mac-Apple-Silicon.dmg",
+      "status": 206,
+      "contentRange": "bytes 0-1023/295034092"
+    },
+    {
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.1/WorkWise-0.5.1-mac-Intel.dmg",
+      "status": 206,
+      "contentRange": "bytes 0-1023/299835593"
+    },
+    {
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.1/WorkWise-0.5.1-win-x64.exe",
+      "status": 206,
+      "contentRange": "bytes 0-1023/246825029"
+    }
+  ]
+}

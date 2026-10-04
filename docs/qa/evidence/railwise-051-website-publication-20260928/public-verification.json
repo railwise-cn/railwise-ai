@@ -1,0 +1,83 @@
+{
+  "checkedAt": "2026-09-28T01:43:04.191Z",
+  "version": "0.5.1",
+  "sourceCommit": "01bccd2fcedce1e94f02e308d9e0ebcd57f9f4a9",
+  "workflowRun": "36366801508",
+  "requests": [
+    {
+      "url": "https://www.railwise.cn/products/workwise/",
+      "status": 200,
+      "contentRange": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://www.railwise.cn/products/workwise/?release=0.5.1&t=1790559784192",
+      "status": 200,
+      "contentRange": null,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "url": "https://www.railwise.cn/data/workwise-product.json",
+      "status": 200,
+      "contentRange": null,
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.1/WorkWise-0.5.1-mac-Apple-Silicon.dmg",
+      "status": 206,
+      "contentRange": "bytes 0-1023/295034092",
+      "contentType": "application/octet-stream"
+    },
+    {
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.1/WorkWise-0.5.1-mac-Intel.dmg",
+      "status": 206,
+      "contentRange": "bytes 0-1023/299835593",
+      "contentType": "application/octet-stream"
+    },
+    {
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.1/WorkWise-0.5.1-win-x64.exe",
+      "status": 206,
+      "contentRange": "bytes 0-1023/246825029",
+      "contentType": "application/octet-stream"
+    },
+    {
+      "url": "https://www.railwise.cn/products/screenshots/workwise/07-survey-051-zh-light.jpg",
+      "status": 200,
+      "contentRange": null,
+      "contentType": "image/jpeg"
+    },
+    {
+      "url": "https://www.railwise.cn/products/screenshots/workwise/08-survey-051-delivery.jpg",
+      "status": 200,
+      "contentRange": null,
+      "contentType": "image/jpeg"
+    },
+    {
+      "url": "https://www.railwise.cn/products/screenshots/workwise/09-survey-051-settings.jpg",
+      "status": 200,
+      "contentRange": null,
+      "contentType": "image/jpeg"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "07-survey-051-zh-light.jpg",
+      "expected": "f5f334002aa229c9992b6ef7769f6607597038613505bb2fdda443e8a77a9f4b",
+      "actual": "f5f334002aa229c9992b6ef7769f6607597038613505bb2fdda443e8a77a9f4b",
+      "matches": true
+    },
+    {
+      "file": "08-survey-051-delivery.jpg",
+      "expected": "291b1f2d198e05f8a8daafc020baf00a3a62d7e65c19e82b5958c383e801c0da",
+      "actual": "291b1f2d198e05f8a8daafc020baf00a3a62d7e65c19e82b5958c383e801c0da",
+      "matches": true
+    },
+    {
+      "file": "09-survey-051-settings.jpg",
+      "expected": "0c277a9fd82e937aab37763830ebf4b3c6be4c47a36d7f5da67c11bed127b5bf",
+      "actual": "0c277a9fd82e937aab37763830ebf4b3c6be4c47a36d7f5da67c11bed127b5bf",
+      "matches": true
+    }
+  ],
+  "passed": true
+}

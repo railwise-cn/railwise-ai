@@ -30,7 +30,7 @@ describe('Project change confirmation card', () => {
     expect(request).toHaveBeenCalledTimes(1)
     expect(container.textContent).toContain('Old name')
     expect(container.textContent).toContain('New name')
-    expect(container.textContent).toContain('does not transform imported coordinates')
+    expect(container.textContent).toContain('Imported source material and historical results remain unchanged')
     expect(container.textContent).not.toContain('ui-only-confirmation-token')
     const confirm = [...container.querySelectorAll('button')].find(button => button.textContent === 'Confirm changes')!
     await act(async () => confirm.click())
@@ -44,7 +44,7 @@ describe('Project change confirmation card', () => {
     request.mockImplementation(async (_path: string, method?: string) => method === 'POST' ? response({}, 409) : response({ suggestions: [{ suggestion, token: 'ui-only-confirmation-token' }] }))
     await render()
     await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Confirm changes')!.click())
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Request a fresh suggestion')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Reload plan and evidence')
     expect(container.textContent).toContain('Old name')
     expect(refresh).not.toHaveBeenCalled()
   })
@@ -53,5 +53,28 @@ describe('Project change confirmation card', () => {
     request.mockResolvedValue(response({ suggestions: [{ suggestion: { ...suggestion, projectId: 'other-project' }, token: 'token' }] }))
     await render()
     expect(container.querySelector('[data-testid="engineering-project-suggestion"]')).toBeNull()
+  })
+
+  it('keeps implementation fields out of project change values', async () => {
+    const unsafe = {
+      ...suggestion,
+      reason: 'Confirm the reviewed datum; contextHash=abc123.',
+      before: { coordinateSystem: 'CGCS2000', sourceHash: 'sha256-secret', nested: { parserVersion: '0.3.0' } },
+      patch: { coordinateSystem: 'CGCS2000', sourceHash: 'sha256-secret', nested: { parserVersion: '0.4.0' } }
+    }
+    request.mockResolvedValue(response({ suggestions: [{ suggestion: unsafe, token: 'ui-only-confirmation-token' }] }))
+    await render()
+    expect(container.textContent).toContain('Coordinate system')
+    expect(container.textContent).toContain('CGCS2000')
+    expect(container.textContent).not.toMatch(/contextHash|sourceHash|parserVersion|sha256-secret|nested/i)
+  })
+
+  it('localizes internal project task enums before presenting the proposed change', async () => {
+    const taskChange = { ...suggestion, before: { taskType: 'leveling-network' }, patch: { taskType: 'control-network' } }
+    request.mockResolvedValue(response({ suggestions: [{ suggestion: taskChange, token: 'ui-only-confirmation-token' }] }))
+    await render()
+    expect(container.textContent).toContain('Leveling network')
+    expect(container.textContent).toContain('Control network')
+    expect(container.textContent).not.toMatch(/leveling-network|control-network/)
   })
 })

@@ -26,7 +26,7 @@ void i18n.use(initReactI18next).init({
   },
   lng: 'en',
   fallbackLng: 'en',
-  interpolation: { escapeValue: false, defaultVariables: { productName: brand.platform, runtimeName: brand.runtime } },
+  interpolation: { escapeValue: false, defaultVariables: { productName: brand.platform, surveyName: brand.survey, runtimeName: brand.runtime } },
   defaultNS: 'common',
   ns: ['common', 'settings', 'qualityScoring', 'qualityAssessment', 'standardBasis']
 })

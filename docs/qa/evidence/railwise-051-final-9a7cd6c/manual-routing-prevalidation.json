@@ -1,0 +1,570 @@
+{
+  "purpose": "Manual prompt validation on #158, not automatic composer/new-package acceptance",
+  "turnId": "turn_n6ehcqej",
+  "items": [
+    {
+      "id": "item_tool_turn_n6ehcqej_call_00_78jmyvaXpARQwE71j4Lv0842",
+      "turnId": "turn_n6ehcqej",
+      "threadId": "thr_fmn0gfzc",
+      "role": "tool",
+      "status": "pending",
+      "createdAt": "2026-09-27T12:33:06.548Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_context",
+      "callId": "call_00_78jmyvaXpARQwE71j4Lv0842",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_context\nParameters: 5 field(s); sensitive values omitted"
+    },
+    {
+      "id": "item_tool_turn_n6ehcqej_call_00_78jmyvaXpARQwE71j4Lv0842",
+      "turnId": "turn_n6ehcqej",
+      "threadId": "thr_fmn0gfzc",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-09-27T12:33:06.548Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_context",
+      "callId": "call_00_78jmyvaXpARQwE71j4Lv0842",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_context\nParameters: 5 field(s); sensitive values omitted",
+      "finishedAt": "2026-09-27T12:33:06.606Z"
+    },
+    {
+      "id": "item_call_00_78jmyvaXpARQwE71j4Lv0842",
+      "turnId": "turn_n6ehcqej",
+      "threadId": "thr_fmn0gfzc",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-09-27T12:33:06.606Z",
+      "finishedAt": "2026-09-27T12:33:06.606Z",
+      "kind": "tool_result",
+      "toolName": "survey_read_context",
+      "callId": "call_00_78jmyvaXpARQwE71j4Lv0842",
+      "toolKind": "tool_call",
+      "output": {
+        "context": {
+          "schemaVersion": 1,
+          "projectId": "project_ddbb224a-1bff-4499-b069-08da32e28cd7",
+          "projectRevision": 2,
+          "generatedAt": "2026-09-27T12:33:06.604Z",
+          "project": {
+            "name": "候选156功能验收（合成样例）",
+            "taskType": "control-network",
+            "monitoringType": "control-network",
+            "unit": "m",
+            "reportPeriod": {},
+            "thresholds": {}
+          },
+          "datasets": [],
+          "analyses": [],
+          "runs": [],
+          "surveyNetworks": [
+            {
+              "id": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+              "networkType": "plane-control",
+              "coordinateSystem": "待确认",
+              "verticalDatum": "待确认",
+              "pointCount": 4,
+              "observationCount": 5,
+              "qualityStatus": "validated",
+              "revision": 2,
+              "inputAttachmentHash": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+            }
+          ],
+          "surveyAdjustments": [
+            {
+              "id": "adjustment_c123b84b-e1df-4dd6-957f-db23fa75a6db",
+              "networkId": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+              "status": "completed",
+              "revision": 1,
+              "strategyId": "plane-control",
+              "algorithmVersion": "workwise-survey-adjustment-7",
+              "inputHash": "e042cc86b7edf3e7ec5eaa8b757013cb39de245e0ec928855e72c5e0f9f5bd8e",
+              "validation": "valid",
+              "observationCount": 5,
+              "unknownCount": 3,
+              "degreesOfFreedom": 2,
+              "sourceAdmission": {
+                "status": "current-admissible",
+                "rawSourceIntegrity": {
+                  "status": "verified",
+                  "ledgerEntryCount": 2,
+                  "errors": []
+                },
+                "sourceEligibility": {
+                  "eligible": true,
+                  "findings": []
+                }
+              }
+            }
+          ],
+          "citations": [],
+          "watchDrafts": [],
+          "contextHash": "sha256-bfcf80a88de69d012bf848a3b7124753639c8df9b1052860ab94a5914e0a73e0"
+        },
+        "selectedPoint": {
+          "id": "S1",
+          "pointClass": "station",
+          "x": 50.00000001228713,
+          "y": 49.999999767779975,
+          "known": false,
+          "sourceRow": 5,
+          "sourceLocator": "COSA.in2:5",
+          "rawFields": {
+            "station": "S1",
+            "recordType": "station",
+            "initialCoordinateMethod": "cosa-station-polar-rigid-initialization",
+            "initialCoordinateDistanceRmsMetres": 1.2287124206979806e-08
+          }
+        },
+        "evidence": [],
+        "selectedNetwork": {
+          "id": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+          "networkType": "plane-control",
+          "revision": 2,
+          "source": {
+            "sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+            "parserId": "cosa-in2-parser",
+            "parserVersion": "0.3.0",
+            "parserSourceHash": "14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04"
+          },
+          "observationCount": 5,
+          "observations": [
+            {
+              "id": "cosa-in2-6-backsight-reset",
+              "type": "direction",
+              "from": "S1",
+              "to": "A",
+              "station": "S1",
+              "target": "A",
+              "value": 0,
+              "unit": "rad",
+              "sigma": 4.84813681109536e-06,
+              "sigmaUnit": "rad",
+              "correctionState": {
+                "ppmApplied": false,
+                "prismConstantApplied": false,
+                "additiveConstantApplied": false,
+                "meteoApplied": false,
+                "slopeToHorizontalApplied": false,
+                "earthCurvatureRefractionApplied": false,
+                "centeringApplied": false,
+                "projectionReductionApplied": false
+              },
+              "qualityFlags": [
+                "cosa-backsight-reset"
+              ],
+              "sourceRow": 6,
+              "sourceLocator": "COSA.in2:6",
+              "sourceRecordId": "cosa-in2-record-6",
+              "rawFields": {
+                "target": "A",
+                "code": "L",
+                "value": "0",
+                "record": "A,L,0",
+                "rawUnit": "cosa-degree-dot-mmss",
+                "priorDirectionSigmaArcSeconds": "1.000",
+                "priorDistanceConstantMillimetres": "1",
+                "priorDistancePpm": "1",
+                "priorDirectionSigmaUnit": "arcsec",
+                "priorDistanceConstantUnit": "mm",
+                "priorDistancePpmUnit": "ppm",
+                "role": "backsight-reset",
+                "directionReference": "cosa-station-circle",
+                "stationCircleOrientation": true,
+                "coordinateAxisOrder": "north-east"
+              }
+            },
+            {
+              "id": "cosa-in2-7-direction",
+              "type": "direction",
+              "from": "S1",
+              "to": "B",
+              "station": "S1",
+              "target": "B",
+              "value": 4.71238898038469,
+              "unit": "rad",
+              "sigma": 4.84813681109536e-06,
+              "sigmaUnit": "rad",
+              "correctionState": {
+                "ppmApplied": false,
+                "prismConstantApplied": false,
+                "additiveConstantApplied": false,
+                "meteoApplied": false,
+                "slopeToHorizontalApplied": false,
+                "earthCurvatureRefractionApplied": false,
+                "centeringApplied": false,
+                "projectionReductionApplied": false
+              },
+              "sourceRow": 7,
+              "sourceLocator": "COSA.in2:7",
+              "sourceRecordId": "cosa-in2-record-7",
+              "rawFields": {
+                "target": "B",
+                "code": "L",
+                "value": "270.00000",
+                "record": "B,L,270.00000",
+                "rawUnit": "cosa-degree-dot-mmss",
+                "priorDirectionSigmaArcSeconds": "1.000",
+                "priorDistanceConstantMillimetres": "1",
+                "priorDistancePpm": "1",
+                "priorDirectionSigmaUnit": "arcsec",
+                "priorDistanceConstantUnit": "mm",
+                "priorDistancePpmUnit": "ppm",
+                "role": "foresight",
+                "directionReference": "cosa-station-circle",
+                "stationCircleOrientation": true,
+                "coordinateAxisOrder": "north-east"
+              }
+            },
+            {
+              "id": "cosa-in2-8-distance",
+              "type": "distance",
+              "from": "S1",
+              "to": "B",
+              "station": "S1",
+              "target": "B",
+              "value": 100,
+              "unit": "m",
+              "sigma": 0.001004987562112089,
+              "sigmaUnit": "m",
+              "correctionState": {
+                "ppmApplied": false,
+                "prismConstantApplied": false,
+                "additiveConstantApplied": false,
+                "meteoApplied": false,
+                "slopeToHorizontalApplied": false,
+                "earthCurvatureRefractionApplied": false,
+                "centeringApplied": false,
+                "projectionReductionApplied": false
+              },
+              "sourceRow": 8,
+              "sourceLocator": "COSA.in2:8",
+              "sourceRecordId": "cosa-in2-record-8",
+              "rawFields": {
+                "target": "B",
+                "code": "S",
+                "value": "100.000",
+                "record": "B,S,100.000",
+                "rawUnit": "m",
+                "priorDirectionSigmaArcSeconds": "1.000",
+                "priorDistanceConstantMillimetres": "1",
+                "priorDistancePpm": "1",
+                "priorDirectionSigmaUnit": "arcsec",
+                "priorDistanceConstantUnit": "mm",
+                "priorDistancePpmUnit": "ppm"
+              }
+            },
+            {
+              "id": "cosa-in2-9-direction",
+              "type": "direction",
+              "from": "S1",
+              "to": "C",
+              "station": "S1",
+              "target": "C",
+              "value": 5.497787143782138,
+              "unit": "rad",
+              "sigma": 4.84813681109536e-06,
+              "sigmaUnit": "rad",
+              "correctionState": {
+                "ppmApplied": false,
+                "prismConstantApplied": false,
+                "additiveConstantApplied": false,
+                "meteoApplied": false,
+                "slopeToHorizontalApplied": false,
+                "earthCurvatureRefractionApplied": false,
+                "centeringApplied": false,
+                "projectionReductionApplied": false
+              },
+              "sourceRow": 9,
+              "sourceLocator": "COSA.in2:9",
+              "sourceRecordId": "cosa-in2-record-9",
+              "rawFields": {
+                "target": "C",
+                "code": "L",
+                "value": "315.00000",
+                "record": "C,L,315.00000",
+                "rawUnit": "cosa-degree-dot-mmss",
+                "priorDirectionSigmaArcSeconds": "1.000",
+                "priorDistanceConstantMillimetres": "1",
+                "priorDistancePpm": "1",
+                "priorDirectionSigmaUnit": "arcsec",
+                "priorDistanceConstantUnit": "mm",
+                "priorDistancePpmUnit": "ppm",
+                "role": "foresight",
+                "directionReference": "cosa-station-circle",
+                "stationCircleOrientation": true,
+                "coordinateAxisOrder": "north-east"
+              }
+            },
+            {
+              "id": "cosa-in2-10-distance",
+              "type": "distance",
+              "from": "S1",
+              "to": "C",
+              "station": "S1",
+              "target": "C",
+              "value": 100,
+              "unit": "m",
+              "sigma": 0.001004987562112089,
+              "sigmaUnit": "m",
+              "correctionState": {
+                "ppmApplied": false,
+                "prismConstantApplied": false,
+                "additiveConstantApplied": false,
+                "meteoApplied": false,
+                "slopeToHorizontalApplied": false,
+                "earthCurvatureRefractionApplied": false,
+                "centeringApplied": false,
+                "projectionReductionApplied": false
+              },
+              "sourceRow": 10,
+              "sourceLocator": "COSA.in2:10",
+              "sourceRecordId": "cosa-in2-record-10",
+              "rawFields": {
+                "target": "C",
+                "code": "S",
+                "value": "100.000",
+                "record": "C,S,100.000",
+                "rawUnit": "m",
+                "priorDirectionSigmaArcSeconds": "1.000",
+                "priorDistanceConstantMillimetres": "1",
+                "priorDistancePpm": "1",
+                "priorDirectionSigmaUnit": "arcsec",
+                "priorDistanceConstantUnit": "mm",
+                "priorDistancePpmUnit": "ppm"
+              }
+            }
+          ],
+          "pointCount": 4,
+          "points": [
+            {
+              "id": "A",
+              "pointClass": "known",
+              "x": 50,
+              "y": 150,
+              "known": true,
+              "sourceRow": 2,
+              "sourceLocator": "COSA.in2:2",
+              "rawFields": {
+                "point": "A",
+                "x": "50.000000",
+                "y": "150.000000",
+                "recordType": "known-point"
+              }
+            },
+            {
+              "id": "B",
+              "pointClass": "known",
+              "x": 150,
+              "y": 50,
+              "known": true,
+              "sourceRow": 3,
+              "sourceLocator": "COSA.in2:3",
+              "rawFields": {
+                "point": "B",
+                "x": "150.000000",
+                "y": "50.000000",
+                "recordType": "known-point"
+              }
+            },
+            {
+              "id": "C",
+              "pointClass": "known",
+              "x": 120.710678,
+              "y": 120.710678,
+              "known": true,
+              "sourceRow": 4,
+              "sourceLocator": "COSA.in2:4",
+              "rawFields": {
+                "point": "C",
+                "x": "120.710678",
+                "y": "120.710678",
+                "recordType": "known-point"
+              }
+            },
+            {
+              "id": "S1",
+              "pointClass": "station",
+              "x": 50.00000001228713,
+              "y": 49.999999767779975,
+              "known": false,
+              "sourceRow": 5,
+              "sourceLocator": "COSA.in2:5",
+              "rawFields": {
+                "station": "S1",
+                "recordType": "station",
+                "initialCoordinateMethod": "cosa-station-polar-rigid-initialization",
+                "initialCoordinateDistanceRmsMetres": 1.2287124206979806e-08
+              }
+            }
+          ]
+        },
+        "adjustments": [
+          {
+            "runId": "adjustment_c123b84b-e1df-4dd6-957f-db23fa75a6db",
+            "networkId": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+            "inputHash": "e042cc86b7edf3e7ec5eaa8b757013cb39de245e0ec928855e72c5e0f9f5bd8e",
+            "sourceAdmission": {
+              "status": "current-admissible",
+              "rawSourceIntegrity": {
+                "status": "verified",
+                "ledgerEntryCount": 2,
+                "errors": []
+              },
+              "sourceEligibility": {
+                "eligible": true,
+                "findings": []
+              }
+            },
+            "validation": "valid",
+            "algorithmVersion": "workwise-survey-adjustment-7",
+            "closure": {
+              "horizontal": 1.3726709029343796e-07,
+              "angular": 3.111529177070756e-10
+            },
+            "closureUnits": {
+              "horizontal": "m",
+              "angular": "rad"
+            },
+            "precision": {
+              "maxPointStdDev": 1.3592152495710963e-07,
+              "passed": true
+            },
+            "linearUnit": "m",
+            "angularUnit": "rad",
+            "unitWeightStdDev": 0.00010671165867325277,
+            "unitWeightStdDevUnit": "dimensionless",
+            "varianceFactor": 1.1387378096796804e-08,
+            "varianceFactorUnit": "dimensionless",
+            "degreesOfFreedom": 2,
+            "qualityFindings": [
+              {
+                "schemaVersion": 1,
+                "id": "survey_finding_87e529e0-8083-46e2-a8ce-0e3eb0437606",
+                "networkId": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+                "code": "format_detected",
+                "severity": "warning",
+                "message": "COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+                "localized": {
+                  "en": {
+                    "message": "cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.",
+                    "suggestedAction": "Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment."
+                  }
+                },
+                "suggestion": "继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。",
+                "status": "open",
+                "createdAt": "2026-09-27T11:32:16.273Z"
+              }
+            ],
+            "residuals": [
+              {
+                "observationId": "cosa-in2-6-backsight-reset",
+                "correction": -2.3735413634540237e-10,
+                "residual": -2.3735413634540237e-10,
+                "unit": "rad",
+                "standardizedResidual": 4.895780494523131e-05,
+                "standardizedResidualUnit": "sigma",
+                "outlier": false,
+                "sourceRow": 6,
+                "sourceRecordId": "cosa-in2-record-6"
+              },
+              {
+                "observationId": "cosa-in2-7-direction",
+                "correction": 1.971329766092822e-10,
+                "residual": 1.971329766092822e-10,
+                "unit": "rad",
+                "standardizedResidual": 4.066159522522697e-05,
+                "standardizedResidualUnit": "sigma",
+                "outlier": false,
+                "sourceRow": 7,
+                "sourceRecordId": "cosa-in2-record-7"
+              },
+              {
+                "observationId": "cosa-in2-8-distance",
+                "correction": 7.159016490732029e-09,
+                "residual": 7.159016490732029e-09,
+                "unit": "m",
+                "standardizedResidual": 7.123487653604974e-06,
+                "standardizedResidualUnit": "sigma",
+                "outlier": false,
+                "sourceRow": 8,
+                "sourceRecordId": "cosa-in2-record-8"
+              },
+              {
+                "observationId": "cosa-in2-9-direction",
+                "correction": 4.022115973612017e-11,
+                "residual": 4.022115973612017e-11,
+                "unit": "rad",
+                "standardizedResidual": 8.296209720004341e-06,
+                "standardizedResidualUnit": "sigma",
+                "outlier": false,
+                "sourceRow": 9,
+                "sourceRecordId": "cosa-in2-record-9"
+              },
+              {
+                "observationId": "cosa-in2-10-distance",
+                "correction": -1.3708027779557597e-07,
+                "residual": -1.3708027779557597e-07,
+                "unit": "m",
+                "standardizedResidual": 0.00013639997445091467,
+                "standardizedResidualUnit": "sigma",
+                "outlier": false,
+                "sourceRow": 10,
+                "sourceRecordId": "cosa-in2-record-10"
+              }
+            ],
+            "selectedAdjustedPoint": {
+              "id": "S1",
+              "x": 49.99999999284098,
+              "y": 49.999999963710295,
+              "correctionX": -1.9446147803137137e-08,
+              "correctionY": 1.95930319080162e-07,
+              "standardError": 1.3592152495710963e-07,
+              "covariance": [
+                6.872084438073081e-07,
+                -6.262705982801717e-07,
+                7.474163269919943e-09,
+                -6.262705982801717e-07,
+                9.351721243643048e-07,
+                -8.88516487243097e-09
+              ],
+              "xyErrorEllipse": {
+                "algorithmVersion": "survey-xy-error-ellipse-1",
+                "coordinatePlane": "solution-xy",
+                "covarianceUnit": "m2",
+                "covarianceXY": [
+                  7.825502380945158e-15,
+                  -7.131580093523458e-15,
+                  -7.131580093523458e-15,
+                  1.064915856572102e-14
+                ],
+                "semiMajor": 1.284808010949112e-07,
+                "semiMinor": 4.435475957184348e-08,
+                "axisUnit": "m",
+                "orientationRad": 2.2584737816163187,
+                "orientationConvention": "positive-x-toward-positive-y-mod-pi",
+                "scale": "unit-mahalanobis-radius",
+                "varianceBasis": "a-posteriori"
+              }
+            },
+            "residualCount": 5
+          }
+        ]
+      },
+      "isError": false
+    },
+    {
+      "id": "item_text_ky71a7z2",
+      "turnId": "turn_n6ehcqej",
+      "threadId": "thr_fmn0gfzc",
+      "role": "assistant",
+      "status": "completed",
+      "createdAt": "2026-09-27T12:33:25.843Z",
+      "kind": "assistant_text",
+      "text": "已按要求用 `survey_read_context` 读取给定 legacy 选择器解析当前记录（未调用 `survey_read_evidence`，也未虚构类型化证据）。选择器中的 `projectId/projectRevision/networkId/networkRevision/sourceSha256/adjustmentId/pointId` 均原样传入；`parserId/parserVersion/parserSourceHash/algorithmVersion` 用于核验解析与算法来源；`section:\"result\"`、`metric:\"point-precision\"` 属结果定位描述，`survey_read_context` 无对应参数，故未作为过滤字段传入——以下说明中的点位精度即对应 `point-precision`。\n\n## 1. S1 的结果\n\n平差 `adjustment_c123b84b-e1df-4dd6-957f-db23fa75a6db`（算法 `workwise-survey-adjustment-7`，completed / valid）：\n\n| 项目 | 值 |\n| --- | --- |\n| 平差后坐标 | X = 49.99999999284 m，Y = 49.99999996371 m |\n| 初始坐标（极坐标刚性初始化） | X = 50.00000001229 m，Y = 49.99999976778 m |\n| 坐标改正数 | dX = −1.94e-8 m，dY = +1.96e-7 m |\n| **点位精度（point-precision，standardError）** | **1.3592e-7 m**（全网 maxPointStdDev，`precision.passed: true`） |\n| 误差椭圆（验后，unit-mahalanobis） | 长半轴 1.2848e-7 m、短半轴 4.4355e-8 m、方位角 2.2585 rad |\n\n即：S1 平差成果约 (50.0000000, 50.0000000)，点位中误差约 0.14 μm，判定通过。该精度是合成样例的数学结果，不代表真实作业预期。\n\n## 2. 原始依据\n\n- 源文件 `COSA.in2`，SHA-256 = `4281cc7a…`（与选择器一致）；解析器 `cosa-in2-parser 0.3.0`，parserSourceHash `14b059f8…`（与选择器一致）。\n- 网络 `network_95a405d2…`（revision 2，plane-control，qualityStatus: validated）：4 点、5 观测。已知点 A(50,150)、B(150,50)、C(120.710678,120.710678)。\n- S1 测站观测（COSA.in2:6–10）：\n  - 后视 A 方向归零（0 rad，角色 backsight-reset）\n  - 至 B：方向 270°（4.7124 rad）+ 距离 100.000 m\n  - 至 C：方向 315°（5.4978 rad）+ 距离 100.000 m\n- 先验精度：方向 1″（σ≈4.85e-6 rad）；距离 1 mm + 1 ppm（σ≈1.005e-3 m）。\n- 平差统计：5 观测、3 未知数、自由度 2；闭合差水平 1.3727e-7 m、角度 3.1115e-10 rad；单位权中误差 1.0671e-4；验后方差因子 1.1387e-8；标准化残差最大 0.00014σ，无粗差。\n- 源准入：`sourceAdmission.status = current-admissible`，原始源完整性 verified（台账 2 条、0 错误）。\n\n## 3. 需要复核的问题\n\n1. **平差输入与所选源文件的版本一致性**：平差记录 revision 1，其 `inputHash = e042cc86…` 与选择器的 `sourceSha256 = 4281cc7a…`（网络 rev 2 的当前源）不同。需确认该平差是否基于网络 revision 2 的当前源重算，否则 S1 精度只能对应平差当时的输入快照。\n2. **未关闭的质量发现**：存在 `severity: warning`、`status: open` 的发现（`format_detected`，survey_finding_87e529e0…）——提示需继续完成基准、控制点、观测角色、拓扑、闭合与精度校验，任一不满足都会阻断平差。该项未关闭前不应作为专业验收结论。\n3. **精度\"通过\"没有阈值依据**：项目 `thresholds` 为空 `{}`，`precision.passed: true` 是在无项目阈值下的判定；若按现行规范需要限差，应设置阈值后重新验收。\n4. **基准与坐标框架待确认**：项目 `coordinateSystem`、`verticalDatum` 均为\"待确认\"，成果坐标框架声明不完整。\n5. **先验精度与验后方差不匹配**：验后方差因子 1.14e-8 ≪ 1，表明 1″/1mm+1ppm 的先验精度对本样例偏保守，点位精度 0.1 μm 量级源于合成数据的理想化，不应外推。\n6. **所有观测改正未应用**：各观测 `correctionState`（PPM、棱镜常数、气象、斜距改平、球气差、对中、投影归化）均为 false。100 m 短边影响极小，但需确认原始数据是否本就不需要这些改正。\n7. **后视归零记录的角色处理**：`cosa-in2-6-backsight-reset` 作为观测参与平差并留有小残差（−2.37e-10 rad），需复核其按\"归零定向\"还是\"独立观测\"处理的语义是否正确。\n8. **轴序与误差椭圆约定**：坐标轴序为 north-east；椭圆方位角约定 `positive-x-toward-positive-y-mod-pi`。与其他软件或规范比对时需统一轴序与方位角定义。\n9. **选择器字段未全部可传**：`section:\"result\"`、`metric:\"point-precision\"` 无法作为 context 读取参数传入，本次以 `pointId: S1` + `adjustmentId` 定位到该点的精度记录；如需逐字段证据级验证，请提供类型化证据的完整引用（含 kind 与各 hash），我无法在当前无 typedEvidence 情况下构造它。\n\n如需针对其中任何一项进一步核查（例如按现行规范补阈值后重新验收），请告知具体标准或提供完整证据引用。"
+    }
+  ]
+}

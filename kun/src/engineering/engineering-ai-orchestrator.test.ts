@@ -10,6 +10,22 @@ import { SurveyService } from './survey-service.js'
 import { importWorkwiseSurveyNetwork } from './survey-test-helpers.js'
 
 describe('Engineering AI orchestration', () => {
+  it('sets a professional user-facing response contract for Survey AI', async () => {
+    const orchestrator = new EngineeringAiOrchestrator({
+      context: {} as never,
+      repository: { planForTurn: () => null } as never,
+      threadStore: { get: vi.fn(async () => ({ domain: 'engineering', projectId: 'survey-project', turns: [] })) } as never,
+      turns: {} as never,
+      runTurn: vi.fn()
+    })
+
+    const policy = await orchestrator.conversationPolicy('survey-thread', 'survey-project', 'consultation-turn')
+
+    expect(policy.instruction).toMatch(/user-facing.*survey.*answer.*measurement.*evidence/i)
+    expect(policy.instruction).toContain('Never reveal tool or API names')
+    expect(policy.instruction).toContain('never repeat them in the user-facing answer')
+  })
+
   it('creates bounded plans, rejects unsafe tools and replays idempotent requests', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-engineering-ai-'))
     const engineering = new EngineeringService({ rootDir: join(root, 'runtime') })

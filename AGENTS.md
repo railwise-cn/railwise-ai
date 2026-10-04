@@ -6,7 +6,8 @@
 - CI success, unit tests, a successful build, or a green GitHub Action is necessary evidence but is never release approval.
 - Candidate builds must use a private, isolated feed and must never be promoted to `stable` or advertised as an official release.
 - Before requesting release approval, install the final packaged application locally and record: package version, signature/notarization result, screenshots of the reviewed UI, a functional checklist, and a real updater round-trip report.
-- The user must personally confirm the installed UI and required functions before any public release operation. The confirmation must identify the exact version to publish.
+- Before any public release operation, complete and record an independent review of the installed package UI and required functions using computer-use inspection and a separate senior-engineer-mode agent review. The review must identify the exact package version and preserve screenshots, a functional checklist, and findings. The user must still explicitly approve the exact public version and action; agent review is not release approval.
+- Agent review may simulate the combined perspective of an experienced engineering-survey practitioner, software engineer, and product designer for product/software acceptance. It must be labeled as AI review and must never be represented as licensed vendor/SUC interoperability evidence, a real professional signature, or a real human approval.
 - A failed or incomplete local acceptance test blocks release. Do not replace it with a mocked updater test or a manual website download.
 
 ## Compatibility and migration
@@ -18,4 +19,5 @@
 ## UI acceptance
 
 - Glass material is limited to approved window chrome, startup UI, and transient overlays. Work surfaces and navigation content must remain readable and opaque enough for scanning.
-- A visual change is not complete until it has been checked in the packaged application at the supported themes and window sizes, then shown to the user for confirmation.
+- A visual change is not complete until the installed packaged application has been inspected with computer-use tooling at the supported themes, languages, and window sizes, and an independent senior-engineer-mode agent has reviewed the workflow and evidence. Archive screenshots, a functional checklist, accessibility findings, and defects. The user does not need to perform routine UI/functional acceptance; retain explicit user approval only for consequential public release actions.
+- For Survey acceptance, the agent reviewer should combine engineering-survey practice, numerical/reporting semantics, software quality, and product-design judgment. Clearly mark simulated expertise as AI review; it does not certify regulatory conformity, vendor compatibility, professional signoff, or production acceptance that requires external evidence.

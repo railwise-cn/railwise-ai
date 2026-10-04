@@ -22,6 +22,7 @@ export type SurveyRawRecordLocator = Readonly<{
   rawOffset: number
   rawLength: number
   rawLineNo?: number
+  containerMember?: Readonly<{ path: string; sha256: string; byteOffset: number; byteLength: number; row: number }>
 }>
 
 /**
@@ -72,7 +73,8 @@ function canonicalRecordLocator(record: SurveyRawRecordLocator): Record<string, 
     id: record.id,
     rawOffset: record.rawOffset,
     rawLength: record.rawLength,
-    ...(record.rawLineNo === undefined ? {} : { rawLineNo: record.rawLineNo })
+    ...(record.rawLineNo === undefined ? {} : { rawLineNo: record.rawLineNo }),
+    ...(record.containerMember === undefined ? {} : { containerMember: record.containerMember })
   }
 }
 
@@ -94,6 +96,11 @@ function assertRawSourceEvidence(source: SurveyRawSourceEvidence): void {
     if (!Number.isSafeInteger(record.rawLength) || record.rawLength <= 0) throw new SurveyRawSourceIntegrityError(`raw record ${record.id} has an invalid length`)
     if (record.rawOffset + record.rawLength > source.fileSize) throw new SurveyRawSourceIntegrityError(`raw record ${record.id} lies outside the preserved source`)
     if (record.rawLineNo !== undefined && (!Number.isSafeInteger(record.rawLineNo) || record.rawLineNo <= 0)) throw new SurveyRawSourceIntegrityError(`raw record ${record.id} has an invalid line number`)
+    const member = record.containerMember
+    if (member && (!member.path.trim() || member.path.length > 256 || member.path.startsWith('/') || member.path.includes('\\') || member.path.split('/').includes('..')
+      || !isSha256(member.sha256) || !Number.isSafeInteger(member.byteOffset) || member.byteOffset < 0
+      || !Number.isSafeInteger(member.byteLength) || member.byteLength <= 0 || !Number.isSafeInteger(member.byteOffset + member.byteLength)
+      || !Number.isSafeInteger(member.row) || member.row <= 0)) throw new SurveyRawSourceIntegrityError(`raw record ${record.id} has an invalid container member locator`)
   }
 }
 

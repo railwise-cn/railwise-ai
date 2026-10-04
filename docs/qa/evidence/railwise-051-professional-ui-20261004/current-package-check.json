@@ -1,0 +1,20 @@
+{
+  "packageVersion": "0.5.1",
+  "releaseBaselineVersion": "0.5.1",
+  "candidateStatus": "post-release-development-candidate",
+  "nextPublicVersion": "0.5.2-planned-not-approved",
+  "architecture": "arm64",
+  "packagePath": "dist/mac-arm64/RailWise AI.app",
+  "appAsarSha256": "023ca43ca76ba88ac9dfd54c00aca1cd8ea188678e5993d9dbb734db65e619dd",
+  "dmgSha256": "382e8fbf690ceb96393cea44df1cf06b03b34e1ae3d1d9986af4a432276c188f",
+  "signature": "adhoc-verified",
+  "notarized": false,
+  "asarIntegrity": {"files": 14072, "compiledFiles": 466, "passed": true},
+  "sourceReconnectRegression": {"passed": true, "tests": 64},
+  "targetedProfessionalUiTests": {"testFiles": 6, "tests": 235, "passed": true, "scope": "current source targeted suite"},
+  "computerUseCoverage": ["zh-CN", "dark", "wide-window", "overview", "processing", "results", "delivery", "ai-drawer", "advanced-drawer"],
+  "computerUseGaps": ["en-US", "light-theme", "narrow-window", "isolated-source-bound-recovery-run", "full-accessibility-checklist", "updater-round-trip"],
+  "blockingFinding": "The host data-root launch exposed a legacy completed task without a current survey source; a frozen source-bound user-data fixture is required before task 4.2 can be closed.",
+  "releaseState": "private-candidate-only",
+  "publicReleasePerformed": false
+}

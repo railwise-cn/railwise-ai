@@ -1,0 +1,185 @@
+--- before/config/site-navigation.json
++++ after/config/site-navigation.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "2026-07-25.1",
++  "version": "2026-09-28.1",
+   "brand": {
+     "name": "宁波睿威工程技术有限公司",
+     "home": "https://www.railwise.cn/",
+@@ -59,10 +59,10 @@
+         },
+         {
+           "id": "workwise",
+-          "badge": "WorkWise",
++          "badge": "RailWise AI",
+           "icon": "fa-pen-to-square",
+-          "title": "WorkWise",
+-          "description": "桌面端 AI 工作台与文档交付工具",
++          "title": "RailWise AI",
++          "description": "工程测量内业与桌面 AI 工作台",
+           "href": "https://www.railwise.cn/products/workwise/"
+         }
+       ]
+--- before/includes/rw_products.php
++++ after/includes/rw_products.php
+@@ -13,9 +13,9 @@
+             'g1'    => '#3B82F6', 'g2' => '#1D4ED8',
+         ],
+         'workwise' => [
+-            'name'  => 'WorkWise',
+-            'tag'   => 'WorkWise',
+-            'desc'  => '桌面端 AI 工作台 · Code、Write、Skills、插件与文档导出',
++            'name'  => 'RailWise AI',
++            'tag'   => 'RailWise AI',
++            'desc'  => '工程测量内业 · Survey、Code、Write 与可追溯成果',
+             'icon'  => 'fa-pen-to-square',
+             'g1'    => '#2563EB', 'g2' => '#1D4ED8',
+         ],
+--- before/products.php
++++ after/products.php
+@@ -5,8 +5,8 @@
+ 
+ // SEO
+ $pageTitle = 'RAILWISE 产品矩阵 · 软件平台与智能监测硬件';
+-$pageDesc = 'RAILWISE 产品矩阵覆盖 CLI、WorkWise、RAILWISE-TSM、RAILWISE-OS，以及由固定式全站仪与 TSM 智能采集器组成的全站仪智能综合监测系统。';
+-$pageKeywords = 'RAILWISE CLI,WorkWise,RAILWISE TSM,RAILWISE OS,全站仪智能综合监测系统,TSM采集器,自动化监测平台';
++$pageDesc = 'RAILWISE 产品矩阵覆盖 CLI、RailWise AI、RAILWISE-TSM、RAILWISE-OS，以及由固定式全站仪与 TSM 智能采集器组成的全站仪智能综合监测系统。';
++$pageKeywords = 'RAILWISE CLI,RailWise AI,RAILWISE TSM,RAILWISE OS,全站仪智能综合监测系统,TSM采集器,自动化监测平台';
+ $pageHeroVisualKey = 'products';
+ $pageOgImage = 'https://www.railwise.cn/images/heroes/desktop/products.jpg';
+ 
+@@ -94,7 +94,7 @@
+         <div class="products-selection-guide" aria-label="产品选型提示">
+             <div class="products-selection-guide__item">
+                 <strong>个人工程工作台</strong>
+-                <span>RAILWISE-CLI · WorkWise</span>
++                <span>RAILWISE-CLI · RailWise AI</span>
+                 <small>本地优先，适合分析、写作、质检和团队知识复用</small>
+             </div>
+             <div class="products-selection-guide__item">
+@@ -139,11 +139,11 @@
+ 
+             <div class="product-card compact">
+                 <div class="product-card-head">
+-                    <div class="product-badge workwise"><i class="fas fa-pen-to-square"></i> WorkWise</div>
+-                    <div class="product-card-github"><a href="/products/workwise/" aria-label="WorkWise"><i class="fas fa-arrow-right"></i></a></div>
+-                </div>
+-                <h3>WorkWise</h3>
+-                <p class="product-desc">桌面 AI 工作台，支持编程与文档任务；RAILWISE Survey 工程内业候选正在验收。</p>
++                    <div class="product-badge workwise"><i class="fas fa-pen-to-square"></i> RailWise AI</div>
++                    <div class="product-card-github"><a href="/products/workwise/" aria-label="RailWise AI"><i class="fas fa-arrow-right"></i></a></div>
++                </div>
++                <h3>RailWise AI</h3>
++                <p class="product-desc">RailWise AI 桌面工作台，以 Survey 串联导入预检、建网平差、分析与精度、成果与审查，并支持编程与文档任务。</p>
+                 <div class="product-features">
+                     <span class="feature-tag">Code / Write</span>
+                     <span class="feature-tag">可靠任务</span>
+@@ -152,12 +152,12 @@
+                     <span class="feature-tag"><?php echo htmlspecialchars($workwiseVersion); ?></span>
+                 </div>
+                 <ul class="product-highlights">
+-                    <li><i class="fas fa-bolt"></i><span>稳定下载与候选预览分别标注</span></li>
++                    <li><i class="fas fa-bolt"></i><span>工程计算保留来源，生成成果须人工复核</span></li>
+                     <li><i class="fas fa-file-pen"></i><span>写作、预览、DOCX / PDF 等交付与格式校验一体化</span></li>
+                     <li><i class="fas fa-download"></i><span>macOS 与 Windows 官方安装包，提供 SHA256 校验值</span></li>
+                 </ul>
+                 <div class="product-footer">
+-                    <div class="tech-stack"><i class="fas fa-laptop-code"></i> WorkWise · Local-first</div>
++                    <div class="tech-stack"><i class="fas fa-laptop-code"></i> RailWise AI · Local-first</div>
+                     <div class="product-actions">
+                         <a href="/products/workwise/" class="product-link">查看详情 <i class="fas fa-arrow-right"></i></a>
+                         <a href="https://kb.railwise.cn/products/workwise/" class="product-link">知识库 <i class="fas fa-book-open"></i></a>
+--- before/index.php
++++ after/index.php
+@@ -165,7 +165,7 @@
+    <a href="/services"><span>01 · 工程负责人</span><h3>工程测量与安全监测</h3><p>明确监测对象、工况风险与成果要求，沟通方案和现场服务。</p><b>查看工程服务 →</b></a>
+    <a href="/products/total-station-monitoring/"><span>02 · 监测团队</span><h3>自动化采集与数据复核</h3><p>了解全站仪、智能采集器与 TSM 平台的部署关系。</p><b>了解监测系统 →</b></a>
+    <a href="/products/os/"><span>03 · 业务管理者</span><h3>项目运营与成果交付</h3><p>围绕合同、项目、数据审核和报告建立业务流程。</p><b>了解 RAILWISE-OS →</b></a>
+-   <a href="/products/workwise/"><span>04 · 个人与知识团队</span><h3>AI 写作、编程与设计</h3><p>下载 WorkWise，在本地工作区处理文档和日常任务。</p><b>下载与安装 →</b></a>
++   <a href="/products/workwise/"><span>04 · 个人与知识团队</span><h3>AI 写作、编程与设计</h3><p>下载 RailWise AI，在本地工作区处理文档和日常任务。</p><b>下载与安装 →</b></a>
+   </div>
+  </div>
+ </section>
+@@ -176,11 +176,11 @@
+    <li><span>现场采集</span><h3><a href="/products/total-station-monitoring/">全站仪 + 智能采集器</a></h3><p>现场任务、观测与数据回传</p></li>
+    <li><span>监测分析</span><h3><a href="/products/tsm/">RAILWISE-TSM</a></h3><p>数据复核、趋势分析与预警</p></li>
+    <li><span>业务交付</span><h3><a href="/products/os/">RAILWISE-OS</a></h3><p>项目流程、报告与成果归档</p></li>
+-   <li><span>AI 辅助</span><h3><a href="/products/workwise/">WorkWise</a> / <a href="/products/cli/">CLI</a></h3><p>文档、知识与工程任务辅助</p></li>
++   <li><span>AI 辅助</span><h3><a href="/products/workwise/">RailWise AI</a> / <a href="/products/cli/">CLI</a></h3><p>文档、知识与工程任务辅助</p></li>
+   </ol>
+   <div class="rw-home-workwise">
+-   <div><span class="feature-tag"><?php echo htmlspecialchars($workwiseVersion); ?></span> <span class="feature-tag">稳定版下载</span><h3>WorkWise · 把 AI 带入真实工作</h3><p>从写作、代码到设计，在自己的工作区完成任务。下载页提供官方安装包、大小与 SHA256。</p><a class="hero-cta primary" href="/products/workwise/#download">选择安装包 →</a><a class="rw-home-text-link" href="/products">比较全部产品 →</a></div>
+-   <figure><?php echo rw_workwise_screenshot_picture('products/screenshots/workwise/01-write-home.png', 'WorkWise 写作工作台界面'); ?><figcaption>WorkWise 产品界面；具体功能以当前版本为准。</figcaption></figure>
++   <div><span class="feature-tag"><?php echo htmlspecialchars($workwiseVersion); ?></span> <span class="feature-tag">稳定版下载</span><h3>RailWise AI · 把 AI 带入真实工作</h3><p>从写作、代码到设计，在自己的工作区完成任务。下载页提供官方安装包、大小与 SHA256。</p><a class="hero-cta primary" href="/products/workwise/#download">选择安装包 →</a><a class="rw-home-text-link" href="/products">比较全部产品 →</a></div>
++   <figure><?php echo rw_workwise_screenshot_picture('products/screenshots/workwise/01-write-home.png', 'RailWise AI 写作工作台界面'); ?><figcaption>RailWise AI 产品界面；具体功能以当前版本为准。</figcaption></figure>
+   </div>
+  </div>
+ </section>
+--- before/help.php
++++ after/help.php
+@@ -102,8 +102,8 @@
+ $titleParts[] = '帮助与支持';
+ $titleParts[] = '宁波睿威工程技术有限公司';
+ $pageTitle = implode(' · ', $titleParts);
+-$pageDesc = '睿威产品资源中心：CLI、WorkWise、TSM、OS 产品使用指南、下载、视频教程、常见问题与技术支持。';
+-$pageKeywords = 'railwise 帮助,railwise-cli,WorkWise,railwise-tsm,railwise-os,使用指南,软件下载';
++$pageDesc = '睿威产品资源中心：CLI、RailWise AI、TSM、OS 产品使用指南、下载、视频教程、常见问题与技术支持。';
++$pageKeywords = 'railwise 帮助,railwise-cli,RailWise AI,railwise-tsm,railwise-os,使用指南,软件下载';
+ $pageHeroVisualKey = 'help';
+ $pageOgImage = 'https://www.railwise.cn/images/heroes/desktop/help.jpg';
+ 
+@@ -146,7 +146,7 @@
+             <span class="help-hero__grad">一站式产品资源与技术服务</span>
+         </h1>
+         <p class="help-hero__lede">
+-            CLI / WorkWise / TSM / OS —— 按产品查找介绍、下载、手册、视频、常见问题与技术支持。
++            CLI / RailWise AI / TSM / OS —— 按产品查找介绍、下载、手册、视频、常见问题与技术支持。
+         </p>
+         <form class="help-search" action="/help" method="GET">
+             <?php if ($productSlug !== ''): ?><input type="hidden" name="product" value="<?php echo htmlspecialchars($productSlug); ?>"><?php endif; ?>
+@@ -310,13 +310,13 @@
+ <section class="help-list">
+     <div class="container mx-auto px-6">
+         <?php if ($showWorkwiseHub): ?>
+-        <div class="help-list__meta">WorkWise 官方知识库 · <b><?php echo count($workwiseDocs); ?></b> 个精选入口</div>
++        <div class="help-list__meta">RailWise AI 官方知识库 · <b><?php echo count($workwiseDocs); ?></b> 个精选入口</div>
+         <div class="help-list__grid">
+             <?php foreach ($workwiseDocs as $doc): ?>
+             <a href="<?php echo htmlspecialchars($doc['url'], ENT_QUOTES, 'UTF-8'); ?>" class="help-card" data-reveal <?php echo rw_tracking_attrs('conversion_click', ['location' => 'help_workwise_hub', 'label' => $doc['title'], 'product' => 'workwise', 'source' => 'help', 'destination' => 'knowledge_base']); ?>>
+                 <span class="help-card__bar" style="background: linear-gradient(180deg, #06b6d4, #2563eb);"></span>
+                 <div class="help-card__body">
+-                    <div class="help-card__tags"><span class="help-card__tag help-card__tag--product" style="--g1: #06b6d4; --g2: #2563eb;"><i class="fas <?php echo htmlspecialchars($doc['icon'], ENT_QUOTES, 'UTF-8'); ?>"></i> WorkWise</span><span class="help-card__tag help-card__tag--cat"><i class="fas fa-book-open"></i> 官方知识库</span></div>
++                    <div class="help-card__tags"><span class="help-card__tag help-card__tag--product" style="--g1: #06b6d4; --g2: #2563eb;"><i class="fas <?php echo htmlspecialchars($doc['icon'], ENT_QUOTES, 'UTF-8'); ?>"></i> RailWise AI</span><span class="help-card__tag help-card__tag--cat"><i class="fas fa-book-open"></i> 官方知识库</span></div>
+                     <h3 class="help-card__title"><?php echo htmlspecialchars($doc['title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                     <p class="help-card__summary"><?php echo htmlspecialchars($doc['desc'], ENT_QUOTES, 'UTF-8'); ?></p>
+                     <div class="help-card__foot"><span><i class="fas fa-circle-check"></i> v<?php echo htmlspecialchars((string)rw_workwise_manifest()['version'], ENT_QUOTES, 'UTF-8'); ?></span><span class="help-card__cta">阅读文档 <i class="fas fa-arrow-up-right-from-square"></i></span></div>
+--- before/products/workwise/index.php
++++ after/products/workwise/index.php
+@@ -59,7 +59,7 @@
+ ];
+ $workwiseUseCases = [
+   ['title' => '控制网与水准网内业', 'desc' => '导入原始观测，检查控制点、单位和几何条件，完成平差与精度复核。', 'icon' => 'fas fa-compass'],
+-  ['title' => '工程成果复核', 'desc' => '把残差、闭合差、点位精度与原始记录对应起来，形成待审查证据包。', 'icon' => 'fas fa-file-check'],
++  ['title' => '工程成果复核', 'desc' => '把残差、闭合差、点位精度与原始记录对应起来，形成待审查证据包。', 'icon' => 'fas fa-file-circle-check'],
+   ['title' => '长文档写作', 'desc' => '从 Markdown 到 Word / PDF，减少反复搬运。', 'icon' => 'fas fa-file-export'],
+   ['title' => '桌面端 AI 工作区', 'desc' => '用图形化界面管理会话、模板、Skills 和项目资料。', 'icon' => 'fas fa-desktop'],
+   ['title' => '项目资料整理', 'desc' => '把资料、会话和成果放进同一个工作区。', 'icon' => 'fas fa-folder-tree'],
+@@ -99,7 +99,7 @@
+   ],
+ ];
+ $rwConversionDock = [
+-  'eyebrow' => 'WORKWISE DEMO',
++  'eyebrow' => 'RAILWISE AI DEMO',
+   'title' => '预约 RailWise AI 场景演示',
+   'description' => '围绕工程测量内业、代码协作或文档编排，演示从资料处理到可复核成果的工作流程。',
+   'subject' => 'RailWise AI 产品演示',
+@@ -179,7 +179,7 @@
+         <div class="pd-cap-head">
+           <span class="pd-cap-ico workwise-code"><i class="fas fa-bolt"></i></span>
+           <div>
+-            <span class="pd-eyebrow dark">WORKWISE <?php echo htmlspecialchars($workwiseVersion); ?> · AVAILABLE NOW</span>
++            <span class="pd-eyebrow dark">RAILWISE AI <?php echo htmlspecialchars($workwiseVersion); ?> · AVAILABLE NOW</span>
+             <h3>统一默认模型 deepseek-flash</h3>
+             <p>首次启动只需配置 DeepSeek API Key 和可选服务地址。主 Agent、Write、定时任务和其他 Agent 默认使用官方模型 ID <code>deepseek-flash</code>；<code>deepseek-v4-pro</code> 可作为显式兼容选择，旧 Flash ID 仅为迁移保留。</p>
+             <a href="https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md" target="_blank" rel="noopener" class="cli-inline-link">查看 RailWise AI 软件介绍 <i class="fas fa-arrow-up-right-from-square"></i></a>

@@ -1,0 +1,320 @@
+[
+  {
+    "run": {
+      "schemaVersion": 1,
+      "id": "adjustment_4963cb87-5389-4c68-8730-27f2a13decb6",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "networkId": "network_7d2034e5-f550-48d2-88e3-5c5f9602c81e",
+      "method": "weighted-least-squares",
+      "constraint": "fixed-known-points",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "inputHash": "2af204729a5d43c2230647dc8bf0d138e59c853a2fd48ddecc7dd6660f4bf70d",
+      "status": "completed",
+      "revision": 1,
+      "idempotencyKey": "packaged-calculate-network_7d2034e5-f550-48d2-88e3-5c5f9602c81e",
+      "resumeCount": 0,
+      "createdAt": "2026-10-01T02:51:31.659Z",
+      "updatedAt": "2026-10-01T02:51:31.660Z",
+      "completedAt": "2026-10-01T02:51:31.660Z"
+    },
+    "result": {
+      "schemaVersion": 1,
+      "id": "adjustment_result_a01e8eec-c40d-4e5c-8284-c08c716c9b6f",
+      "runId": "adjustment_4963cb87-5389-4c68-8730-27f2a13decb6",
+      "networkId": "network_7d2034e5-f550-48d2-88e3-5c5f9602c81e",
+      "observationCount": 2,
+      "unknownCount": 1,
+      "redundancy": 1,
+      "degreesOfFreedom": 1,
+      "linearUnit": "m",
+      "angularUnit": "rad",
+      "closure": {
+        "heightDifference": 0
+      },
+      "closureUnits": {
+        "heightDifference": "m"
+      },
+      "parameters": {},
+      "parameterUnits": {},
+      "unitWeightStdDev": 0,
+      "unitWeightStdDevUnit": "dimensionless",
+      "varianceFactor": 0,
+      "varianceFactorUnit": "dimensionless",
+      "varianceFactorEstimated": true,
+      "statisticalSummary": {
+        "schemaVersion": 1,
+        "scope": "descriptive-screening",
+        "numericalStatus": "clear",
+        "availableCount": 2,
+        "unavailableCount": 0,
+        "flaggedCount": 0,
+        "varianceBasis": "estimated-posterior",
+        "varianceLog10RatioToUnit": null,
+        "standardDeviationLog10RatioToUnit": null,
+        "significance": "not-evaluated",
+        "standardsConformity": "not-evaluated"
+      },
+      "points": [
+        {
+          "id": "BM",
+          "height": 10
+        },
+        {
+          "id": "P",
+          "height": 11,
+          "correctionHeight": 0,
+          "standardError": 0,
+          "covariance": [
+            50
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "observationId": "fwd",
+          "correction": 0,
+          "residual": 0,
+          "unit": "m",
+          "standardizedResidual": 0,
+          "standardizedResidualUnit": "sigma",
+          "residualStatistic": {
+            "schemaVersion": 1,
+            "method": "weight-normalized-residual",
+            "scaleBasis": "relative-weight",
+            "scope": "descriptive-screening",
+            "significance": "not-evaluated",
+            "status": "available",
+            "value": 0,
+            "threshold": 3,
+            "thresholdExceeded": false
+          },
+          "outlier": false,
+          "sourceRecordId": "workwise-json-observation-1"
+        },
+        {
+          "observationId": "back",
+          "correction": 0,
+          "residual": 0,
+          "unit": "m",
+          "standardizedResidual": 0,
+          "standardizedResidualUnit": "sigma",
+          "residualStatistic": {
+            "schemaVersion": 1,
+            "method": "weight-normalized-residual",
+            "scaleBasis": "relative-weight",
+            "scope": "descriptive-screening",
+            "significance": "not-evaluated",
+            "status": "available",
+            "value": 0,
+            "threshold": 3,
+            "thresholdExceeded": false
+          },
+          "outlier": false,
+          "sourceRecordId": "workwise-json-observation-2"
+        }
+      ],
+      "displacements": [
+        {
+          "pointId": "BM",
+          "dH": 0,
+          "magnitude": 0,
+          "kind": "vertical"
+        },
+        {
+          "pointId": "P",
+          "dH": 0,
+          "magnitude": 0,
+          "kind": "vertical"
+        }
+      ],
+      "covariance": [
+        [
+          50
+        ]
+      ],
+      "precision": {
+        "maxPointStdDev": 0,
+        "passed": true
+      },
+      "qualityFindings": [],
+      "inputHash": "2af204729a5d43c2230647dc8bf0d138e59c853a2fd48ddecc7dd6660f4bf70d",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "validation": "valid",
+      "strategyId": "leveling",
+      "solverDiagnostics": {
+        "iterations": 1,
+        "rank": 1,
+        "conditionEstimate": 1
+      },
+      "createdAt": "2026-10-01T02:51:31.660Z"
+    },
+    "rawSourceIntegrity": {
+      "status": "verified",
+      "ledgerEntryCount": 2,
+      "errors": []
+    },
+    "sourceEligibility": {
+      "eligible": true,
+      "findings": []
+    }
+  },
+  {
+    "run": {
+      "schemaVersion": 1,
+      "id": "adjustment_75094846-1afd-4a42-944c-8d3843922bb6",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "networkId": "network_7b57e283-ace1-4178-9810-dad7cbf0d71d",
+      "method": "weighted-least-squares",
+      "constraint": "fixed-known-points",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "inputHash": "71920f5001da45df0ca879f53805e719693ba70ce0722891c6224f67af2042a0",
+      "status": "completed",
+      "revision": 1,
+      "idempotencyKey": "packaged-calculate-network_7b57e283-ace1-4178-9810-dad7cbf0d71d",
+      "resumeCount": 0,
+      "createdAt": "2026-10-01T02:51:31.698Z",
+      "updatedAt": "2026-10-01T02:51:31.699Z",
+      "completedAt": "2026-10-01T02:51:31.699Z"
+    },
+    "result": {
+      "schemaVersion": 1,
+      "id": "adjustment_result_6f058c02-dc31-49f7-bee3-4c2a4861211d",
+      "runId": "adjustment_75094846-1afd-4a42-944c-8d3843922bb6",
+      "networkId": "network_7b57e283-ace1-4178-9810-dad7cbf0d71d",
+      "observationCount": 2,
+      "unknownCount": 1,
+      "redundancy": 1,
+      "degreesOfFreedom": 1,
+      "linearUnit": "m",
+      "angularUnit": "rad",
+      "closure": {
+        "heightDifference": 0
+      },
+      "closureUnits": {
+        "heightDifference": "m"
+      },
+      "parameters": {},
+      "parameterUnits": {},
+      "unitWeightStdDev": 0,
+      "unitWeightStdDevUnit": "dimensionless",
+      "varianceFactor": 0,
+      "varianceFactorUnit": "dimensionless",
+      "varianceFactorEstimated": true,
+      "statisticalSummary": {
+        "schemaVersion": 1,
+        "scope": "descriptive-screening",
+        "numericalStatus": "clear",
+        "availableCount": 2,
+        "unavailableCount": 0,
+        "flaggedCount": 0,
+        "varianceBasis": "estimated-posterior",
+        "varianceLog10RatioToUnit": null,
+        "standardDeviationLog10RatioToUnit": null,
+        "significance": "not-evaluated",
+        "standardsConformity": "not-evaluated"
+      },
+      "points": [
+        {
+          "id": "BM",
+          "height": 10
+        },
+        {
+          "id": "P",
+          "height": 10.998,
+          "correctionHeight": -0.0020000000000000018,
+          "standardError": 0,
+          "covariance": [
+            50
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "observationId": "fwd",
+          "correction": 0,
+          "residual": 0,
+          "unit": "m",
+          "standardizedResidual": 0,
+          "standardizedResidualUnit": "sigma",
+          "residualStatistic": {
+            "schemaVersion": 1,
+            "method": "weight-normalized-residual",
+            "scaleBasis": "relative-weight",
+            "scope": "descriptive-screening",
+            "significance": "not-evaluated",
+            "status": "available",
+            "value": 0,
+            "threshold": 3,
+            "thresholdExceeded": false
+          },
+          "outlier": false,
+          "sourceRecordId": "workwise-json-observation-1"
+        },
+        {
+          "observationId": "back",
+          "correction": 0,
+          "residual": 0,
+          "unit": "m",
+          "standardizedResidual": 0,
+          "standardizedResidualUnit": "sigma",
+          "residualStatistic": {
+            "schemaVersion": 1,
+            "method": "weight-normalized-residual",
+            "scaleBasis": "relative-weight",
+            "scope": "descriptive-screening",
+            "significance": "not-evaluated",
+            "status": "available",
+            "value": 0,
+            "threshold": 3,
+            "thresholdExceeded": false
+          },
+          "outlier": false,
+          "sourceRecordId": "workwise-json-observation-2"
+        }
+      ],
+      "displacements": [
+        {
+          "pointId": "BM",
+          "dH": 0,
+          "magnitude": 0,
+          "kind": "vertical"
+        },
+        {
+          "pointId": "P",
+          "dH": -0.002000000000000668,
+          "magnitude": 0.002000000000000668,
+          "kind": "vertical"
+        }
+      ],
+      "covariance": [
+        [
+          50
+        ]
+      ],
+      "precision": {
+        "maxPointStdDev": 0,
+        "passed": true
+      },
+      "qualityFindings": [],
+      "inputHash": "71920f5001da45df0ca879f53805e719693ba70ce0722891c6224f67af2042a0",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "validation": "valid",
+      "strategyId": "leveling",
+      "solverDiagnostics": {
+        "iterations": 1,
+        "rank": 1,
+        "conditionEstimate": 1
+      },
+      "createdAt": "2026-10-01T02:51:31.699Z"
+    },
+    "rawSourceIntegrity": {
+      "status": "verified",
+      "ledgerEntryCount": 2,
+      "errors": []
+    },
+    "sourceEligibility": {
+      "eligible": true,
+      "findings": []
+    }
+  }
+]

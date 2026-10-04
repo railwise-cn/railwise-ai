@@ -5,6 +5,7 @@ import type { SurveyStatisticalDiagnosticsV1 } from '@shared/survey-statistics'
 import { readSurveyStatisticalDiagnostics, SurveyStatisticalRequestError, type SurveyStatisticalBinding } from '../../agent/survey-statistics-client'
 import { saveGeneratedWorkspaceFileAs } from '../../lib/generated-file-actions'
 import { EngineeringEvidenceQuestion, EngineeringSelectedEvidence } from './EngineeringEvidenceQuestion'
+import { surveyObservationDisplayLabel, type SurveyObservationDisplayInput } from './survey-professional-labels'
 
 const unavailableKeys = {
   'unsupported-network-type': 'surveyStatsUnsupported', 'dimension-limit': 'surveyStatsDimensionLimit',
@@ -15,8 +16,15 @@ const unavailableKeys = {
 const errorKeys = { stale: 'surveyStatsStale', unavailable: 'surveyStatsServiceUnavailable',
   'invalid-response': 'surveyStatsInvalidResponse', 'request-failed': 'surveyStatsRequestFailed' } as const
 
+function csvCell(value: string | number): string {
+  const raw = String(value)
+  const safe = typeof value === 'string' && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
+  return `"${safe.replaceAll('"', '""')}"`
+}
+
 export function SurveyStatisticalDiagnostics({ binding, contextRevision, networkRevision, runtimeReady, eligible, workspace,
-  renderSourceRecord }: {
+  renderSourceRecord, observations = [] }: {
+  observations?: Array<SurveyObservationDisplayInput & { id: string }>
   binding: SurveyStatisticalBinding | null
   contextRevision: string
   networkRevision?: number
@@ -26,6 +34,7 @@ export function SurveyStatisticalDiagnostics({ binding, contextRevision, network
   renderSourceRecord: (sourceRecordId: string, onDismiss: () => void) => ReactNode
 }): React.JSX.Element {
   const { t, i18n } = useTranslation('common')
+  const observationDisplay = (id: string, index: number, sourceRow?: number): string => surveyObservationDisplayLabel({ ...observations.find(item => item.id === id), observationId: id, sourceRow, sequence: index + 1 }, i18n.language)
   const [result, setResult] = useState<{ scope: string; diagnostic: SurveyStatisticalDiagnosticsV1 } | null>(null)
   const [busy, setBusy] = useState<'read' | 'save' | null>(null)
   const [message, setMessage] = useState('')
@@ -56,11 +65,22 @@ export function SurveyStatisticalDiagnostics({ binding, contextRevision, network
       const value = await readSurveyStatisticalDiagnostics(binding, download)
       if (!stillCurrent()) return
       setResult({ scope, diagnostic: value })
-      if (download) {
+      if (download && value.status === 'available') {
+        const headings = [
+          t('surveyStatsCsvObservation'), t('surveyStatsCsvResidual', { unit: value.residualUnit }),
+          t('surveyStatsCsvStudentized'), t('surveyStatsCsvRedundancy'),
+          t('surveyStatsCsvSourceRow'), t('surveyStatsCsvDecision'), t('surveyStatsCsvAssumptions'), t('surveyStatsCsvWeights')
+        ]
+        const rows = value.observations.map((observation, index) => [
+          observationDisplay(observation.observationId, index, observation.sourceRow), observation.residual, observation.externallyStudentizedResidual,
+          observation.redundancy, observation.sourceRow ?? '', t('surveyStatsCsvNotEvaluated'),
+          t('surveyStatsCsvNotVerified'), t(value.weightBasis === 'inverse-declared-sigma-squared' ? 'surveyStatsDeclaredSigma' : 'surveyStatsRouteWeight')
+        ])
+        const csv = `\uFEFF${[headings, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n')}\r\n`
         let binary = ''
-        for (const byte of new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`)) binary += String.fromCharCode(byte)
-        const saved = await saveGeneratedWorkspaceFileAs({ suggestedName: 'survey-statistical-diagnostics.json',
-          workspaceRoot: workspace, mimeType: 'application/json', dataBase64: btoa(binary) })
+        for (const byte of new TextEncoder().encode(csv)) binary += String.fromCharCode(byte)
+        const saved = await saveGeneratedWorkspaceFileAs({ suggestedName: 'survey-statistical-diagnostics.csv',
+          workspaceRoot: workspace, mimeType: 'text/csv;charset=utf-8', dataBase64: btoa(binary) })
         if (!stillCurrent()) return
         if (saved.ok) setMessage('surveyStatsSaved')
         else if (!saved.canceled) setError('surveyStatsSaveFailed')
@@ -81,11 +101,11 @@ export function SurveyStatisticalDiagnostics({ binding, contextRevision, network
           className="inline-flex min-h-8 items-center gap-1.5 rounded border border-ds-border px-2.5 text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
           <Activity aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{t(busy === 'read' ? 'surveyStatsReading' : 'surveyStatsRead')}
         </button>
-        <button type="button" onClick={() => void read(true)} disabled={!canRead || !diagnostic || busy !== null}
+        {diagnostic?.status === 'available' ? <button type="button" onClick={() => void read(true)} disabled={!canRead || busy !== null}
           aria-label={t('surveyStatsDownload')} title={t('surveyStatsDownload')}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-ds-border text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
-          <Download aria-hidden="true" className="h-3.5 w-3.5" />
-        </button>
+          className="inline-flex min-h-8 items-center gap-1.5 rounded border border-ds-border px-2.5 text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
+          <Download aria-hidden="true" className="h-3.5 w-3.5" />{t('surveyStatsDownload')}
+        </button> : null}
       </div>
     </div>
     <div role="status" aria-live="polite" className="mt-2 text-ds-muted">
@@ -115,14 +135,14 @@ export function SurveyStatisticalDiagnostics({ binding, contextRevision, network
               <th scope="col" className="px-3 py-2">{t('surveyRawRecord')}</th>
             </tr></thead>
             <tbody className="divide-y divide-ds-border-muted">{diagnostic.observations.map((observation, index) => <tr key={observation.observationId}>
-              <th scope="row" className="max-w-44 break-all px-3 py-2 text-left font-mono font-normal text-ds-ink">{observation.observationId}<EngineeringEvidenceQuestion label={observation.observationId} selector={{ path: ['observations', index], identity: { observationId: observation.observationId } }} /></th>
+              <th scope="row" className="max-w-44 break-all px-3 py-2 text-left font-normal text-ds-ink">{observationDisplay(observation.observationId, index, observation.sourceRow)}<EngineeringEvidenceQuestion label={observationDisplay(observation.observationId, index, observation.sourceRow)} selector={{ path: ['observations', index], identity: { observationId: observation.observationId } }} /></th>
               <td className="px-3 py-2 tabular-nums text-ds-ink">{number(observation.residual)}</td>
               <td className="px-3 py-2 tabular-nums text-ds-ink">{number(observation.externallyStudentizedResidual)}</td>
               <td className="px-3 py-2 tabular-nums text-ds-ink">{number(observation.redundancy)}</td>
               <td className="px-3 py-2">{observation.sourceRecordId ? <div className="flex items-center gap-2">
-                <code className="max-w-40 truncate font-mono text-[9.5px] text-ds-muted" title={observation.sourceRecordId}>{observation.sourceRecordId}</code>
+                <span className="text-ds-muted">{t('surveySourceRecordAvailable')}</span>
                 <button type="button" onClick={() => setSourceRecordId(observation.sourceRecordId!)}
-                  aria-label={t('surveyLocateRecordAria', { observation: observation.observationId, record: observation.sourceRecordId })}
+                  aria-label={t('surveyLocateObservationRecordAria', { observation: observationDisplay(observation.observationId, index, observation.sourceRow) })}
                   title={t('surveyLocateRecord')} className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
                   <LocateFixed aria-hidden="true" className="h-3.5 w-3.5" />
                 </button>
@@ -132,11 +152,6 @@ export function SurveyStatisticalDiagnostics({ binding, contextRevision, network
         </div>
         {sourceRecordId ? <div ref={sourcePanel} tabIndex={-1} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{renderSourceRecord(sourceRecordId, () => setSourceRecordId(null))}</div> : null}
       </> : null}
-      <details className="mt-3 text-[10px] text-ds-muted"><summary className="cursor-pointer py-1">{t('surveyStatsProvenance')}</summary>
-        <dl className="mt-2 space-y-2">{[['surveyStatsRun', diagnostic.runId], ['surveyStatsVersion', diagnostic.diagnosticsVersion],
-          ['surveyStatsInputHash', diagnostic.inputHash], ['surveyStatsSourceHash', diagnostic.sourceSha256],
-          ['surveyStatsCalculationHash', diagnostic.calculationHash]].map(([label, value]) => <div key={label}><dt>{t(label!)}</dt><dd className="mt-0.5 break-all font-mono text-ds-ink">{value}</dd></div>)}</dl>
-      </details>
     </EngineeringSelectedEvidence> : null}
   </section>
 }

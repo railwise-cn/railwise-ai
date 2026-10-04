@@ -1,0 +1,174 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container 高级详情
+					5 container
+						6 标题 高级详情, Value: 2
+							7 文本 高级详情
+						8 按钮 关闭详情
+					9 container
+						10 标题 测量与平差控制台, Value: 3
+							11 文本 测量与平差控制台
+						12 文本 计算结果可重复
+						13 按钮 收起高级详情
+						14 按钮 询问测量 AI
+						15 文本 已有测量网络
+						16 弹出式按钮 Description: 已有测量网络, Value: golden-plane-control-e2e.in2 · 未知格式 · 可进入校核与平差
+							17 (selected) golden-plane-control-e2e.in2 · 未知格式 · 可进入校核与平差
+						18 文本 网络类型
+						19 弹出式按钮 Description: 网络类型, Value: 平面控制网
+							20 (selected) 平面控制网
+						21 文本 测量服务已连接
+						22 container 测量计算状态
+							23 文本 网型
+							24 文本 平面控制网
+							25 container
+								26 文本 当前约束
+								27 container Description: 平差约束, Help: 本次按固定已知点约束进行平差；自由网和最小约束方式暂不可选。
+									28 文本 固定已知点
+							29 container
+								30 文本 平差方法 / 权模型
+								31 container Description: 平差方法, Help: 本次采用加权最小二乘；坐标或高程转换按已选择的转换模型执行。
+									32 文本 加权最小二乘
+							33 文本 可解性
+							34 文本 已通过校核
+						35 container 平差工作区导航
+							36 文本 工作区
+							37 按钮 网形与基准
+							38 按钮 观测表 5
+								39 文本 观测表
+								40 文本 5
+							41 按钮 点位与坐标 4
+								42 文本 点位与坐标
+								43 文本 4
+							44 按钮 平差结果
+							45 按钮 自由水准试算
+							46 按钮 期次变形 0
+								47 文本 期次变形
+								48 文本 0
+						49 text 导入仪器、GNSS 或交换文件 仪器、GNSS 与交换格式；识别不等于可平差。
+						50 按钮 选择专业测量文件
+						51 text 原始资料会完整保留；通过来源核验后，才可进行校核和平差。 项目基准
+						52 定义列表
+							53 container 网络类型
+								54 文本 网络类型
+							55 文本 平面控制网
+							56 container 平面坐标系
+								57 文本 平面坐标系
+							58 文本 待确认
+							59 container 高程基准
+								60 文本 高程基准
+							61 文本 待确认
+						62 文本 导入时使用的已知控制点（可选）
+						63 文本输入区 (settable) Description: 导入时使用的已知控制点（可选）, Placeholder: BM-01,100.000
+						64 文本 每行：点号,高程[,X,Y]，数值单位为米。请在选择文件前填写，输入将随原文件导入并保留映射证据；冲突数据会阻断，不自动替换原记录。
+						65 container 专业测量来源筛选
+							66 文本 已有来源筛选
+							67 文本 格式
+							68 弹出式按钮 Description: 按来源格式筛选, Value: 全部格式（1）
+								69 (selected) 全部格式（1）
+							70 文本 就绪状态
+							71 弹出式按钮 Description: 按平差就绪状态筛选, Value: 全部状态
+								72 (selected) 全部状态
+							73 文本 显示 1 / 1
+						74 文本 原始资料完整性已核验（2 条记录）。这不代表已完成质量复核、专业签署、规范符合性检查或正式交付。
+						75 container 专业测量来源预检
+							76 文本 golden-plane-control-e2e.in2
+							77 文本 可进入校核与平差
+							78 container
+								79 text COSA(科傻)  ·  未知格式  ·  置信度 98%
+							80 文本 10 条已识别记录 · 0.1 KiB
+							81 container
+								82 text 原文件 已保留
+							83 container 原始资料与处理说明
+								84 定义列表
+									85 container 声明扩展名
+										86 文本 声明扩展名
+									87 文本 .in2
+									88 container 厂商 / 内容探测格式
+										89 文本 厂商 / 内容探测格式
+									90 container
+										91 text COSA(科傻)  ·  未知格式  ·  版本 未声明
+									92 container 检测方法 / 置信度
+										93 文本 检测方法 / 置信度
+									94 container
+										95 text 结构探针  ·  98%
+									96 container 扩展名一致性 / 人工确认
+										97 文本 扩展名一致性 / 人工确认
+									98 container
+										99 text 未发现冲突  ·  无需人工确认
+									100 container 导入处置 / 下一步
+										101 文本 导入处置 / 下一步
+									102 container
+										103 text 可进入校核与平差  ·  资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。 复核单位、基准和点位角色后执行质量校核。
+									104 container 长度单位（原始 → 规范）
+										105 文本 长度单位（原始 → 规范）
+									106 container
+										107 text m  →  m
+									108 container 角度单位（原始 → 规范）
+										109 文本 角度单位（原始 → 规范）
+									110 container
+										111 text cosa-degree-dot-mmss  →  rad
+									112 container 平面基准 / 高程基准
+										113 文本 平面基准 / 高程基准
+									114 container
+										115 text 未声明  /  未声明
+									116 container 点 / 测站
+										117 文本 点 / 测站
+									118 container
+										119 text 3  /  1
+									120 container 观测 / 记录 / 跳过
+										121 文本 观测 / 记录 / 跳过
+									122 container
+										123 text 5  /  10  /  0
+							124 定义列表
+								125 container 扩展名一致性
+									126 文本 扩展名一致性
+								127 container
+									128 text .in2  ·  未发现冲突
+							129 文本 资料检查
+							130 文本 阻断 0 · 警告 1
+							131 按钮 询问 资料诊断 1 的测量 AI
+							132 文本 文本编码 utf-8
+							133 按钮 询问 资料诊断 2 的测量 AI
+							134 文本 识别为 COSA(科傻) / cosa-in2，置信度 98%
+							135 按钮 询问 资料诊断 3 的测量 AI
+							136 text 资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。 下一步： 继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。
+							137 container
+								138 文本 原始记录定位
+								139 按钮 查看 10
+								140 文本 可按测量记录定位到仪器文件中的原始内容；原始资料保持不变。
+						141 text 点位 4 3 已知 · 1 未知 观测 5 已保留单位与权 质量状态 已通过校核 已通过校核 运行状态 已完成 已有计算结果
+						142 按钮 质量校核
+						143 按钮 运行平差
+						144 文本 质量门禁
+						145 文本 资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。
+						146 文本 当前输入
+						147 定义列表
+							148 container 来源
+								149 文本 来源
+							150 文本 golden-plane-control-e2e.in2
+							151 container 格式
+								152 文本 格式
+							153 文本 未知格式
+							154 container 就绪状态
+								155 文本 就绪状态
+							156 文本 可进入校核与平差
+							157 container 阻断项
+								158 文本 阻断项
+							159 文本 0
+						160 文本 结果可追溯
+	161 关闭按钮
+	162 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	163 最小化按钮
+164 menu bar
+	165 RailWise AI
+	166 文件
+	167 编辑
+	168 显示
+	169 窗口
+	170 帮助
+
+The focused UI element is 8 按钮 关闭详情

@@ -1,0 +1,349 @@
+{
+  "capturedAt": "2026-09-27T19:26:57.448296+00:00",
+  "runs": {
+    "36339828655": {
+      "conclusion": "success",
+      "databaseId": 36339828655,
+      "headSha": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+      "jobs": [
+        {
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:13:13Z",
+          "completedAt": "2026-09-27T18:18:34Z"
+        },
+        {
+          "name": "Electron production smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:13:13Z",
+          "completedAt": "2026-09-27T18:14:43Z"
+        },
+        {
+          "name": "Windows path, spawn, persistence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:13:13Z",
+          "completedAt": "2026-09-27T18:15:35Z"
+        }
+      ],
+      "number": 480,
+      "status": "completed",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36339828655"
+    },
+    "36339825669": {
+      "conclusion": "success",
+      "databaseId": 36339825669,
+      "headSha": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+      "jobs": [
+        {
+          "name": "Windows path, spawn, persistence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:13:10Z",
+          "completedAt": "2026-09-27T18:15:47Z"
+        },
+        {
+          "name": "Electron production smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:13:10Z",
+          "completedAt": "2026-09-27T18:14:49Z"
+        },
+        {
+          "name": "OpenSpec, brand, lint, type, test, build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:13:10Z",
+          "completedAt": "2026-09-27T18:18:25Z"
+        }
+      ],
+      "number": 479,
+      "status": "completed",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36339825669"
+    },
+    "36340558856": {
+      "conclusion": "success",
+      "databaseId": 36340558856,
+      "headSha": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+      "jobs": [
+        {
+          "name": "isolated-survey-candidate / Isolated macOS arm64 candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T18:25:11Z",
+          "completedAt": "2026-09-27T18:34:50Z"
+        },
+        {
+          "name": "Roll back WorkWise Stable pointers",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:03Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Cleanup updater acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:03Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Prepare release version",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:03Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Repair website updater metadata cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:03Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Two-hour pre-release stability",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:03Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Build macOS",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:04Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Build Windows",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:04Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "MarkItDown ${{ matrix.platform }} ${{ matrix.arch }}",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:04Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Verify three-client candidate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:04Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Publish GitHub Release",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:04Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Verify final candidate on macOS",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:04Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "Native updater acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:10Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        },
+        {
+          "name": "private-updater-acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T18:25:13Z",
+          "completedAt": "2026-09-27T18:25:03Z"
+        }
+      ],
+      "number": 164,
+      "status": "completed",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36340558856"
+    },
+    "36342879401": {
+      "conclusion": "success",
+      "databaseId": 36342879401,
+      "headSha": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+      "jobs": [
+        {
+          "name": "private-updater-acceptance / Private macOS arm64 native updater round-trip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T19:02:45Z",
+          "completedAt": "2026-09-27T19:22:32Z"
+        },
+        {
+          "name": "Native updater acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        },
+        {
+          "name": "Cleanup updater acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        },
+        {
+          "name": "isolated-survey-candidate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        },
+        {
+          "name": "Prepare release version",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        },
+        {
+          "name": "Roll back WorkWise Stable pointers",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        },
+        {
+          "name": "Two-hour pre-release stability",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        },
+        {
+          "name": "Build macOS",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:40Z"
+        },
+        {
+          "name": "MarkItDown ${{ matrix.platform }} ${{ matrix.arch }}",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:40Z"
+        },
+        {
+          "name": "Build Windows",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:40Z"
+        },
+        {
+          "name": "Verify three-client candidate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:40Z"
+        },
+        {
+          "name": "Publish GitHub Release",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:40Z"
+        },
+        {
+          "name": "Verify final candidate on macOS",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:40Z",
+          "completedAt": "2026-09-27T19:02:40Z"
+        },
+        {
+          "name": "Repair website updater metadata cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:02:49Z",
+          "completedAt": "2026-09-27T19:02:39Z"
+        }
+      ],
+      "number": 165,
+      "status": "completed",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36342879401"
+    },
+    "36343000275": {
+      "conclusion": "",
+      "databaseId": 36343000275,
+      "headSha": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+      "jobs": [
+        {
+          "name": "Prepare release version",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-09-27T19:22:35Z",
+          "completedAt": "2026-09-27T19:22:46Z"
+        },
+        {
+          "name": "Cleanup updater acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:22:33Z",
+          "completedAt": "2026-09-27T19:22:33Z"
+        },
+        {
+          "name": "private-updater-acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:22:33Z",
+          "completedAt": "2026-09-27T19:22:33Z"
+        },
+        {
+          "name": "Repair website updater metadata cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:22:33Z",
+          "completedAt": "2026-09-27T19:22:33Z"
+        },
+        {
+          "name": "Native updater acceptance",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:22:33Z",
+          "completedAt": "2026-09-27T19:22:33Z"
+        },
+        {
+          "name": "Roll back WorkWise Stable pointers",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:22:33Z",
+          "completedAt": "2026-09-27T19:22:33Z"
+        },
+        {
+          "name": "isolated-survey-candidate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-09-27T19:22:39Z",
+          "completedAt": "2026-09-27T19:22:33Z"
+        },
+        {
+          "name": "Two-hour pre-release stability",
+          "status": "in_progress",
+          "conclusion": "",
+          "startedAt": "2026-09-27T19:22:48Z",
+          "completedAt": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "number": 166,
+      "status": "in_progress",
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36343000275"
+    }
+  }
+}

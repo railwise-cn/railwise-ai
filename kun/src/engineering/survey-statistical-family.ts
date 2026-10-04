@@ -6,6 +6,7 @@ import {
   type SurveyStatisticalDistributionV1,
   type SurveyStatisticalFamilyMemberResultV1
 } from '../contracts/survey-statistical-family.js'
+import { unverifiedSurveyStatisticalDeclarationV1 } from '../contracts/survey-statistical-declaration.js'
 
 const flags = {
   algorithmVersion: 'declared-statistical-family-1', status: 'trial-only', modelAssumptions: 'not-verified',
@@ -185,5 +186,10 @@ export function evaluateSurveyStatisticalFamilyV1(input: unknown): SurveyStatist
       return { memberId: member.id, status: 'numerical-failure', code: error.code, message: error.message }
     }
   })
-  return SurveyStatisticalFamilyOutputV1.parse({ ...flags, outcome: 'evaluated', request, requestSha256: createHash('sha256').update(JSON.stringify(request)).digest('hex'), denominator, memberAlpha, results })
+  return SurveyStatisticalFamilyOutputV1.parse({ ...flags, outcome: 'evaluated', request,
+    statisticalDeclaration: request.statisticalDeclaration ?? unverifiedSurveyStatisticalDeclarationV1({
+      scope: 'per-member', modelVersion: 'declared-statistical-family-1', covarianceModelVersion: null,
+      testFamily: { id: request.familyId, declaration: request.declaration, source: 'survey/statistical-family/members', alpha: request.alpha, correction: request.correction }
+    }),
+    requestSha256: createHash('sha256').update(JSON.stringify(request)).digest('hex'), denominator, memberAlpha, results })
 }

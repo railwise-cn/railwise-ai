@@ -1,0 +1,4398 @@
+{
+  "model": {
+    "title": "合成水准网专业成果验收 测量平差专业成果册",
+    "projectName": "合成水准网专业成果验收",
+    "taskType": "水准网",
+    "generatedAt": "2026-09-30T08:00:00Z",
+    "reviewStatus": "unsigned",
+    "reportStatus": "draft",
+    "sourceBinding": [
+      {
+        "networkId": "network_c386599c-6d41-438e-82e6-59605b382391",
+        "name": "合成水准网.json",
+        "sha256": "435de418cb73135b017a169da9b4149084269e545c220d4404d4150161e24ec3",
+        "status": "bound",
+        "integrity": "verified",
+        "inputHash": "193fe1962ec6c2a73cc674b93f13cb31bebbedb085802366d07c533c64e245ef",
+        "resultHash": "8b494292af1bb6eb4be7c7dc13d122af45ae60230db54f9d42fcf15dff55ce48",
+        "projectionHash": "ebf6b6af88dc20ca9516b23b3bec5396de8be8dd4bfd5490eaea785b7b3829fc"
+      }
+    ],
+    "tables": [
+      {
+        "id": "source-binding",
+        "title": "资料与版本绑定",
+        "columns": [
+          {
+            "key": "networkId",
+            "label": "网络编号"
+          },
+          {
+            "key": "source",
+            "label": "源文件"
+          },
+          {
+            "key": "status",
+            "label": "绑定状态"
+          },
+          {
+            "key": "integrity",
+            "label": "原件完整性"
+          }
+        ],
+        "rows": [
+          {
+            "networkId": "network_c386599c-6d41-438e-82e6-59605b382391",
+            "source": "合成水准网.json",
+            "status": "已绑定",
+            "integrity": "已校验"
+          }
+        ],
+        "note": "完整输入、结果和投影摘要在版本附录及专业成果 JSON 中保留。"
+      },
+      {
+        "id": "network_c386599c-6d41-438e-82e6-59605b382391-reference",
+        "title": "基准与已知控制点",
+        "columns": [
+          {
+            "key": "id",
+            "label": "点号"
+          },
+          {
+            "key": "role",
+            "label": "类型"
+          },
+          {
+            "key": "height",
+            "label": "高程",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          }
+        ],
+        "rows": [
+          {
+            "id": "BM01",
+            "role": "已知点",
+            "height": 100
+          }
+        ],
+        "note": "高程基准：1985 国家高程基准（合成样例声明）；单位：m；状态：已声明"
+      },
+      {
+        "id": "network_c386599c-6d41-438e-82e6-59605b382391-closures",
+        "title": "闭合与附合检核",
+        "columns": [
+          {
+            "key": "id",
+            "label": "线路"
+          },
+          {
+            "key": "kind",
+            "label": "类型"
+          },
+          {
+            "key": "from",
+            "label": "起点"
+          },
+          {
+            "key": "to",
+            "label": "终点"
+          },
+          {
+            "key": "observed",
+            "label": "观测高差和",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "known",
+            "label": "已知高差",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "misclosure",
+            "label": "闭合差",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "tolerance",
+            "label": "限差",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "status",
+            "label": "状态"
+          }
+        ],
+        "rows": [
+          {
+            "id": "leveling-cycle:测段10",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0000700000000000145,
+            "known": 0,
+            "misclosure": -0.0700000000000145,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段11",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00009999999999998899,
+            "known": 0,
+            "misclosure": 0.09999999999998899,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段12",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00009000000000014552,
+            "known": 0,
+            "misclosure": -0.09000000000014552,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段13",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00011999999999989797,
+            "known": 0,
+            "misclosure": 0.11999999999989797,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段14",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0001100000000000545,
+            "known": 0,
+            "misclosure": -0.1100000000000545,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段15",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000140000000000029,
+            "known": 0,
+            "misclosure": 0.140000000000029,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段16",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00013000000000018552,
+            "known": 0,
+            "misclosure": -0.13000000000018552,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段17",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00015999999999993797,
+            "known": 0,
+            "misclosure": 0.15999999999993797,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段18",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0001500000000000945,
+            "known": 0,
+            "misclosure": -0.1500000000000945,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段19",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000180000000000069,
+            "known": 0,
+            "misclosure": 0.180000000000069,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段2",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000009999999999843467,
+            "known": 0,
+            "misclosure": 0.009999999999843467,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段20",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00017000000000000348,
+            "known": 0,
+            "misclosure": -0.17000000000000348,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段21",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00019999999999997797,
+            "known": 0,
+            "misclosure": 0.19999999999997797,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段22",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0001900000000001345,
+            "known": 0,
+            "misclosure": -0.1900000000001345,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段23",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000220000000000109,
+            "known": 0,
+            "misclosure": 0.220000000000109,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段24",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00021000000000004349,
+            "known": 0,
+            "misclosure": -0.21000000000004349,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段25",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00024000000000001798,
+            "known": 0,
+            "misclosure": 0.24000000000001798,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段26",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0002300000000001745,
+            "known": 0,
+            "misclosure": -0.2300000000001745,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段27",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00025999999999992696,
+            "known": 0,
+            "misclosure": 0.25999999999992696,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段28",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0002500000000000835,
+            "known": 0,
+            "misclosure": -0.2500000000000835,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段29",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000280000000000058,
+            "known": 0,
+            "misclosure": 0.280000000000058,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段3",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00001999999999990898,
+            "known": 0,
+            "misclosure": 0.01999999999990898,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段30",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00026999999999999247,
+            "known": 0,
+            "misclosure": -0.26999999999999247,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段31",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00029999999999996696,
+            "known": 0,
+            "misclosure": 0.29999999999996696,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段32",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0002900000000001235,
+            "known": 0,
+            "misclosure": -0.2900000000001235,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段33",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000320000000000098,
+            "known": 0,
+            "misclosure": 0.320000000000098,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段34",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00031000000000003247,
+            "known": 0,
+            "misclosure": -0.31000000000003247,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段35",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00034000000000000696,
+            "known": 0,
+            "misclosure": 0.34000000000000696,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段36",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0003300000000001635,
+            "known": 0,
+            "misclosure": -0.3300000000001635,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段37",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00035999999999991594,
+            "known": 0,
+            "misclosure": 0.35999999999991594,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段38",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0003500000000000725,
+            "known": 0,
+            "misclosure": -0.3500000000000725,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段39",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00038000000000004697,
+            "known": 0,
+            "misclosure": 0.38000000000004697,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段4",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.000010000000000065512,
+            "known": 0,
+            "misclosure": -0.010000000000065512,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段40",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00036999999999998145,
+            "known": 0,
+            "misclosure": -0.36999999999998145,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段41",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00039999999999995595,
+            "known": 0,
+            "misclosure": 0.39999999999995595,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段42",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.0003900000000001125,
+            "known": 0,
+            "misclosure": -0.3900000000001125,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段43",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00042000000000008697,
+            "known": 0,
+            "misclosure": 0.42000000000008697,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段44",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.00041000000000002146,
+            "known": 0,
+            "misclosure": -0.41000000000002146,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段45",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00043999999999999595,
+            "known": 0,
+            "misclosure": 0.43999999999999595,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段5",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.000040000000000040004,
+            "known": 0,
+            "misclosure": 0.040000000000040004,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段6",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.000030000000000196536,
+            "known": 0,
+            "misclosure": -0.030000000000196536,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段7",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00005999999999994898,
+            "known": 0,
+            "misclosure": 0.05999999999994898,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段8",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": -0.000050000000000105516,
+            "known": 0,
+            "misclosure": -0.050000000000105516,
+            "tolerance": 5,
+            "status": "通过"
+          },
+          {
+            "id": "leveling-cycle:测段9",
+            "kind": "闭合环",
+            "from": "BM01",
+            "to": "BM01",
+            "observed": 0.00008000000000008001,
+            "known": 0,
+            "misclosure": 0.08000000000008001,
+            "tolerance": 5,
+            "status": "通过"
+          }
+        ],
+        "note": "闭合差与限差以 mm 显示，观测和已知高差以 m 显示；限差未配置时不得推定合格。"
+      },
+      {
+        "id": "network_c386599c-6d41-438e-82e6-59605b382391-summary",
+        "title": "平差统计与检查状态",
+        "columns": [
+          {
+            "key": "networkType",
+            "label": "网型"
+          },
+          {
+            "key": "observationCount",
+            "label": "观测数",
+            "numeric": true,
+            "decimals": 0
+          },
+          {
+            "key": "pointCount",
+            "label": "点数",
+            "numeric": true,
+            "decimals": 0
+          },
+          {
+            "key": "dof",
+            "label": "自由度",
+            "numeric": true,
+            "decimals": 0
+          },
+          {
+            "key": "unitWeightStdDev",
+            "label": "单位权中误差",
+            "unit": "无量纲",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "varianceFactor",
+            "label": "方差因子",
+            "unit": "无量纲",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "varianceBasis",
+            "label": "方差依据"
+          },
+          {
+            "key": "validation",
+            "label": "计算状态"
+          }
+        ],
+        "rows": [
+          {
+            "networkType": "水准网",
+            "observationCount": 45,
+            "pointCount": 2,
+            "dof": 44,
+            "unitWeightStdDev": 0.06586391694664873,
+            "varianceFactor": 0.004338055555555042,
+            "varianceBasis": "后验",
+            "validation": "计算有效"
+          }
+        ],
+        "note": "残差范数仅作描述性统计，不等同闭合差；0.0008737835989406574 m（45 条）"
+      },
+      {
+        "id": "network_c386599c-6d41-438e-82e6-59605b382391-points",
+        "title": "点位成果与精度",
+        "columns": [
+          {
+            "key": "id",
+            "label": "点号"
+          },
+          {
+            "key": "role",
+            "label": "类型"
+          },
+          {
+            "key": "height",
+            "label": "高程",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "correctionHeight",
+            "label": "高程改正数",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "standardError",
+            "label": "点位中误差",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "precisionBasis",
+            "label": "精度依据"
+          }
+        ],
+        "rows": [
+          {
+            "id": "BM01",
+            "role": "已知点",
+            "height": 100,
+            "precisionBasis": "未记录"
+          },
+          {
+            "id": "P01",
+            "role": "待定点",
+            "height": 101.23421022222222,
+            "correctionHeight": 234.21022222222228,
+            "standardError": 0.019636826074280925,
+            "precisionBasis": "后验"
+          }
+        ],
+        "note": "最弱点：P01，点位中误差 0.000019636826074280926 m。最弱边：未评估（点间协方差不可用）。"
+      },
+      {
+        "id": "network_c386599c-6d41-438e-82e6-59605b382391-observations",
+        "title": "观测值、改正数与残差",
+        "columns": [
+          {
+            "key": "id",
+            "label": "观测号"
+          },
+          {
+            "key": "type",
+            "label": "类型"
+          },
+          {
+            "key": "fromTo",
+            "label": "起讫点"
+          },
+          {
+            "key": "observed",
+            "label": "观测值",
+            "numeric": true,
+            "decimals": 10
+          },
+          {
+            "key": "adjusted",
+            "label": "平差值",
+            "numeric": true,
+            "decimals": 10
+          },
+          {
+            "key": "unit",
+            "label": "值单位"
+          },
+          {
+            "key": "correction",
+            "label": "改正数",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "residual",
+            "label": "残差",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "residualUnit",
+            "label": "改正/残差单位"
+          },
+          {
+            "key": "screening",
+            "label": "残差筛查"
+          },
+          {
+            "key": "source",
+            "label": "原始定位"
+          }
+        ],
+        "rows": [
+          {
+            "id": "测段1",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.234,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.21022222222230602,
+            "residual": 0.21022222222230602,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-1"
+          },
+          {
+            "id": "测段2",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2339900000000001,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.2202222222221495,
+            "residual": -0.2202222222221495,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-2"
+          },
+          {
+            "id": "测段3",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23402,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.19022222222239704,
+            "residual": 0.19022222222239704,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-3"
+          },
+          {
+            "id": "测段4",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23401,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.2002222222222405,
+            "residual": -0.2002222222222405,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-4"
+          },
+          {
+            "id": "测段5",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23404,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.17022222222226602,
+            "residual": 0.17022222222226602,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-5"
+          },
+          {
+            "id": "测段6",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2340300000000002,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.18022222222210948,
+            "residual": -0.18022222222210948,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-6"
+          },
+          {
+            "id": "测段7",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23406,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.15022222222235704,
+            "residual": 0.15022222222235704,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-7"
+          },
+          {
+            "id": "测段8",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23405,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.1602222222222005,
+            "residual": -0.1602222222222005,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-8"
+          },
+          {
+            "id": "测段9",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23408,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.13022222222222601,
+            "residual": 0.13022222222222601,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-9"
+          },
+          {
+            "id": "测段10",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23407,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.14022222222229153,
+            "residual": -0.14022222222229153,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-10"
+          },
+          {
+            "id": "测段11",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.2341,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.11022222222231703,
+            "residual": 0.11022222222231703,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-11"
+          },
+          {
+            "id": "测段12",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2340900000000001,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.1202222222221605,
+            "residual": -0.1202222222221605,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-12"
+          },
+          {
+            "id": "测段13",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.2341199999999999,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.09022222222240806,
+            "residual": 0.09022222222240806,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-13"
+          },
+          {
+            "id": "测段14",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23411,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.10022222222225152,
+            "residual": -0.10022222222225152,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-14"
+          },
+          {
+            "id": "测段15",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23414,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.07022222222227703,
+            "residual": 0.07022222222227703,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-15"
+          },
+          {
+            "id": "测段16",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2341300000000002,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.0802222222221205,
+            "residual": -0.0802222222221205,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-16"
+          },
+          {
+            "id": "测段17",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23416,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.05022222222236805,
+            "residual": 0.05022222222236805,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-17"
+          },
+          {
+            "id": "测段18",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23415,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.06022222222221152,
+            "residual": -0.06022222222221152,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-18"
+          },
+          {
+            "id": "测段19",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23418,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.030222222222237027,
+            "residual": 0.030222222222237027,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-19"
+          },
+          {
+            "id": "测段20",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23417,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.04022222222230254,
+            "residual": -0.04022222222230254,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-20"
+          },
+          {
+            "id": "测段21",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.2342,
+            "adjusted": 1.2342102222222222,
+            "correction": 0.010222222222328048,
+            "residual": 0.010222222222328048,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-21"
+          },
+          {
+            "id": "测段22",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2341900000000001,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.020222222222171515,
+            "residual": -0.020222222222171515,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-22"
+          },
+          {
+            "id": "测段23",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23422,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.009777777777802976,
+            "residual": -0.009777777777802976,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-23"
+          },
+          {
+            "id": "测段24",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23421,
+            "adjusted": -1.2342102222222222,
+            "correction": -0.00022222222226253585,
+            "residual": -0.00022222222226253585,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-24"
+          },
+          {
+            "id": "测段25",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23424,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.029777777777711956,
+            "residual": -0.029777777777711956,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-25"
+          },
+          {
+            "id": "测段26",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2342300000000002,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.019777777777868488,
+            "residual": 0.019777777777868488,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-26"
+          },
+          {
+            "id": "测段27",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23426,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.049777777777620935,
+            "residual": -0.049777777777620935,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-27"
+          },
+          {
+            "id": "测段28",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23425,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.03977777777777747,
+            "residual": 0.03977777777777747,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-28"
+          },
+          {
+            "id": "测段29",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23428,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.06977777777775196,
+            "residual": -0.06977777777775196,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-29"
+          },
+          {
+            "id": "测段30",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23427,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.05977777777768645,
+            "residual": 0.05977777777768645,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-30"
+          },
+          {
+            "id": "测段31",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.2343,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.08977777777766094,
+            "residual": -0.08977777777766094,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-31"
+          },
+          {
+            "id": "测段32",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23429,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.07977777777781747,
+            "residual": 0.07977777777781747,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-32"
+          },
+          {
+            "id": "测段33",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23432,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.10977777777779196,
+            "residual": -0.10977777777779196,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-33"
+          },
+          {
+            "id": "测段34",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23431,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.09977777777772645,
+            "residual": 0.09977777777772645,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-34"
+          },
+          {
+            "id": "测段35",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23434,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.12977777777770094,
+            "residual": -0.12977777777770094,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-35"
+          },
+          {
+            "id": "测段36",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.2343300000000001,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.11977777777785747,
+            "residual": 0.11977777777785747,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-36"
+          },
+          {
+            "id": "测段37",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23436,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.14977777777760992,
+            "residual": -0.14977777777760992,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-37"
+          },
+          {
+            "id": "测段38",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23435,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.13977777777776645,
+            "residual": 0.13977777777776645,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-38"
+          },
+          {
+            "id": "测段39",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23438,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.16977777777774095,
+            "residual": -0.16977777777774095,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-39"
+          },
+          {
+            "id": "测段40",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23437,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.15977777777767543,
+            "residual": 0.15977777777767543,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-40"
+          },
+          {
+            "id": "测段41",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.2344,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.18977777777764993,
+            "residual": -0.18977777777764993,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-41"
+          },
+          {
+            "id": "测段42",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23439,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.17977777777780646,
+            "residual": 0.17977777777780646,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-42"
+          },
+          {
+            "id": "测段43",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23442,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.20977777777778095,
+            "residual": -0.20977777777778095,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-43"
+          },
+          {
+            "id": "测段44",
+            "type": "高差",
+            "fromTo": "P01 → BM01",
+            "observed": -1.23441,
+            "adjusted": -1.2342102222222222,
+            "correction": 0.19977777777771544,
+            "residual": 0.19977777777771544,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-44"
+          },
+          {
+            "id": "测段45",
+            "type": "高差",
+            "fromTo": "BM01 → P01",
+            "observed": 1.23444,
+            "adjusted": 1.2342102222222222,
+            "correction": -0.22977777777768993,
+            "residual": -0.22977777777768993,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-45"
+          }
+        ],
+        "note": "观测值与平差值保持 m / rad；线性改正数和残差以 mm 显示，角度以角秒显示。"
+      },
+      {
+        "id": "network_c386599c-6d41-438e-82e6-59605b382391-checks",
+        "title": "质量检查与复核状态",
+        "columns": [
+          {
+            "key": "id",
+            "label": "检查项"
+          },
+          {
+            "key": "status",
+            "label": "状态"
+          },
+          {
+            "key": "reason",
+            "label": "依据/缺项原因"
+          }
+        ],
+        "rows": [
+          {
+            "id": "来源绑定",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "原始记录覆盖",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "基准声明",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "外业检核",
+            "status": "未评估",
+            "reason": "测站原始读数未评估"
+          },
+          {
+            "id": "独立闭合检核",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "精度限差",
+            "status": "未评估",
+            "reason": "未配置精度限差"
+          },
+          {
+            "id": "数值结果",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "规范符合性",
+            "status": "未评估",
+            "reason": "适用规范和符合性未评估"
+          }
+        ]
+      },
+      {
+        "id": "version-appendix",
+        "title": "版本与证据摘要附录",
+        "columns": [
+          {
+            "key": "networkId",
+            "label": "网络编号"
+          },
+          {
+            "key": "kind",
+            "label": "版本项"
+          },
+          {
+            "key": "hash",
+            "label": "完整 SHA-256"
+          }
+        ],
+        "rows": [
+          {
+            "networkId": "network_c386599c-6d41-438e-82e6-59605b382391",
+            "kind": "输入",
+            "hash": "193fe1962ec6c2a73cc674b93f13cb31bebbedb085802366d07c533c64e245ef"
+          },
+          {
+            "networkId": "network_c386599c-6d41-438e-82e6-59605b382391",
+            "kind": "结果",
+            "hash": "8b494292af1bb6eb4be7c7dc13d122af45ae60230db54f9d42fcf15dff55ce48"
+          },
+          {
+            "networkId": "network_c386599c-6d41-438e-82e6-59605b382391",
+            "kind": "成果投影",
+            "hash": "ebf6b6af88dc20ca9516b23b3bec5396de8be8dd4bfd5490eaea785b7b3829fc"
+          }
+        ]
+      }
+    ],
+    "notes": [
+      "本成果由确定性计算结果投影生成，数值未由 AI 改写。",
+      "“未评估/不可用”表示当前资料或合同不足，不代表通过、合格或安全。",
+      "本稿未完成专业复核、审核、批准和签名；签认栏保留空白。",
+      "显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。"
+    ],
+    "signoff": [
+      {
+        "role": "编制",
+        "name": "",
+        "date": "",
+        "signature": ""
+      },
+      {
+        "role": "复核",
+        "name": "",
+        "date": "",
+        "signature": ""
+      },
+      {
+        "role": "批准",
+        "name": "",
+        "date": "",
+        "signature": ""
+      }
+    ]
+  },
+  "review": {
+    "schemaVersion": 1,
+    "projectionVersion": "survey-professional-review-1",
+    "projectId": "report-sample",
+    "networkId": "network_c386599c-6d41-438e-82e6-59605b382391",
+    "runId": "adjustment_92c41552-9952-4378-b2ed-e8bd06371525",
+    "resultId": "adjustment_result_bf6910d4-4846-43c4-9a75-3cfe6854d7df",
+    "inputHash": "193fe1962ec6c2a73cc674b93f13cb31bebbedb085802366d07c533c64e245ef",
+    "resultHash": "8b494292af1bb6eb4be7c7dc13d122af45ae60230db54f9d42fcf15dff55ce48",
+    "projectionHash": "ebf6b6af88dc20ca9516b23b3bec5396de8be8dd4bfd5490eaea785b7b3829fc",
+    "algorithmVersion": "workwise-survey-adjustment-8",
+    "resultCreatedAt": "2026-09-30T10:24:43.654Z",
+    "source": {
+      "networkRevision": 2,
+      "sha256": "435de418cb73135b017a169da9b4149084269e545c220d4404d4150161e24ec3",
+      "formatId": "workwise-json",
+      "name": "合成水准网.json",
+      "status": "bound",
+      "integrity": "verified",
+      "anchoredObservationCount": 45,
+      "missingAnchorObservationIds": []
+    },
+    "reference": {
+      "coordinateSystem": "独立高程网",
+      "projection": "无",
+      "ellipsoid": "不适用",
+      "verticalDatum": "1985 国家高程基准（合成样例声明）",
+      "linearUnit": "m",
+      "angularUnit": "rad",
+      "knownPoints": [
+        {
+          "id": "BM01",
+          "pointClass": "known",
+          "height": 100,
+          "known": true,
+          "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+        }
+      ],
+      "status": "declared"
+    },
+    "summary": {
+      "networkType": "leveling",
+      "observationCount": 45,
+      "pointCount": 2,
+      "degreesOfFreedom": 44,
+      "unitWeightStdDev": 0.06586391694664873,
+      "varianceFactor": 0.004338055555555042,
+      "varianceBasis": "a-posteriori",
+      "validation": "valid"
+    },
+    "closures": [
+      {
+        "id": "leveling-cycle:测段10",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段10",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23407,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-10"
+          }
+        ],
+        "sumObservedMetres": -0.0000700000000000145,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0000700000000000145,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段11",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段11",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.2341,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-11"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00009999999999998899,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00009999999999998899,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段12",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段12",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2340900000000001,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-12"
+          }
+        ],
+        "sumObservedMetres": -0.00009000000000014552,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00009000000000014552,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段13",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段13",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.2341199999999999,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-13"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00011999999999989797,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00011999999999989797,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段14",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段14",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23411,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-14"
+          }
+        ],
+        "sumObservedMetres": -0.0001100000000000545,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0001100000000000545,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段15",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段15",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23414,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-15"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.000140000000000029,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000140000000000029,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段16",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段16",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2341300000000002,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-16"
+          }
+        ],
+        "sumObservedMetres": -0.00013000000000018552,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00013000000000018552,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段17",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段17",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23416,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-17"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00015999999999993797,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00015999999999993797,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段18",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段18",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23415,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-18"
+          }
+        ],
+        "sumObservedMetres": -0.0001500000000000945,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0001500000000000945,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段19",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段19",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23418,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-19"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.000180000000000069,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000180000000000069,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段2",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段2",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2339900000000001,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-2"
+          }
+        ],
+        "sumObservedMetres": 0.000009999999999843467,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000009999999999843467,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段20",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段20",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23417,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-20"
+          }
+        ],
+        "sumObservedMetres": -0.00017000000000000348,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00017000000000000348,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段21",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段21",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.2342,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-21"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00019999999999997797,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00019999999999997797,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段22",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段22",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2341900000000001,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-22"
+          }
+        ],
+        "sumObservedMetres": -0.0001900000000001345,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0001900000000001345,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段23",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段23",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23422,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-23"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.000220000000000109,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000220000000000109,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段24",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段24",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23421,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-24"
+          }
+        ],
+        "sumObservedMetres": -0.00021000000000004349,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00021000000000004349,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段25",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段25",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23424,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-25"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00024000000000001798,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00024000000000001798,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段26",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段26",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2342300000000002,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-26"
+          }
+        ],
+        "sumObservedMetres": -0.0002300000000001745,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0002300000000001745,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段27",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段27",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23426,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-27"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00025999999999992696,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00025999999999992696,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段28",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段28",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23425,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-28"
+          }
+        ],
+        "sumObservedMetres": -0.0002500000000000835,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0002500000000000835,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段29",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段29",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23428,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-29"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.000280000000000058,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000280000000000058,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段3",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段3",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23402,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-3"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00001999999999990898,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00001999999999990898,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段30",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段30",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23427,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-30"
+          }
+        ],
+        "sumObservedMetres": -0.00026999999999999247,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00026999999999999247,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段31",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段31",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.2343,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-31"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00029999999999996696,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00029999999999996696,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段32",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段32",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23429,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-32"
+          }
+        ],
+        "sumObservedMetres": -0.0002900000000001235,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0002900000000001235,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段33",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段33",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23432,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-33"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.000320000000000098,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000320000000000098,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段34",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段34",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23431,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-34"
+          }
+        ],
+        "sumObservedMetres": -0.00031000000000003247,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00031000000000003247,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段35",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段35",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23434,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-35"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00034000000000000696,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00034000000000000696,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段36",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段36",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2343300000000001,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-36"
+          }
+        ],
+        "sumObservedMetres": -0.0003300000000001635,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0003300000000001635,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段37",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段37",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23436,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-37"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00035999999999991594,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00035999999999991594,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段38",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段38",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23435,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-38"
+          }
+        ],
+        "sumObservedMetres": -0.0003500000000000725,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0003500000000000725,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段39",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段39",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23438,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-39"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00038000000000004697,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00038000000000004697,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段4",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段4",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23401,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-4"
+          }
+        ],
+        "sumObservedMetres": -0.000010000000000065512,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.000010000000000065512,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段40",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段40",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23437,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-40"
+          }
+        ],
+        "sumObservedMetres": -0.00036999999999998145,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00036999999999998145,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段41",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段41",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.2344,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-41"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00039999999999995595,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00039999999999995595,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段42",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段42",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23439,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-42"
+          }
+        ],
+        "sumObservedMetres": -0.0003900000000001125,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.0003900000000001125,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段43",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段43",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23442,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-43"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00042000000000008697,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00042000000000008697,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段44",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段44",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23441,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-44"
+          }
+        ],
+        "sumObservedMetres": -0.00041000000000002146,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.00041000000000002146,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段45",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段45",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23444,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-45"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00043999999999999595,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00043999999999999595,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段5",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段5",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23404,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-5"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.000040000000000040004,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.000040000000000040004,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段6",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段6",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.2340300000000002,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-6"
+          }
+        ],
+        "sumObservedMetres": -0.000030000000000196536,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.000030000000000196536,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段7",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段7",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23406,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-7"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00005999999999994898,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00005999999999994898,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段8",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段1",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "observationId": "测段8",
+            "direction": 1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.23405,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-8"
+          }
+        ],
+        "sumObservedMetres": -0.000050000000000105516,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": -0.000050000000000105516,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      },
+      {
+        "id": "leveling-cycle:测段9",
+        "kind": "loop",
+        "from": "BM01",
+        "to": "BM01",
+        "members": [
+          {
+            "observationId": "测段9",
+            "direction": 1,
+            "from": "BM01",
+            "to": "P01",
+            "heightDifferenceMetres": 1.23408,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-9"
+          },
+          {
+            "observationId": "测段1",
+            "direction": -1,
+            "from": "P01",
+            "to": "BM01",
+            "heightDifferenceMetres": -1.234,
+            "routeLengthMetres": 250,
+            "sourceRecordId": "workwise-json-observation-1"
+          }
+        ],
+        "sumObservedMetres": 0.00008000000000008001,
+        "knownHeightDifferenceMetres": 0,
+        "misclosureMetres": 0.00008000000000008001,
+        "totalLengthMetres": 500,
+        "toleranceMetres": 0.005,
+        "toleranceBasis": "network.instrumentParameters.closureTolerance",
+        "status": "pass"
+      }
+    ],
+    "residualNorms": [
+      {
+        "unit": "m",
+        "value": 0.0008737835989406574,
+        "count": 45,
+        "status": "descriptive-only"
+      }
+    ],
+    "observations": [
+      {
+        "id": "测段1",
+        "observationId": "测段1",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.234,
+        "rawUnit": "m",
+        "observed": 1.234,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00021022222222230602,
+        "residual": 0.00021022222222230602,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-1",
+        "sourceLocator": "WorkWise JSON:network.observations[0]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.10511111111115301,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段2",
+        "observationId": "测段2",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2339900000000001,
+        "rawUnit": "m",
+        "observed": -1.2339900000000001,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.0002202222222221495,
+        "residual": -0.0002202222222221495,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-2",
+        "sourceLocator": "WorkWise JSON:network.observations[1]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.11011111111107474,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段3",
+        "observationId": "测段3",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23402,
+        "rawUnit": "m",
+        "observed": 1.23402,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00019022222222239704,
+        "residual": 0.00019022222222239704,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-3",
+        "sourceLocator": "WorkWise JSON:network.observations[2]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.09511111111119852,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段4",
+        "observationId": "测段4",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23401,
+        "rawUnit": "m",
+        "observed": -1.23401,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.0002002222222222405,
+        "residual": -0.0002002222222222405,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-4",
+        "sourceLocator": "WorkWise JSON:network.observations[3]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.10011111111112025,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段5",
+        "observationId": "测段5",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23404,
+        "rawUnit": "m",
+        "observed": 1.23404,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00017022222222226602,
+        "residual": 0.00017022222222226602,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-5",
+        "sourceLocator": "WorkWise JSON:network.observations[4]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.08511111111113301,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段6",
+        "observationId": "测段6",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2340300000000002,
+        "rawUnit": "m",
+        "observed": -1.2340300000000002,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.00018022222222210948,
+        "residual": -0.00018022222222210948,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-6",
+        "sourceLocator": "WorkWise JSON:network.observations[5]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.09011111111105474,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段7",
+        "observationId": "测段7",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23406,
+        "rawUnit": "m",
+        "observed": 1.23406,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00015022222222235704,
+        "residual": 0.00015022222222235704,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-7",
+        "sourceLocator": "WorkWise JSON:network.observations[6]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.07511111111117852,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段8",
+        "observationId": "测段8",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23405,
+        "rawUnit": "m",
+        "observed": -1.23405,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.0001602222222222005,
+        "residual": -0.0001602222222222005,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-8",
+        "sourceLocator": "WorkWise JSON:network.observations[7]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.08011111111110025,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段9",
+        "observationId": "测段9",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23408,
+        "rawUnit": "m",
+        "observed": 1.23408,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00013022222222222601,
+        "residual": 0.00013022222222222601,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-9",
+        "sourceLocator": "WorkWise JSON:network.observations[8]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.06511111111111301,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段10",
+        "observationId": "测段10",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23407,
+        "rawUnit": "m",
+        "observed": -1.23407,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.00014022222222229153,
+        "residual": -0.00014022222222229153,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-10",
+        "sourceLocator": "WorkWise JSON:network.observations[9]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.07011111111114576,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段11",
+        "observationId": "测段11",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.2341,
+        "rawUnit": "m",
+        "observed": 1.2341,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00011022222222231703,
+        "residual": 0.00011022222222231703,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-11",
+        "sourceLocator": "WorkWise JSON:network.observations[10]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.05511111111115852,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段12",
+        "observationId": "测段12",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2340900000000001,
+        "rawUnit": "m",
+        "observed": -1.2340900000000001,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.0001202222222221605,
+        "residual": -0.0001202222222221605,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-12",
+        "sourceLocator": "WorkWise JSON:network.observations[11]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.06011111111108025,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段13",
+        "observationId": "测段13",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.2341199999999999,
+        "rawUnit": "m",
+        "observed": 1.2341199999999999,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00009022222222240806,
+        "residual": 0.00009022222222240806,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-13",
+        "sourceLocator": "WorkWise JSON:network.observations[12]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.04511111111120403,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段14",
+        "observationId": "测段14",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23411,
+        "rawUnit": "m",
+        "observed": -1.23411,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.00010022222222225152,
+        "residual": -0.00010022222222225152,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-14",
+        "sourceLocator": "WorkWise JSON:network.observations[13]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.05011111111112576,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段15",
+        "observationId": "测段15",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23414,
+        "rawUnit": "m",
+        "observed": 1.23414,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00007022222222227703,
+        "residual": 0.00007022222222227703,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-15",
+        "sourceLocator": "WorkWise JSON:network.observations[14]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.035111111111138515,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段16",
+        "observationId": "测段16",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2341300000000002,
+        "rawUnit": "m",
+        "observed": -1.2341300000000002,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.0000802222222221205,
+        "residual": -0.0000802222222221205,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-16",
+        "sourceLocator": "WorkWise JSON:network.observations[15]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.04011111111106025,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段17",
+        "observationId": "测段17",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23416,
+        "rawUnit": "m",
+        "observed": 1.23416,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.00005022222222236805,
+        "residual": 0.00005022222222236805,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-17",
+        "sourceLocator": "WorkWise JSON:network.observations[16]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.025111111111184026,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段18",
+        "observationId": "测段18",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23415,
+        "rawUnit": "m",
+        "observed": -1.23415,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.00006022222222221152,
+        "residual": -0.00006022222222221152,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-18",
+        "sourceLocator": "WorkWise JSON:network.observations[17]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.03011111111110576,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段19",
+        "observationId": "测段19",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23418,
+        "rawUnit": "m",
+        "observed": 1.23418,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.000030222222222237027,
+        "residual": 0.000030222222222237027,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-19",
+        "sourceLocator": "WorkWise JSON:network.observations[18]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.015111111111118514,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段20",
+        "observationId": "测段20",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23417,
+        "rawUnit": "m",
+        "observed": -1.23417,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.00004022222222230254,
+        "residual": -0.00004022222222230254,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-20",
+        "sourceLocator": "WorkWise JSON:network.observations[19]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.02011111111115127,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段21",
+        "observationId": "测段21",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.2342,
+        "rawUnit": "m",
+        "observed": 1.2342,
+        "adjusted": 1.2342102222222222,
+        "correction": 0.000010222222222328048,
+        "residual": 0.000010222222222328048,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-21",
+        "sourceLocator": "WorkWise JSON:network.observations[20]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.005111111111164024,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段22",
+        "observationId": "测段22",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2341900000000001,
+        "rawUnit": "m",
+        "observed": -1.2341900000000001,
+        "adjusted": -1.2342102222222222,
+        "correction": -0.000020222222222171515,
+        "residual": -0.000020222222222171515,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-22",
+        "sourceLocator": "WorkWise JSON:network.observations[21]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.010111111111085758,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段23",
+        "observationId": "测段23",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23422,
+        "rawUnit": "m",
+        "observed": 1.23422,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.000009777777777802976,
+        "residual": -0.000009777777777802976,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-23",
+        "sourceLocator": "WorkWise JSON:network.observations[22]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.004888888888901488,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段24",
+        "observationId": "测段24",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23421,
+        "rawUnit": "m",
+        "observed": -1.23421,
+        "adjusted": -1.2342102222222222,
+        "correction": -2.2222222226253585e-7,
+        "residual": -2.2222222226253585e-7,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-24",
+        "sourceLocator": "WorkWise JSON:network.observations[23]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.00011111111113126793,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段25",
+        "observationId": "测段25",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23424,
+        "rawUnit": "m",
+        "observed": 1.23424,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.000029777777777711956,
+        "residual": -0.000029777777777711956,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-25",
+        "sourceLocator": "WorkWise JSON:network.observations[24]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.014888888888855978,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段26",
+        "observationId": "测段26",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2342300000000002,
+        "rawUnit": "m",
+        "observed": -1.2342300000000002,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.000019777777777868488,
+        "residual": 0.000019777777777868488,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-26",
+        "sourceLocator": "WorkWise JSON:network.observations[25]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.009888888888934244,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段27",
+        "observationId": "测段27",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23426,
+        "rawUnit": "m",
+        "observed": 1.23426,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.000049777777777620935,
+        "residual": -0.000049777777777620935,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-27",
+        "sourceLocator": "WorkWise JSON:network.observations[26]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.024888888888810468,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段28",
+        "observationId": "测段28",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23425,
+        "rawUnit": "m",
+        "observed": -1.23425,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00003977777777777747,
+        "residual": 0.00003977777777777747,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-28",
+        "sourceLocator": "WorkWise JSON:network.observations[27]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.019888888888888734,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段29",
+        "observationId": "测段29",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23428,
+        "rawUnit": "m",
+        "observed": 1.23428,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00006977777777775196,
+        "residual": -0.00006977777777775196,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-29",
+        "sourceLocator": "WorkWise JSON:network.observations[28]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.03488888888887598,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段30",
+        "observationId": "测段30",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23427,
+        "rawUnit": "m",
+        "observed": -1.23427,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00005977777777768645,
+        "residual": 0.00005977777777768645,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-30",
+        "sourceLocator": "WorkWise JSON:network.observations[29]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.029888888888843224,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段31",
+        "observationId": "测段31",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.2343,
+        "rawUnit": "m",
+        "observed": 1.2343,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00008977777777766094,
+        "residual": -0.00008977777777766094,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-31",
+        "sourceLocator": "WorkWise JSON:network.observations[30]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.04488888888883047,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段32",
+        "observationId": "测段32",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23429,
+        "rawUnit": "m",
+        "observed": -1.23429,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00007977777777781747,
+        "residual": 0.00007977777777781747,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-32",
+        "sourceLocator": "WorkWise JSON:network.observations[31]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.039888888888908736,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段33",
+        "observationId": "测段33",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23432,
+        "rawUnit": "m",
+        "observed": 1.23432,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00010977777777779196,
+        "residual": -0.00010977777777779196,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-33",
+        "sourceLocator": "WorkWise JSON:network.observations[32]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.05488888888889598,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段34",
+        "observationId": "测段34",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23431,
+        "rawUnit": "m",
+        "observed": -1.23431,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00009977777777772645,
+        "residual": 0.00009977777777772645,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-34",
+        "sourceLocator": "WorkWise JSON:network.observations[33]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.049888888888863225,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段35",
+        "observationId": "测段35",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23434,
+        "rawUnit": "m",
+        "observed": 1.23434,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00012977777777770094,
+        "residual": -0.00012977777777770094,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-35",
+        "sourceLocator": "WorkWise JSON:network.observations[34]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.06488888888885047,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段36",
+        "observationId": "测段36",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.2343300000000001,
+        "rawUnit": "m",
+        "observed": -1.2343300000000001,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00011977777777785747,
+        "residual": 0.00011977777777785747,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-36",
+        "sourceLocator": "WorkWise JSON:network.observations[35]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.05988888888892874,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段37",
+        "observationId": "测段37",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23436,
+        "rawUnit": "m",
+        "observed": 1.23436,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00014977777777760992,
+        "residual": -0.00014977777777760992,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-37",
+        "sourceLocator": "WorkWise JSON:network.observations[36]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.07488888888880496,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段38",
+        "observationId": "测段38",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23435,
+        "rawUnit": "m",
+        "observed": -1.23435,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00013977777777776645,
+        "residual": 0.00013977777777776645,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-38",
+        "sourceLocator": "WorkWise JSON:network.observations[37]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.06988888888888323,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段39",
+        "observationId": "测段39",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23438,
+        "rawUnit": "m",
+        "observed": 1.23438,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00016977777777774095,
+        "residual": -0.00016977777777774095,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-39",
+        "sourceLocator": "WorkWise JSON:network.observations[38]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.08488888888887047,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段40",
+        "observationId": "测段40",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23437,
+        "rawUnit": "m",
+        "observed": -1.23437,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00015977777777767543,
+        "residual": 0.00015977777777767543,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-40",
+        "sourceLocator": "WorkWise JSON:network.observations[39]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.07988888888883772,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段41",
+        "observationId": "测段41",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.2344,
+        "rawUnit": "m",
+        "observed": 1.2344,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00018977777777764993,
+        "residual": -0.00018977777777764993,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-41",
+        "sourceLocator": "WorkWise JSON:network.observations[40]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.09488888888882496,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段42",
+        "observationId": "测段42",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23439,
+        "rawUnit": "m",
+        "observed": -1.23439,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00017977777777780646,
+        "residual": 0.00017977777777780646,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-42",
+        "sourceLocator": "WorkWise JSON:network.observations[41]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.08988888888890323,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段43",
+        "observationId": "测段43",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23442,
+        "rawUnit": "m",
+        "observed": 1.23442,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00020977777777778095,
+        "residual": -0.00020977777777778095,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-43",
+        "sourceLocator": "WorkWise JSON:network.observations[42]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.10488888888889047,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段44",
+        "observationId": "测段44",
+        "type": "height-difference",
+        "from": "P01",
+        "to": "BM01",
+        "rawValue": -1.23441,
+        "rawUnit": "m",
+        "observed": -1.23441,
+        "adjusted": -1.2342102222222222,
+        "correction": 0.00019977777777771544,
+        "residual": 0.00019977777777771544,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-44",
+        "sourceLocator": "WorkWise JSON:network.observations[43]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.09988888888885772,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      },
+      {
+        "id": "测段45",
+        "observationId": "测段45",
+        "type": "height-difference",
+        "from": "BM01",
+        "to": "P01",
+        "rawValue": 1.23444,
+        "rawUnit": "m",
+        "observed": 1.23444,
+        "adjusted": 1.2342102222222222,
+        "correction": -0.00022977777777768993,
+        "residual": -0.00022977777777768993,
+        "unit": "m",
+        "sourceRecordId": "workwise-json-observation-45",
+        "sourceLocator": "WorkWise JSON:network.observations[44]",
+        "outlierCandidate": false,
+        "screening": {
+          "schemaVersion": 1,
+          "method": "observation-sigma-ratio",
+          "scaleBasis": "declared-prior",
+          "scope": "descriptive-screening",
+          "significance": "not-evaluated",
+          "status": "available",
+          "value": 0.11488888888884496,
+          "threshold": 3,
+          "thresholdExceeded": false
+        },
+        "screeningStatus": "available"
+      }
+    ],
+    "points": [
+      {
+        "id": "BM01",
+        "role": "known",
+        "height": 100,
+        "precisionBasis": "not-recorded",
+        "unit": "m"
+      },
+      {
+        "id": "P01",
+        "role": "unknown",
+        "height": 101.23421022222222,
+        "correctionHeight": 0.2342102222222223,
+        "standardError": 0.000019636826074280926,
+        "precisionBasis": "a-posteriori",
+        "unit": "m"
+      }
+    ],
+    "weakestPoint": {
+      "status": "available",
+      "criterion": "largest-reported-point-standard-error",
+      "pointId": "P01",
+      "standardErrorMetres": 0.000019636826074280926
+    },
+    "weakestEdge": {
+      "status": "not-evaluated",
+      "reason": "cross-covariance-unavailable"
+    },
+    "checks": [
+      {
+        "id": "source-binding",
+        "status": "pass"
+      },
+      {
+        "id": "source-coverage",
+        "status": "pass"
+      },
+      {
+        "id": "reference",
+        "status": "pass"
+      },
+      {
+        "id": "field-checks",
+        "status": "not-evaluated",
+        "reason": "station-readings-not-evaluated"
+      },
+      {
+        "id": "closure",
+        "status": "pass"
+      },
+      {
+        "id": "precision",
+        "status": "not-evaluated",
+        "reason": "precision-tolerance-not-configured"
+      },
+      {
+        "id": "numerical-result",
+        "status": "pass"
+      },
+      {
+        "id": "standards",
+        "status": "not-evaluated",
+        "reason": "standards-not-evaluated"
+      }
+    ],
+    "reviewStatus": "unsigned",
+    "standardsConformity": "not-evaluated"
+  }
+}

@@ -6,6 +6,8 @@ import { expect, it } from 'vitest'
 import { SurveyFormatRegistry } from '../../../../../kun/src/engineering/survey-format-registry'
 import { surveyDiagnosticText, surveyLegacyDiagnosticText } from './survey-diagnostic-text'
 
+const implementationVocabulary = /P0|格式目录|格式受理目录|解析对象|策略校验|workwise-survey-format-catalog|WorkWise JSON|networkType|transformType|sigmaUnit|textEncoding|fixture|合同|契约|哈希|解析器|frozen|contract|SourceFile|preservedRawFields|F-FMT|physical lex|semantic pars|golden/i
+
 it('renders all shipped source-file fixture diagnostics in English without rewriting raw evidence', async () => {
   const root = fileURLToPath(new URL('../../../../../kun/src/engineering/fixtures/survey-formats/', import.meta.url))
   const registry = new SurveyFormatRegistry()
@@ -19,9 +21,12 @@ it('renders all shipped source-file fixture diagnostics in English without rewri
     const original = JSON.stringify(source)
     for (const diagnostic of source.diagnostics) {
       for (const field of ['message', 'action'] as const) {
-        expect.soft(surveyDiagnosticText(diagnostic, 'en', field), `${entry.name}: ${diagnostic.code} ${field}`).not.toMatch(/\p{Script=Han}/u)
+        const english = surveyDiagnosticText(diagnostic, 'en', field)
+        expect.soft(english, `${entry.name}: ${diagnostic.code} ${field}`).not.toMatch(/\p{Script=Han}/u)
+        expect.soft(english, `${entry.name}: English ${field}`).not.toMatch(implementationVocabulary)
+        expect.soft(surveyDiagnosticText(diagnostic, 'zh', field), `${entry.name}: Chinese ${field}`).not.toMatch(implementationVocabulary)
       }
-      expect(surveyDiagnosticText(diagnostic, 'zh')).toBe(diagnostic.message)
+      expect(surveyDiagnosticText(diagnostic, 'zh').trim()).not.toBe('')
     }
     expect.soft(source.dispositionReasonEn ?? surveyLegacyDiagnosticText(source.dispositionReason ?? '', 'en'), `${entry.name}: disposition`).not.toMatch(/\p{Script=Han}/u)
     expect(JSON.stringify(source)).toBe(original)
@@ -83,9 +88,12 @@ it('renders rejected frozen JSON and truncated RTCM diagnostics without changing
     const before = JSON.stringify(source)
     for (const diagnostic of source.diagnostics) {
       for (const field of ['message', 'action'] as const) {
-        expect.soft(surveyDiagnosticText(diagnostic, 'en', field), `${input.name}: ${diagnostic.code} ${field}`).not.toMatch(/\p{Script=Han}/u)
+        const english = surveyDiagnosticText(diagnostic, 'en', field)
+        expect.soft(english, `${input.name}: ${diagnostic.code} ${field}`).not.toMatch(/\p{Script=Han}/u)
+        expect.soft(english, `${input.name}: English ${field}`).not.toMatch(implementationVocabulary)
+        expect.soft(surveyDiagnosticText(diagnostic, 'zh', field), `${input.name}: Chinese ${field}`).not.toMatch(implementationVocabulary)
       }
-      expect(surveyDiagnosticText(diagnostic, 'zh')).toBe(diagnostic.message)
+      expect(surveyDiagnosticText(diagnostic, 'zh').trim()).not.toBe('')
     }
     expect.soft(source.dispositionReasonEn ?? surveyLegacyDiagnosticText(source.dispositionReason ?? '', 'en'), input.name).not.toMatch(/\p{Script=Han}/u)
     expect(JSON.stringify(source)).toBe(before)
@@ -94,7 +102,7 @@ it('renders rejected frozen JSON and truncated RTCM diagnostics without changing
 
 it('keeps Chinese duplicate IDs and custom unit labels verbatim inside translated rejection messages', () => {
   const point = '控制点等 12 个'
-  expect(surveyLegacyDiagnosticText(`WorkWise JSON 已知点/未知点中存在重复点号 ${point}；点位映射不唯一，不能进入平差。`, 'en')).toBe(`WorkWise JSON known/unknown points contain duplicate IDs ${point}. Point mapping is ambiguous and adjustment is blocked.`)
+  expect(surveyLegacyDiagnosticText(`WorkWise JSON 已知点/未知点中存在重复点号 ${point}；点位映射不唯一，不能进入平差。`, 'en')).toBe(`Known and unknown points contain duplicate point identifiers ${point}. Observations cannot be assigned unambiguously and adjustment is blocked. Check the records and use unique point identifiers.`)
   const unit = '现场单位'
   expect(surveyLegacyDiagnosticText(`WorkWise JSON 网络坐标/高程单位 ${unit} 尚无冻结的点位换算合同；不得把点位数值标记为米制或进入平差。`, 'en')).toContain(unit)
 })

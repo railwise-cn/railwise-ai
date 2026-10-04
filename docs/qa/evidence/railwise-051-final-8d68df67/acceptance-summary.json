@@ -1,0 +1,183 @@
+{
+  "recordedAt": "2026-09-27T15:05:46.506464+00:00",
+  "candidate": 162,
+  "packageVersion": "0.5.1",
+  "packageSource": "8d68df67c16e3020c83dabf2f23f5a403ca5d257",
+  "publicReleaseApproved": false,
+  "userAcceptanceCompleted": false,
+  "scopedChecksCompleted": true,
+  "professionalExplanationAccepted": false,
+  "knownIssue": "variance factor 1.14e-8 described as four orders of magnitude; variance should be about eight, standard deviation about four",
+  "turns": [
+    {
+      "turnId": "turn_kzqucr16",
+      "toolResults": [
+        {
+          "toolName": "survey_read_context",
+          "isError": false,
+          "status": null
+        }
+      ],
+      "errorCount": 0,
+      "answerCharacters": 2097
+    },
+    {
+      "turnId": "turn_rzemn9y9",
+      "toolResults": [
+        {
+          "toolName": "survey_read_evidence",
+          "isError": false,
+          "status": "resolved"
+        },
+        {
+          "toolName": "survey_read_context",
+          "isError": false,
+          "status": null
+        }
+      ],
+      "errorCount": 0,
+      "answerCharacters": 2288
+    },
+    {
+      "turnId": "turn_m52x0qrf",
+      "toolResults": [
+        {
+          "toolName": "survey_read_evidence",
+          "isError": false,
+          "status": "resolved"
+        },
+        {
+          "toolName": "survey_read_context",
+          "isError": false,
+          "status": null
+        }
+      ],
+      "errorCount": 0,
+      "answerCharacters": 2027
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "01-installed-system-dark.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "42f6f917492344fedc5a843583e3ce51712d23ff1153b30c41a0cf2f541edb55"
+    },
+    {
+      "file": "02-negative-file-blocked.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "a5e27807b78a9615330e1420b71a49c017c2b62d1b3faea02d629bdb1f9bd5a2"
+    },
+    {
+      "file": "03-source-record.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "13da1976ca118c48d9908842c1e770707e533804f3f4dce6c9f90c7d36019d26"
+    },
+    {
+      "file": "04-legacy-readback.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "35ace8b13103227dc21336bc61b290436b899138fa925b83a65b16ab6b3c00f5"
+    },
+    {
+      "file": "05-typed-readback.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "c22b6e5d6472d5d28fb71ce6fc35ca055bcc577ed9b76d84161efc8953bbb755"
+    },
+    {
+      "file": "06-system-theme-setting.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "b12927e6e087ebe448819788f6cee2ee7208ee02ee780c1295cebc3e225a4182"
+    },
+    {
+      "file": "07-light-normal.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "e5e26c88c56b8082d05ab08903056c60d22072b65eca3aaa27f93da551b4d0f6"
+    },
+    {
+      "file": "08-light-minimum.jpg",
+      "pixelSize": [
+        1920,
+        1280
+      ],
+      "sha256": "ea40f5492df9c71d739922538bafdfbf04bdfe9b97bc8c6ccca70125b6974d8a"
+    },
+    {
+      "file": "09-light-maximum.jpg",
+      "pixelSize": [
+        3840,
+        1960
+      ],
+      "sha256": "b73d165de2106a01b960abf469c5c09b61dad63d075b60f1ca30221011044cc1"
+    },
+    {
+      "file": "10-dark-maximum.jpg",
+      "pixelSize": [
+        3840,
+        1960
+      ],
+      "sha256": "9b60d89b8b9cb9a81f91d37c678651d177b8a3c52c1da9e5eefe12beb3549515"
+    },
+    {
+      "file": "11-dark-normal.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "f418babd9ba16622c54be86cff51d51bcb65fab33650b47cf391610d2348e16e"
+    },
+    {
+      "file": "12-dark-minimum.jpg",
+      "pixelSize": [
+        1920,
+        1280
+      ],
+      "sha256": "72e75981d4953005fe09bf39bc14b3cb928c404edefa5e5eb25ad9c511393d3d"
+    },
+    {
+      "file": "14-restarted-system-dark.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "10030f635101645d47341797055175578eafd578d4a5c3da3867baf2a7cb8ed8"
+    },
+    {
+      "file": "15-post-restart-readback.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "1c28a2c6a1e4115eaa6411470c057dbe6bae23cc2f46ee470ca52e772bf699ee"
+    },
+    {
+      "file": "16-final-review.jpg",
+      "pixelSize": [
+        2560,
+        1680
+      ],
+      "sha256": "c2ee50e6b651a4d0fe88cf40ad791b1a02a40cee0a05b0c6c76f12aad26c0a18"
+    }
+  ],
+  "restartBusinessDataUnchanged": true,
+  "readbackBusinessDataUnchanged": true
+}

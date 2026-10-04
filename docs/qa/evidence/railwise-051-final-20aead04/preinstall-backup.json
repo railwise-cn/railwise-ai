@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-09-27T20:22:40.817993+00:00",
+  "location": "/private/tmp/railwise-pre166-backup/business-databases",
+  "method": "read-only SQLite backup API; local 0700 directory and 0600 files",
+  "databases": [
+    {
+      "file": "engineering-ai.sqlite3",
+      "bytes": 57344,
+      "sha256": "145b5e0414dec45bb8cec56d466edb929dcefb4775ae0ca7dac0a229fdb9f52a"
+    },
+    {
+      "file": "engineering.sqlite3",
+      "bytes": 122880,
+      "sha256": "3eb6f0311ed24d7675acb3a64d6c0d5eb1fca81def79bb68eb721348ba7f3207"
+    },
+    {
+      "file": "survey-advanced-trials.sqlite3",
+      "bytes": 20480,
+      "sha256": "a74fb1038dcfa5a25497ae5ab012298ec6fb1b334f0f0fa0eb16074702c712b7"
+    },
+    {
+      "file": "survey-quality-assessment.sqlite3",
+      "bytes": 36864,
+      "sha256": "ff46167137cedae1f261184a3ab7bc6251ef95414e4275c19987f28f60046fad"
+    },
+    {
+      "file": "survey-quality-scoring.sqlite3",
+      "bytes": 20480,
+      "sha256": "461cda0b6500257ae57c147fd73689bfd7ecb17d231e52bac3851c940a1adc90"
+    },
+    {
+      "file": "survey-quality-workflow.sqlite3",
+      "bytes": 32768,
+      "sha256": "0f9c76135beb141197c6c43052735847946d09b6dbe62c158f4c60cc173280d6"
+    },
+    {
+      "file": "survey-quality.sqlite3",
+      "bytes": 61440,
+      "sha256": "b5f6eb752131f5a8fef40d8b08a042ad75a2b094a8b03d08d0b4d913254904e5"
+    },
+    {
+      "file": "survey-sampling.sqlite3",
+      "bytes": 40960,
+      "sha256": "64dfca78c90a9ecdbea5564a93f3e552a15a9ed3ac8da8600688501d56bb91c4"
+    },
+    {
+      "file": "survey.sqlite3",
+      "bytes": 282624,
+      "sha256": "613bd3c99374c89ae4b06974987fc5a8a31054cd4254ce1a4da68913c95571dc"
+    }
+  ]
+}

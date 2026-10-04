@@ -353,19 +353,21 @@ export function WorkMetaRow({
 }
 
 /**
- * Tiny mono "via <model>" tag rendered above the user message body. Subtle by
- * design — no pill, no ring, just faint monospaced text right-aligned at the
- * top of the bubble. Hidden when there's no model selection to surface.
+ * Model metadata is retained in the block for routing and diagnostics, but is
+ * hidden from conversation surfaces by default. Product-facing conversations
+ * should describe the result and its evidence, not the model implementation.
  */
 export function ModelMetaTag({
   label,
-  className = ''
+  className = '',
+  visible = false
 }: {
   label?: string
   className?: string
+  visible?: boolean
 }): ReactElement | null {
   const { t } = useTranslation('common')
-  if (!label) return null
+  if (!visible || !label) return null
   return (
     <div
       className={`flex min-w-0 text-right ${className}`.trim()}

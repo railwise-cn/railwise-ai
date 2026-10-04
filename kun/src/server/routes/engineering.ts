@@ -122,6 +122,12 @@ export async function inspectCosaSurveyFileGroups(request: Request): Promise<Jso
   } catch (error) { return mapSurveyError(error) }
 }
 
+export async function probeSurveyTabular(service: SurveyService | undefined, request: Request): Promise<JsonResponse | Response> {
+  if (!service) return ERRORS.unavailable('survey adjustment service is unavailable')
+  const body = await readJsonBody(request); if (!body.ok) return body.response
+  try { return jsonResponse({ probe: await service.probeTabular(body.value) }) } catch (error) { return mapSurveyError(error) }
+}
+
 export function listSurveyNetworks(service: SurveyService | undefined, projectId?: string): JsonResponse {
   if (!service) return ERRORS.unavailable('survey adjustment service is unavailable')
   return jsonResponse({
@@ -186,6 +192,14 @@ export async function createAdjustment(service: SurveyService | undefined, reque
 export function getAdjustment(service: SurveyService | undefined, id: string): JsonResponse {
   if (!service) return ERRORS.unavailable('survey adjustment service is unavailable')
   const adjustment = service.getAdjustment(id); return adjustment ? jsonResponse(adjustment) : ERRORS.notFound(`adjustment not found: ${id}`)
+}
+
+export function getSurveyProfessionalReview(service: SurveyService | undefined, id: string): JsonResponse {
+  if (!service) return ERRORS.unavailable('survey adjustment service is unavailable')
+  try {
+    const review = service.getProfessionalReview(id)
+    return review ? jsonResponse({ review }) : ERRORS.notFound(`adjustment professional review not found: ${id}`)
+  } catch (error) { return mapSurveyError(error) }
 }
 
 export function listAdjustments(service: SurveyService | undefined, projectId?: string): JsonResponse {

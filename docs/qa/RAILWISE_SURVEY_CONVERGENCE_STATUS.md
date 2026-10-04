@@ -1,5 +1,95 @@
 # RailWise AI / Survey 总计划执行台账
 
+## 2026-10-04 当前源快照与验收状态
+
+当前源码已修复 Runtime 重连期间测量摘要空响应造成的状态错位：空网络或空平差列表会沿用同一工作区/项目最近一次有效快照，切换项目或工作区时清空快照。`EngineeringWorkspaceView.dom.test.ts` 的回归为 64/64。重新构建的私有候选 `0.5.1` arm64 app.asar SHA-256 为 `023ca43ca76ba88ac9dfd54c00aca1cd8ea188678e5993d9dbb734db65e619dd`；ASAR、构建新鲜度、品牌边界、ad-hoc 签名结构和 OpenSpec strict 检查通过。
+
+这只闭合源码和定向回归，不闭合完整安装包验收。当前 CUA/独立 AI 复核覆盖中文、深色、宽窗口；英文、明亮、窄窗口、隔离来源数据恢复、更新往返和完整无障碍清单仍未完成。本机默认数据根启动还暴露了一个“结果已生成但当前没有测量来源”的旧工程快照，因此必须用冻结且绑定来源的隔离数据重新跑候选，才能勾选 4.2。4.4 仍是授权 COSA/SUC 对算、真实设备/格式互操作和真实角色专业签认门禁。
+
+## 2026-10-02 专业用户界面展示隔离
+
+针对独立 AI 工程师审查发现的产品级问题，Survey 会话新增展示层专业化投影：默认回答隐藏模型名称、工具调用计数、TaskRun/执行回执、计划编号、上下文/来源哈希、修订标识和内部证据协议；保留结果数值、单位、异常、依据与下一步建议。Typed Plan 默认折叠，执行方案仅在高级区域按需展开。原始消息、审计记录、哈希和运行合同未删除，仍可用于高级追溯。专业回答过滤、计划摘要和 Survey AI DOM 定向 64 项通过，桌面类型检查、OpenSpec 12/12 与 `git diff --check` 通过。该修复尚未重新打包当前候选，因此 4.2 精确包 CUA 验收仍未关闭；4.4 真实 COSA/SUC 对算与专业角色签认仍未完成。
+
+## 2026-10-02 论文对照缺口的首轮实现复核
+
+依据 Baarda (1968) 与 Lösler、Eschelbach、Haas (2017) 的验收判据，本轮把报告中三个可由源码闭合的差距拆成增量并复核：
+
+- `SurveyProfessionalReviewV1` 新增可选 solver 投影，输出 rank、参数数、代数 datum defect、约束语义和基准状态；明确不把代数缺陷当作物理稳定或规范结论。旧 review JSON 仍兼容，专业 review/numerical 21 项和 DOM 12 项通过。
+- 两期测段比较新增 `observationIdentifiability`。共同控制点不足、测段未连接共同控制点或两期原始观测缺 sigma/covariance 时返回 `unavailable`，状态纳入新 input hash；旧比较记录按 legacy hash 重放。监测/成果相关定向测试和 Runtime typecheck 通过。连续性投影仍按各比较记录携带状态，尚未实现原始观测自由网同类分析。
+- 广义 w 与统计家族结果新增可追溯 statistical declaration：H0/H1 范围、target power（当前未声明时为 null）、模型/协方差版本、检验家族来源与 alpha/校正、人工复核声明；高级结果页在折叠详情中展示这些字段。旧调用会显式输出 `not-evaluated`，保留 `trial-only`、`decision=not-evaluated`、`observationAction=none`。三个 Runtime 文件 333 项测试通过；尚未接入项目级功效验证、复测与人工审批闭环。
+
+本轮源码验证：`npm --prefix kun run typecheck`、`npm run typecheck` 通过；未重打包候选，未改变版本、tag、Release、stable feed 或官网。精确 `be1d6fef` 包仍因当前主机 LaunchServices/AppKit 阻断无法完成 CUA；OpenSpec 4.2、4.4 继续保持未完成。
+
+## 2026-10-02 论文对照工程验收与来源绑定修复
+
+以工程测量算法与成果审查工程师角色阅读并对照了 Baarda (1968)《A Testing Procedure for Use in Geodetic Networks》和 Lösler、Eschelbach、Haas (2017)《Kongruenzanalyse auf der Basis originärer Beobachtungen》。论文证据、核读范围和限制见[论文对照验收报告](evidence/survey-acceptance-be1d6fef/paper-based-engineering-acceptance-20261002.md)及[来源登记](evidence/railwise-advanced-methods-20260920/sources.json)。结论：只读自由水准试算、完整协方差广义 w、多重比较边界、固定基准结果和多期来源追溯已有源码/测试证据；正式成果尚未完整报告自由网基准亏损，期次比较尚未实现原始观测层参考点稳定性分析，统计输出仍明确为试验性、未作工程判定。
+
+本轮还修复专业投影的来源绑定：网络快照哈希始终由当前快照重新计算，`expectedInputHash` 只能额外校验，不能覆盖实际哈希；兼容历史 `pointClass=known` 控制点语义。8 个专业数值/统计测试文件 434 项通过，Runtime typecheck、Runtime build 和 `git diff --check` 通过。该修复发生在 `be1d6fef` 候选 ZIP 生成之后，尚未重打包，因此不关闭 OpenSpec 4.2；4.4 仍等待当前授权 COSA/SUC 对算材料和真实专业角色签认。
+
+## 2026-10-01 当前源码候选与验收阻断
+
+私有候选源码 `be1d6fef2e070a4996c14ec9413a331292e246f0` 生成 `0.5.1` macOS arm64 ZIP，SHA-256 为 `d2d20680d64d8a70cb6c160947e024a7e6ae72ff238129fe2b63e71d0236f6b3`。ZIP、ASAR 和 ad-hoc 签名验证通过；未公证。桌面和 Runtime 类型检查、XLSX importer 9/9、Survey 面板 DOM 52/52 通过。已修复 XLSX 摘要锚点错标 ZIP 偏移、放宽 worksheet relationship URI 后缀判断这两处问题。
+
+候选从 ZIP 解压到隔离目录后，macOS `open -n` 返回 `kLSNoExecutableErr (-10827)`，直接执行在 AppKit 初始化阶段 exit 134，CUA 选择精确候选超时 `-10005`。因此当前包无截图、无 CUA 功能通过结论，OpenSpec 4.2 保持未勾。DMG 阶段遇到默认 electron-builder 缓存目录 `EPERM`，已用项目 ZIP 脚本封装现有 app bundle。未更改 Spotlight/LaunchServices 系统设置，未做 updater round-trip、未公证、未公开发布。完整工件和阻断证据见[本轮验收记录](evidence/survey-acceptance-be1d6fef/README.md)。4.4 仍需当前授权 COSA/SUC 对算材料和真实专业角色签认。
+
+## 2026-10-01 私有候选阻断与闭合误报修复
+
+本轮精确候选 `23856736cd7283a241aeb62c7f89b3f128807f1a` 为 `0.5.1` arm64 私有包，ZIP SHA-256 为 `6d57789eea5d0450bebc5d1b93cb8ccd18f0dc61c081b2fad5c6341d71a232ec`；ZIP CRC、ASAR完整性与 ad-hoc code signature 验证通过，未公证。computer-use 启动时，Spotlight 在 `/` 与 Data 卷均显示 disabled，候选及历史应用 `lsregister -lint` 均为 `-10822 from spotlight`，候选崩溃于 `NSApplication` 初始化；因此本机未得到该精确包的可用 CUA 截图，不能勾选 4.2。旧候选截图不冒充本包证据。详细记录见[候选诊断](evidence/survey-acceptance-23856736cd72/README.md)。
+
+独立 AI 工程测量/软件复核发现原闭合快捷路径会把拼接的多个环合并，正负误差可能抵消。本地源码现在按连通分量生成独立基本闭环与附合路线，也检查无已知控制点的闭合分量；新增误差抵消、无控制闭环、乱序附合路线回归。专业投影 11/11 测试、Runtime typecheck、OpenSpec 12/12 与 `git diff --check` 通过。SQLite 集成回归有 14 项因本机 better-sqlite3 ABI 148/Node ABI 147 无法加载；未绕过 npm 安装脚本策略。该修复尚未进入 `238567...` 候选，需在主机服务可用后重新冻结和验收。
+
+## 2026-10-01 质量生命周期与专业成果补强
+
+质量工作流新增版本化阶段和外部门禁：规划、过程、最终、验收必须按顺序以追加事件记录；规范适用性可声明、撤销；整改复查、签认声明和交付审批请求均保留来源绑定。Runtime 现在返回 `qualityGate`，只表示 `not-evaluated`、`blocked` 或 `ready-for-external-approval`；即使满足软件侧资格，也继续保持 `deliveryApproval=not-granted`、`reviewStatus=draft`，不会把本地声明伪装成规范符合或专业签章。生命周期倒序、未完成验收、规则撤销、签认撤销、未解决问题和审批缺少有效签认均有回归覆盖。
+
+专业成果网形索引新增测段长度、观测方向、起讫点、闭合/附合路径及原始记录定位，并同步 DOCX/PDF/XLSX。质量工作流和专业成果定向测试、Runtime 类型检查与构建通过；本轮仍未改版本、tag、Release、stable feed 或官网。4.2 当前源码安装包的 CUA/独立 AI 审查尚未完成；4.4 当前授权 COSA/SUC 对算与专业签认继续保持未完成。
+
+## 2026-10-01 监测语义与专业-only 交付收口
+
+监测分析与日报投影现在明确记录来源单位、项目单位关系和累计字段口径。混合来源单位、同一时刻重复记录或累计字段只在部分期次存在时，不生成跨期累计/速率/阈值结论；来源单位内部一致但与项目单位不同的变化仍保留并以来源单位显示，阈值/异常待确认。普通文本摘要、`evidence.xlsx`、专业日报表和三格式专业成果均同步这些字段，避免把源值按项目单位误标。没有平差结果的监测-only 交付也会生成专业 DOCX/PDF/XLSX/JSON。多期连续性 ID 改为固定长度哈希，完整期次链仍由 `comparisonIds` 和 `inputHash` 绑定。
+
+本轮验证：定向 Runtime 5 个文件、47 项通过；`npm --prefix kun run typecheck`、`npm --prefix kun run build`、`npm run typecheck`、`npm run openspec:validate`（12/12）及 `git diff --check` 通过。只验证当前源码，未重新打包或安装候选；4.2 用户本人 UI/功能确认和 4.4 当前授权 COSA/SUC 对算、专业签认继续保持未完成。
+
+## 2026-10-01 监测日报与多期连续性 P1 增量
+
+监测成果新增统一日报投影：初始值、上期/本期、本次与累计变化、变化速率、阈值状态、期次连续性、原始行和源文件 SHA-256 均来自同一冻结数据集与确定性分析。该表已进入普通 `evidence.xlsx` 的 `monitoring_daily` 工作表，并在含平差成果的专业 DOCX/PDF/XLSX 中使用同一结构化模型。多期测段比较增加只读累计连续性投影，要求显式选择的比较记录相邻、时间有序、测段起终点一致，并写入预览、交付 manifest 和专业 JSON。
+
+2026-10-01 后续复核：日报投影现保留首期/上期/本期的实际观测值与各自单位；混合单位和同一时刻重复记录不跨单位/跨期计算变化或速率；来源单位内部一致但与项目单位不一致时，变化/速率按来源单位保留，阈值和异常结论待确认，并在 DOCX/PDF/XLSX 中保留冲突期次、原始行和来源。多期连续性新增 EngineeringService 级别的预览、幂等重放、重启、专业 JSON、XLSX 单元格、manifest 和 verify 覆盖。当前 Runtime 全量测试（本地 loopback 权限）为 204 个文件、3023 项通过、22 项跳过；桌面全量为 341 个文件、2926 项通过、2 项跳过。私有候选 `2ac333b7fd88e7985d112f84bd48dade59558380` 已安装并完成 48 屏矩阵、两期水准结果页和交付草稿检查，证据见 [本轮候选](evidence/survey-professional-ui-2ac333b7fd88/README.md)。候选为 ad-hoc 签名，未公证、未做本增量 updater 往返，未发布或提升；4.2 个人 UI/功能确认与 4.4 当前授权厂商/SUC 对算、专业签认仍未完成。
+
+本轮 `npm run typecheck`、`npm --prefix kun run typecheck`、主应用/Runtime 构建、相关 34 项测试和 lint 均通过；lint 仅保留既有 `Workbench.tsx` Hook warning。源码与候选包未改变版本、tag、Release、stable feed 或官网；4.2 用户本人安装包确认、4.4 当前授权 COSA/SUC 对算与专业签认继续保持未完成。
+
+## 2026-10-01 导入重试与两期比较成果增量
+
+源码冻结为 `69842e5c53766cdeaf6f3d8bdd88809fefb20bf5`，版本仍为 `0.5.1`。导入幂等重试现在允许合法预检只推进 `findings`、状态、修订号和更新时间，并以确定性重算校验生命周期；测量内容、来源字节、伪造状态和旧修订仍拒绝。期次比较增加严格的当前结果/来源读取，预览、回放、成果清单和验证均只接受显式选中的两期。
+
+私有候选已安装：`/private/tmp/railwise-professional-candidate/installed/RailWise AI Candidate 69842e5c5376.app`。真实包内流程导入 `period-valid-1.json` / `period-valid-2.json`，确认 `BM → P`，生成比较成果册，观测和平差高差变化均为 `-0.002000 m`（`-2.0000 mm`），并回读初值事件历史。DOCX/PDF/XLSX 已检查三张比较表、成员来源和两期哈希绑定；本轮证据见 [69842e5c 候选](evidence/survey-professional-ui-69842e5c5376/README.md)。
+
+本轮完成的是源码与隔离候选验收，不关闭 4.2 的用户本人确认或 4.4 的当前授权 COSA/SUC 对算、专业签认。候选未公证，未执行本增量 updater 往返，没有修改公开版本、tag、Release、公共 feed 或官网下载页。
+
+## 2026-09-30 COSA / 测量云专业工作流增量
+
+当前源码增量冻结为 `d31f03d0f85e91a6197ac0502aa35a41af1c1a57`，版本仍为 `0.5.1`。专业水准/平面结果复核、严格 CSV/XLSX 映射与来源锚点、两期测段比较、追加式初值历史、专业 DOCX/PDF/XLSX 成果和四区 Survey 工作台已实现；水准摘要按任务类型只显示高程基准与长度单位，缺少近似高程时不把零初始化显示成真实改正。桌面 IPC 补齐 project-scoped 初值/期次路径白名单，抽屉关闭后保持结果页。
+
+最终隔离候选已安装：`/private/tmp/railwise-professional-candidate/installed/RailWise AI Candidate d31f03d0f85e.app`。ad-hoc deep strict signature 通过，Apple 公证和本增量 updater 往返未执行。48 张中英文/明暗主题/三窗口矩阵无失败；实际两期 `BM → P` 变化为 `-0.002000 m`，初值记录重启后保持，专业表格横向滚动、AI 证据抽屉焦点和 Escape 返回通过。证据见 [最终 UI 目录](evidence/survey-professional-ui-d31f03d0f85e/README.md) 与 [最终四页联系表](evidence/survey-professional-ui-d31f03d0f85e/zh-light-four-pages-final-contact-sheet.png)。
+
+这属于隔离候选的源码/包验收，不关闭 4.2 的用户本人确认或 4.4 的当前授权 COSA/SUC 对算、专业签认。没有修改公开版本、tag、Release、公共 feed 或官网下载页。
+
+## 2026-09-28 0.5.1 数量级修复与最终续验
+
+源码 `20aead04` 明确区分方差和标准差的数量级。隔离候选 #164 新建公开合成 IN2 工程完成 GUI 导入、校核、平差、首次 legacy 追问及正常重启后的 typed 追问；两次真实模型回答正确给出方差约 8 / 标准差约 4 个数量级。9 个业务数据库在重启和只读问答后逻辑摘要一致；签名、公证通过。同源码私有 updater #165 的实际下载、安装、自动重启及数据哨兵保全六阶段全部通过。源代码 Quality 两个工作流全通过。
+
+正式身份三端候选 #166 完整两小时稳定检查和三端打包全部通过，已安装并通过真实问答、重启、9 库只读保全和三格式导出。454 个 renderer 文件与用户已确认 #162 完全一致。用户已确认继续发布 0.5.1，正式发布与官网更新处理中。#164 和 #165 均是隔离身份，不能当作 #166 的相同二进制。详见[当前续验报告](evidence/railwise-051-final-20aead04/README.md)。下方 #162 方差解释错误为历史失败记录，保持原样；全矩阵/P1/P2及专业生产签认边界未关闭。
+
+## 2026-09-27 0.5.1 安装崩溃与成果追问续验
+
+本轮限定目标为安装后的启动崩溃、跟随系统主题及最终包功能验证，未将范围扩展为全部P1/P2。macOS签名已保留并逐个验证5个Electron/V8可执行文件的运行权限。正式身份候选#156/#158/#161均已安装过；签名、公证、system深色及选定IN2数值/原件锚点有实机证据，三个候选仍因各自的真实模型读回问题记录为失败。
+
+源码依次修复：`9a7cd6c3` 为17分支对象schema补根type，`5e49d220` 为legacy选择器指定context入口，`8d68df67` 将持久化参数摘要移出可执行工具参数，避免模型抄用 `_workwise_summary`。最新Runtime2945项、桌面2870项通过，双端类型、构建、strict11项及PR质量/Windows/Electron检查通过。新候选#162及同源码私有updater#163的精确状态见[当前验收报告](evidence/railwise-051-final-8d68df67/README.md)，旧证据不倒填为新包通过。
+
+最终候选#162（0.5.1 / `8d68df67`）已安装到本机，严格签名、公证、5个V8权限、普通启动与正常重启通过；选定Survey页面的明暗主题×常规/最小/最大窗口已实看，最终恢复system深色和常规尺寸。新建公开IN2合成项目完成导入、校核、平差及原件锚点；一次legacy、两次typed（含重启后历史恢复）均首次正确读取，无schema或摘要参数污染。重启及最后只读问答前后9个业务SQLite逻辑摘要一致。同源码隔离updater#163真实0.0.0→0.5.1六阶段通过，不能冒充正式身份同二进制或历史数据迁移。
+
+AI文字仍将约1.14e-8方差因子说成“方差缩小约4个数量级”（应为约8，标准差才约4）；专业解释语义验收未通过，精确读取成功不能覆盖此缺陷。用户本人确认、发布批准以及原总计划广泛矩阵/专业签认仍未完成。没有改变公开版本、tag、Release、公共feed或官网下载页面；两小时稳定门禁未在本次候选快速复验中执行。
+
 ## 2026-09-24 声明整改链源码与真实 GUI 失败记录
 
 新增[声明式质检整改与复查链](RAILWISE_SURVEY_QUALITY_WORKFLOW.md)：检查未通过/未评估、问题登记、不同保全成果整改及明确的已解决/未解决复查进入独立追加式 SQLite；Runtime、IPC、严格客户端和双语人工入口已接通。旧保全记录仍只表达材料完整性，不把声明链转换为签章、规范符合或交付批准。独立审查发现的重复源读取预算、绑定验证、分页游标、重试身份及卸载晚写入问题已修复。
@@ -240,7 +330,7 @@ e1708d7 基线验证：Runtime 全量 1680 通过 / 3 跳过；桌面全量 2534
 | 签名/公证 | e1708d7 同一 ASAR 签名公证、本机双格式 GUI、真实 updater 均通过；Gatekeeper 启用证据来自 hosted runner | 后续新增源码的新包验收与用户确认；不沿用旧包证据 |
 | 安装/升级链 | e1708d7 私有 HTTPS 下载、原生安装/重启/数据哨兵保留通过；本机双真实项目重启复验通过 | 历史旧用户数据及平台覆盖；同源 0.0.0 探针不等于真实旧版迁移 |
 | 主题/尺寸/键盘 | a81cc3a 实机切换英文深色、中文浅色，发现布局缺陷并修复 | 613e990 中文浅色常规/最大化、英文深色审查已检查；6c3f5f6 窄窗口与 Tab/Space 已实测；全键盘/a11y 和最新增量验收未完成 |
-| 用户验收 | 未完成 | 用户对精确候选 UI、功能和专业结果确认 |
+| 安装包验收 | 未完成 | 按 AGENTS.md 使用 CUA 检查精确源码候选，并由独立高级工程师模式 AI 审查；当前主机 Spotlight/LaunchServices 不可用，见 2026-10-01 记录 |
 
 ## P1：未完成的专业可信度任务
 
@@ -428,3 +518,19 @@ GitHub 有效 Apple 凭据和私有 HTTPS updater 已用于 e1708d7 真实成功
 - [5651d50 精确包侧栏回归](./evidence/railwise-convergence-5651d503448f/README.md)：签名、双真实格式包内 Runtime/独立参考、两次建项、切换语言/项目及重启后项目计数稳定通过。旧失败候选保留。
 - d249035 的 6 项 GitHub Quality/Windows/Electron 检查全部通过。隔离公证运行 [35433189815](https://github.com/wangjiawei508/WorkWise/actions/runs/35433189815) 成功；签名、公证票据、Gatekeeper 和 candidate 身份/feed 校验通过，未发布 Release、feed 或网站。首轮 35432979660 因浅克隆缺少固定审计提交失败，后续改为完整历史并通过。
 - 监测数据资产新增原生选择按钮与选中状态，引用类型/来源/位置补可访问名称，删除引用按钮在键盘聚焦时可见。新回归在旧代码失败，修复后定向 19/19；桌面全量 2508 通过/2 跳过、类型/构建/strict OpenSpec 11/11 通过，改动文件 lint 通过。该增量尚不在以上两个候选包内，全量键盘验收未勾选。
+## 2026-10-02 当前源码增量：简化主流程与两期原始观测边界
+
+### 2026-10-02 专业展示层修复
+
+内业“需要处理”中的格式处置原因已改为测量人员可执行的专业提示，默认不再显示 `P0`、格式目录、解析对象、策略校验、目录版本等开发语义；观测页校核按钮的辅助提示同样经过专业化过滤。工程测量会话默认隐藏模型标签。`survey-diagnostic-text`、Survey 处理面板和格式样本回归通过，当前源码重新生成 `0.5.1` ARM64 未签名/未公证候选，ASAR 完整性通过。由于本机 computer-use 对新候选窗口连续超时，当前包的 CUA 截图、主题/尺寸/a11y 复验仍未关闭；未发布。
+
+- 内业顶部已将任务选择和新建任务合并为一个控件组，主导航保留“概览 / 处理 / 结果 / 交付”，AI 和高级入口保持可访问但降低竞争；旧 tab ID、深链和历史状态继续兼容。
+- 测量处理层增加“专业检查”摘要，直接显示网形/基准、观测数量、点位数量和当前阻断状态，三项入口可进入原详细分区。新增中英文 DOM 回归覆盖。
+- 两期测段比较增加来源绑定的 `rawObservationCongruence` 试算：使用两期原始观测及 sigma/covariance（含单位转换），对整体平移候选、共同变动候选和不可用原因作保守投影；结果固定为 `trial-only / engineering decision: not evaluated`，并纳入哈希和严格回放。该能力不替代论文中的增广自由网方程、参考点稳定性检验、最小可探测偏差或专业签认。
+- 本轮验证：Runtime typecheck、桌面 web/node typecheck、OpenSpec strict 12/12、定向 Survey period / Survey adjustment / workspace DOM 105 项、两期监测 Runtime 回归 11 项、`git diff --check` 均通过。
+- 当前源码尚未重新打包；精确 `0.5.1` 候选仍受主机 LaunchServices/AppKit 启动故障阻断，未取得当前源码对应包截图，任务 4.2 仍未关闭。真实授权 COSA/SUC 文件、独立金标准和角色专业签认仍未取得，任务 4.4 仍未关闭。
+# 2026-10-04 current-source update
+
+The reconnect-state regression found in the current packaged candidate is fixed in `EngineeringWorkspaceView`: an empty survey read-model response now retains the last non-empty snapshot scoped to the active workspace and project, while project/workspace changes clear it. The DOM regression passes 64/64. Candidate `0.5.1` arm64 was rebuilt with app.asar SHA-256 `023ca43ca76ba88ac9dfd54c00aca1cd8ea188678e5993d9dbb734db65e619dd`; ASAR integrity, build freshness, brand-boundary, ad-hoc signature verification, and strict OpenSpec validation pass.
+
+This is a source and targeted-regression completion, not a complete package acceptance. Current computer-use and independent AI review cover Chinese/dark/wide-window screens; the required English/light/narrow matrix, isolated data-bound recovery run, updater round-trip, and full accessibility checklist are still open. The host data-root launch also exposed a legacy project whose completed status had no current source, so the candidate must be re-run with a frozen, source-bound user-data fixture before task 4.2 can be checked. Licensed COSA/SUC evidence and authentic role-based professional signoff remain task 4.4 blockers.

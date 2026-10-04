@@ -1,0 +1,9 @@
+[2026-10-03T08:13:42.425Z] [LIFECYCLE] [runtime pid=95238] spawned on port 8899 using data dir /Users/wangjiawei/.workgpt/kun
+[2026-10-03T08:13:42.746Z] [STDOUT] [runtime pid=95238] [runtime startup] usage-carryover begin
+[2026-10-03T08:13:42.747Z] [STDOUT] [runtime pid=95238] [runtime startup] usage-carryover done elapsedMs=2
+[2026-10-03T08:13:42.748Z] [STDOUT] [runtime pid=95238] [runtime startup] mcp-connect begin
+[2026-10-03T08:13:44.853Z] [STDOUT] [runtime pid=95238] [runtime startup] mcp-connect done elapsedMs=2106
+[2026-10-03T08:13:44.854Z] [STDOUT] [runtime pid=95238] [runtime startup] skills begin
+[2026-10-03T08:13:49.897Z] [STDOUT] [runtime pid=95238] [runtime startup] skills pending-root="/Users/wangjiawei/Documents/WorkWise/src/asset/skills" elapsedMs=5001
+[2026-10-03T08:14:27.427Z] [LIFECYCLE] [runtime pid=95238] startup failed before ready: WorkWise Runtime did not report ready within 45000ms
+[2026-10-03T08:14:27.441Z] [LIFECYCLE] [runtime pid=95238] exited with signal SIGTERM

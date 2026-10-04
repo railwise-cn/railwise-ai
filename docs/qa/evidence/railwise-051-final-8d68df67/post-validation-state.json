@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-09-27T14:57:49.659808+00:00",
+  "theme": "system",
+  "latestCrash": {
+    "name": "RailWise AI-2026-09-27-160241.ips",
+    "modifiedAt": "2026-09-27T08:02:41.269898+00:00"
+  },
+  "8787": {
+    "exitCode": 0,
+    "stdout": "COMMAND     PID       USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nRailWise  69931 wangjiawei   60u  IPv4 0x969db9a9005bccd1      0t0  TCP 127.0.0.1:8787 (LISTEN)\n"
+  },
+  "8788": {
+    "exitCode": 0,
+    "stdout": "COMMAND     PID       USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nRailWise  69931 wangjiawei   59u  IPv4 0x930f07ec3f1f62db      0t0  TCP 127.0.0.1:8788 (LISTEN)\n"
+  }
+}

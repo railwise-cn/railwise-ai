@@ -9,7 +9,14 @@ import { useChatStore } from '../../store/chat-store'
 import { FloatingComposer } from '../chat/FloatingComposer'
 import { composerReasoningEffortRequestValue, type ComposerReasoningEffort } from '../chat/FloatingComposerModelPicker'
 import { EMPTY_ENGINEERING_DRAFT, useEngineeringConversationDrafts } from './engineering-conversation-drafts'
-import { isSurveyInstrumentFile, SURVEY_FILE_ACCEPT } from './survey-file-selection'
+import { isSurveyImportFile, SURVEY_FILE_ACCEPT } from './survey-file-selection'
+import { engineeringProfessionalText } from './engineering-professional-text'
+
+function professionalAttachmentError(error: unknown, fallback: string): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const cleaned = engineeringProfessionalText(raw)
+  return cleaned || fallback
+}
 
 export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId, unavailableReason, onSurveyFiles }: {
   workspaceRoot: string; projectId: string; ready: boolean; threadId: string | null; unavailableReason?: string; onSurveyFiles: (files: File[]) => void
@@ -44,9 +51,9 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
     const capabilities = runtimeInfo?.capabilities.attachments
     const current = useEngineeringConversationDrafts.getState().drafts[scope] ?? EMPTY_ENGINEERING_DRAFT
     if (!ready || !threadId || !isCurrentThread() || !capabilities?.available || current.uploading) return
-    const surveyFiles = files.filter(isSurveyInstrumentFile)
+    const surveyFiles = files.filter(isSurveyImportFile)
     if (surveyFiles.length) onSurveyFiles(surveyFiles)
-    files = files.filter((file) => !isSurveyInstrumentFile(file))
+    files = files.filter((file) => !isSurveyImportFile(file))
     if (!files.length) return
     update(scope, (value) => ({ ...value, uploading: true, error: null }))
     try {
@@ -68,12 +75,12 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
             update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...result.attachment, managedPath: result.managedPath, localSourcePath: sourcePath } : item) }))
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
+          const message = professionalAttachmentError(error, t('engineeringAttachmentUnavailable'))
           update(scope, (value) => ({ ...value, error: message, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item) }))
         }
       }
     } catch (error) {
-      update(scope, (value) => ({ ...value, error: error instanceof Error ? error.message : String(error) }))
+      update(scope, (value) => ({ ...value, error: professionalAttachmentError(error, t('engineeringAttachmentUnavailable')) }))
     } finally { update(scope, (value) => ({ ...value, uploading: false })) }
   }
 
@@ -85,7 +92,7 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
       const result = await window.workwise.importChatAttachment({ importId: id, sourcePath: attachment.localSourcePath, declaredMimeType: attachment.mimeType || undefined, threadId, workspace: workspaceRoot })
       update(scope, (value) => ({ ...value, attachments: value.attachments.map((item) => item.id === id ? { ...result.attachment, managedPath: result.managedPath, localSourcePath: attachment.localSourcePath } : item) }))
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = professionalAttachmentError(error, t('engineeringAttachmentUnavailable'))
       update(scope, (value) => ({ ...value, error: message, attachments: value.attachments.map((item) => item.id === id ? { ...item, state: 'failed', degradationReasons: [message] } : item) }))
     }
   }
@@ -112,10 +119,14 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
   const selected = draft.evidenceContext
   const typed = selected?.typedEvidence
   const typedIdentity = typed?.selector?.identity
-  const typedLabel = typedIdentity ? Object.values(typedIdentity).join(' / ') : typed ? Object.entries(typed).find(([key]) => ['trialId', 'recordId', 'comparisonId', 'analysisId', 'datasetId', 'populationId', 'runId', 'planId', 'attemptId', 'manifestId', 'networkId'].includes(key))?.[1] : undefined
-  const evidenceLabel = (typeof typedLabel === 'string' ? typedLabel : undefined) ?? selected?.observationId ?? selected?.pointId ?? selected?.diagnosticCode
-    ?? selected?.outputPath?.split(/[\\/]/).pop() ?? selected?.manifestId
-    ?? (selected?.metric === 'closure' ? t('surveyClosureReview') : selected?.metric === 'precision' ? t('surveyMaxPointError') : selected?.sourceRecordId)
+  // Only semantic point names are user labels. Observation and diagnostic IDs
+  // remain in the evidence envelope sent for exact record resolution.
+  const pointLabel = selected?.pointId ?? (typedIdentity && typeof typedIdentity.pointId === 'string' ? typedIdentity.pointId : undefined)
+  const evidenceLabel = pointLabel
+    ?? (selected?.observationId ? t('surveySelectedObservation') : undefined)
+    ?? (selected?.diagnosticCode ? t('surveyReviewNeeded') : undefined)
+    ?? selected?.outputPath?.split(/[\\/]/).pop()
+    ?? (selected?.metric === 'closure' ? t('surveyClosureReview') : selected?.metric === 'precision' ? t('surveyMaxPointError') : t('surveySelectedEvidenceCurrent'))
 
   return <div className="min-w-0 w-full">
     {selected ? <div role="status" className="mb-1 flex items-center gap-2 px-2 text-[11px] text-ds-muted">
@@ -131,10 +142,11 @@ export function EngineeringComposer({ workspaceRoot, projectId, ready, threadId,
     composerModel={composerModel} composerPickList={composerPickList} composerModelGroups={composerModelGroups}
     composerProviderId={composerProviderId}
     composerReasoningEffort={effort} onComposerModelChange={setComposerModel} onComposerReasoningEffortChange={setEffort}
+    hideModelPicker
     queuedMessages={threadId ? queuedMessages : []} onRemoveQueuedMessage={removeQueuedMessage}
     attachments={draft.attachments} attachmentUploadEnabled={runtimeInfo?.capabilities.attachments.available === true}
     attachmentAccept={`${SURVEY_FILE_ACCEPT},.pdf,.docx,.pptx,.md,.markdown,image/png,image/jpeg,image/gif,image/webp`}
-    isAdditionalAttachment={isSurveyInstrumentFile}
+    isAdditionalAttachment={isSurveyImportFile}
     attachmentUploadBusy={draft.uploading} attachmentUploadError={draft.error}
     onPickAttachments={(files) => void pickAttachments(files)}
     onRemoveAttachment={(id) => {

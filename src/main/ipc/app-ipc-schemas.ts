@@ -5,6 +5,8 @@ import { SurveyAdvancedTrialCreateV1, SurveyAdvancedTrialReverifyRequestV1, SURV
 import { z } from 'zod'
 import { RUNTIME_STANDARD_BASIS_PATH, STANDARD_BASIS_QUERY_KEYS, SurveyStandardBasisReferenceV1 } from '../../shared/survey-standard-basis'
 import { SurveyFreeLevelingTrialRequestV1 } from '../../shared/survey-free-leveling'
+import { SurveyTabularProbeRequestV1 } from '../../shared/survey-tabular'
+import { SurveyInitialValueChangeRequestV1, SurveySegmentComparisonRequestV1 } from '../../shared/survey-monitoring'
 import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQualityRecordCreateV1, SurveyQualityCheckAppendV1 } from '../../shared/survey-quality-workspace'
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import {
@@ -82,6 +84,7 @@ import {
   ,RUNTIME_ENGINEERING_CAPABILITIES_TEMPLATE
   ,RUNTIME_ENGINEERING_SKILLS_CATALOG_TEMPLATE
   ,RUNTIME_ENGINEERING_SURVEY_COSA_GROUP_INSPECT_TEMPLATE
+  ,RUNTIME_ENGINEERING_SURVEY_TABULAR_PROBE_TEMPLATE
   ,RUNTIME_ENGINEERING_SURVEY_NETWORK_IMPORT_TEMPLATE
   ,RUNTIME_ENGINEERING_SURVEY_NETWORKS_TEMPLATE
   ,RUNTIME_ENGINEERING_SURVEY_NETWORK_VALIDATE_TEMPLATE
@@ -89,12 +92,15 @@ import {
   ,RUNTIME_ENGINEERING_SURVEY_NETWORK_CORRECTIONS_REPLAY_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENTS_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENT_TEMPLATE
+  ,RUNTIME_ENGINEERING_PROFESSIONAL_REVIEW_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENT_CANCEL_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENT_RESUME_TEMPLATE
   ,RUNTIME_ENGINEERING_ADJUSTMENT_PREVIEW_TEMPLATE
   ,RUNTIME_ENGINEERING_STATISTICAL_DIAGNOSTICS_TEMPLATE
   ,RUNTIME_ENGINEERING_DEFORMATIONS_TEMPLATE
   ,RUNTIME_ENGINEERING_DEFORMATION_TEMPLATE
+  ,RUNTIME_ENGINEERING_INITIAL_VALUES_TEMPLATE
+  ,RUNTIME_ENGINEERING_SEGMENT_COMPARISONS_TEMPLATE
 } from '../../shared/runtime-endpoints'
 import {
   CLAW_MODEL_IDS,
@@ -186,7 +192,7 @@ function compileEndpoint(
   // substituting the approved identifier placeholders with `[^/]+`. The
   // template fragments are URL-encoded by the path helpers, so they
   // contain only characters that are safe to escape directly.
-  const pattern = template.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\{(?:id|turn|manifestId|adjustmentId|networkId|trialId|planId|recordId|populationId|runId)\}/g, '[^/]+')
+  const pattern = template.replace(/[.+*?^$()|[\]\\]/g, '\\$&').replace(/\{(?:id|turn|projectId|manifestId|adjustmentId|networkId|trialId|planId|recordId|populationId|runId)\}/g, '[^/]+')
   const regex = new RegExp(`^${pattern}$`)
   return {
     match: (path: string) => regex.test(path),
@@ -312,6 +318,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ENGINEERING_CAPABILITIES_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_ENGINEERING_SKILLS_CATALOG_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_ENGINEERING_SURVEY_COSA_GROUP_INSPECT_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_ENGINEERING_SURVEY_TABULAR_PROBE_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_ENGINEERING_SURVEY_NETWORK_IMPORT_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_SURVEY_NETWORKS_TEMPLATE, ['GET'], ['projectId']),
   compileEndpoint(RUNTIME_ENGINEERING_SURVEY_NETWORK_VALIDATE_TEMPLATE, ['POST']),
@@ -319,6 +326,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ENGINEERING_SURVEY_NETWORK_CORRECTIONS_REPLAY_TEMPLATE, ['GET'], ['head']),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENTS_TEMPLATE, ['GET', 'POST'], ['projectId']),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_ENGINEERING_PROFESSIONAL_REVIEW_TEMPLATE, ['GET'], []),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_CANCEL_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_RESUME_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ENGINEERING_ADJUSTMENT_PREVIEW_TEMPLATE, ['POST']),
@@ -327,6 +335,8 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE, ['GET'], ['download']),
   compileEndpoint(RUNTIME_ENGINEERING_DEFORMATIONS_TEMPLATE, ['GET', 'POST'], ['projectId']),
   compileEndpoint(RUNTIME_ENGINEERING_DEFORMATION_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_ENGINEERING_INITIAL_VALUES_TEMPLATE, ['GET', 'POST'], []),
+  compileEndpoint(RUNTIME_ENGINEERING_SEGMENT_COMPARISONS_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_MEMORY_TEMPLATE, ['GET', 'POST']),
   compileEndpoint(RUNTIME_MEMORY_DIAGNOSTICS_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_MEMORY_RECORD_TEMPLATE, ['PATCH', 'DELETE']),
@@ -380,6 +390,27 @@ export const runtimeRequestPayloadSchema = z
     try { url = new URL(payload.path, 'http://localhost') } catch {
       context.addIssue({ code: 'custom', message: 'invalid runtime request URL' })
       return
+    }
+    if (/^\/v1\/engineering\/adjustments\/[^/]+\/professional-review$/.test(url.pathname)
+      && ((payload.method ?? 'GET') !== 'GET' || payload.body !== undefined || url.search || url.hash)) {
+      context.addIssue({ code: 'custom', message: 'invalid read-only professional review request' })
+    }
+    if (url.pathname === RUNTIME_ENGINEERING_SURVEY_TABULAR_PROBE_TEMPLATE) {
+      let valid = (payload.method ?? 'GET') === 'POST' && !url.search && !url.hash
+        && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= 91 * 1024 * 1024
+      if (valid) {
+        try { valid = SurveyTabularProbeRequestV1.safeParse(JSON.parse(payload.body!)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid survey table inspection request' })
+    }
+    const monitoring = /^\/v1\/engineering\/projects\/[^/]+\/survey\/(initial-values|segment-comparisons)$/.exec(url.pathname)
+    if (monitoring) {
+      const method = payload.method ?? 'GET'
+      let valid = !url.search && !url.hash && method === 'GET' && monitoring[1] === 'initial-values' && payload.body === undefined
+      if (method === 'POST' && !url.search && !url.hash && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= 256 * 1024) {
+        try { valid = (monitoring[1] === 'initial-values' ? SurveyInitialValueChangeRequestV1 : SurveySegmentComparisonRequestV1).safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid survey monitoring request' })
     }
     if (url.pathname === RUNTIME_STANDARD_BASIS_PATH || url.pathname.startsWith(`${RUNTIME_STANDARD_BASIS_PATH}/`)) {
       let valid = (payload.method ?? 'GET') === 'GET' && payload.body === undefined && !url.hash

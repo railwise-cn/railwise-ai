@@ -186,7 +186,8 @@ describe('P0 professional survey delivery', () => {
     const outputs = new Map(preview.files.map((file) => [file.mediaType, join(workspace, file.path)]))
     const docxPath = outputs.get('application/vnd.openxmlformats-officedocument.wordprocessingml.document')!
     const pdfPath = outputs.get('application/pdf')!
-    const xlsxPath = outputs.get('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')!
+    const xlsxPath = join(workspace, preview.files.find(file => file.path.endsWith('/evidence.xlsx'))!.path)
+    const professionalXlsxPath = join(workspace, preview.files.find(file => file.path.endsWith('/professional.xlsx'))!.path)
     const manifestPath = join(workspace, '.workwise', 'deliverables', project.id, manifest.runId, 'manifest.json')
     await Promise.all([stat(docxPath), stat(pdfPath), stat(xlsxPath), stat(manifestPath)])
 
@@ -209,6 +210,8 @@ describe('P0 professional survey delivery', () => {
     expect(workbookXml).toContain('survey_closures')
     expect(workbookXml).toContain('survey_parameters')
     expect(workbookXml).toContain('survey_error_ellipses')
+    const professionalWorkbook = await JSZip.loadAsync(await readFile(professionalXlsxPath))
+    expect(await professionalWorkbook.file('xl/workbook.xml')!.async('text')).toContain('点位成果与精度')
     const ellipse = planeAdjustment.result.points.find(point => point.id === 'S1')!.xyErrorEllipse!
     expect(ellipse).toBeDefined()
     expect(documentXml).toContain(`长半轴=${ellipse.semiMajor} m`)

@@ -1,11 +1,12 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { basename, extname, join, resolve } from 'node:path'
+import { basename, extname, join, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import type { SkillsCapabilityConfig } from '../contracts/capabilities.js'
 
 const DEFAULT_ACTIVE_LIMIT = 3
 const DEFAULT_INSTRUCTION_BUDGET_BYTES = 24_000
 const MIN_BUDGETED_SKILL_BYTES = 500
+const DEFAULT_DISCOVERY_WAIT_MS = 5_000
 const GENERIC_KEYWORDS = new Set([
   '帮我',
   '我要',
@@ -108,6 +109,18 @@ export type SkillRuntimeDiagnostics = {
 export type SkillRuntimeOptions = {
   activeLimit?: number
   instructionBudgetBytes?: number
+  discoveryWaitMs?: number
+}
+
+type DiscoveredSkills = {
+  skills: LoadedSkill[]
+  validationErrors: Array<{ root: string; message: string }>
+}
+
+type PendingDiscovery = {
+  wait: Promise<void>
+  workspace?: string
+  queuedWorkspace?: string
 }
 
 export class SkillRuntime {
@@ -115,11 +128,12 @@ export class SkillRuntime {
   private validationErrors: Array<{ root: string; message: string }>
   private lastActivations: SkillActivation[] = []
   private lastInjection: SkillRuntimeDiagnostics['lastInjection']
+  private discovery: PendingDiscovery | undefined
 
   private constructor(
     private readonly config: SkillsCapabilityConfig,
     private readonly options: Required<SkillRuntimeOptions>,
-    loaded: { skills: LoadedSkill[]; validationErrors: Array<{ root: string; message: string }> }
+    loaded: DiscoveredSkills
   ) {
     this.skills = loaded.skills
     this.validationErrors = loaded.validationErrors
@@ -132,15 +146,51 @@ export class SkillRuntime {
     const normalized = config ?? { enabled: false, roots: [], legacySkillMd: true }
     const resolvedOptions = {
       activeLimit: options.activeLimit ?? DEFAULT_ACTIVE_LIMIT,
-      instructionBudgetBytes: options.instructionBudgetBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES
+      instructionBudgetBytes: options.instructionBudgetBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES,
+      discoveryWaitMs: Number.isFinite(options.discoveryWaitMs) && options.discoveryWaitMs! >= 0
+        ? options.discoveryWaitMs!
+        : DEFAULT_DISCOVERY_WAIT_MS
     }
-    const loaded = normalized.enabled
-      ? await discoverSkills(normalized)
-      : { skills: [], validationErrors: [] }
-    return new SkillRuntime(normalized, resolvedOptions, loaded)
+    const runtime = new SkillRuntime(normalized, resolvedOptions, { skills: [], validationErrors: [] })
+    await runtime.refresh()
+    return runtime
   }
 
   async refresh(workspace?: string): Promise<void> {
+    if (!this.config.enabled) return
+    const requestedWorkspace = workspace?.trim() ? resolve(workspace) : undefined
+    if (this.discovery) {
+      // Reuse the same reads even after the wait budget has elapsed. A stuck filesystem
+      // call must not create a new worker-pool request on every catalog/refresh request.
+      // Keep only the latest distinct workspace request. Returning to the
+      // active workspace cancels a queued detour instead of applying skills
+      // from an older workspace after the current scan finishes.
+      if (requestedWorkspace) this.discovery.queuedWorkspace = requestedWorkspace === this.discovery.workspace ? undefined : requestedWorkspace
+      return this.discovery.wait
+    }
+    const pending: PendingDiscovery = { wait: Promise.resolve(), workspace: requestedWorkspace }
+    this.discovery = pending
+    let waitTimer: ReturnType<typeof setTimeout>
+    const completion = this.discover(requestedWorkspace).catch(() => {
+      // Keep the usable catalog and never emit an exception payload to process logs.
+      console.info('[runtime startup] skills discovery failed; retaining loaded skills')
+    }).finally(() => {
+      clearTimeout(waitTimer)
+      if (this.discovery === pending) this.discovery = undefined
+      if (pending.queuedWorkspace) void this.refresh(pending.queuedWorkspace)
+    })
+    pending.wait = new Promise<void>((resolveWait) => {
+      waitTimer = setTimeout(() => {
+        console.info(`[runtime startup] skills discovery pending after ${this.options.discoveryWaitMs}ms; continuing in background`)
+        resolveWait()
+      }, this.options.discoveryWaitMs)
+      void completion.then(resolveWait)
+    })
+    return pending.wait
+  }
+
+  private async discover(workspace?: string): Promise<void> {
+    const previousSkills = this.skills
     const dynamicRootCandidates = workspace?.trim()
       ? [
           join(resolve(workspace), '.agents', 'skills'),
@@ -155,9 +205,11 @@ export class SkillRuntime {
     const refreshedConfig = dynamicRoots.length > 0
       ? { ...this.config, roots: [...dynamicRoots, ...this.config.roots] }
       : this.config
-    const loaded = refreshedConfig.enabled
-      ? await discoverSkills(refreshedConfig)
-      : { skills: [], validationErrors: [] }
+    const loaded = await discoverSkills(refreshedConfig, previousSkills, (progress) => {
+      // Publish successful reads while retaining the old catalog until this scan ends.
+      this.skills = uniqueSkills([...progress.skills, ...previousSkills])
+      this.validationErrors = progress.validationErrors
+    })
     this.skills = loaded.skills
     this.validationErrors = loaded.validationErrors
   }
@@ -272,24 +324,41 @@ export class SkillRuntime {
   }
 }
 
-async function discoverSkills(config: SkillsCapabilityConfig): Promise<{
-  skills: LoadedSkill[]
-  validationErrors: Array<{ root: string; message: string }>
-}> {
+async function discoverSkills(
+  config: SkillsCapabilityConfig,
+  previousSkills: LoadedSkill[],
+  onProgress: (loaded: DiscoveredSkills) => void
+): Promise<DiscoveredSkills> {
   const skills: LoadedSkill[] = []
   const validationErrors: Array<{ root: string; message: string }> = []
   for (const rawRoot of config.roots) {
     const root = resolve(rawRoot)
-    const candidates = await packageCandidates(root).catch((error) => {
-      validationErrors.push({ root, message: errorMessage(error) })
-      return []
-    })
-    for (const candidate of candidates) {
-      const loaded = await loadSkillPackage(candidate, config.legacySkillMd).catch((error) => {
-        validationErrors.push({ root: candidate, message: errorMessage(error) })
-        return null
+    const startedAt = Date.now()
+    const pendingRootTimer = setTimeout(() => {
+      // Internal log only: a stalled scan must remain attributable without exposing file contents.
+      console.info(`[runtime startup] skills pending-root=${JSON.stringify(root)} elapsedMs=${Date.now() - startedAt}`)
+    }, 5_000)
+    pendingRootTimer.unref()
+    try {
+      const candidates = await packageCandidates(root).catch((error) => {
+        validationErrors.push({ root, message: errorMessage(error) })
+        skills.push(...previousSkills.filter((skill) => skill.root === root || skill.root.startsWith(root + sep)))
+        return []
       })
-      if (loaded) skills.push(loaded)
+      for (const candidate of candidates) {
+        const loaded = await loadSkillPackage(candidate, config.legacySkillMd).catch((error) => {
+          validationErrors.push({ root: candidate, message: errorMessage(error) })
+          skills.push(...previousSkills.filter((skill) => skill.root === candidate))
+          return null
+        })
+        if (loaded) {
+          skills.push(loaded)
+          onProgress({ skills: uniqueSkills(skills), validationErrors: [...validationErrors] })
+        }
+      }
+      onProgress({ skills: uniqueSkills(skills), validationErrors: [...validationErrors] })
+    } finally {
+      clearTimeout(pendingRootTimer)
     }
   }
   const unique = new Map<string, LoadedSkill>()
@@ -298,6 +367,12 @@ async function discoverSkills(config: SkillsCapabilityConfig): Promise<{
     else validationErrors.push({ root: skill.root, message: `duplicate Skill id: ${skill.id}` })
   }
   return { skills: [...unique.values()].sort((a, b) => a.id.localeCompare(b.id)), validationErrors }
+}
+
+function uniqueSkills(skills: LoadedSkill[]): LoadedSkill[] {
+  const unique = new Map<string, LoadedSkill>()
+  for (const skill of skills) if (!unique.has(skill.id)) unique.set(skill.id, skill)
+  return [...unique.values()].sort((a, b) => a.id.localeCompare(b.id))
 }
 
 async function packageCandidates(root: string): Promise<string[]> {

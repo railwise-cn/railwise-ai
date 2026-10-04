@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { z } from 'zod';
 import * as C from '../contracts/survey-quality-workflow.js';
 import { SurveyQualityWorkspacePlanReadV1, SurveyQualityWorkspaceRecordReadV1 } from '../contracts/survey-quality-workspace.js';
-import { appendSurveyQualityEvent, verifySurveyQualityRecord, SURVEY_QUALITY_CHAIN_GENESIS } from './survey-quality-record.js';
+import { appendSurveyQualityEvent, evaluateSurveyQualityGate, verifySurveyQualityRecord, SURVEY_QUALITY_CHAIN_GENESIS } from './survey-quality-record.js';
 import { assessmentDigest } from './survey-quality-assessment.js';
 import { parseAdvancedTrialJson } from './survey-advanced-trials-json.js';
 import type { SurveyQualityEventV1 } from '../contracts/survey-standard-quality.js';
@@ -190,8 +190,22 @@ export class SurveyQualityWorkflowService {
             event = { kind: e.kind, issueId: e.issueId, checkId: e.checkId, evidenceSha256 };
         else if (e.kind === 'correction-recorded')
             event = { kind: e.kind, issueId: e.issueId, correctionId: e.correctionId, correctedArtifactSha256: target!.artifactHash, evidenceSha256 };
-        else
+        else if (e.kind === 'issue-rechecked')
             event = { kind: e.kind, issueId: e.issueId, correctionId: e.correctionId, recheckedArtifactSha256: target!.artifactHash, outcome: e.outcome, evidenceSha256 };
+        else if (e.kind === 'stage-started')
+            event = { kind: e.kind, stageId: e.stageId, stageKind: e.stageKind, policyVersion: e.policyVersion, checkedScope: e.checkedScope, evidenceSha256 };
+        else if (e.kind === 'stage-completed')
+            event = { kind: e.kind, stageId: e.stageId, stageKind: e.stageKind, outcome: e.outcome, evidenceSha256 };
+        else if (e.kind === 'rule-applicability')
+            event = { kind: e.kind, declarationId: e.declarationId, rule: e.rule, status: e.status, rationale: e.rationale, evidenceSha256 };
+        else if (e.kind === 'rule-revoked')
+            event = { kind: e.kind, declarationId: e.declarationId, reason: e.reason, evidenceSha256 };
+        else if (e.kind === 'signoff-declared')
+            event = { kind: e.kind, signoffId: e.signoffId, purpose: e.purpose, actorKey: e.actorKey, evidenceSha256 };
+        else if (e.kind === 'signoff-revoked')
+            event = { kind: e.kind, signoffId: e.signoffId, reason: e.reason, evidenceSha256 };
+        else
+            event = { kind: e.kind, approvalId: e.approvalId, requiredSignoffIds: e.requiredSignoffIds, evidenceSha256 };
         return { event, evidenceBinding: evidence.binding, targetBinding: target };
     }
     private verifySources(pid: string, first: SourceCache): void {
@@ -247,9 +261,10 @@ export class SurveyQualityWorkflowService {
         // changes during a read; this is not an external authenticated checkpoint.
         if (reverify)
             this.verifySources(pid, firstCache);
+        const qualityGate = C.SurveyQualityWorkflowGateV1.parse(evaluateSurveyQualityGate(entries.map(e => e.event)));
         const result = C.SurveyQualityWorkflowReadV1.parse({ workflow, entries, headHash: entries.at(-1)?.event.thisHash ?? SURVEY_QUALITY_CHAIN_GENESIS,
             recordIntegrity: true, openIssueCount: check.openIssueCount, recordedCheckCount: check.recordedCheckCount,
-            semantics: 'caller-declared-workflow-only', checkpointTrust: 'local-records-only', standardConformity: 'not-evaluated', humanSignatureVerification: 'not-evaluated', deliveryApproval: 'not-granted' });
+            semantics: 'caller-declared-workflow-only', checkpointTrust: 'local-records-only', standardConformity: 'not-evaluated', humanSignatureVerification: 'not-evaluated', deliveryApproval: 'not-granted', qualityGate });
         if (Buffer.byteLength(JSON.stringify(result)) > L.recordBytes)
             return fail('limit');
         return result;

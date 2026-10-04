@@ -49,7 +49,19 @@ let root: Root
 async function render(overrides: Partial<Parameters<typeof SurveyQualityWorkspace>[0]> = {}): Promise<void> {
   await act(async () => root.render(createElement(SurveyQualityWorkspace, { binding, runtimeReady: true, ...overrides })))
 }
-const button = (label: string): HTMLButtonElement => Array.from(host.querySelectorAll('button')).find(item => item.textContent === label)!
+const buttonLabels: Record<string, string> = {
+  'Freeze this retention plan': 'qualityWorkspaceFreeze',
+  'Create a retention record for this plan': 'qualityWorkspaceCreateRecord',
+  'Record bundle byte check': 'qualityWorkspaceCheckBytes',
+  'Retain selected member and record this check': 'qualityWorkspaceRetainCheck',
+  'Read plan history': 'qualityWorkspacePlanHistory',
+  'Read records for this plan': 'qualityWorkspaceRecordHistory',
+  'Reverify local records and frozen bytes': 'qualityWorkspaceReverify',
+  'Retry the same request': 'qualityWorkspaceRetry',
+  'Next page': 'qualityWorkspaceNext',
+  'Previous page': 'qualityWorkspacePrevious'
+}
+const button = (label: string, occurrence = 0): HTMLButtonElement => Array.from(host.querySelectorAll('button')).filter(item => item.textContent === i18n.t(buttonLabels[label] ?? label))[occurrence]!
 async function click(target: HTMLElement): Promise<void> { await act(async () => target.click()) }
 async function open(): Promise<void> { await act(async () => { const details = host.querySelector('details')!; details.open = true; details.dispatchEvent(new Event('toggle')) }) }
 async function freeze(): Promise<void> { await click(host.querySelector('input')!); await click(button('Freeze this retention plan')) }
@@ -80,7 +92,7 @@ describe('quality retention desktop workspace', () => {
     useEngineeringConversationDrafts.setState({ drafts: {} })
     await act(async () => root.render(createElement(EngineeringEvidenceQuestions, { scope: { workspace: '/test', projectId: 'project', projectRevision: 2, ready: true, focus }, children: createElement(SurveyQualityWorkspace, { binding, runtimeReady: true }) })))
     await open(); await freeze(); await createRecord(); await click(button('Record bundle byte check'))
-    const question = host.querySelector('button[aria-label*="event-1"]') as HTMLButtonElement
+    const question = host.querySelector<HTMLButtonElement>('[data-testid="quality-workspace-event"] button')!
     runtimeRequest.mockClear(); await click(question)
     expect(runtimeRequest).not.toHaveBeenCalled(); expect(focus).toHaveBeenCalledOnce()
     expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/test', 'project'])]?.evidenceContext?.typedEvidence).toEqual({ schemaVersion: 1, projectId: 'project', projectRevision: 2, kind: 'retention-record', recordId: storedRecord.record.id, planHash: storedRecord.record.planHash, headHash: storedRecord.verification.headHash, selector: { path: ['events', 0], identity: { id: 'event-1', sequence: 1, thisHash: storedRecord.verification.headHash } } })
@@ -91,14 +103,15 @@ describe('quality retention desktop workspace', () => {
     await render(); expect(runtimeRequest).not.toHaveBeenCalled()
     await open(); expect(runtimeRequest).not.toHaveBeenCalled()
     expect(button('Freeze this retention plan').disabled).toBe(true)
-    expect(host.textContent).toContain(output.path)
-    expect(host.textContent).toContain('not quality approval')
+    expect(host.textContent).toContain('report.pdf')
+    expect(host.textContent).not.toContain(output.path)
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceBoundary'))
     await freeze()
     expect(runtimeRequest).toHaveBeenCalledTimes(1)
     expect(JSON.parse(runtimeRequest.mock.calls[0]![2])).toEqual({ manifestId: 'manifest', expectedProjectRevision: 2, idempotencyKey: expect.any(String), requiredEvidence: plan.plan.requiredEvidence })
     await createRecord()
     expect(runtimeRequest).toHaveBeenCalledTimes(2)
-    expect(host.textContent).toContain('Not yet recorded')
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceMissing'))
     await click(button('Record bundle byte check'))
     expect(JSON.parse(runtimeRequest.mock.calls.at(-1)![2])).toEqual({ expectedHeadHash: hash('0'), idempotencyKey: expect.any(String), checkId: 'artifact-bytes' })
     await click(button('Retain selected member and record this check'))
@@ -107,13 +120,19 @@ describe('quality retention desktop workspace', () => {
     expect(JSON.parse(runtimeRequest.mock.calls.at(-1)![2])).toEqual({ expectedHeadHash: '1'.padStart(64, '0'), idempotencyKey: expect.any(String), checkId: 'evidence:output-1', evidenceId: 'evidence-1' })
     expect(host.querySelector('select')).toBeNull()
     expect(storedRecord.events).toHaveLength(2)
-    expect(host.textContent).toContain('Recorded (byte retention only)')
-    expect(host.textContent).toContain('History coverage, standards conformity and human signatures remain unevaluated')
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceRecorded'))
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceVerifiedBoundary'))
+    expect(host.textContent).not.toContain('plan-1')
+    expect(host.textContent).not.toContain('record-1')
+    expect(host.textContent).not.toContain('.workwise/deliverables')
+    expect(host.textContent).not.toContain('SHA-256')
+    expect(host.textContent).not.toContain(hash('a'))
+    expect(host.textContent).not.toContain(hash('0'))
     await click(button('Reverify local records and frozen bytes'))
     expect(runtimeRequest.mock.calls.at(-2)!.slice(0, 3)).toEqual(['/v1/engineering/projects/project/quality-records/record-1/verify', 'POST', '{}'])
     await act(async () => { await i18n.changeLanguage('zh') })
-    expect(host.textContent).toContain('不代表质量批准')
-    expect(host.textContent).toContain('已记录（仅字节留存）')
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceBoundary'))
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceRecorded'))
   })
 
   it('restores a selected plan and its records through bounded history pages and fresh reads', async () => {
@@ -121,18 +140,18 @@ describe('quality retention desktop workspace', () => {
     runtimeRequest.mockResolvedValueOnce(response({ plans: [plan], unavailable: [{ id: 'old-plan', reason: 'stale' }, { id: 'damaged-plan', reason: 'integrity' }], nextOffset: 20 }))
     await click(button('Read plan history'))
     expect(runtimeRequest.mock.calls.at(-1)![0]).toContain('?limit=20&offset=0')
-    expect(host.textContent).toContain('old-plan')
-    expect(host.textContent).toContain('damaged-plan')
-    expect(host.textContent).toContain('cannot restore')
+    expect(host.textContent).not.toContain('old-plan')
+    expect(host.textContent).not.toContain('damaged-plan')
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceHistoryIntegrity'))
     expect(Array.from(host.querySelectorAll('button')).some(item => item.textContent?.includes('old-plan'))).toBe(false)
     await click(button('Next page')); expect(runtimeRequest.mock.calls.at(-1)![0]).toContain('offset=20')
     await click(button('Previous page'))
-    await click(Array.from(host.querySelectorAll('button')).find(item => item.textContent?.startsWith('Validate and restore plan'))!)
+    await click(Array.from(host.querySelectorAll('button')).find(item => item.textContent?.startsWith(i18n.t('qualityWorkspaceRestorePlan'))!)!)
     await click(button('Read records for this plan'))
     expect(runtimeRequest.mock.calls.at(-1)![0]).toContain('/quality-records?limit=20&offset=0')
-    await click(Array.from(host.querySelectorAll('button')).find(item => item.textContent?.startsWith('Validate and restore record'))!)
+    await click(Array.from(host.querySelectorAll('button')).find(item => item.textContent?.startsWith(i18n.t('qualityWorkspaceRestoreRecord'))!)!)
     expect(runtimeRequest).toHaveBeenLastCalledWith('/v1/engineering/projects/project/quality-records/record-1', 'GET')
-    expect(host.textContent).toContain('Local retention record')
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceRecord'))
     expect(runtimeRequest.mock.calls.every(([, method]) => method === 'GET')).toBe(true)
   })
 
@@ -146,7 +165,7 @@ describe('quality retention desktop workspace', () => {
     expect(runtimeRequest.mock.calls.at(-1)).toEqual(original)
     runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: JSON.stringify({ code: 'quality_workspace_stale', message: 'PRIVATE /path' }) })
     await click(button('Record bundle byte check'))
-    expect(host.textContent).toContain('project revision, manifest or source files changed')
+    expect(host.textContent).toContain(i18n.t('qualityWorkspaceStale'))
     expect(host.textContent).not.toContain('Local retention record')
     expect(host.textContent).not.toContain('PRIVATE')
     expect(button('Retry the same request')).toBeUndefined()

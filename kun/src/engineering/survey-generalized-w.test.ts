@@ -42,7 +42,27 @@ describe('known absolute covariance generalized w pure diagnostic', () => {
     expect(JSON.stringify(request)).toBe(before)
     expect(result).toMatchObject({ assumptionsVerified: false, familyDeclarationVerified: false, observationAction: 'none',
       distributionEvaluation: 'not-performed', multipleComparisonAdjustment: 'not-performed', decision: 'not-evaluated' })
+    expect(result.statisticalDeclaration).toMatchObject({
+      hypotheses: { h0: expect.any(String), h1: expect.any(String), scope: 'per-bias-direction' },
+      targetPower: null,
+      modelVersion: result.diagnosticsVersion,
+      covarianceModelVersion: expect.any(String),
+      testFamily: { id: result.request.family.id, declaration: result.request.family.declaration, source: expect.any(String), correction: 'not-applied' },
+      humanReview: { status: 'not-evaluated', declaration: expect.any(String) }
+    })
     expect(SurveyGeneralizedWResultV1.parse(result)).toEqual(result)
+    const legacy = { ...result }; delete legacy.statisticalDeclaration
+    expect(SurveyGeneralizedWResultV1.parse(legacy)).toEqual(legacy)
+  })
+  it('rejects a declaration bound to a different covariance model', () => {
+    const request = input()
+    request.statisticalDeclaration = {
+      status: 'not-evaluated', hypotheses: { h0: 'zero', h1: 'non-zero', scope: 'per-bias-direction' }, targetPower: null,
+      modelVersion: 'fixed-linear-known-covariance-generalized-w-1', covarianceModelVersion: 'wrong-covariance-v2',
+      testFamily: { id: request.family.id, declaration: request.family.declaration, source: 'test', alpha: request.family.alpha, correction: 'not-applied' },
+      humanReview: { status: 'not-evaluated', declaration: 'not reviewed' }
+    }
+    expect(SurveyGeneralizedWRequestV1.safeParse(request).success).toBe(false)
   })
 
   const cases = ['golden', 'invarianceBase', 'rowPermutation', 'parameterColumnPermutation', 'negativeControlWrongDirectionPermutation',

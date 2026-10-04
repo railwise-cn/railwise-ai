@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SurveyStatisticalDeclarationV1 } from './survey-statistical-declaration.js'
 
 export const SURVEY_GENERALIZED_W_LIMITS = Object.freeze({ observations: 64, parameters: 16, directions: 64 })
 const finite = z.number().finite()
@@ -23,6 +24,8 @@ export const SurveyGeneralizedWRequestV1 = z.object({
       && new TextDecoder().decode(new TextEncoder().encode(value)) === value), matrix }).strict(),
   family: z.object({ id, alpha: finite.gt(0).lt(1), tail: z.literal('two-sided'),
     declaration: z.literal('caller-declared-before-evaluation') }).strict(),
+  /** Optional for old callers; new trials persist the declaration in output. */
+  statisticalDeclaration: SurveyStatisticalDeclarationV1.optional(),
   biasDirections: z.array(z.object({ id, coefficients: vector }).strict()).min(1).max(SURVEY_GENERALIZED_W_LIMITS.directions)
 }).strict().superRefine((value, context) => {
   const n = value.observationIds.length, p = value.parameterIds.length
@@ -30,6 +33,15 @@ export const SurveyGeneralizedWRequestV1 = z.object({
     || value.parameterUnits.length !== p || value.covariance.matrix.length !== n || value.covariance.matrix.some(row => row.length !== n)
     || value.biasDirections.some(direction => direction.coefficients.length !== n || direction.coefficients.every(item => item === 0))) {
     context.addIssue({ code: 'custom', message: 'A, y, C and nonzero bias direction dimensions must match the declared rows and columns' })
+  }
+  if (value.statisticalDeclaration
+    && (value.statisticalDeclaration.modelVersion !== 'fixed-linear-known-covariance-generalized-w-1'
+      || value.statisticalDeclaration.covarianceModelVersion !== 'caller-declared-known-apriori-absolute-observation-covariance'
+      || value.statisticalDeclaration.hypotheses.scope !== 'per-bias-direction'
+      || value.statisticalDeclaration.testFamily.id !== value.family.id
+      || value.statisticalDeclaration.testFamily.alpha !== value.family.alpha
+      || value.statisticalDeclaration.testFamily.correction !== 'not-applied')) {
+    context.addIssue({ code: 'custom', message: 'Statistical declaration family identity, alpha and correction must match the generalized-w family' })
   }
   for (const values of [value.observationIds, value.parameterIds, value.biasDirections.map(direction => direction.id)]) {
     if (new Set(values).size !== values.length) context.addIssue({ code: 'custom', message: 'duplicate row, parameter or direction ID' })
@@ -60,6 +72,8 @@ const common = {
   projectionComputation: z.literal('column-scaled-pivoted-householder-qr'),
   relativeRankTolerance: z.literal(1e-10), relativeDetectabilityTolerance: z.literal(1e-10),
   statisticErrorPolicy: z.literal('conservative-condition-based-budget-1'), relativeStatisticErrorBudget: z.literal(1e-8),
+  /** Optional keeps historical trial records readable. New results include it. */
+  statisticalDeclaration: SurveyStatisticalDeclarationV1.optional(),
   ...boundaries
 }
 export const SurveyGeneralizedWResultV1 = z.discriminatedUnion('modelStatus', [
@@ -75,6 +89,14 @@ export const SurveyGeneralizedWResultV1 = z.discriminatedUnion('modelStatus', [
     aprioriWeightedResidualSum: finite.nonnegative(),
     diagnostics: z.array(SurveyGeneralizedWDirectionV1).min(1).max(SURVEY_GENERALIZED_W_LIMITS.directions) }).strict()
 ]).superRefine((value, context) => {
+  if (value.statisticalDeclaration && (value.statisticalDeclaration.modelVersion !== value.diagnosticsVersion
+    || value.statisticalDeclaration.covarianceModelVersion !== 'caller-declared-known-apriori-absolute-observation-covariance'
+    || value.statisticalDeclaration.hypotheses.scope !== 'per-bias-direction'
+    || value.statisticalDeclaration.testFamily.id !== value.request.family.id
+    || value.statisticalDeclaration.testFamily.alpha !== value.request.family.alpha
+    || value.statisticalDeclaration.testFamily.correction !== 'not-applied')) {
+    context.addIssue({ code: 'custom', message: 'statistical declaration must bind to the generalized-w model and family' })
+  }
   if (value.modelStatus !== 'resolved') return
   const n = value.request.observationIds.length, p = value.request.parameterIds.length
   if (value.rank !== p || value.degreesOfFreedom !== n - p || value.parameters.length !== p

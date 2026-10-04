@@ -11,9 +11,10 @@ describe('survey import identity', () => {
       surveyImportKey('project-one', { ...input, dataBase64: 'different-data' }),
       surveyImportKey('project-one', { ...input, networkType: 'plane-control' }),
       surveyImportKey('project-one', { ...input, cosaIn1Mapping: { knownPointRecordCount: 3 } }),
+      surveyImportKey('project-one', { ...input, tabularMapping: { linearUnit: 'mm', confirmed: true } }),
       surveyImportKey('project-one', { ...input, name: 'renamed.in1' })
     ])
-    expect(new Set([original, ...variants]).size).toBe(6)
+    expect(new Set([original, ...variants]).size).toBe(7)
     expect(original).not.toContain('original-bytes')
   })
 })

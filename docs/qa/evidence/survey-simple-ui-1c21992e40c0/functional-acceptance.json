@@ -1,0 +1,112 @@
+{
+  "focusEntered": true,
+  "tabContainment": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "focusReturned": true,
+  "draftPreserved": true,
+  "advancedEntered": true,
+  "advancedFocusReturned": true,
+  "outputRecords": [
+    {
+      "format": "DOCX",
+      "hash": "b5f7fbe99465eb32649e85aa9c088759738c1e94ed6afafd223a5fecc61c7491"
+    },
+    {
+      "format": "PDF",
+      "hash": "968dddb3dcb2e19cdcc51f77ab2c0c19c35145a0ecd2875132199253be290275"
+    },
+    {
+      "format": "XLSX",
+      "hash": "9767ea55e52cc305e2cc82e2677c03bf4bd5d3d08183d1cce4be373044041479"
+    }
+  ],
+  "exportIntegrityMatches": true,
+  "exportedFiles": [
+    {
+      "format": "DOCX",
+      "path": "/private/tmp/railwise-survey-ui-candidate/acceptance/exports/1c21992e40c0/report.docx",
+      "sizeBytes": 4616,
+      "sha256": "b5f7fbe99465eb32649e85aa9c088759738c1e94ed6afafd223a5fecc61c7491",
+      "nativeSaveDialog": true,
+      "containerValid": true
+    },
+    {
+      "format": "PDF",
+      "path": "/private/tmp/railwise-survey-ui-candidate/acceptance/exports/1c21992e40c0/report.pdf",
+      "sizeBytes": 29651,
+      "sha256": "968dddb3dcb2e19cdcc51f77ab2c0c19c35145a0ecd2875132199253be290275",
+      "nativeSaveDialog": true,
+      "containerValid": true
+    },
+    {
+      "format": "XLSX",
+      "path": "/private/tmp/railwise-survey-ui-candidate/acceptance/exports/1c21992e40c0/evidence.xlsx",
+      "sizeBytes": 36609,
+      "sha256": "9767ea55e52cc305e2cc82e2677c03bf4bd5d3d08183d1cce4be373044041479",
+      "nativeSaveDialog": true,
+      "containerValid": true
+    }
+  ],
+  "freshTaskFlow": {
+    "fixture": "simple-flow.csv",
+    "sourceUpload": "AI composer file input",
+    "automaticPreflight": true,
+    "warningCount": 1,
+    "mainActions": [
+      "Create task",
+      "Upload files",
+      "Confirm and continue",
+      "Start calculation"
+    ],
+    "actionsToFirstResult": 4,
+    "resultRows": [
+      {
+        "point": "P01",
+        "current": 0.001,
+        "unit": "m"
+      },
+      {
+        "point": "P02",
+        "current": 0.002,
+        "unit": "m"
+      }
+    ],
+    "unconfiguredThresholdsRemainUnresolved": true,
+    "retainedAfterFinalPackageRelaunch": true
+  },
+  "previewAction": {
+    "format": "PDF",
+    "uiNotice": "已打开成果文件。",
+    "externalViewerRenderingVerified": false
+  }
+}

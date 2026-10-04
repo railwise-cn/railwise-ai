@@ -1,0 +1,3 @@
+9135047c4f68df5eb0e06e18d14d590545e6d17204ed62628dfdd1de5a97f8cc  WorkWise-0.5.1-mac-Apple-Silicon.dmg
+573fe3762d72267aa782158b0e0ffe28357fd95544fcb7ffd5d95745d6829afb  WorkWise-0.5.1-mac-Intel.dmg
+3cb27907a0de2e9c4c3309e1869b91aefb0c4c3a88224be90831c43662cc67de  WorkWise-0.5.1-win-x64.exe

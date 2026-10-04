@@ -1,0 +1,50 @@
+{
+  "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+  "scrolling": {
+    "width": 765,
+    "scrollWidth": 780,
+    "scrollLeft": 15,
+    "overflow": "auto",
+    "text": "Segment\tReference observed / adjusted (m)\tCurrent observed / adjusted (m)\tChange (observed / adjusted, m)\tStandards and conformity\nBM → P\t1.000000 / 1.000000\t0.998000 / 0.998000\t-0.002000 / -0.002000\tNot evaluated"
+  },
+  "initialValues": {
+    "events": [
+      {
+        "schemaVersion": 1,
+        "id": "initial_value_c9796c74-b40f-4a67-ad13-b31808f07240",
+        "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+        "previousEventId": null,
+        "previousHash": null,
+        "adjustmentId": "adjustment_9929094e-12ee-4cda-8a27-ac8dae15698a",
+        "resultId": "adjustment_result_ea556d29-2665-4665-9b51-33c23382dc06",
+        "resultHash": "e0af087c88e227434fb1e5cd3998638d9fbd96d96f4b5d556282680a26646add",
+        "inputHash": "0ccf5a6876854c191880858f2a9e2d99ff1b21e0dbfd7808b3a4f2173aa2fa7c",
+        "sourceSha256": "0aee26e168ba9e05db405e96340b7257cc2b24425add425dfb314b2fb3f5f9b8",
+        "networkRevision": 2,
+        "reason": "Local candidate acceptance: explicitly establish the reference period; keep existing results unchanged.",
+        "confirmation": "user-confirmed",
+        "signoff": "unsigned",
+        "createdAt": "2026-09-30T13:09:42.284Z",
+        "eventHash": "f268d8c0a2cc2c5c5a2c15c7e81768af529da01be1e4fd94bb47fda59614cd6c"
+      },
+      {
+        "schemaVersion": 1,
+        "id": "initial_value_931dfb42-669c-4e98-b1b4-f4b82d385729",
+        "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+        "previousEventId": "initial_value_c9796c74-b40f-4a67-ad13-b31808f07240",
+        "previousHash": "f268d8c0a2cc2c5c5a2c15c7e81768af529da01be1e4fd94bb47fda59614cd6c",
+        "adjustmentId": "adjustment_4963cb87-5389-4c68-8730-27f2a13decb6",
+        "resultId": "adjustment_result_a01e8eec-c40d-4e5c-8284-c08c716c9b6f",
+        "resultHash": "0164e4f5f7e1f49f68ef149b144de9f03b2b0f83042c2a38d4b23cd76fb9b314",
+        "inputHash": "2af204729a5d43c2230647dc8bf0d138e59c853a2fd48ddecc7dd6660f4bf70d",
+        "sourceSha256": "0aee26e168ba9e05db405e96340b7257cc2b24425add425dfb314b2fb3f5f9b8",
+        "networkRevision": 2,
+        "reason": "Local candidate acceptance: explicitly establish the reference period; keep existing results unchanged.",
+        "confirmation": "user-confirmed",
+        "signoff": "unsigned",
+        "createdAt": "2026-10-01T02:52:01.277Z",
+        "eventHash": "4cfeb3c4c6c5e7e2ce6e8bf590cee6525aa9e3e2d274c2de595f1eb9c138545a"
+      }
+    ]
+  }
+}

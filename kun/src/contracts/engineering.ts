@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { AdjustmentResultV1, DeformationComparisonV1, SurveySourceFileV1 } from './survey.js'
+import { SurveySegmentComparisonV1, SurveySegmentContinuityV1 } from './survey-monitoring.js'
 
 export const ENGINEERING_SCHEMA_VERSION = 1 as const
 export const ENGINEERING_MAX_OBSERVATIONS = 500_000
@@ -99,7 +100,13 @@ export const MonitoringAnalysisV1 = z.object({
   inputHash: z.string().min(1), algorithmVersion: z.string().min(1), results: z.array(z.object({
     monitoringItem: z.string(), point: z.string(), currentValue: z.number().finite().optional(), previousValue: z.number().finite().optional(),
     cumulativeChange: z.number().finite().optional(), changeRate: z.number().finite().optional(), trend: z.enum(['rising', 'falling', 'stable', 'unknown']),
-    anomaly: z.boolean(), thresholdStatus: z.enum(['normal', 'warning', 'alarm', 'control', 'unresolved'])
+    anomaly: z.boolean(), thresholdStatus: z.enum(['normal', 'warning', 'alarm', 'control', 'unresolved']),
+    /** The source unit for the current value; legacy analyses may omit it. */
+    unit: z.string().min(1).optional(),
+    /** Arithmetic and threshold conclusions require an aligned, unambiguous unit. */
+    unitStatus: z.enum(['aligned', 'source-differs', 'conflict']).optional(),
+    /** The source field used for cumulative change; mixed fields are unavailable. */
+    cumulativeBasis: z.enum(['source-cumulative', 'observed-value', 'mixed-unavailable']).optional()
   }).strict()), createdAt: z.string()
 }).strict()
 export type MonitoringAnalysisV1 = z.infer<typeof MonitoringAnalysisV1>
@@ -133,6 +140,10 @@ export const DeliverableManifestV1 = z.object({
   adjustments: z.array(AdjustmentResultV1).default([]),
   /** Immutable comparisons derived only from the linked adjustment results. */
   deformations: z.array(DeformationComparisonV1).default([]),
+  /** Explicit repeat-survey comparisons; absent in historical manifests. */
+  segmentComparisons: z.array(SurveySegmentComparisonV1).max(100).optional(),
+  /** Read-only cumulative continuity derived from explicitly selected adjacent comparisons. */
+  segmentContinuity: SurveySegmentContinuityV1.optional(),
   /** Instrument/GNSS source provenance linked through adjustment network IDs. */
   surveySources: z.array(SurveySourceEvidenceV1).default([]),
   validation: z.object({ valid: z.boolean(), errors: z.array(z.string()), warnings: z.array(z.string()) }).strict(), reviewStatus: z.enum(['draft', 'approved', 'archived']),
@@ -204,7 +215,8 @@ const DeliveryInputs = {
   analysisId: z.string().min(1).optional(),
   citations: z.array(KnowledgeCitationV1).default([]),
   adjustmentIds: z.array(z.string().min(1)).max(100).default([]),
-  deformationIds: z.array(z.string().min(1)).max(100).default([])
+  deformationIds: z.array(z.string().min(1)).max(100).default([]),
+  segmentComparisonIds: z.array(z.string().min(1)).max(100).default([])
 }
 const hasDeliveryInputs = (value: { datasetId?: string; analysisId?: string; adjustmentIds: string[]; deformationIds: string[] }): boolean =>
   Boolean(value.datasetId || (!value.analysisId && (value.adjustmentIds.length || value.deformationIds.length)))

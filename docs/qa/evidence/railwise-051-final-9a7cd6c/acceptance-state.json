@@ -1,0 +1,19 @@
+{
+  "sourceHead": "9a7cd6c394d0f796ccb28f06f694439bf280227d",
+  "packageVersion": "0.5.1",
+  "candidateRun": 36316718463,
+  "candidateNumber": 158,
+  "updaterRun": 36316720232,
+  "updaterNumber": 159,
+  "status": "failed-legacy-evidence-routing",
+  "publicReleaseApproval": false,
+  "scope": "Final packaged application startup, system theme, retained synthetic IN2 computation and real AI evidence readback; same-source isolated native updater.",
+  "updaterStatus": "passed",
+  "updaterInstalledAsarSha256": "0dc62b42c198ad6ed3093d09103dfee3f7eba4a588fc6d5cd9a379da3f23b79c",
+  "installedPath": "/Applications/RailWise AI.app",
+  "installedSignature": "passed",
+  "installedNotarization": "passed",
+  "runtimeEntitlements": "passed",
+  "runtimeFixSha256": "75fbe0cba5909fe19ea0a977263a8bc66c4144c600e5c167c362402c3e0af40c",
+  "followupFix": "5e49d220928c300ac4f1c6d5a6ff5fd35c0aa492"
+}

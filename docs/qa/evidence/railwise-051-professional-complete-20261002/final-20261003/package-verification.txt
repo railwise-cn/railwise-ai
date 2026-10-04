@@ -1,0 +1,13 @@
+Version: 0.5.1
+Installed: /Applications/RailWise AI.app
+Candidate path: /Users/wangjiawei/Documents/WorkWise/dist/mac-arm64/RailWise AI.app
+ASAR SHA-256: 35d087051b52bbf89014089d2e7300503ddd247e480faf39607a377b796f4063
+Runtime dist tree SHA-256: b19afa1b8453daa29761fdb0a35a186f7347198b3e4f2f8f715f240688011dd7
+Build freshness: passed
+ASAR integrity: passed, 13363 files / 466 compiled outputs
+Packaged SQLite: passed, ABI 148
+Signature: ad hoc; codesign --verify --deep --strict passed
+Apple notarization: not performed
+Update provider: none
+Public publishing: never
+Computer Use: not completed; SyntaxError/Transport closed prevented a fresh final AX/screenshot capture

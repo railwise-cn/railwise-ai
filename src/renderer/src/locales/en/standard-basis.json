@@ -1,11 +1,11 @@
 {
   "open": "View standard basis",
   "title": "Standard basis for this result",
-  "boundary": "Read-only catalog reviewed by agents. Project applicability, standards conformity and human signatures remain unevaluated.",
-  "legacyAssociation": "This explanation is matched to the result's retained source, algorithm and input contract. It does not add a rule reference or approval to the original record.",
+  "boundary": "Reference guidance for this result. Project applicability, standards conformity and human signatures remain unevaluated.",
+  "legacyAssociation": "This explanation is matched to the retained survey source and result. It does not add an approval or change the original record.",
   "missingIdentity": "This result has no complete source identity. No standard basis is assigned.",
-  "offline": "The local runtime is unavailable.",
-  "loading": "Loading the exact standard basis…",
+  "offline": "The standard reference is currently unavailable.",
+  "loading": "Loading the applicable standard reference…",
   "retry": "Retry lookup",
   "standard": "Standard",
   "profile": "Product profile",
@@ -23,8 +23,8 @@
   "ruleDigest": "Catalog rule SHA-256",
   "profileVersion": "Product profile version",
   "errors": {
-    "mismatch": "No unique exact catalog match exists for this result. Its original record is unchanged.",
-    "invalid-response": "The standard basis response failed identity or integrity checks. No source link is available.",
+    "mismatch": "No single applicable standard reference was found for this result. Its original record is unchanged.",
+    "invalid-response": "The standard reference could not be verified. No source link is available.",
     "unavailable": "This standard basis version is unavailable. No newer version was substituted.",
     "request-failed": "The standard basis could not be loaded.",
     "open-failed": "The official PDF could not be opened. The result is unchanged."

@@ -21,6 +21,8 @@ export const SurveyEvidenceReferenceV1 = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('network'), ...network }).strict(),
   z.object({ ...common, kind: z.literal('deformation'), comparisonId: id, inputHash: hash, algorithmVersion: id, referenceAdjustmentId: id, currentAdjustmentId: id }).strict(),
   z.object({ ...common, kind: z.literal('statistics'), ...network, adjustmentId: id, inputHash: hash, calculationHash: hash, diagnosticsVersion: id }).strict(),
+  z.object({ ...common, kind: z.literal('professional-review'), ...network, adjustmentId: id, resultId: id,
+    inputHash: id, resultHash: hash, projectionHash: hash, projectionVersion: id }).strict(),
   z.object({ ...common, kind: z.literal('free-leveling'), ...network, trialId: id, recordHash: hash }).strict(),
   z.object({ ...common, kind: z.literal('advanced-trial'), trialId: id, recordHash: hash }).strict(),
   z.object({ ...common, kind: z.literal('sampling-population'), populationId: id, populationHash: hash, unitIndex: z.number().int().min(0).max(9999).optional(), unitId: id.optional() }).strict(),

@@ -1,0 +1,182 @@
+{
+  "conclusion": "failure",
+  "databaseId": 36362064585,
+  "event": "workflow_dispatch",
+  "headBranch": "main",
+  "headSha": "4d939619798b70fa8469858c93604543aba1aa7f",
+  "jobs": [
+    {
+      "completedAt": "2026-09-28T00:26:33Z",
+      "conclusion": "failure",
+      "databaseId": 108741055445,
+      "name": "deploy",
+      "startedAt": "2026-09-28T00:23:49Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-28T00:23:50Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-28T00:23:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:23:50Z",
+          "conclusion": "success",
+          "name": "Validate requested source",
+          "number": 2,
+          "startedAt": "2026-09-28T00:23:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:23:54Z",
+          "conclusion": "success",
+          "name": "Check out trusted deployment tools",
+          "number": 3,
+          "startedAt": "2026-09-28T00:23:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:23:58Z",
+          "conclusion": "success",
+          "name": "Check out exact content source",
+          "number": 4,
+          "startedAt": "2026-09-28T00:23:54Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:23:58Z",
+          "conclusion": "success",
+          "name": "Confirm source identity",
+          "number": 5,
+          "startedAt": "2026-09-28T00:23:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:02Z",
+          "conclusion": "success",
+          "name": "Set up Node.js",
+          "number": 6,
+          "startedAt": "2026-09-28T00:23:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:03Z",
+          "conclusion": "success",
+          "name": "Enforce explicit production approval",
+          "number": 7,
+          "startedAt": "2026-09-28T00:24:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:03Z",
+          "conclusion": "skipped",
+          "name": "Test content transaction and PHP guards",
+          "number": 8,
+          "startedAt": "2026-09-28T00:24:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:03Z",
+          "conclusion": "success",
+          "name": "Test public version and download guards",
+          "number": 9,
+          "startedAt": "2026-09-28T00:24:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:04Z",
+          "conclusion": "success",
+          "name": "Verify official Stable version",
+          "number": 10,
+          "startedAt": "2026-09-28T00:24:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:04Z",
+          "conclusion": "success",
+          "name": "Prepare pinned website SSH transport",
+          "number": 11,
+          "startedAt": "2026-09-28T00:24:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:04Z",
+          "conclusion": "skipped",
+          "name": "Render private candidate preview",
+          "number": 12,
+          "startedAt": "2026-09-28T00:24:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:24:04Z",
+          "conclusion": "skipped",
+          "name": "Upload rendered HTML and screenshot preview",
+          "number": 13,
+          "startedAt": "2026-09-28T00:24:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:25:30Z",
+          "conclusion": "success",
+          "name": "Deploy product page with server backup",
+          "number": 14,
+          "startedAt": "2026-09-28T00:24:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:26:27Z",
+          "conclusion": "failure",
+          "name": "Verify public page and immutable downloads",
+          "number": 15,
+          "startedAt": "2026-09-28T00:25:30Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:26:31Z",
+          "conclusion": "success",
+          "name": "Roll back website after failed public verification",
+          "number": 16,
+          "startedAt": "2026-09-28T00:26:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:26:31Z",
+          "conclusion": "skipped",
+          "name": "Post Set up Node.js",
+          "number": 30,
+          "startedAt": "2026-09-28T00:26:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:26:31Z",
+          "conclusion": "success",
+          "name": "Post Check out exact content source",
+          "number": 31,
+          "startedAt": "2026-09-28T00:26:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:26:31Z",
+          "conclusion": "success",
+          "name": "Post Check out trusted deployment tools",
+          "number": 32,
+          "startedAt": "2026-09-28T00:26:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:26:31Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 33,
+          "startedAt": "2026-09-28T00:26:31Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36362064585/job/108741055445"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36362064585"
+}

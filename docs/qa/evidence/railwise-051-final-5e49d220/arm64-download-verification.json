@@ -1,0 +1,8 @@
+{
+  "artifactId": 10932317896,
+  "method": "HTTP Range extraction of ZIP member with CRC32 and SHA256SUMS validation",
+  "filename": "WorkWise-0.5.1-mac-Apple-Silicon.dmg",
+  "size": 295025091,
+  "sha256": "8b12b5e7b83b56a1f39b5c144193083ce7ba80dfc55ba188bddb914d4e265bda",
+  "archiveDigestVerified": false
+}

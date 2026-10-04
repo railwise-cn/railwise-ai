@@ -1,0 +1,113 @@
+{
+  "purpose": "Typed raw point readback on #158, not #161 acceptance",
+  "turnId": "turn_qc8erety",
+  "items": [
+    {
+      "id": "item_tool_turn_qc8erety_call_00_O0u75VwTc0nO6lchfs5X7327",
+      "turnId": "turn_qc8erety",
+      "threadId": "thr_fmn0gfzc",
+      "role": "tool",
+      "status": "pending",
+      "createdAt": "2026-09-27T12:41:17.111Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_O0u75VwTc0nO6lchfs5X7327",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_evidence\nParameters: 8 field(s); sensitive values omitted"
+    },
+    {
+      "id": "item_tool_turn_qc8erety_call_00_O0u75VwTc0nO6lchfs5X7327",
+      "turnId": "turn_qc8erety",
+      "threadId": "thr_fmn0gfzc",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-09-27T12:41:17.111Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_O0u75VwTc0nO6lchfs5X7327",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_evidence\nParameters: 8 field(s); sensitive values omitted",
+      "finishedAt": "2026-09-27T12:41:17.166Z"
+    },
+    {
+      "id": "item_call_00_O0u75VwTc0nO6lchfs5X7327",
+      "turnId": "turn_qc8erety",
+      "threadId": "thr_fmn0gfzc",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-09-27T12:41:17.166Z",
+      "finishedAt": "2026-09-27T12:41:17.166Z",
+      "kind": "tool_result",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_O0u75VwTc0nO6lchfs5X7327",
+      "toolKind": "tool_call",
+      "output": {
+        "status": "resolved",
+        "reference": {
+          "schemaVersion": 1,
+          "projectId": "project_ddbb224a-1bff-4499-b069-08da32e28cd7",
+          "projectRevision": 2,
+          "selector": {
+            "path": [
+              "unknownPoints",
+              0
+            ],
+            "identity": {
+              "id": "S1"
+            }
+          },
+          "kind": "network",
+          "networkId": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+          "networkRevision": 2,
+          "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+        },
+        "boundaries": {
+          "readOnly": true,
+          "newComputationStarted": false,
+          "approvalCapability": "none",
+          "callerDeclarationsAuthenticated": false,
+          "standardConformity": "not-evaluated",
+          "humanSignatureVerification": "not-evaluated",
+          "interpretation": "Explain the selected stored evidence and its original limits. Caller declarations and trial outputs are not professional acceptance or authenticated field facts."
+        },
+        "provenance": {
+          "record": {
+            "id": "network_95a405d2-9674-409e-8136-0b769cc5ec1d",
+            "projectId": "project_ddbb224a-1bff-4499-b069-08da32e28cd7",
+            "revision": 2,
+            "createdAt": "2026-09-27T11:31:28.831Z",
+            "unit": "m"
+          }
+        },
+        "value": {
+          "id": "S1",
+          "pointClass": "station",
+          "x": 50.00000001228713,
+          "y": 49.999999767779975,
+          "known": false,
+          "sourceRow": 5,
+          "sourceLocator": "COSA.in2:5",
+          "rawFields": {
+            "station": "S1",
+            "recordType": "station",
+            "initialCoordinateMethod": "cosa-station-polar-rigid-initialization",
+            "initialCoordinateDistanceRmsMetres": 1.2287124206979806e-08
+          }
+        }
+      },
+      "isError": false
+    },
+    {
+      "id": "item_text_j9u97xua",
+      "turnId": "turn_qc8erety",
+      "threadId": "thr_fmn0gfzc",
+      "role": "assistant",
+      "status": "completed",
+      "createdAt": "2026-09-27T12:41:37.158Z",
+      "kind": "assistant_text",
+      "text": "已按给定的 `typedEvidence` 精确调用 `survey_read_evidence`，证据成功解析（status: resolved）。以下解释严格限定在这份选定证据及其边界内。\n\n## 1. 证据解析状态与边界\n\n- 引用被精确命中：kind=network，networkId `network_95a405d2-9674-409e-8136-0b769cc5ec1d`，networkRevision 2，sourceSha256 `4281cc7a…`，selector `path:[\"unknownPoints\",0]` + `identity:{\"id\":\"S1\"}`。\n- 记录来源：该网络记录创建于 2026-09-27T11:31:28.831Z，单位 m。\n- **读取边界**：只读；未启动新计算；无审批能力；调用方声明未被认证；规范符合性 not-evaluated；人员签认 not-evaluated。即本证据是存储的中间网络记录，**不构成专业验收或现场事实认证**。\n\n## 2. S1 的结果（本证据实际内容）\n\n选中的是网络层\"未知点\"记录，内容为 S1 的**初始坐标**，不是平差成果、也不是点位精度：\n\n| 字段 | 值 |\n| --- | --- |\n| id | S1 |\n| pointClass | station（测站点） |\n| x（初始） | 50.00000001228713 m |\n| y（初始） | 49.999999767779975 m |\n| known | false（未知点，需平差解算） |\n| sourceRow / sourceLocator | 5 / `COSA.in2:5` |\n| 初始化方式 | `cosa-station-polar-rigid-initialization`（极坐标刚性初始化） |\n| 初始化拟合距离 RMS | 1.2287e-8 m |\n\n注意：初始 y 与 50.0000000 相差约 **−2.32e-7 m**；这份记录里**没有** point-precision、协方差或误差椭圆字段——那些属于平差记录（adjustment），不在本选定证据范围内，我不用其他记录冒充本证据的答案。\n\n## 3. 原始依据\n\n- 原始文件：`COSA.in2`，SHA-256 `4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0`；源记录锚点 `COSA.in2:5`。\n- 网络：`network_95a405d2-9674-409e-8136-0b769cc5ec1d` revision 2，平面控制网（plane-control，此前项目上下文中质量状态为 validated，4 点 5 观测）。\n- S1 的初始值由解析器按\"极坐标刚性初始化\"得到，初始化距离 RMS ≈ 1.23e-8 m，说明该初始坐标与本站观测方向/距离的一致性在合成数据下非常高。\n\n## 4. 需要复核的问题\n\n1. **本证据只含初始坐标，不含精度**：若问题目标是 S1 的 point-precision，需要另行引用平差证据（含 adjustmentId、inputHash、calculationHash 等完整字段）才能作答；当前证据本身没有该字段，我不能从这份证据推导或替代。\n2. **初始坐标不等于成果坐标**：S1 是 unknown 点，初始值仅用于线性化；成果应看平差记录。二者不可混用。\n3. **源快照一致性**：证据绑定 networkRevision 2 与源 hash `4281cc7a…`；若源文件此后变更，本证据即对应旧快照，需按 revision/hash 精确核对。\n4. **初始化 y 偏差 −2.32e-7 m 的成因**：需复核极坐标刚性初始化的参考点与定向基准（A 后视归零、B/C 方向+距离）是否与最终平差基准一致。\n5. **边界声明**：standardConformity 与人员签认均为 not-evaluated——如需规范符合性或签认结论，必须在当前项目内另行完成评估，不能从本证据推断。\n6. **坐标框架**：项目上下文中 coordinateSystem 与 verticalDatum 均为\"待确认\"，成果坐标的框架声明需先补齐。\n\n如需我继续定位 S1 的平差精度证据（用其精确的 typed 引用读取），或核查初始坐标与平差成果的差异成因，请提供对应完整证据引用。"
+    }
+  ]
+}

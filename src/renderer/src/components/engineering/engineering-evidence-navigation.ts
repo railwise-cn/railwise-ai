@@ -88,6 +88,12 @@ export function evidenceCardNavigationTarget(context: EngineeringNavigationConte
 export function focusEvidenceElement(root: HTMLElement, key: string): boolean {
   const element = Array.from(root.querySelectorAll<HTMLElement>('[data-evidence-key]')).find(item => item.dataset.evidenceKey === key)
   if (!element) return false
+  // Evidence links must reveal any progressively disclosed ancestors first.
+  let parent: HTMLElement | null = element.parentElement
+  while (parent && parent !== root) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true
+    parent = parent.parentElement
+  }
   element.focus({ preventScroll: true })
   element.scrollIntoView?.({ block: 'center', behavior: 'instant' })
   return true

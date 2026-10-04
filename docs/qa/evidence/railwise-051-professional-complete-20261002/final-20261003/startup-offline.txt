@@ -1,0 +1,57 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 收起侧边栏
+						7 container
+							8 container 编程 / 内业
+								9 按钮 编程
+								10 按钮 内业
+							11 切换 Description: 专注模式, Value: off
+							12 container 工作区工具
+								13 开合三角标记 工具
+									14 文本 工具
+							15 按钮 (disabled) 新建任务, Help: 请先连接服务，再继续操作。
+						16 container
+							17 text 任务 0
+							18 切换按钮 (disabled) Description: 刷新工程测量项目, Value: 0
+							19 文本 连接测量服务后即可加载内业任务和成果。
+						20 container
+							21 切换按钮 连接手机, Value: 0
+							22 按钮 设置
+					23 container
+						24 按钮 收起侧边栏
+						25 标题 RailWise Survey, Value: 1
+							26 文本 RailWise Survey
+						27 text 工程测量内业 当前内业任务
+						28 弹出式按钮 (disabled) 当前内业任务, Value: 尚未选择内业任务
+						29 按钮 (disabled) 新建任务
+						30 container 工作视图
+							31 按钮 概览
+							32 按钮 处理
+							33 按钮 结果
+							34 按钮 交付
+						35 文本 工作视图
+						36 按钮 打开 AI
+						37 按钮 高级
+					38 文本 RailWise Survey 需要连接本地测量服务，才能完成校核、分析和成果生成。连接成功后，任务数据会自动刷新。
+					39 container
+						40 标题 从一个任务开始, Value: 3
+							41 文本 从一个任务开始
+						42 文本 新建任务后，上传资料或描述目标。我们会先检查资料，再由你确认计算。
+						43 按钮 (disabled) 新建任务
+	44 关闭按钮
+	45 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	46 最小化按钮
+47 menu bar
+	48 RailWise AI
+	49 文件
+	50 编辑
+	51 显示
+	52 窗口
+	53 帮助
+
+The focused UI element is 10 按钮 内业

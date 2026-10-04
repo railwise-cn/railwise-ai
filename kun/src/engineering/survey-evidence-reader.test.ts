@@ -17,6 +17,11 @@ function fixture() {
     survey: { getNetwork: vi.fn(() => network), getRawSourceIntegrity: vi.fn(() => ({ status: 'verified', ledgerEntryCount: 1, errors: [] })),
       getDeformationForProjectNewUse: vi.fn(() => ({ id: 'comparison', projectId: 'project', inputHash: hash, algorithmVersion: 'v1', referenceAdjustmentId: 'old', currentAdjustmentId: 'new', points: [{ pointId: 'P1', delta: 1 }] })),
       getAdjustmentStatisticalDiagnostics: vi.fn(() => ({ projectId: 'project', networkId: 'network', runId: 'adjustment', inputHash: hash, calculationHash: hash, sourceSha256: hash, diagnosticsVersion: 'leveling-deleted-t-1', status: 'unavailable', reason: 'insufficient-redundancy' })),
+      getProfessionalReview: vi.fn(() => ({ projectId: 'project', networkId: 'network', runId: 'adjustment', resultId: 'result', inputHash: hash,
+        resultHash: hash, projectionHash: hash, projectionVersion: 'survey-professional-review-1', reviewStatus: 'unsigned', standardsConformity: 'not-evaluated',
+        source: { networkRevision: 2, sha256: hash, status: 'bound', integrity: 'verified' },
+        closures: [{ id: 'route-1', misclosureMetres: 0.003, status: 'not-evaluated', reason: 'closure-tolerance-not-configured' }],
+        residualNorms: [{ unit: 'm', value: 0.002, status: 'descriptive-only' }] })),
       getFreeLevelingTrial: vi.fn(() => ({ id: 'trial', projectId: 'project', recordHash: hash, networkRevision: 2, sourceSha256: hash, output: { points: [{ id: 'P1', height: 2 }] } })) },
     advanced: { getTrial: vi.fn(() => ({ id: 'trial', projectId: 'project', recordHash: hash, result: { rows: [{ observationId: 'obs', value: 7 }] } })) },
     scoring: { getRecord: vi.fn(() => ({ id: 'record', projectId: 'project', recordHash: hash, result: { score: { numerator: '100', denominator: '3' } } })) },
@@ -45,7 +50,8 @@ const examples = [
   { kind: 'monitoring-dataset', datasetId: 'dataset', datasetRevision: 2, sourceFileHash: hash },
   { kind: 'monitoring-analysis', analysisId: 'analysis', datasetId: 'dataset', inputHash: hash, algorithmVersion: 'v2', selector: { path: ['results', 0], identity: { monitoringItem: 'settlement', point: 'P1' } } },
   { kind: 'deliverable-verification', manifestId: 'manifest', checkedAt: '2026-09-21T00:00:00Z' },
-  { kind: 'monitoring-replay', manifestId: 'manifest', attemptId: 'attempt', checkedAt: '2026-09-21T00:00:00Z' }
+  { kind: 'monitoring-replay', manifestId: 'manifest', attemptId: 'attempt', checkedAt: '2026-09-21T00:00:00Z' },
+  { kind: 'professional-review', ...networkBinding, adjustmentId: 'adjustment', resultId: 'result', inputHash: hash, resultHash: hash, projectionHash: hash, projectionVersion: 'survey-professional-review-1' }
 ]
 
 describe('exact read-only Survey evidence', () => {
@@ -122,6 +128,25 @@ describe('exact read-only Survey evidence', () => {
   it('refuses a different diagnostic algorithm for the same calculation', () => {
     const { reader } = fixture()
     expect(reader.read({ ...base, ...examples[2], diagnosticsVersion: 'leveling-deleted-t-0' }, scope)).toMatchObject({ status: 'unavailable', reason: 'binding-mismatch' })
+  })
+  it('explains a bound professional closure with its pending limit and unsigned status', () => {
+    const { reader } = fixture()
+    const reference = { ...base, ...examples.at(-1), selector: { path: ['closures', 0], identity: { id: 'route-1' } } }
+    expect(reader.read(reference, scope)).toMatchObject({ status: 'resolved',
+      provenance: { record: { reviewStatus: 'unsigned', standardsConformity: 'not-evaluated', projectionHash: hash } },
+      value: { misclosureMetres: 0.003, status: 'not-evaluated', reason: 'closure-tolerance-not-configured' } })
+  })
+  it.each(['resultId', 'inputHash', 'resultHash', 'projectionHash', 'projectionVersion', 'adjustmentId', 'networkRevision', 'sourceSha256'])(
+    'refuses professional evidence with a mismatched %s', field => {
+      const { reader } = fixture()
+      const ref = { ...base, ...examples.at(-1), [field]: field === 'networkRevision' ? 3 : field.endsWith('Hash') || field === 'sourceSha256' ? otherHash : 'other' }
+      expect(reader.read(ref, scope)).toMatchObject({ status: 'unavailable', reason: 'binding-mismatch' })
+    })
+  it('refuses professional review whose original source no longer passes integrity', () => {
+    const { reader, deps } = fixture()
+    const value = deps.survey.getProfessionalReview()
+    deps.survey.getProfessionalReview.mockReturnValue({ ...value, source: { ...value.source, status: 'unverified', integrity: 'failed' } })
+    expect(reader.read({ ...base, ...examples.at(-1) }, scope)).toMatchObject({ status: 'unavailable', reason: 'binding-mismatch' })
   })
   it('refuses a valid alternate scoring product profile attached to another profile record', () => {
     const { reader, deps } = fixture()

@@ -601,6 +601,106 @@ describe('SurveyService', () => {
     service.close()
   })
 
+  it.each(['validated', 'blocked'] as const)('replays the current %s network after normal validation without changing import evidence', async (status) => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-survey-import-after-validation-'))
+    const service = new SurveyService({ rootDir: root })
+    const request = workwiseSurveyNetworkFileImport({
+      projectId: 'project-import-after-validation', expectedRevision: 0, idempotencyKey: `import-after-validation-${status}`,
+      network: { networkType: 'leveling', coordinateSystem: 'LOCAL', verticalDatum: 'LOCAL-BM',
+        knownPoints: [{ id: 'BM', height: 10, known: true }],
+        unknownPoints: [{ id: 'P', height: 10.1 }, ...(status === 'blocked' ? [{ id: 'Q', height: 10.2 }] : [])],
+        observations: [{ id: 'dh', type: 'height-difference', from: 'BM', to: 'P', value: 0.1, unit: 'm', sigma: 0.001, sigmaUnit: 'm' }] }
+    })
+    const database = new Database(join(root, 'survey.sqlite3'))
+    try {
+      const imported = await service.importNetwork(request)
+      const snapshots = () => ({
+        idempotency: database.prepare('SELECT result_json FROM survey_idempotency WHERE key = ?').get(request.idempotencyKey),
+        admission: database.prepare('SELECT * FROM survey_source_admissions WHERE network_id = ?').get(imported.id),
+        rawSource: database.prepare('SELECT * FROM survey_raw_source_ledger WHERE network_id = ? AND sequence = 1').all(imported.id)
+      })
+      const originalEvidence = snapshots()
+      const first = service.validateNetwork(imported.id, { expectedRevision: imported.revision, idempotencyKey: `validate-import-retry-${status}-1` })
+      expect(first.qualityStatus).toBe(status)
+      await expect(service.importNetwork(request)).resolves.toEqual(first)
+      const second = service.validateNetwork(imported.id, { expectedRevision: first.revision, idempotencyKey: `validate-import-retry-${status}-2` })
+      await expect(service.importNetwork({ ...request, expectedRevision: 99 })).resolves.toEqual(second)
+      if (status === 'validated') {
+        expect(service.createAdjustment({ networkId: second.id, expectedRevision: second.revision, idempotencyKey: 'adjust-import-retry-valid' }).run.status).toBe('completed')
+        await expect(service.importNetwork(request)).resolves.toEqual(second)
+      }
+      expect(snapshots()).toEqual(originalEvidence)
+      expect(service.listNetworks()).toHaveLength(1)
+      const reopened = new SurveyService({ rootDir: root })
+      try { await expect(reopened.importNetwork(request)).resolves.toEqual(second) } finally { reopened.close() }
+    } finally { database.close(); service.close() }
+  })
+
+  it('rejects forged validation lifecycle fields during import replay without erasing blocked history', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-survey-import-lifecycle-tamper-'))
+    const service = new SurveyService({ rootDir: root })
+    const request = workwiseSurveyNetworkFileImport({
+      projectId: 'project-import-lifecycle-tamper', expectedRevision: 0, idempotencyKey: 'import-lifecycle-tamper',
+      network: { networkType: 'leveling', coordinateSystem: 'LOCAL', verticalDatum: 'LOCAL-BM',
+        knownPoints: [{ id: 'BM', height: 10, known: true }], unknownPoints: [{ id: 'P', height: 10.1 }, { id: 'Q', height: 10.2 }],
+        observations: [{ id: 'dh', type: 'height-difference', from: 'BM', to: 'P', value: 0.1, unit: 'm' }] }
+    })
+    const database = new Database(join(root, 'survey.sqlite3'))
+    try {
+      const imported = await service.importNetwork(request)
+      const blocked = service.validateNetwork(imported.id, { expectedRevision: imported.revision, idempotencyKey: 'validate-lifecycle-tamper' })
+      expect(blocked.qualityStatus).toBe('blocked')
+      const original = JSON.stringify(blocked)
+      for (const forged of [
+        { ...blocked, qualityStatus: 'validated', findings: [] },
+        { ...blocked, findings: [] },
+        { ...blocked, revision: imported.revision }
+      ]) {
+        database.prepare('UPDATE survey_networks SET data_json = ? WHERE id = ?').run(JSON.stringify(forged), imported.id)
+        await expect(service.importNetwork(request)).rejects.toThrow(/no longer matches (fresh current checks|its durable record)/)
+      }
+      database.prepare('UPDATE survey_networks SET data_json = ? WHERE id = ?').run(original, imported.id)
+      await expect(service.importNetwork(request)).resolves.toEqual(blocked)
+    } finally { database.close(); service.close() }
+  })
+
+  it('still rejects changed import inputs, cached projections and original bytes after validation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-survey-import-content-tamper-'))
+    const service = new SurveyService({ rootDir: root })
+    const request = workwiseSurveyNetworkFileImport({
+      projectId: 'project-import-content-tamper', expectedRevision: 0, idempotencyKey: 'import-content-tamper',
+      network: { networkType: 'leveling', coordinateSystem: 'LOCAL', verticalDatum: 'LOCAL-BM',
+        knownPoints: [{ id: 'BM', height: 10, known: true }], unknownPoints: [{ id: 'P', height: 10.1 }],
+        observations: [{ id: 'dh', type: 'height-difference', from: 'BM', to: 'P', value: 0.1, unit: 'm' }] }
+    })
+    const database = new Database(join(root, 'survey.sqlite3'))
+    try {
+      const imported = await service.importNetwork(request)
+      const checked = service.validateNetwork(imported.id, { expectedRevision: imported.revision, idempotencyKey: 'validate-content-tamper' })
+      for (const changed of [
+        { ...checked, observations: checked.observations.map(row => ({ ...row, value: 0.2 })) },
+        { ...checked, sourceFile: { ...checked.sourceFile!, parserVersion: 'altered' } },
+        { ...checked, createdAt: '2099-01-01T00:00:00.000Z' }
+      ]) {
+        database.prepare('UPDATE survey_networks SET data_json = ? WHERE id = ?').run(JSON.stringify(changed), checked.id)
+        await expect(service.importNetwork(request)).rejects.toThrow(/no longer matches its durable record/)
+      }
+      database.prepare('UPDATE survey_networks SET data_json = ? WHERE id = ?').run(JSON.stringify(checked), checked.id)
+      const original = database.prepare('SELECT result_json FROM survey_idempotency WHERE key = ?').get(request.idempotencyKey) as { result_json: string }
+      const forged = JSON.parse(original.result_json)
+      forged.network.observations[0].value = 0.2
+      database.prepare('UPDATE survey_idempotency SET result_json = ? WHERE key = ?').run(JSON.stringify(forged), request.idempotencyKey)
+      await expect(service.importNetwork(request)).rejects.toThrow(/projection differs from its durable network/)
+      database.prepare('UPDATE survey_idempotency SET result_json = ? WHERE key = ?').run(original.result_json, request.idempotencyKey)
+      const originalPath = join(root, 'sources', checked.sourceFile!.sha256, 'original')
+      const bytes = await readFile(originalPath)
+      await writeFile(originalPath, Buffer.concat([bytes, Buffer.from('\n')]))
+      await expect(service.importNetwork(request)).rejects.toThrow(/source is no longer verified/)
+      await writeFile(originalPath, bytes)
+      await expect(service.importNetwork(request)).resolves.toEqual(checked)
+    } finally { database.close(); service.close() }
+  })
+
   it('keeps a committed import replayable if its sidecar projection fails', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-survey-import-sidecar-'))
     const nonDirectoryWorkspace = join(root, 'not-a-workspace')
@@ -707,25 +807,27 @@ describe('SurveyService', () => {
     service.close()
   })
 
-  it('imports GNSS ΔX/ΔY/ΔZ aliases and row-major covariance from CSV', async () => {
+  it('preserves unconfirmed GNSS CSV without treating vector aliases as approved measurements', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-survey-gnss-csv-'))
     const service = new SurveyService({ rootDir: root })
     const csv = 'type,from,to,dx,dy,dz,unit,covariance\ngnss-baseline,A,P,1000,2000,3000,mm,"1;0.1;0;0.1;2;0;0;0;3"'
     const network = await service.importNetwork({ projectId: 'project-gnss-csv', expectedRevision: 0, idempotencyKey: 'survey-import-gnss-csv', networkType: 'gnss', name: 'baselines.csv', dataBase64: Buffer.from(csv).toString('base64') })
-    expect(network.observations[0]).toMatchObject({ value: 0, vectorX: 1000, vectorY: 2000, vectorZ: 3000, unit: 'mm' })
-    expect(network.observations[0]?.covariance).toEqual([1, 0.1, 0, 0.1, 2, 0, 0, 0, 3])
+    expect(network.observations).toEqual([])
+    expect(network.sourceFile?.disposition).toBe('archive-only')
+    expect(await readFile(join(root,'sources',network.sourceFile!.sha256,'original'),'utf8')).toBe(csv)
     service.close()
   })
 
-  it('imports a multi-sheet XLSX survey network with worksheet provenance', async () => {
+  it('preserves an unconfirmed multi-sheet XLSX as archive-only', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-survey-xlsx-'))
     const service = new SurveyService({ rootDir: root })
     const workbook = new JSZip()
     const sheet = (point: string) => `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>type</t></is></c><c r="B1" t="inlineStr"><is><t>from</t></is></c><c r="C1" t="inlineStr"><is><t>to</t></is></c><c r="D1" t="inlineStr"><is><t>value</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>height-difference</t></is></c><c r="B2" t="inlineStr"><is><t>BM</t></is></c><c r="C2" t="inlineStr"><is><t>${point}</t></is></c><c r="D2" t="inlineStr"><is><t>1</t></is></c></row></sheetData></worksheet>`
     workbook.file('xl/worksheets/sheet1.xml', sheet('P1')); workbook.file('xl/worksheets/sheet2.xml', sheet('P2'))
     const network = await service.importNetwork({ projectId: 'project-xlsx', expectedRevision: 0, idempotencyKey: 'survey-import-xlsx-1', name: 'survey.xlsx', dataBase64: (await workbook.generateAsync({ type: 'nodebuffer' })).toString('base64'), networkType: 'leveling' })
-    expect(network.observations).toHaveLength(2)
-    expect(network.observations[0]?.sourceLocator).toContain('sheet1.xml')
+    expect(network.observations).toHaveLength(0)
+    expect(network.sourceFile?.disposition).toBe('archive-only')
+    expect(service.getRawSourceIntegrity(network.id).status).toBe('verified')
     service.close()
   })
 
@@ -746,12 +848,14 @@ describe('SurveyService', () => {
     service.close()
   })
 
-  it('converts DMS strings from a survey CSV into decimal degrees', async () => {
+  it('does not infer DMS encoding in an unconfirmed survey CSV', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-survey-dms-'))
     const service = new SurveyService({ rootDir: root })
     const csv = 'type,from,to,value,unit\ndirection,A,B,45°30′00″,deg\n'
     const network = await service.importNetwork({ projectId: 'project-dms', expectedRevision: 0, idempotencyKey: 'survey-import-dms-1', networkType: 'plane-control', name: 'angles.csv', dataBase64: Buffer.from(csv).toString('base64') })
-    expect(network.observations[0]?.value).toBeCloseTo(45.5, 8)
+    expect(network.observations).toHaveLength(0)
+    expect(network.sourceFile?.disposition).toBe('archive-only')
+    expect(await readFile(join(root,'sources',network.sourceFile!.sha256,'original'),'utf8')).toBe(csv)
     service.close()
   })
 
@@ -894,7 +998,8 @@ describe('SurveyService', () => {
     ].join('\n')
     const network = await service.importNetwork({ projectId: 'project-transform-csv', expectedRevision: 0, idempotencyKey: 'survey-import-transform-csv', networkType: 'coordinate-transform', transformType: 'similarity-2d', name: 'control-pairs.csv', dataBase64: Buffer.from(csv).toString('base64') })
     expect(network.transformType).toBe('similarity-2d')
-    expect(network.knownPoints).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'A', x: 0, y: 0 }), expect.objectContaining({ id: 'B', x: 100, y: 0 })]))
+    expect(network.knownPoints).toEqual([])
+    expect(await readFile(join(root,'sources',network.sourceFile!.sha256,'original'),'utf8')).toBe(csv)
     const checked = service.validateNetwork(network.id, { expectedRevision: network.revision, idempotencyKey: 'survey-validate-transform-csv' })
     const output = service.createAdjustment({ networkId: network.id, expectedRevision: checked.revision, idempotencyKey: 'survey-adjust-transform-csv' })
     expect(checked.qualityStatus).toBe('blocked')
@@ -1148,7 +1253,7 @@ describe('SurveyService', () => {
     })
 
     expect(network.sourceFile).toMatchObject({ detection: { format: 'delimited-text' }, disposition: 'archive-only', requiresManualConfirmation: true })
-    expect(network.observations).toHaveLength(1)
+    expect(network.observations).toHaveLength(0)
     expect(network.findings).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'mapping_required', severity: 'blocking' }),
       expect.objectContaining({ code: 'source_not_adjustment_ready', severity: 'blocking' })

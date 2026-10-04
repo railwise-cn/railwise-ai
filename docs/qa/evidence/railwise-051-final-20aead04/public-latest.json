@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "productName": "RailWise AI",
+  "channel": "stable",
+  "version": "0.5.1",
+  "tag": "v0.5.1",
+  "generatedAt": "2026-09-27T23:05:25.717Z",
+  "updateBaseUrl": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/",
+  "updateMetadata": {
+    "mac": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/latest-mac.yml",
+    "win": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/latest.yml"
+  },
+  "files": [
+    {
+      "name": "WorkWise-0.5.1-mac-Apple-Silicon.dmg",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/WorkWise-0.5.1-mac-Apple-Silicon.dmg",
+      "size": 295034092,
+      "sha256": "81c6d25ae853cf29a4271911cb4dc8333a09bde2e80c89dab5f06d9d23e2fe9a"
+    },
+    {
+      "name": "WorkWise-0.5.1-mac-Intel.dmg",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/WorkWise-0.5.1-mac-Intel.dmg",
+      "size": 299835593,
+      "sha256": "9c4d575a3194944de5be9f740a1e1eb9048c0f1251b638d1a0c73ccf431d9e6d"
+    },
+    {
+      "name": "WorkWise-0.5.1-mac-arm64.zip",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/WorkWise-0.5.1-mac-arm64.zip",
+      "size": 301191314,
+      "sha256": "789172b814aeb8da666a32daeb583676cdeeb413b262f1addb77ef5ac3a41974"
+    },
+    {
+      "name": "WorkWise-0.5.1-mac-x64.zip",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/WorkWise-0.5.1-mac-x64.zip",
+      "size": 306210243,
+      "sha256": "a847dd841321581e0cd5ebf31a1e1857d428e907ead8990ea0a35ffadcc1f0a0"
+    },
+    {
+      "name": "WorkWise-0.5.1-win-x64.exe",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/WorkWise-0.5.1-win-x64.exe",
+      "size": 246825029,
+      "sha256": "79dad522af4fb2c462e99bed83ffeb54f567a23802f7b20cb7f43cebe63dac2c"
+    },
+    {
+      "name": "WorkWise-0.5.1-win-x64.exe.blockmap",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/WorkWise-0.5.1-win-x64.exe.blockmap",
+      "size": 253498,
+      "sha256": "a1cc0cc07561749b1a06b160337eaf4b5dfea3783fa7e79c28357e06a779e1c3"
+    }
+  ]
+}

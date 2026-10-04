@@ -124,8 +124,12 @@ describe('SurveyFormatRegistry', () => {
     const source = `${firstLine}\r${invalidWord}`
     const result = await ingest('malformed.gsi', source)
     const diagnostic = result.sourceFile.diagnostics.find((item) => item.message.includes('物理词法校验失败'))!
+    const capability = result.sourceFile.diagnostics.find((item) => item.message.includes('P0 格式目录'))!
 
     expect(result.sourceFile.disposition).toBe('archive-only')
+    expect(capability.message).toContain('当前能力策略为 archive-only')
+    expect(capability.localized?.en.message).toContain('permits archive-only')
+    expect(capability.localized?.en.message).not.toContain('permits adjustment-ready')
     expect(diagnostic).toMatchObject({
       code: 'invalid_record',
       severity: 'blocking',

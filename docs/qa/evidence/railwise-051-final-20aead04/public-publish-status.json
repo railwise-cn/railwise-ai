@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-09-28T00:18:20.192925+00:00",
+  "releaseVersion": "0.5.1",
+  "releaseWorkflow": {
+    "id": 36355577889,
+    "status": "success"
+  },
+  "publicRelease": "https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1",
+  "stableFeed": "0.5.1",
+  "localFormalInstall": "passed",
+  "websitePr": 30,
+  "websiteCommit": "cb0f8fc03c1b38bfa177aa66a514ce65f5171d0e",
+  "websiteQuality": "all six checks passed",
+  "websiteDeployment": "first attempt failed public version check; server rollback succeeded; repair PR #31 in progress",
+  "websiteDeployWorkflow": {
+    "id": 36360784189,
+    "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36360784189"
+  },
+  "websiteApproval": "用户明确批准：批准发布 0.5.1 官网下载页",
+  "previousApprovalReview": {
+    "rejected": true,
+    "resolvedBy": "explicit user approval of version and website deployment"
+  },
+  "websiteRepairPr": "https://github.com/railwise-cn/railwise-ai/pull/31"
+}

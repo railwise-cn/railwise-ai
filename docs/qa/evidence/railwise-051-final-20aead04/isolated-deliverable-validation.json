@@ -1,0 +1,230 @@
+{
+  "runId": "run_7b0a670a-b8d4-4890-90d7-be9e20172112",
+  "files": {
+    "report.docx": {
+      "size": 5421,
+      "sha256": "75a4bd249c4d0ff483abd8e39f31c846c5dac3f15ca3c88a53a65dba367ce26a"
+    },
+    "evidence.xlsx": {
+      "size": 39084,
+      "sha256": "ae3284d9dae670cbd5b17a38e29e51539113d9b0f8bb3dc9ab88480d7e2a16ac"
+    },
+    "report.pdf": {
+      "size": 40641,
+      "sha256": "a4f2dcb9da86982113ab05ce582e63f9029444115294a1e64dcb8ea2c86c0c5d"
+    }
+  },
+  "pdfPages": 2,
+  "pdfText": "项目：候选20aead04数量级验收（公开合成样例）\n测量平差成果报告（待审查）\n单位：长度 m；角度 rad；统计量按各项标注。\n专业测量源文件\n网络 network_0079743b-35f3-423e-af60-2b0fc26dee0c: golden-plane-control-e2e.in2；厂商=COSA(科傻)；\n格式=cosa-in2；置信度=98%；状态=adjustment-ready；解析器=cosa-in2-parser/0.3.0；\nSHA-256=4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0\n测量平差结果\n平差运行 adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c：网络=network_0079743b-35f3-423e-\naf60-2b0fc26dee0c，策略=plane-control，观测=5，未知数=3，多余观测=2\n单位权中误差=0.00010671165867325277（无量纲）；方差因子=1.1387378096796804e-8（无量纲，后验估\n计），最大点位中误差=1.3592152495710963e-7 m，状态=valid，输入 \nSHA-256=f17e8ec8d38a9e5fea7f85e22af4da9d3f881f9430f2bd3307a57a27232ba0b5\n闭合量=horizontal:1.3726709029343796e-7 m；angular:3.111529177070756e-10 rad\n解算参数=orientation:S1:1.5707963269606606 rad\n点位 A: X=50 m Y=150 m H=-\n点位 B: X=150 m Y=50 m H=-\n点位 C: X=120.710678 m Y=120.710678 m H=-\n点位 S1: X=49.99999999284098 m Y=49.999999963710295 m H=-\n点位 S1 XY 标准误差椭圆：长半轴=1.284808010949112e-7 m；短半轴=4.435475957184348e-8 m；轴向\n=2.2584737816163187 rad（+X 转向 +Y，模 π）；后验方差；单位马氏半径，非置信百分比；解算 XY 平面，\nGNSS 不代表当地东/北；算法=survey-xy-error-ellipse-1\n位移 A: dX=0 m dY=0 m dH=- 模长=0 m\n位移 B: dX=0 m dY=0 m dH=- 模长=0 m\n位移 C: dX=0 m dY=0 m dH=- 模长=0 m\n位移 S1: dX=-1.9446147803137137e-8 m dY=1.95930319080162e-7 m dH=- 模长=1.9689297244755981e-7 m\n变形期次比较\n本报告未关联变形期次比较\n质量问题\nadjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c: warning: COSA(科傻) / cosa-in2 已保留可审计的解析\n对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解\n析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻\n1 / 2\n断。（format_detected，open）\n来源引用\n无\n审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签\n名。\n2 / 2",
+  "docxText": "项目：候选20aead04数量级验收（公开合成样例） 测量平差成果报告（待审查） 单位：长度 m；角度 rad；统计量按各项标注。 专业测量源文件 网络 network_0079743b-35f3-423e-af60-2b0fc26dee0c: golden-plane-control-e2e.in2；厂商=COSA(科傻)；格式=cosa-in2；置信度=98%；状态=adjustment-ready；解析器=cosa-in2-parser/0.3.0；SHA-256=4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0 测量平差结果 平差运行 adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c：网络=network_0079743b-35f3-423e-af60-2b0fc26dee0c，策略=plane-control，观测=5，未知数=3，多余观测=2 单位权中误差=0.00010671165867325277（无量纲）；方差因子=1.1387378096796804e-8（无量纲，后验估计），最大点位中误差=1.3592152495710963e-7 m，状态=valid，输入 SHA-256=f17e8ec8d38a9e5fea7f85e22af4da9d3f881f9430f2bd3307a57a27232ba0b5 闭合量=horizontal:1.3726709029343796e-7 m；angular:3.111529177070756e-10 rad 解算参数=orientation:S1:1.5707963269606606 rad 点位 A: X=50 m Y=150 m H=- 点位 B: X=150 m Y=50 m H=- 点位 C: X=120.710678 m Y=120.710678 m H=- 点位 S1: X=49.99999999284098 m Y=49.999999963710295 m H=- 点位 S1 XY 标准误差椭圆：长半轴=1.284808010949112e-7 m；短半轴=4.435475957184348e-8 m；轴向=2.2584737816163187 rad（+X 转向 +Y，模 π）；后验方差；单位马氏半径，非置信百分比；解算 XY 平面，GNSS 不代表当地东/北；算法=survey-xy-error-ellipse-1 位移 A: dX=0 m dY=0 m dH=- 模长=0 m 位移 B: dX=0 m dY=0 m dH=- 模长=0 m 位移 C: dX=0 m dY=0 m dH=- 模长=0 m 位移 S1: dX=-1.9446147803137137e-8 m dY=1.95930319080162e-7 m dH=- 模长=1.9689297244755981e-7 m 变形期次比较 本报告未关联变形期次比较 质量问题 adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c: warning: COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。（format_detected，open） 来源引用 无 审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签名。",
+  "sheets": {
+    "survey_adjustments": {
+      "rows": 2,
+      "columns": 18,
+      "values": [
+        [
+          "runId",
+          "networkId",
+          "resultId",
+          "strategyId",
+          "transformType",
+          "algorithmVersion",
+          "observationCount",
+          "unknownCount",
+          "redundancy",
+          "unitWeightStdDev",
+          "unitWeightStdDevUnit",
+          "varianceFactor",
+          "varianceFactorUnit",
+          "varianceFactorEstimated",
+          "maxPointStdDev",
+          "maxPointStdDevUnit",
+          "validation",
+          "inputHash"
+        ],
+        [
+          "adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c",
+          "network_0079743b-35f3-423e-af60-2b0fc26dee0c",
+          "adjustment_result_cba17d2b-3b8a-487a-abc2-79c47234929c",
+          "plane-control",
+          "",
+          "workwise-survey-adjustment-7",
+          "5",
+          "3",
+          "2",
+          "0.00010671165867325277",
+          "dimensionless",
+          "1.1387378096796804e-8",
+          "dimensionless",
+          "true",
+          "1.3592152495710963e-7",
+          "m",
+          "valid",
+          "f17e8ec8d38a9e5fea7f85e22af4da9d3f881f9430f2bd3307a57a27232ba0b5"
+        ]
+      ]
+    },
+    "survey_sources": {
+      "rows": 2,
+      "columns": 23
+    },
+    "survey_source_diagnostics": {
+      "rows": 4,
+      "columns": 7
+    },
+    "survey_raw_anchors": {
+      "rows": 11,
+      "columns": 9
+    },
+    "survey_closures": {
+      "rows": 3,
+      "columns": 4
+    },
+    "survey_parameters": {
+      "rows": 2,
+      "columns": 4
+    },
+    "survey_points": {
+      "rows": 5,
+      "columns": 12,
+      "values": [
+        [
+          "runId",
+          "pointId",
+          "x",
+          "y",
+          "height",
+          "latitudeDeg",
+          "longitudeDeg",
+          "correctionX",
+          "correctionY",
+          "correctionHeight",
+          "standardError",
+          "linearUnit"
+        ],
+        [
+          "adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c",
+          "A",
+          "50",
+          "150",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "m"
+        ],
+        [
+          "adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c",
+          "B",
+          "150",
+          "50",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "m"
+        ],
+        [
+          "adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c",
+          "C",
+          "120.710678",
+          "120.710678",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "m"
+        ],
+        [
+          "adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c",
+          "S1",
+          "49.99999999284098",
+          "49.999999963710295",
+          "",
+          "",
+          "",
+          "-1.9446147803137137e-8",
+          "1.95930319080162e-7",
+          "",
+          "1.3592152495710963e-7",
+          "m"
+        ]
+      ]
+    },
+    "survey_error_ellipses": {
+      "rows": 2,
+      "columns": 14,
+      "values": [
+        [
+          "runId",
+          "pointId",
+          "algorithmVersion",
+          "coordinatePlane",
+          "semiMajor_m",
+          "semiMinor_m",
+          "orientation_rad",
+          "orientationConvention",
+          "varianceBasis",
+          "scale",
+          "Cxx_m2",
+          "Cxy_m2",
+          "Cyx_m2",
+          "Cyy_m2"
+        ],
+        [
+          "adjustment_525e4c5e-7bf9-42cd-87b2-6654de84806c",
+          "S1",
+          "survey-xy-error-ellipse-1",
+          "solution-xy",
+          "1.284808010949112e-7",
+          "4.435475957184348e-8",
+          "2.2584737816163187",
+          "positive-x-toward-positive-y-mod-pi",
+          "a-posteriori",
+          "unit-mahalanobis-radius",
+          "7.825502380945158e-15",
+          "-7.131580093523458e-15",
+          "-7.131580093523458e-15",
+          "1.064915856572102e-14"
+        ]
+      ]
+    },
+    "survey_residuals": {
+      "rows": 6,
+      "columns": 10
+    },
+    "survey_displacements": {
+      "rows": 5,
+      "columns": 8
+    },
+    "deformation_epochs": {
+      "rows": 1,
+      "columns": 7
+    },
+    "deformation_points": {
+      "rows": 1,
+      "columns": 20
+    },
+    "deformation_pairs": {
+      "rows": 1,
+      "columns": 16
+    },
+    "citations": {
+      "rows": 1,
+      "columns": 8
+    },
+    "manifest_summary": {
+      "rows": 2,
+      "columns": 11
+    }
+  }
+}

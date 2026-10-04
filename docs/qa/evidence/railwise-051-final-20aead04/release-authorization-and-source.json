@@ -1,0 +1,31 @@
+{
+  "version": "0.5.1",
+  "userApproval": "确认，继续发布",
+  "scope": "在本会话已展示并确认的 0.5.1 UI/功能与发布上下文中继续正式发布、stable feed 和官网下载页更新",
+  "approvalDoesNotMean": "专业工程签认、P1/P2 完成或用户重新操作过 #166",
+  "applicationSource": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+  "releasePreparationCommit": "33c2178118da9e5304c74f879f1cc98576b1fa2e",
+  "onlyChangesSinceCandidate": [
+    "release/release-v0.5.1.md",
+    "scripts/deploy-workwise-product-page.mjs"
+  ],
+  "stabilityEvidence": {
+    "runId": 36343000275,
+    "fullTwoHours": true,
+    "result": "success"
+  },
+  "plannedReleaseBuild": {
+    "candidate_only": false,
+    "skip_stability": true,
+    "reason": "同应用源码已在 #166 完整通过两小时稳定门禁；之后只修改不打入应用的发布说明和官网部署校验。正式包仍重新构建、签名、公证和校验，禁止推广私有候选包。"
+  },
+  "updatedAt": "2026-09-27T22:25:10.361459+00:00",
+  "releaseTag": "v0.5.1",
+  "releaseCommit": "4bcc09fee46dfa4231a0b53905ffa2068c3f88c1",
+  "mergeTreeMatchesTestedPreparationCommit": true,
+  "cancelledDuplicateStabilityRun": 36355491145,
+  "publicReleaseRun": 36355577889,
+  "cancelledDuplicateStabilityRunStatus": "completed/cancelled",
+  "publicTagEstablished": true,
+  "privateCandidateWasNotPromoted": true
+}

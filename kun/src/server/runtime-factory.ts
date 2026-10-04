@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { buildRouter } from './routes/index.js'
 import type { ServerRuntime } from './routes/server-runtime.js'
 import { startNodeHttpServer, type NodeHttpServerHandle } from './node-http-server.js'
+import { traceRuntimeStartupPhase } from './runtime-startup-diagnostics.js'
 import { FileAttachmentStore } from '../attachments/attachment-store.js'
 import { InMemoryApprovalGate } from '../adapters/in-memory-approval-gate.js'
 import { InMemoryUserInputGate } from '../adapters/in-memory-user-input-gate.js'
@@ -277,7 +278,8 @@ export async function createKunServeRuntime(
     workspaceReferences: workspaceReferenceService
   })
   const uiActionService = new UiActionService({ sessionStore, turns: turnService })
-  await seedUsageCarryover({ threadStore, sessionStore, usageService })
+  await traceRuntimeStartupPhase('usage-carryover', () =>
+    seedUsageCarryover({ threadStore, sessionStore, usageService }))
   const defaultModelClient = new DeepseekCompatModelClient({
     baseUrl: options.baseUrl,
     apiKey: options.apiKey,
@@ -301,7 +303,8 @@ export async function createKunServeRuntime(
     ...(tokenEconomy ? { tokenEconomy } : {}),
     ...(options.runtime ? { runtime: options.runtime } : {})
   })
-  const mcpProviders = await buildMcpToolProviders(options.capabilities?.mcp)
+  const mcpProviders = await traceRuntimeStartupPhase('mcp-connect', () =>
+    buildMcpToolProviders(options.capabilities?.mcp))
   const deepSeekWebSearch = isDeepSeekResponsesWebSearchConfig(options)
     ? new DeepSeekResponsesWebProvider({
         baseUrl: options.baseUrl,
@@ -314,7 +317,8 @@ export async function createKunServeRuntime(
     ...(deepSeekWebSearch ? { searchProvider: deepSeekWebSearch } : {}),
     nowIso
   })
-  const skillRuntime = await SkillRuntime.create(options.capabilities?.skills)
+  const skillRuntime = await traceRuntimeStartupPhase('skills', () =>
+    SkillRuntime.create(options.capabilities?.skills))
   const attachmentStore = options.capabilities?.attachments.enabled
     ? new FileAttachmentStore({
         rootDir: join(options.dataDir, 'attachments'),
@@ -322,7 +326,8 @@ export async function createKunServeRuntime(
         nowIso
       })
     : undefined
-  await attachmentStore?.cleanupAbandoned()
+  await traceRuntimeStartupPhase('attachment-cleanup', async () =>
+    attachmentStore?.cleanupAbandoned())
   let surveyService: SurveyService
   const engineeringService = new EngineeringService({
     rootDir: join(options.dataDir, 'engineering'),
@@ -355,6 +360,12 @@ export async function createKunServeRuntime(
       const network = surveyService.getNetwork(networkId)
       return network?.projectId === projectId ? network : null
     },
+    getProfessionalReview: (projectId, adjustmentId) => {
+      const review = surveyService.getProfessionalReview(adjustmentId)
+      return review?.projectId === projectId ? review : null
+    },
+    getSegmentComparison: (projectId, comparisonId) => surveyService.getPeriodSegmentComparisonForNewUse(projectId, comparisonId),
+    getSegmentContinuity: (projectId, comparisonIds) => surveyService.getContinuousSegmentSummaryForNewUse(projectId, comparisonIds),
     getSurveySources: (projectId, networkIds) => networkIds.flatMap((id) => {
       const network = surveyService.getNetwork(id)
       return network?.projectId === projectId

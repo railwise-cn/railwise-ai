@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-09-27T12:20:24.401Z",
+  "sourceHead": "9a7cd6c394d0f796ccb28f06f694439bf280227d",
+  "candidateRun": 36316718463,
+  "candidateNumber": 158,
+  "app": "/Applications/RailWise AI.app",
+  "version": {
+    "exitCode": 0,
+    "stdout": "0.5.1\n",
+    "stderr": ""
+  },
+  "bundle": {
+    "exitCode": 0,
+    "stdout": "com.wangjiawei508.workgpt\n",
+    "stderr": ""
+  },
+  "architecture": {
+    "exitCode": 0,
+    "stdout": "arm64\n",
+    "stderr": ""
+  },
+  "signature": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "identity": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "Executable=/Applications/RailWise AI.app/Contents/MacOS/RailWise AI\nIdentifier=com.wangjiawei508.workgpt\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=453 flags=0x10000(runtime) hashes=3+7 location=embedded\nVersionPlatform=1\nVersionMin=786432\nVersionSDK=1704960\nHash type=sha256 size=32\nCandidateCDHash sha256=2a96107406f14bcc997f9f22b2fdbb9a2d7fdc57\nCandidateCDHashFull sha256=2a96107406f14bcc997f9f22b2fdbb9a2d7fdc57f2d561c28708d22effac206c\nHash choices=sha256\nCMSDigest=2a96107406f14bcc997f9f22b2fdbb9a2d7fdc57f2d561c28708d22effac206c\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=16384\nExecutable Segment flags=0x1\nPage size=16384\nCDHash=2a96107406f14bcc997f9f22b2fdbb9a2d7fdc57\nSignature size=9112\nAuthority=Developer ID Application: Ningbo Ruiwei Engineering Technology Co., Ltd. (R35G7F4A9U)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTimestamp=Sep 27, 2026 at 20:01:53\nNotarization Ticket=stapled\nInfo.plist entries=32\nTeamIdentifier=R35G7F4A9U\nRuntime Version=26.4.0\nSealed Resources version=2 rules=13 files=9221\nInternal requirements count=1 size=188\nTotal signatures=1\nChosen signature=1\n"
+  },
+  "notarization": {
+    "exitCode": 0,
+    "stdout": "Processing: /Applications/RailWise AI.app\nThe validate action worked!\n",
+    "stderr": ""
+  },
+  "gatekeeper": {
+    "exitCode": 1,
+    "stdout": "assessments disabled\n",
+    "stderr": ""
+  },
+  "assessment": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "/Applications/RailWise AI.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+  },
+  "asarSha256": "d544d8412caac38fb24b4adc1694db34479e41ac55fdc9ec3dc6c41f4b986623",
+  "mountedAsarSha256": "d544d8412caac38fb24b4adc1694db34479e41ac55fdc9ec3dc6c41f4b986623",
+  "updateConfiguration": "provider: generic\nurl: https://127.0.0.1/\nupdaterCacheDirName: workwise-updater\n",
+  "runtimeEntitlements": "passed"
+}

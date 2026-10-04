@@ -1,0 +1,29 @@
+{
+  "sourceHead": "be1d6fef2e070a4996c14ec9413a331292e246f0",
+  "version": "0.5.1",
+  "platform": "darwin-arm64",
+  "visibility": "private-candidate",
+  "artifactPath": "/private/tmp/railwise-survey-candidate.5xcEqY/candidate-dist/WorkWise-Candidate-be1d6fef2e07-0.5.1-mac-arm64.zip",
+  "sha256": "d2d20680d64d8a70cb6c160947e024a7e6ae72ff238129fe2b63e71d0236f6b3",
+  "zipIntegrity": "passed",
+  "asarIntegrity": {
+    "status": "passed",
+    "files": 18369,
+    "compiledFiles": 466
+  },
+  "signature": {
+    "status": "valid-on-disk",
+    "type": "ad-hoc",
+    "developerId": false,
+    "teamId": null
+  },
+  "notarization": "not-performed-no-credentials",
+  "installedAppLaunch": {
+    "open": "failed-kLSNoExecutableErr-10827",
+    "directExecutableExitCode": 134,
+    "computerUse": "timed-out-10005"
+  },
+  "uiAcceptance": "blocked-no-window-or-current-package-screenshots",
+  "updaterRoundTrip": "not-run",
+  "publicPublication": "not-performed"
+}

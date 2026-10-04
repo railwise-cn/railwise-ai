@@ -29,5 +29,5 @@ it('sends Survey evidence as an object tool schema while preserving every exact-
   expect(chunks).toContainEqual({ kind: 'assistant_text_delta', text: 'accepted' })
   const original = z.toJSONSchema(SurveyEvidenceReferenceV1)
   expect(parameters).toEqual({ ...original, type: 'object' })
-  expect(original.oneOf).toHaveLength(17)
+  expect(original.oneOf).toHaveLength(18)
 })

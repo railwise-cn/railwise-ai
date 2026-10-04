@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-09-27T14:56:15.760209+00:00",
+  "theme": "system",
+  "latestCrash": {
+    "name": "RailWise AI-2026-09-27-160241.ips",
+    "modifiedAt": "2026-09-27T08:02:41.269898+00:00"
+  },
+  "8787": {
+    "exitCode": 1,
+    "stdout": ""
+  },
+  "8788": {
+    "exitCode": 1,
+    "stdout": ""
+  }
+}

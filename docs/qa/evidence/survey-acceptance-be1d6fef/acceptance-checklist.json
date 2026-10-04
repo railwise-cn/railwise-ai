@@ -1,0 +1,30 @@
+{
+  "reviewRole": "AI-simulated senior engineering survey practitioner, software engineer, and product designer",
+  "evidenceType": "private packaged candidate",
+  "sourceHead": "be1d6fef2e070a4996c14ec9413a331292e246f0",
+  "packageChecks": {
+    "version": { "status": "passed", "value": "0.5.1" },
+    "architecture": { "status": "passed", "value": "arm64" },
+    "zipIntegrity": { "status": "passed" },
+    "asarIntegrity": { "status": "passed", "fileCount": 18369, "compiledFileCount": 466 },
+    "codeSignature": { "status": "passed", "value": "ad-hoc; not Developer ID" },
+    "notarization": { "status": "not-run", "reason": "Apple notary credentials unavailable" }
+  },
+  "installedApplication": {
+    "launch": { "status": "blocked", "evidence": ["open: kLSNoExecutableErr -10827", "direct executable: exit 134", "Computer Use: timeout -10005"] },
+    "screenshots": { "status": "not-captured", "reason": "No current-candidate window could be opened" },
+    "localeThemeWindowMatrix": { "status": "not-run", "required": ["zh-CN", "en", "light", "dark", "960x800", "1280x800", "1440x900"] },
+    "overviewProcessResultsDelivery": { "status": "not-run" },
+    "measurementImportPrecheckAdjustment": { "status": "not-run" },
+    "periodComparisonAndDeliverables": { "status": "not-run" },
+    "keyboardFocusAccessibility": { "status": "not-run" },
+    "failureAndRecovery": { "status": "not-run" },
+    "privateUpdaterRoundTrip": { "status": "not-run" },
+    "independentAiInstalledUiReview": { "status": "blocked", "reason": "Requires an inspectable current-candidate window" }
+  },
+  "openSpec": {
+    "task4_2": "open-current-package-CUA-acceptance",
+    "task4_4": "open-licensed-vendor-evidence-and-authentic-professional-signoff"
+  },
+  "publication": "not-performed"
+}
