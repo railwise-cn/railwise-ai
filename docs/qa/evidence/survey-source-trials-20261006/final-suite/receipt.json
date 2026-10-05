@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "reviewType": "Source verification, not installed package acceptance",
+  "baseCommit": "4c387f518657bb464fb4b17f58fbd75e5a943953",
+  "publicVersion": "0.5.2",
+  "boundary": "Tests ran before the newly started reassessment and collaboration increments; those changes require new affected checks. Skips are not counted as passes. Public tag and release bytes are unchanged.",
+  "checks": [
+    {
+      "name": "desktop-full",
+      "log": "railwise-final-desktop-full-20261006.log",
+      "sha256": "71d0cd61f2872dc6cc226d1d0869f1a23dc0d328833a190c51b1b46b7f04b8d1",
+      "result": "exit 0",
+      "note": ""
+    },
+    {
+      "name": "runtime-full",
+      "log": "railwise-final-runtime-full-20261006.log",
+      "sha256": "4a67b87405777742d91f04d51149ceec18599cbf4263c2a0e8f2355bdf6c52f4",
+      "result": "exit 0",
+      "note": ""
+    },
+    {
+      "name": "lint",
+      "log": "railwise-final-lint-20261006.log",
+      "sha256": "7ecd776a76eea0e052b1ef3fdbce313cdd839f0953654e0e402b24dec759d740",
+      "result": "exit 0",
+      "note": ""
+    },
+    {
+      "name": "desktop-types",
+      "log": "railwise-final-desktop-types-20261006.log",
+      "sha256": "46ad469197adf175dd5840bb501a69c69165bc5d30afc00d853aee60a7a82dfd",
+      "result": "exit 0",
+      "note": ""
+    },
+    {
+      "name": "runtime-types",
+      "log": "railwise-final-runtime-types-20261006.log",
+      "sha256": "369fb1b91d4bc5be75374f253acfa1ccd86ab16e2a1c4ddce423943f6f1d18b6",
+      "result": "exit 0",
+      "note": ""
+    },
+    {
+      "name": "build",
+      "log": "railwise-final-build-20261006.log",
+      "sha256": "537427159b0af58a6643026e825964569ee3c12e91b2b2dbf06031f22ec99cd3",
+      "result": "exit 0",
+      "note": ""
+    },
+    {
+      "name": "openspec",
+      "log": "railwise-final-openspec-20261006.log",
+      "sha256": "6fd8a8b547b5dd41ee4242e06ba3c63f44f55d7a1c9aece9faa2b03b31738599",
+      "result": "exit 0",
+      "note": "12 items passed; OpenSpec CLI telemetry flush timed out after validation"
+    },
+    {
+      "name": "brand",
+      "log": "railwise-final-brand-20261006.log",
+      "sha256": "5b190810f87dd7483a1e6e22574cf9629c4f053cbd61570795b86f0525090040",
+      "result": "exit 0",
+      "note": ""
+    }
+  ],
+  "desktop": {
+    "filesPassed": 350,
+    "testsPassed": 3138,
+    "filesSkipped": 2,
+    "testsSkipped": 2
+  },
+  "runtime": {
+    "filesPassed": 213,
+    "testsPassed": 3103,
+    "filesSkipped": 2,
+    "testsSkipped": 22
+  }
+}

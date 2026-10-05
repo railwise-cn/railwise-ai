@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-05T16:57:29.509218+00:00",
+  "reviewType": "Independent AI source and generated-file/actual-loopback behavior review; not installed-package acceptance",
+  "agent": "fresh_quality_checks",
+  "headAtReceipt": "4c387f518657bb464fb4b17f58fbd75e5a943953",
+  "branch": "codex/survey-reliability",
+  "packageVersion": "0.5.2",
+  "runtimePackageVersion": "0.5.1",
+  "sourceFiles": {
+    "kun/src/engineering/engineering-report-pdf.ts": "5989d124250fa0c502b5496da0541ad3a5304d89b20315ab333399753a835bbe",
+    "kun/src/engineering/survey-professional-report.ts": "dfd83c58a1db6fa7969bf108c0dbf473f00b7a8100d578d6e70fb36d231325d0",
+    "kun/src/engineering/survey-professional-report.test.ts": "bfb58746141e511f16ef2e3063eea85967af7837006e1a7c2b552498689df124",
+    "kun/src/engineering/engineering-report-metadata.test.ts": "2b9ca64b040a10fc065d5e7633789e2f14114f9364c722226b7e06e46e823d85",
+    "kun/src/engineering/survey-p0-delivery-e2e.test.ts": "03be8855f4719830466e9cdcc6f7f90bcb6e7760aa03960281fe16dea3dd6ce3",
+    "kun/src/engineering/survey-m5-delivery-e2e.test.ts": "68cf747a675c0fd9e9032289b439824ab6f21e45e91fa36dc5bf4441895a29dc",
+    "kun/tests/survey-report-independent-review.test.ts": "6de8d9bdc4532a92c19751393cbba860074b5c284baaa6746eb314052dbe3411",
+    "kun/tests/helpers/report-pdf.ts": "89ae049a73752c15657be8f52e5162385dbb405bcd16ef32752b821ab92c73da",
+    "kun/src/contracts/survey-quality-workflow.ts": "032cea73674410f9530eeb60b30faa0dddbce5ecd688b6814a7ac90f989775c5",
+    "kun/src/contracts/survey-standard-quality.ts": "a930ca78876985424ee3f521299cf06df0227f4046678a97147add9a63666350",
+    "kun/src/contracts/survey-quality-sampling-workspace.ts": "7562918e9d09b6b3c68bafa559d5275fd6287e369ea6c0b0874af7a3a162dd61",
+    "kun/src/engineering/survey-quality-workflow.ts": "d4da5c567e8a3935f37c2ad5cc55881ddfefdd7331bf8d77d23898986763d060",
+    "kun/src/engineering/survey-quality-record.ts": "023564110e171b1a66fdf911e1e779d248265c2d9e4b92b8a9e685830f7c5ecd",
+    "kun/src/engineering/survey-sampling-workspace.ts": "95b45802a1ecfe02d32c43c9d40288478416714cec07b14f89ceecabb4431773",
+    "kun/src/engineering/survey-quality-workflow.test.ts": "d725cc5b98df686639c81ce3806b23748dc16b583e4c1c585e2021f033697bee",
+    "kun/src/engineering/survey-sampling-workspace.test.ts": "e9dd08d3fc2ffd591effb0184eb5687bea1d9586c658910d09dcb60512c9572a",
+    "src/renderer/src/agent/survey-quality-workflow-client.ts": "09cf3fa6dbb6f4432b6064ca85f73e69223b596c6f6a03d4642d946fb3c30479",
+    "src/renderer/src/agent/survey-quality-sampling-client.ts": "06b86525c938954c70e69cb136888197bf738cc90d783df531b6c80b38fa5422",
+    "src/renderer/src/agent/survey-standard-basis-client.ts": "6cf2a757e5219631f0f4edcafe33e8ddd4848ab56eefe56076334971015f8996",
+    "src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.tsx": "512256a8ec59d3052ad722b3f0e55199a5fc79d841e12ed46e1ca1355b3a0278",
+    "src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.tsx": "f2c554fe452133a8a39cfd256c20e55090119a442bffadc19df69dfff351051a",
+    "src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.tsx": "7033dc24fee554a651910d82e7d5e27c55bc2b425b4dacccd775954d9f8a7ca0",
+    "kun/src/adapters/mcp/survey-context-access-store.ts": "1ddc16045bdd31a5e6f0195f9a5aec530b007224507aa85ee783625500397d93",
+    "kun/src/server/routes/survey-context-mcp.ts": "22b2ab719e7cbbcccc9da1434bc91fa39e5518db2db111116ff4f3113d49a3a8",
+    "kun/src/adapters/mcp/survey-context-reader.ts": "11464335e84cb86eb242c9768d65a805167647b5f67f90eabf32978a872b7239",
+    "kun/src/adapters/mcp/survey-context-server.ts": "3c4f6c6d694c411b76c3c96576163820548dec46b52e8936f2347d13776bb261",
+    "kun/tests/survey-context-mcp-http.test.ts": "442a99c040d7678d8a77c8078b4f7451cbf4c7350c60e959fbbb624074139f36"
+  },
+  "checks": [
+    {
+      "cwd": "kun",
+      "command": "ELECTRON_RUN_AS_NODE=1 ../node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ../node_modules/vitest/vitest.mjs run src/engineering/engineering-report-metadata.test.ts src/engineering/survey-professional-report.test.ts src/engineering/survey-p0-delivery-e2e.test.ts src/engineering/survey-m5-delivery-e2e.test.ts tests/survey-report-independent-review.test.ts --maxWorkers=1",
+      "exitCode": 0,
+      "filesPassed": 5,
+      "testsPassed": 18,
+      "log": "report-review-fresh.log"
+    },
+    {
+      "cwd": "kun",
+      "command": "ELECTRON_RUN_AS_NODE=1 ../node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ../node_modules/vitest/vitest.mjs run src/engineering/survey-sampling-workspace.test.ts src/engineering/survey-quality-workflow.test.ts src/engineering/survey-quality-record.test.ts tests/survey-context-mcp-http.test.ts src/adapters/mcp/survey-context-reader.test.ts src/adapters/mcp/survey-context-server.test.ts --maxWorkers=1",
+      "exitCode": 0,
+      "filesPassed": 6,
+      "testsPassed": 68,
+      "log": "../survey-quality-refinements-20261006/independent-runtime-tests.txt"
+    },
+    {
+      "cwd": ".",
+      "command": "ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/vitest/vitest.mjs run src/renderer/src/agent/survey-quality-workflow-client.test.ts src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.dom.test.ts src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts --maxWorkers=1",
+      "exitCode": 0,
+      "filesPassed": 4,
+      "testsPassed": 59,
+      "log": "../survey-quality-refinements-20261006/independent-desktop-tests.txt"
+    }
+  ],
+  "evidenceFiles": {
+    "docs/qa/evidence/survey-source-trials-20261006/report-review-fresh.log": "6538ebd66f1982fffe0eaaaf87fec5992daf278a321944ca37c899680a2d4c9c",
+    "docs/qa/evidence/survey-mcp-loopback-20261006/independent-regression.txt": "aee6e1bd9ddc2eda04a885004f8d1829a0dbaeead8f406f4ef372c797aad9478",
+    "docs/qa/evidence/survey-quality-refinements-20261006/independent-runtime-tests.txt": "aee6e1bd9ddc2eda04a885004f8d1829a0dbaeead8f406f4ef372c797aad9478",
+    "docs/qa/evidence/survey-quality-refinements-20261006/independent-desktop-tests.txt": "6b9f630e70184894bdb6e620827a27453632906ad53ccf52b1776b398ac7afa3",
+    "docs/qa/evidence/survey-mcp-loopback-20261006/independent-review.md": "792a6d13b0c049956856aef45ff2c44256596b92f8e7eb2fbd24da680ba70735",
+    "docs/qa/evidence/survey-quality-refinements-20261006/independent-review.md": "ec2d8e752142587274d4a9b2d45f881639fd51d927b9a37f92ca0ed5189e250f",
+    "docs/qa/evidence/survey-source-trials-20261006/report-review-fresh-20261006.md": "873a54eb7a555a337925be470ccdc2697dddb13e03c7193e0ca5c8251982a287"
+  },
+  "limits": [
+    "Source hashes captured after fresh checks in a shared working tree, not a frozen candidate package.",
+    "Reinspection scheduling and recomputation do not implement post-reinspection scoring; assessment UI remains first-round only.",
+    "No licensed vendor interoperability, human signature, regulatory conformity or public release approval implied."
+  ]
+}

@@ -90,7 +90,7 @@ type ReviewEnvelope = { review: SurveyProfessionalReviewV1; adjustment?: Adjustm
 
 /** Build the three report formats from one deterministic review projection. */
 export function buildProfessionalReportModel(input: {
-  project: Pick<RailwiseProjectV1, 'name' | 'taskType' | 'monitoringType' | 'workspace'> & { id?: string }
+  project: Pick<RailwiseProjectV1, 'name' | 'taskType' | 'monitoringType' | 'workspace'> & { id?: string; signConvention?: string }
   reviews: readonly ReviewEnvelope[]
   segmentComparisons?: readonly SurveySegmentComparisonV1[]
   segmentContinuity?: SurveySegmentContinuityV1
@@ -378,6 +378,7 @@ export function buildProfessionalReportModel(input: {
     '“未评估/不可用”表示当前资料或合同不足，不代表通过、合格或安全。',
     '本稿未完成专业复核、审核、批准和签名；签认栏保留空白。',
     '显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。',
+    ...(input.monitoringReport ? [`符号约定：${input.project.signConvention === 'positive' ? '正值为正向变形' : input.project.signConvention === 'negative' ? '负值为正向变形' : input.project.signConvention === 'custom' ? '自定义（以项目约定为准）' : input.project.signConvention ?? '未声明，请复核资料的正负方向'}。变化速率单位为各行所列单位/天。`] : []),
     ...(deformations.length ? ['变形成果表中的线性变形量和速率分别以 mm、mm/day 显示；距离和基线保留 m。'] : [])
   ]
   return { title: input.title ?? `${input.project.name} 测量平差专业成果册`, projectName: input.project.name, taskType, generatedAt, reviewStatus: 'unsigned', reportStatus: 'draft', sourceBinding, ...(comparisonBinding.length ? { comparisonBinding } : {}), ...(input.segmentContinuity ? { segmentContinuity: input.segmentContinuity } : {}), ...(input.monitoringReport ? { monitoringReport: input.monitoringReport } : {}), tables, notes, signoff: [{ role: '编制', name: '', date: '', signature: '' }, { role: '复核', name: '', date: '', signature: '' }, { role: '批准', name: '', date: '', signature: '' }], ...(input.appendix ? { appendix: input.appendix } : {}) }

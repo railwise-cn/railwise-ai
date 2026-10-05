@@ -1132,6 +1132,68 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     expect(needsAttention?.textContent).not.toMatch(/P0|格式目录|解析对象|策略校验|解析器|记录锚点|adjustment-ready|archive-only|converter-required|gnss-processing-required|workwise-survey-format-catalog/)
   })
 
+  it.each(['zh', 'en'])('shows every current blocker before warnings and explains how to supply the missing datum (%s)', async language => {
+    await act(async () => { await i18n.changeLanguage(language) })
+    const blockers = [
+      { code: 'missing_datum', severity: 'blocking' as const, message: '水准网缺少已知高程基准点', suggestion: '至少提供一个已知点高程并标记为已知' },
+      { code: 'disconnected_network', severity: 'blocking' as const, message: '点 P-02 未连接到已知基准点。' },
+      { code: 'invalid_weight', severity: 'blocking' as const, message: '测段 BM-01 → P-02 缺少有效先验精度。' },
+      { code: 'unit_missing', severity: 'blocking' as const, message: '测段 P-02 → P-03 的高差单位未确认。' }
+    ]
+    const blockedNetwork = { ...network, knownPoints: [], qualityStatus: 'blocked',
+      sourceEligibility: { eligible: true, findings: [blockers[0]!] },
+      findings: [{ ...blockers[0]!, severity: 'warning' }, ...[1, 2, 3, 4].map(number => ({ code: `warning_${number}`, severity: 'warning', message: `请复核测段 ${number} 的原始记录。` })), ...blockers]
+    }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [blockedNetwork] }) : runtimeResponse({ adjustments: [] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: `complete-blockers-${language}`, project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, compact: true, preferredSection: 'network'
+    })))
+    await settle()
+    const needsAttention = Array.from(container.querySelectorAll('p')).find(item => item.textContent === (language === 'en' ? 'Needs attention' : '需要处理'))?.parentElement
+    expect(needsAttention).toBeTruthy()
+    const rows = [...needsAttention!.querySelectorAll('li')]
+    expect(rows.length).toBeGreaterThanOrEqual(4)
+    expect(rows[0]!.textContent).toContain(language === 'en' ? 'height datum' : '已知高程基准点')
+    expect(rows[1]!.textContent).toContain('P-02')
+    expect(rows[2]!.textContent).toContain('BM-01 → P-02')
+    expect(rows[3]!.textContent).toContain('P-02 → P-03')
+    expect(rows.filter(row => /已知高程基准点|height datum point/.test(row.textContent ?? ''))).toHaveLength(1)
+    expect(visibleText(container)).not.toContain(language === 'en' ? 'Survey data passed the current calculation checks.' : '资料已通过当前计算条件校验。')
+    const calcButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes(language === 'en' ? 'Start calculation' : '开始计算'))
+    expect(calcButton?.disabled).toBe(true)
+    await act(async () => rows[0]!.querySelector<HTMLButtonElement>('button')?.click())
+    expect(document.activeElement).toBe(container.querySelector('textarea[aria-label="' + (language === 'en' ? 'Known control points for import (optional)' : '导入时使用的已知控制点（可选）') + '"]'))
+    expect(visibleText(container)).toContain(language === 'en' ? 'import the original file again' : '重新导入原文件')
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('keeps calculation disabled when a validated payload still contains an unresolved blocker', async () => {
+    const blockedNetwork = { ...network, findings: [{ code: 'missing_datum', severity: 'blocking', message: '水准网缺少已知高程基准点' }] }
+    runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')
+      ? runtimeResponse({ networks: [blockedNetwork] }) : runtimeResponse({ adjustments: [] }))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'contradictory-validated-blocker', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, compact: true, preferredSection: 'network'
+    })))
+    await settle()
+    const calcButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes('开始计算'))
+    expect(calcButton?.disabled).toBe(true)
+    expect(visibleText(container)).not.toContain('资料已通过当前计算条件校验。')
+  })
+
+  it('does not announce validation success while the returned network still has blocking findings', async () => {
+    validationResponse = { ...network, findings: [{ code: 'missing_datum', severity: 'blocking', message: '水准网缺少已知高程基准点' }] }
+    const networkTab = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes('网形与基准'))
+    await act(async () => networkTab?.click())
+    const validateButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes('质量校核'))
+    await act(async () => validateButton?.click())
+    await settle()
+    expect(container.textContent).toContain('质量校核发现阻断项')
+    expect(container.textContent).not.toContain(i18n.t('surveyValidationPassed'))
+  })
+
   it('shows professional source facts and actionable checks without parser, signature, converter, or hash internals', async () => {
     const sourceFile = {
       ...network.sourceFile,

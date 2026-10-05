@@ -202,7 +202,7 @@ describe('P0 professional survey delivery', () => {
     const worksheetXml = (await Promise.all(Object.keys(xlsx.files)
       .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
       .map((name) => xlsx.file(name)!.async('text')))).join('\n')
-    for (const expected of ['cosa-in1-level-golden-a.in1', 'golden-plane-control-e2e.in2', '格式=cosa-in1', '格式=cosa-in2']) {
+    for (const expected of ['cosa-in1-level-golden-a.in1', 'golden-plane-control-e2e.in2', '点位成果与精度', '闭合与附合检核']) {
       expect(documentXml).toContain(expected)
       expect(pdf.text).toContain(expected)
     }
@@ -214,9 +214,13 @@ describe('P0 professional survey delivery', () => {
     expect(await professionalWorkbook.file('xl/workbook.xml')!.async('text')).toContain('点位成果与精度')
     const ellipse = planeAdjustment.result.points.find(point => point.id === 'S1')!.xyErrorEllipse!
     expect(ellipse).toBeDefined()
-    expect(documentXml).toContain(`长半轴=${ellipse.semiMajor} m`)
+    const pointRows = [...documentXml.matchAll(/<w:tr>([\s\S]*?)<\/w:tr>/g)].map(match => match[1]!.replace(/<[^>]+>/g, ''))
+    expect(pointRows).toContain(`S1${(ellipse.semiMajor * 1000).toFixed(4)}${(ellipse.semiMinor * 1000).toFixed(4)}${ellipse.orientationRad!.toFixed(6)}后验`)
     expect(documentXml).toContain('单位马氏半径，非置信百分比')
-    expect(pdf.text).toContain('survey-xy-error-ellipse-1')
+    expect(pdf.text).toContain('XY 标准误差椭圆')
+    for (const text of [documentXml, pdf.text]) {
+      for (const internal of ['格式=cosa-in1', '格式=cosa-in2', 'survey-xy-error-ellipse-1', levelAdjustment.run.id, planeAdjustment.run.id, levelNetwork.sourceFile!.sha256, planeNetwork.sourceFile!.sha256]) expect(text).not.toContain(internal)
+    }
     expect(worksheetXml).toContain('Cxx_m2')
     expect(worksheetXml).toContain(String(ellipse.semiMajor))
     expect(worksheetXml).toContain('unit-mahalanobis-radius')

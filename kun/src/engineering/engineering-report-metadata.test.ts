@@ -20,13 +20,26 @@ it('reports the selected task type and readable units without rewriting legacy m
     const document = await archive.file('word/document.xml')!.async('text')
     const rendered = await readReportPdf(await readFile(join(root, pdf.path)))
     for (const text of [document, rendered.text]) {
-      expect(text).toContain('任务类型：变形监测')
+      expect(text).toContain('作业类型：变形监测')
       expect(text).not.toContain('监测类型：control-network')
       expect(text).toContain('符号约定：正值为正向变形')
-      expect(text).toContain('当前=4 mm 上期=2 mm 累计=2 mm 速率=2 mm/d 趋势=上升')
-      expect(text).toContain('阈值=正常')
-      expect(text).toContain('当前为待审查草稿，不代表专业复核、批准或签名')
+      expect(text).toContain('变化速率单位为各行所列单位/天')
+      expect(text).toContain('监测日报与累计变化')
+      expect(text).toContain('正常')
+      expect(text).toContain('本稿未完成专业复核、审核、批准和签名')
+      expect(text).not.toContain(dataset.id)
+      expect(text).not.toContain(dataset.sourceFileHash)
     }
+    const rows = [...document.matchAll(/<w:tr>([\s\S]*?)<\/w:tr>/g)].map(match =>
+      [...match[1]!.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map(cell => cell[1]!.replace(/<[^>]+>/g, '')))
+    const columns = rows.find(row => row.includes('本期值'))!
+    const point = rows.find(row => row.includes('S01'))!
+    for (const [column, value] of Object.entries({ 初始值: '2.0000', 上期值: '2.0000', 本期值: '4.0000', 本次变化: '2.0000', 累计变化: '2.0000', 变化速率: '2.0000', 单位: 'mm', 控制值: '10.0000', 原始行: '2,3' })) {
+      expect(columns, `missing professional column ${column}`).toContain(column)
+      expect(point[columns.indexOf(column)], column).toBe(value)
+    }
+    expect(rendered.text).toContain('4.0000')
+    expect(rendered.text).toContain('10.0000')
     expect(service.getProjectOverview(project.id).project.monitoringType).toBe('control-network')
     expect(preview.run.status).toBe('completed')
   } finally {

@@ -33,8 +33,6 @@ export async function makeProfessionalReportPdf(model: ProfessionalReportModel):
     const endY = (): number => document.page.height - 54
     const ensureSpace = (height: number): void => { if (document.y + height > endY()) document.addPage() }
     const renderTable = (table: ProfessionalReportTable): void => {
-      ensureSpace(85)
-      document.fontSize(12).fillColor('#17212B').text(table.title, { paragraphGap: 8 })
       const width = document.page.width - 84
       const cellWidth = width / table.columns.length
       const headers = table.columns.map(column => column.unit ? `${column.label} (${column.unit})` : column.label)
@@ -48,6 +46,13 @@ export async function makeProfessionalReportPdf(model: ProfessionalReportModel):
       if (textColumnCount) for (let index = 0; index < columnWidths.length; index += 1) if (!table.columns[index]!.numeric) columnWidths[index] = (width - numericWidth) / textColumnCount
       const rowHeight = (cells: string[]): number => Math.max(...cells.map((cell, index) => document.heightOfString(cell, { width: columnWidths[index]! - 10, lineGap: 1 }))) + 10
       const headerHeight = rowHeight(headers)
+      const firstRowHeight = rowHeight(dataRows[0]!)
+      document.fontSize(12)
+      const titleHeight = document.heightOfString(table.title, { width }) + 8
+      if (titleHeight + headerHeight + firstRowHeight > document.page.height - 96) throw new Error(`professional table ${table.id} contains a heading and first row too tall for one printable page; split this result before exporting`)
+      ensureSpace(titleHeight + headerHeight + firstRowHeight)
+      document.fillColor('#17212B').text(table.title, { width, paragraphGap: 8 })
+      document.fontSize(9)
       let start = 0
       while (start < dataRows.length) {
         let required = headerHeight

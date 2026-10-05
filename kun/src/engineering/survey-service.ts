@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { SurveySourceFixedModelRequestV1, SurveySourceFixedModelV1 } from '../contracts/survey-source-fixed-model.js'
 import { mkdir } from 'node:fs/promises'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -3325,6 +3326,41 @@ export class SurveyService {
   /** Project-scoped strict lookup for delivery providers; never probe another project's evidence. */
   getAdjustmentForProjectNewUse(projectId: string, id: string): SurveyAdjustmentRead | null {
     return this.getAdjustmentForNewUseScoped(id, projectId)
+  }
+
+  /** Read-only exact-source adapter. A nonlinear or relative-weight model is
+   * never presented as a fixed model with known absolute prior covariance. */
+  getSourceFixedModel(projectId: string, input: unknown): SurveySourceFixedModelV1 | null {
+    const request = SurveySourceFixedModelRequestV1.parse(input)
+    const project = this.options.getProject?.(projectId)
+    if (!project || project.id !== projectId) return null
+    if (project.revision !== request.expectedProjectRevision) throw new Error('source-model-stale-project')
+    const stored = this.getAdjustmentForProjectNewUse(projectId, request.adjustmentId)
+    if (!stored?.result) return null
+    const context = this.freeLevelingContext(projectId, stored.run.networkId)
+    if (!context) return null
+    const { network } = context
+    if (network.revision !== request.expectedNetworkRevision) throw new Error('source-model-stale-network')
+    if (!['leveling', 'height-control'].includes(network.networkType)) throw new Error('source-model-unsupported-nonlinear-network')
+    if (network.observations.some(o => o.type !== 'height-difference' || !o.from || !o.to || !o.sourceRecordId || o.covariance !== undefined)) throw new Error('source-model-unsupported-observations')
+    if (network.observations.some(o => o.sigma === undefined || !(o.sigma > 0))) throw new Error('source-model-absolute-prior-required')
+    const { unknownIds, rows } = levelingEquations(network)
+    if (!unknownIds.length || unknownIds.length > 16 || rows.length > 64 || rows.length <= unknownIds.length || rows.length !== network.observations.length) throw new Error('source-model-dimension-or-redundancy')
+    const solved = weightedLeastSquares(rows)
+    if (!solved || solved.rank !== unknownIds.length || JSON.stringify(solved.covariance) !== JSON.stringify(stored.result.covariance)) throw new Error('source-model-prior-covariance-inconsistent')
+    const observations = rows.map(({ observation: o, misclosure }) => ({ id: o.id, from: o.from!, to: o.to!, heightDifference: normalizeObservationValue(o), value: misclosure,
+      sigma: normalizeLengthUncertainty(o.sigma!, o.sigmaUnit ?? o.unit), sourceAnchor: o.sourceRecordId! }))
+    const model = {
+      kind: 'fixed-datum-independent-linear-height-differences', unit: 'm', parameterMeaning: 'height-corrections-from-source-approximation',
+      covarianceBasis: 'source-declared-independent-absolute-prior-sigma-squared-not-field-authenticated', parameterIds: unknownIds,
+      referencePoints: [...network.knownPoints, ...network.unknownPoints].map(p => ({ id: p.id, height: p.height ?? 0, fixed: p.known, heightBasis: p.height === undefined ? 'zero-initial-approximation' : 'declared-height' })), observations,
+      designMatrix: rows.map(r => r.coefficients), observationCovariance: observations.map((o,i) => observations.map((_,j) => i === j ? o.sigma ** 2 : 0)),
+      priorParameterCovariance: solved.covariance, formalCorrections: solved.corrections, degreesOfFreedom: solved.dof
+    }
+    return SurveySourceFixedModelV1.parse({ schemaVersion: 1, sourceName: network.sourceFile!.name, model,
+      binding: { adapterVersion: 'admitted-fixed-leveling-1', projectId, projectRevision: project.revision, networkId: network.id, networkRevision: network.revision,
+        runId: stored.run.id, resultId: stored.result.id, inputHash: context.inputHash, algorithmVersion: stored.run.algorithmVersion,
+        sourceSha256: context.sourceSha256, sourceAdmissionHash: context.sourceAdmissionHash, calculationHash: adjustmentCalculationHash(stored.result), fixedModelHash: sha256CanonicalSurveyValue(model) } })
   }
 
   /** Recomputable diagnostic supplement. Never mutates historical results,

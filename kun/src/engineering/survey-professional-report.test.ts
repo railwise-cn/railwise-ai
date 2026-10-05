@@ -63,6 +63,23 @@ async function comparisonFixture() {
 }
 
 describe('professional survey report formats', () => {
+  it('keeps each PDF table heading with its header and first observation on the same page', async () => {
+    const { model } = await fixture()
+    const tables = Array.from({ length: 12 }, (_, index) => ({
+      id: `layout-${index}`, title: `专业检核段 ${index + 1}`,
+      columns: [{ key: 'id', label: '观测编号' }, { key: 'record', label: '原始记录与现场检查说明' }, { key: 'context', label: '复核说明' }, { key: 'status', label: '状态' }],
+      rows: [{ id: `CHECK-${index + 1}`, record: '现场记录保留完整且未替换原始观测。'.repeat(14), context: '详细检查资料及基准。'.repeat(12), status: '需要复核' }]
+    }))
+    const pdf = await readReportPdf(await makeProfessionalReportPdf({ ...model, tables }))
+    expect(pdf.pageCount).toBeGreaterThan(2)
+    for (const [index, table] of tables.entries()) {
+      const page = pdf.pages.find(page => page.includes(table.title))!
+      expect(page, `${table.title} missing`).toBeDefined()
+      expect(page, `${table.title} separated from first row`).toContain(`CHECK-${index + 1}`)
+      expect(page).toContain('观测编号')
+    }
+  }, 20000)
+
   it('preserves original XML and worksheet positions and never invents a source position from display order', async () => {
     const { review } = await fixture()
     const originalPositions = ['/JOBFile/FieldBook/Station[2]/Observation[3]', '观测数据!C12:F12']

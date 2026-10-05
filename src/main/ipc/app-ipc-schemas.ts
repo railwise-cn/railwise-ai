@@ -1,7 +1,7 @@
 import { SurveyQualityAssessmentPlanCreateV1, SurveyQualityAssessmentCreateV1, SurveyQualityAssessmentReverifyV1, QUALITY_ASSESSMENT_LIMITS, parseAssessmentJson } from '../../shared/survey-quality-assessment'
 import { SurveyQualityScoringCreateV1, SurveyQualityScoringReverifyRequestV1, SURVEY_QUALITY_SCORING_WORKSPACE_LIMITS, SurveyQualityScoringInputV1, parseQualityScoringJson } from '../../shared/survey-quality-scoring'
 import { SurveySamplingPopulationCreateV1, SurveySamplingRunCreateV1, SurveySamplingVerifyRequestV1, SURVEY_SAMPLING_WORKSPACE_LIMITS } from '../../shared/survey-quality-sampling-workspace'
-import { SurveyAdvancedTrialCreateV1, SurveyAdvancedTrialReverifyRequestV1, SURVEY_ADVANCED_TRIAL_LIMITS, SurveyGeneralizedWRequestV1, SurveyVceTrialInputV1, SurveyHuberTrialInputV1, SurveyStatisticalFamilyInputV1, SurveyReferenceDatumInputV1, SurveyStaticIncrementalInputV1, parseAdvancedTrialJson } from '../../shared/survey-advanced-trials'
+import { SurveySourceFixedModelRequestV1, SurveyAdvancedTrialCreateV1, SurveyAdvancedTrialReverifyRequestV1, SURVEY_ADVANCED_TRIAL_LIMITS, SurveyGeneralizedWRequestV1, SurveyVceTrialInputV1, SurveyHuberTrialInputV1, SurveyStatisticalFamilyInputV1, SurveyReferenceDatumInputV1, SurveyStaticIncrementalInputV1, parseAdvancedTrialJson } from '../../shared/survey-advanced-trials'
 import { z } from 'zod'
 import { RUNTIME_STANDARD_BASIS_PATH, STANDARD_BASIS_QUERY_KEYS, SurveyStandardBasisReferenceV1 } from '../../shared/survey-standard-basis'
 import { SurveyFreeLevelingTrialRequestV1 } from '../../shared/survey-free-leveling'
@@ -252,6 +252,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint('/v1/engineering/projects/{id}/quality-scoring/{recordId}', ['GET'], []),
   compileEndpoint('/v1/engineering/projects/{id}/quality-scoring/{recordId}/reverify', ['POST'], []),
   compileEndpoint('/v1/engineering/projects/{id}/quality-scoring/{recordId}/export', ['GET'], []),
+  compileEndpoint('/v1/engineering/projects/{id}/advanced-trial-model', ['POST'], []),
   compileEndpoint('/v1/engineering/projects/{id}/advanced-trials', ['GET', 'POST'], ['limit', 'offset']),
   compileEndpoint('/v1/engineering/projects/{id}/advanced-trials/{trialId}', ['GET'], []),
   compileEndpoint('/v1/engineering/projects/{id}/advanced-trials/{trialId}/reverify', ['POST'], []),
@@ -459,6 +460,13 @@ export const runtimeRequestPayloadSchema = z
         } catch { valid = false }
       }
       if (!valid) context.addIssue({ code: 'custom', message: 'invalid scoring model trial request' })
+    }
+    if (/^\/v1\/engineering\/projects\/[^/]+\/advanced-trial-model$/.test(url.pathname)) {
+      let valid = false
+      if (payload.method === 'POST' && !url.search && payload.body !== undefined && Buffer.byteLength(payload.body, 'utf8') <= 4096) {
+        try { valid = SurveySourceFixedModelRequestV1.safeParse(parseAdvancedTrialJson(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid source model selection' })
     }
     const advanced = /^\/v1\/engineering\/projects\/[^/]+\/advanced-trials(?:\/[^/]+(?:\/(reverify|export))?)?$/.exec(url.pathname)
     if (advanced) {

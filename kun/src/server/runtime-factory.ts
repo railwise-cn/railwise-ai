@@ -414,7 +414,8 @@ export async function createKunServeRuntime(
   })
   const surveyAdvancedTrialsWorkspaceService = new SurveyAdvancedTrialsWorkspaceService({
     rootDir: join(options.dataDir, 'engineering'), nowIso,
-    getProject: (projectId) => engineeringService.getProject(projectId)
+    getProject: (projectId) => engineeringService.getProject(projectId),
+    getSourceModel: (projectId, request) => surveyService.getSourceFixedModel(projectId, request)
   })
   const surveySamplingWorkspaceService = new SurveySamplingWorkspaceService({
     rootDir: join(options.dataDir, 'engineering'),

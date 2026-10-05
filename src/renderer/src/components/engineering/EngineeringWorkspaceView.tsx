@@ -1336,7 +1336,8 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
               <PanelHeading title={t('engineeringSkillsPanelTitle')} description={t('engineeringSkillsPanelDescription')} />
               <EngineeringSkillsPanel runtimeReady={runtimeReady} />
             </section> : null}
-            {tab === 'advanced-models' ? <SurveyAdvancedModelWorkspace binding={{ projectId: overview.project.id, projectRevision: overview.project.revision, workspaceRoot }} runtimeReady={runtimeReady} /> : null}      </> : null}
+            {tab === 'advanced-models' ? <SurveyAdvancedModelWorkspace binding={{ projectId: overview.project.id, projectRevision: overview.project.revision, workspaceRoot }} runtimeReady={runtimeReady}
+                sourceSelection={activeSurveyNetwork && latestSurveyAdjustment ? { adjustmentId: latestSurveyAdjustment.run.id, networkId: activeSurveyNetwork.id, networkRevision: activeSurveyNetwork.revision } : undefined} /> : null}      </> : null}
     </EngineeringDrawer>
     {busy ? <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center"><span role="status" className="inline-flex items-center gap-2 rounded-md border border-ds-border bg-ds-card px-3 py-2 text-[12px] text-ds-muted shadow-panel"><Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />{t('engineeringRuntimeProcessing')}</span></div> : null}
   </div></EngineeringEvidenceQuestions>
