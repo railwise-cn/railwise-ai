@@ -1,0 +1,80 @@
+[
+  {
+    "file": "kun-test-electron-final.log",
+    "sha256": "b9e1c48576ec3b09cb489d3df10a24927008551da0f27e1d06e64f252e384f64",
+    "originalSha256": "13a0c38de644fce07d8b7ba6ae9a09a51f4fc5de06c315dfe023a328a18713be",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "kun-test-electron.log",
+    "sha256": "a0580140068e07c0f6df1996f58dbbfb5766140f9f15768747d3a4451a09307e",
+    "originalSha256": "ab05378ecc373b1a540ad55ddd3e7179a03d7c8e9243da81c575189c7aeac1a6",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "kun-test.log",
+    "sha256": "5db3a8397a59984e9b975e326c6a8ec9a2ce7ec9bf2c1e119e52d7b9cbd6f8fc",
+    "originalSha256": "e762bfd18f1b7af3f4fa8017086a932fca8040c759159455832336ee0793a793",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "kun-typecheck-final.log",
+    "sha256": "a62b660f256c8001c1416a2698257656b95beea60ea8f7871f1ff86f36f6d7d7",
+    "originalSha256": "369fb1b91d4bc5be75374f253acfa1ccd86ab16e2a1c4ddce423943f6f1d18b6",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "managed-runtime-mocked.log",
+    "sha256": "f4664d58657dd3896bfcaf6e78cc550f3aba30a8b39a9804ba198e09523df002",
+    "originalSha256": "279b665dd68bd6cd1bb515ab75dda8d69c670406c803fc19a6282476009e2011",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "restricted-code-electron-green.log",
+    "sha256": "80b70d08864c7cc522b643507ff192e3a00c806183e72a142620fda10040d634",
+    "originalSha256": "5906d1ef40a8f8d73f99df1e87c010c3a854ea072a98b35ff6be075d53eca9dd",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "restricted-code-electron-red.log",
+    "sha256": "c41a5f327bb3994222fefc04cd39cbd2da21bbbb0c4efe5ec083359960b32c9c",
+    "originalSha256": "299bf30839fba2e9555339cd98eb9d108918b8aed3fcfad761e3614203582dfb",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "restricted-code-node-green.log",
+    "sha256": "30d25834f31fb0ccb025a5d5f83129e92d3b17b773af8a92102e1e0ff5a94070",
+    "originalSha256": "b9b93812ab1a251e4e843d9c6cd0891e10cadaceb952c17eff2daa26c6018fe6",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "restricted-code-node-red.log",
+    "sha256": "accf27e294cb57a6d4932eaa194b1dc615e0fdcd9435a5bf41d1e7fb4c000d70",
+    "originalSha256": "cae4678cbd7ceefbdfd87c283d2cbf82f9a7f80c0eb6ab1eb7cd219e7bb04689",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "root-test-electron-final.log",
+    "sha256": "62af239735df81f38b2ba3f9a55e951bf53c60e3ad45788dbcd9b8409fdce52b",
+    "originalSha256": "2e8a9b579cd0d2b850994ff720f5672ba9e904eafb74cc7d2116788f1f141c88",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "root-test-electron.log",
+    "sha256": "68674332d5361749b2bd2159dc27f15752c7f737bfe1316775543b5f281db7f9",
+    "originalSha256": "38883f5a2fa9d470e01620583c207879d2f3a4b41c5664d9b86ca7c661727961",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "root-test.log",
+    "sha256": "9e7252aad8ee99c458ee873bd5f3501f6180ed65d2a5d60bb0aff454316b4339",
+    "originalSha256": "2df6c9fe422dc940a1584ded13704c4545e34fc50f39e768f8d7f79da2bc1326",
+    "normalization": "remove redundant empty lines at EOF"
+  },
+  {
+    "file": "root-typecheck-final.log",
+    "sha256": "368c1924517cb34cafcfbf2d3194ac6fb75aa65d1012718ca69fecd959444ab0",
+    "originalSha256": "46ad469197adf175dd5840bb501a69c69165bc5d30afc00d853aee60a7a82dfd",
+    "normalization": "remove redundant empty lines at EOF"
+  }
+]

@@ -1,0 +1,25 @@
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+(node:29525) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `Electron --trace-deprecation ...` to show where the warning was created)
+ ❯ src/flow/restricted-code.test.ts (3 tests | 2 failed) 2109ms
+     × uses a JSON-only child process and returns JSON 1004ms
+     × does not expose process, require, or fetch 1002ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/flow/restricted-code.test.ts > restricted Flow code > uses a JSON-only child process and returns JSON
+ FAIL  src/flow/restricted-code.test.ts > restricted Flow code > does not expose process, require, or fetch
+Error: Restricted code timed out after 1000ms
+ ❯ restrictedError src/flow/restricted-code.ts:104:87
+
+ ❯ Timeout.<anonymous> src/flow/restricted-code.ts:93:43
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 207 passed | 2 skipped (210)
+      Tests  2 failed | 3061 passed | 22 skipped (3085)
+   Start at  23:17:48
+   Duration  53.05s (transform 3.30s, setup 0ms, import 19.01s, tests 175.91s, environment 8ms)

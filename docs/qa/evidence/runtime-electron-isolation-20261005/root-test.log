@@ -1,0 +1,860 @@
+
+> workwise@0.5.2 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise
+
+ ❯ src/main/services/im-delivery-ledger.test.ts (13 tests | 13 failed) 833ms
+     × restricts the ledger directory and database to the current user 759ms
+     × deduplicates an inbound provider message and exposes stable idempotency 9ms
+     × recovers non-terminal jobs after an expired worker lease 8ms
+     × allows only one worker to claim the same inbound message lease 4ms
+     × does not let an expired worker overwrite the replacement worker state 4ms
+     × clears the owned lease on delivery and never regresses the terminal state 7ms
+     × keeps an active worker lease fresh so recovery cannot take over a live Turn 5ms
+     × allows the original owner to renew after expiry until another owner claims it 6ms
+     × does not mark a result delivered until provider delivery succeeds 5ms
+     × stops retrying a permanently failed provider delivery 5ms
+     × keeps a delivered Runtime failure distinct from a successful result 5ms
+     × never reclaims a terminal failed message as a new Runtime Turn 5ms
+     × redacts old terminal payloads, deletes expired terminal rows, and preserves active work 7ms
+stdout | src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts
+🌐 i18next is made possible by our own product, Locize — consider powering your project with managed localization (AI, CDN, integrations): https://locize.com 💙
+
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts (28 tests | 28 failed) 170ms
+     × prepares a node question from the selected saved score with no new calculation 12ms
+     × has complete Chinese and English messages for all displayed rules and static controls 10ms
+     × requires declaration and confirmation, preserves exact fractions, and localizes the result 7ms
+     × builds an accuracy assessment from professional fields without exposing declaration internals 5ms
+     × names the deduction adjustment coefficient without presenting it as an inspection count 7ms
+     × distinguishes exact partial grade from full-product qualification and retains pending/A veto traces 5ms
+     × offers strict templates for all seven stages in both product profiles without filling data 4ms
+     × shows the packaged acceptance case without changing its raw JSON: full 5ms
+     × shows the packaged acceptance case without changing its raw JSON: child-veto 10ms
+     × shows the packaged acceptance case without changing its raw JSON: pending 4ms
+     × shows the packaged acceptance case without changing its raw JSON: multiple-sixty 5ms
+     × restores height records with their own product and stage even while the draft selector is planar 4ms
+     × blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests 5ms
+     × paginates real history and isolates unavailable records 6ms
+     × retries an uncertain save with exactly the same original body and key and suppresses double clicks 7ms
+     × resolves an uncertain save by restoring the same request from history 5ms
+     × discards a late create response after project without fetching its detail 5ms
+     × discards a late create response after revision without fetching its detail 5ms
+     × discards a late create response after workspace without fetching its detail 4ms
+     × discards a late create response after offline without fetching its detail 4ms
+     × discards a late create response after cancel without fetching its detail 7ms
+     × discards a late restored detail after project 8ms
+     × discards a late restored detail after offline 8ms
+     × does not issue the second GET if scope changes during reverify 8ms
+     × strictly binds real records, normalized data and hashes without browser Buffer 5ms
+     × maps deterministic environment/validation errors without suggesting generic network retry 4ms
+     × exports only a freshly replayed record through native Save As, preserving UTF-8 original input 4ms
+     × does not open Save As for a corrupted export or a late response after the scope changes 4ms
+stdout | src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts
+🌐 i18next is made possible by our own product, Locize — consider powering your project with managed localization (AI, CDN, integrations): https://locize.com 💙
+
+ ❯ src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts (17 tests | 17 failed) 142ms
+     × binds a unit question to the restored assessment and disables it during revalidation 18ms
+     × has complete bilingual controls and state strings 11ms
+     × freezes an actual complete run with explicit mappings using real source APIs 7ms
+     × shows veto and missing coverage simultaneously with pending draft in en 6ms
+     × shows veto and missing coverage simultaneously with pending draft in zh 7ms
+     × restores immutable plan and saves missing scores with one POST and no extra GET 6ms
+     × ignores late assessment creation after project 5ms
+     × ignores late assessment creation after revision 8ms
+     × ignores late assessment creation after workspace 8ms
+     × ignores late assessment creation after offline 11ms
+     × ignores late assessment creation after cancel 6ms
+     × retries exact original request bytes after an uncertain save 8ms
+     × performs fresh export and labels native cancellation without success 9ms
+     × checks real records and export without browser Buffer, rejecting wrong workspace and changed hashes 7ms
+     × clears previous verified detail and export after sources change 7ms
+     × does not leave a different frozen plan below a restored assessment 8ms
+     × rejects swapped plan and assessment response roles 9ms
+(node:17574) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts
+🌐 i18next is made possible by our own product, Locize — consider powering your project with managed localization (AI, CDN, integrations): https://locize.com 💙
+
+ ❯ src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts (42 tests | 42 failed) 264ms
+     × prepares exact stored generalized-w evidence and a resolvable selected result without another Runtime call 11ms
+     × prepares exact stored vce evidence and a resolvable selected result without another Runtime call 11ms
+     × prepares exact stored huber evidence and a resolvable selected result without another Runtime call 6ms
+     × prepares exact stored statistical-family evidence and a resolvable selected result without another Runtime call 5ms
+     × prepares exact stored reference-datum evidence and a resolvable selected result without another Runtime call 5ms
+     × prepares exact stored static-incremental evidence and a resolvable selected result without another Runtime call 6ms
+     × requires an explicit model and confirmation, preserves raw evidence, and displays null directions plus all covariance cells 6ms
+     × submits a one-parameter variance-group trial from survey fields without exposing request internals 4ms
+     × saves, restores, replays and exports huber with bilingual boundary information 4ms
+     × saves, restores, replays and exports statistical-family with bilingual boundary information 8ms
+     × shows declared degrees of freedom beside distinct Student t probabilities and the chi-square prior scale 9ms
+     × does not collapse a narrow statistical resolution interval through display rounding 8ms
+     × restores reordered statistical subsets using the frozen kernel normalization while retaining raw evidence and family order 4ms
+     × keeps flat Huber uniqueness unestablished and exhausted iterates unaccepted 6ms
+     × rejects altered huber result requests before exposing a restored record 5ms
+     × rejects altered statistical-family result requests before exposing a restored record 5ms
+     × shows VCE normalization, initial groups, numerical convergence and the final refit without approval wording 5ms
+     × shows a negative VCE candidate and stops without presenting a converged fit 8ms
+     × blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests 6ms
+     × paginates real history and isolates unavailable records 5ms
+     × retries an uncertain save with exactly the same original body and key and suppresses double clicks 7ms
+     × resolves an uncertain save by restoring the same request from history 4ms
+     × discards a late create response after project without fetching its detail 4ms
+     × discards a late create response after revision without fetching its detail 4ms
+     × discards a late create response after workspace without fetching its detail 4ms
+     × discards a late create response after offline without fetching its detail 6ms
+     × discards a late create response after cancel without fetching its detail 8ms
+     × discards a late restored detail after project 8ms
+     × discards a late restored detail after offline 7ms
+     × does not issue the second GET if scope changes during reverify 7ms
+     × strictly binds real records, normalized data and hashes without browser Buffer 9ms
+     × maps deterministic environment/validation errors without suggesting generic network retry 5ms
+     × exports only a freshly replayed record through native Save As, preserving UTF-8 original input 9ms
+     × does not open Save As for a corrupted export or a late response after the scope changes 4ms
+     × saves mapped epoch evidence and exposes the complete covariance without claiming stable points 4ms
+     × shows singular GLS failure and retained semidefinite qualification on an explicitly different method 6ms
+     × renders maximum cross-epoch covariance and mappings from a strictly replayed real record 8ms
+     × shows survey result metrics without exposing QR implementation details, replays, restores and exports exact evidence 4ms
+     × renders a changed base model without exposing internal binding details 8ms
+     × rejects missing zero-mean declaration before any Runtime request 5ms
+     × does not relabel native export cancellation as success 6ms
+   × restores all 128 appended rows and 16-by-16 prior covariance matrices at the declared capacity 4ms
+(node:21967) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22115) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22760) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23405) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23415) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23559) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23587) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23591) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23616) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23794) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/main/claw-runtime.test.ts (95 tests | 10 failed) 33324ms
+     × records transmitted Feishu failures as failed and successful replies as delivered in SQLite 12ms
+     × does not produce a delivery after another worker has taken the expired ledger lease 8ms
+     × recovers a Feishu reply and PPTX from a reopened SQLite ledger without starting another Turn 8ms
+     × terminalizes a malformed Feishu ledger payload during recovery 7ms
+     × terminalizes a malformed WeChat delivery result during recovery 5ms
+     × does not send a recovered WeChat result after losing the delivery lease 6ms
+     × resumes a crash-interrupted Feishu Turn from a webhook-shaped SQLite payload without receiving it again 7ms
+     × extends the provider delivery lease before returning a webhook result 6ms
+     × enforces delivery start, renew, and idempotent completion receipts 7ms
+     × rejects stale delivery owners and requeues provider failures 6ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 110 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > records transmitted Feishu failures as failed and successful replies as delivered in SQLite
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:1953:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > does not produce a delivery after another worker has taken the expired ledger lease
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:2208:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > recovers a Feishu reply and PPTX from a reopened SQLite ledger without starting another Turn
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:2330:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > terminalizes a malformed Feishu ledger payload during recovery
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:2407:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > terminalizes a malformed WeChat delivery result during recovery
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:2436:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > does not send a recovered WeChat result after losing the delivery lease
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:2712:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > resumes a crash-interrupted Feishu Turn from a webhook-shaped SQLite payload without receiving it again
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:2751:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > extends the provider delivery lease before returning a webhook result
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:3271:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > enforces delivery start, renew, and idempotent completion receipts
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:3333:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/197]⎯
+
+ FAIL  src/main/claw-runtime.test.ts > ClawRuntime > rejects stale delivery owners and requeues provider failures
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/claw-runtime.test.ts:3411:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > restricts the ledger directory and database to the current user
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:12:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > deduplicates an inbound provider message and exposes stable idempotency
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:23:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > recovers non-terminal jobs after an expired worker lease
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:48:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > allows only one worker to claim the same inbound message lease
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:61:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > does not let an expired worker overwrite the replacement worker state
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:75:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > clears the owned lease on delivery and never regresses the terminal state
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:101:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > keeps an active worker lease fresh so recovery cannot take over a live Turn
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:139:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > allows the original owner to renew after expiry until another owner claims it
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:155:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > does not mark a result delivered until provider delivery succeeds
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:173:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > stops retrying a permanently failed provider delivery
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:200:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > keeps a delivered Runtime failure distinct from a successful result
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:219:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > never reclaims a terminal failed message as a new Runtime Turn
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:240:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/197]⎯
+
+ FAIL  src/main/services/im-delivery-ledger.test.ts > ImDeliveryLedger > redacts old terminal payloads, deletes expired terminal rows, and preserves active work
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new ImDeliveryLedger src/main/services/im-delivery-ledger.ts:66:15
+     64|     mkdirSync(databaseDirectory, { recursive: true, mode: 0o700 })
+     65|     if (process.platform !== 'win32') chmodSync(databaseDirectory, 0o7…
+     66|     this.db = new Database(databasePath)
+       |               ^
+     67|     if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
+     68|     this.db.pragma('journal_mode = WAL')
+ ❯ src/main/services/im-delivery-ledger.test.ts:261:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/197]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored generalized-w evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored vce evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored huber evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored statistical-family evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored reference-datum evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored static-incremental evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > requires an explicit model and confirmation, preserves raw evidence, and displays null directions plus all covariance cells
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > submits a one-parameter variance-group trial from survey fields without exposing request internals
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > saves, restores, replays and exports huber with bilingual boundary information
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > saves, restores, replays and exports statistical-family with bilingual boundary information
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > shows declared degrees of freedom beside distinct Student t probabilities and the chi-square prior scale
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > does not collapse a narrow statistical resolution interval through display rounding
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > restores reordered statistical subsets using the frozen kernel normalization while retaining raw evidence and family order
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > keeps flat Huber uniqueness unestablished and exhausted iterates unaccepted
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > rejects altered huber result requests before exposing a restored record
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > rejects altered statistical-family result requests before exposing a restored record
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > shows VCE normalization, initial groups, numerical convergence and the final refit without approval wording
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > shows a negative VCE candidate and stops without presenting a converged fit
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > paginates real history and isolates unavailable records
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > retries an uncertain save with exactly the same original body and key and suppresses double clicks
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > resolves an uncertain save by restoring the same request from history
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after project without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after revision without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after workspace without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after offline without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after cancel without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after project
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after offline
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > does not issue the second GET if scope changes during reverify
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > strictly binds real records, normalized data and hashes without browser Buffer
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > maps deterministic environment/validation errors without suggesting generic network retry
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > exports only a freshly replayed record through native Save As, preserving UTF-8 original input
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > does not open Save As for a corrupted export or a late response after the scope changes
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > reference datum desktop workflow > saves mapped epoch evidence and exposes the complete covariance without claiming stable points
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > reference datum desktop workflow > shows singular GLS failure and retained semidefinite qualification on an explicitly different method
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > reference datum desktop workflow > renders maximum cross-epoch covariance and mappings from a strictly replayed real record
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > shows survey result metrics without exposing QR implementation details, replays, restores and exports exact evidence
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > renders a changed base model without exposing internal binding details
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > rejects missing zero-mean declaration before any Runtime request
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > does not relabel native export cancellation as success
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > restores all 128 appended rows and 16-by-16 prior covariance matrices at the declared capacity
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new SurveyAdvancedTrialsWorkspaceService kun/src/engineering/survey-advanced-trials-workspace.ts:53:15
+     51|   constructor(private readonly options: { rootDir: string; nowIso?: ()…
+     52|     mkdirSync(resolve(options.rootDir), { recursive: true, mode: 0o700…
+     53|     this.db = new Database(join(options.rootDir, 'survey-advanced-tria…
+       |               ^
+     54|     this.db.pragma('journal_mode = WAL')
+     55|     this.db.pragma('busy_timeout = 5000')
+ ❯ src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts:98:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/197]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored generalized-w evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored vce evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored huber evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored statistical-family evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored reference-datum evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares exact stored static-incremental evidence and a resolvable selected result without another Runtime call
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > requires an explicit model and confirmation, preserves raw evidence, and displays null directions plus all covariance cells
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > submits a one-parameter variance-group trial from survey fields without exposing request internals
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > saves, restores, replays and exports huber with bilingual boundary information
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > saves, restores, replays and exports statistical-family with bilingual boundary information
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > shows declared degrees of freedom beside distinct Student t probabilities and the chi-square prior scale
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > does not collapse a narrow statistical resolution interval through display rounding
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > restores reordered statistical subsets using the frozen kernel normalization while retaining raw evidence and family order
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > keeps flat Huber uniqueness unestablished and exhausted iterates unaccepted
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > rejects altered huber result requests before exposing a restored record
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > rejects altered statistical-family result requests before exposing a restored record
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > shows VCE normalization, initial groups, numerical convergence and the final refit without approval wording
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > shows a negative VCE candidate and stops without presenting a converged fit
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > paginates real history and isolates unavailable records
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > retries an uncertain save with exactly the same original body and key and suppresses double clicks
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > resolves an uncertain save by restoring the same request from history
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after project without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after revision without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after workspace without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after offline without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after cancel without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after project
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after offline
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > does not issue the second GET if scope changes during reverify
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > strictly binds real records, normalized data and hashes without browser Buffer
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > maps deterministic environment/validation errors without suggesting generic network retry
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > exports only a freshly replayed record through native Save As, preserving UTF-8 original input
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > declared advanced model desktop workflow > does not open Save As for a corrupted export or a late response after the scope changes
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > reference datum desktop workflow > saves mapped epoch evidence and exposes the complete covariance without claiming stable points
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > reference datum desktop workflow > shows singular GLS failure and retained semidefinite qualification on an explicitly different method
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > reference datum desktop workflow > renders maximum cross-epoch covariance and mappings from a strictly replayed real record
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > shows survey result metrics without exposing QR implementation details, replays, restores and exports exact evidence
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > renders a changed base model without exposing internal binding details
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > rejects missing zero-mean declaration before any Runtime request
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > static append desktop workflow > does not relabel native export cancellation as success
+ FAIL  src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts > restores all 128 appended rows and 16-by-16 prior covariance matrices at the declared capacity
+TypeError: Cannot read properties of undefined (reading 'unmount')
+ ❯ src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts:103:52
+    101|   host = document.createElement('div'); host.style.width = '960px'; do…
+    102| })
+    103| afterEach(async () => { await act(async () => root.unmount()); host.re…
+       |                                                    ^
+    104|
+    105| describe('declared advanced model desktop workflow', () => {
+ ❯ process.env.NODE_ENV.exports.act node_modules/.pnpm/react@19.3.0/node_modules/react/cjs/react.development.js:890:22
+ ❯ src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts:103:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/197]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > binds a unit question to the restored assessment and disables it during revalidation
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > has complete bilingual controls and state strings
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > freezes an actual complete run with explicit mappings using real source APIs
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > shows veto and missing coverage simultaneously with pending draft in en
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > shows veto and missing coverage simultaneously with pending draft in zh
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > restores immutable plan and saves missing scores with one POST and no extra GET
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after project
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after revision
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after workspace
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after offline
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after cancel
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > retries exact original request bytes after an uncertain save
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > performs fresh export and labels native cancellation without success
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > checks real records and export without browser Buffer, rejecting wrong workspace and changed hashes
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > clears previous verified detail and export after sources change
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > does not leave a different frozen plan below a restored assessment
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > rejects swapped plan and assessment response roles
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new EngineeringService kun/src/engineering/engineering-service.ts:245:15
+    243|     this.nowIso = options.nowIso ?? (() => new Date().toISOString())
+    244|     mkdirSync(resolve(options.rootDir), { recursive: true })
+    245|     this.db = new Database(resolve(options.rootDir, 'engineering.sqlit…
+       |               ^
+    246|     this.db.pragma('journal_mode = WAL')
+    247|     this.db.exec(`CREATE TABLE IF NOT EXISTS engineering_projects (id …
+ ❯ Module.assessmentFixture kun/src/engineering/survey-quality-assessment-test-helpers.ts:16:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/197]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > binds a unit question to the restored assessment and disables it during revalidation
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > has complete bilingual controls and state strings
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > freezes an actual complete run with explicit mappings using real source APIs
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > shows veto and missing coverage simultaneously with pending draft in en
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > shows veto and missing coverage simultaneously with pending draft in zh
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > restores immutable plan and saves missing scores with one POST and no extra GET
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after project
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after revision
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after workspace
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after offline
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > ignores late assessment creation after cancel
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > retries exact original request bytes after an uncertain save
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > performs fresh export and labels native cancellation without success
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > checks real records and export without browser Buffer, rejecting wrong workspace and changed hashes
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > clears previous verified detail and export after sources change
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > does not leave a different frozen plan below a restored assessment
+ FAIL  src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts > declared linkage desktop integration > rejects swapped plan and assessment response roles
+TypeError: Cannot read properties of undefined (reading 'unmount')
+ ❯ src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts:45:67
+
+ ❯ Proxy.process.env.NODE_ENV.exports.act node_modules/.pnpm/react@19.3.0/node_modules/react/cjs/react.development.js:890:22
+ ❯ src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts:45:49
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/197]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares a node question from the selected saved score with no new calculation
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > has complete Chinese and English messages for all displayed rules and static controls
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > requires declaration and confirmation, preserves exact fractions, and localizes the result
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > builds an accuracy assessment from professional fields without exposing declaration internals
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > names the deduction adjustment coefficient without presenting it as an inspection count
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > distinguishes exact partial grade from full-product qualification and retains pending/A veto traces
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > offers strict templates for all seven stages in both product profiles without filling data
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: full
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: child-veto
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: pending
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: multiple-sixty
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > restores height records with their own product and stage even while the draft selector is planar
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > paginates real history and isolates unavailable records
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > retries an uncertain save with exactly the same original body and key and suppresses double clicks
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > resolves an uncertain save by restoring the same request from history
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after project without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after revision without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after workspace without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after offline without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after cancel without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after project
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after offline
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > does not issue the second GET if scope changes during reverify
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > strictly binds real records, normalized data and hashes without browser Buffer
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > maps deterministic environment/validation errors without suggesting generic network retry
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > exports only a freshly replayed record through native Save As, preserving UTF-8 original input
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > does not open Save As for a corrupted export or a late response after the scope changes
+Error: The module '/Users/wangjiawei/Documents/WorkWise/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 148. This version of Node.js requires
+NODE_MODULE_VERSION 147. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+ ❯ bindings node_modules/.pnpm/bindings@1.5.0/node_modules/bindings/bindings.js:112:48
+ ❯ new Database node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/lib/database.js:48:64
+ ❯ new SurveyQualityScoringWorkspaceService kun/src/engineering/survey-quality-scoring-workspace.ts:43:15
+     41|   constructor(private readonly options: { rootDir: string; nowIso?: ()…
+     42|     mkdirSync(resolve(options.rootDir), { recursive: true, mode: 0o700…
+     43|     this.db = new Database(join(options.rootDir, 'survey-quality-scori…
+       |               ^
+     44|     this.db.pragma('journal_mode = WAL')
+     45|     this.db.pragma('busy_timeout = 5000')
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts:86:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/197]⎯
+
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > prepares a node question from the selected saved score with no new calculation
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > has complete Chinese and English messages for all displayed rules and static controls
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > requires declaration and confirmation, preserves exact fractions, and localizes the result
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > builds an accuracy assessment from professional fields without exposing declaration internals
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > names the deduction adjustment coefficient without presenting it as an inspection count
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > distinguishes exact partial grade from full-product qualification and retains pending/A veto traces
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > offers strict templates for all seven stages in both product profiles without filling data
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: full
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: child-veto
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: pending
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > shows the packaged acceptance case without changing its raw JSON: multiple-sixty
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > restores height records with their own product and stage even while the draft selector is planar
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > paginates real history and isolates unavailable records
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > retries an uncertain save with exactly the same original body and key and suppresses double clicks
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > resolves an uncertain save by restoring the same request from history
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after project without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after revision without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after workspace without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after offline without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late create response after cancel without fetching its detail
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after project
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > discards a late restored detail after offline
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > does not issue the second GET if scope changes during reverify
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > strictly binds real records, normalized data and hashes without browser Buffer
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > maps deterministic environment/validation errors without suggesting generic network retry
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > exports only a freshly replayed record through native Save As, preserving UTF-8 original input
+ FAIL  src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts > declared advanced model desktop workflow > does not open Save As for a corrupted export or a late response after the scope changes
+TypeError: Cannot read properties of undefined (reading 'unmount')
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts:91:52
+     89|   host = document.createElement('div'); host.style.width = '960px'; do…
+     90| })
+     91| afterEach(async () => { await act(async () => root.unmount()); host.re…
+       |                                                    ^
+     92|
+     93| describe('declared advanced model desktop workflow', () => {
+ ❯ process.env.NODE_ENV.exports.act node_modules/.pnpm/react@19.3.0/node_modules/react/cjs/react.development.js:890:22
+ ❯ src/renderer/src/components/engineering/SurveyQualityScoringWorkspace.dom.test.ts:91:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/197]⎯
+
+
+ Test Files  5 failed | 345 passed | 2 skipped (352)
+      Tests  110 failed | 3002 passed | 2 skipped (3114)
+   Start at  23:14:27
+   Duration  34.35s (transform 12.21s, setup 0ms, import 39.90s, tests 123.24s, environment 7.39s)

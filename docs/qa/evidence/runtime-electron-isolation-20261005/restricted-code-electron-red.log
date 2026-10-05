@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise/kun
+
+ × src/flow/restricted-code.test.ts > restricted Flow code > uses a JSON-only child process and returns JSON 1006ms
+   → Restricted code timed out after 1000ms
+ × src/flow/restricted-code.test.ts > restricted Flow code > runs the real child with only the Node-mode bootstrap environment 1002ms
+   → Restricted code timed out after 1000ms
+ × src/flow/restricted-code.test.ts > restricted Flow code > does not expose process, require, or fetch 1003ms
+   → Restricted code timed out after 1000ms
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > times out CPU-bound code and rejects extra permissions 101ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/flow/restricted-code.test.ts > restricted Flow code > uses a JSON-only child process and returns JSON
+ FAIL  src/flow/restricted-code.test.ts > restricted Flow code > runs the real child with only the Node-mode bootstrap environment
+ FAIL  src/flow/restricted-code.test.ts > restricted Flow code > does not expose process, require, or fetch
+Error: Restricted code timed out after 1000ms
+ ❯ restrictedError src/flow/restricted-code.ts:104:87
+
+ ❯ Timeout.<anonymous> src/flow/restricted-code.ts:93:43
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'restricted_code_timeout' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  23:28:53
+   Duration  3.23s (transform 21ms, setup 0ms, import 29ms, tests 3.11s, environment 0ms)

@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise/kun
+
+(node:36806) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `Electron --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  208 passed | 2 skipped (210)
+      Tests  3064 passed | 22 skipped (3086)
+   Start at  23:30:17
+   Duration  54.64s (transform 4.02s, setup 0ms, import 22.51s, tests 176.81s, environment 8ms)

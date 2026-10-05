@@ -1,0 +1,12 @@
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > uses a JSON-only child process and returns JSON 66ms
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > runs the real child with only the Node-mode bootstrap environment 58ms
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > does not expose process, require, or fetch 61ms
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > times out CPU-bound code and rejects extra permissions 102ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  23:29:27
+   Duration  455ms (transform 28ms, setup 0ms, import 40ms, tests 289ms, environment 0ms)
