@@ -11,7 +11,7 @@ This record covers the exact local arm64 package built from commit `41f7078c5b62
 - Architecture: macOS arm64
 - Bundle identifier: `com.wangjiawei508.workgpt`
 - ASAR SHA-256: `aa705cb8574f78714a21720c3fbf59668b810a642a1617d222cfaebacd0cbf20`
-- ZIP SHA-256: `7f998a5103efd193b97220a091b1f98119d9710337467234d6a6f8ff8721b919`
+- ZIP SHA-256: `b9fee39144ad49741a40a9baa726041fa39b24de232b76ed1af910c7b7a4107d`
 - DMG SHA-256: `b8c71962331c9817f5794eccea18e946849d07955355af728596f5f1c9683685`
 - Signature: ad-hoc deep strict verification passed; no Developer ID identity was available locally.
 - Notarization: not performed locally because Apple notary credentials were unavailable.
