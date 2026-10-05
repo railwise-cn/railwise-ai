@@ -37,7 +37,14 @@ import { isGnssSurveyFormat, SurveyFormatRegistry, type SurveySourceEnvelope } f
 import type { CosaIn1Mapping } from './survey-cosa-in1.js'
 import { levelingNetworkClosures } from './survey-leveling-closure.js'
 import { surveyErrorEllipse } from './survey-error-ellipse.js'
+import { residualStatistic, SEMANTIC_ADJUSTMENT_VERSION, withStatisticalSemantics } from './survey-statistical-semantics.js'
 import { SurveyStatisticalDiagnosticsV1 } from '../contracts/survey-statistics.js'
+import { SurveyProfessionalReviewV1 } from '../contracts/survey-professional.js'
+import { buildSurveyProfessionalReview, surveyProfessionalInputHash } from './survey-professional-review.js'
+import { SurveyMonitoringRecords } from './survey-monitoring-records.js'
+import type { SurveySegmentComparisonV1, SurveySegmentContinuityV1 } from '../contracts/survey-monitoring.js'
+import { SurveyTabularMappingV1, SurveyTabularProbeRequestV1, SurveyTabularProbeV1 } from '../contracts/survey-tabular.js'
+import { probeSurveyTabular } from './survey-tabular-import.js'
 import { diagnoseDeletedResiduals } from './survey-statistical-diagnostics.js'
 import { SurveyFreeLevelingTrialRequestV1, SurveyFreeLevelingTrialV1, SurveyFreeLevelingTrialSummaryV1, type SurveyFreeLevelingTrialListV1 } from '../contracts/survey-free-leveling.js'
 import { solveFreeLevelingTrial, FREE_LEVELING_VERSION } from './survey-free-leveling.js'
@@ -250,7 +257,8 @@ export type RecordTrustedSurveyDerivedObservationValueCorrection = Readonly<{
   expectedCorrectionHeadHash: string
 }>
 
-const ALGORITHM_VERSION = 'workwise-survey-adjustment-7'
+const ALGORITHM_VERSION = SEMANTIC_ADJUSTMENT_VERSION
+const LEGACY_STATISTICS_ALGORITHM = 'workwise-survey-adjustment-7'
 const LEGACY_ELLIPSE_FREE_ALGORITHM = 'workwise-survey-adjustment-6'
 
 function pointErrorEllipse(run: AdjustmentRunV1, solved: { covariance: Matrix; varianceFactor: number; varianceFactorEstimated: boolean }, x: number, y: number) {
@@ -383,6 +391,12 @@ function validationFindingsHash(findings: readonly SurveyQualityFindingV1[]): st
   return sha256CanonicalSurveyValue(stable)
 }
 
+/** Validation changes these lifecycle fields without changing imported evidence. */
+function importedNetworkContentHash(network: SurveyNetworkV1): string {
+  const { findings: _findings, qualityStatus: _qualityStatus, revision: _revision, updatedAt: _updatedAt, ...content } = network
+  return sha256CanonicalSurveyValue(content)
+}
+
 /** Serialize import semantics without relying on object insertion order. */
 function canonicalImportRequestJson(value: unknown): string {
   if (value === null || typeof value === 'boolean' || typeof value === 'string') return JSON.stringify(value)
@@ -404,26 +418,7 @@ function sha256CanonicalSurveyValue(value: unknown): string {
 
 /** Fields that directly define a numerical calculation, excluding mutable lifecycle/UI state. */
 function surveySolverInputHash(network: SurveyNetworkV1): string {
-  return sha256CanonicalSurveyValue({
-    schemaVersion: 1,
-    projectId: network.projectId,
-    networkId: network.id,
-    networkType: network.networkType,
-    transformType: network.transformType ?? null,
-    coordinateSystem: network.coordinateSystem,
-    projection: network.projection,
-    centralMeridian: network.centralMeridian ?? null,
-    ellipsoid: network.ellipsoid,
-    verticalDatum: network.verticalDatum,
-    heightDatum: network.heightDatum ?? null,
-    unit: network.unit,
-    knownPoints: network.knownPoints,
-    unknownPoints: network.unknownPoints,
-    observations: network.observations,
-    instrumentParameters: network.instrumentParameters,
-    observationEpoch: network.observationEpoch ?? null,
-    inputAttachmentHash: network.inputAttachmentHash ?? null
-  })
+  return surveyProfessionalInputHash(network)
 }
 
 function surveySourceFileAdmissionHash(source: SurveySourceFileV1): string {
@@ -473,6 +468,7 @@ function prepareImportRequest(request: SurveyNetworkImportRequest): PreparedImpo
     transformType: request.transformType ?? null,
     inputAttachmentHash: request.inputAttachmentHash ?? null,
     cosaIn1Mapping: request.cosaIn1Mapping ?? null,
+    ...(request.tabularMapping ? { tabularMapping: request.tabularMapping } : {}),
     knownPoints: request.knownPoints ?? null,
     // Retain a canonical structural compatibility request too. It is not
     // publicly accepted by Runtime, but migrated in-process callers must not
@@ -550,7 +546,8 @@ function rawSourceEvidence(source: SurveySourceFileV1 | undefined): SurveyRawSou
         id: record.id,
         rawOffset: record.rawOffset,
         rawLength: record.rawLength,
-        ...(record.rawLineNo === undefined ? {} : { rawLineNo: record.rawLineNo })
+        ...(record.rawLineNo === undefined ? {} : { rawLineNo: record.rawLineNo }),
+        ...(record.containerMember === undefined ? {} : { containerMember: record.containerMember })
       }))
   }
 }
@@ -699,9 +696,10 @@ async function parseNetworkPayload(
   transformType?: SurveyNetworkV1['transformType'],
   cosaIn1Mapping?: CosaIn1Mapping,
   knownPointMappings?: readonly SurveyKnownPointInputV1[],
-  persistSource?: (source: SurveySourceEnvelope) => Promise<void>
+  persistSource?: (source: SurveySourceEnvelope) => Promise<void>,
+  tabularMapping?: SurveyTabularMappingV1
 ): Promise<SurveyNetworkV1> {
-  const source = await formatRegistry.ingest({ name, bytes, networkType, cosaIn1Mapping })
+  const source = await formatRegistry.ingest({ name, bytes, networkType, cosaIn1Mapping, tabularMapping })
   await persistSource?.(source)
   const mappedPoints = applyKnownPointMappings(source.knownPoints, source.unknownPoints, knownPointMappings)
   // Converted output, when present, is the active parser source. The original
@@ -751,8 +749,8 @@ async function parseNetworkPayload(
     })
   }
   const generalFormat = source.sourceFile.detection.format === 'xlsx' || source.sourceFile.detection.format === 'delimited-text'
-  if (!generalFormat) {
-    const selectedNetworkType = isGnssSurveyFormat(source.sourceFile.detection.format) ? 'gnss' : networkType ?? 'leveling'
+  if (!generalFormat || tabularMapping || source.sourceFile.disposition === 'archive-only') {
+    const selectedNetworkType = source.networkType ?? (isGnssSurveyFormat(source.sourceFile.detection.format) ? 'gnss' : networkType ?? 'leveling')
     const networkId = `network_${randomUUID()}`
     const findings = sourceFindingsFor(networkId)
     return SurveyNetworkV1.parse({
@@ -1007,6 +1005,11 @@ function sourceAdjustabilityFindings(network: SurveyNetworkV1, nowIso: () => str
       nowIso
     ))
   }
+  if (source.parserId === 'survey-confirmed-tabular-parser' && (!source.tabularMapping || source.tabularMapping.sourceSha256 !== source.sha256)) {
+    findings.push(finding(network.id, 'source_not_adjustment_ready', 'blocking',
+      '测量表格缺少完整且绑定原文件的确认映射，不能进入新的计算。',
+      '从保留的原文件重新导入并确认字段、单位、基准和控制点。', undefined, nowIso))
+  }
   const hasAuditableLinearEvidence = source.linearUnitCanonical === 'm'
     && !['legacy-unknown', 'not-declared'].includes(source.linearUnitRaw)
     && source.parserSourceHash !== 'legacy-unavailable'
@@ -1073,7 +1076,10 @@ function sourceAdjustabilityFindings(network: SurveyNetworkV1, nowIso: () => str
     // fallback used in a multi-record source instead of an exact locator.
     const isWholeFileAnchor = source.records.length > 1 && anchor.rawOffset === 0 && anchor.rawLength >= source.fileSize
     const hasExactRange = anchor.rawLength > 0 && anchor.rawOffset + anchor.rawLength <= source.fileSize && !isWholeFileAnchor
-    if (!hasExactRange) {
+    const hasTrustedMember = !anchor.containerMember || source.formatId === 'xlsx' && source.parserId === 'survey-confirmed-tabular-parser'
+      && /^xl\/worksheets\/.+\.xml$/.test(anchor.containerMember.path)
+      && anchor.containerMember.byteLength > 0 && /^[0-9a-f]{64}$/.test(anchor.containerMember.sha256)
+    if (!hasExactRange || !hasTrustedMember) {
       findings.push(finding(
         network.id,
         'source_not_adjustment_ready',
@@ -1535,6 +1541,16 @@ function buildGnssResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso:
       residual,
       unit: 'm' as const,
       standardizedResidual: residualVariances[component]! > 1e-24 ? Math.abs(residual) / Math.sqrt(residualVariances[component]!) : 0,
+      ...(run.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION ? { residualStatistic: residualStatistic(
+        { method: 'residual-sigma-ratio', scaleBasis: solved.varianceFactorEstimated ? 'estimated-posterior' : 'declared-prior' },
+        residualVariances[component]! > 1e-24 ? Math.abs(residual) / Math.sqrt(residualVariances[component]!) : undefined,
+        solved.dof,
+        // Do not interpret cancellation, negative covariance or a zero fitted
+        // variance as a perfectly screened component.
+        block.covariance[component]![component]! - propagated[component]![component]!
+          <= 64 * Number.EPSILON * Math.max(block.covariance[component]![component]!, Math.abs(propagated[component]![component]!))
+          || residualVariances[component]! <= 1e-24 ? 'residual-variance-unresolved' : undefined
+      ) } : {}),
       outlier: residualVariances[component]! > 1e-24 && Math.abs(residual) / Math.sqrt(residualVariances[component]!) > 3,
       sourceRow: block.observation.sourceRow
     }))
@@ -2186,6 +2202,7 @@ export class SurveyService {
   private readonly nowIso: () => string
   private readonly pendingPersistence = new Set<Promise<void>>()
   private readonly formatRegistry: SurveyFormatRegistry
+  private monitoringRecords?: SurveyMonitoringRecords
   constructor(private readonly options: { rootDir: string; getProject?: SurveyProjectLookup; nowIso?: () => string; formatRegistry?: SurveyFormatRegistry }) {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString())
     this.formatRegistry = options.formatRegistry ?? new SurveyFormatRegistry()
@@ -2875,6 +2892,11 @@ export class SurveyService {
     return network
   }
 
+  async probeTabular(input: unknown): Promise<SurveyTabularProbeV1> {
+    const request = SurveyTabularProbeRequestV1.parse(input)
+    return await probeSurveyTabular(request.name, Buffer.from(request.dataBase64, 'base64'), request.delimiter)
+  }
+
   private async importNetworkTracked(input: unknown, attempt: SurveyImportAttempt): Promise<SurveyNetworkV1> {
     const req = SurveyNetworkImportRequest.parse(input)
     attempt.stage = 'preparation'
@@ -2931,7 +2953,8 @@ export class SurveyService {
             await atomicWriteFile(this.rawSourceOriginalPath(original.sha256), source.originalBytes)
           }
           await atomicWriteFile(this.rawSourceOriginalPath(source.sourceFile.sha256), source.effectiveBytes)
-        }
+        },
+        req.tabularMapping
       )
       persistedRawOriginal = true
     }
@@ -3107,7 +3130,7 @@ export class SurveyService {
     } else {
       result = invalidAdjustmentResult(solverNetwork, run, [finding(solverNetwork.id, 'invalid_observation', 'blocking', `暂不支持网型 ${solverNetwork.networkType} 的确定性平差`, '选择受支持的测量网型或补充适配策略', undefined, this.nowIso)], this.nowIso)
     }
-    return retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType }))
+    return withStatisticalSemantics(solverNetwork, retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType })))
   }
 
   createAdjustment(input: unknown): { run: AdjustmentRunV1; result: AdjustmentResultV1 } {
@@ -3198,6 +3221,30 @@ export class SurveyService {
     return this.withCurrentSourceAdmission(stored)
   }
 
+  /** Historical review stays readable; unavailable/currently changed sources remain explicit. */
+  getProfessionalReview(id: string): SurveyProfessionalReviewV1 | null {
+    const rows = this.db.prepare('SELECT id, project_id, network_id, data_json FROM survey_adjustments WHERE id = ? OR json_extract(data_json, \'$.result.id\') = ?').all(id, id) as Array<{ id: string; project_id: string; network_id: string; data_json: string }>
+    if (!rows.length) return null
+    if (rows.length !== 1) throw new Error(`adjustment ${id} has ambiguous professional review ownership`)
+    const row = rows[0]!
+    const stored = this.normalizeStoredAdjustment(JSON.parse(row.data_json))
+    if (!stored.result) return null
+    if (row.id !== stored.run.id || row.project_id !== stored.run.projectId || row.network_id !== stored.run.networkId
+      || stored.result.runId !== stored.run.id || stored.result.networkId !== stored.run.networkId
+      || stored.result.inputHash !== stored.run.inputHash || stored.result.algorithmVersion !== stored.run.algorithmVersion) {
+      throw new Error(`adjustment ${id} has inconsistent professional review provenance`)
+    }
+    const network = this.getNetwork(stored.run.networkId)
+    const admission = network ? this.verifySourceAdmission(network) : undefined
+    const integrity = network ? this.checkRawSourceIntegrity(network, false) : undefined
+    const evidence = network && admission?.valid && admission.record ? this.verifyAdjustmentEvidence(stored, network, admission.record) : undefined
+    return buildSurveyProfessionalReview({
+      projectId: stored.run.projectId, result: stored.result, network,
+      constraint: stored.run.constraint,
+      sourceIntegrity: integrity?.status === 'failed' ? 'failed' : integrity?.status === 'verified' && admission?.valid && evidence?.valid && network && this.sourceEligibility(network, integrity).eligible ? 'verified' : 'not-verified'
+    })
+  }
+
   /**
    * Resolve a new-use adjustment by its durable row, not just JSON embedded
    * identity. A result ID remains a supported read alias, but it must resolve
@@ -3237,7 +3284,7 @@ export class SurveyService {
       || stored.result.networkId !== network.id
       || stored.run.inputHash !== inputHash
       || stored.result.inputHash !== inputHash
-      || ![ALGORITHM_VERSION, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
+      || ![ALGORITHM_VERSION, LEGACY_STATISTICS_ALGORITHM, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
       || stored.result.algorithmVersion !== stored.run.algorithmVersion
       || stored.run.status !== 'completed'
       || stored.result.validation !== 'valid') {
@@ -3685,6 +3732,15 @@ export class SurveyService {
     return (rows as Array<{ data_json: string }>).map((row) => DeformationComparisonV1.parse(JSON.parse(row.data_json)))
   }
 
+  private monitoring(): SurveyMonitoringRecords {
+    return this.monitoringRecords ??= new SurveyMonitoringRecords(this.db, this, this.nowIso)
+  }
+  listInitialValueEvents(projectId: string) { return this.monitoring().listInitialValues(projectId) }
+  changeInitialValue(projectId: string, input: unknown) { return this.monitoring().changeInitialValue(projectId, input) }
+  comparePeriodSegments(projectId: string, input: unknown) { return this.monitoring().compareSegments(projectId, input) }
+  getPeriodSegmentComparisonForNewUse(projectId: string, comparisonId: string): SurveySegmentComparisonV1 | null { return this.monitoring().getSegmentComparisonForNewUse(projectId, comparisonId) }
+  getContinuousSegmentSummaryForNewUse(projectId: string, comparisonIds: readonly string[]): SurveySegmentContinuityV1 | null { return this.monitoring().getContinuousSegmentSummaryForNewUse(projectId, comparisonIds) }
+
   private saveNetwork(network: SurveyNetworkV1, expectedRevision?: number): void {
     const result = expectedRevision === undefined
       ? this.db.prepare('UPDATE survey_networks SET revision = ?, data_json = ?, updated_at = ? WHERE id = ?').run(network.revision, JSON.stringify(network), network.updatedAt, network.id)
@@ -3834,17 +3890,19 @@ export class SurveyService {
     }
     // The idempotency envelope proves request identity only. Never return its
     // embedded network projection: it can be stale or independently altered.
-    // The authoritative row must exist and match the complete projection.
+    // The authoritative row must retain every imported content field, while
+    // validation may advance its status, findings, revision and update time.
     const durable = this.getNetwork(envelopeNetwork.id)
     if (!durable || durable.projectId !== envelopeNetwork.projectId || durable.projectId !== request.projectId) {
       throw new Error(`historical imported network replay is unavailable: ${envelopeNetwork.id}`)
     }
     const durableHash = sha256CanonicalSurveyValue(durable)
-    if (typeof stored.durableNetworkHash === 'string' && stored.durableNetworkHash !== durableHash) {
-      throw new Error(`historical imported network replay no longer matches its durable record: ${durable.id}`)
-    }
-    if (canonicalImportRequestJson(envelopeNetwork) !== canonicalImportRequestJson(durable)) {
+    const envelopeHash = sha256CanonicalSurveyValue(envelopeNetwork)
+    if (typeof stored.durableNetworkHash === 'string' && stored.durableNetworkHash !== envelopeHash) {
       throw new Error(`historical import idempotency projection differs from its durable network: ${durable.id}`)
+    }
+    if (importedNetworkContentHash(envelopeNetwork) !== importedNetworkContentHash(durable)) {
+      throw new Error(`historical imported network replay no longer matches its durable record: ${durable.id}`)
     }
     const sourceFile = durable.sourceFile
     if (provenance.mode === 'raw-source') {
@@ -3866,6 +3924,16 @@ export class SurveyService {
       const admission = this.verifySourceAdmission(durable)
       if (!admission.valid) {
         throw new Error(`historical imported network source admission is invalid: ${admission.errors.join('；')}`)
+      }
+    }
+    if (durableHash !== envelopeHash) {
+      const freshFindings = this.evaluateCurrentNetworkFindings(durable)
+      const freshStatus = freshFindings.some(finding => finding.severity === 'blocking') ? 'blocked' : 'validated'
+      if (durable.revision <= envelopeNetwork.revision) {
+        throw new Error(`historical imported network replay no longer matches its durable record: ${durable.id}`)
+      }
+      if (durable.qualityStatus !== freshStatus || validationFindingsHash(durable.findings) !== validationFindingsHash(freshFindings)) {
+        throw new Error(`historical imported network replay no longer matches fresh current checks: ${durable.id}`)
       }
     }
     return durable

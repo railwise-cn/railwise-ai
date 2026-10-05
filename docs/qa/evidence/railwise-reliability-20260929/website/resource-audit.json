@@ -1,0 +1,970 @@
+[
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.218Z",
+    "url": "https://www.railwise.cn/",
+    "title": "宁波睿威工程技术有限公司官方网站",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "我在选软件产品比较全部产品自动化监测平台、业务运营系统、命令行工具与桌面 AI 工作台。",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "我有工程项目查看工程服务基坑、隧道、桥梁与保护区监测，从方案、现场采集到成果报告。",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 19,
+    "iconCount": 28,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.274Z",
+    "url": "https://www.railwise.cn/products",
+    "title": "RAILWISE 产品矩阵 · 软件平台与智能监测硬件",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 6,
+    "iconCount": 68,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      },
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-brands-400.ttf",
+        "sha256": "20c4a58bc9d1d69e935d06f1528923646a715be5e218665655cade8f5f1b8c00"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.285Z",
+    "url": "https://www.railwise.cn/products/railwise-ai/",
+    "title": "RailWise AI（原 WorkWise）· 编程与工程测量内业桌面工作台",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 10,
+    "iconCount": 110,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      },
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-brands-400.ttf",
+        "sha256": "20c4a58bc9d1d69e935d06f1528923646a715be5e218665655cade8f5f1b8c00"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.359Z",
+    "url": "https://www.railwise.cn/products/tsm/",
+    "title": "RAILWISE-TSM · 全站仪自动化变形监测平台",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 24,
+    "iconCount": 61,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      },
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-brands-400.ttf",
+        "sha256": "20c4a58bc9d1d69e935d06f1528923646a715be5e218665655cade8f5f1b8c00"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.475Z",
+    "url": "https://www.railwise.cn/products/os/",
+    "title": "RAILWISE-OS · 监测单位业务运营操作系统",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 31,
+    "iconCount": 61,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      },
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-brands-400.ttf",
+        "sha256": "20c4a58bc9d1d69e935d06f1528923646a715be5e218665655cade8f5f1b8c00"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.481Z",
+    "url": "https://www.railwise.cn/products/cli/",
+    "title": "RAILWISE-CLI · AI 工程测绘多智能体命令行系统",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 4,
+    "iconCount": 73,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      },
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-brands-400.ttf",
+        "sha256": "20c4a58bc9d1d69e935d06f1528923646a715be5e218665655cade8f5f1b8c00"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.836Z",
+    "url": "https://www.railwise.cn/products/total-station-monitoring/",
+    "title": "RailWise 全站仪智能综合监测系统 · 自动化变形监测",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 11,
+    "iconCount": 65,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.927Z",
+    "url": "https://www.railwise.cn/services",
+    "title": "核心业务与解决方案 · 宁波睿威工程技术有限公司",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 9,
+    "iconCount": 104,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:52.998Z",
+    "url": "https://www.railwise.cn/news",
+    "title": "新闻资讯 · 宁波睿威工程技术有限公司",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 9,
+    "iconCount": 36,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:53.044Z",
+    "url": "https://www.railwise.cn/help",
+    "title": "帮助与支持 · 宁波睿威工程技术有限公司",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      },
+      {
+        "text": "1",
+        "url": "https://www.railwise.cn/help?page=1"
+      },
+      {
+        "text": "下一页",
+        "url": "https://www.railwise.cn/help?page=2"
+      }
+    ],
+    "imageCount": 4,
+    "iconCount": 133,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:53.137Z",
+    "url": "https://www.railwise.cn/about",
+    "title": "关于睿威 · 宁波睿威工程技术有限公司",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 25,
+    "iconCount": 57,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:53.143Z",
+    "url": "https://www.railwise.cn/contact",
+    "title": "联系我们 · 宁波睿威工程技术有限公司",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 4,
+    "iconCount": 46,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  },
+  {
+    "schemaVersion": 1,
+    "checkedAt": "2026-09-29T02:31:53.143Z",
+    "url": "https://www.railwise.cn/products/railwise-ai/",
+    "title": "RailWise AI（原 WorkWise）· 编程与工程测量内业桌面工作台",
+    "status": "passed",
+    "failures": [],
+    "unknown": [],
+    "nav": [
+      {
+        "text": "01 首页",
+        "url": "https://www.railwise.cn/"
+      },
+      {
+        "text": "02 产品介绍",
+        "url": "https://www.railwise.cn/products"
+      },
+      {
+        "text": "TSM RAILWISE-TSM 全站仪自动化变形监测平台",
+        "url": "https://www.railwise.cn/products/tsm/"
+      },
+      {
+        "text": "硬件 全站仪智能综合监测系统 全站仪、TSM 智能采集器与现场采控",
+        "url": "https://www.railwise.cn/products/total-station-monitoring/"
+      },
+      {
+        "text": "OS RAILWISE-OS 监测单位业务运营操作系统",
+        "url": "https://www.railwise.cn/products/os/"
+      },
+      {
+        "text": "CLI RAILWISE-CLI AI 工程测绘多智能体命令行系统",
+        "url": "https://www.railwise.cn/products/cli/"
+      },
+      {
+        "text": "RailWise AI RailWise AI 编程与工程测量内业桌面工作台",
+        "url": "https://www.railwise.cn/products/railwise-ai/"
+      },
+      {
+        "text": "03 知识库",
+        "url": "https://kb.railwise.cn/"
+      },
+      {
+        "text": "04 核心业务",
+        "url": "https://www.railwise.cn/services"
+      },
+      {
+        "text": "05 新闻资讯",
+        "url": "https://www.railwise.cn/news"
+      },
+      {
+        "text": "06 帮助与支持",
+        "url": "https://www.railwise.cn/help"
+      },
+      {
+        "text": "07 关于我们",
+        "url": "https://www.railwise.cn/about"
+      },
+      {
+        "text": "预约演示",
+        "url": "https://www.railwise.cn/contact?subject=%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA&source=header"
+      }
+    ],
+    "imageCount": 10,
+    "iconCount": 110,
+    "fontDigests": [
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-solid-900.ttf",
+        "sha256": "67a65763c7f80903d81603bbeb9049fc2bf28508479b83ed011fe24c71fa950a"
+      },
+      {
+        "url": "https://www.railwise.cn/webfonts/fa-brands-400.ttf",
+        "sha256": "20c4a58bc9d1d69e935d06f1528923646a715be5e218665655cade8f5f1b8c00"
+      }
+    ],
+    "scope": "Observed DOM, same-origin resources and Unicode font cmap; screenshots and glyph outlines require visual review."
+  }
+]

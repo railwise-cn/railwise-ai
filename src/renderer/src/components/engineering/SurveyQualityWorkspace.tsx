@@ -20,7 +20,7 @@ const failureKeys: Record<string, string> = {
 }
 
 export function SurveyQualityWorkspace({ binding, runtimeReady }: { binding: QualityBinding; runtimeReady: boolean }): ReactElement {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
   const [expanded, setExpanded] = useState(false)
   const scope = JSON.stringify([binding, runtimeReady, expanded])
   const activeScope = useRef(scope); activeScope.current = scope
@@ -77,19 +77,20 @@ export function SurveyQualityWorkspace({ binding, runtimeReady }: { binding: Qua
     void execute(async stillCurrent => ({ plan, record: await appendQualityBytesCheck(binding, plan, record, checkId, appendKey, memberId, evidenceKey, stillCurrent) }))
   }
   const formatDate = (date: string): string => new Date(date).toLocaleString()
+  const fileName = (path: string): string => path.split(/[\\/]/).at(-1) || t('qualityWorkspaceArtifactBytes')
 
   return <details className="mt-3 min-w-0 rounded border border-ds-border-muted" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary className="cursor-pointer px-3 py-2 font-medium">{t('qualityWorkspaceOpen')}</summary>
     {expanded ? <section className="min-w-0 space-y-3 border-t border-ds-border-muted p-3" aria-label={t('qualityWorkspaceTitle')}>
       <h4 ref={heading} tabIndex={-1} className="font-semibold">{t('qualityWorkspaceTitle')}</h4>
       <p className="leading-5 text-amber-900 dark:text-amber-200">{t('qualityWorkspaceBoundary')}</p>
-      <p className="break-all text-ds-muted">{t('qualityWorkspaceBinding', { id: binding.manifestId, revision: binding.projectRevision })}</p>
+      <p className="text-ds-muted">{t('qualityWorkspaceProfessionalScope')}</p>
       <div className="space-y-2">
         <p className="font-medium">{t('qualityWorkspaceProposedScope')}</p>
         <p className="text-ds-muted">{t('qualityWorkspaceScopeHint')}</p>
         <ol className="list-decimal space-y-2 pl-5">
           <li>{t('qualityWorkspaceArtifactBytes')}</li>
-          {binding.outputs.map((output, index) => <li key={`${output.path}-${index}`} className="break-all"><span className="font-medium">{requirements[index]!.title}</span><span className="block text-ds-muted">{output.path}</span><span className="block font-mono text-[10px]">SHA-256 {output.sha256} · {output.sizeBytes} B</span></li>)}
+          {binding.outputs.map((output, index) => <li key={`${output.path}-${index}`}><span className="font-medium">{fileName(output.path)}</span><span className="block text-ds-muted">{t('qualityWorkspaceFileSize', { size: output.sizeBytes })}</span></li>)}
         </ol>
         <label className="flex items-start gap-2 leading-5"><input type="checkbox" className="mt-1" checked={acknowledged} disabled={!ready || !!retry.current} onChange={event => setAcknowledged(event.target.checked)} /><span>{t('qualityWorkspaceAcknowledge')}</span></label>
         <div className="flex flex-wrap gap-2">
@@ -104,35 +105,46 @@ export function SurveyQualityWorkspace({ binding, runtimeReady }: { binding: Qua
       {error ? <div role="alert"><p>{t(failureKeys[error] ?? 'qualityWorkspaceFailed')}</p>{retry.current ? <button type="button" className={`${buttonClass} mt-2`} disabled={!ready} onClick={() => { if (retry.current) void execute(retry.current) }}>{t('qualityWorkspaceRetry')}</button> : null}</div> : null}
       {plan ? <EngineeringSelectedEvidence reference={{ kind: 'retention-plan', planId: plan.plan.id, manifestHash: plan.plan.manifestHash, artifactHash: plan.plan.artifactHash }}><div className="min-w-0 space-y-3 border-t border-ds-border-muted pt-3">
         <h5 className="font-medium">{t('qualityWorkspaceFrozenPlan')}<EngineeringEvidenceQuestion label={t('qualityWorkspaceFrozenPlan')} disabled={!ready} /></h5>
-        <p className="break-all font-mono text-[10px]">{plan.plan.id} · {formatDate(plan.plan.createdAt)}</p>
+        <p className="text-ds-muted">{t('qualityWorkspacePlanSummary', { count: plan.plan.requiredEvidence.length, date: formatDate(plan.plan.createdAt) })}</p>
         <ul className="list-disc space-y-1 pl-5"><li>{t('qualityWorkspaceArtifactBytes')}</li>{plan.plan.requiredEvidence.map((item, index) => <li key={item.id} className="break-words">{item.title}<EngineeringEvidenceQuestion label={item.title} selector={{ path: ['plan', 'requiredEvidence', index], identity: { id: item.id, memberId: item.memberId } }} disabled={!ready} /></li>)}</ul>
-        <details><summary className="cursor-pointer">{t('qualityWorkspaceFrozenFiles')}</summary><ul className="mt-2 space-y-2">{plan.artifact.members.map((member, index) => <li key={member.id} className="break-all"><p>{member.path}<EngineeringEvidenceQuestion label={member.path} selector={{ path: ['artifact', 'members', index], identity: { id: member.id, sha256: member.sha256 } }} disabled={!ready} /></p><p className="font-mono text-[10px]">SHA-256 {member.sha256} · {member.sizeBytes} B</p></li>)}</ul><p className="mt-2 break-all font-mono text-[10px]">{t('qualityWorkspaceBundleHash')}: {plan.artifact.bundleHash}</p></details>
+        <details><summary className="cursor-pointer">{t('qualityWorkspaceFrozenFiles')}</summary><ul className="mt-2 space-y-2">{plan.artifact.members.map((member, index) => <li key={member.id} className="break-words"><p>{fileName(member.path)}<EngineeringEvidenceQuestion label={fileName(member.path)} selector={{ path: ['artifact', 'members', index], identity: { id: member.id, sha256: member.sha256 } }} disabled={!ready} /></p><p className="text-ds-muted">{t('qualityWorkspaceFileSize', { size: member.sizeBytes })}</p></li>)}</ul></details>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={buttonClass} disabled={!ready} onClick={() => { const key = crypto.randomUUID(); void execute(async () => ({ plan, record: await createQualityRecord(binding, plan, key) })) }}>{t('qualityWorkspaceCreateRecord')}</button>
           <button type="button" className={buttonClass} disabled={!ready} onClick={() => loadRecords(plan)}>{t('qualityWorkspaceRecordHistory')}</button>
         </div>
       </div></EngineeringSelectedEvidence> : null}
       {history ? <div className="space-y-2" aria-label={t(history.kind === 'plans' ? 'qualityWorkspacePlanHistory' : 'qualityWorkspaceRecordHistory')}>
-        {history.unavailable.length ? <div role="status"><p>{t('qualityWorkspaceUnavailableHistory')}</p><ul className="mt-1 space-y-2">{history.unavailable.map(item => <li key={item.id} className="break-all">{item.id} · {t(item.reason === 'stale' ? 'qualityWorkspaceHistoryStale' : 'qualityWorkspaceHistoryIntegrity')}</li>)}</ul></div> : null}
+        {history.unavailable.length ? <div role="status"><p>{t('qualityWorkspaceUnavailableHistory')}</p><ul className="mt-1 space-y-2">{history.unavailable.map(item => <li key={item.id}>{t(item.reason === 'stale' ? 'qualityWorkspaceHistoryStale' : 'qualityWorkspaceHistoryIntegrity')}</li>)}</ul></div> : null}
         {(history.kind === 'plans' ? history.plans.length : history.records.length) === 0 ? <p>{t('qualityWorkspaceNoHistory')}</p> : null}
-        {history.kind === 'plans' ? history.plans.map(item => <button type="button" key={item.plan.id} className={`${buttonClass} block w-full break-all`} disabled={!ready} onClick={() => void execute(async () => ({ plan: await readQualityPlan(binding, item) }))}>{t('qualityWorkspaceRestorePlan')} · {item.plan.id} · {formatDate(item.plan.createdAt)}</button>) : history.records.map(item => <button type="button" key={item.record.id} className={`${buttonClass} block w-full break-all`} disabled={!ready || !plan} onClick={() => { if (plan) void execute(async () => ({ plan, record: await readQualityRecord(binding, plan, item) })) }}>{t('qualityWorkspaceRestoreRecord')} · {item.record.id} · {formatDate(item.record.createdAt)}</button>)}
+        {history.kind === 'plans' ? history.plans.map(item => <button type="button" key={item.plan.id} className={`${buttonClass} block w-full`} disabled={!ready} onClick={() => void execute(async () => ({ plan: await readQualityPlan(binding, item) }))}>{t('qualityWorkspaceRestorePlan')} · {t('qualityWorkspacePlanDate', { date: formatDate(item.plan.createdAt) })}</button>) : history.records.map(item => <button type="button" key={item.record.id} className={`${buttonClass} block w-full`} disabled={!ready || !plan} onClick={() => { if (plan) void execute(async () => ({ plan, record: await readQualityRecord(binding, plan, item) })) }}>{t('qualityWorkspaceRestoreRecord')} · {t('qualityWorkspacePlanDate', { date: formatDate(item.record.createdAt) })}</button>)}
         <div className="flex flex-wrap gap-2">{history.offset > 0 ? <button type="button" className={buttonClass} disabled={!ready} onClick={() => history.kind === 'plans' ? loadPlans(Math.max(0, history.offset - 20)) : plan && loadRecords(plan, Math.max(0, history.offset - 20))}>{t('qualityWorkspacePrevious')}</button> : null}{history.nextOffset !== null ? <button type="button" className={buttonClass} disabled={!ready} onClick={() => history.kind === 'plans' ? loadPlans(history.nextOffset!) : plan && loadRecords(plan, history.nextOffset!)}>{t('qualityWorkspaceNext')}</button> : null}</div>
       </div> : null}
       {plan && record ? <EngineeringSelectedEvidence reference={{ kind: 'retention-record', recordId: record.record.id, planHash: record.record.planHash, headHash: record.verification.headHash }}><div className="min-w-0 space-y-3 border-t border-ds-border-muted pt-3">
         <h5 className="font-medium">{t('qualityWorkspaceRecord')}<EngineeringEvidenceQuestion label={t('qualityWorkspaceRecord')} disabled={!ready} /></h5>
-        <p className="break-all font-mono text-[10px]">{record.record.id}</p>
+        <p className="text-ds-muted">{t('qualityWorkspaceRecordSummary', { count: record.verification.checks.length, date: formatDate(record.record.createdAt) })}</p>
         <p role="status">{t('qualityWorkspaceVerifiedBoundary')}</p>
         <ul className="space-y-4">{record.verification.checks.map((check, index) => {
           const requirement = plan.plan.requiredEvidence.find(item => `evidence:${item.id}` === check.checkId)
           const title = requirement?.title ?? t('qualityWorkspaceArtifactBytes')
           const selected = requirement?.memberId
           return <li key={check.checkId} className="space-y-2 border border-ds-border-muted p-2"><p className="break-words font-medium">{title} · {t(check.status === 'passed' ? 'qualityWorkspaceRecorded' : 'qualityWorkspaceMissing')}<EngineeringEvidenceQuestion label={title} selector={{ path: ['verification', 'checks', index], identity: { checkId: check.checkId } }} disabled={!ready} /></p>
-            {requirement ? <p className="break-all text-ds-muted">{t('qualityWorkspaceBoundMember')}: {selected} · {plan.artifact.members.find(member => member.id === selected)?.path}</p> : null}
+            {requirement ? <p className="break-words text-ds-muted">{t('qualityWorkspaceBoundMember')}: {fileName(plan.artifact.members.find(member => member.id === selected)?.path ?? '')}</p> : null}
             <button type="button" className={buttonClass} disabled={!ready} onClick={() => append(check.checkId, requirement ? selected : undefined)}>{t(requirement ? 'qualityWorkspaceRetainCheck' : 'qualityWorkspaceCheckBytes')}</button>
           </li>
         })}</ul>
         <button type="button" className={buttonClass} disabled={!ready} onClick={() => void execute(async () => ({ plan, record: await verifyQualityRecord(binding, plan, record) }))}>{t('qualityWorkspaceReverify')}</button>
-        <details><summary className="cursor-pointer">{t('qualityWorkspaceAudit')}</summary><p className="mt-2 break-all font-mono text-[10px]">{t('qualityWorkspaceHeadHash')}: {record.verification.headHash}</p><p>{t('qualityWorkspaceEventCount', { count: record.events.length })}</p><ol className="mt-2 space-y-2">{record.events.map((event, index) => <li key={event.id} className="break-all font-mono text-[10px]">#{event.sequence} · {event.id} · {formatDate(event.occurredAt)} · {t('qualityWorkspaceSystemActor')}<EngineeringEvidenceQuestion label={event.id} selector={{ path: ['events', index], identity: { id: event.id, sequence: event.sequence, thisHash: event.thisHash } }} disabled={!ready} /><span className="block">{event.thisHash}</span></li>)}</ol></details>
+        <details><summary className="cursor-pointer">{t('qualityWorkspaceAudit')}</summary><ol className="mt-2 space-y-2">{record.events.map((event, index) => {
+          const checkId = event.event.kind === 'check' || event.event.kind === 'artifact-check' ? event.event.checkId : undefined
+          const requirement = checkId ? plan.plan.requiredEvidence.find(item => `evidence:${item.id}` === checkId) : undefined
+          const title = requirement?.title ?? t('qualityWorkspaceArtifactBytes')
+          const member = requirement ? plan.artifact.members.find(item => item.id === requirement.memberId) : undefined
+          return <li key={event.id} data-testid="quality-workspace-event" className="space-y-1 border-l-2 border-ds-border-muted pl-2">
+            <p className="font-medium">{t('qualityWorkspaceEventIndex', { index: index + 1 })} · <time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString(i18n.language)}</time></p>
+            <p>{title} · {t(event.event.kind === 'check' || event.event.kind === 'artifact-check' ? event.event.outcome === 'passed' ? 'qualityWorkspaceRecorded' : 'qualityWorkspaceMissing' : 'qualityWorkspaceRecorded')}</p>
+            {member ? <p className="text-ds-muted">{fileName(member.path)}</p> : null}
+            <EngineeringEvidenceQuestion label={t('qualityWorkspaceRecord')} selector={{ path: ['events', index], identity: { id: event.id, sequence: event.sequence, thisHash: event.thisHash } }} disabled={!ready} />
+          </li>
+        })}</ol></details>
         <SurveyQualityWorkflowWorkspace binding={binding} plan={plan} record={record} runtimeReady={runtimeReady && !busy} />
       </div></EngineeringSelectedEvidence> : null}
     </section> : null}

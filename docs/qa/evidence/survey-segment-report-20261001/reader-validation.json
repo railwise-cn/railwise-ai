@@ -1,0 +1,94 @@
+{
+  "kind": "segment-comparison-report-reader-validation",
+  "generatedAt": "2026-10-01T00:00:00.000Z",
+  "comparisonId": "segment_comparison_5300e1aa-ba30-4ee4-9d9f-aceaca25bce4",
+  "observationIds": [
+    "fwd",
+    "back"
+  ],
+  "segmentId": "BM-P",
+  "point": "P",
+  "observedChangeMillimetres": -7,
+  "adjustedChangeMillimetres": -4.5,
+  "units": {
+    "periods": "m",
+    "differences": "mm"
+  },
+  "signoff": "unsigned",
+  "standardsConformity": "not-evaluated",
+  "pdfs": [
+    {
+      "name": "report.pdf",
+      "pages": 7,
+      "hash": "d69dc88094544d660042b39432c4b322c704fbc67d828dbf2100cdd3bc8e5c06"
+    },
+    {
+      "name": "docx-reader-render.pdf",
+      "pages": 7,
+      "hash": "f4bf498393e88cb329900f41ad6ef57151ae69f2fb82f4616fe147295ad43a9d"
+    },
+    {
+      "name": "xlsx-reader-render.pdf",
+      "pages": 20,
+      "hash": "1ed7ee01cb90ca1b98e0bde3383d0d1303eb60fe922ba5523ef5e9022ebc1ca8"
+    }
+  ],
+  "files": [
+    {
+      "name": "report.docx",
+      "bytes": 51704,
+      "sha256": "fed9f19125ea3e11275d51bb035f22d10e99d20bedaaf92df848061571793a8f"
+    },
+    {
+      "name": "report.pdf",
+      "bytes": 64531,
+      "sha256": "d69dc88094544d660042b39432c4b322c704fbc67d828dbf2100cdd3bc8e5c06"
+    },
+    {
+      "name": "professional.xlsx",
+      "bytes": 71102,
+      "sha256": "2995c5b9d638d49c9b1a0719ab0448ddff575469b568c45db1981770ce80f3e3"
+    },
+    {
+      "name": "professional-review.json",
+      "bytes": 48037,
+      "sha256": "c8ac6d850978499f79b898d04562343a9c103377227f70530fa42ccaa39062cb"
+    }
+  ],
+  "pngs": [
+    "docx-page-1.png",
+    "docx-page-2.png",
+    "docx-page-3.png",
+    "docx-page-4.png",
+    "docx-page-5.png",
+    "docx-page-6.png",
+    "docx-page-7.png",
+    "pdf-page-1.png",
+    "pdf-page-2.png",
+    "pdf-page-3.png",
+    "pdf-page-4.png",
+    "pdf-page-5.png",
+    "pdf-page-6.png",
+    "pdf-page-7.png",
+    "xlsx-page-01.png",
+    "xlsx-page-02.png",
+    "xlsx-page-03.png",
+    "xlsx-page-04.png",
+    "xlsx-page-05.png",
+    "xlsx-page-06.png",
+    "xlsx-page-07.png",
+    "xlsx-page-08.png",
+    "xlsx-page-09.png",
+    "xlsx-page-10.png",
+    "xlsx-page-11.png",
+    "xlsx-page-12.png",
+    "xlsx-page-13.png",
+    "xlsx-page-14.png",
+    "xlsx-page-15.png",
+    "xlsx-page-16.png",
+    "xlsx-page-17.png",
+    "xlsx-page-18.png",
+    "xlsx-page-19.png",
+    "xlsx-page-20.png"
+  ]
+}

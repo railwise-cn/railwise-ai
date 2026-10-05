@@ -1,0 +1,22 @@
+The following is a diff from the previous accessibility tree for Window: "RailWise AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++							839 container 残差原始记录定位
++								840 文本 原始记录定位
++								841 文本 残差已关联到 Runtime 返回的唯一字节范围；下方摘录仅供复核，原件仍以保留文件为准。
++								842 按钮 关闭
++								843 定义列表
++									844 container 原始记录 ID
++										845 文本 原始记录 ID
++									846 文本 cosa-in2-record-8
++									847 container 分区 / 类型
++										848 文本 分区 / 类型
++									849 container
++										850 text cosa-in2  / distance
++									851 container 字节偏移
++										852 文本 字节偏移
++									853 文本 103
++									854 container 字节长度
++										855 文本 字节长度
++									856 文本 11
++								857 文本 原始摘录（有界）
++								858 文本 B,S,100.000
+The focused UI element is 687 按钮 定位 cosa-in2-8-distance 的原始记录 cosa-in2-record-8

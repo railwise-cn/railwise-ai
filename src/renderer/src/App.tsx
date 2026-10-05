@@ -1,10 +1,11 @@
+import brand from '@shared/product-brand.json'
 import { lazy, Suspense } from 'react'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
 
 const AppShell = lazy(() => import('./AppShell'))
 
 export function startupShellLabel(locale: 'en' | 'zh'): string {
-  return locale === 'zh' ? '正在打开 RailWise AI 工作台…' : 'Opening RailWise AI workbench…'
+  return locale === 'zh' ? `正在打开 ${brand.platform} 工作台…` : `Opening ${brand.platform} workbench…`
 }
 
 function StartupShell(): React.ReactElement {

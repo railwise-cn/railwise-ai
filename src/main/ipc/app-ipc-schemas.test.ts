@@ -323,6 +323,57 @@ describe('app-ipc-schemas', () => {
     ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
   })
 
+  it('allows only the exact read-only professional review path without overrides', () => {
+    const path = '/v1/engineering/adjustments/adjustment_1/professional-review'
+    expect(runtimeRequestPayloadSchema.parse({ path, method: 'GET' }).path).toBe(path)
+    for (const request of [
+      { path, method: 'POST' }, { path, method: 'DELETE' }, { path, method: 'GET', body: '{}' },
+      { path: `${path}?projectId=other`, method: 'GET' }, { path: `${path}?download=1`, method: 'GET' },
+      { path: `${path}#other`, method: 'GET' },
+      { path: '/v1/engineering/professional-review/adjustment_1', method: 'GET' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
+  })
+
+  it('allows project-scoped initial-value history and confirmed survey period operations', () => {
+    const base = '/v1/engineering/projects/project_20260930/survey'
+    const initialPath = `${base}/initial-values`
+    const comparisonPath = `${base}/segment-comparisons`
+    const initialBody = JSON.stringify({ adjustmentId: 'adjustment_2', expectedPreviousEventId: null,
+      reason: 'Confirmed baseline period', confirmed: true, idempotencyKey: 'initial-value-2' })
+    const comparisonBody = JSON.stringify({ referenceAdjustmentId: 'adjustment_1', currentAdjustmentId: 'adjustment_2',
+      segments: [{ id: 'BM-P', from: 'BM', to: 'P', referenceObservationIds: ['fwd_1'], currentObservationIds: ['fwd_2'] }],
+      idempotencyKey: 'segment-comparison-2' })
+    for (const request of [
+      { path: initialPath, method: 'GET' },
+      { path: initialPath, method: 'POST', body: initialBody },
+      { path: comparisonPath, method: 'POST', body: comparisonBody }
+    ]) expect(runtimeRequestPayloadSchema.parse(request).path).toBe(request.path)
+    for (const request of [
+      { path: initialPath, method: 'PATCH', body: initialBody },
+      { path: initialPath, method: 'DELETE' },
+      { path: comparisonPath, method: 'GET' },
+      { path: comparisonPath, method: 'DELETE' },
+      { path: `${initialPath}?projectId=other`, method: 'GET' },
+      { path: `${initialPath}?limit=50`, method: 'GET' },
+      { path: `${comparisonPath}?projectId=other`, method: 'POST', body: comparisonBody },
+      { path: '/v1/engineering/survey/initial-values', method: 'GET' },
+      { path: '/v1/engineering/projects/project_20260930/survey/initial-values/event_1', method: 'GET' },
+      { path: '/v1/engineering/projects/project_20260930/survey/segment-comparison', method: 'POST', body: comparisonBody }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, request.path).toBe(false)
+  })
+
+  it('requires a strict explicit table inspection request without calculation overrides', () => {
+    const path = '/v1/engineering/survey/tabular/probe'
+    const body = JSON.stringify({ name: 'observations.csv', dataBase64: 'YSxiLGM=', delimiter: ',' })
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body }).success).toBe(true)
+    for (const request of [
+      { path, method: 'GET', body }, { path, method: 'DELETE' }, { path, method: 'POST' },
+      { path, method: 'POST', body: '{' }, { path, method: 'POST', body: '{}' },
+      { path: `${path}?projectId=other`, method: 'POST', body },
+      { path, method: 'POST', body: JSON.stringify({ name: 'observations.csv', dataBase64: 'YSxiLGM=', confirmed: true }) }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success).toBe(false)
+  })
+
   it('allows only project-scoped read-only statistical diagnostics and the explicit download flag', () => {
     const path = '/v1/engineering/projects/project_1/adjustments/adjustment_1/statistical-diagnostics'
     expect(runtimeRequestPayloadSchema.parse({ path, method: 'GET' }).path).toBe(path)

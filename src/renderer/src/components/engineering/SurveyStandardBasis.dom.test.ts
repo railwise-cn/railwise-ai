@@ -189,9 +189,16 @@ describe('accessible bilingual result standard basis', () => {
   })
   it('loads only when expanded and opens the exact official PDF page through the desktop API', async () => {
     await render(); expect(runtimeRequest).not.toHaveBeenCalled()
+    expect(host.textContent).not.toContain(context.sourceSha256)
+    expect(host.textContent).not.toContain(context.algorithmVersion)
     await toggle(); await loaded()
     expect(host.querySelector('section')?.getAttribute('aria-label')).toBe('Standard basis for this result')
     expect(host.textContent).toContain('standards conformity and human signatures remain unevaluated')
+    expect(host.textContent).not.toContain(context.sourceSha256)
+    expect(host.textContent).not.toContain(context.algorithmVersion)
+    expect(host.textContent).not.toContain(entry.ruleDigest)
+    expect(host.textContent).not.toContain(rule.ruleId)
+    expect(host.querySelectorAll('details')).toHaveLength(1)
     const link = host.querySelector<HTMLAnchorElement>('a')!
     expect(link.textContent).toContain('Printed page 6 · PDF page 9')
     expect(link.href).toBe(`${rule.source.officialUrl}#page=9`)
@@ -205,12 +212,12 @@ describe('accessible bilingual result standard basis', () => {
   it('does not query incomplete identities or offline runtime', async () => {
     await render(null); await toggle(); expect(host.textContent).toContain('no complete source identity')
     expect(runtimeRequest).not.toHaveBeenCalled()
-    await render(context, false); expect(host.textContent).toContain('runtime is unavailable')
+    await render(context, false); expect(host.textContent).toContain('standard reference is currently unavailable')
     expect(runtimeRequest).not.toHaveBeenCalled()
   })
   it('shows mismatch without links or a silent latest fallback', async () => {
     await render({ ...context, algorithmVersion: 'legacy' }); await toggle()
-    await vi.waitFor(() => expect(host.querySelector('[role="alert"]')?.textContent).toContain('No unique exact catalog match'))
+    await vi.waitFor(() => expect(host.querySelector('[role="alert"]')?.textContent).toContain('No single applicable standard reference was found'))
     expect(host.querySelector('a')).toBeNull(); expect(runtimeRequest).toHaveBeenCalledTimes(1)
   })
   it('discards late responses when switching results and closing the view', async () => {

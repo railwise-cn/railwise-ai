@@ -2,6 +2,7 @@ import { registerSurveyQualityAssessmentRoutes } from './survey-quality-assessme
 import { registerSurveyStandardBasisRoutes } from './survey-standard-basis.js'
 import { registerSurveyQualityScoringWorkspaceRoutes } from './survey-quality-scoring-workspace.js'
 import { Router } from '../router.js'
+import { registerSurveyMonitoringRoutes } from './survey-monitoring.js'
 import { getStatisticalDiagnostics } from './survey-statistics.js'
 import * as freeLevelingRoutes from './survey-free-leveling.js'
 import { registerSurveyAdvancedTrialsWorkspaceRoutes } from './survey-advanced-trials-workspace.js'
@@ -104,6 +105,7 @@ import * as engineeringAiRoutes from './engineering-ai.js'
  */
 export function buildRouter(runtime: ServerRuntime): Router {
   const router = new Router()
+  registerSurveyMonitoringRoutes(router, { getService: () => runtime.surveyService, authorize: request => authorize(request, runtime) })
   registerSurveyQualityWorkflowRoutes(router, { getService: () => runtime.surveyQualityWorkflowService, authorize: request => authorize(request, runtime) })
   registerSurveyStandardBasisRoutes(router, { authorize: request => authorize(request, runtime) })
   registerSurveyQualityAssessmentRoutes(router, { getService: () => runtime.surveyQualityAssessmentService, authorize: request => authorize(request, runtime) })
@@ -172,6 +174,8 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('POST', '/v1/engineering/adjustments', async (request) => authorize(request, runtime) ? engineeringRoutes.createAdjustment(runtime.surveyService, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/adjustments', async (request) => authorize(request, runtime) ? engineeringRoutes.listAdjustments(runtime.surveyService, new URL(request.url).searchParams.get('projectId') ?? undefined) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/adjustments/:id', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.getAdjustment(runtime.surveyService, ctx.params.id) : ERRORS.unauthorized())
+  router.add('GET', '/v1/engineering/adjustments/:id/professional-review', async (request, ctx) => authorize(request, runtime) ? engineeringRoutes.getSurveyProfessionalReview(runtime.surveyService, ctx.params.id) : ERRORS.unauthorized())
+  router.add('POST', '/v1/engineering/survey/tabular/probe', async (request) => authorize(request, runtime) ? engineeringRoutes.probeSurveyTabular(runtime.surveyService, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/projects/:projectId/adjustments/:id/statistical-diagnostics', async (request, ctx) => authorize(request, runtime) ? getStatisticalDiagnostics(runtime.surveyService, ctx.params.projectId, ctx.params.id, new URL(request.url).searchParams.get('download') === '1') : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/projects/:projectId/networks/:networkId/free-leveling-trials', async (request, ctx) => authorize(request, runtime) ? freeLevelingRoutes.createFreeLevelingTrial(runtime.surveyService, request, ctx.params.projectId, ctx.params.networkId) : ERRORS.unauthorized())
   router.add('GET', '/v1/engineering/projects/:projectId/networks/:networkId/free-leveling-trials', async (request, ctx) => authorize(request, runtime) ? freeLevelingRoutes.listFreeLevelingTrials(runtime.surveyService, request, ctx.params.projectId, ctx.params.networkId) : ERRORS.unauthorized())

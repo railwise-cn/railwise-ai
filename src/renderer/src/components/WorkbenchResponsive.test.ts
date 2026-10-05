@@ -97,7 +97,7 @@ describe('Workbench responsive panel contract', () => {
     expect(workbench.match(/navigationRoute=\{route\}/g)).toHaveLength(2)
   })
 
-  it('opens Engineering on an AI command center with a deterministic delivery path', async () => {
+  it('opens Engineering with four primary views and progressive details', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
     const [engineering, aiCommandCenter] = await Promise.all([
@@ -109,20 +109,21 @@ describe('Workbench responsive panel contract', () => {
     expect(engineering).toContain("workwise.survey.stage.v1:")
     expect(engineering).toContain('<EngineeringAiCommandCenter')
     expect(aiCommandCenter).toContain("t('engineeringAiTitle')")
-    expect(engineering).toContain("t('engineeringDashboardConsoleTitle')")
-    expect(engineering).toContain('<DeliveryStage index={1}')
-    expect(engineering).toContain('<DeliveryStage index={6}')
-    expect(engineering).toContain("t('engineeringImmutableEvidenceShort')")
+    expect(engineering).toContain("t('engineeringSimpleOverview')")
+    expect(engineering).toContain("['overview', 'process', 'results', 'delivery']")
+    expect(engineering).toContain('<EngineeringDrawer')
+    expect(engineering).toContain("t('engineeringReviewPendingShort')")
     expect(engineering).toContain('engineering-persistent-chat')
     expect(engineering).toContain('engineering-classic-shell')
   })
 
-  it('keeps data and conversation side by side or stacked according to available workbench width', async () => {
+  it('keeps the engineering work surface full width and opens AI as a companion drawer', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)
     const css = await readFile(new URL('../styles/surfaces-write.css', import.meta.url), 'utf8')
-    expect(css).toContain("grid-template-areas: 'data chat'")
-    expect(css).toContain('@container (max-width: 1000px)')
-    expect(css).toContain("grid-template-areas: 'data' 'chat'")
+    expect(css).toContain('.engineering-detail-drawer')
+    expect(css).toContain('.engineering-detail-drawer::backdrop')
+    expect(css).toContain('width: min(100vw, 480px)')
+    expect(css).not.toContain('.engineering-agent-grid')
   })
 })

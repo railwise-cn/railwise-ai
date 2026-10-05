@@ -1,0 +1,1 @@
+Verified packaged RailWise AI Runtime native dependency on macOS arm64: WORKWISE_PACKAGED_SQLITE_OK ABI=148

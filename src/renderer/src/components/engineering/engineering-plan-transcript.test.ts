@@ -10,18 +10,72 @@ const receipt = [
 ].join('\n\n')
 
 describe('Legacy plan receipt display', () => {
-  it('translates receipt chrome and known steps while retaining IDs, hashes, custom text and the stored original', () => {
+  it('projects receipt chrome and known steps without exposing internal IDs or hashes', () => {
     const english = engineeringPlanTranscriptText(receipt, 'en-US')
-    expect(english).toContain('Nothing has been executed.')
-    expect(english).toContain('Validate the survey network and datum (survey_network_validate, individual approval required)')
-    expect(english).toContain('项目自定义步骤 (survey_adjustment_read, read-only)')
-    expect(english).toContain(`Context hash: sha256-${'a'.repeat(64)}`)
-    expect(english).toContain('Plan ID: eplan_12345678-abcd')
-    expect(engineeringPlanTranscriptText(receipt, 'zh-CN')).toBe(receipt)
+    expect(english).toContain('Nothing has been run.')
+    expect(english).toContain('Validate survey network and datum (needs confirmation)')
+    expect(english).toContain('Check survey data (automatic check)')
+    expect(english).not.toContain('survey_network_validate')
+    expect(english).not.toContain('survey_adjustment_read')
+    expect(english).not.toContain('Context hash:')
+    expect(english).not.toContain('Plan ID:')
+    expect(english).not.toContain('TaskRun')
+    const chinese = engineeringPlanTranscriptText(receipt, 'zh-CN')
+    expect(chinese).toContain('测量执行方案已生成')
+    expect(chinese).toContain('检查测量资料（自动检查）')
+    expect(chinese).not.toContain('上下文哈希：')
+    expect(chinese).not.toContain('计划编号：')
+    expect(chinese).not.toContain('TaskRun')
   })
-  it('does not translate partial, altered or quoted messages', () => {
+  it('leaves unrelated text alone and safely summarizes partial or quoted plans', () => {
+    expect(engineeringPlanTranscriptText('控制网资料已准备好。', 'zh-CN')).toBe('控制网资料已准备好。')
     for (const text of ['Please explain:\n' + receipt, receipt + '\nextra', receipt.replace('2. 项目', '9. 项目'), receipt.replace('eplan_', 'other_')]) {
-      expect(engineeringPlanTranscriptText(text, 'en')).toBe(text)
+      const shown = engineeringPlanTranscriptText(text, 'en')
+      expect(shown).not.toContain('eplan_12345678-abcd')
+      expect(shown).not.toContain('sha256-')
+      expect(shown).not.toContain('survey_network_validate')
+      expect(shown).not.toContain('survey_adjustment_read')
+      expect(shown).not.toContain('TaskRun')
+      expect(shown).toContain('Processing starts after your confirmation.')
     }
+  })
+  it('summarizes oversized pending plans without returning protocol text', () => {
+    const oversized = `${receipt}\n${'internal payload '.repeat(2_500)}`
+    const shown = engineeringPlanTranscriptText(oversized, 'zh-CN')
+
+    expect(shown).toContain('校核测量网络与基准（需要确认）')
+    expect(shown).toContain('检查测量资料（自动检查）')
+    expect(shown).toContain('确认后将开始处理')
+    expect(shown).not.toContain('eplan_12345678-abcd')
+    expect(shown).not.toContain('上下文哈希')
+    expect(shown).not.toContain('survey_network_validate')
+    expect(shown).not.toContain('TaskRun')
+    expect(shown).not.toContain('internal payload')
+  })
+  it('keeps readable steps and risk labels when receipt metadata is malformed', () => {
+    const malformed = receipt
+      .replace('计划编号：eplan_12345678-abcd', '计划编号：eplan_hidden-7')
+      .replace(`上下文哈希：sha256-${'a'.repeat(64)}`, '上下文哈希：sha256-private-value')
+    const shown = engineeringPlanTranscriptText(malformed, 'zh-CN')
+
+    expect(shown).toContain('校核测量网络与基准（需要确认）')
+    expect(shown).toContain('检查测量资料（自动检查）')
+    expect(shown).toContain('确认后将开始处理')
+    expect(shown).not.toContain('eplan_hidden-7')
+    expect(shown).not.toContain('sha256-private-value')
+    expect(shown).not.toContain('survey_network_validate')
+    expect(shown).not.toContain('TaskRun')
+  })
+  it('hides attached JSON while retaining a pending plan summary', () => {
+    const withJson = `${receipt}\n\n{"planId":"eplan_secret-123","contextHash":"sha256-secret","tool":"survey_network_validate"}`
+    const shown = engineeringPlanTranscriptText(withJson, 'zh-CN')
+
+    expect(shown).toContain('校核测量网络与基准（需要确认）')
+    expect(shown).toContain('确认后将开始处理')
+    expect(shown).not.toContain('planId')
+    expect(shown).not.toContain('eplan_secret-123')
+    expect(shown).not.toContain('sha256-secret')
+    expect(shown).not.toContain('survey_network_validate')
+    expect(shown).not.toContain('{"')
   })
 })

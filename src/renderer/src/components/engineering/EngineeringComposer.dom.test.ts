@@ -40,12 +40,21 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('Survey composer continuity', () => {
+  it('keeps technical observation identifiers in the request but out of the reference label', async () => {
+    prepareEngineeringQuestion(workspaceRoot, 'project-a', 'Explain this observation', { section: 'observations', observationId: 'cosa-in2-6-backsight-reset', diagnosticCode: 'format_detected' })
+    await render()
+    expect(container.textContent).toContain('Selected observation')
+    expect(container.textContent).not.toMatch(/cosa-in2|format_detected/)
+    await act(async () => composer.onSend())
+    expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining('cosa-in2-6-backsight-reset'), 'agent', expect.any(Object))
+  })
+
   it('waits for explicit Send and requests exact read-only resolution of the selected typed evidence', async () => {
     const typedEvidence = { schemaVersion: 1 as const, projectId: 'project-a', projectRevision: 3, kind: 'advanced-trial' as const, trialId: 'selected-trial', recordHash: 'a'.repeat(64), selector: { path: ['result', 'states', 1], identity: { iteration: 1 } } }
     prepareEngineeringQuestion(workspaceRoot, 'project-a', 'Explain this iteration', { projectId: 'project-a', projectRevision: 3, section: 'advanced-trial', typedEvidence })
     await render()
     expect(sendMessage).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('1')
+    expect(container.textContent).toContain('Current result')
     await act(async () => composer.onSend())
     expect(sendMessage).toHaveBeenCalledOnce()
     expect(sendMessage).toHaveBeenCalledWith(expect.stringContaining(JSON.stringify(typedEvidence)), 'agent', expect.objectContaining({ displayText: 'Explain this iteration' }))
@@ -123,6 +132,7 @@ describe('Survey composer continuity', () => {
 
   it('passes provider identity to the shared picker even when model names match', async () => {
     await render()
+    expect(composer.hideModelPicker).toBe(true)
     expect(composer.composerModel).toBe('shared-model')
     expect(composer.composerProviderId).toBe('provider-a')
     await act(async () => useChatStore.setState({ composerProviderId: 'provider-b' }))
@@ -188,7 +198,8 @@ describe('Survey composer continuity', () => {
     const scope = JSON.stringify([workspaceRoot, 'project-a'])
     prepareEngineeringQuestion(workspaceRoot, 'project-a', 'Explain this observation', { section: 'observations', observationId: 'obs-31' })
     await render()
-    expect(container.textContent).toContain('obs-31')
+    expect(container.textContent).toContain('Selected observation')
+    expect(container.textContent).not.toContain('obs-31')
     await act(async () => container.querySelector<HTMLButtonElement>('button')!.click())
     expect(useEngineeringConversationDrafts.getState().drafts[scope]).toMatchObject({ input: 'Explain this observation', evidenceContext: undefined, viewContext: undefined })
     expect(container.textContent).not.toContain('obs-31')

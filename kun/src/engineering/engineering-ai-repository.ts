@@ -120,6 +120,14 @@ export class EngineeringAiRepository {
     return row ? EngineeringRunPlanV1.parse(JSON.parse(row.data_json)) : null
   }
 
+  recentPlans(threadId: string, projectId: string): Array<Pick<EngineeringRunPlan, 'id' | 'goal' | 'createdAt'>> {
+    const rows = this.db.prepare(`SELECT data_json FROM engineering_ai_plans WHERE thread_id = ? AND project_id = ? ORDER BY updated_at DESC, id DESC LIMIT 50`).all(threadId, projectId) as JsonRow[]
+    return rows.map(row => {
+      const plan = EngineeringRunPlanV1.parse(JSON.parse(row.data_json))
+      return { id: plan.id, goal: plan.goal, createdAt: plan.createdAt }
+    })
+  }
+
   getApproval(token: string): EngineeringApproval | null {
     const row = this.db
       .prepare('SELECT data_json FROM engineering_ai_approvals WHERE token = ?')

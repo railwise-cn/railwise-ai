@@ -56,6 +56,6 @@ describe('MessageTimeline initial heatmap empty hero routing', () => {
       runtimeError: i18n.t('common:runtimePortConflict')
     })
 
-    expect(html).toContain('The runtime port is already in use.')
+    expect(html).toContain('Another program is using the local service connection.')
   })
 })

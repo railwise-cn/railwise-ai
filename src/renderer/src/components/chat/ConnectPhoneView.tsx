@@ -612,7 +612,7 @@ export function ConnectPhoneView({
             {credentialAccessUnavailable ? (
               <div className="mx-auto mt-4 max-w-[460px] rounded-[10px] border border-amber-300/70 bg-amber-50 px-3 py-2 text-left text-[12.5px] leading-5 text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
                 <div className="font-semibold">{t('connectPhoneCredentialAccessRequired')}</div>
-                <div className="mt-0.5">{t('connectPhoneCredentialAccessHint')}</div>
+                <div className="mt-0.5">{t('connectPhoneCredentialAccessHint', { productName: brand.platform })}</div>
               </div>
             ) : allowReauthorization ? (
               <div className="mx-auto mt-4 max-w-[460px] rounded-[10px] border border-amber-300/70 bg-amber-50 px-3 py-2 text-left text-[12.5px] leading-5 text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
@@ -1233,7 +1233,7 @@ export function ConnectPhoneSidebarPanel({
           {imHealth ? (
             <div className="mt-3 border-t border-ds-border-muted pt-3 text-[11.5px] leading-5 text-ds-faint">
               <div className="break-words text-ds-muted">
-                {credentialAccessUnavailable ? t('connectPhoneCredentialAccessHint') : imHealth.message}
+                {credentialAccessUnavailable ? t('connectPhoneCredentialAccessHint', { productName: brand.platform }) : imHealth.message}
               </div>
               <div className="mt-1">
                 {t('connectPhoneHealthCounts', {

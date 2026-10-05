@@ -1,0 +1,41 @@
+{
+  "regions": [
+    {
+      "label": "Known points",
+      "width": 679,
+      "scrollWidth": 679,
+      "scrollLeft": 0,
+      "overflow": "auto"
+    },
+    {
+      "label": "Independent closure checks",
+      "width": 711,
+      "scrollWidth": 1045,
+      "scrollLeft": 334.4444580078125,
+      "overflow": "auto"
+    },
+    {
+      "label": "Observations and corrections",
+      "width": 711,
+      "scrollWidth": 1040,
+      "scrollLeft": 328.8888854980469,
+      "overflow": "auto"
+    },
+    {
+      "label": "Adjusted point results",
+      "width": 711,
+      "scrollWidth": 842,
+      "scrollLeft": 131.11111450195312,
+      "overflow": "auto"
+    }
+  ],
+  "focusEntered": true,
+  "tabContained": true,
+  "focusReturned": {
+    "tag": "BUTTON",
+    "text": "AI explanation",
+    "aria": "Ask Survey AI about Independent closure checks BM → BM"
+  },
+  "draft": "Explain Independent closure checks BM → BM, its source evidence, and anything requiring review.",
+  "content": "Open AI\nSurvey AI session\n\nprofessional\n\nSurvey AI\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nSelected evidence\nLocate evidence\nReference: leveling-route\nRemove reference\nAuto\nUltra"
+}

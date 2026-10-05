@@ -150,7 +150,28 @@ describe('declared family accounting and explicit limits', () => {
     expect(calculated(input('chi-square', 2, 1380)).pValue).toBeGreaterThan(0)
   })
   it('reports declarations as unverified and performs no observation action', () => {
-    expect(evaluated(input())).toMatchObject({ status: 'trial-only', modelAssumptions: 'not-verified', familyPredeclaration: 'not-verified', engineeringDecision: 'not-evaluated', observationAction: 'none', numericalIntervalMeaning: 'software-resolution-policy-not-certified-error-bound' })
+    const result = evaluated(input())
+    expect(result).toMatchObject({ status: 'trial-only', modelAssumptions: 'not-verified', familyPredeclaration: 'not-verified', engineeringDecision: 'not-evaluated', observationAction: 'none', numericalIntervalMeaning: 'software-resolution-policy-not-certified-error-bound' })
+    expect(result.statisticalDeclaration).toMatchObject({
+      hypotheses: { h0: expect.any(String), h1: expect.any(String), scope: 'per-member' },
+      targetPower: null,
+      modelVersion: result.algorithmVersion,
+      covarianceModelVersion: null,
+      testFamily: { id: result.request.familyId, declaration: result.request.declaration, source: expect.any(String) },
+      humanReview: { status: 'not-evaluated', declaration: expect.any(String) }
+    })
+    const legacy = { ...result }; delete legacy.statisticalDeclaration
+    expect(SurveyStatisticalFamilyOutputV1.parse(legacy)).toEqual(legacy)
+  })
+  it('rejects a covariance version on a scalar family without a covariance model', () => {
+    const value = input()
+    value.statisticalDeclaration = {
+      status: 'not-evaluated', hypotheses: { h0: 'consistent', h1: 'inconsistent', scope: 'per-member' }, targetPower: null,
+      modelVersion: 'declared-statistical-family-1', covarianceModelVersion: 'unexpected-covariance',
+      testFamily: { id: value.familyId, declaration: value.declaration, source: 'test', alpha: value.alpha, correction: 'bonferroni' },
+      humanReview: { status: 'not-evaluated', declaration: 'not reviewed' }
+    }
+    expect(SurveyStatisticalFamilyInputV1.safeParse(value).success).toBe(false)
   })
 })
 

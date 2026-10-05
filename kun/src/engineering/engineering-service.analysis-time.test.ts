@@ -2,8 +2,9 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { ENGINEERING_ANALYSIS_ALGORITHM_VERSION, ReportPreviewRequest } from '../contracts/engineering.js'
+import { ENGINEERING_ANALYSIS_ALGORITHM_VERSION, ReportPreviewRequest, type MonitoringObservationV1, type RailwiseProjectV1 } from '../contracts/engineering.js'
 import { EngineeringService } from './engineering-service.js'
+import { calculateMonitoringAnalysisV2 } from './monitoring-analysis.js'
 
 async function fixture(rows: string) {
   const root = await mkdtemp(join(tmpdir(), 'railwise-analysis-time-'))
@@ -45,8 +46,27 @@ it('recognizes equal instants written with different offsets as duplicates and d
   try {
     expect(dataset.observations).toHaveLength(2)
     expect(dataset.findings.filter(finding => finding.code === 'duplicate_observation')).toEqual([expect.objectContaining({ severity: 'warning', row: 3 })])
-    expect(service.createAnalysis(request).results[0]!.changeRate).toBeUndefined()
+    expect(service.createAnalysis(request).results[0]).toMatchObject({ changeRate: undefined, cumulativeChange: undefined, trend: 'unknown', thresholdStatus: 'unresolved', unitStatus: 'aligned', unit: 'mm', anomaly: false })
   } finally { service.close() }
+})
+
+it('keeps source units visible and suppresses arithmetic when units conflict or differ from the project declaration', async () => {
+  const mixed = await fixture('沉降,S01,2026-08-01,2,mm\n沉降,S01,2026-08-02,4,m')
+  const sourceDiffers = await fixture('沉降,S01,2026-08-01,2,m\n沉降,S01,2026-08-02,4,m')
+  try {
+    expect(mixed.service.createAnalysis(mixed.request).results[0]).toMatchObject({ currentValue: 4, previousValue: 2, unit: 'm', unitStatus: 'conflict', cumulativeChange: undefined, changeRate: undefined, trend: 'unknown', thresholdStatus: 'unresolved', anomaly: false })
+    expect(sourceDiffers.service.createAnalysis(sourceDiffers.request).results[0]).toMatchObject({ currentValue: 4, previousValue: 2, unit: 'm', unitStatus: 'source-differs', cumulativeChange: 2, changeRate: 2, trend: 'rising', thresholdStatus: 'unresolved', anomaly: false })
+  } finally { mixed.service.close(); sourceDiffers.service.close() }
+})
+
+it('does not mix cumulative fields with observed values when only some periods provide them', async () => {
+  const project = { unit: 'mm', thresholds: { default: 20 } } as unknown as RailwiseProjectV1
+  const observation = (id: string, timestamp: string, value: number, cumulative?: number): MonitoringObservationV1 => ({
+    schemaVersion: 1, id, projectId: 'project', datasetId: 'dataset', monitoringItem: '沉降', point: 'S01', timestamp, value, unit: 'mm', sourceRow: Number(id.slice(1)), sourceFields: {},
+    ...(cumulative === undefined ? {} : { cumulative })
+  })
+  const result = calculateMonitoringAnalysisV2(project, [observation('o1', '2026-08-01', 2, 10), observation('o2', '2026-08-02', 4)])
+  expect(result[0]).toMatchObject({ cumulativeBasis: 'mixed-unavailable', cumulativeChange: undefined, trend: 'unknown', anomaly: false })
 })
 
 it('keeps delimiter-containing item and point identities distinct in analysis and quality checks', async () => {

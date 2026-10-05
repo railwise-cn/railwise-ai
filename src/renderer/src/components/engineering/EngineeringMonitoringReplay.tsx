@@ -51,7 +51,6 @@ export function EngineeringMonitoringReplay({ projectId, manifestId, reviewStatu
 
   const result = runtimeReady && stored?.scope === scope ? stored.result : null
   const error = runtimeReady && failure?.scope === scope ? failure.key : null
-  const field = (label: string, value: string): React.JSX.Element => <div className="min-w-0"><dt className="text-ds-muted">{t(label)}</dt><dd className="break-all font-mono">{value}</dd></div>
   return <section aria-label={t('monitoringReplayTitle')} className="mt-3 min-w-0 border-t border-ds-border-muted pt-3 text-[11px]">
     <button type="button" onClick={() => void replay()} disabled={!runtimeReady || busy} className="inline-flex min-h-7 items-center gap-1 rounded border border-ds-border-muted px-2 py-1 text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50">
       <Calculator size={14} aria-hidden="true" />{t(busy ? 'monitoringReplayRunning' : 'monitoringReplayAction')}
@@ -63,28 +62,10 @@ export function EngineeringMonitoringReplay({ projectId, manifestId, reviewStatu
           {t(statusKeys[result.status])} · <time dateTime={result.checkedAt}>{new Date(result.checkedAt).toLocaleString(i18n.language)}</time>
         </p>
         <p>{t(monitoringReplayReasonKeys[result.reasonCode])}</p>
-        <EngineeringEvidenceQuestion label={result.attemptId} reference={{ kind: 'monitoring-replay', manifestId: result.manifestId, attemptId: result.attemptId, checkedAt: result.checkedAt }} />
+        <EngineeringEvidenceQuestion label={t('monitoringReplayResult')} reference={{ kind: 'monitoring-replay', manifestId: result.manifestId, attemptId: result.attemptId, checkedAt: result.checkedAt }} />
         {result.analyses.length ? <ul className="space-y-1">{result.analyses.map(item => <li key={item.analysisId} className="break-words">
-          <span className="break-all font-mono">{item.analysisId}</span>: {t(statusKeys[item.status])} · {t(monitoringReplayReasonKeys[item.reasonCode])}
+          <span>{t('monitoringReplayAnalysisIndex', { index: result.analyses.indexOf(item) + 1 })}</span>: {t(statusKeys[item.status])} · {t(monitoringReplayReasonKeys[item.reasonCode])}
         </li>)}</ul> : null}
-        <details className="min-w-0">
-          <summary className="cursor-pointer">{t('monitoringReplayEvidence')}</summary>
-          <dl className="mt-2 grid min-w-0 gap-2">
-            {field('monitoringReplayAttempt', result.attemptId)}
-            {field('monitoringReplayComparison', result.comparisonVersion)}
-            {field('monitoringReplayEnvironment', JSON.stringify(result.execution))}
-          </dl>
-            {result.analyses.map(item => <dl key={item.analysisId} className="mt-2 min-w-0 space-y-2 border-t border-ds-border-muted pt-2">
-              {field('monitoringReplayAnalysis', item.analysisId)}
-              {field('monitoringReplayDataset', item.datasetId)}
-              {field('monitoringReplayAlgorithm', item.algorithmVersion)}
-              {field('monitoringReplayInputHash', item.inputHash)}
-              {item.sourceFileHash ? field('monitoringReplaySourceHash', item.sourceFileHash) : null}
-              {item.sourceContextHash ? field('monitoringReplaySourceContext', item.sourceContextHash) : null}
-              {field('monitoringReplayStoredHash', item.storedResultsHash)}
-              {item.recomputedResultsHash ? field('monitoringReplayRecomputedHash', item.recomputedResultsHash) : null}
-            </dl>)}
-        </details>
         <p className="text-ds-muted">{t('monitoringReplayBoundary')}</p>
       </> : null}
     </div>

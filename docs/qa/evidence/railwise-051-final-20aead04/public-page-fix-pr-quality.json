@@ -1,0 +1,340 @@
+{
+  "conclusion": "cancelled",
+  "databaseId": 36361329764,
+  "event": "pull_request",
+  "headBranch": "codex/fix-051-page-verification",
+  "headSha": "25552382027ba5571e0804404cf9fd02d4dff9e9",
+  "jobs": [
+    {
+      "completedAt": "2026-09-28T00:14:05Z",
+      "conclusion": "success",
+      "databaseId": 108738968277,
+      "name": "Electron production smoke",
+      "startedAt": "2026-09-28T00:12:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-28T00:12:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-28T00:12:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:12:29Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-09-28T00:12:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:12:35Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-28T00:12:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:01Z",
+          "conclusion": "success",
+          "name": "Run npm ci",
+          "number": 4,
+          "startedAt": "2026-09-28T00:12:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:03Z",
+          "conclusion": "success",
+          "name": "Prepare checksummed Electron runtime",
+          "number": 5,
+          "startedAt": "2026-09-28T00:13:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:33Z",
+          "conclusion": "success",
+          "name": "Run npm run build",
+          "number": 6,
+          "startedAt": "2026-09-28T00:13:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:03Z",
+          "conclusion": "success",
+          "name": "Launch packaged production preview",
+          "number": 7,
+          "startedAt": "2026-09-28T00:13:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:03Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 13,
+          "startedAt": "2026-09-28T00:14:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:03Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 14,
+          "startedAt": "2026-09-28T00:14:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:03Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-09-28T00:14:03Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36361329764/job/108738968277"
+    },
+    {
+      "completedAt": "2026-09-28T00:15:10Z",
+      "conclusion": "success",
+      "databaseId": 108738968388,
+      "name": "Windows path, spawn, persistence",
+      "startedAt": "2026-09-28T00:12:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-28T00:12:26Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-28T00:12:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:12:35Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-09-28T00:12:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:03Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-28T00:12:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:45Z",
+          "conclusion": "success",
+          "name": "Run npm ci",
+          "number": 4,
+          "startedAt": "2026-09-28T00:13:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:22Z",
+          "conclusion": "success",
+          "name": "Run npm run typecheck",
+          "number": 5,
+          "startedAt": "2026-09-28T00:13:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:36Z",
+          "conclusion": "success",
+          "name": "Run core Windows security tests",
+          "number": 6,
+          "startedAt": "2026-09-28T00:14:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:48Z",
+          "conclusion": "success",
+          "name": "Run plugin Windows security tests",
+          "number": 7,
+          "startedAt": "2026-09-28T00:14:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:15:06Z",
+          "conclusion": "success",
+          "name": "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+          "number": 8,
+          "startedAt": "2026-09-28T00:14:48Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:15:07Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 15,
+          "startedAt": "2026-09-28T00:15:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:15:08Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 16,
+          "startedAt": "2026-09-28T00:15:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:15:08Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 17,
+          "startedAt": "2026-09-28T00:15:08Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36361329764/job/108738968388"
+    },
+    {
+      "completedAt": "2026-09-28T00:16:26Z",
+      "conclusion": "cancelled",
+      "databaseId": 108738968435,
+      "name": "OpenSpec, brand, lint, type, test, build",
+      "startedAt": "2026-09-28T00:12:25Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-09-28T00:12:27Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-09-28T00:12:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:12:31Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v7",
+          "number": 2,
+          "startedAt": "2026-09-28T00:12:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:12:40Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v7",
+          "number": 3,
+          "startedAt": "2026-09-28T00:12:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:07Z",
+          "conclusion": "success",
+          "name": "Run npm ci",
+          "number": 4,
+          "startedAt": "2026-09-28T00:12:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:07Z",
+          "conclusion": "success",
+          "name": "Run npm run openspec:validate",
+          "number": 5,
+          "startedAt": "2026-09-28T00:13:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:08Z",
+          "conclusion": "success",
+          "name": "Run npm run verify:brand-boundary",
+          "number": 6,
+          "startedAt": "2026-09-28T00:13:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:08Z",
+          "conclusion": "success",
+          "name": "Run npm run verify:document-licenses",
+          "number": 7,
+          "startedAt": "2026-09-28T00:13:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:13:40Z",
+          "conclusion": "success",
+          "name": "Run npm run lint",
+          "number": 8,
+          "startedAt": "2026-09-28T00:13:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:14:18Z",
+          "conclusion": "success",
+          "name": "Run npm run typecheck",
+          "number": 9,
+          "startedAt": "2026-09-28T00:13:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:15:45Z",
+          "conclusion": "success",
+          "name": "Run npm test",
+          "number": 10,
+          "startedAt": "2026-09-28T00:14:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:16:00Z",
+          "conclusion": "success",
+          "name": "Run npm --prefix kun run typecheck",
+          "number": 11,
+          "startedAt": "2026-09-28T00:15:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:16:23Z",
+          "conclusion": "cancelled",
+          "name": "Run npm --prefix kun test",
+          "number": 12,
+          "startedAt": "2026-09-28T00:16:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:16:23Z",
+          "conclusion": "skipped",
+          "name": "Run npm run build",
+          "number": 13,
+          "startedAt": "2026-09-28T00:16:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:16:23Z",
+          "conclusion": "skipped",
+          "name": "Post Run actions/setup-node@v7",
+          "number": 25,
+          "startedAt": "2026-09-28T00:16:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:16:24Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v7",
+          "number": 26,
+          "startedAt": "2026-09-28T00:16:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-09-28T00:16:24Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 27,
+          "startedAt": "2026-09-28T00:16:24Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36361329764/job/108738968435"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/36361329764"
+}

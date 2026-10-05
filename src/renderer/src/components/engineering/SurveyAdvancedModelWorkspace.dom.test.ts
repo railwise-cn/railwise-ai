@@ -53,7 +53,25 @@ async function render(overrides: Partial<Parameters<typeof SurveyAdvancedModelWo
   await act(async () => root.render(createElement(SurveyAdvancedModelWorkspace, { binding, runtimeReady: true, ...overrides })))
 }
 async function click(target: HTMLElement) { await act(async () => target.click()) }
-const button = (text: string): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent === text)!
+const commonText = (key: string, options?: Record<string, unknown>): string => i18n.t(`common:${key}`, options)
+const buttonKeys: Record<string, string> = {
+  'Confirm and save trial': 'advancedSave', 'Reverify and replay': 'advancedReverify',
+  'Reverify and export JSON': 'advancedExport', 'Trial history': 'advancedHistory',
+  'Strictly verify and restore': 'advancedRestore', 'Retry original request': 'advancedRetry',
+  'Stop waiting': 'advancedCancel', 'Next page': 'advancedNext', 'Previous page': 'advancedPrevious'
+}
+const button = (text: string): HTMLButtonElement => {
+  const label = commonText(buttonKeys[text] ?? text)
+  return [...host.querySelectorAll('button')].find(item => item.textContent === label)!
+}
+const commonButton = (key: string): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent === commonText(key))!
+const restoreButton = (): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent?.startsWith(commonText('advancedRestore')))!;
+const importField = (): HTMLInputElement => host.querySelector<HTMLInputElement>('input[type="file"]')!
+async function importDeclaration(text: string) {
+  const file = { size: new TextEncoder().encode(text).byteLength, text: async () => text } as File
+  Object.defineProperty(importField(), 'files', { configurable: true, value: [file] })
+  await act(async () => { importField().dispatchEvent(new Event('change', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 0)) })
+}
 function field<T extends HTMLElement>(text: string): T { return [...host.querySelectorAll('label')].find(label => label.querySelector('span')?.textContent === text)!.querySelector('input,textarea,select') as unknown as T }
 async function edit(label: string, value: string) {
   const target = field<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(label)
@@ -63,13 +81,13 @@ async function edit(label: string, value: string) {
     target.dispatchEvent(new Event(target instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
   })
 }
-const ack = () => field<HTMLInputElement>('I have checked the declared model and basis and confirm saving an independent experimental trial only. I understand that assumptions are unverified and results do not constitute engineering approval.')
+const ack = () => field<HTMLInputElement>(commonText('advancedAcknowledge'))
 async function fill(selected = input()) {
-  await edit('Trial method', selected.kind); await edit('Model basis statement', selected.modelBasisStatement)
-  await edit('Complete trial request JSON', selected.declarationJson)
+  await edit(commonText('advancedMethod'), selected.kind); await edit(commonText('advancedBasis'), selected.modelBasisStatement)
+  await importDeclaration(selected.declarationJson)
 }
-async function save(selected = input()) { await fill(selected); await click(ack()); await click(button('Confirm and save trial')); await loaded() }
-async function loaded() { await vi.waitFor(async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) }); expect(button('Reverify and replay')).toBeDefined() }) }
+async function save(selected = input()) { await fill(selected); await click(ack()); await click(commonButton('advancedSave')); await loaded() }
+async function loaded() { await vi.waitFor(async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) }); expect(commonButton('advancedReverify')).toBeDefined() }) }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -106,21 +124,44 @@ describe('declared advanced model desktop workflow', () => {
   })
 
   it('requires an explicit model and confirmation, preserves raw evidence, and displays null directions plus all covariance cells', async () => {
-    await render(); expect(runtimeRequest).not.toHaveBeenCalled(); expect(button('Confirm and save trial').disabled).toBe(true)
-    expect(field<HTMLSelectElement>('Trial method').value).toBe('')
-    await fill(); expect(ack().checked).toBe(false); expect(button('Confirm and save trial').disabled).toBe(true)
-    await click(ack()); await edit('Model basis statement', basis + '\nchecked'); expect(ack().checked).toBe(false)
-    await click(ack()); await click(button('Confirm and save trial')); await loaded()
+    await render(); expect(runtimeRequest).not.toHaveBeenCalled(); expect(commonButton('advancedSave').disabled).toBe(true)
+    expect(field<HTMLSelectElement>(commonText('advancedMethod')).value).toBe('')
+    await fill(); expect(ack().checked).toBe(false); expect(commonButton('advancedSave').disabled).toBe(true)
+    await click(ack()); await edit(commonText('advancedBasis'), basis + '\nchecked'); expect(ack().checked).toBe(false)
+    await click(ack()); await click(commonButton('advancedSave')); await loaded()
     const raw = runtimeRequest.mock.calls[0]![2] as string, sent = JSON.parse(raw)
     expect(sent).toMatchObject({ ...input(), modelBasisStatement: basis + '\nchecked', acknowledged: true, expectedProjectRevision: 1, idempotencyKey: expect.any(String) })
     expect(host.textContent).toContain('Undetectable or numerically unresolved'); expect(host.textContent).toContain('Not computed')
     const covariance = host.querySelector('[aria-label="Full residual covariance matrix"]')!
     expect(covariance.querySelectorAll('tbody td')).toHaveLength(9)
-    expect([...host.querySelectorAll('pre')].some(pre => pre.textContent === input().declarationJson)).toBe(true)
+    expect(host.textContent).not.toContain('schemaVersion'); expect(host.querySelectorAll('pre')).toHaveLength(0)
+    expect(host.textContent).not.toMatch(/Runtime|JSON|contextHash|inputHash|requestSha256|schemaVersion|idempotencyKey|fingerprint|replay environment/i)
     expect(document.activeElement).toBe(host.querySelector('h3'))
     expect(host.querySelectorAll('[role="region"][tabindex="0"]').length).toBeGreaterThan(2)
     await act(async () => { await i18n.changeLanguage('zh') })
     expect(host.textContent).toContain('高级模型试算'); expect(host.textContent).toContain('不可探测或数值未分辨'); expect(host.textContent).not.toContain('advancedTitle')
+  })
+  it('submits a one-parameter variance-group trial from survey fields without exposing request internals', async () => {
+    await render()
+    await edit(commonText('advancedMethod'), 'vce')
+    await edit(i18n.t('common:advancedParameter'), 'Mean elevation')
+    await edit(i18n.t('common:advancedObservationUnit'), 'mm')
+    await edit(i18n.t('common:advancedObservationRows'), '1\n2\n4\n5')
+    await edit(i18n.t('common:advancedInitialValue'), '1')
+    await edit(i18n.t('common:advancedRelativeVariance'), '1')
+    await edit(i18n.t('common:advancedSourceReference'), 'level-book/run-12')
+    await edit(commonText('advancedBasis'), 'Independent leveling observations in one group with a declared initial variance.')
+    expect(commonButton('advancedSave').disabled).toBe(true)
+    expect(ack().disabled).toBe(false)
+    await click(ack()); expect(commonButton('advancedSave').disabled).toBe(false)
+    await click(commonButton('advancedSave')); await loaded()
+    const request = JSON.parse(runtimeRequest.mock.calls[0]![2] as string)
+    const declaration = JSON.parse(request.declarationJson)
+    expect(declaration).toMatchObject({ unit: 'mm', parameterIds: ['Mean elevation'], groups: [{ initialVariance: 1, sourceAnchor: 'level-book/run-12' }] })
+    expect(declaration.observations.map((row: { value: number; coefficients: number[] }) => [row.value, row.coefficients])).toEqual([[1, [1]], [2, [1]], [4, [1]], [5, [1]]])
+    expect(host.textContent).not.toContain('requestSha256'); expect(host.textContent).not.toContain('schemaVersion')
+    expect(host.textContent).not.toMatch(/Runtime|JSON|contextHash|inputHash|requestSha256|schemaVersion|idempotencyKey|fingerprint|replay environment/i)
+    expect(host.querySelectorAll('pre')).toHaveLength(0)
   })
   it.each(['huber', 'statistical-family'] as const)('saves, restores, replays and exports %s with bilingual boundary information', async kind => {
     const model = JSON.parse(advancedTrialTestRequest(kind).declarationJson), selected = input(kind, model)
@@ -140,8 +181,8 @@ describe('declared advanced model desktop workflow', () => {
     const payload = saveWorkspaceFileAs.mock.calls[0]![0], exported = JSON.parse(Buffer.from(payload.dataBase64, 'base64').toString('utf8'))
     expect(payload.suggestedName).toBe(`survey-${kind}-trial.json`)
     expect(exported.kind).toBe(kind); expect(exported.declarationJson).toBe(selected.declarationJson)
-    await click(button('Trial history')); await vi.waitFor(() => expect(host.textContent).toContain('Strictly verify and restore'))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!); await loaded()
+    await click(button('Trial history')); await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedRestore')))
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes(commonText('advancedRestore')))!); await loaded()
     await act(async () => { await i18n.changeLanguage('zh') })
     expect(host.textContent).toContain(kind === 'huber' ? 'Huber 试算结果' : '统计检验族结果')
     expect(host.textContent).toContain(kind === 'huber' ? '派生 IRLS 权' : '完整分母 3')
@@ -218,8 +259,7 @@ describe('declared advanced model desktop workflow', () => {
     expect(host.textContent).toContain('Numerical trial convergence · Not engineering acceptance')
     expect(host.textContent).toContain('Declared groups and initial variances')
     expect(host.textContent).toContain('Parameters refitted under final variances (mm)')
-    const normalized = [...host.querySelectorAll('pre')].map(item => item.textContent).find(text => text?.includes('"groupId": "group"'))
-    expect(normalized).toBeDefined(); expect([...host.querySelectorAll('pre')].some(pre => pre.textContent === input('vce').declarationJson)).toBe(true)
+    expect(host.textContent).not.toContain('schemaVersion'); expect(host.textContent).not.toContain('requestSha256'); expect(host.querySelectorAll('pre')).toHaveLength(0)
   })
   it('shows a negative VCE candidate and stops without presenting a converged fit', async () => {
     const model = { ...vce, parameterIds: ['mean'], groups: ['g0', 'g1'].map(id => ({ id, initialVariance: 1, sourceAnchor: 'paper-example' })), observations: [1.6, .9, -.9, 3.6].map((value, i) => ({ id: `o${i}`, value, coefficients: [1], groupId: i < 2 ? 'g0' : 'g1', relativeVariance: 1, sourceAnchor: 'paper-example' })) }
@@ -229,9 +269,9 @@ describe('declared advanced model desktop workflow', () => {
   })
   it('blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests', async () => {
     await render(); await fill(); const duplicate = input().declarationJson.replace('"schemaVersion": 1', '"schemaVersion": 1,"schemaVersion": 1')
-    await edit('Complete trial request JSON', duplicate); expect(button('Confirm and save trial').disabled).toBe(true)
-    const oversized = '中'.repeat(100_000); await edit('Complete trial request JSON', oversized)
-    expect(field<HTMLTextAreaElement>('Complete trial request JSON').value).toBe(oversized)
+    await importDeclaration(duplicate); expect(button('Confirm and save trial').disabled).toBe(true)
+    const oversized = '中'.repeat(100_000)
+    await importDeclaration(oversized)
     expect(runtimeRequest).not.toHaveBeenCalled(); expect(button('Confirm and save trial').disabled).toBe(true)
   })
   it('paginates real history and isolates unavailable records', async () => {
@@ -242,15 +282,15 @@ describe('declared advanced model desktop workflow', () => {
     expect(runtimeRequest.mock.calls.at(-1)![0]).toContain('offset=10')
     await vi.waitFor(() => expect(button('Next page').disabled).toBe(true))
     runtimeRequest.mockResolvedValueOnce(response({ trials: [], unavailable: [{ id: 'damaged', reason: 'integrity' }, { id: 'old', reason: 'stale' }, { id: 'other-engine', reason: 'replay-environment' }], nextOffset: null }))
-    await click(button('Trial history')); expect(host.textContent).toContain('damaged'); expect(host.textContent).toContain('This does not by itself mean the record was tampered with')
-    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Strictly verify and restore'))).toBe(false)
+    await click(button('Trial history')); expect(host.textContent).toContain('This record cannot be restored'); expect(host.textContent).toContain(commonText('advancedEnvironment'))
+    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes(commonText('advancedRestore')))).toBe(false)
   })
   it('retries an uncertain save with exactly the same original body and key and suppresses double clicks', async () => {
     await render(); await fill(); await click(ack())
     runtimeRequest.mockImplementationOnce((path, method, body) => { handle(path, method, body); return Promise.reject(new Error('connection lost after save')) })
     await click(button('Confirm and save trial'))
     const first = runtimeRequest.mock.calls[0]![2]
-    expect(field<HTMLTextAreaElement>('Complete trial request JSON').disabled).toBe(true)
+    expect(importField().disabled).toBe(true)
     await click(button('Retry original request')); await loaded()
     expect(runtimeRequest.mock.calls[1]![2]).toBe(first)
     expect(service.listTrials(binding.projectId).trials).toHaveLength(1)
@@ -258,11 +298,11 @@ describe('declared advanced model desktop workflow', () => {
   it('resolves an uncertain save by restoring the same request from history', async () => {
     await render(); await fill(); await click(ack())
     runtimeRequest.mockImplementationOnce((path, method, body) => { handle(path, method, body); return Promise.reject(new Error('lost response')) })
-    await click(button('Confirm and save trial')); expect(field<HTMLTextAreaElement>('Complete trial request JSON').disabled).toBe(true)
+    await click(button('Confirm and save trial')); expect(importField().disabled).toBe(true)
     await click(button('Trial history'))
-    await vi.waitFor(() => expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Strictly verify and restore'))).toBe(true))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!); await loaded()
-    expect(field<HTMLTextAreaElement>('Complete trial request JSON').disabled).toBe(false)
+    await vi.waitFor(() => expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes(commonText('advancedRestore')))).toBe(true))
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes(commonText('advancedRestore')))!); await loaded()
+    expect(importField().disabled).toBe(false)
     expect(host.textContent).not.toContain('The save outcome is not confirmed')
   })
   it.each(['project', 'revision', 'workspace', 'offline', 'cancel'] as const)('discards a late create response after %s without fetching its detail', async change => {
@@ -278,8 +318,8 @@ describe('declared advanced model desktop workflow', () => {
   it.each(['project', 'offline'] as const)('discards a late restored detail after %s', async change => {
     const { summary, record } = stored(), wait = deferred<ReturnType<typeof response>>()
     runtimeRequest.mockResolvedValueOnce(response({ trials: [summary], unavailable: [], nextOffset: null })).mockReturnValueOnce(wait.promise)
-    await render(); await click(button('Trial history')); await vi.waitFor(() => expect(host.textContent).toContain(summary.id))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!)
+    await render(); await click(button('Trial history')); await vi.waitFor(() => expect(restoreButton()).toBeDefined())
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes(commonText('advancedRestore')))!)
     await render(change === 'offline' ? { runtimeReady: false } : { binding: { ...binding, projectId: 'other' } })
     await act(async () => wait.resolve(response(record))); await new Promise(resolve => setTimeout(resolve, 10))
     expect(host.textContent).not.toContain(record.id); expect(button('Reverify and replay')).toBeUndefined()
@@ -308,9 +348,9 @@ describe('declared advanced model desktop workflow', () => {
   it('maps deterministic environment/validation errors without suggesting generic network retry', async () => {
     await render()
     runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: '{"code":"advanced_trials_replay_environment"}' })
-    await click(button('Trial history')); expect(host.textContent).toContain('preventing exact replay'); expect(button('Retry original request')).toBeUndefined()
+    await click(button('Trial history')); expect(host.textContent).toContain(commonText('advancedEnvironment')); expect(button('Retry original request')).toBeUndefined()
     runtimeRequest.mockResolvedValueOnce({ ok: false, status: 400, body: '{"code":"advanced_trials_validation"}' })
-    await click(button('Trial history')); expect(host.textContent).toContain('strict contract'); expect(button('Retry original request')).toBeUndefined()
+    await click(button('Trial history')); expect(host.textContent).toContain(commonText('advancedValidation')); expect(button('Retry original request')).toBeUndefined()
   })
   it('exports only a freshly replayed record through native Save As, preserving UTF-8 original input', async () => {
     await render(); await save(); await click(button('Reverify and export JSON'))
@@ -320,11 +360,12 @@ describe('declared advanced model desktop workflow', () => {
     expect(payload).toMatchObject({ workspaceRoot: binding.workspaceRoot, suggestedName: 'survey-generalized-w-trial.json', mimeType: 'application/json' })
     const exported = JSON.parse(Buffer.from(payload.dataBase64, 'base64').toString('utf8'))
     expect(exported.declarationJson).toBe(input().declarationJson); expect(exported.modelBasisStatement).toBe(basis)
-    expect(host.textContent).toContain('Saved as /chosen/trial.json')
+    expect(host.textContent).toContain(commonText('advancedExportSaved', { path: 'trial.json' }))
+    expect(host.textContent).not.toContain('/chosen/')
     saveWorkspaceFileAs.mockResolvedValueOnce({ ok: false, canceled: true, message: 'cancelled' })
-    await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(host.textContent).toContain('Save As was cancelled'))
+    await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedExportCancelled')))
     saveWorkspaceFileAs.mockResolvedValueOnce({ ok: false, message: 'disk error' })
-    await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(host.textContent).toContain('Save As failed'))
+    await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedExportFailed')))
     expect(button('Reverify and export JSON')).toBeDefined()
   })
   it('does not open Save As for a corrupted export or a late response after the scope changes', async () => {
@@ -346,9 +387,9 @@ describe('reference datum desktop workflow', () => {
   it('saves mapped epoch evidence and exposes the complete covariance without claiming stable points', async () => {
     const req = advancedTrialTestRequest('reference-datum')
     await render(); await save(input('reference-datum', JSON.parse(req.declarationJson)))
-    expect(host.textContent).toContain('physical stability is not evaluated')
+    expect(host.textContent).toContain(commonText('advancedReferenceBoundary'))
     expect(host.textContent).toContain('Reference shift 3 mm; shift variance 1 mm²')
-    expect(host.textContent).toContain('caller-declared independence')
+    expect(host.textContent).toContain(commonText('advancedReferenceIndependent'))
     expect(host.querySelector('[aria-label="Full displacement covariance"]')!.querySelectorAll('tbody td')).toHaveLength(9)
     const table = host.querySelector('[aria-label="Point mapping, reference weights and displacements"]')!
     expect([...table.querySelectorAll('tbody tr')].map(row => [...row.querySelectorAll('td')].map(x => x.textContent))).toEqual([['2','0.5','-1','0'],['4','0.5','1','0'],['7','0','4','-1']])
@@ -364,7 +405,7 @@ describe('reference datum desktop workflow', () => {
     vi.stubGlobal('Buffer', undefined)
     expect(await readAdvancedTrial(binding, summary)).toEqual(exported)
     await act(async () => i18n.changeLanguage('zh'))
-    expect(host.textContent).toContain('物理稳定性未判定')
+    expect(host.textContent).toContain(commonText('advancedReferenceBoundary'))
     expect(host.textContent).not.toMatch(/advancedReference[A-Z]/)
   })
   it('shows singular GLS failure and retained semidefinite qualification on an explicitly different method', async () => {
@@ -381,12 +422,12 @@ describe('reference datum desktop workflow', () => {
   })
   it('renders maximum cross-epoch covariance and mappings from a strictly replayed real record', async () => {
     const req = maximumReferenceDatumRequest()
-    const { record } = stored(input('reference-datum', JSON.parse(req.declarationJson)))
+    stored(input('reference-datum', JSON.parse(req.declarationJson)))
     await render(); await click(button('Trial history'))
-    await vi.waitFor(() => expect(host.textContent).toContain(record.id))
-    await click([...host.querySelectorAll('button')].find(b => b.textContent?.includes('Strictly verify and restore'))!)
+    await vi.waitFor(() => expect(restoreButton()).toBeDefined())
+    await click([...host.querySelectorAll('button')].find(b => b.textContent?.includes(commonText('advancedRestore')))!)
     await loaded()
-    expect(host.textContent).toContain('caller-declared full cross covariance')
+    expect(host.textContent).toContain(commonText('advancedReferenceDependent'))
     expect(host.querySelector('[aria-label="Full displacement covariance"]')!.querySelectorAll('tbody td')).toHaveLength(1024)
     expect(host.querySelector('[aria-label="Point mapping, reference weights and displacements"]')!.querySelectorAll('tbody tr')).toHaveLength(32)
     expect(host.querySelector('[aria-label="Two-epoch comparison under declared references"]')!.textContent).not.toMatch(/NaN|Infinity|undefined|advancedReference[A-Z]/)
@@ -394,37 +435,41 @@ describe('reference datum desktop workflow', () => {
 })
 
 describe('static append desktop workflow', () => {
-  it('saves the explicit model, displays counts/prior covariance/steps, replays, restores and natively exports exact evidence', async () => {
+  it('shows survey result metrics without exposing QR implementation details, replays, restores and exports exact evidence', async () => {
     const model = JSON.parse(advancedTrialTestRequest('static-incremental').declarationJson), selected = input('static-incremental', model)
     await render(); await save(selected)
     expect(host.textContent).toContain('Existing 3 · Appended 2 · Total observations 5')
-    expect(host.textContent).toContain('not authenticated source files or prior runtime state')
-    expect(host.textContent).toContain('no normality claim')
+    expect(host.textContent).toContain('Calculated')
+    expect(host.textContent).toContain('Parameter comparison')
+    expect(host.textContent).toContain('Weighted residual sum of squares')
     expect(host.querySelector('[aria-label="Updated prior parameter covariance"]')?.querySelectorAll('tbody td')).toHaveLength(1)
-    expect(host.querySelector('[aria-label="Per-observation update state"]')?.querySelectorAll('tbody tr')).toHaveLength(2)
-    expect(host.textContent).toContain('not used to scale prior covariance')
+    expect(host.querySelector('[aria-label="Per-observation update state"]')).toBeNull()
+    expect(host.querySelectorAll('pre')).toHaveLength(0)
+    expect(host.textContent).not.toMatch(/fingerprint|Householder|Givens|QR state|rotation coefficients|policy tolerance/i)
     await click(button('Reverify and replay')); await loaded()
     await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(saveWorkspaceFileAs).toHaveBeenCalledTimes(1))
     const payload = saveWorkspaceFileAs.mock.calls[0]![0], exported = JSON.parse(Buffer.from(payload.dataBase64, 'base64').toString('utf8'))
     expect(payload.suggestedName).toBe('survey-static-incremental-trial.json')
     expect(exported).toMatchObject({ kind: 'static-incremental', baseObservationCount: 3, appendedObservationCount: 2, observationCount: 5, declarationJson: selected.declarationJson })
     expect(exported.result.request.base.observations).toEqual(model.base.observations)
-    await click(button('Trial history')); await vi.waitFor(() => expect(host.textContent).toContain('Strictly verify and restore'))
+    await click(button('Trial history')); await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedRestore')))
     expect(host.textContent).toContain('Existing 3 · Appended 2 · Total observations 5')
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!); await loaded()
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes(commonText('advancedRestore')))!); await loaded()
     await act(async () => { await i18n.changeLanguage('zh') })
     expect(host.textContent).toContain('静态观测追加结果'); expect(host.textContent).toContain('原有 3 条 · 追加 2 条 · 总观测 5 条')
-    expect(host.textContent).toContain('先验协方差'); expect(host.textContent).toContain('来源、独立性、零均值与先验方差均未验真')
+    expect(host.textContent).toContain('先验协方差')
+    expect(host.textContent).not.toMatch(/指纹|Householder|Givens|QR 状态|旋转系数|策略阈值/)
     expect(host.textContent).not.toContain('advancedStatic')
   })
-  it('renders an unavailable fingerprint mismatch without an accepted fit and keeps the raw declaration', async () => {
+  it('renders a changed base model without exposing internal binding details', async () => {
     const model = JSON.parse(advancedTrialTestRequest('static-incremental').declarationJson)
     model.base.observations[0].value += 1
     const selected = input('static-incremental', model)
     await render(); await save(selected)
-    expect(host.textContent).toContain('Append refused: base fingerprint differs from the declaration.')
+    expect(host.textContent).toContain(commonText('advancedInvalidInput'))
+    expect(host.textContent).not.toContain('fingerprint')
     expect(host.querySelector('[aria-label="Parameter comparison"]')).toBeNull()
-    expect([...host.querySelectorAll('pre')].some(pre => pre.textContent === selected.declarationJson)).toBe(true)
+    expect(host.textContent).not.toContain('sourceSha256'); expect(host.textContent).not.toContain('schemaVersion')
   })
   it('rejects missing zero-mean declaration before any Runtime request', async () => {
     const model = JSON.parse(advancedTrialTestRequest('static-incremental').declarationJson)
@@ -437,8 +482,8 @@ describe('static append desktop workflow', () => {
     saveWorkspaceFileAs.mockResolvedValueOnce({ ok: false, canceled: true })
     await render(); await save(input('static-incremental', JSON.parse(advancedTrialTestRequest('static-incremental').declarationJson)))
     await click(button('Reverify and export JSON'))
-    await vi.waitFor(() => expect(host.textContent).toContain('Save As was cancelled'))
-    expect(host.textContent).not.toContain('Saved to')
+    await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedExportCancelled')))
+    expect(host.textContent).not.toContain(commonText('advancedExportSaved', { path: 'trial.json' }))
   })
 })
 
@@ -448,8 +493,8 @@ it('restores all 128 appended rows and 16-by-16 prior covariance matrices at the
   stored(selected)
   await render(); await click(button('Trial history'))
   await vi.waitFor(() => expect(host.textContent).toContain('Existing 128 · Appended 128 · Total observations 256'))
-  await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!); await loaded()
-  expect(host.querySelector('[aria-label="Per-observation update state"]')?.querySelectorAll('tbody tr')).toHaveLength(128)
+  await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes(commonText('advancedRestore')))!); await loaded()
+  expect(host.querySelector(`[aria-label="${commonText('advancedStaticObservation')}"]`)?.querySelectorAll('tbody tr')).toHaveLength(128)
   expect(host.querySelector('[aria-label="Updated prior parameter covariance"]')?.querySelectorAll('tbody td')).toHaveLength(256)
   expect(host.querySelector('[aria-label="Existing prior parameter covariance"]')?.querySelectorAll('tbody td')).toHaveLength(256)
   expect(host.querySelector('[aria-label="Parameter comparison"]')?.querySelectorAll('tbody tr')).toHaveLength(16)

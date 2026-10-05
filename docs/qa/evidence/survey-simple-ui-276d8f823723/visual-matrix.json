@@ -1,0 +1,3890 @@
+[
+  {
+    "screenshot": "zh-light-1280x800-overview.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "overview",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": "step",
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\nreview-levels\n\n描述目标或添加资料，系统会检查资料并引导你完成计算和交付。\n\nreview-levels.csv\n\n结果已生成 · 待审查\n\n查看结果\n最近结果\n\n2 个分析结果\n\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-light-1280x800-process.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "process",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": "step",
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 923,
+        "containerWidth": 923,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n上传资料\n资料类型\n自动识别\n监测数据\n测量源文件\n描述任务\n\n测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。\n\n已导入资料与字段映射\n高级详情\n质量校核与问题处置\n\n阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。\n\n重新校核\n发现 0 项阻断、0 项警告 · 详细状态\n级别\t问题与建议\t来源行\t处置\n警告\t\n\n项目未配置阈值\n\n在项目设置中补充阈值\n\n\t第 1 行\t\n已接受\n\n计算前请确认：review-levels.csv · 单位 m。如不符合原始资料，请先修改。\n\n修改基准与单位\n开始计算"
+  },
+  {
+    "screenshot": "zh-light-1280x800-results.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "results",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": "step",
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 933,
+        "containerWidth": 933,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n计算结果\n\n查看点位变化、异常及待确认项目，数值来自本地计算。\n\n趋势图\n运行分析\n\n正常\n\n0\n\n低于提示阈值\n\n提示\n\n0\n\n达到关注区间\n\n报警\n\n0\n\n达到或超过阈值\n\n控制\n\n0\n\n控制状态\n\n待确认\n\n2\n\n项目未配置阈值\n\n监测项 / 测点\t当前值\t累计变化\t变化速率\t趋势\t阈值状态\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\t上升\t待确认\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\t上升\t待确认\n来源与版本\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-light-1280x800-delivery.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "delivery",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": "step",
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n交付\n\n生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。\n\n生成审查稿\n\n审查稿文件\n\n已恢复历史审查稿，文件尚未重新复核。\n\n来源与版本\n未归档\n\nreport.docx\n\n来源与版本\n预览\n导出 DOCX\n询问测量 AI\n4.5 KB\n\nreport.pdf\n\n来源与版本\n预览\n导出 PDF\n询问测量 AI\n28.9 KB\n\nevidence.xlsx\n\n来源与版本\n预览\n导出 XLSX\n询问测量 AI\n35.8 KB\n\ntrend.svg\n\n来源与版本\n预览\n导出 SVG\n询问测量 AI\n4.9 KB\n高级详情\n来源引用\n高级：审查、归档与来源记录"
+  },
+  {
+    "screenshot": "zh-light-1440x900-overview.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "overview",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": "step",
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\nreview-levels\n\n描述目标或添加资料，系统会检查资料并引导你完成计算和交付。\n\nreview-levels.csv\n\n结果已生成 · 待审查\n\n查看结果\n最近结果\n\n2 个分析结果\n\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-light-1440x900-process.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "process",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": "step",
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 715,
+        "containerWidth": 715,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n上传资料\n资料类型\n自动识别\n监测数据\n测量源文件\n描述任务\n\n测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。\n\n已导入资料与字段映射\n高级详情\n质量校核与问题处置\n\n阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。\n\n重新校核\n发现 0 项阻断、0 项警告 · 详细状态\n级别\t问题与建议\t来源行\t处置\n警告\t\n\n项目未配置阈值\n\n在项目设置中补充阈值\n\n\t第 1 行\t\n已接受\n\n计算前请确认：review-levels.csv · 单位 m。如不符合原始资料，请先修改。\n\n修改基准与单位\n开始计算"
+  },
+  {
+    "screenshot": "zh-light-1440x900-results.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "results",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": "step",
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n计算结果\n\n查看点位变化、异常及待确认项目，数值来自本地计算。\n\n趋势图\n运行分析\n\n正常\n\n0\n\n低于提示阈值\n\n提示\n\n0\n\n达到关注区间\n\n报警\n\n0\n\n达到或超过阈值\n\n控制\n\n0\n\n控制状态\n\n待确认\n\n2\n\n项目未配置阈值\n\n监测项 / 测点\t当前值\t累计变化\t变化速率\t趋势\t阈值状态\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\t上升\t待确认\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\t上升\t待确认\n来源与版本\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-light-1440x900-delivery.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "delivery",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": "step",
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n交付\n\n生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。\n\n生成审查稿\n\n审查稿文件\n\n已恢复历史审查稿，文件尚未重新复核。\n\n来源与版本\n未归档\n\nreport.docx\n\n来源与版本\n预览\n导出 DOCX\n询问测量 AI\n4.5 KB\n\nreport.pdf\n\n来源与版本\n预览\n导出 PDF\n询问测量 AI\n28.9 KB\n\nevidence.xlsx\n\n来源与版本\n预览\n导出 XLSX\n询问测量 AI\n35.8 KB\n\ntrend.svg\n\n来源与版本\n预览\n导出 SVG\n询问测量 AI\n4.9 KB\n高级详情\n来源引用\n高级：审查、归档与来源记录"
+  },
+  {
+    "screenshot": "zh-light-960x800-overview.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "overview",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": "step",
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\nreview-levels\n\n描述目标或添加资料，系统会检查资料并引导你完成计算和交付。\n\nreview-levels.csv\n\n结果已生成 · 待审查\n\n查看结果\n最近结果\n\n2 个分析结果\n\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-light-960x800-process.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "process",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": "step",
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n上传资料\n资料类型\n自动识别\n监测数据\n测量源文件\n描述任务\n\n测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。\n\n已导入资料与字段映射\n高级详情\n质量校核与问题处置\n\n阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。\n\n重新校核\n发现 0 项阻断、0 项警告 · 详细状态\n级别\t问题与建议\t来源行\t处置\n警告\t\n\n项目未配置阈值\n\n在项目设置中补充阈值\n\n\t第 1 行\t\n已接受\n\n计算前请确认：review-levels.csv · 单位 m。如不符合原始资料，请先修改。\n\n修改基准与单位\n开始计算"
+  },
+  {
+    "screenshot": "zh-light-960x800-results.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "results",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": "step",
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n计算结果\n\n查看点位变化、异常及待确认项目，数值来自本地计算。\n\n趋势图\n运行分析\n\n正常\n\n0\n\n低于提示阈值\n\n提示\n\n0\n\n达到关注区间\n\n报警\n\n0\n\n达到或超过阈值\n\n控制\n\n0\n\n控制状态\n\n待确认\n\n2\n\n项目未配置阈值\n\n监测项 / 测点\t当前值\t累计变化\t变化速率\t趋势\t阈值状态\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\t上升\t待确认\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\t上升\t待确认\n来源与版本\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-light-960x800-delivery.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "delivery",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": "step",
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n交付\n\n生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。\n\n生成审查稿\n\n审查稿文件\n\n已恢复历史审查稿，文件尚未重新复核。\n\n来源与版本\n未归档\n\nreport.docx\n\n来源与版本\n预览\n导出 DOCX\n询问测量 AI\n4.5 KB\n\nreport.pdf\n\n来源与版本\n预览\n导出 PDF\n询问测量 AI\n28.9 KB\n\nevidence.xlsx\n\n来源与版本\n预览\n导出 XLSX\n询问测量 AI\n35.8 KB\n\ntrend.svg\n\n来源与版本\n预览\n导出 SVG\n询问测量 AI\n4.9 KB\n高级详情\n来源引用\n高级：审查、归档与来源记录"
+  },
+  {
+    "screenshot": "zh-dark-1280x800-overview.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "overview",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": "step",
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\nreview-levels\n\n描述目标或添加资料，系统会检查资料并引导你完成计算和交付。\n\nreview-levels.csv\n\n结果已生成 · 待审查\n\n查看结果\n最近结果\n\n2 个分析结果\n\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-dark-1280x800-process.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "process",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": "step",
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 923,
+        "containerWidth": 923,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n上传资料\n资料类型\n自动识别\n监测数据\n测量源文件\n描述任务\n\n测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。\n\n已导入资料与字段映射\n高级详情\n质量校核与问题处置\n\n阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。\n\n重新校核\n发现 0 项阻断、0 项警告 · 详细状态\n级别\t问题与建议\t来源行\t处置\n警告\t\n\n项目未配置阈值\n\n在项目设置中补充阈值\n\n\t第 1 行\t\n已接受\n\n计算前请确认：review-levels.csv · 单位 m。如不符合原始资料，请先修改。\n\n修改基准与单位\n开始计算"
+  },
+  {
+    "screenshot": "zh-dark-1280x800-results.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "results",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": "step",
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 933,
+        "containerWidth": 933,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n计算结果\n\n查看点位变化、异常及待确认项目，数值来自本地计算。\n\n趋势图\n运行分析\n\n正常\n\n0\n\n低于提示阈值\n\n提示\n\n0\n\n达到关注区间\n\n报警\n\n0\n\n达到或超过阈值\n\n控制\n\n0\n\n控制状态\n\n待确认\n\n2\n\n项目未配置阈值\n\n监测项 / 测点\t当前值\t累计变化\t变化速率\t趋势\t阈值状态\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\t上升\t待确认\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\t上升\t待确认\n来源与版本\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-dark-1280x800-delivery.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "delivery",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 845.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 895.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 945.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": "step",
+        "rect": {
+          "x": 995.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n交付\n\n生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。\n\n生成审查稿\n\n审查稿文件\n\n已恢复历史审查稿，文件尚未重新复核。\n\n来源与版本\n未归档\n\nreport.docx\n\n来源与版本\n预览\n导出 DOCX\n询问测量 AI\n4.5 KB\n\nreport.pdf\n\n来源与版本\n预览\n导出 PDF\n询问测量 AI\n28.9 KB\n\nevidence.xlsx\n\n来源与版本\n预览\n导出 XLSX\n询问测量 AI\n35.8 KB\n\ntrend.svg\n\n来源与版本\n预览\n导出 SVG\n询问测量 AI\n4.9 KB\n高级详情\n来源引用\n高级：审查、归档与来源记录"
+  },
+  {
+    "screenshot": "zh-dark-1440x900-overview.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "overview",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": "step",
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\nreview-levels\n\n描述目标或添加资料，系统会检查资料并引导你完成计算和交付。\n\nreview-levels.csv\n\n结果已生成 · 待审查\n\n查看结果\n最近结果\n\n2 个分析结果\n\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-dark-1440x900-process.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "process",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": "step",
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 715,
+        "containerWidth": 715,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n上传资料\n资料类型\n自动识别\n监测数据\n测量源文件\n描述任务\n\n测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。\n\n已导入资料与字段映射\n高级详情\n质量校核与问题处置\n\n阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。\n\n重新校核\n发现 0 项阻断、0 项警告 · 详细状态\n级别\t问题与建议\t来源行\t处置\n警告\t\n\n项目未配置阈值\n\n在项目设置中补充阈值\n\n\t第 1 行\t\n已接受\n\n计算前请确认：review-levels.csv · 单位 m。如不符合原始资料，请先修改。\n\n修改基准与单位\n开始计算"
+  },
+  {
+    "screenshot": "zh-dark-1440x900-results.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "results",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": "step",
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n计算结果\n\n查看点位变化、异常及待确认项目，数值来自本地计算。\n\n趋势图\n运行分析\n\n正常\n\n0\n\n低于提示阈值\n\n提示\n\n0\n\n达到关注区间\n\n报警\n\n0\n\n达到或超过阈值\n\n控制\n\n0\n\n控制状态\n\n待确认\n\n2\n\n项目未配置阈值\n\n监测项 / 测点\t当前值\t累计变化\t变化速率\t趋势\t阈值状态\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\t上升\t待确认\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\t上升\t待确认\n来源与版本\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-dark-1440x900-delivery.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "delivery",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 1005.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 1055.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 1105.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": "step",
+        "rect": {
+          "x": 1155.890625,
+          "y": 11,
+          "width": 48,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n交付\n\n生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。\n\n生成审查稿\n\n审查稿文件\n\n已恢复历史审查稿，文件尚未重新复核。\n\n来源与版本\n未归档\n\nreport.docx\n\n来源与版本\n预览\n导出 DOCX\n询问测量 AI\n4.5 KB\n\nreport.pdf\n\n来源与版本\n预览\n导出 PDF\n询问测量 AI\n28.9 KB\n\nevidence.xlsx\n\n来源与版本\n预览\n导出 XLSX\n询问测量 AI\n35.8 KB\n\ntrend.svg\n\n来源与版本\n预览\n导出 SVG\n询问测量 AI\n4.9 KB\n高级详情\n来源引用\n高级：审查、归档与来源记录"
+  },
+  {
+    "screenshot": "zh-dark-960x800-overview.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "overview",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": "step",
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\nreview-levels\n\n描述目标或添加资料，系统会检查资料并引导你完成计算和交付。\n\nreview-levels.csv\n\n结果已生成 · 待审查\n\n查看结果\n最近结果\n\n2 个分析结果\n\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-dark-960x800-process.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "process",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": "step",
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n上传资料\n资料类型\n自动识别\n监测数据\n测量源文件\n描述任务\n\n测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。\n\n已导入资料与字段映射\n高级详情\n质量校核与问题处置\n\n阻断项必须回到源文件修正并重新导入。警告项可由人工接受，接受记录会进入最终成果清单。\n\n重新校核\n发现 0 项阻断、0 项警告 · 详细状态\n级别\t问题与建议\t来源行\t处置\n警告\t\n\n项目未配置阈值\n\n在项目设置中补充阈值\n\n\t第 1 行\t\n已接受\n\n计算前请确认：review-levels.csv · 单位 m。如不符合原始资料，请先修改。\n\n修改基准与单位\n开始计算"
+  },
+  {
+    "screenshot": "zh-dark-960x800-results.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "results",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": "step",
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n计算结果\n\n查看点位变化、异常及待确认项目，数值来自本地计算。\n\n趋势图\n运行分析\n\n正常\n\n0\n\n低于提示阈值\n\n提示\n\n0\n\n达到关注区间\n\n报警\n\n0\n\n达到或超过阈值\n\n控制\n\n0\n\n控制状态\n\n待确认\n\n2\n\n项目未配置阈值\n\n监测项 / 测点\t当前值\t累计变化\t变化速率\t趋势\t阈值状态\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\t上升\t待确认\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\t上升\t待确认\n来源与版本\n导出审查稿"
+  },
+  {
+    "screenshot": "zh-dark-960x800-delivery.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "delivery",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "概览",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "处理",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "结果",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "交付",
+        "current": "step",
+        "rect": {
+          "x": 790.25,
+          "y": 63,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "刷新工程测量项目",
+        "title": "刷新工程测量项目",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\n工程测量内业\n\n当前内业任务\n尚未选择内业任务\nreview-levels\n概览\n处理\n结果\n交付\n工作视图\n导入与预检\n建网与平差\n分析与精度\n成果与审查\n打开 AI\n高级\n当前来源\nreview-levels.csv\n当前状态\n结果已生成 · 待审查\n最近结果\n2 个分析结果\n更多指标\n交付总览\n交付\n\n生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。\n\n生成审查稿\n\n审查稿文件\n\n已恢复历史审查稿，文件尚未重新复核。\n\n来源与版本\n未归档\n\nreport.docx\n\n来源与版本\n预览\n导出 DOCX\n询问测量 AI\n4.5 KB\n\nreport.pdf\n\n来源与版本\n预览\n导出 PDF\n询问测量 AI\n28.9 KB\n\nevidence.xlsx\n\n来源与版本\n预览\n导出 XLSX\n询问测量 AI\n35.8 KB\n\ntrend.svg\n\n来源与版本\n预览\n导出 SVG\n询问测量 AI\n4.9 KB\n高级详情\n来源引用\n高级：审查、归档与来源记录"
+  },
+  {
+    "screenshot": "en-light-1280x800-overview.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "overview",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": "step",
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nreview-levels\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nreview-levels.csv\n\nResults ready · pending review\n\nView results\nLatest result\n\n2 analysis results\n\nExport review draft"
+  },
+  {
+    "screenshot": "en-light-1280x800-process.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "process",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": "step",
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 923,
+        "containerWidth": 923,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nAdd files\nSource type\nIdentify automatically\nMonitoring data\nSurvey sources\nDescribe the task\n\nSurvey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.\n\nImported files and field mapping\nAdvanced details\nQuality checks and issue handling\n\nBlocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.\n\nRun checks again\n0 blockers · 0 warnings · Details\nLevel\tIssue and suggestion\tSource row\tDisposition\nWarning\t\n\nProject thresholds are not configured.\n\nSupply thresholds in project settings.\n\n\tRow 1\t\nAccepted\n\nBefore calculating, confirm: review-levels.csv · unit m. Correct the basis if it differs from the original source.\n\nEdit basis and units\nStart calculation"
+  },
+  {
+    "screenshot": "en-light-1280x800-results.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "results",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": "step",
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 933,
+        "containerWidth": 933,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nResults\n\nReview point changes, anomalies, and items needing confirmation. Values come from the local calculation.\n\nTrend chart\nRun analysis\n\nNormal\n\n0\n\nBelow warning threshold\n\nWarning\n\n0\n\nIn attention range\n\nAlarm\n\n0\n\nAt or above threshold\n\nControl\n\n0\n\nControl state\n\nNeeds confirmation\n\n2\n\nProject threshold not configured\n\nItem / point\tCurrent value\tCumulative change\tChange rate\tTrend\tThreshold status\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\tRising\tNeeds confirmation\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\tRising\tNeeds confirmation\nSource and version\nExport review draft"
+  },
+  {
+    "screenshot": "en-light-1280x800-delivery.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "delivery",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": "step",
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nDelivery\n\nGenerate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.\n\nGenerate review draft\n\nReview draft files\n\nPrevious draft restored. Files have not been reverified.\n\nSource and version\nNot archived\n\nreport.docx\n\nSource and version\nPreview\nExport DOCX\nAsk Survey AI\n4.5 KB\n\nreport.pdf\n\nSource and version\nPreview\nExport PDF\nAsk Survey AI\n28.9 KB\n\nevidence.xlsx\n\nSource and version\nPreview\nExport XLSX\nAsk Survey AI\n35.8 KB\n\ntrend.svg\n\nSource and version\nPreview\nExport SVG\nAsk Survey AI\n4.9 KB\nAdvanced details\nCitations\nAdvanced: review, archive and provenance"
+  },
+  {
+    "screenshot": "en-light-1440x900-overview.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "overview",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": "step",
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nreview-levels\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nreview-levels.csv\n\nResults ready · pending review\n\nView results\nLatest result\n\n2 analysis results\n\nExport review draft"
+  },
+  {
+    "screenshot": "en-light-1440x900-process.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "process",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": "step",
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 715,
+        "containerWidth": 715,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nAdd files\nSource type\nIdentify automatically\nMonitoring data\nSurvey sources\nDescribe the task\n\nSurvey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.\n\nImported files and field mapping\nAdvanced details\nQuality checks and issue handling\n\nBlocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.\n\nRun checks again\n0 blockers · 0 warnings · Details\nLevel\tIssue and suggestion\tSource row\tDisposition\nWarning\t\n\nProject thresholds are not configured.\n\nSupply thresholds in project settings.\n\n\tRow 1\t\nAccepted\n\nBefore calculating, confirm: review-levels.csv · unit m. Correct the basis if it differs from the original source.\n\nEdit basis and units\nStart calculation"
+  },
+  {
+    "screenshot": "en-light-1440x900-results.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "results",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": "step",
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nResults\n\nReview point changes, anomalies, and items needing confirmation. Values come from the local calculation.\n\nTrend chart\nRun analysis\n\nNormal\n\n0\n\nBelow warning threshold\n\nWarning\n\n0\n\nIn attention range\n\nAlarm\n\n0\n\nAt or above threshold\n\nControl\n\n0\n\nControl state\n\nNeeds confirmation\n\n2\n\nProject threshold not configured\n\nItem / point\tCurrent value\tCumulative change\tChange rate\tTrend\tThreshold status\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\tRising\tNeeds confirmation\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\tRising\tNeeds confirmation\nSource and version\nExport review draft"
+  },
+  {
+    "screenshot": "en-light-1440x900-delivery.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "delivery",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": "step",
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nDelivery\n\nGenerate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.\n\nGenerate review draft\n\nReview draft files\n\nPrevious draft restored. Files have not been reverified.\n\nSource and version\nNot archived\n\nreport.docx\n\nSource and version\nPreview\nExport DOCX\nAsk Survey AI\n4.5 KB\n\nreport.pdf\n\nSource and version\nPreview\nExport PDF\nAsk Survey AI\n28.9 KB\n\nevidence.xlsx\n\nSource and version\nPreview\nExport XLSX\nAsk Survey AI\n35.8 KB\n\ntrend.svg\n\nSource and version\nPreview\nExport SVG\nAsk Survey AI\n4.9 KB\nAdvanced details\nCitations\nAdvanced: review, archive and provenance"
+  },
+  {
+    "screenshot": "en-light-960x800-overview.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "overview",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": "step",
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nreview-levels\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nreview-levels.csv\n\nResults ready · pending review\n\nView results\nLatest result\n\n2 analysis results\n\nExport review draft"
+  },
+  {
+    "screenshot": "en-light-960x800-process.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "process",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": "step",
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nAdd files\nSource type\nIdentify automatically\nMonitoring data\nSurvey sources\nDescribe the task\n\nSurvey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.\n\nImported files and field mapping\nAdvanced details\nQuality checks and issue handling\n\nBlocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.\n\nRun checks again\n0 blockers · 0 warnings · Details\nLevel\tIssue and suggestion\tSource row\tDisposition\nWarning\t\n\nProject thresholds are not configured.\n\nSupply thresholds in project settings.\n\n\tRow 1\t\nAccepted\n\nBefore calculating, confirm: review-levels.csv · unit m. Correct the basis if it differs from the original source.\n\nEdit basis and units\nStart calculation"
+  },
+  {
+    "screenshot": "en-light-960x800-results.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "results",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": "step",
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nResults\n\nReview point changes, anomalies, and items needing confirmation. Values come from the local calculation.\n\nTrend chart\nRun analysis\n\nNormal\n\n0\n\nBelow warning threshold\n\nWarning\n\n0\n\nIn attention range\n\nAlarm\n\n0\n\nAt or above threshold\n\nControl\n\n0\n\nControl state\n\nNeeds confirmation\n\n2\n\nProject threshold not configured\n\nItem / point\tCurrent value\tCumulative change\tChange rate\tTrend\tThreshold status\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\tRising\tNeeds confirmation\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\tRising\tNeeds confirmation\nSource and version\nExport review draft"
+  },
+  {
+    "screenshot": "en-light-960x800-delivery.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "delivery",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "light",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": "step",
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nDelivery\n\nGenerate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.\n\nGenerate review draft\n\nReview draft files\n\nPrevious draft restored. Files have not been reverified.\n\nSource and version\nNot archived\n\nreport.docx\n\nSource and version\nPreview\nExport DOCX\nAsk Survey AI\n4.5 KB\n\nreport.pdf\n\nSource and version\nPreview\nExport PDF\nAsk Survey AI\n28.9 KB\n\nevidence.xlsx\n\nSource and version\nPreview\nExport XLSX\nAsk Survey AI\n35.8 KB\n\ntrend.svg\n\nSource and version\nPreview\nExport SVG\nAsk Survey AI\n4.9 KB\nAdvanced details\nCitations\nAdvanced: review, archive and provenance"
+  },
+  {
+    "screenshot": "en-dark-1280x800-overview.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "overview",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": "step",
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nreview-levels\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nreview-levels.csv\n\nResults ready · pending review\n\nView results\nLatest result\n\n2 analysis results\n\nExport review draft"
+  },
+  {
+    "screenshot": "en-dark-1280x800-process.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "process",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": "step",
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 923,
+        "containerWidth": 923,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nAdd files\nSource type\nIdentify automatically\nMonitoring data\nSurvey sources\nDescribe the task\n\nSurvey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.\n\nImported files and field mapping\nAdvanced details\nQuality checks and issue handling\n\nBlocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.\n\nRun checks again\n0 blockers · 0 warnings · Details\nLevel\tIssue and suggestion\tSource row\tDisposition\nWarning\t\n\nProject thresholds are not configured.\n\nSupply thresholds in project settings.\n\n\tRow 1\t\nAccepted\n\nBefore calculating, confirm: review-levels.csv · unit m. Correct the basis if it differs from the original source.\n\nEdit basis and units\nStart calculation"
+  },
+  {
+    "screenshot": "en-dark-1280x800-results.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "results",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": "step",
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 933,
+        "containerWidth": 933,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nResults\n\nReview point changes, anomalies, and items needing confirmation. Values come from the local calculation.\n\nTrend chart\nRun analysis\n\nNormal\n\n0\n\nBelow warning threshold\n\nWarning\n\n0\n\nIn attention range\n\nAlarm\n\n0\n\nAt or above threshold\n\nControl\n\n0\n\nControl state\n\nNeeds confirmation\n\n2\n\nProject threshold not configured\n\nItem / point\tCurrent value\tCumulative change\tChange rate\tTrend\tThreshold status\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\tRising\tNeeds confirmation\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\tRising\tNeeds confirmation\nSource and version\nExport review draft"
+  },
+  {
+    "screenshot": "en-dark-1280x800-delivery.png",
+    "nativeWindow": "0, 40, 1280, 800",
+    "view": "delivery",
+    "viewport": [
+      1280,
+      800
+    ],
+    "outerWindow": [
+      1280,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1280,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 727.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 805.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 876.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": "step",
+        "rect": {
+          "x": 944.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nDelivery\n\nGenerate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.\n\nGenerate review draft\n\nReview draft files\n\nPrevious draft restored. Files have not been reverified.\n\nSource and version\nNot archived\n\nreport.docx\n\nSource and version\nPreview\nExport DOCX\nAsk Survey AI\n4.5 KB\n\nreport.pdf\n\nSource and version\nPreview\nExport PDF\nAsk Survey AI\n28.9 KB\n\nevidence.xlsx\n\nSource and version\nPreview\nExport XLSX\nAsk Survey AI\n35.8 KB\n\ntrend.svg\n\nSource and version\nPreview\nExport SVG\nAsk Survey AI\n4.9 KB\nAdvanced details\nCitations\nAdvanced: review, archive and provenance"
+  },
+  {
+    "screenshot": "en-dark-1440x900-overview.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "overview",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": "step",
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nreview-levels\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nreview-levels.csv\n\nResults ready · pending review\n\nView results\nLatest result\n\n2 analysis results\n\nExport review draft"
+  },
+  {
+    "screenshot": "en-dark-1440x900-process.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "process",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": "step",
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 715,
+        "containerWidth": 715,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nAdd files\nSource type\nIdentify automatically\nMonitoring data\nSurvey sources\nDescribe the task\n\nSurvey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.\n\nImported files and field mapping\nAdvanced details\nQuality checks and issue handling\n\nBlocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.\n\nRun checks again\n0 blockers · 0 warnings · Details\nLevel\tIssue and suggestion\tSource row\tDisposition\nWarning\t\n\nProject thresholds are not configured.\n\nSupply thresholds in project settings.\n\n\tRow 1\t\nAccepted\n\nBefore calculating, confirm: review-levels.csv · unit m. Correct the basis if it differs from the original source.\n\nEdit basis and units\nStart calculation"
+  },
+  {
+    "screenshot": "en-dark-1440x900-results.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "results",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": "step",
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 1093,
+        "containerWidth": 1093,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nResults\n\nReview point changes, anomalies, and items needing confirmation. Values come from the local calculation.\n\nTrend chart\nRun analysis\n\nNormal\n\n0\n\nBelow warning threshold\n\nWarning\n\n0\n\nIn attention range\n\nAlarm\n\n0\n\nAt or above threshold\n\nControl\n\n0\n\nControl state\n\nNeeds confirmation\n\n2\n\nProject threshold not configured\n\nItem / point\tCurrent value\tCumulative change\tChange rate\tTrend\tThreshold status\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\tRising\tNeeds confirmation\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\tRising\tNeeds confirmation\nSource and version\nExport review draft"
+  },
+  {
+    "screenshot": "en-dark-1440x900-delivery.png",
+    "nativeWindow": "0, 40, 1440, 900",
+    "view": "delivery",
+    "viewport": [
+      1440,
+      900
+    ],
+    "outerWindow": [
+      1440,
+      900
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 1440,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 887.53125,
+          "y": 11,
+          "width": 75.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 965.328125,
+          "y": 11,
+          "width": 69.3984375,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 1036.7265625,
+          "y": 11,
+          "width": 65.796875,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": "step",
+        "rect": {
+          "x": 1104.5234375,
+          "y": 11,
+          "width": 62.859375,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nDelivery\n\nGenerate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.\n\nGenerate review draft\n\nReview draft files\n\nPrevious draft restored. Files have not been reverified.\n\nSource and version\nNot archived\n\nreport.docx\n\nSource and version\nPreview\nExport DOCX\nAsk Survey AI\n4.5 KB\n\nreport.pdf\n\nSource and version\nPreview\nExport PDF\nAsk Survey AI\n28.9 KB\n\nevidence.xlsx\n\nSource and version\nPreview\nExport XLSX\nAsk Survey AI\n35.8 KB\n\ntrend.svg\n\nSource and version\nPreview\nExport SVG\nAsk Survey AI\n4.9 KB\nAdvanced details\nCitations\nAdvanced: review, archive and provenance"
+  },
+  {
+    "screenshot": "en-dark-960x800-overview.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "overview",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": "step",
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nreview-levels\n\nDescribe your goal or add files. We will check the inputs and guide you through calculation and delivery.\n\nreview-levels.csv\n\nResults ready · pending review\n\nView results\nLatest result\n\n2 analysis results\n\nExport review draft"
+  },
+  {
+    "screenshot": "en-dark-960x800-process.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "process",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": "step",
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 4,
+        "width": 545,
+        "containerWidth": 545,
+        "overflow": "auto"
+      },
+      {
+        "columns": 4,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nAdd files\nSource type\nIdentify automatically\nMonitoring data\nSurvey sources\nDescribe the task\n\nSurvey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.\n\nImported files and field mapping\nAdvanced details\nQuality checks and issue handling\n\nBlocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.\n\nRun checks again\n0 blockers · 0 warnings · Details\nLevel\tIssue and suggestion\tSource row\tDisposition\nWarning\t\n\nProject thresholds are not configured.\n\nSupply thresholds in project settings.\n\n\tRow 1\t\nAccepted\n\nBefore calculating, confirm: review-levels.csv · unit m. Correct the basis if it differs from the original source.\n\nEdit basis and units\nStart calculation"
+  },
+  {
+    "screenshot": "en-dark-960x800-results.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "results",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": "step",
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": null,
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [
+      {
+        "columns": 6,
+        "width": 603,
+        "containerWidth": 603,
+        "overflow": "auto"
+      }
+    ],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nResults\n\nReview point changes, anomalies, and items needing confirmation. Values come from the local calculation.\n\nTrend chart\nRun analysis\n\nNormal\n\n0\n\nBelow warning threshold\n\nWarning\n\n0\n\nIn attention range\n\nAlarm\n\n0\n\nAt or above threshold\n\nControl\n\n0\n\nControl state\n\nNeeds confirmation\n\n2\n\nProject threshold not configured\n\nItem / point\tCurrent value\tCumulative change\tChange rate\tTrend\tThreshold status\n\n\nP01\n\nsettlement\n\n\t0.001 m\t0.001\t0.001\tRising\tNeeds confirmation\n\n\nP02\n\nsettlement\n\n\t0.002 m\t0.002\t0.002\tRising\tNeeds confirmation\nSource and version\nExport review draft"
+  },
+  {
+    "screenshot": "en-dark-960x800-delivery.png",
+    "nativeWindow": "0, 40, 960, 800",
+    "view": "delivery",
+    "viewport": [
+      960,
+      800
+    ],
+    "outerWindow": [
+      960,
+      800
+    ],
+    "theme": "dark",
+    "language": "en",
+    "fontScale": "1",
+    "bodyWidth": 960,
+    "primaryNavigation": [
+      {
+        "text": "Overview",
+        "current": null,
+        "rect": {
+          "x": 320,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Process",
+        "current": null,
+        "rect": {
+          "x": 476.75,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Results",
+        "current": null,
+        "rect": {
+          "x": 633.5,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      },
+      {
+        "text": "Deliver",
+        "current": "step",
+        "rect": {
+          "x": 790.25,
+          "y": 115,
+          "width": 154.75,
+          "height": 44
+        }
+      }
+    ],
+    "smallIconTargets": [
+      {
+        "label": "Refresh Survey projects",
+        "title": "Refresh Survey projects",
+        "rect": {
+          "x": 248,
+          "y": 299,
+          "width": 28,
+          "height": 28
+        }
+      }
+    ],
+    "unlabeledIconButtons": 0,
+    "brokenImages": [],
+    "tables": [],
+    "technicalDefaultMatches": [],
+    "text": "RailWise Survey\n\nEngineering Survey Processing\n\nCurrent Survey job\nNo Survey job selected\nreview-levels\nOverview\nProcess\nResults\nDeliver\nWork view\nImport and preflight\nNetwork and adjustment\nAnalysis and precision\nDeliverables and review\nOpen AI\nAdvanced\nCurrent source\nreview-levels.csv\nCurrent status\nResults ready · pending review\nLatest result\n2 analysis results\nMore metrics\nDelivery overview\nDelivery\n\nGenerate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.\n\nGenerate review draft\n\nReview draft files\n\nPrevious draft restored. Files have not been reverified.\n\nSource and version\nNot archived\n\nreport.docx\n\nSource and version\nPreview\nExport DOCX\nAsk Survey AI\n4.5 KB\n\nreport.pdf\n\nSource and version\nPreview\nExport PDF\nAsk Survey AI\n28.9 KB\n\nevidence.xlsx\n\nSource and version\nPreview\nExport XLSX\nAsk Survey AI\n35.8 KB\n\ntrend.svg\n\nSource and version\nPreview\nExport SVG\nAsk Survey AI\n4.9 KB\nAdvanced details\nCitations\nAdvanced: review, archive and provenance"
+  }
+]

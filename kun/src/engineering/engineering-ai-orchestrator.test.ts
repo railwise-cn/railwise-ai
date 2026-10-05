@@ -10,6 +10,22 @@ import { SurveyService } from './survey-service.js'
 import { importWorkwiseSurveyNetwork } from './survey-test-helpers.js'
 
 describe('Engineering AI orchestration', () => {
+  it('sets a professional user-facing response contract for Survey AI', async () => {
+    const orchestrator = new EngineeringAiOrchestrator({
+      context: {} as never,
+      repository: { planForTurn: () => null } as never,
+      threadStore: { get: vi.fn(async () => ({ domain: 'engineering', projectId: 'survey-project', turns: [] })) } as never,
+      turns: {} as never,
+      runTurn: vi.fn()
+    })
+
+    const policy = await orchestrator.conversationPolicy('survey-thread', 'survey-project', 'consultation-turn')
+
+    expect(policy.instruction).toMatch(/user-facing.*survey.*answer.*measurement.*evidence/i)
+    expect(policy.instruction).toContain('Never reveal tool or API names')
+    expect(policy.instruction).toContain('never repeat them in the user-facing answer')
+  })
+
   it('creates bounded plans, rejects unsafe tools and replays idempotent requests', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-engineering-ai-'))
     const engineering = new EngineeringService({ rootDir: join(root, 'runtime') })
@@ -239,7 +255,7 @@ describe('Engineering AI orchestration', () => {
     engineering.close()
   })
 
-  it('restores an awaiting-approval plan, token and idempotent result after restart', async () => {
+  it('restores a blocked draft and token after restart with derived diagnostics and unchanged stored history', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-engineering-restart-'))
     const runtimeRoot = join(root, 'runtime')
     const engineering = new EngineeringService({ rootDir: runtimeRoot })
@@ -262,7 +278,12 @@ describe('Engineering AI orchestration', () => {
     const restored = await reopened.latestPlan({ threadId: 'restart-thread', projectId: project.id })
     const replay = await reopened.createPlan({ threadId: 'restart-thread', projectId: project.id, goal: '生成只读复核计划', idempotencyKey: 'restart-plan-001' })
 
-    expect(restored?.plan).toEqual({ ...created.plan, execution: { complete: false, completedStepIds: [], pendingStepIds: created.plan.steps.map(step => step.id) } })
+    expect(restored?.plan).toEqual({ ...created.plan, execution: { complete: false, completedStepIds: [], pendingStepIds: created.plan.steps.map(step => step.id) }, parameterIssues: [
+      { stepId: 'inspect-data', code: 'invalid-parameters', fields: ['datasetId', 'expectedRevision'] },
+      { stepId: 'analyse-trend', code: 'invalid-parameters', fields: ['datasetId'] },
+      { stepId: 'prepare-report', code: 'invalid-parameters', fields: ['expectedRevision'] }
+    ] })
+    expect(reopenedRepository.getPlan(created.plan.id)).toEqual(created.plan)
     expect(restored?.approval?.token).toBe(created.approval.token)
     expect(replay).toEqual(created)
     reopenedRepository.close()

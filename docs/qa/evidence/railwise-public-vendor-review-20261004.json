@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-04",
+  "publicReleaseBaseline": "0.5.1",
+  "nextPublicVersion": "0.5.2-planned-not-approved",
+  "sources": [
+    "docs/references/SURVEY_FORMAT_SOURCES.md",
+    "docs/qa/WORKWISE_0.5.0_SURVEY_FORMAT_ACCEPTANCE_MATRIX.md"
+  ],
+  "sourceFamiliesReviewed": [
+    "COSA in1/in2/NET/ou1/ou2",
+    "Leica GSI/HeXML",
+    "Trimble JobXML",
+    "Carlson RW5",
+    "South DAT/PA2005"
+  ],
+  "targetedTests": {
+    "files": 3,
+    "tests": 206,
+    "passed": true,
+    "command": "npm --prefix kun test -- src/engineering/survey-format-registry.test.ts src/engineering/survey-native-format-golden.test.ts src/engineering/survey-professional-fixture-manifest.test.ts"
+  },
+  "tabularMappingProfiles": "implemented-and-covered-in-current-source",
+  "externalEvidence": {
+    "licensedVendorInteroperability": "not-established",
+    "authenticRoleBasedProfessionalSignoff": "not-established",
+    "currentMachineAuthorizedSourceMounted": false
+  },
+  "releaseOperation": "none"
+}

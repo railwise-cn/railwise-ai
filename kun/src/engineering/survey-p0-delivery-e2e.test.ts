@@ -142,7 +142,13 @@ describe('P0 professional survey delivery', () => {
       .calculateAdjustmentResult(checkedPlane, legacyRun)
     expect(legacyResult.algorithmVersion).toBe('workwise-survey-adjustment-6')
     expect(legacyResult.points).toEqual(planeAdjustment.result.points.map(({ xyErrorEllipse: _ellipse, ...point }) => point))
-    expect(legacyResult.observations).toEqual(planeAdjustment.result.observations)
+    expect(legacyResult.statisticalSummary).toBeUndefined()
+    expect(legacyResult.observations).toEqual(planeAdjustment.result.observations.map(({ residualStatistic: _statistic, ...row }) => row))
+    const legacy7 = (survey as unknown as { calculateAdjustmentResult(network: SurveyNetworkV1, run: AdjustmentRunV1): AdjustmentResultV1 })
+      .calculateAdjustmentResult(checkedPlane, { ...planeAdjustment.run, algorithmVersion: 'workwise-survey-adjustment-7' })
+    expect(legacy7.points).toEqual(planeAdjustment.result.points)
+    expect(legacy7.observations).toEqual(legacyResult.observations)
+    expect(legacy7.statisticalSummary).toBeUndefined()
 
     const adjustmentIds = [levelAdjustment.run.id, planeAdjustment.run.id]
     const previewRequest = {
@@ -180,7 +186,8 @@ describe('P0 professional survey delivery', () => {
     const outputs = new Map(preview.files.map((file) => [file.mediaType, join(workspace, file.path)]))
     const docxPath = outputs.get('application/vnd.openxmlformats-officedocument.wordprocessingml.document')!
     const pdfPath = outputs.get('application/pdf')!
-    const xlsxPath = outputs.get('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')!
+    const xlsxPath = join(workspace, preview.files.find(file => file.path.endsWith('/evidence.xlsx'))!.path)
+    const professionalXlsxPath = join(workspace, preview.files.find(file => file.path.endsWith('/professional.xlsx'))!.path)
     const manifestPath = join(workspace, '.workwise', 'deliverables', project.id, manifest.runId, 'manifest.json')
     await Promise.all([stat(docxPath), stat(pdfPath), stat(xlsxPath), stat(manifestPath)])
 
@@ -203,6 +210,8 @@ describe('P0 professional survey delivery', () => {
     expect(workbookXml).toContain('survey_closures')
     expect(workbookXml).toContain('survey_parameters')
     expect(workbookXml).toContain('survey_error_ellipses')
+    const professionalWorkbook = await JSZip.loadAsync(await readFile(professionalXlsxPath))
+    expect(await professionalWorkbook.file('xl/workbook.xml')!.async('text')).toContain('点位成果与精度')
     const ellipse = planeAdjustment.result.points.find(point => point.id === 'S1')!.xyErrorEllipse!
     expect(ellipse).toBeDefined()
     expect(documentXml).toContain(`长半轴=${ellipse.semiMajor} m`)

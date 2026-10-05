@@ -1,0 +1,653 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RailWise AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 3
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 候选162功能验收（公开合成样例） 控制网 · m · 9/27
+							26 文本 候选162功能验收（公开合成样例）
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/27
+						32 按钮 候选156功能验收（合成样例） 控制网 · m · 9/27
+							33 文本 候选156功能验收（合成样例）
+							34 文本 控制网
+							35 文本  · 
+							36 文本 m
+							37 文本  · 
+							38 文本 9/27
+						39 按钮 新建内业任务 控制网 · m · 9/27
+							40 文本 新建内业任务
+							41 文本 控制网
+							42 文本  · 
+							43 文本 m
+							44 文本  · 
+							45 文本 9/27
+						46 text Survey AI 会话 3
+						47 按钮 Survey AI · 新建内业任务 候选162功能验收（公开合成样例） · 7 条消息
+							48 文本 Survey AI · 新建内业任务
+							49 文本 候选162功能验收（公开合成样例）
+							50 文本  · 
+							51 文本 7
+							52 文本 条消息
+						53 按钮 Survey AI · 新建内业任务 候选156功能验收（合成样例） · 12 条消息
+							54 文本 Survey AI · 新建内业任务
+							55 文本 候选156功能验收（合成样例）
+							56 文本  · 
+							57 文本 12
+							58 文本 条消息
+						59 按钮 Survey AI · 新建内业任务 新建内业任务 · 0 条消息
+							60 文本 Survey AI · 新建内业任务
+							61 文本 新建内业任务
+							62 文本  · 
+							63 文本 0
+							64 文本 条消息
+						65 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					66 container
+						67 切换按钮 连接手机, Value: 0
+						68 按钮 设置
+					69 container
+						70 按钮 收起侧边栏
+						71 标题 RailWise Survey, Value: 1
+							72 文本 RailWise Survey
+						73 text 工程测量内业 当前内业任务
+						74 弹出式按钮 当前内业任务, Value: 候选162功能验收（公开合成样例）
+							75 (selected) 候选162功能验收（公开合成样例）
+						76 文本 工作视图
+						77 弹出式按钮 工作视图, Value: 分析与精度
+							78 (selected) 分析与精度
+						79 按钮 新建工程测量项目
+					80 container
+						81 text 任务 候选162功能验收（公开合成样例） 阶段 分析与精度 数据源 / 格式
+						82 按钮 询问 golden-plane-control-e2e.in2 的测量 AI
+						83 text golden-plane-control-e2e.in2  ·  COSA-IN2 处置状态 候选成果 基准 待确认  ·  待确认 点数 4 测站数 1 观测 5 闭合差 1.3727E-7 m 精度 1.3592E-7 m 成果 — 网型 平面控制网 审查 —
+					84 container Survey AI 会话
+						85 container
+							86 标题 Survey AI 会话, Value: 2
+								87 文本 Survey AI 会话
+							88 文本 候选162功能验收（公开合成样例）
+							89 按钮 数据资产
+							90 按钮 测量平差
+							91 按钮 刷新上下文
+						92 container
+							93 文本 请解释 S1 的结果、原始依据及需要复核的问题。
+							94 container google-docs
+								95 text 已启用技能 1
+							96 文本 deepseek-v4-pro
+							97 按钮 复制消息
+							98 文本 已按给定选择器从运行时读取到当前记录（
+							99 文本 networkRevision=2
+							100 文本 、
+							101 文本 adjustment_e110cbc8…
+							102 文本 、源文件 SHA256 均匹配，
+							103 文本 sourceAdmission=current-admissible
+							104 文本 ，无陈旧问题）。以下是基于该上下文的解释，未执行任何新计算。
+							105 标题 1. S1 的结果（point-precision）, Value: 2
+								106 文本 1. S1 的结果（point-precision）
+							107 按钮 复制表格
+								108 图像
+							109 按钮 下载表格
+								110 图像
+							111 按钮 全屏查看
+								112 图像
+							113 表格
+								114 row
+									115 列标题
+										116 文本 项目
+									117 列标题
+										118 文本 值
+								119 row
+									120 单元格
+										121 文本 点位中误差（后验，sqrt(σx²+σy²)）
+									122 单元格
+										123 文本 1.3592e-7 m ≈ 0.136 μm
+								124 row
+									125 单元格
+										126 文本 全网最大点位中误差 maxPointStdDev
+									127 单元格
+										128 文本 同为 1.3592e-7 m（S1 即最弱点）
+								129 row
+									130 单元格
+										131 文本 精度判定
+									132 单元格
+										133 文本 passed=true
+								134 row
+									135 单元格
+										136 文本 平差后坐标
+									137 单元格
+										138 文本 x=49.99999999284098，y=49.999999963710295
+								139 row
+									140 单元格
+										141 文本 坐标改正
+									142 单元格
+										143 文本 dx=−1.9446e-8 m，dy=+1.9593e-7 m
+								144 row
+									145 单元格
+										146 文本 误差椭圆（1σ，后验）
+									147 单元格
+										148 文本 长半轴 1.2848e-7 m，短半轴 4.4355e-8 m，长轴方位 2.2585 rad（≈129.4°，约定：x 正向朝 y 正向，mod π）
+							149 文本 单位权中误差（σ0）= 1.0671e-4（无量纲），方差因子 = 1.1387e-8。也就是说后验方差在先验方差基础上缩小了约 4 个数量级——这是合成数据近乎零残差造成的，引用该 0.136 μm 数值时必须说明是"后验"口径。
+							150 标题 2. 原始依据, Value: 2
+								151 文本 2. 原始依据
+							152 内容列表
+								153 container
+									154 AXListMarker • 
+									155 text 源文件 ：COSA.in2（公开合成样例），SHA256  4281cc7a…d9f0 ，解析器 cosa-in2-parser 0.3.0；来源完整性已验证（台账 2 条，无错误），来源合格（eligible）。
+								156 container
+									157 AXListMarker • 
+									158 text 基准 ：固定点 A(50,150)、B(150,50)、C(120.710678,120.710678)，视为无误差；未知点仅 S1。
+								159 container
+									160 AXListMarker • 
+									161 text 观测（5 个，全部在 S1 站） ：
+									162 内容列表
+										163 container
+											164 AXListMarker ◦ 
+											165 text 至 A 的方向（后视归零，值 0，标志  cosa-backsight-reset ）
+										166 container
+											167 AXListMarker ◦ 
+											168 文本 至 B 的方向 270°、距离 100.000 m
+										169 container
+											170 AXListMarker ◦ 
+											171 文本 至 C 的方向 315°、距离 100.000 m
+										172 container
+											173 AXListMarker ◦ 
+											174 文本 先验精度：方向 1″，距离 1 mm + 1 ppm
+								175 container
+									176 AXListMarker • 
+									177 text 平差结构 ：未知数 3（S1 的 x、y 及度盘定向），多余观测数 2；闭合差：水平 1.37e-7 m、角度 3.1e-10 rad，均可忽略。
+								178 container
+									179 AXListMarker • 
+									180 text 残差 ：5 个观测标准化残差全部 < 0.00014 σ，无超限观测。
+								181 container
+									182 AXListMarker • 
+									183 text S1 初始坐标 ：由解析器按"极坐标刚性初始化"生成（row 5），初始化距离 RMS = 1.23e-8 m，即初始坐标并非实测坐标，仅用于线性化。
+							184 标题 3. 需要复核的问题, Value: 2
+								185 文本 3. 需要复核的问题
+							186 内容列表
+								187 container
+									188 AXListMarker 1. 
+									189 text 基准参数未确认 ：网的  coordinateSystem  和  verticalDatum  均为"待确认"占位符。S1 的精度只在 A/B/C 被视为无误差固定点的前提下成立，正式交付前必须确认坐标系、高程基准及固定点坐标来源。
+								190 container
+									191 AXListMarker 2. 
+									192 text 已知点误差未传播 ：A/B/C 坐标取 6 位小数并作固定值，其基准误差没有进入 S1 的协方差。若固定点有实际精度，S1 的精度评定偏乐观。
+								193 container
+									194 AXListMarker 3. 
+									195 text 观测改正全部未应用 ：气象、斜距改平、曲率/折光、投影归算、对中及加乘常数均为 false。合成样例可接受，但真实工程需逐项核对。
+								196 container
+									197 AXListMarker 4. 
+									198 text 先验/后验方差因子异常小 （1.1387e-8）：残差几乎为零说明合成数据与 1″/1mm+1ppm 的先验相比"过度自洽"。按报告值换算，先验口径的点位中误差约 1.27 mm（解释性换算，非运行时产出结果）。验收报告中引用精度须注明后验口径，并复核先验精度取值。
+								199 container
+									200 AXListMarker 5. 
+									201 text 验收阈值未配置 ：项目  thresholds  为空， passed=true  基于运行时默认判定，建议配置明确的精度验收阈值。
+								202 container
+									203 AXListMarker 6. 
+									204 text 仍有未关闭的质量提示 ： survey_finding_9ca36199… （warning， format_detected ，status=open），提示"继续完成基准、控制点、观测角色、拓扑、闭合与精度校验"。虽然 validation=valid 且精度通过，该提示仍未关闭，交付前应处理或在记录中说明处置。
+								205 container
+									206 AXListMarker 7. 
+									207 text 后视归零的角色解释 ： cosa-in2-6  被作为带 1″ 先验的方向观测计入平差（而非仅作定向约束）。这一角色解释是否符合 COSA 惯例建议复核，避免定向约束被重复计入。
+								208 container
+									209 AXListMarker 8. 
+									210 text 网络拓扑强度 ：全网仅 S1 单测站、3 个固定点、2 个多余观测。点位精度完全依赖基准点与仪器先验；如需内/外可靠性指标，需另行评估。
+							211 text 如需我针对上述某项（例如配置验收阈值、复核基准参数）提出参数修改建议或安排进一步分析，请告诉我。 9月27日 22:35
+							212 按钮 复制消息
+							213 文本 请解释 S1 的结果、原始依据及需要复核的问题。
+							214 container rail-any-station-control-network, google-docs
+								215 text 已启用技能 2
+							216 文本 deepseek-v4-pro
+							217 按钮 复制消息
+							218 text 已按给定 typedEvidence 精确读取。先补一次当前上下文的读取，以确保 S1 平差结果不是沿用上轮旧快照： 9月27日 22:37
+							219 按钮 复制消息
+							220 文本 typedEvidence 已精确读取并解析成功（
+							221 文本 status: resolved
+							222 文本 ），随后按相同 networkId/networkRevision/源哈希复核了当前上下文，两条记录一致，无陈旧问题。以下解释严格基于所选证据与当前存储结果，未执行任何新计算。
+							223 标题 0. 所选证据本身说明了什么, Value: 2
+								224 文本 0. 所选证据本身说明了什么
+							225 内容列表
+								226 container
+									227 AXListMarker • 
+									228 text 引用 ： kind=network ， network_a33e828e… （revision 2），选择器  unknownPoints[0] ，身份  {"id":"S1"} ，源文件 SHA256  4281cc7a… 。
+								229 container
+									230 AXListMarker • 
+									231 text 解析值 ：S1 为  pointClass=station 、 known=false ，来源行  COSA.in2:5 ，坐标为 (50.00000001228713, 49.999999767779975)。
+								232 container
+									233 AXListMarker • 
+									234 text 关键元数据 ： initialCoordinateMethod = "cosa-station-polar-rigid-initialization" ，初始化距离 RMS = 1.23e-8 m。即该行不是实测坐标，而是解析器用极坐标刚性初始化生成的近似值，仅作平差迭代起点。
+								235 container
+									236 AXListMarker • 
+									237 text 读取边界（运行时明示） ：只读；未启动新计算； standardConformity=not-evaluated ； humanSignatureVerification=not-evaluated ；调用方声明未做真实性认证。即本次证据只能用于解释存储结果及其固有局限，不构成专业验收或现场事实认证。
+							238 标题 1. S1 的结果, Value: 2
+								239 文本 1. S1 的结果
+							240 文本 来自当前仍有效的平差 
+							241 文本 adjustment_e110cbc8-97b6-4182-be4e-0024e5ddb43f
+							242 文本 （validation=valid，输入哈希与来源准入一致）：
+							243 按钮 复制表格
+								244 图像
+							245 按钮 下载表格
+								246 图像
+							247 按钮 全屏查看
+								248 图像
+							249 表格
+								250 row
+									251 列标题
+										252 文本 项目
+									253 列标题
+										254 文本 值
+								255 row
+									256 单元格
+										257 文本 平差后坐标
+									258 单元格
+										259 文本 x = 49.99999999284098，y = 49.999999963710295
+								260 row
+									261 单元格
+										262 文本 坐标改正
+									263 单元格
+										264 文本 dx = −1.94e-8 m，dy = +1.96e-7 m
+								265 row
+									266 单元格
+										267 文本 点位中误差（后验）
+									268 单元格
+										269 text 1.3592e-7 m ≈ 0.14 μm ，且为全网最弱点（maxPointStdDev 相同），passed=true
+								270 row
+									271 单元格
+										272 文本 误差椭圆（1σ 后验）
+									273 单元格
+										274 文本 长半轴 1.28e-7 m，短半轴 4.44e-8 m，长轴方位 2.2585 rad（≈129.4°）
+								275 row
+									276 单元格
+										277 文本 单位权中误差 / 方差因子
+									278 单元格
+										279 文本 1.07e-4（无量纲）/ 1.14e-8（先验后方差缩小约 4 个数量级）
+							280 标题 2. 原始依据, Value: 2
+								281 文本 2. 原始依据
+							282 内容列表
+								283 container
+									284 AXListMarker • 
+									285 text 源文件 ： COSA.in2 （公开合成样例），SHA256  4281cc7a…d9f0 ，解析器 cosa-in2-parser 0.3.0；原始来源完整性已验证（台账 2 条、无错误），来源合格（eligible）。
+								286 container
+									287 AXListMarker • 
+									288 text 固定点（视为无误差基准） ：A(50,150)、B(150,50)、C(120.710678,120.710678)，来源行 2–4。
+								289 container
+									290 AXListMarker • 
+									291 text 观测（5 个，全部在 S1 站） ：对 A 方向（后视归零， cosa-backsight-reset ）、对 B 方向 270° + 距离 100.000 m、对 C 方向 315° + 距离 100.000 m；先验精度方向 1″、距离 1 mm + 1 ppm。
+								292 container
+									293 AXListMarker • 
+									294 text 结构 ：未知数 3（S1 x、y、度盘定向），多余观测 2；闭合差水平 1.37e-7 m、角度 3.1e-10 rad；全部 5 个标准化残差 < 0.00014 σ，无超限观测。
+							295 标题 3. 需要复核的问题, Value: 2
+								296 文本 3. 需要复核的问题
+							297 内容列表
+								298 container
+									299 AXListMarker 1. 
+									300 text 基准参数未确认 ： coordinateSystem 、 verticalDatum  均为"待确认"。S1 精度仅在该三固定点无误差的假设下成立。
+								301 container
+									302 AXListMarker 2. 
+									303 text 已知点误差未传播 ：A/B/C 坐标取 6 位小数作固定值，其基准误差未进入 S1 协方差，精度评定偏乐观。
+								304 container
+									305 AXListMarker 3. 
+									306 text 观测改正全部未应用 ：气象、斜距改平、曲率/折光、投影归算、对中、加乘常数均为 false。合成样例可接受，真实工程需逐项核对。
+								307 container
+									308 AXListMarker 4. 
+									309 text 后验方差因子异常小（1.14e-8） ：残差近零，说明数据与先验"过度自洽"。0.14 μm 是后验口径；引用该值必须注明，并复核先验精度取值。
+								310 container
+									311 AXListMarker 5. 
+									312 text 验收阈值未配置 ： thresholds  为空，passed=true 属运行时默认判定，建议配置明确阈值。
+								313 container
+									314 AXListMarker 6. 
+									315 text 未关闭的质量提示 ： survey_finding_9ca36199… （warning、 format_detected 、status=open）要求继续完成基准/拓扑/闭合/精度校验；validation=valid 不等于该提示已处理。
+								316 container
+									317 AXListMarker 7. 
+									318 text 后视归零的角色解释 ： cosa-in2-6  被作为带 1″ 先验的方向观测计入，而非仅作定向约束，是否符合 COSA 惯例建议复核。
+								319 container
+									320 AXListMarker 8. 
+									321 text 拓扑强度 ：单测站、3 固定点、2 多余观测，精度完全依赖基准与仪器先验。
+							322 text 如需针对上述任一项（如配置验收阈值、确认基准参数）提出项目参数修改建议，请告诉我。 9月27日 22:37
+							323 按钮 复制消息
+							324 文本 请解释 S1 的结果、原始依据及需要复核的问题。
+							325 文本 deepseek-v4-pro
+							326 按钮 复制消息
+							327 文本 已按要求先以给定 typedEvidence 精确调用 
+							328 文本 survey_read_evidence
+							329 文本 （解析成功，
+							330 文本 status: resolved
+							331 文本 ），随后以相同网络/源哈希读取当前上下文做新鲜核验（生成本轮 14:59:42，contextHash 
+							332 文本 sha256-a04738…
+							333 文本  与上轮一致），未替换任何记录，也未执行计算。
+							334 标题 0. 所选证据的固有边界, Value: 2
+								335 文本 0. 所选证据的固有边界
+							336 内容列表
+								337 container
+									338 AXListMarker • 
+									339 text 记录： network_a33e828e…  rev 2 的  unknownPoints[0] ，身份  id=S1 ，来源行  COSA.in2:5 。
+								340 container
+									341 AXListMarker • 
+									342 text 读取边界：只读、未启动新计算； standardConformity=not-evaluated 、 humanSignatureVerification=not-evaluated 。此证据仅用于解释存储结果及其局限，不构成规范符合性判定或现场事实认证。
+							343 标题 1. S1 的结果, Value: 2
+								344 文本 1. S1 的结果
+							345 文本 来自当前有效的平差 
+							346 文本 adjustment_e110cbc8-97b6-4182-be4e-0024e5ddb43f
+							347 文本 （validation=valid，算法 workwise-survey-adjustment-7，多余观测数 2）：
+							348 按钮 复制表格
+								349 图像
+							350 按钮 下载表格
+								351 图像
+							352 按钮 全屏查看
+								353 图像
+							354 表格
+								355 row
+									356 列标题
+										357 文本 项目
+									358 列标题
+										359 文本 值
+								360 row
+									361 单元格
+										362 文本 平差后坐标
+									363 单元格
+										364 文本 x = 49.99999999284098，y = 49.999999963710295
+								365 row
+									366 单元格
+										367 文本 坐标改正
+									368 单元格
+										369 文本 dx = −1.94e-8 m，dy = +1.96e-7 m
+								370 row
+									371 单元格
+										372 文本 点位中误差（后验）
+									373 单元格
+										374 text 1.3592e-7 m ≈ 0.14 μm ，为全网最弱点（maxPointStdDev），passed=true
+								375 row
+									376 单元格
+										377 文本 误差椭圆（1σ 后验）
+									378 单元格
+										379 文本 长半轴 1.28e-7 m，短半轴 4.44e-8 m，长轴方位 2.2585 rad（≈129.4°）
+								380 row
+									381 单元格
+										382 文本 单位权中误差 / 方差因子
+									383 单元格
+										384 文本 1.07e-4（无量纲）/ 1.14e-8（后验方差较先验缩小约 4 个数量级）
+							385 标题 2. 原始依据, Value: 2
+								386 文本 2. 原始依据
+							387 内容列表
+								388 container
+									389 AXListMarker • 
+									390 text 源文件 ： COSA.in2 （公开合成样例），SHA256  4281cc7a…d9f0 ；解析器 cosa-in2-parser 0.3.0；原始来源完整性已验证（台账 2 条、无错误），来源合格。
+								391 container
+									392 AXListMarker • 
+									393 text S1 行本身（所选证据） ： known=false 、 pointClass=station ，坐标 (50.00000001228713, 49.999999767779975) 由解析器按  cosa-station-polar-rigid-initialization  生成（初始化距离 RMS = 1.23e-8 m）——是平差迭代初值，不是实测坐标。
+								394 container
+									395 AXListMarker • 
+									396 text 固定点 ：A(50,150)、B(150,50)、C(120.710678,120.710678)，视为无误差基准。
+								397 container
+									398 AXListMarker • 
+									399 text 观测（5 个，均在 S1 站） ：对 A 方向（后视归零）、对 B 方向 270° + 距离 100.000 m、对 C 方向 315° + 距离 100.000 m；先验精度方向 1″、距离 1 mm + 1 ppm。
+								400 container
+									401 AXListMarker • 
+									402 text 闭合与残差 ：闭合差水平 1.37e-7 m、角度 3.1e-10 rad；5 个标准化残差均 < 0.00014 σ，无超限观测。
+							403 标题 3. 需要复核的问题, Value: 2
+								404 文本 3. 需要复核的问题
+							405 内容列表
+								406 container
+									407 AXListMarker 1. 
+									408 text 基准参数未确认 ： coordinateSystem 、 verticalDatum  均为"待确认"，S1 精度只在 A/B/C 无误差假设下成立。
+								409 container
+									410 AXListMarker 2. 
+									411 text 已知点误差未传播 ：固定点坐标取 6 位小数且未计误差，S1 精度评定偏乐观。
+								412 container
+									413 AXListMarker 3. 
+									414 text 观测改正全部未应用 ：气象、斜距改平、曲率/折光、投影、对中、加乘常数均为 false，真实工程需逐项核对。
+								415 container
+									416 AXListMarker 4. 
+									417 text 后验方差因子异常小（1.14e-8） ：残差近零，0.14 μm 是后验口径，引用须注明并复核先验精度取值。
+								418 container
+									419 AXListMarker 5. 
+									420 text 验收阈值未配置 ： thresholds  为空，passed=true 属运行时默认判定。
+								421 container
+									422 AXListMarker 6. 
+									423 text 未关闭的警告 ： survey_finding_9ca36199… （warning、 format_detected 、status=open）要求继续完成基准/拓扑/闭合/精度校验，尚未处理。
+								424 container
+									425 AXListMarker 7. 
+									426 text 后视归零的角色解释 ： cosa-in2-6  被作为带 1″ 先验的方向观测计入而非仅作定向约束，建议复核是否与 COSA 惯例一致。
+								427 container
+									428 AXListMarker 8. 
+									429 text 拓扑强度 ：单测站、3 固定点、2 多余观测，精度完全依赖基准点与仪器先验，如需内/外可靠性指标需另行评估。
+							430 text 如需针对上述任一项提出项目参数修改建议（如配置验收阈值、确认基准参数），请告诉我。 9月27日 22:59
+							431 按钮 复制消息
+						432 container
+							433 文本输入区 (settable) 继续输入，发送后会在当前回复结束后依次发送…
+							434 按钮 更多操作
+							435 弹出式按钮 模型与推理设置
+							436 按钮 (disabled) 发送
+					437 container
+						438 container 工作视图
+							439 按钮 平差结果与精度
+							440 按钮 趋势分析
+						441 container 测量与平差控制台
+							442 标题 测量与平差控制台, Value: 3
+								443 文本 测量与平差控制台
+							444 文本 Runtime 确定性计算
+							445 按钮 询问测量 AI
+							446 文本 已有测量网络
+							447 弹出式按钮 Description: 已有测量网络, Value: cosa-in2 · 可进入校核与平差 · 51c15be3
+								448 (selected) cosa-in2 · 可进入校核与平差 · 51c15be3
+							449 文本 网络类型
+							450 弹出式按钮 Description: 网络类型, Value: 平面控制网
+								451 (selected) 平面控制网
+							452 文本 Runtime 在线
+							453 container 测量计算状态
+								454 文本 网型
+								455 文本 平面控制网
+								456 container
+									457 文本 当前约束
+									458 container Description: 当前 Runtime 约束, Help: Runtime 当前仅按固定已知点执行；最小约束和自由网尚不可选。
+										459 文本 固定已知点（Runtime 当前实现）
+								460 container
+									461 文本 平差方法 / 权模型
+									462 container Description: 当前 Runtime 执行方式, Help: 条件平差不提供为用户可选项；坐标 / 高程转换按其已选类型由 Runtime 执行。
+										463 文本 加权最小二乘
+								464 文本 可解性
+								465 文本 已通过校核
+							466 container 平差工作区导航
+								467 按钮 网形与基准
+								468 按钮 观测表 5
+									469 文本 观测表
+									470 文本 5
+								471 按钮 点位与坐标 4
+									472 文本 点位与坐标
+									473 文本 4
+								474 按钮 平差结果
+								475 按钮 自由水准试算
+								476 按钮 期次变形 0
+									477 文本 期次变形
+									478 文本 0
+							479 标题 点位与网形 询问 点位与网形 的测量 AI, Value: 4
+								480 文本 点位与网形
+								481 按钮 询问 点位与网形 的测量 AI
+							482 图像 测量网络关系图（按坐标绘制）
+							483 text 已知点 未知点 按 X/Y 坐标归一化
+							484 表格
+								485 row
+									486 列标题
+										487 文本 点号
+									488 列标题
+										489 文本 角色
+									490 列标题
+										491 文本 初始高程
+								492 row
+									493 单元格
+										494 文本 A
+										495 按钮 询问 A 的测量 AI
+									496 单元格
+										497 文本 已知
+									498 单元格
+										499 文本 —
+								500 row
+									501 单元格
+										502 文本 B
+										503 按钮 询问 B 的测量 AI
+									504 单元格
+										505 文本 已知
+									506 单元格
+										507 文本 —
+								508 row
+									509 单元格
+										510 文本 C
+										511 按钮 询问 C 的测量 AI
+									512 单元格
+										513 文本 已知
+									514 单元格
+										515 文本 —
+								516 row
+									517 单元格
+										518 文本 S1
+										519 按钮 询问 S1 的测量 AI
+									520 单元格
+										521 文本 未知
+									522 单元格
+										523 文本 —
+							524 container
+								525 text 质量门禁 COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 当前输入
+								526 定义列表
+									527 container 来源
+										528 文本 来源
+									529 文本 golden-plane-control-e2e.in2
+									530 container 格式
+										531 文本 格式
+									532 文本 cosa-in2
+									533 container 就绪状态
+										534 文本 就绪状态
+									535 文本 可进入校核与平差
+									536 container 阻断项
+										537 文本 阻断项
+									538 文本 0
+								539 文本 结果可追溯
+							540 container 平差点位成果
+								541 标题 点位成果与复核摘要, Value: 4
+									542 文本 点位成果与复核摘要
+								543 文本 平差后的坐标/高程、改正数和点位中误差；这是可写入成果包的确定性结果。
+								544 text 长度单位 m 协方差 已返回 粗差候选 0
+								545 文本 半轴采用单位马氏半径，不代表置信百分比。轴向从 +X 转向 +Y，按 180° 周期表示。XY 为解算坐标平面，GNSS 的 XY 不等同于当地东/北。固定点和旧成果不补造椭圆。
+								546 container 平差点位成果
+									547 表格
+										548 row
+											549 列标题
+												550 文本 点号
+											551 列标题
+												552 文本 平差 X（m）
+											553 列标题
+												554 文本 平差 Y（m）
+											555 列标题
+												556 文本 纬度 / 经度（°）
+											557 列标题
+												558 文本 平差高程（m）
+											559 列标题
+												560 文本 改正数（m）
+											561 列标题
+												562 文本 点位中误差（m）
+											563 列标题
+												564 文本 XY 标准误差椭圆
+										565 row
+											566 单元格
+												567 文本 A
+												568 按钮 询问 A 的测量 AI
+											569 单元格
+												570 文本 50
+											571 单元格
+												572 文本 150
+											573 单元格
+												574 文本 —
+											575 单元格
+												576 文本 —
+											577 单元格
+												578 文本 —
+											579 单元格
+												580 文本 —
+											581 单元格
+												582 文本 —
+										583 row
+											584 单元格
+												585 文本 B
+												586 按钮 询问 B 的测量 AI
+											587 单元格
+												588 文本 150
+											589 单元格
+												590 文本 50
+											591 单元格
+												592 文本 —
+											593 单元格
+												594 文本 —
+											595 单元格
+												596 文本 —
+											597 单元格
+												598 文本 —
+											599 单元格
+												600 文本 —
+										601 row
+											602 单元格
+												603 文本 C
+												604 按钮 询问 C 的测量 AI
+											605 单元格
+												606 文本 120.710678
+											607 单元格
+												608 文本 120.710678
+											609 单元格
+												610 文本 —
+											611 单元格
+												612 文本 —
+											613 单元格
+												614 文本 —
+											615 单元格
+												616 文本 —
+											617 单元格
+												618 文本 —
+										619 row
+											620 单元格
+												621 文本 S1
+												622 按钮 询问 S1 的测量 AI
+											623 单元格
+												624 文本 50
+											625 单元格
+												626 文本 50
+											627 单元格
+												628 文本 —
+											629 单元格
+												630 文本 —
+											631 单元格
+												632 文本 -1.944615e-8
+											633 单元格
+												634 文本 1.35922e-7
+											635 单元格
+												636 container 半轴采用单位马氏半径，不代表置信百分比。轴向从 +X 转向 +Y，按 180° 周期表示。XY 为解算坐标平面，GNSS 的 XY 不等同于当地东/北。固定点和旧成果不补造椭圆。
+													637 文本 长半轴 1.28481e-7 m · 短半轴 4.43548e-8 m
+													638 文本 轴向：129.401°
+													639 文本 后验方差
+	640 关闭按钮
+	641 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	642 最小化按钮
+643 menu bar
+	644 RailWise AI
+	645 文件
+	646 编辑
+	647 显示
+	648 窗口
+	649 帮助
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html

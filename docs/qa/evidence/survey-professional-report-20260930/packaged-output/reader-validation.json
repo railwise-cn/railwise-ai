@@ -1,0 +1,104 @@
+{
+  "kind": "packaged-app-output-reader-validation",
+  "origin": "/private/tmp/railwise-professional-candidate/home/.workwise/default_workspace/.workwise/deliverables/project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec/run_145f3736-b484-492d-b320-fb2db9f696d0",
+  "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+  "generatedAt": "2026-09-30T10:59:28.352Z",
+  "source": {
+    "networkRevision": 2,
+    "sha256": "444a71b823936b80ee45ce6ee15bcc28ffef8482b641f56e45d24459c59a22d9",
+    "formatId": "delimited-text",
+    "name": "professional.csv",
+    "status": "bound",
+    "integrity": "verified",
+    "anchoredObservationCount": 2,
+    "missingAnchorObservationIds": []
+  },
+  "sampleScope": "synthetic-CSV-pair",
+  "observationRows": 2,
+  "closureRows": 1,
+  "pointRows": 2,
+  "signoff": "unsigned",
+  "standardsConformity": "not-evaluated",
+  "pdfs": [
+    {
+      "name": "report.pdf",
+      "pages": 5,
+      "observationIdsRead": 2,
+      "closureIdsRead": 1,
+      "numericalDisplayReadback": "passed",
+      "sha256": "e849530cc7e8da18bb4730c1289e293754b8124b8f16d4d311e5e2ba3646bff1"
+    },
+    {
+      "name": "docx-reader-render.pdf",
+      "pages": 5,
+      "observationIdsRead": 2,
+      "closureIdsRead": 1,
+      "numericalDisplayReadback": "passed",
+      "sha256": "6bae9f1d418973f83933bc593b6b13547b5bbc7aecb6c10b553d7dbb826ead33"
+    },
+    {
+      "name": "xlsx-reader-render.pdf",
+      "pages": 9,
+      "observationIdsRead": 2,
+      "closureIdsRead": 1,
+      "numericalDisplayReadback": "passed",
+      "sha256": "69c1ec46437ed69e34038ec043a6acdb080954d102c946a5b5948de3c10801ec"
+    }
+  ],
+  "files": [
+    {
+      "name": "report.docx",
+      "sizeBytes": 28226,
+      "sha256": "8fd47963c2425aeaaca360deefd5ad1245c1641f2e0abe4de5008c2438da337c"
+    },
+    {
+      "name": "report.pdf",
+      "sizeBytes": 62745,
+      "sha256": "e849530cc7e8da18bb4730c1289e293754b8124b8f16d4d311e5e2ba3646bff1"
+    },
+    {
+      "name": "professional.xlsx",
+      "sizeBytes": 34636,
+      "sha256": "8024968889e40f6cad4d708ff9024079ce349aa2a4d460c9e2fd11295c820cb9"
+    },
+    {
+      "name": "evidence.xlsx",
+      "sizeBytes": 33073,
+      "sha256": "f4694f1ebbe26c055a29701b0739325877d99ac76c92f2565ce6d7162260de6e"
+    },
+    {
+      "name": "professional-review.json",
+      "sizeBytes": 22521,
+      "sha256": "211d6a78467aa785daf910521c846066ec727b31e8d1f2e116013aaee3c50356"
+    }
+  ],
+  "pngOrder": [
+    "docx-reader-page-1.png",
+    "docx-reader-page-2.png",
+    "docx-reader-page-3.png",
+    "docx-reader-page-4.png",
+    "docx-reader-page-5.png",
+    "pdf-page-1.png",
+    "pdf-page-2.png",
+    "pdf-page-3.png",
+    "pdf-page-4.png",
+    "pdf-page-5.png",
+    "xlsx-reader-page-1.png",
+    "xlsx-reader-page-2.png",
+    "xlsx-reader-page-3.png",
+    "xlsx-reader-page-4.png",
+    "xlsx-reader-page-5.png",
+    "xlsx-reader-page-6.png",
+    "xlsx-reader-page-7.png",
+    "xlsx-reader-page-8.png",
+    "xlsx-reader-page-9.png"
+  ],
+  "excludes": [
+    "vendor-acceptance",
+    "licensed-COSA-comparison",
+    "SUC-import",
+    "professional-human-signoff",
+    "Apple-notarization",
+    "updater-round-trip"
+  ]
+}

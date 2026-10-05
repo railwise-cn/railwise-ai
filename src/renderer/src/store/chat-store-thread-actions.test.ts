@@ -168,7 +168,7 @@ describe('chat-store-thread-actions queued messages', () => {
     })).resolves.toBe(false)
 
     expect(state.queuedMessages).toEqual([])
-    expect(state.error).toContain('provider is unavailable')
+    expect(state.error).toContain('AI assistance is temporarily unavailable')
   })
 
   it('returns a recoverable failure when image routing settings cannot be read', async () => {

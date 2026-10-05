@@ -1,5 +1,21 @@
 ## ADDED Requirements
 
+### Requirement: Explicit residual interpretation and scale facts
+
+New adjustment results MUST carry versioned per-row statistic method, scale basis, availability and descriptive scope, plus a deterministic numerical summary. They MUST distinguish observation-sigma ratios, relative-weight normalization and posterior residual-sigma ratios. No redundancy or unresolved residual variance MUST NOT appear as a zero-valued passing statistic. UI, reports and AI MUST retain these distinctions and keep significance and standards conformity unevaluated. Runtime MUST provide separate variance and standard-deviation log10 ratios to its nominal unit scale when estimable. Algorithm 6/7 historical reads and exact replay MUST preserve their original payloads and hashes.
+
+#### Scenario: A GNSS component has zero estimated residual variance
+
+- **WHEN** a new adjustment cannot resolve a positive residual variance or has no redundant observations
+- **THEN** the component is not-testable with an explicit reason and no numeric screening value
+- **AND** it is not counted as a passing statistical or engineering check
+
+#### Scenario: Explain an older result
+
+- **WHEN** a historical result lacks the versioned statistical fields
+- **THEN** its original numbers remain readable and its recorded algorithm is replayed unchanged
+- **AND** consumers show an unknown historical statistical basis rather than inferring conformance from precision.passed
+
 ### Requirement: Retained-material declared correction workflow
 
 The Runtime SHALL persist caller-declared quality checks, opened issues, corrections and rechecks separately from legacy technical retention checks. Creation SHALL freeze the exact project revision/workspace, retention plan, record, head and artifact. Every event SHALL reference an actually retained same-project evidence member. Correction and recheck targets SHALL be resolved from retained records rather than accepted as unverified hash strings. The service SHALL generate chain metadata, enforce bounded append-only storage, head concurrency and payload-bound idempotency, and revalidate sources and the complete chain when reading. No declaration SHALL grant delivery approval, authenticate a professional signature, assert standard conformity or rewrite an existing deliverable.
@@ -94,6 +110,12 @@ The Runtime MUST turn a non-empty Engineering goal into a bounded, versioned `En
 - **WHEN** an approval token is replayed, expired, or references a previous plan/context revision
 - **THEN** the Runtime rejects it with a stable approval error and leaves all side effects untouched
 
+#### Scenario: A plan selects the wrong survey capability
+
+- **WHEN** a plan selects an unsupported tool for a literal or predecessor-bound network, or supplies a network type as a solver method
+- **THEN** the draft remains non-executable with bounded parameter diagnostics before approval
+- **AND** a corrected draft preserves the original history and uses the same capability table as execution
+
 ### Requirement: TaskRun is the only execution carrier
 
 Engineering AI MUST enqueue approved work through `TaskController`, persist status in `TaskRunRepository`, and execute through `AgentLoop`. `EngineeringService` MUST remain deterministic data/artifact logic and MUST NOT create a second queue or mark an AI run completed outside TaskRun terminal handling.
@@ -107,6 +129,15 @@ Engineering AI MUST enqueue approved work through `TaskController`, persist stat
 
 - **WHEN** the same `inputHash + planHash + idempotencyKey` is submitted twice
 - **THEN** the original TaskRun and outputs are returned without duplicate work or files
+
+#### Scenario: An approved deterministic step fails
+
+- **WHEN** an authorized tool returns an error or throws during execution
+- **THEN** the plan needs attention and Task continuation waits for explicit recovery
+- **AND** generic progress wording or a failed explanatory model call cannot restart it; this execution turn cannot create a replacement plan or project suggestion
+- **AND** the UI offers continuation of the same bound approved Task with pending receipts after the user addresses the failure
+- **AND** a bounded scoped history selector can restore the exact original plan even when a later unapproved draft exists; a missing or cross-scope ID never substitutes the latest plan
+- **AND** existing successful receipts remain available without claiming the failed step succeeded
 
 ### Requirement: Deterministic monitoring dataset import
 The Runtime MUST import CSV and XLSX attachments through the managed Attachment Store, support canonical RailWise fields and explicit user mappings, preserve unknown columns, and return source hashes and row provenance.
@@ -160,6 +191,14 @@ Opaque vendor formats including Trimble T00/T01/T02/T04/JOB, Leica DBX/MDB, and 
 
 ### Requirement: Reviewable analysis and deliverables
 The Runtime MUST produce deterministic analysis, chart artifacts, DOCX/PDF reports, XLSX evidence packages, citations, and an immutable manifest tied to input hashes.
+
+Recorded AI export descriptors MUST remain visible after reload without recalculation or an implied new verification. New evidence MUST record the bundled Runtime package version; historical versions and output bytes MUST remain unchanged.
+
+#### Scenario: Restore a recorded AI export
+
+- **WHEN** a completed export has retained output descriptors and the desktop reloads its project
+- **THEN** the UI restores their recorded paths and hashes and binds evidence questions to the exact run
+- **AND** damaged descriptors remain unavailable without replacing them or hiding the rest of the project
 
 #### Scenario: Finalize reviewed report
 - **WHEN** blocking findings are resolved and warnings are acknowledged

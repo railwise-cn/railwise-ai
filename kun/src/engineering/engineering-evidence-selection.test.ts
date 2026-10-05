@@ -56,7 +56,7 @@ describe('Exact Survey evidence selection', () => {
       const preview = await engineering.previewReport({ ...input, idempotencyKey: 'evidence-preview' })
       const context = new EngineeringContextService(engineering)
       const evidence = context.conversationEvidence(project.id, { runId: preview.run.id, outputSha256: preview.files[1]!.sha256 })
-      expect(evidence).toMatchObject({ selectedDelivery: { runId: preview.run.id, reviewStatus: 'draft', verification: 'recorded-metadata-only', outputCount: 4, outputs: [preview.files[1]] } })
+      expect(evidence).toMatchObject({ selectedDelivery: { runId: preview.run.id, reviewStatus: 'draft', verification: 'recorded-metadata-only', outputCount: preview.files.length, outputs: [preview.files[1]] } })
       expect(engineering.getPreviewEvidence(other.id, preview.run.id)).toBeNull()
       expect(() => context.conversationEvidence(other.id, { runId: preview.run.id })).toThrow(/current Survey project/)
       expect(() => context.conversationEvidence(project.id, { runId: preview.run.id, outputSha256: 'wrong' })).toThrow(/output hash/)

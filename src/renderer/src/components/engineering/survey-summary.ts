@@ -48,6 +48,7 @@ export function surveyDatumLabel(value: string | undefined, t: (key: string) => 
 
 export function surveyStatusLabel(value: string | undefined, t: (key: string) => string): string {
   const labels: Record<string, string> = {
+    valid: 'surveyValidated', invalid: 'surveyReviewNeeded',
     imported: 'engineeringStatusImported', validated: 'surveyValidated', blocked: 'engineeringStatusBlocked',
     completed: 'engineeringStatusCompleted', running: 'engineeringStatusRunning',
     failed: 'engineeringStatusFailed', cancelled: 'engineeringStatusCancelled', queued: 'engineeringStatusQueued'

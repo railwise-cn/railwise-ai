@@ -1,0 +1,702 @@
+{
+  "runId": "run_6e47f356-7561-49bd-a0fa-34b10b12cb51",
+  "files": {
+    "report.docx": {
+      "sha256": "e851f70835d584265a14c63c28023c3aa1e6fe505d8c690acf5d11d63e389c1a",
+      "size": 5406,
+      "matchesGUI": true
+    },
+    "report.pdf": {
+      "sha256": "b2ead2a113abc5da3a49c4530f7f5412b52f54a686e800816dcbf4f5c92d4304",
+      "size": 40004,
+      "matchesGUI": true
+    },
+    "evidence.xlsx": {
+      "sha256": "6249eb3c6862a0e7a56943bebd71684110da1358c33977ca2b65b200b4a93182",
+      "size": 39084,
+      "matchesGUI": true
+    }
+  },
+  "pdfPages": 2,
+  "pdfText": "项目：0.5.1验收（公开合成控制网）\n测量平差成果报告（待审查）\n单位：长度 m；角度 rad；统计量按各项标注。\n专业测量源文件\n网络 network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4: golden-plane-control-e2e.in2；厂商=COSA(科傻)；\n格式=cosa-in2；置信度=98%；状态=adjustment-ready；解析器=cosa-in2-parser/0.3.0；\nSHA-256=4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0\n测量平差结果\n平差运行 adjustment_caf219cb-7c35-42e2-8a7f-784423799247：网络\n=network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4，策略=plane-control，观测=5，未知数=3，多余观测=2\n单位权中误差=0.00010671165867325277（无量纲）；方差因子=1.1387378096796804e-8（无量纲，后验估\n计），最大点位中误差=1.3592152495710963e-7 m，状态=valid，输入 \nSHA-256=f96651c542bb5866bf0857ffc327670e2500cb3ae2edead05aa54a503f97c61a\n闭合量=horizontal:1.3726709029343796e-7 m；angular:3.111529177070756e-10 rad\n解算参数=orientation:S1:1.5707963269606606 rad\n点位 A: X=50 m Y=150 m H=-\n点位 B: X=150 m Y=50 m H=-\n点位 C: X=120.710678 m Y=120.710678 m H=-\n点位 S1: X=49.99999999284098 m Y=49.999999963710295 m H=-\n点位 S1 XY 标准误差椭圆：长半轴=1.284808010949112e-7 m；短半轴=4.435475957184348e-8 m；轴向\n=2.2584737816163187 rad（+X 转向 +Y，模 π）；后验方差；单位马氏半径，非置信百分比；解算 XY 平面，\nGNSS 不代表当地东/北；算法=survey-xy-error-ellipse-1\n位移 A: dX=0 m dY=0 m dH=- 模长=0 m\n位移 B: dX=0 m dY=0 m dH=- 模长=0 m\n位移 C: dX=0 m dY=0 m dH=- 模长=0 m\n位移 S1: dX=-1.9446147803137137e-8 m dY=1.95930319080162e-7 m dH=- 模长=1.9689297244755981e-7 m\n变形期次比较\n本报告未关联变形期次比较\n质量问题\nadjustment_caf219cb-7c35-42e2-8a7f-784423799247: warning: COSA(科傻) / cosa-in2 已保留可审计的解析\n对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解\n析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻\n1 / 2\n断。（format_detected，open）\n来源引用\n无\n审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签\n名。\n2 / 2",
+  "docxText": "项目：0.5.1验收（公开合成控制网） 测量平差成果报告（待审查） 单位：长度 m；角度 rad；统计量按各项标注。 专业测量源文件 网络 network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4: golden-plane-control-e2e.in2；厂商=COSA(科傻)；格式=cosa-in2；置信度=98%；状态=adjustment-ready；解析器=cosa-in2-parser/0.3.0；SHA-256=4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0 测量平差结果 平差运行 adjustment_caf219cb-7c35-42e2-8a7f-784423799247：网络=network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4，策略=plane-control，观测=5，未知数=3，多余观测=2 单位权中误差=0.00010671165867325277（无量纲）；方差因子=1.1387378096796804e-8（无量纲，后验估计），最大点位中误差=1.3592152495710963e-7 m，状态=valid，输入 SHA-256=f96651c542bb5866bf0857ffc327670e2500cb3ae2edead05aa54a503f97c61a 闭合量=horizontal:1.3726709029343796e-7 m；angular:3.111529177070756e-10 rad 解算参数=orientation:S1:1.5707963269606606 rad 点位 A: X=50 m Y=150 m H=- 点位 B: X=150 m Y=50 m H=- 点位 C: X=120.710678 m Y=120.710678 m H=- 点位 S1: X=49.99999999284098 m Y=49.999999963710295 m H=- 点位 S1 XY 标准误差椭圆：长半轴=1.284808010949112e-7 m；短半轴=4.435475957184348e-8 m；轴向=2.2584737816163187 rad（+X 转向 +Y，模 π）；后验方差；单位马氏半径，非置信百分比；解算 XY 平面，GNSS 不代表当地东/北；算法=survey-xy-error-ellipse-1 位移 A: dX=0 m dY=0 m dH=- 模长=0 m 位移 B: dX=0 m dY=0 m dH=- 模长=0 m 位移 C: dX=0 m dY=0 m dH=- 模长=0 m 位移 S1: dX=-1.9446147803137137e-8 m dY=1.95930319080162e-7 m dH=- 模长=1.9689297244755981e-7 m 变形期次比较 本报告未关联变形期次比较 质量问题 adjustment_caf219cb-7c35-42e2-8a7f-784423799247: warning: COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。（format_detected，open） 来源引用 无 审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签名。",
+  "sheets": {
+    "survey_adjustments": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "networkId",
+          "resultId",
+          "strategyId",
+          "transformType",
+          "algorithmVersion",
+          "observationCount",
+          "unknownCount",
+          "redundancy",
+          "unitWeightStdDev",
+          "unitWeightStdDevUnit",
+          "varianceFactor",
+          "varianceFactorUnit",
+          "varianceFactorEstimated",
+          "maxPointStdDev",
+          "maxPointStdDevUnit",
+          "validation",
+          "inputHash"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "adjustment_result_984dae8f-1d68-4bcb-a921-e0a905a2eb83",
+          "plane-control",
+          "",
+          "workwise-survey-adjustment-7",
+          "5",
+          "3",
+          "2",
+          "0.00010671165867325277",
+          "dimensionless",
+          "1.1387378096796804e-8",
+          "dimensionless",
+          "true",
+          "1.3592152495710963e-7",
+          "m",
+          "valid",
+          "f96651c542bb5866bf0857ffc327670e2500cb3ae2edead05aa54a503f97c61a"
+        ]
+      ]
+    },
+    "survey_sources": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "networkId",
+          "sourceName",
+          "sha256",
+          "vendor",
+          "format",
+          "version",
+          "confidence",
+          "disposition",
+          "parserId",
+          "parserVersion",
+          "recordCount",
+          "originalPreserved",
+          "extension",
+          "extensionConflict",
+          "matchedSignatures",
+          "converterId",
+          "converterVersion",
+          "converterLicense",
+          "converterExecutableHash",
+          "converterInputHash",
+          "converterOutputHash",
+          "converterNetworkAccess",
+          "converterStatus"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "COSA(科傻)",
+          "cosa-in2",
+          "",
+          "0.98",
+          "adjustment-ready",
+          "cosa-in2-parser",
+          "0.3.0",
+          "10",
+          "true",
+          ".in2",
+          "false",
+          "COSA .in2 three-value header + L,0 station block",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    "survey_source_diagnostics": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "networkId",
+          "sourceName",
+          "code",
+          "severity",
+          "message",
+          "sourceRecord",
+          "byteOffset"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "encoding_detected",
+          "info",
+          "文本编码 utf-8",
+          "",
+          ""
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "format_detected",
+          "info",
+          "识别为 COSA(科傻) / cosa-in2，置信度 98%",
+          "",
+          ""
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "format_detected",
+          "warning",
+          "COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+          "",
+          ""
+        ]
+      ]
+    },
+    "survey_raw_anchors": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "networkId",
+          "sourceName",
+          "anchorId",
+          "sourceRecord",
+          "line",
+          "byteOffset",
+          "byteLength",
+          "section",
+          "recordType"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-1",
+          "1",
+          "1",
+          "0",
+          "9",
+          "cosa-in2",
+          "prior-header"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-2",
+          "2",
+          "2",
+          "10",
+          "22",
+          "cosa-in2",
+          "known-point"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-3",
+          "3",
+          "3",
+          "33",
+          "22",
+          "cosa-in2",
+          "known-point"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-4",
+          "4",
+          "4",
+          "56",
+          "23",
+          "cosa-in2",
+          "known-point"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-5",
+          "5",
+          "5",
+          "80",
+          "2",
+          "cosa-in2",
+          "station"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-6",
+          "6",
+          "6",
+          "83",
+          "5",
+          "cosa-in2",
+          "backsight-reset"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-7",
+          "7",
+          "7",
+          "89",
+          "13",
+          "cosa-in2",
+          "direction"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-8",
+          "8",
+          "8",
+          "103",
+          "11",
+          "cosa-in2",
+          "distance"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-9",
+          "9",
+          "9",
+          "115",
+          "13",
+          "cosa-in2",
+          "direction"
+        ],
+        [
+          "network_05104c9e-356d-4a4f-8e3a-6dcccfb8efa4",
+          "golden-plane-control-e2e.in2",
+          "cosa-in2-record-10",
+          "10",
+          "10",
+          "129",
+          "11",
+          "cosa-in2",
+          "distance"
+        ]
+      ]
+    },
+    "survey_closures": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "closureKey",
+          "value",
+          "unit"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "horizontal",
+          "1.3726709029343796e-7",
+          "m"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "angular",
+          "3.111529177070756e-10",
+          "rad"
+        ]
+      ]
+    },
+    "survey_parameters": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "parameterKey",
+          "value",
+          "unit"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "orientation:S1",
+          "1.5707963269606606",
+          "rad"
+        ]
+      ]
+    },
+    "survey_points": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "pointId",
+          "x",
+          "y",
+          "height",
+          "latitudeDeg",
+          "longitudeDeg",
+          "correctionX",
+          "correctionY",
+          "correctionHeight",
+          "standardError",
+          "linearUnit"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "A",
+          "50",
+          "150",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "m"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "B",
+          "150",
+          "50",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "m"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "C",
+          "120.710678",
+          "120.710678",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "m"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "S1",
+          "49.99999999284098",
+          "49.999999963710295",
+          "",
+          "",
+          "",
+          "-1.9446147803137137e-8",
+          "1.95930319080162e-7",
+          "",
+          "1.3592152495710963e-7",
+          "m"
+        ]
+      ]
+    },
+    "survey_error_ellipses": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "pointId",
+          "algorithmVersion",
+          "coordinatePlane",
+          "semiMajor_m",
+          "semiMinor_m",
+          "orientation_rad",
+          "orientationConvention",
+          "varianceBasis",
+          "scale",
+          "Cxx_m2",
+          "Cxy_m2",
+          "Cyx_m2",
+          "Cyy_m2"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "S1",
+          "survey-xy-error-ellipse-1",
+          "solution-xy",
+          "1.284808010949112e-7",
+          "4.435475957184348e-8",
+          "2.2584737816163187",
+          "positive-x-toward-positive-y-mod-pi",
+          "a-posteriori",
+          "unit-mahalanobis-radius",
+          "7.825502380945158e-15",
+          "-7.131580093523458e-15",
+          "-7.131580093523458e-15",
+          "1.064915856572102e-14"
+        ]
+      ]
+    },
+    "survey_residuals": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "observationId",
+          "correction",
+          "residual",
+          "unit",
+          "standardizedResidual",
+          "standardizedResidualUnit",
+          "outlier",
+          "sourceRow",
+          "sourceRecordId"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "cosa-in2-6-backsight-reset",
+          "-2.3735413634540237e-10",
+          "-2.3735413634540237e-10",
+          "rad",
+          "0.00004895780494523131",
+          "sigma",
+          "false",
+          "6",
+          "cosa-in2-record-6"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "cosa-in2-7-direction",
+          "1.971329766092822e-10",
+          "1.971329766092822e-10",
+          "rad",
+          "0.00004066159522522697",
+          "sigma",
+          "false",
+          "7",
+          "cosa-in2-record-7"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "cosa-in2-8-distance",
+          "7.159016490732029e-9",
+          "7.159016490732029e-9",
+          "m",
+          "0.000007123487653604974",
+          "sigma",
+          "false",
+          "8",
+          "cosa-in2-record-8"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "cosa-in2-9-direction",
+          "4.022115973612017e-11",
+          "4.022115973612017e-11",
+          "rad",
+          "0.000008296209720004341",
+          "sigma",
+          "false",
+          "9",
+          "cosa-in2-record-9"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "cosa-in2-10-distance",
+          "-1.3708027779557597e-7",
+          "-1.3708027779557597e-7",
+          "m",
+          "0.00013639997445091467",
+          "sigma",
+          "false",
+          "10",
+          "cosa-in2-record-10"
+        ]
+      ]
+    },
+    "survey_displacements": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "runId",
+          "pointId",
+          "dX",
+          "dY",
+          "dH",
+          "magnitude",
+          "unit",
+          "kind"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "A",
+          "0",
+          "0",
+          "",
+          "0",
+          "m",
+          "horizontal"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "B",
+          "0",
+          "0",
+          "",
+          "0",
+          "m",
+          "horizontal"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "C",
+          "0",
+          "0",
+          "",
+          "0",
+          "m",
+          "horizontal"
+        ],
+        [
+          "adjustment_caf219cb-7c35-42e2-8a7f-784423799247",
+          "S1",
+          "-1.9446147803137137e-8",
+          "1.95930319080162e-7",
+          "",
+          "1.9689297244755981e-7",
+          "m",
+          "horizontal"
+        ]
+      ]
+    },
+    "deformation_epochs": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "comparisonId",
+          "adjustmentId",
+          "resultId",
+          "networkId",
+          "observationEpoch",
+          "inputHash",
+          "resultHash"
+        ]
+      ]
+    },
+    "deformation_points": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "comparisonId",
+          "pointId",
+          "dX",
+          "dY",
+          "dH",
+          "settlement",
+          "horizontalDisplacement",
+          "spatialDisplacement",
+          "dXPerDay",
+          "dYPerDay",
+          "dHPerDay",
+          "settlementPerDay",
+          "horizontalPerDay",
+          "spatialPerDay",
+          "trend",
+          "combinedStandardError",
+          "standardizedDisplacement",
+          "significant",
+          "unit",
+          "rateUnit"
+        ]
+      ]
+    },
+    "deformation_pairs": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "comparisonId",
+          "pairId",
+          "kind",
+          "firstPointId",
+          "secondPointId",
+          "distanceMode",
+          "referenceDistance",
+          "currentDistance",
+          "convergence",
+          "convergenceRatePerDay",
+          "baselineM",
+          "differentialSettlement",
+          "tilt",
+          "linearUnit",
+          "rateUnit",
+          "tiltUnit"
+        ]
+      ]
+    },
+    "citations": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "id",
+          "sourceType",
+          "source",
+          "page",
+          "worksheet",
+          "row",
+          "url",
+          "locator"
+        ]
+      ]
+    },
+    "manifest_summary": {
+      "rows": null,
+      "columns": null,
+      "values": [
+        [
+          "schemaVersion",
+          "projectId",
+          "datasetId",
+          "sourceFileHash",
+          "analysisId",
+          "analysisInputHash",
+          "adjustmentIds",
+          "deformationIds",
+          "surveySourceHashes",
+          "runtimeVersion",
+          "generatedAt"
+        ],
+        [
+          "1",
+          "project_fdb89c5c-a112-4908-8702-a7c86ef4c420",
+          "",
+          "",
+          "",
+          "",
+          "adjustment_result_984dae8f-1d68-4bcb-a921-e0a905a2eb83",
+          "",
+          "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "0.5.0",
+          "2026-09-27T22:06:16.915Z"
+        ]
+      ]
+    }
+  },
+  "validation": "passed"
+}

@@ -23,6 +23,7 @@ import { DiffView } from '../DiffView'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { ModelMetaTag, WritePromptMetaDisclosure } from './message-timeline-cards'
 import { readNumber, formatDuration, formatToolTitle } from './message-timeline-tools'
+import { engineeringProfessionalAnswerText, engineeringProfessionalUserSurfaceText } from '../engineering/engineering-professional-text'
 
 const COPY_FEEDBACK_RESET_MS = 1600
 
@@ -33,9 +34,13 @@ const COPY_FEEDBACK_RESET_MS = 1600
  * a fresh turn on the same thread (see chat-store `rewindAndResend`).
  */
 function UserMessageBubble({
-  block
+  block,
+  professionalSurface = false,
+  language
 }: {
   block: Extract<ChatBlock, { kind: 'user' }>
+  professionalSurface?: boolean
+  language?: string
 }): ReactElement {
   const { t } = useTranslation('common')
   const busy = useChatStore((s) => s.busy)
@@ -59,8 +64,15 @@ function UserMessageBubble({
     typeof block.meta?.displayText === 'string' && block.meta.displayText.trim()
       ? block.meta.displayText.trim()
       : null
-  const displayText = metaDisplayText ?? parsedWritePrompt?.userInput ?? parsedClawPrompt?.text ?? block.text
-  const canEdit = !metaDisplayText
+  const rawDisplayText = metaDisplayText ?? parsedWritePrompt?.userInput ?? parsedClawPrompt?.text ?? block.text
+  const displayText = professionalSurface
+    ? engineeringProfessionalUserSurfaceText(rawDisplayText, language)
+    : rawDisplayText
+  // A translated survey prompt may contain an internal record selector in its
+  // stored text. Do not offer editing for that prompt: resending the translated
+  // label would lose the selector while exposing it in the editor would leak
+  // implementation details onto the professional surface.
+  const canEdit = !metaDisplayText && (!professionalSurface || displayText === rawDisplayText)
   const showClawInboundCard = route === 'claw' && parsedClawPrompt?.inbound === true
 
   useEffect(() => {
@@ -144,9 +156,11 @@ function UserMessageBubble({
             </div>
           </div>
         </div>
-        <div className="mt-2 flex min-w-0 items-center justify-end">
-          <ModelMetaTag label={block.modelLabel} />
-        </div>
+        {!professionalSurface ? (
+          <div className="mt-2 flex min-w-0 items-center justify-end">
+            <ModelMetaTag label={block.modelLabel} />
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -168,11 +182,16 @@ function UserMessageBubble({
               onToggle={() => setWriteMetaOpen((value) => !value)}
             />
           ) : null}
-          <RuntimeMetaChips meta={block.meta} align="right" hideAttachments />
+          <RuntimeMetaChips
+            meta={block.meta}
+            align="right"
+            hideAttachments
+            professionalSurface={professionalSurface}
+          />
         </div>
       )}
       <div className="mt-2 flex min-w-0 items-center justify-between gap-3 text-ds-faint opacity-90 transition group-hover:opacity-100">
-        <ModelMetaTag label={block.modelLabel} className="flex-1 justify-start text-left" />
+        {!professionalSurface ? <ModelMetaTag label={block.modelLabel} className="flex-1 justify-start text-left" /> : <span className="flex-1" />}
         <div className="flex items-center justify-end gap-3">
           <CopyFeedbackButton text={displayText} iconOnly />
           {canEdit ? (
@@ -811,11 +830,13 @@ function MediaAttachmentGallery({
 export function GeneratedFilesPanel({
   blocks,
   workspaceRoot,
-  activeThreadId
+  activeThreadId,
+  professionalSurface = false
 }: {
   blocks: ToolBlock[]
   workspaceRoot?: string
   activeThreadId?: string | null
+  professionalSurface?: boolean
 }): ReactElement | null {
   const { t } = useTranslation('common')
   const media = useMemo(
@@ -829,7 +850,10 @@ export function GeneratedFilesPanel({
     [blocks]
   )
 
-  if (media.length === 0) return null
+  // Generated files expose runtime paths, MIME types and tool-produced
+  // artifacts. Survey users should only see professional deliverables in the
+  // dedicated delivery view, never this developer conversation panel.
+  if (professionalSurface || media.length === 0) return null
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -902,22 +926,24 @@ function metaSources(meta: Record<string, unknown> | undefined): Array<{ title?:
 function RuntimeMetaChips({
   meta,
   align = 'left',
-  hideAttachments = false
+  hideAttachments = false,
+  professionalSurface = false
 }: {
   meta?: Record<string, unknown>
   align?: 'left' | 'right'
   hideAttachments?: boolean
+  professionalSurface?: boolean
 }): ReactElement | null {
   const { t } = useTranslation('common')
   const attachmentIds = metaStringArray(meta, 'attachmentIds')
-  const activeSkillIds = metaStringArray(meta, 'activeSkillIds')
-  const injectedMemoryIds = metaStringArray(meta, 'injectedMemoryIds')
+  const activeSkillIds = professionalSurface ? [] : metaStringArray(meta, 'activeSkillIds')
+  const injectedMemoryIds = professionalSurface ? [] : metaStringArray(meta, 'injectedMemoryIds')
   const sources = metaSources(meta)
   const child = meta?.child && typeof meta.child === 'object' ? meta.child as Record<string, unknown> : null
   const childLabel =
-    typeof child?.childLabel === 'string' && child.childLabel.trim()
+    !professionalSurface && typeof child?.childLabel === 'string' && child.childLabel.trim()
       ? child.childLabel.trim()
-      : typeof child?.childId === 'string'
+      : !professionalSurface && typeof child?.childId === 'string'
         ? child.childId
         : ''
   if (
@@ -1402,10 +1428,15 @@ function formatMessageDateTime(input: string, locale: string): string {
   }).format(date)
 }
 
-export function MessageBubble({ block, nested = false }: { block: ChatBlock; nested?: boolean }): ReactElement {
+export function MessageBubble({ block, nested = false, professionalSurface = false, language }: { block: ChatBlock; nested?: boolean; professionalSurface?: boolean; language?: string }): ReactElement {
   const { t, i18n } = useTranslation('common')
   const resolveApproval = useChatStore((s) => s.resolveApproval)
   const activeThreadId = useChatStore((s) => s.activeThreadId)
+  const hideRuntimeBlock = professionalSurface && block.kind !== 'assistant' && block.kind !== 'user'
+  // The professional conversation surface renders assistant answers and user
+  // questions only. Runtime blocks are intentionally omitted here so a direct
+  // caller cannot accidentally leak tool names, paths, session IDs, approval
+  // payloads, or system codes into a Survey workflow.
   const dshUiProjection = useMemo(() => {
     if (block.kind !== 'assistant') return null
     const streaming = block.id === 'live-assistant'
@@ -1421,19 +1452,23 @@ export function MessageBubble({ block, nested = false }: { block: ChatBlock; nes
           })
     })
   }, [block])
+  if (hideRuntimeBlock) return <></>
   if (block.kind === 'user') {
-    return <UserMessageBubble block={block} />
+    return <UserMessageBubble block={block} professionalSurface={professionalSurface} language={language ?? i18n.language} />
   }
   if (block.kind === 'assistant') {
     const streaming = block.id === 'live-assistant'
-    const uiBlocks = streaming ? dshUiProjection?.blocks : block.uiBlocks
+    const uiBlocks = professionalSurface ? undefined : streaming ? dshUiProjection?.blocks : block.uiBlocks
+    const displayedText = professionalSurface
+      ? engineeringProfessionalAnswerText(block.text, i18n.language)
+      : dshUiProjection?.markdown ?? block.text
     const createdAtLabel = block.createdAt
       ? formatMessageDateTime(block.createdAt, i18n.language)
       : null
     return (
       <div className="group/message flex min-w-0 max-w-full flex-col">
         <div className="ds-markdown ds-chat-answer min-w-0 max-w-full text-ds-ink">
-          <AssistantMarkdown text={dshUiProjection?.markdown ?? block.text} streaming={streaming} />
+          <AssistantMarkdown text={displayedText} streaming={streaming} />
           {uiBlocks?.length ? (
             <DshUiBlocks
               blocks={uiBlocks}
@@ -1441,7 +1476,7 @@ export function MessageBubble({ block, nested = false }: { block: ChatBlock; nes
               messageId={block.id}
             />
           ) : null}
-          {dshUiProjection?.diagnostics.map((diagnostic, index) => (
+          {!professionalSurface && dshUiProjection?.diagnostics.map((diagnostic, index) => (
             <div key={`${diagnostic.code}:${diagnostic.blockId ?? index}`} role="status" className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
               {t(`dshUiDiagnostic_${diagnostic.code}`, { blockId: diagnostic.blockId ?? '' })}
             </div>
@@ -1450,7 +1485,7 @@ export function MessageBubble({ block, nested = false }: { block: ChatBlock; nes
         {!streaming ? (
           <div className="mt-1 flex min-h-5 min-w-0 items-center justify-between gap-3 text-[11.5px] text-ds-faint opacity-0 transition duration-150 group-hover/message:opacity-100">
             <span className="min-w-0 truncate">{createdAtLabel ?? ''}</span>
-            <CopyFeedbackButton text={block.text} />
+            <CopyFeedbackButton text={displayedText} />
           </div>
         ) : null}
       </div>

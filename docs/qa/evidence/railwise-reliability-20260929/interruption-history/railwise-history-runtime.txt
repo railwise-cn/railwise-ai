@@ -1,0 +1,13 @@
+
+> kun@0.5.1 test
+> vitest run tests/engineering-completion-gate.test.ts src/server/routes/engineering-ai.test.ts src/adapters/tool/engineering-conversation-tools.test.ts
+
+
+ RUN  v4.1.8 <repo>/kun
+
+
+ Test Files  3 passed (3)
+      Tests  30 passed (30)
+   Start at  16:30:47
+   Duration  16.65s (transform 1.28s, setup 0ms, import 1.98s, tests 15.88s, environment 0ms)
+

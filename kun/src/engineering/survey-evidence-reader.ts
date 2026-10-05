@@ -10,7 +10,7 @@ import { resolveSurveyStandardBasis } from './survey-standard-basis.js'
 
 export type SurveyEvidenceSources = {
   engineering: Pick<EngineeringService, 'getProject' | 'readMonitoringDatasetEvidence' | 'readMonitoringAnalysisEvidence' | 'readDeliverableVerificationEvidence' | 'readMonitoringReplayEvidence'>
-  survey: Pick<SurveyService, 'getNetwork' | 'getRawSourceIntegrity' | 'getDeformationForProjectNewUse' | 'getAdjustmentStatisticalDiagnostics' | 'getFreeLevelingTrial'>
+  survey: Pick<SurveyService, 'getNetwork' | 'getRawSourceIntegrity' | 'getDeformationForProjectNewUse' | 'getAdjustmentStatisticalDiagnostics' | 'getFreeLevelingTrial' | 'getProfessionalReview'>
   advanced: Pick<SurveyAdvancedTrialsWorkspaceService, 'getTrial'>
   scoring: Pick<SurveyQualityScoringWorkspaceService, 'getRecord'>
   retention: Pick<SurveyQualityWorkspaceService, 'getPlan' | 'getRecord'>
@@ -84,7 +84,7 @@ function recordContext(value: unknown): Record<string, unknown> {
     'inputHash', 'outputHash', 'recordHash', 'requestHash', 'requestSha256', 'declarationSha256', 'modelBasisSha256', 'modelHash', 'resultHash', 'replayEnvironmentHash',
     'sourceSha256', 'sourceFileHash', 'sourceAdmissionHash', 'populationHash', 'definitionEvidenceSha256', 'planHash', 'runHash', 'manifestHash', 'artifactHash', 'headHash',
     'referenceAdjustmentId', 'currentAdjustmentId', 'referenceEpoch', 'currentEpoch', 'datasetId', 'runId', 'resultId', 'manifestId', 'attemptId', 'checkedAt',
-    'createdAt', 'diagnosticsVersion', 'calculationHash', 'status', 'outcome', 'reason', 'purpose', 'decision', 'engineeringDecision', 'standardConformity', 'humanSignatureVerification',
+    'createdAt', 'diagnosticsVersion', 'calculationHash', 'projectionVersion', 'projectionHash', 'reviewStatus', 'standardsConformity', 'status', 'outcome', 'reason', 'purpose', 'decision', 'engineeringDecision', 'standardConformity', 'humanSignatureVerification',
     'modelAssumptions', 'declarationTrust', 'associationTrust', 'checkpointTrust', 'definitionTrust', 'populationCompleteness', 'formalResultsModified', 'unit', 'units']
   return Object.fromEntries(fields.filter(key => Object.hasOwn(value, key)).map(key => [key, value[key]]))
 }
@@ -143,6 +143,15 @@ export class SurveyEvidenceReader {
         const value = required(s.survey.getAdjustmentStatisticalDiagnostics(pid, ref.adjustmentId))
         same(value.projectId, pid); same(value.networkId, ref.networkId); same(value.runId, ref.adjustmentId); same(value.inputHash, ref.inputHash); same(value.calculationHash, ref.calculationHash); same(value.sourceSha256, ref.sourceSha256)
         same(value.diagnosticsVersion, ref.diagnosticsVersion)
+        return value
+      }
+      case 'professional-review': {
+        const value = required(s.survey.getProfessionalReview(ref.adjustmentId))
+        same(value.projectId, pid); same(value.networkId, ref.networkId); same(value.runId, ref.adjustmentId)
+        same(value.resultId, ref.resultId); same(value.inputHash, ref.inputHash); same(value.resultHash, ref.resultHash)
+        same(value.projectionHash, ref.projectionHash); same(value.projectionVersion, ref.projectionVersion)
+        same(value.source.networkRevision, ref.networkRevision); same(value.source.sha256, ref.sourceSha256)
+        same(value.source.status, 'bound'); same(value.source.integrity, 'verified')
         return value
       }
       case 'free-leveling': {

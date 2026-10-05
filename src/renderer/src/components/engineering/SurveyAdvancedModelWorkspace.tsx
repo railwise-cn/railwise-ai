@@ -1,4 +1,3 @@
-import { staticIncrementalExample } from '@shared/survey-static-incremental-example'
 import { SurveyStaticIncrementalResult } from './SurveyStaticIncrementalResult'
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +15,6 @@ import { EngineeringEvidenceQuestion, EngineeringSelectedEvidence } from './Engi
 
 const buttonClass = 'min-h-9 max-w-full rounded border border-ds-border px-3 py-2 text-left text-[12px] hover:bg-ds-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50'
 const inputClass = 'block w-full min-w-0 rounded border border-ds-border bg-ds-card px-3 py-2 text-[12px] text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent'
-const preClass = 'max-h-96 max-w-full overflow-auto whitespace-pre-wrap break-all rounded border border-ds-border-muted p-3 font-mono text-[11px]'
 const errorKeys: Record<string, string> = {
   stale: 'advancedStale', integrity: 'advancedIntegrity', conflict: 'advancedConflict', limit: 'advancedLimit',
   rate_limit: 'advancedRateLimit', 'replay-environment': 'advancedEnvironment', 'invalid-response': 'advancedInvalidResponse',
@@ -28,44 +26,7 @@ type Props = { binding: AdvancedTrialBinding; runtimeReady: boolean }
 
 const methodKeys: Record<AdvancedTrialKind, string> = { 'generalized-w': 'advancedWMethod', vce: 'advancedVceMethod', huber: 'advancedHuberMethod', 'statistical-family': 'advancedStatisticalMethod', 'reference-datum': 'advancedReferenceMethod', 'static-incremental': 'advancedStaticMethod' }
 const limitKeys: Record<AdvancedTrialKind, string> = { 'generalized-w': 'advancedWLimits', vce: 'advancedVceLimits', huber: 'advancedHuberLimits', 'statistical-family': 'advancedStatisticalLimits', 'reference-datum': 'advancedReferenceLimits', 'static-incremental': 'advancedStaticLimits' }
-const examples: Record<AdvancedTrialKind, unknown> = {
-  'static-incremental': staticIncrementalExample,
-  'reference-datum': {
-    schemaVersion: 1, model: 'two-epoch-one-dimensional-declared-reference-datum', unit: 'mm', method: 'gls-reference-mean',
-    referenceDeclaration: 'caller-selected-reference-set-not-verified-stable', testingStrategy: 'none-datum-comparison-only',
-    firstEpoch: { id: 'epoch-1', sourceAnchor: 'synthetic-not-verified', sourceSha256: '0'.repeat(64), covarianceBasis: 'caller-declared-full-coordinate-covariance-not-cofactor',
-      points: [0, 10, 20].map((coordinate, i) => ({ id: ['a', 'b', 'c'][i], coordinate })), covariance: [[1,0,0],[0,1,0],[0,0,1]] },
-    secondEpoch: { id: 'epoch-2', sourceAnchor: 'synthetic-not-verified', sourceSha256: '0'.repeat(64), covarianceBasis: 'caller-declared-full-coordinate-covariance-not-cofactor',
-      points: [2, 14, 27].map((coordinate, i) => ({ id: ['a', 'b', 'c'][i], coordinate })), covariance: [[1,0,0],[0,1,0],[0,0,1]] },
-    mapping: ['a', 'b', 'c'].map(id => ({ id, firstPointId: id, secondPointId: id })), referenceIds: ['a', 'b'],
-    dependence: { kind: 'caller-declared-independent', sourceAnchor: 'synthetic-not-verified' }
-  },
-  huber: {
-    schemaVersion: 1, model: 'fixed-linear-full-column-rank', independenceDeclaration: 'caller-declared-independent-observations', residualConvention: 'observed-minus-fitted', observationUnit: 'm',
-    parameterIds: ['position'], parameterUnits: ['m'], initialParameters: [0], scale: { kind: 'fixed-external', value: 1, unit: 'm', basisStatement: 'Synthetic fixed external scale.' }, loss: { kind: 'huber', k: 1 },
-    observations: [0, 0, 0, 10].map((value, i) => ({ id: `o${i}`, value, coefficients: [1], relativeSigma: 1, sourceAnchor: 'synthetic-example' })),
-    stopping: { maxIterations: 200, standardizedPredictionStepTolerance: 1e-10, relativeObjectiveTolerance: 1e-10, normalizedScoreTolerance: 1e-10 }
-  },
-  'statistical-family': {
-    schemaVersion: 1, familyId: 'example-family', declaration: 'caller-declared-before-observing-statistics', statisticPrecision: 'caller-declared-exact-scalar-inputs-no-upstream-error-propagation', correction: 'bonferroni', alpha: .05,
-    members: ['a', 'b'].map(id => ({ id, sourceAnchor: 'synthetic-example', distribution: { kind: 'normal', tail: 'two-sided', statisticBasis: 'standardized-by-known-prior-scale', scaleBasis: 'caller-declared-known-prior-standard-deviation', priorStandardDeviation: 1, scaleUnit: 'm' } })),
-    statistics: [{ memberId: 'a', status: 'available', value: 3 }]
-  },
-  'generalized-w': {
-    schemaVersion: 1, model: 'fixed-linear-full-column-rank', purpose: 'declared-model-readonly-diagnostic', residualConvention: 'observed-minus-adjusted',
-    observationUnit: 'm', observationIds: ['o1', 'o2', 'o3'], parameterIds: ['mean'], parameterUnits: ['m'],
-    designMatrix: [[1], [1], [1]], observations: [0, 11, 2],
-    covariance: { kind: 'known-apriori-absolute-observation-covariance', basisStatement: 'Synthetic known covariance for this example only.', matrix: [[4, 1, 0], [1, 9, 0], [0, 0, 1]] },
-    family: { id: 'example-family', alpha: 0.05, tail: 'two-sided', declaration: 'caller-declared-before-evaluation' },
-    biasDirections: [{ id: 'o1-axis', coefficients: [1, 0, 0] }, { id: 'common-mode', coefficients: [1, 1, 1] }]
-  },
-  vce: {
-    schemaVersion: 1, model: 'fixed-linear-independent-disjoint-variance-groups', unit: 'mm', parameterIds: ['mean'],
-    groups: [{ id: 'g1', initialVariance: 1, sourceAnchor: 'synthetic-example' }],
-    observations: [1, 2, 4, 5].map((value, i) => ({ id: `o${i + 1}`, value, coefficients: [1], groupId: 'g1', relativeVariance: 1, sourceAnchor: 'synthetic-example' })),
-    maxIterations: 30, relativeTolerance: 1e-10
-  }
-}
+const fileName = (path: string): string => path.split(/[\\/]/).at(-1) ?? path
 
 export function SurveyAdvancedModelWorkspace(props: Props): ReactElement {
   // A new project, revision, workspace or connection gets a fresh local session.
@@ -77,15 +38,29 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
   const { t } = useTranslation('common')
   const [kind, setKind] = useState<AdvancedTrialKind | ''>('')
   const [declarationJson, setDeclarationJson] = useState(''), [modelBasisStatement, setBasis] = useState('')
+  const [vceParameter, setVceParameter] = useState(''), [vceUnit, setVceUnit] = useState<'m' | 'mm'>('mm')
+  const [vceValues, setVceValues] = useState(''), [vceInitialVariance, setVceInitialVariance] = useState(''), [vceRelativeVariance, setVceRelativeVariance] = useState(''), [vceSource, setVceSource] = useState('')
   const [acknowledged, setAcknowledged] = useState(false), [busy, setBusy] = useState(false)
   const [view, setView] = useState<View | null>(null), [error, setError] = useState(''), [cancelled, setCancelled] = useState(false)
   const generation = useRef(0), inFlight = useRef(false), alive = useRef(true)
+  const importSequence = useRef(0)
   const retry = useRef<Operation | null>(null), pendingSave = useRef<Operation | null>(null)
   const heading = useRef<HTMLHeadingElement>(null), kindControl = useRef<HTMLSelectElement>(null)
   const focusKind = useRef(false)
-  useEffect(() => { alive.current = true; return () => { alive.current = false; generation.current += 1 } }, [])
+  useEffect(() => { alive.current = true; return () => { alive.current = false; generation.current += 1; importSequence.current += 1 } }, [])
   useEffect(() => { if (focusKind.current) { focusKind.current = false; kindControl.current?.focus() } })
-  const input = useMemo(() => kind ? { kind, declarationJson, modelBasisStatement } : null, [kind, declarationJson, modelBasisStatement])
+  const professionalDeclaration = useMemo(() => {
+    if (kind !== 'vce' || !vceParameter.trim() || !vceSource.trim() || !vceValues.trim() || !vceInitialVariance.trim() || !vceRelativeVariance.trim()) return ''
+    const values = vceValues.split(/\r?\n/).map(value => value.trim()).filter(Boolean).map(Number)
+    const initialVariance = Number(vceInitialVariance), relativeVariance = Number(vceRelativeVariance)
+    if (values.length < 2 || values.some(value => !Number.isFinite(value)) || !Number.isFinite(initialVariance) || !Number.isFinite(relativeVariance)) return ''
+    return JSON.stringify({ schemaVersion: 1, model: 'fixed-linear-independent-disjoint-variance-groups', unit: vceUnit, parameterIds: [vceParameter.trim()],
+      groups: [{ id: '观测组', initialVariance, sourceAnchor: vceSource.trim() }],
+      observations: values.map((value, index) => ({ id: `观测${index + 1}`, value, coefficients: [1], groupId: '观测组', relativeVariance, sourceAnchor: vceSource.trim() })),
+      maxIterations: 30, relativeTolerance: 1e-8 })
+  }, [kind, vceParameter, vceUnit, vceValues, vceInitialVariance, vceRelativeVariance, vceSource])
+  const effectiveDeclaration = declarationJson || professionalDeclaration
+  const input = useMemo(() => kind ? { kind, declarationJson: effectiveDeclaration, modelBasisStatement } : null, [kind, effectiveDeclaration, modelBasisStatement])
   const valid = useMemo(() => !!input && validateAdvancedTrialInput(binding, input), [binding, input])
   const ready = runtimeReady && !busy
   const formReady = ready && !pendingSave.current
@@ -96,7 +71,21 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
   function resetDraft(nextKind: AdvancedTrialKind | '' = kind): void {
     focusKind.current = true
     invalidate(); retry.current = null; pendingSave.current = null; setCancelled(false)
-    setKind(nextKind); setDeclarationJson(''); setBasis('')
+    importSequence.current += 1
+    setKind(nextKind); setDeclarationJson(''); setBasis(''); setVceParameter(''); setVceUnit('mm'); setVceValues(''); setVceInitialVariance(''); setVceRelativeVariance(''); setVceSource('')
+  }
+  function clearImportedDeclaration(): void { importSequence.current += 1; setDeclarationJson('') }
+  async function importDeclaration(file: File | undefined): Promise<void> {
+    const sequence = ++importSequence.current
+    setDeclarationJson(''); setAcknowledged(false); setView(null)
+    if (!file) return
+    if (file.size > LIMITS.declarationBytes) { setError('invalid-input'); return }
+    try {
+      const text = await file.text()
+      if (!alive.current || sequence !== importSequence.current) return
+      if (new TextEncoder().encode(text).byteLength > LIMITS.declarationBytes) { setError('invalid-input'); return }
+      setDeclarationJson(text); setError('')
+    } catch { if (alive.current && sequence === importSequence.current) setError('invalid-input') }
   }
   async function execute(operation: Operation): Promise<void> {
     if (!runtimeReady || inFlight.current || !alive.current) return
@@ -146,16 +135,24 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
     <h3 ref={heading} tabIndex={-1} className="text-[15px] font-semibold outline-offset-4">{t('advancedTitle')}</h3>
     <p className="leading-5 text-ds-muted">{t('advancedIntro')}</p>
     <p className="rounded border border-amber-300 bg-amber-50 p-3 leading-5 text-amber-950 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100">{t('advancedBoundary')}</p>
-    <p className="break-all text-ds-muted">{t('advancedBinding', { id: binding.projectId, revision: binding.projectRevision })}</p>
     <div className="min-w-0 space-y-3 rounded border border-ds-border-muted bg-ds-card p-3">
       <label className="block space-y-1"><span>{t('advancedMethod')}</span><select ref={kindControl} className={inputClass} value={kind} disabled={!formReady} onChange={event => resetDraft(event.target.value as AdvancedTrialKind | '')}><option value="">{t('advancedChooseMethod')}</option>{(Object.entries(methodKeys) as Array<[AdvancedTrialKind, string]>).map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label>
       {kind ? <>
         <p className="leading-5">{t(limitKeys[kind])}</p>
-        <details><summary className="cursor-pointer py-2">{t('advancedExample')}</summary><p className="mb-2 leading-5 text-ds-muted">{t('advancedExampleWarning')}</p><pre className={preClass} tabIndex={0}>{JSON.stringify(examples[kind], null, 2)}</pre></details>
+        {kind === 'vce' ? <fieldset className="grid min-w-0 gap-3 rounded border border-ds-border-muted p-3 sm:grid-cols-2"><legend className="px-1 font-medium">{t('advancedProfessionalInput')}</legend>
+          <label className="block space-y-1"><span>{t('advancedParameter')}</span><input className={inputClass} value={vceParameter} disabled={!formReady} onChange={event => { setVceParameter(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
+          <label className="block space-y-1"><span>{t('advancedObservationUnit')}</span><select className={inputClass} value={vceUnit} disabled={!formReady} onChange={event => { setVceUnit(event.target.value as 'm' | 'mm'); clearImportedDeclaration(); setAcknowledged(false); setView(null) }}><option value="m">m</option><option value="mm">mm</option></select></label>
+          <label className="block space-y-1"><span>{t('advancedObservationRows')}</span><textarea rows={5} className={inputClass} value={vceValues} disabled={!formReady} onChange={event => { setVceValues(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
+          <div className="space-y-3">
+            <label className="block space-y-1"><span>{t('advancedInitialValue')}</span><input inputMode="decimal" className={inputClass} value={vceInitialVariance} disabled={!formReady} onChange={event => { setVceInitialVariance(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
+            <label className="block space-y-1"><span>{t('advancedRelativeVariance')}</span><input inputMode="decimal" className={inputClass} value={vceRelativeVariance} disabled={!formReady} onChange={event => { setVceRelativeVariance(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
+            <label className="block space-y-1"><span>{t('advancedSourceReference')}</span><input className={inputClass} value={vceSource} disabled={!formReady} onChange={event => { setVceSource(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
+          </div>
+          <p className="leading-5 text-ds-muted sm:col-span-2">{t('advancedVceProfessionalHint')}</p>
+        </fieldset> : null}
+        <label className="block space-y-1"><span>{t('advancedImportModel')}</span><input type="file" accept="application/json,.json" className={inputClass} disabled={!formReady} onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void importDeclaration(file) }} /></label>
         <label className="block space-y-1"><span>{t('advancedBasis')}</span><textarea rows={4} className={inputClass} value={modelBasisStatement} disabled={!formReady} onChange={event => { setBasis(event.target.value); setAcknowledged(false); setView(null) }} /></label>
         <p className="leading-5 text-ds-muted">{t('advancedBasisHint', { limit: LIMITS.basisBytes / 1024 })}</p>
-        <label className="block space-y-1"><span>{t('advancedJson')}</span><textarea rows={12} spellCheck={false} className={`${inputClass} font-mono`} value={declarationJson} disabled={!formReady} onChange={event => { setDeclarationJson(event.target.value); setAcknowledged(false); setView(null) }} /></label>
-        <p className="leading-5 text-ds-muted">{t('advancedJsonHint', { limit: LIMITS.declarationBytes / 1024, bytes: new TextEncoder().encode(declarationJson).byteLength })}</p>
         {!valid && (declarationJson || modelBasisStatement) ? <p role="status" className="text-amber-900 dark:text-amber-200">{t('advancedValidation')}</p> : null}
         <label className="flex items-start gap-2 leading-5"><input type="checkbox" className="mt-1" checked={acknowledged} disabled={!formReady || !valid} onChange={event => setAcknowledged(event.target.checked)} /><span>{t('advancedAcknowledge')}</span></label>
       </> : null}
@@ -168,25 +165,22 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
     {ready && retry.current ? <button type="button" className={buttonClass} onClick={() => { if (retry.current) void execute(retry.current) }}>{t('advancedRetry')}</button> : null}
     {pendingSave.current && !busy ? <div className="space-y-2"><p className="leading-5 text-ds-muted">{t('advancedPending')}</p><div className="flex flex-wrap gap-2">{retry.current !== pendingSave.current ? <button type="button" className={buttonClass} disabled={!ready} onClick={() => { if (pendingSave.current) void execute(pendingSave.current) }}>{t('advancedRetrySave')}</button> : null}<button type="button" className={buttonClass} disabled={!ready} onClick={() => resetDraft()}>{t('advancedNewDraft')}</button></div></div> : null}
     {record ? <EngineeringSelectedEvidence reference={{ kind: 'advanced-trial', trialId: record.id, recordHash: record.recordHash }}><div className="min-w-0 space-y-4 border-t border-ds-border-muted pt-4">
-      <EngineeringEvidenceQuestion label={`${t(methodKeys[record.kind])} · ${record.id}`} />
-      <h4 className="font-semibold">{t('advancedSavedRecord')}</h4><p className="break-all font-mono text-[11px]">{record.id} · {record.createdAt}</p>
+      <EngineeringEvidenceQuestion label={t(methodKeys[record.kind])} />
+      <h4 className="font-semibold">{t('advancedSavedRecord')}</h4><p className="text-ds-muted">{new Date(record.createdAt).toLocaleString()}</p>
       <p className="leading-5 text-ds-muted">{t('advancedVerified')}</p>
       <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={!ready} onClick={() => void execute({ kind: 'read', run: async stillCurrent => ({ record: await reverifyAdvancedTrial(binding, advancedTrialSummary(record), stillCurrent) }) })}>{t('advancedReverify')}</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => exportRecord(record)}>{t('advancedExport')}</button></div>
-      {view?.exportStatus ? <p role={view.exportStatus === 'failed' ? 'alert' : 'status'} className="break-all leading-5">{t(view.exportStatus === 'saved' ? 'advancedExportSaved' : view.exportStatus === 'cancelled' ? 'advancedExportCancelled' : 'advancedExportFailed', { path: view.exportPath })}</p> : null}
+      {view?.exportStatus ? <p role={view.exportStatus === 'failed' ? 'alert' : 'status'} className="break-words leading-5">{t(view.exportStatus === 'saved' ? 'advancedExportSaved' : view.exportStatus === 'cancelled' ? 'advancedExportCancelled' : 'advancedExportFailed', { path: view.exportPath ? fileName(view.exportPath) : undefined })}</p> : null}
       <h5 className="font-medium">{t('advancedBasis')}</h5><p className="whitespace-pre-wrap break-words leading-5">{record.modelBasisStatement}</p>
       {record.kind === 'static-incremental' ? <SurveyStaticIncrementalResult result={record.result} /> : record.kind === 'reference-datum' ? <SurveyReferenceDatumResult result={record.result} /> : record.kind === 'generalized-w' ? <GeneralizedWResult result={record.result} /> : record.kind === 'huber' ? <HuberTrialResult result={record.result} /> : record.kind === 'statistical-family' ? <StatisticalFamilyResult result={record.result} /> : <>
         <div className="min-w-0 space-y-2" aria-label={t('advancedInitialGroups')}><h5 className="font-medium">{t('advancedInitialGroups')}</h5>{record.declaration.groups.map(group => <p key={group.id} className="break-all">{group.id} · {group.initialVariance} {record.declaration.unit}² · {group.sourceAnchor}</p>)}<p>{t('advancedStoppingPolicy', { iterations: record.declaration.maxIterations, tolerance: record.declaration.relativeTolerance })}</p></div>
         <VceTrialResult result={record.result} />
       </>}
-      <details><summary className="cursor-pointer py-2">{t('advancedOriginalInput')}</summary><p className="mb-2 leading-5 text-ds-muted">{t('advancedNormalizationHint')}</p><pre className={preClass} tabIndex={0}>{record.declarationJson}</pre></details>
-      <details><summary className="cursor-pointer py-2">{t('advancedNormalizedInput')}</summary><pre className={preClass} tabIndex={0}>{JSON.stringify(record.declaration, null, 2)}</pre></details>
-      <details><summary className="cursor-pointer py-2">{t('advancedEvidence')}</summary><dl className="space-y-2 break-all text-[11px]">{(['algorithmVersion', 'requestSha256', 'declarationSha256', 'modelBasisSha256', 'modelHash', 'resultHash', 'recordHash', 'replayEnvironmentHash'] as const).map(key => <div key={key}><dt>{key}</dt><dd className="font-mono">{record[key]}</dd></div>)}</dl><pre className={`${preClass} mt-3`} tabIndex={0}>{record.requestJson}</pre><pre className={`${preClass} mt-3`} tabIndex={0}>{JSON.stringify(record.result, null, 2)}</pre></details>
     </div></EngineeringSelectedEvidence> : null}
     {page ? <section className="min-w-0 space-y-3 border-t border-ds-border-muted pt-4" aria-label={t('advancedHistory')}>
       <h4 className="font-semibold">{t('advancedHistory')}</h4>
       {!page.trials.length && !page.unavailable.length ? <p>{t('advancedNoHistory')}</p> : null}
-      {page.unavailable.map(item => <div role="status" key={item.id} className="break-all rounded border border-amber-300 p-3"><p>{t('advancedUnrestorable')} · {item.id}</p><p>{t(errorKeys[item.reason])}</p></div>)}
-      {page.trials.map(item => <button key={item.id} type="button" className={`${buttonClass} block w-full break-words`} disabled={!ready} onClick={() => restore(item)}><span className="block">{t('advancedRestore')} · {t(methodKeys[item.kind])} · {t(advancedOutcomeKeys[item.outcome])}</span><span className="mt-1 block break-all font-mono text-[11px]">{item.id} · {item.createdAt}</span>{item.kind === 'static-incremental' ? <span className="mt-1 block">{t('advancedStaticCounts', { base: item.baseObservationCount, appended: item.appendedObservationCount, total: item.observationCount })}</span> : null}</button>)}
+      {page.unavailable.map(item => <div role="status" key={item.id} className="rounded border border-amber-300 p-3"><p>{t('advancedUnrestorable')}</p><p>{t(errorKeys[item.reason])}</p></div>)}
+      {page.trials.map(item => <button key={item.id} type="button" className={`${buttonClass} block w-full break-words`} disabled={!ready} onClick={() => restore(item)}><span className="block">{t('advancedRestore')} · {t(methodKeys[item.kind])} · {t(advancedOutcomeKeys[item.outcome])}</span><span className="mt-1 block text-ds-muted">{new Date(item.createdAt).toLocaleString()}</span>{item.kind === 'static-incremental' ? <span className="mt-1 block">{t('advancedStaticCounts', { base: item.baseObservationCount, appended: item.appendedObservationCount, total: item.observationCount })}</span> : null}</button>)}
       <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={!ready || page.offset === 0} onClick={() => history(Math.max(0, page.offset - LIMITS.pageSize))}>{t('advancedPrevious')}</button><button type="button" className={buttonClass} disabled={!ready || page.nextOffset === null} onClick={() => { if (page.nextOffset !== null) history(page.nextOffset) }}>{t('advancedNext')}</button></div>
     </section> : null}
   </section>

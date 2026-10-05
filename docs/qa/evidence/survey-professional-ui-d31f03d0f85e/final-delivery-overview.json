@@ -1,0 +1,86 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "id": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+    "name": "professional",
+    "taskType": "control-network",
+    "monitoringType": "control-network",
+    "unit": "m",
+    "signConvention": "positive",
+    "thresholds": {},
+    "reportPeriod": {},
+    "workspace": "/private/tmp/railwise-professional-candidate/home/.workwise/default_workspace",
+    "revision": 2,
+    "createdAt": "2026-09-30T10:42:02.941Z",
+    "updatedAt": "2026-09-30T10:43:34.323Z"
+  },
+  "datasets": [],
+  "analyses": [],
+  "runs": [
+    {
+      "id": "run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "deliveryInputHash": "5b6e9f093e61603e61014db771012b4f49d21446e7254b5bbb4637e07ef689c2",
+      "status": "completed",
+      "revision": 1,
+      "idempotencyKey": "engineering-preview-project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec-1790774036461",
+      "createdAt": "2026-09-30T13:13:57.074Z",
+      "updatedAt": "2026-09-30T13:13:57.074Z"
+    },
+    {
+      "id": "run_145f3736-b484-492d-b320-fb2db9f696d0",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "deliveryInputHash": "5b6e9f093e61603e61014db771012b4f49d21446e7254b5bbb4637e07ef689c2",
+      "status": "completed",
+      "revision": 1,
+      "idempotencyKey": "engineering-preview-project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec-1790765968340",
+      "createdAt": "2026-09-30T10:59:28.979Z",
+      "updatedAt": "2026-09-30T10:59:28.979Z"
+    }
+  ],
+  "manifests": [],
+  "latestPreview": {
+    "run": {
+      "id": "run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "deliveryInputHash": "5b6e9f093e61603e61014db771012b4f49d21446e7254b5bbb4637e07ef689c2",
+      "status": "completed",
+      "revision": 1,
+      "idempotencyKey": "engineering-preview-project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec-1790774036461",
+      "createdAt": "2026-09-30T13:13:57.074Z",
+      "updatedAt": "2026-09-30T13:13:57.074Z"
+    },
+    "files": [
+      {
+        "path": ".workwise/deliverables/project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec/run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc/report.docx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "sha256": "71af42822558652c9dde1bda771c3529fcc1878d0a4551a4f46894493934ff5f",
+        "sizeBytes": 27841
+      },
+      {
+        "path": ".workwise/deliverables/project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec/run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc/report.pdf",
+        "mediaType": "application/pdf",
+        "sha256": "d35a385ebe1835fc8a2d9a79a0d6115329a4bac1327cc0fc4437fa3f79db1b14",
+        "sizeBytes": 61185
+      },
+      {
+        "path": ".workwise/deliverables/project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec/run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc/evidence.xlsx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "sha256": "64eccffdf3185b8ace7f5ce2efc0159118752949d4aba6005475950caeb5e08d",
+        "sizeBytes": 33967
+      },
+      {
+        "path": ".workwise/deliverables/project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec/run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc/professional.xlsx",
+        "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "sha256": "3500966d9d260d82f796ede207d24aebc7282c9b19c265c2788547b6573e5e77",
+        "sizeBytes": 34374
+      },
+      {
+        "path": ".workwise/deliverables/project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec/run_2e8ace7d-cb36-4b5e-ab0a-fe009f747ecc/professional-review.json",
+        "mediaType": "application/json",
+        "sha256": "34481def79dd09ddb89f6028f82f8ce1e704391a7661aab61e662a9a7159c86b",
+        "sizeBytes": 21732
+      }
+    ]
+  }
+}

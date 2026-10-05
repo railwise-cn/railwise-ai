@@ -102,6 +102,20 @@ export async function parseQualityWorkflow(value: unknown, context: WorkflowCont
         || issue.correctionId !== actual.correctionId || issue.artifactHash !== actual.recheckedArtifactSha256 || !entry.targetBinding
         || !matchingSource(entry.targetBinding, declared.rechecked, origin) || actual.recheckedArtifactSha256 !== entry.targetBinding.artifactHash) return invalid()
       issue.resolved = actual.outcome === 'resolved'
+    } else if (declared.kind === 'stage-started' && actual.kind === 'stage-started') {
+      if (actual.stageId !== declared.stageId || actual.stageKind !== declared.stageKind || actual.policyVersion !== declared.policyVersion || actual.checkedScope !== declared.checkedScope || entry.targetBinding !== null) return invalid()
+    } else if (declared.kind === 'stage-completed' && actual.kind === 'stage-completed') {
+      if (actual.stageId !== declared.stageId || actual.stageKind !== declared.stageKind || actual.outcome !== declared.outcome || entry.targetBinding !== null) return invalid()
+    } else if (declared.kind === 'rule-applicability' && actual.kind === 'rule-applicability') {
+      if (actual.declarationId !== declared.declarationId || !equal(actual.rule, declared.rule) || actual.status !== declared.status || actual.rationale !== declared.rationale || entry.targetBinding !== null) return invalid()
+    } else if (declared.kind === 'rule-revoked' && actual.kind === 'rule-revoked') {
+      if (actual.declarationId !== declared.declarationId || actual.reason !== declared.reason || entry.targetBinding !== null) return invalid()
+    } else if (declared.kind === 'signoff-declared' && actual.kind === 'signoff-declared') {
+      if (actual.signoffId !== declared.signoffId || actual.purpose !== declared.purpose || actual.actorKey !== declared.actorKey || entry.targetBinding !== null) return invalid()
+    } else if (declared.kind === 'signoff-revoked' && actual.kind === 'signoff-revoked') {
+      if (actual.signoffId !== declared.signoffId || actual.reason !== declared.reason || entry.targetBinding !== null) return invalid()
+    } else if (declared.kind === 'delivery-approval-requested' && actual.kind === 'delivery-approval-requested') {
+      if (actual.approvalId !== declared.approvalId || !equal(actual.requiredSignoffIds, declared.requiredSignoffIds) || entry.targetBinding !== null) return invalid()
     } else return invalid()
     previousHash = thisHash; previousTime = Date.parse(event.occurredAt); ids.add(event.id); keys.add(entry.request.idempotencyKey)
   }

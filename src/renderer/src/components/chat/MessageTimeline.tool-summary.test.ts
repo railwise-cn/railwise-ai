@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { ChatBlock, NormalizedThread, ToolBlock } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
 import { MessageTimeline, summarizeToolBlock } from './MessageTimeline'
-import { MessageBubble } from './message-timeline-bubbles'
+import { GeneratedFilesPanel, MessageBubble } from './message-timeline-bubbles'
 import { ProcessSectionRow } from './message-timeline-process'
 import { resolveTimelineWorkspaceRoot } from './use-timeline-stores'
 
@@ -148,6 +148,53 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     })
   })
 
+  it('enforces the professional surface boundary for direct assistant rendering', () => {
+    const block: ChatBlock = {
+      kind: 'assistant',
+      id: 'assistant_professional',
+      text: 'survey_read_context returned contextHash=abc. S1 residual is 0.4 mm and remains below the tolerance.'
+    }
+
+    const html = renderToStaticMarkup(createElement(MessageBubble, { block, professionalSurface: true, language: 'zh-CN' }))
+
+    expect(html).toContain('S1 residual is 0.4 mm')
+    expect(html).not.toContain('survey_read_context')
+    expect(html).not.toContain('contextHash')
+  })
+
+  it('removes internal evidence routing metadata from user messages on the professional surface', () => {
+    const block: ChatBlock = {
+      kind: 'user',
+      id: 'user_professional',
+      text: [
+        '请解释 S1 的结果。',
+        '',
+        'Selected Survey evidence (reference IDs only, not execution approval): {"projectId":"p","networkId":"n"}',
+        'Read these exact legacy selectors using survey_read_context before answering. This selection has no typedEvidence.'
+      ].join('\n')
+    }
+
+    const html = renderToStaticMarkup(createElement(MessageBubble, { block, professionalSurface: true, language: 'zh-CN' }))
+
+    expect(html).toContain('请解释 S1 的结果。')
+    expect(html).not.toContain('Selected Survey evidence')
+    expect(html).not.toContain('survey_read_context')
+    expect(html).not.toContain('projectId')
+  })
+
+  it('translates generated survey record IDs in professional user questions', () => {
+    const block: ChatBlock = {
+      kind: 'user',
+      id: 'user_survey_record_id',
+      text: '请解释观测 cosa-in2-6-backsight-reset 的结果。'
+    }
+
+    const html = renderToStaticMarkup(createElement(MessageBubble, { block, professionalSurface: true, language: 'zh-CN' }))
+
+    expect(html).toContain('请解释观测 后视归零方向 的结果。')
+    expect(html).not.toContain('cosa-in2-6-backsight-reset')
+  })
+
   it('renders user image attachments as thumbnails instead of attachment chips', () => {
     const block: ChatBlock = {
       kind: 'user',
@@ -200,6 +247,72 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
     expect(html).not.toContain('Claw managed instructions')
     expect(html).not.toContain('Agent name')
     expect(html).not.toContain('Feishu / Lark inbound message')
+  })
+
+  it('hides runtime skill, memory, and child-agent metadata on the professional surface', () => {
+    const block: ChatBlock = {
+      kind: 'user',
+      id: 'user_professional_runtime_meta',
+      text: '请检查控制网资料。',
+      meta: {
+        activeSkillIds: ['rail-any-station-control-network'],
+        injectedMemoryIds: ['memory-internal-1'],
+        child: {
+          parentThreadId: 'thread-parent-1',
+          parentTurnId: 'turn-parent-1',
+          childId: 'child-research-1',
+          childLabel: 'research',
+          childStatus: 'completed',
+          childSeq: 1
+        }
+      }
+    }
+
+    const html = renderToStaticMarkup(createElement(MessageBubble, { block, professionalSurface: true }))
+
+    expect(html).toContain('请检查控制网资料。')
+    expect(html).not.toContain('rail-any-station-control-network')
+    expect(html).not.toContain('memory-internal-1')
+    expect(html).not.toContain('child-research-1')
+    expect(html).not.toContain('research')
+    expect(html).not.toMatch(/Skills|Memories|Child agent|已启用技能|记忆|子任务/)
+  })
+
+  it('hides generated file panels from the professional conversation surface', () => {
+    const block = toolBlock({
+      meta: {
+        generatedFiles: [{
+          id: 'deliverable-1',
+          name: 'adjustment-report.pdf',
+          mimeType: 'application/pdf',
+          relativePath: 'deliverables/adjustment-report.pdf'
+        }]
+      }
+    })
+
+    const html = renderToStaticMarkup(createElement(GeneratedFilesPanel, {
+      blocks: [block],
+      workspaceRoot: '/tmp/project',
+      activeThreadId: 'thr_1',
+      professionalSurface: true
+    }))
+
+    expect(html).toBe('')
+  })
+
+  it('does not render runtime blocks when a professional caller passes them directly', () => {
+    const blocks: ChatBlock[] = [
+      { kind: 'reasoning', id: 'reasoning_1', text: 'internal reasoning with a session ID session-123' },
+      toolBlock({ id: 'tool_professional', summary: 'survey_read_context', filePath: '/tmp/project/result.json', meta: { session_id: 'session-123' } }),
+      { kind: 'system', id: 'system_1', text: 'Runtime failure', code: 'runtime_internal_code' },
+      { kind: 'approval', id: 'approval_1', approvalId: 'approval-request-1', status: 'error', summary: 'Approval payload', toolName: 'survey_adjustment', errorMessage: 'exit code 1' }
+    ]
+
+    for (const block of blocks) {
+      const html = renderToStaticMarkup(createElement(MessageBubble, { block, professionalSurface: true, language: 'zh-CN' }))
+      expect(html).toBe('')
+      expect(html).not.toMatch(/survey_read_context|session-123|runtime_internal_code|survey_adjustment|exit code|result\.json/)
+    }
   })
 
   it('renders attachment, Skill, memory, web source, and child-agent chips in bubbles', () => {

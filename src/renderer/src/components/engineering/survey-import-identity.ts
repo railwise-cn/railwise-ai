@@ -5,6 +5,7 @@ export async function surveyImportKey(projectId: string, input: {
   networkType: string
   transformType?: string
   cosaIn1Mapping?: unknown
+  tabularMapping?: unknown
   knownPoints?: unknown
 }): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(input)))

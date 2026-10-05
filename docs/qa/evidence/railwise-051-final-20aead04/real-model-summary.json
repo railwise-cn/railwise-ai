@@ -1,0 +1,36 @@
+{
+  "turn_tjp3v8n2": {
+    "toolCalls": [
+      {
+        "tool": "survey_read_context",
+        "arguments": {},
+        "persistedArgumentsRedacted": true
+      }
+    ],
+    "toolResults": [
+      {
+        "tool": "survey_read_context",
+        "isError": false
+      }
+    ],
+    "answerQuantityCheck": true,
+    "validationScope": "Visible answers and successful stored tool results; persisted raw tool arguments are redacted. No schema-error/retry observed."
+  },
+  "turn_bhitjlkh": {
+    "toolCalls": [
+      {
+        "tool": "survey_read_evidence",
+        "arguments": {},
+        "persistedArgumentsRedacted": true
+      }
+    ],
+    "toolResults": [
+      {
+        "tool": "survey_read_evidence",
+        "isError": false
+      }
+    ],
+    "answerQuantityCheck": true,
+    "validationScope": "Visible answers and successful stored tool results; persisted raw tool arguments are redacted. No schema-error/retry observed."
+  }
+}

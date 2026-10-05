@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-09-27T21:55:55.488228+00:00",
+  "method": "read-only SQLite logical dump SHA256; no record values exported",
+  "databases": {
+    "engineering-ai.sqlite3": {
+      "logicalSha256": "9b2a5a23abe6b3417a650f9dd380f259048bbfd5be8a35fb5ffcef7d47ddfd37",
+      "tables": {
+        "engineering_ai_approvals": 0,
+        "engineering_ai_idempotency": 0,
+        "engineering_ai_plans": 0,
+        "engineering_ai_project_suggestions": 0,
+        "engineering_ai_step_evidence": 0
+      }
+    },
+    "engineering.sqlite3": {
+      "logicalSha256": "51cb97e643f899a2b7722f6c158e79d5b8c89d5e9591828a4be6a67b86c72702",
+      "tables": {
+        "engineering_analyses": 0,
+        "engineering_charts": 0,
+        "engineering_datasets": 0,
+        "engineering_delivery_idempotency": 0,
+        "engineering_idempotency": 5,
+        "engineering_manifests": 0,
+        "engineering_monitoring_replay_events": 0,
+        "engineering_monitoring_sources": 0,
+        "engineering_projects": 3,
+        "engineering_runs": 0,
+        "engineering_verification_attempts": 0,
+        "engineering_verification_events": 0,
+        "sqlite_sequence": 0
+      }
+    },
+    "survey-advanced-trials.sqlite3": {
+      "logicalSha256": "2625022969e07640f9de402808a9cb0b47d89c6caf49f2c9f47c630162698ab2",
+      "tables": {
+        "advanced_trials": 0
+      }
+    },
+    "survey-quality-assessment.sqlite3": {
+      "logicalSha256": "eefe7427aebb0835e6bf302830fcd2ef3c4ea7af0d1505267f0fb1aadc5412b9",
+      "tables": {
+        "assessment_plans": 0,
+        "assessments": 0
+      }
+    },
+    "survey-quality-scoring.sqlite3": {
+      "logicalSha256": "591737618125659a47c5830b66a20261c7aa67a7df1fe48fd7bdef1fd1d1a65a",
+      "tables": {
+        "quality_scoring_records": 0
+      }
+    },
+    "survey-quality-workflow.sqlite3": {
+      "logicalSha256": "e4c2574db06fd14d0c2f6295ca34da7b2018a2003efefd01912a6e0978f3cdf1",
+      "tables": {
+        "workflow_heads": 0,
+        "workflow_records": 0
+      }
+    },
+    "survey-quality.sqlite3": {
+      "logicalSha256": "2d1a74bf50aacce35dbf99678144501e5f2a769d8676924b58854c0a60e35c5b",
+      "tables": {
+        "quality_blobs": 0,
+        "quality_events": 0,
+        "quality_heads": 0,
+        "quality_objects": 0
+      }
+    },
+    "survey-sampling.sqlite3": {
+      "logicalSha256": "0e82e03d0a7059f1f87f67db24e366b2fd9d26184e80b07547dbcf595ea84ddf",
+      "tables": {
+        "sampling_populations": 0,
+        "sampling_runs": 0
+      }
+    },
+    "survey.sqlite3": {
+      "logicalSha256": "e4e6c2722a9320488a208705d6bb12220465a931a56628eff8febe615febb8e7",
+      "tables": {
+        "sqlite_sequence": 1,
+        "survey_adjustment_evidence": 2,
+        "survey_adjustments": 2,
+        "survey_deformations": 0,
+        "survey_derived_correction_idempotency": 0,
+        "survey_derived_corrections": 0,
+        "survey_free_leveling_trials": 0,
+        "survey_idempotency": 7,
+        "survey_import_attempt_events": 9,
+        "survey_networks": 3,
+        "survey_projects": 0,
+        "survey_raw_source_ledger": 5,
+        "survey_source_admissions": 3
+      }
+    }
+  },
+  "comparison": {
+    "baseline": "before",
+    "unchanged": 9,
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "identical": true
+  }
+}

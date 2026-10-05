@@ -2,12 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   buildMcpConfig,
   customMcpConfigFragment,
+  fallbackPluginMonogram,
   mcpConfigHasServer,
   mcpMarketplaceItemsFromConfigAndDiagnostics,
   mcpRuntimeErrorHint,
   mergeMcpJsonConfig,
   skillMarketplaceItemsFromDiscoveredSkills
 } from './PluginMarketplaceView'
+
+describe('PluginMarketplaceView icon fallbacks', () => {
+  it('always produces a visible two-character fallback for missing icon values', () => {
+    const base = { id: 'missing-icon', name: 'Survey Tools' } as any
+    expect(fallbackPluginMonogram(base)).toBe('SU')
+    expect(fallbackPluginMonogram({ ...base, name: '测量工具' })).toBe('测量')
+    expect(fallbackPluginMonogram({ ...base, name: '!!!', id: '!!!' })).toBe('RW')
+  })
+})
 
 describe('PluginMarketplaceView MCP config helpers', () => {
   it('merges recommended MCP servers into JSON config without dropping existing fields', () => {

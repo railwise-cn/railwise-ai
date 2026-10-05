@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SurveyStatisticalDeclarationV1 } from './survey-statistical-declaration.js'
 
 /** Version 1 is deliberately a declared scalar-statistic calculator, not an outlier-removal rule. */
 export const SURVEY_STATISTICAL_FAMILY_POLICY_V1 = {
@@ -40,6 +41,8 @@ export const SurveyStatisticalFamilyInputV1 = z.object({
   statisticPrecision: z.literal('caller-declared-exact-scalar-inputs-no-upstream-error-propagation'),
   correction: z.literal('bonferroni'),
   alpha: finite.min(SURVEY_STATISTICAL_FAMILY_POLICY_V1.minAlpha).max(SURVEY_STATISTICAL_FAMILY_POLICY_V1.maxAlpha),
+  /** Optional for old declarations; evaluated outputs always carry a status. */
+  statisticalDeclaration: SurveyStatisticalDeclarationV1.optional(),
   members: z.array(z.object({ id, sourceAnchor: id, distribution: SurveyStatisticalDistributionV1 }).strict()).min(1).max(SURVEY_STATISTICAL_FAMILY_POLICY_V1.maxFamilySize),
   statistics: z.array(statistic).max(SURVEY_STATISTICAL_FAMILY_POLICY_V1.maxFamilySize)
 }).strict().superRefine((value, ctx) => {
@@ -47,6 +50,15 @@ export const SurveyStatisticalFamilyInputV1 = z.object({
   if (memberIds.size !== value.members.length) ctx.addIssue({ code: 'custom', message: 'Declared member IDs must be unique' })
   if (new Set(value.statistics.map(s => s.memberId)).size !== value.statistics.length) ctx.addIssue({ code: 'custom', message: 'Statistic member IDs must be unique' })
   if (value.statistics.some(s => !memberIds.has(s.memberId))) ctx.addIssue({ code: 'custom', message: 'Every statistic must belong to the predeclared family' })
+  if (value.statisticalDeclaration
+    && (value.statisticalDeclaration.modelVersion !== 'declared-statistical-family-1'
+      || value.statisticalDeclaration.covarianceModelVersion !== null
+      || value.statisticalDeclaration.hypotheses.scope !== 'per-member'
+      || value.statisticalDeclaration.testFamily.id !== value.familyId
+      || value.statisticalDeclaration.testFamily.alpha !== value.alpha
+      || value.statisticalDeclaration.testFamily.correction !== 'bonferroni')) {
+    ctx.addIssue({ code: 'custom', message: 'Statistical declaration family identity, alpha and correction must match the declared family' })
+  }
 })
 export type SurveyStatisticalFamilyInputV1 = z.infer<typeof SurveyStatisticalFamilyInputV1>
 
@@ -74,6 +86,8 @@ const guardrails = {
   engineeringDecision: z.literal('not-evaluated'),
   observationAction: z.literal('none'),
   numericalIntervalMeaning: z.literal('software-resolution-policy-not-certified-error-bound'),
+  /** Optional keeps historical trial records readable. New outputs include it. */
+  statisticalDeclaration: SurveyStatisticalDeclarationV1.optional(),
   logComparisonMargin: z.literal(SURVEY_STATISTICAL_FAMILY_POLICY_V1.logComparisonMargin)
 }
 export const SurveyStatisticalFamilyOutputV1 = z.discriminatedUnion('outcome', [
@@ -90,6 +104,12 @@ export const SurveyStatisticalFamilyOutputV1 = z.discriminatedUnion('outcome', [
   if (value.outcome === 'invalid-input') return
   const issue = (message: string): void => ctx.addIssue({ code: 'custom', message })
   const { request, denominator, memberAlpha, results } = value
+  if (value.statisticalDeclaration && (value.statisticalDeclaration.modelVersion !== value.algorithmVersion
+    || value.statisticalDeclaration.covarianceModelVersion !== null
+    || value.statisticalDeclaration.hypotheses.scope !== 'per-member'
+    || value.statisticalDeclaration.testFamily.id !== request.familyId
+    || value.statisticalDeclaration.testFamily.alpha !== request.alpha
+    || value.statisticalDeclaration.testFamily.correction !== 'bonferroni')) issue('statistical declaration must bind to the statistical-family model and family')
   if (denominator !== request.members.length || results.length !== denominator) issue('All declared members must remain in the denominator and result list')
   if (memberAlpha !== request.alpha / denominator) issue('Member alpha must use the full predeclared denominator')
   results.forEach((result, i) => {

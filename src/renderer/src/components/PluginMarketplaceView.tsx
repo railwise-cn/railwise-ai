@@ -1,3 +1,4 @@
+import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -41,6 +42,7 @@ import type {
 } from '@shared/marketplace'
 import type { SkillListItem } from '@shared/workwise-api'
 import type { McpServerConfigV2 } from '@shared/agent-workbench'
+import brand from '@shared/product-brand.json'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
 import { friendlyMarketplaceError } from './plugin-marketplace-compat'
@@ -805,7 +807,7 @@ export function PluginMarketplaceView(): ReactElement {
           <div>
             <h1 className="text-[20px] font-semibold">{text('pluginUnifiedTitle', 'Plugins')}</h1>
             <p className="mt-0.5 text-[12px] text-ds-muted">
-              {text('pluginUnifiedSummary', 'Connect WorkWise to the tools you use every day')}
+              {text('pluginUnifiedSummary', `Connect ${brand.platform} to the tools you use every day`, { productName: brand.platform })}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1220,7 +1222,7 @@ function LocalSkillsList({
   const browsing = filter !== 'overview' || Boolean(query.trim())
   const filters: Array<[SkillBrowseFilter, string, number | null]> = [
     ['overview', text('pluginUnifiedSkillOverview', 'Overview'), null],
-    ['workwise', text('pluginUnifiedSkillWorkWise', 'WorkWise'), groupCounts.workwise],
+    ['workwise', text('pluginUnifiedSkillWorkWise', brand.platform, { productName: brand.platform }), groupCounts.workwise],
     ['personal', text('pluginUnifiedSkillPersonal', 'Personal'), groupCounts.personal],
     ['project', text('pluginUnifiedSkillProject', 'Project'), groupCounts.project],
     ['integrations', text('pluginUnifiedSkillIntegrations', 'Codex plugins'), groupCounts.integrations],
@@ -1299,7 +1301,7 @@ function LocalSkillsList({
             const source = skill.source?.type === 'github'
               ? `${skill.source.owner}/${skill.source.repo}`
               : skill.source?.type === 'bundled'
-                ? text('pluginUnifiedSkillBundled', 'WorkWise bundled')
+                ? text('pluginUnifiedSkillBundled', `${brand.platform} bundled`, { productName: brand.platform })
                 : text('pluginUnifiedSkillLocal', 'Local folder')
             return (
               <div key={`${skill.root}:${skill.id}`} className="flex min-w-0 items-start gap-3 px-5 py-3.5 md:px-7">
@@ -1400,19 +1402,36 @@ const iconToneClasses: Record<NonNullable<MarketplaceIconV1['tone']>, string> = 
   slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
 }
 
+export function fallbackPluginMonogram(item: MarketplacePackageV1): string {
+  const source = item.name.trim() || item.id.trim()
+  const latin = source.replace(/[^A-Za-z0-9]+/g, '').slice(0, 2).toUpperCase()
+  if (latin) return latin
+  const unicode = Array.from(source).filter((character) => /[\p{L}\p{N}]/u.test(character)).slice(0, 2).join('')
+  return unicode || 'RW'
+}
+
 function PluginIcon({ item, text, compact = false }: { item: MarketplacePackageV1; text: Text; compact?: boolean }): ReactElement {
-  const icon = item.icon ?? {
-    kind: 'monogram' as const,
-    value: item.name.replace(/[^A-Za-z0-9]+/g, '').slice(0, 2).toUpperCase() || 'WW',
-    tone: 'slate' as const,
-    alt: item.name
-  }
+  const [assetFailed, setAssetFailed] = useState(false)
+  const configuredIcon = item.icon
+  const icon = configuredIcon && configuredIcon.value.trim()
+    ? configuredIcon
+    : {
+        kind: 'monogram' as const,
+        value: fallbackPluginMonogram(item),
+        tone: 'slate' as const,
+        alt: item.name
+      }
   const size = compact ? 'h-9 w-9 text-[10px]' : 'h-10 w-10 text-[12px]'
-  if (icon.kind === 'asset' && /^(?:\/|\.\/)/i.test(icon.value)) {
-    return <img src={icon.value} alt={icon.alt ?? packageDisplayName(item, text)} className={`${size} shrink-0 rounded-lg object-cover ring-1 ring-inset ring-black/10 dark:ring-white/10`} />
+  const alt = icon.alt?.trim() || packageDisplayName(item, text)
+  if (icon.kind === 'asset' && /^(?:\/|\.\/)/i.test(icon.value) && !assetFailed) {
+    return <img src={icon.value} alt={alt} onError={() => setAssetFailed(true)} className={`${size} shrink-0 rounded-lg object-cover ring-1 ring-inset ring-black/10 dark:ring-white/10`} />
   }
-  const tone = icon.tone ?? 'slate'
-  return <span aria-label={icon.alt ?? packageDisplayName(item, text)} className={`inline-flex ${size} shrink-0 items-center justify-center rounded-lg font-bold ring-1 ring-inset ring-black/10 dark:ring-white/10 ${iconToneClasses[tone]}`}>{icon.value.slice(0, 3)}</span>
+  // Catalog payloads can come from older or third-party sources. Keep a
+  // deterministic visible fallback when an unknown tone or broken asset is
+  // returned instead of leaving an empty icon slot.
+  const tone = icon.tone && iconToneClasses[icon.tone] ? icon.tone : 'slate'
+  const value = icon.kind === 'monogram' && icon.value.trim() ? icon.value.trim().slice(0, 3) : fallbackPluginMonogram(item)
+  return <span role="img" aria-label={alt} className={`inline-flex ${size} shrink-0 items-center justify-center rounded-lg font-bold ring-1 ring-inset ring-black/10 dark:ring-white/10 ${iconToneClasses[tone]}`}>{!configuredIcon?.value.trim() || assetFailed || icon.kind !== 'monogram' || !/[\p{L}\p{N}]/u.test(value) ? <ProductIcon name="plugins" className="h-5 w-5" aria-hidden="true" /> : value}</span>
 }
 
 function InstalledPluginStrip({ entries, text, onSelect }: {
@@ -1587,7 +1606,7 @@ function DetailsDrawer({ entry, source, installed, server, busy, text, onClose, 
       </DetailSection>
       <DetailSection title={text('pluginUnifiedImplementation', 'Implementation')}>
         {isManagedConnector(item)
-          ? <p className="text-[12px] text-ds-muted">{text('pluginUnifiedManagedConnector', 'WorkWise managed connector')}</p>
+          ? <p className="text-[12px] text-ds-muted">{text('pluginUnifiedManagedConnector', `${brand.platform} managed connector`, { productName: brand.platform })}</p>
           : <div className="flex flex-wrap gap-1.5">{componentTypes(item).map((type) => <ComponentBadge key={type} type={type} />)}</div>}
       </DetailSection>
       <DetailSection title={text('pluginUnifiedPermissions', 'Permissions')}>
@@ -1602,7 +1621,7 @@ function DetailsDrawer({ entry, source, installed, server, busy, text, onClose, 
       <DetailSection title={text('pluginUnifiedHealth', 'Health')}>
         <DefinitionList values={[
           [text('pluginUnifiedStatus', 'Status'), packageHealthLabel(installed?.health.status ?? (server ? (server.enabled ? 'configured' : 'disabled') : isManagedInstalled(item) ? 'managed' : 'not installed'), text)],
-          [text('pluginUnifiedLastCheck', 'Last check'), installed?.health.checkedAt ?? installed?.timestamps.lastCheckedAt ?? (isManagedInstalled(item) ? text('pluginUnifiedManagedCheck', 'Managed with WorkWise') : text('pluginUnifiedNever', 'Never'))]
+          [text('pluginUnifiedLastCheck', 'Last check'), installed?.health.checkedAt ?? installed?.timestamps.lastCheckedAt ?? (isManagedInstalled(item) ? text('pluginUnifiedManagedCheck', `Managed with ${brand.platform} releases`, { productName: brand.platform }) : text('pluginUnifiedNever', 'Never'))]
         ]} />
       </DetailSection>
     </Drawer>

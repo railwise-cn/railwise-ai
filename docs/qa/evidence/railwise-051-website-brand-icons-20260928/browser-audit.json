@@ -1,0 +1,677 @@
+{
+  "url": "https://www.railwise.cn/products/workwise/",
+  "version": "2026-09-28.1",
+  "width": 1440,
+  "overflow": false,
+  "icons": [
+    {
+      "cls": "fas fa-chevron-down text-xs ml-2",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-satellite-dish",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-microchip",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-th-large",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-terminal",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-pen-to-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-calendar-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-download",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-book-open",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-comments",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-bolt",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-diagram-project",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-forward",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-layer-group",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-word",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-pdf",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-plug",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-compass",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-list-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-circle-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-clipboard-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-import",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-compass",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chart-line",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-export",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-comments",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-layer-group",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-download",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-flask",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-route",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fab fa-apple",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Brands\"",
+      "weight": "400"
+    },
+    {
+      "cls": "fas fa-download",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fab fa-apple",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Brands\"",
+      "weight": "400"
+    },
+    {
+      "cls": "fas fa-download",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fab fa-windows",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Brands\"",
+      "weight": "400"
+    },
+    {
+      "cls": "fas fa-download",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-rocket",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-download",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-object-group",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-export",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-layer-group",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-eye",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-shield-halved",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-circle-question",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square ww-doc-card__arrow",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-word",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-fingerprint",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-clock-rotate-left",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-user-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-right",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-compass",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-circle-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-file-export",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-desktop",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-folder-tree",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-boxes-stacked",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-list-check",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-code-branch",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up-right-from-square",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-book-open",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-comments",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-paper-plane",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-phone",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-envelope",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-cube text-2xl",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-chevron-right text-xs opacity-50",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-map-marker-alt text-blue-400 text-sm",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-phone text-blue-400 text-sm",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-envelope text-blue-400 text-sm",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-clock text-blue-400 text-sm",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    },
+    {
+      "cls": "fas fa-arrow-up",
+      "content": "\"\"",
+      "font": "\"Font Awesome 6 Free\"",
+      "weight": "900"
+    }
+  ],
+  "images": [
+    {
+      "src": "https://www.railwise.cn/uploads/logos/logo_1753684408_688719b8d60b3.png",
+      "width": 320,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/uploads/logos/logo_1753684408_688719b8d60b3.png",
+      "width": 320,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/images/heroes/desktop/product-workwise.avif?v=1784885454",
+      "width": 1915,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/products/screenshots/workwise/07-survey-051-zh-light.jpg",
+      "width": 3840,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/products/screenshots/workwise/07-survey-051-zh-light.jpg",
+      "width": 3840,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/products/screenshots/workwise/08-survey-051-delivery.jpg",
+      "width": 3840,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/products/screenshots/workwise/07-survey-051-zh-light.jpg",
+      "width": 3840,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/products/screenshots/workwise/08-survey-051-delivery.jpg",
+      "width": 3840,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/products/screenshots/workwise/09-survey-051-settings.jpg",
+      "width": 2560,
+      "complete": true
+    },
+    {
+      "src": "https://www.railwise.cn/images/qrcode.jpg",
+      "width": 258,
+      "complete": true
+    }
+  ],
+  "legacyVisible": [
+    "WorkWise-0.5.1-mac-Apple-Silicon.dmg",
+    "WorkWise-0.5.1-mac-Intel.dmg",
+    "WorkWise-0.5.1-win-x64.exe"
+  ]
+}

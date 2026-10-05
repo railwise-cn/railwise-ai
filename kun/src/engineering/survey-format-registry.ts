@@ -33,8 +33,10 @@ import { parseCosaIn1, type CosaIn1Mapping } from './survey-cosa-in1.js'
 import { findP0SurveyFormatEntry, isAcceptedOpenSurveyInputFormat, isMappingRequiredOpenSurveyInputFormat } from './survey-format-catalog.js'
 import { lexLeicaGsi, type LeicaGsiLexAnchor, type LeicaGsiLexRecord, type LeicaGsiStandardWord } from './survey-leica-gsi-lexer.js'
 import { toMetres, toRadians } from './survey-units.js'
+import { SurveyTabularMappingV1 } from '../contracts/survey-tabular.js'
+import { parseSurveyTabular, SURVEY_TABULAR_PARSER_ID } from './survey-tabular-import.js'
 
-const REGISTRY_VERSION = 'workwise-survey-formats-23'
+const REGISTRY_VERSION = 'workwise-survey-formats-25'
 const COSA_IN2_PARSER_ID = 'cosa-in2-parser'
 const COSA_IN2_PARSER_VERSION = '0.3.0'
 const SURVEY_CLOUD_SUC_PARSER_ID = 'survey-cloud-suc-archive-adapter'
@@ -106,6 +108,8 @@ type FrozenWorkwiseNetworkMetadata = Partial<Pick<SurveyNetworkV1,
   'centralMeridian' | 'ellipsoid' | 'verticalDatum' | 'heightDatum' | 'unit'
 >>
 type ParsedSource = {
+  tabularMapping?: SurveyTabularMappingV1
+  networkType?: SurveyNetworkTypeV1
   knownPoints: SurveyPoint[]
   unknownPoints: SurveyPoint[]
   observations: SurveyObservation[]
@@ -170,6 +174,7 @@ export type SurveyFormatInput = {
   networkType?: SurveyNetworkTypeV1
   /** Explicit low-level mapping; no default or GUI confirmation is inferred. */
   cosaIn1Mapping?: CosaIn1Mapping
+  tabularMapping?: SurveyTabularMappingV1
   /** Optional local cancellation; never persisted as source provenance. */
   signal?: AbortSignal
 }
@@ -1108,9 +1113,15 @@ function p0CatalogRuntimePolicy(
   const englishPolicy = catalogEntry.currentDispositionReasonEn ?? catalogEntry.currentDispositionReason
   const englishAction = disposition === 'adjustment-ready'
     ? 'Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment.'
-    : 'Inspect raw records, explicit mappings and parser diagnostics; correct the input and repeat detection/import.'
-  const englishReason = `${disposition}: ${disposition !== catalogDisposition ? 'Parser capability restrictions take precedence; ' : ''}P0 format catalog ${catalogEntry.registryVersion} — ${englishPolicy}`
+    : 'Review the original survey records and correct incomplete or unsupported entries before importing again.'
+  const englishReason = `${disposition}: ${disposition !== catalogDisposition ? 'Parser capability restrictions take precedence; the source is retained for review only.' : `P0 format catalog ${catalogEntry.registryVersion} — ${englishPolicy}`}`
   const retained = options.hasAuditableParse ? '已保留可审计的解析对象' : '已保留原始源文件'
+  const chineseReason = disposition !== catalogDisposition
+    ? '解析器能力限制优先，当前资料仅供查看。'
+    : catalogEntry.currentDispositionReason
+  const chineseAction = disposition === 'adjustment-ready'
+    ? '继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。'
+    : '检查原始测量记录并修正不完整或不受支持的内容后重新导入。'
   return {
     disposition,
     // A hard failure should retain its source-specific, blocking reason. For a
@@ -1123,11 +1134,9 @@ function p0CatalogRuntimePolicy(
     diagnostic: {
       code: 'format_detected',
       severity: 'warning',
-      localized: { en: { message: `${catalogEntry.formatId}: ${options.hasAuditableParse ? 'auditable parsed objects retained' : 'original source retained'}; P0 format catalog ${catalogEntry.registryVersion} permits ${catalogDisposition}: ${englishPolicy}`, suggestedAction: englishAction } },
-      message: `${catalogEntry.vendor} / ${catalogEntry.formatId} ${retained}；P0 格式目录 ${catalogEntry.registryVersion} 当前能力策略为 ${catalogDisposition}：${catalogEntry.currentDispositionReason}`,
-      suggestedAction: disposition === 'adjustment-ready'
-        ? '继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。'
-        : '检查原始记录、显式映射和解析诊断；修正后通过重新检测/导入流程复核。'
+      localized: { en: { message: `${catalogEntry.formatId}: ${options.hasAuditableParse ? 'auditable parsed objects retained' : 'original source retained'}; P0 format catalog ${catalogEntry.registryVersion} permits ${disposition}: ${disposition === catalogDisposition ? englishPolicy : 'Parser capability restrictions take precedence; the source is retained for review only.'}`, suggestedAction: englishAction } },
+      message: `${catalogEntry.vendor} / ${catalogEntry.formatId} ${retained}；P0 格式目录 ${catalogEntry.registryVersion} 当前能力策略为 ${disposition}：${chineseReason}`,
+      suggestedAction: chineseAction
     }
   }
 }
@@ -1145,6 +1154,7 @@ function nonP0RuntimePolicy(
     hardArchive: boolean
     parserDisposition?: SurveyImportDispositionV1
     hasAuditableParse: boolean
+    confirmedTabularMapping?: boolean
   }>
 ): Readonly<{
   disposition: SurveyImportDispositionV1
@@ -1155,6 +1165,7 @@ function nonP0RuntimePolicy(
   if (format === 'unknown' || findP0SurveyFormatEntry(format) || isAcceptedOpenSurveyInputFormat(format)) return undefined
 
   if (isMappingRequiredOpenSurveyInputFormat(format)) {
+    if (!options.hardArchive && options.confirmedTabularMapping && options.parserDisposition === 'adjustment-ready') return undefined
     const label = format === 'xlsx' ? 'Excel XLSX' : 'CSV / 分隔文本'
     return {
       disposition: 'archive-only',
@@ -1236,7 +1247,7 @@ async function unwrap(name: string, bytes: Buffer): Promise<UnwrappedSurveySourc
     // trusted.  Without CRC32 validation, a damaged ZIP can pass the entry
     // count/path/ratio checks and later be treated as a valid source.
     const zip = await JSZip.loadAsync(bytes, { createFolders: false, checkCRC32: true })
-    const isOoxmlWorkbook = Boolean(zip.file('[Content_Types].xml') && zip.file('xl/workbook.xml') && Object.keys(zip.files).some((entryName) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entryName)))
+    const isOoxmlWorkbook = Boolean(zip.file('[Content_Types].xml') && zip.file('xl/workbook.xml') && zip.file('xl/_rels/workbook.xml.rels'))
     if (isOoxmlWorkbook) {
       const entries = Object.values(zip.files).filter((entry) => !entry.dir)
       if (entries.length > MAX_OOXML_ENTRIES) throw new SurveySourceParseError('limit_exceeded', `Excel OOXML 条目超过 ${MAX_OOXML_ENTRIES.toLocaleString('zh-CN')} 个上限`)
@@ -4028,7 +4039,11 @@ export class SurveyFormatRegistry {
       }
     } else {
       try {
-        parsed = parsedWithinLimits(parseDetected(detection.format, unpacked.bytes, text, input.cosaIn1Mapping))
+        if (input.tabularMapping) {
+          if (!['xlsx', 'delimited-text'].includes(detection.format)) throw new SurveySourceParseError('invalid_record', 'Confirmed tabular mapping cannot be applied to a vendor format')
+          if (input.networkType && input.networkType !== input.tabularMapping.networkType) throw new SurveySourceParseError('invalid_record', 'Network type contradicts the confirmed tabular mapping')
+          parsed = parsedWithinLimits(await parseSurveyTabular(input.name, unpacked.bytes, input.tabularMapping))
+        } else parsed = parsedWithinLimits(parseDetected(detection.format, unpacked.bytes, text, input.cosaIn1Mapping))
       } catch (error) {
         parseBlocked = true
         if (isCosaIn2ParseError(error)) {
@@ -4058,6 +4073,9 @@ export class SurveyFormatRegistry {
         matchedSignatures: [...detection.matchedSignatures, 'COSA .in1 explicit mapping + strict section parse'].slice(0, 20)
       })
     }
+    if (input.tabularMapping && parsed.parserId === SURVEY_TABULAR_PARSER_ID && parsed.canonicalUnitsVerified === true && parsed.observations.length && !(parsed.diagnostics ?? []).some((item) => item.severity === 'blocking')) {
+      detection = SurveyFormatDetectionV1.parse({ ...detection, confidence: 0.98, method: 'structural-probe', matchedSignatures: [...detection.matchedSignatures, 'source-bound confirmed tabular schema'].slice(0, 20) })
+    }
     const highConfidenceContentEvidence = detection.confidence >= HIGH_CONFIDENCE_CONTENT_CONFLICT_MINIMUM && (detection.method === 'content-signature' || detection.method === 'structural-probe')
     const contentWinsExtensionConflict = detection.extensionConflict && highConfidenceContentEvidence
     const baseDiagnostics = [
@@ -4085,7 +4103,8 @@ export class SurveyFormatRegistry {
     const nonP0Policy = p0Policy ? undefined : nonP0RuntimePolicy(detection.format, {
       hardArchive,
       parserDisposition: parsed.disposition,
-      hasAuditableParse: parsed.observations.length > 0 || parsed.knownPoints.length > 0 || parsed.unknownPoints.length > 0
+      hasAuditableParse: parsed.observations.length > 0 || parsed.knownPoints.length > 0 || parsed.unknownPoints.length > 0,
+      confirmedTabularMapping: parsed.parserId === SURVEY_TABULAR_PARSER_ID && input.tabularMapping !== undefined
     })
     const retainedRawFields = preservedRawFields(parsed)
     const rawFieldRetentionWarning = parsed.preservedRawFieldsTruncated || retainedRawFields.truncationReasons.length > 0
@@ -4136,7 +4155,8 @@ export class SurveyFormatRegistry {
       diagnostics,
       records,
       rawRecordAnchors: records,
-      preservedRawFields: retainedRawFields.fields
+      preservedRawFields: retainedRawFields.fields,
+      ...(parsed.tabularMapping ? { tabularMapping: parsed.tabularMapping } : {})
     })
     if (allowConverter && originalHash === sha256(unpacked.bytes) && resolvedDisposition === 'converter-required' && !unwrapBlocked && !parseBlocked && (!detection.extensionConflict || contentWinsExtensionConflict) && this.converters.has(detection.format)) {
       const conversion = await this.converters.convert(detection.format, unpacked.name, unpacked.bytes, input.signal)

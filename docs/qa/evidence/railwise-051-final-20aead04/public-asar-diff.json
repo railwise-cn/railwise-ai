@@ -1,0 +1,26 @@
+{
+  "publicArchive": "/private/tmp/railwise-public-051-mounted/RailWise AI.app/Contents/Resources/app.asar",
+  "packedEntriesCompared": 17330,
+  "changed": [
+    {
+      "path": "package.json",
+      "candidate": {
+        "sha256": "2cdf102a6ec104ddbcf2d60cab9f69c64a17970a657b5aa120e8f07e7c365321",
+        "size": 2407
+      },
+      "public": {
+        "sha256": "0ad5f0cbad9646e9a5cb5f6c19019ac8bb3ec26079d9fb1eba64892f01ef7c38",
+        "size": 2405
+      }
+    }
+  ],
+  "note": "Unpacked binaries excluded; runtime modules separately checked.",
+  "candidateArchiveAtComparison": "/Applications/RailWise AI.app/Contents/Resources/app.asar",
+  "candidateArchivePreservedAt": "/private/tmp/railwise-pre-public-051-backup/RailWise AI.app/Contents/Resources/app.asar",
+  "packageJsonPropertyDiff": {
+    "updateChannel": {
+      "candidate": "frontier",
+      "public": "stable"
+    }
+  }
+}

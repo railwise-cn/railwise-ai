@@ -1,0 +1,369 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/AppTranslocation/9C734B03-9D6F-4177-8785-C3BB0629D0D3/d/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 RailWise AI
+					6 container
+						7 container 编程 / 内业
+							8 按钮 编程
+							9 按钮 内业
+						10 切换 Description: 专注模式, Value: off
+						11 container 工作区工具
+							12 按钮 写作
+							13 按钮 插件
+							14 按钮 定时任务
+							15 按钮 Flow 流程
+							16 按钮 设计
+						17 按钮 新建工程测量项目
+					18 container
+						19 text 工程测量项目 2
+						20 按钮 新建工程测量项目
+						21 切换按钮 Description: 刷新工程测量项目, Value: 0
+						22 按钮 Survey AI 测绘目标、计划、证据与交付
+							23 文本 Survey AI
+							24 文本 测绘目标、计划、证据与交付
+						25 按钮 候选156功能验收（合成样例） 控制网 · m · 9/27
+							26 文本 候选156功能验收（合成样例）
+							27 文本 控制网
+							28 文本  · 
+							29 文本 m
+							30 文本  · 
+							31 文本 9/27
+						32 按钮 新建内业任务 控制网 · m · 9/27
+							33 文本 新建内业任务
+							34 文本 控制网
+							35 文本  · 
+							36 文本 m
+							37 文本  · 
+							38 文本 9/27
+						39 text Survey AI 会话 2
+						40 按钮 Survey AI · 新建内业任务 候选156功能验收（合成样例） · 0 条消息
+							41 文本 Survey AI · 新建内业任务
+							42 文本 候选156功能验收（合成样例）
+							43 文本  · 
+							44 文本 0
+							45 文本 条消息
+						46 按钮 Survey AI · 新建内业任务 新建内业任务 · 0 条消息
+							47 文本 Survey AI · 新建内业任务
+							48 文本 新建内业任务
+							49 文本  · 
+							50 文本 0
+							51 文本 条消息
+						52 文本 内业任务、数据集、运行记录和成果清单独立保存，不与编程或设计会话混用。
+					53 container
+						54 切换按钮 连接手机, Value: 0
+						55 按钮 设置
+					56 container
+						57 按钮 收起侧边栏
+						58 标题 RailWise Survey, Value: 1
+							59 文本 RailWise Survey
+						60 text 工程测量内业 当前内业任务
+						61 弹出式按钮 当前内业任务, Value: 候选156功能验收（合成样例）
+							62 (selected) 新建内业任务
+						63 文本 工作视图
+						64 弹出式按钮 工作视图, Value: 分析与精度
+						65 按钮 新建工程测量项目
+					66 文本 任务配置已保存。后续计算会使用当前任务配置。
+					67 按钮 关闭提示
+					68 container
+						69 text 任务 候选156功能验收（合成样例） 阶段 分析与精度 数据源 / 格式
+						70 按钮 询问 golden-plane-control-e2e.in2 的测量 AI
+						71 text golden-plane-control-e2e.in2  ·  COSA-IN2 处置状态 候选成果 基准 待确认  ·  待确认 点数 4 测站数 1 观测 5 闭合差 1.3727E-7 m 精度 1.3592E-7 m 成果 — 网型 平面控制网 审查 —
+					72 container Survey AI 会话
+						73 container
+							74 标题 Survey AI 会话, Value: 2
+								75 文本 Survey AI 会话
+							76 文本 候选156功能验收（合成样例）
+							77 按钮 数据资产
+							78 按钮 测量平差
+							79 按钮 刷新上下文
+						80 标题 Survey AI, Value: 2
+							81 文本 Survey AI
+						82 container
+							83 文本输入区 (settable) 向智能体提问…
+							84 按钮 更多操作
+							85 弹出式按钮 模型与推理设置
+							86 按钮 (disabled) 发送
+					87 container
+						88 container 工作视图
+							89 按钮 平差结果与精度
+							90 按钮 趋势分析
+						91 container 测量与平差控制台
+							92 标题 测量与平差控制台, Value: 3
+								93 文本 测量与平差控制台
+							94 文本 Runtime 确定性计算
+							95 按钮 询问测量 AI
+							96 文本 已有测量网络
+							97 弹出式按钮 Description: 已有测量网络, Value: cosa-in2 · 可进入校核与平差 · 9cc5ec1d
+								98 (selected) cosa-in2 · 可进入校核与平差 · 9cc5ec1d
+							99 文本 网络类型
+							100 弹出式按钮 Description: 网络类型, Value: 平面控制网
+								101 (selected) 平面控制网
+							102 文本 Runtime 在线
+							103 container 测量计算状态
+								104 文本 网型
+								105 文本 平面控制网
+								106 container
+									107 文本 当前约束
+									108 container Description: 当前 Runtime 约束, Help: Runtime 当前仅按固定已知点执行；最小约束和自由网尚不可选。
+										109 文本 固定已知点（Runtime 当前实现）
+								110 container
+									111 文本 平差方法 / 权模型
+									112 container Description: 当前 Runtime 执行方式, Help: 条件平差不提供为用户可选项；坐标 / 高程转换按其已选类型由 Runtime 执行。
+										113 文本 加权最小二乘
+								114 文本 可解性
+								115 文本 已通过校核
+							116 container 平差工作区导航
+								117 按钮 网形与基准
+								118 按钮 观测表 5
+									119 文本 观测表
+									120 文本 5
+								121 按钮 点位与坐标 4
+									122 文本 点位与坐标
+									123 文本 4
+								124 按钮 平差结果
+								125 按钮 自由水准试算
+								126 按钮 期次变形 0
+									127 文本 期次变形
+									128 文本 0
+							129 标题 平差结果与精度评定, Value: 4
+								130 文本 平差结果与精度评定
+							131 text 策略 plane-control  ·  workwise-survey-adjustment-7 计算校核通过
+							132 文本 观测 / 未知数
+							133 文本 5 / 3
+							134 文本 多余观测 2
+							135 文本 自由度
+							136 文本 2
+							137 文本 法方程可解性
+							138 文本 单位权中误差 σ₀
+							139 文本 0.000107
+							140 文本 σ₀/方差因子均为无量纲 · 1.13874e-8
+							141 文本 最大点位中误差
+							142 文本 1.35922e-7 m
+							143 文本 已计算点位中误差；项目限差需另行复核
+							144 按钮 询问 最大点位中误差 的测量 AI
+							145 文本 残差与粗差候选
+							146 表格
+								147 row
+									148 列标题
+										149 文本 观测
+									150 列标题
+										151 文本 残差（规范化单位）
+									152 列标题
+										153 文本 标准化残差（σ）
+									154 列标题
+										155 文本 原始记录
+								156 row
+									157 单元格
+										158 文本 cosa-in2-6-backsight-reset
+										159 按钮 询问观测 cosa-in2-6-backsight-reset 的测量 AI
+									160 单元格
+										161 文本 -2.373541e-10 rad
+									162 单元格
+										163 文本 4.896e-5 σ
+									164 单元格
+										165 文本 cosa-in2-record-6
+										166 按钮 定位 cosa-in2-6-backsight-reset 的原始记录 cosa-in2-record-6
+								167 row
+									168 单元格
+										169 文本 cosa-in2-7-direction
+										170 按钮 询问观测 cosa-in2-7-direction 的测量 AI
+									171 单元格
+										172 文本 1.971330e-10 rad
+									173 单元格
+										174 文本 4.066e-5 σ
+									175 单元格
+										176 文本 cosa-in2-record-7
+										177 按钮 定位 cosa-in2-7-direction 的原始记录 cosa-in2-record-7
+								178 row
+									179 单元格
+										180 文本 cosa-in2-8-distance
+										181 按钮 询问观测 cosa-in2-8-distance 的测量 AI
+									182 单元格
+										183 文本 7.159016e-9 m
+									184 单元格
+										185 文本 7.123e-6 σ
+									186 单元格
+										187 文本 cosa-in2-record-8
+										188 按钮 定位 cosa-in2-8-distance 的原始记录 cosa-in2-record-8
+								189 row
+									190 单元格
+										191 文本 cosa-in2-9-direction
+										192 按钮 询问观测 cosa-in2-9-direction 的测量 AI
+									193 单元格
+										194 文本 4.022116e-11 rad
+									195 单元格
+										196 文本 8.296e-6 σ
+									197 单元格
+										198 文本 cosa-in2-record-9
+										199 按钮 定位 cosa-in2-9-direction 的原始记录 cosa-in2-record-9
+								200 row
+									201 单元格
+										202 文本 cosa-in2-10-distance
+										203 按钮 询问观测 cosa-in2-10-distance 的测量 AI
+									204 单元格
+										205 文本 -0.0000001 m
+									206 单元格
+										207 文本 0.0001 σ
+									208 单元格
+										209 文本 cosa-in2-record-10
+										210 按钮 定位 cosa-in2-10-distance 的原始记录 cosa-in2-record-10
+							211 文本 闭合与复核
+							212 按钮 询问 闭合与复核 的测量 AI
+							213 定义列表
+								214 container 水平残差范数
+									215 文本 水平残差范数
+								216 文本 1.37267e-7 m
+								217 container 角度残差范数
+									218 文本 角度残差范数
+								219 文本 3.1115292e-10 rad
+								220 container 高程闭合差
+									221 文本 高程闭合差
+								222 文本 —
+								223 container 导线 fx / fy
+									224 文本 导线 fx / fy
+								225 文本 —
+								226 container 相对闭合差
+									227 文本 相对闭合差
+								228 文本 —
+								229 container GNSS 基线残差范数
+									230 文本 GNSS 基线残差范数
+								231 文本 —
+								232 container 测站定向 S1
+									233 文本 测站定向 S1
+								234 文本 1.57079633 rad
+							235 container
+								236 text 运行 adjustment_c123b84b-e1df-4dd6-957f-db23fa75a6db
+							237 文本 valid
+							238 文本 COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。
+							239 container
+								240 text 质量门禁 COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。 当前输入
+								241 定义列表
+									242 container 来源
+										243 文本 来源
+									244 文本 golden-plane-control-e2e.in2
+									245 container 格式
+										246 文本 格式
+									247 文本 cosa-in2
+									248 container 就绪状态
+										249 文本 就绪状态
+									250 文本 可进入校核与平差
+									251 container 阻断项
+										252 文本 阻断项
+									253 文本 0
+								254 文本 结果可追溯
+							255 container 平差点位成果
+								256 标题 点位成果与复核摘要, Value: 4
+									257 文本 点位成果与复核摘要
+								258 文本 平差后的坐标/高程、改正数和点位中误差；这是可写入成果包的确定性结果。
+								259 text 长度单位 m 协方差 已返回 粗差候选 0
+								260 文本 半轴采用单位马氏半径，不代表置信百分比。轴向从 +X 转向 +Y，按 180° 周期表示。XY 为解算坐标平面，GNSS 的 XY 不等同于当地东/北。固定点和旧成果不补造椭圆。
+								261 container 平差点位成果
+									262 表格
+										263 row
+											264 列标题
+												265 文本 点号
+											266 列标题
+												267 文本 平差 X（m）
+											268 列标题
+												269 文本 平差 Y（m）
+											270 列标题
+												271 文本 纬度 / 经度（°）
+											272 列标题
+												273 文本 平差高程（m）
+											274 列标题
+												275 文本 改正数（m）
+											276 列标题
+												277 文本 点位中误差（m）
+											278 列标题
+												279 文本 XY 标准误差椭圆
+										280 row
+											281 单元格
+												282 文本 A
+												283 按钮 询问 A 的测量 AI
+											284 单元格
+												285 文本 50
+											286 单元格
+												287 文本 150
+											288 单元格
+												289 文本 —
+											290 单元格
+												291 文本 —
+											292 单元格
+												293 文本 —
+											294 单元格
+												295 文本 —
+											296 单元格
+												297 文本 —
+										298 row
+											299 单元格
+												300 文本 B
+												301 按钮 询问 B 的测量 AI
+											302 单元格
+												303 文本 150
+											304 单元格
+												305 文本 50
+											306 单元格
+												307 文本 —
+											308 单元格
+												309 文本 —
+											310 单元格
+												311 文本 —
+											312 单元格
+												313 文本 —
+											314 单元格
+												315 文本 —
+										316 row
+											317 单元格
+												318 文本 C
+												319 按钮 询问 C 的测量 AI
+											320 单元格
+												321 文本 120.710678
+											322 单元格
+												323 文本 120.710678
+											324 单元格
+												325 文本 —
+											326 单元格
+												327 文本 —
+											328 单元格
+												329 文本 —
+											330 单元格
+												331 文本 —
+											332 单元格
+												333 文本 —
+										334 row
+											335 单元格
+												336 文本 S1
+												337 按钮 询问 S1 的测量 AI
+											338 单元格
+												339 文本 50
+											340 单元格
+												341 文本 50
+											342 单元格
+												343 文本 —
+											344 单元格
+												345 文本 —
+											346 单元格
+												347 文本 -1.944615e-8
+											348 单元格
+												349 文本 1.35922e-7
+											350 单元格
+												351 container 半轴采用单位马氏半径，不代表置信百分比。轴向从 +X 转向 +Y，按 180° 周期表示。XY 为解算坐标平面，GNSS 的 XY 不等同于当地东/北。固定点和旧成果不补造椭圆。
+													352 文本 长半轴 1.28481e-7 m · 短半轴 4.43548e-8 m
+													353 文本 轴向：129.401°
+													354 文本 后验方差
+							355 文本 平差完成。结果已锁定输入哈希和算法版本，可进入成果审查。
+	356 关闭按钮
+	357 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	358 最小化按钮
+359 menu bar
+	360 RailWise AI
+	361 文件
+	362 编辑
+	363 显示
+	364 窗口
+	365 帮助
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/AppTranslocation/9C734B03-9D6F-4177-8785-C3BB0629D0D3/d/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html

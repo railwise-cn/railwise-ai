@@ -1,0 +1,75 @@
+{
+  "checkedAt": "2026-09-27T23:35:34.350Z",
+  "sourceHead": "4bcc09fee46dfa4231a0b53905ffa2068c3f88c1",
+  "releaseRun": 36355577889,
+  "releaseTag": "v0.5.1",
+  "app": "/Applications/RailWise AI.app",
+  "version": {
+    "exitCode": 0,
+    "stdout": "0.5.1\n",
+    "stderr": ""
+  },
+  "bundle": {
+    "exitCode": 0,
+    "stdout": "com.wangjiawei508.workgpt\n",
+    "stderr": ""
+  },
+  "architecture": {
+    "exitCode": 0,
+    "stdout": "arm64\n",
+    "stderr": ""
+  },
+  "signature": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "identity": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "Executable=/Applications/RailWise AI.app/Contents/MacOS/RailWise AI\nIdentifier=com.wangjiawei508.workgpt\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=453 flags=0x10000(runtime) hashes=3+7 location=embedded\nVersionPlatform=1\nVersionMin=786432\nVersionSDK=1704960\nHash type=sha256 size=32\nCandidateCDHash sha256=1be5d927a9e3940a79cd14384875a9cc066b6496\nCandidateCDHashFull sha256=1be5d927a9e3940a79cd14384875a9cc066b6496f13f57575bcedb5e96cc7acb\nHash choices=sha256\nCMSDigest=1be5d927a9e3940a79cd14384875a9cc066b6496f13f57575bcedb5e96cc7acb\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=16384\nExecutable Segment flags=0x1\nPage size=16384\nCDHash=1be5d927a9e3940a79cd14384875a9cc066b6496\nSignature size=9111\nAuthority=Developer ID Application: Ningbo Ruiwei Engineering Technology Co., Ltd. (R35G7F4A9U)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTimestamp=Sep 28, 2026 at 06:58:33\nNotarization Ticket=stapled\nInfo.plist entries=32\nTeamIdentifier=R35G7F4A9U\nRuntime Version=26.4.0\nSealed Resources version=2 rules=13 files=9221\nInternal requirements count=1 size=188\nTotal signatures=1\nChosen signature=1\n"
+  },
+  "notarization": {
+    "exitCode": 0,
+    "stdout": "Processing: /Applications/RailWise AI.app\nThe validate action worked!\n",
+    "stderr": ""
+  },
+  "gatekeeper": {
+    "exitCode": 1,
+    "stdout": "assessments disabled\n",
+    "stderr": ""
+  },
+  "assessment": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "/Applications/RailWise AI.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+  },
+  "asarSha256": "8992d72a1b4bbe624145729447bafaedb2cad696c165c7a58c3d3126f74d1028",
+  "mountedAsarSha256": "8992d72a1b4bbe624145729447bafaedb2cad696c165c7a58c3d3126f74d1028",
+  "updateConfiguration": "provider: generic\nurl: https://www.railwise.cn/downloads/workwise/channels/stable/latest/\nupdaterCacheDirName: workwise-updater\n",
+  "runtimeEntitlements": "passed",
+  "runtimeModules": {
+    "engineering/engineering-ai-orchestrator.js": {
+      "installedSha256": "6fb0de50d20b9580c632039ad36bede9d11dd2daefdc25ac62e5aebe44f1cbf4",
+      "mountedSha256": "6fb0de50d20b9580c632039ad36bede9d11dd2daefdc25ac62e5aebe44f1cbf4"
+    },
+    "adapters/model/deepseek-compat-model-client.js": {
+      "installedSha256": "c74ea87628c52c6ef187c495304a3085803740b950fc61680862848b670c727a",
+      "mountedSha256": "c74ea87628c52c6ef187c495304a3085803740b950fc61680862848b670c727a"
+    },
+    "security/tool-persistence-security.js": {
+      "installedSha256": "de907ff2d9fbb42b6bc290b0f5777c3b7ece94baa9b7ab8f119c3e9e306d4e21",
+      "mountedSha256": "de907ff2d9fbb42b6bc290b0f5777c3b7ece94baa9b7ab8f119c3e9e306d4e21"
+    },
+    "adapters/tool/engineering-conversation-tools.js": {
+      "installedSha256": "75fbe0cba5909fe19ea0a977263a8bc66c4144c600e5c167c362402c3e0af40c",
+      "mountedSha256": "75fbe0cba5909fe19ea0a977263a8bc66c4144c600e5c167c362402c3e0af40c"
+    }
+  },
+  "summaryFixPresent": true,
+  "varianceScaleFixPresent": true,
+  "orchestratorMatchesGuiTestedIsolatedPackage": true,
+  "compatibilityIdentityMatch": true,
+  "publicStableFeed": true,
+  "asarMatchesReviewedCandidate162": false
+}

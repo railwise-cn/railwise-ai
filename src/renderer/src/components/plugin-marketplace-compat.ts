@@ -2,6 +2,7 @@ import type {
   CoreRuntimeToolDiagnosticsJson
 } from '../agent/runtime-contract'
 import type { ManagedToolStatus, SkillListItem } from '@shared/workwise-api'
+import brand from '@shared/product-brand.json'
 
 type JsonRecord = Record<string, unknown>
 
@@ -21,7 +22,7 @@ const MARKETPLACE_TEXT_FALLBACKS: Record<string, string> = {
   pluginSkillDocumentIllustratorTitle: 'Document Illustrator',
   pluginCommercialLicenseRequired: 'Commercial license required',
   pluginNoRedistributionLicense: 'No redistribution license',
-  pluginDetailExternalProject: 'External project · not installed by WorkWise',
+  pluginDetailExternalProject: `External project · not installed by ${brand.platform}`,
   pluginCliLarkTitle: 'Lark CLI',
   pluginSkillScanOversized: 'Skipped Skill “{{skill}}”: {{file}} exceeds the {{limit}} discovery limit. Other Skills are unaffected.'
 }

@@ -1,0 +1,288 @@
+[
+  {
+    "run": {
+      "schemaVersion": 1,
+      "id": "adjustment_c1e4f879-6a6c-424c-b76c-19f4ace22c41",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+      "method": "weighted-least-squares",
+      "constraint": "fixed-known-points",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "inputHash": "c4de085da920b840a12d66d007fd359d7ed7f49f88e19a2b8f3ab273ac23b5e2",
+      "status": "needs_attention",
+      "revision": 1,
+      "idempotencyKey": "packaged-calculate-network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+      "resumeCount": 0,
+      "createdAt": "2026-09-30T11:19:37.581Z",
+      "updatedAt": "2026-09-30T11:19:37.581Z",
+      "completedAt": "2026-09-30T11:19:37.581Z"
+    },
+    "result": {
+      "schemaVersion": 1,
+      "id": "adjustment_result_7727a945-6c5d-4aa4-b904-9f21a3cd534a",
+      "runId": "adjustment_c1e4f879-6a6c-424c-b76c-19f4ace22c41",
+      "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+      "observationCount": 2,
+      "unknownCount": 1,
+      "redundancy": 0,
+      "degreesOfFreedom": 0,
+      "linearUnit": "m",
+      "angularUnit": "rad",
+      "closure": {},
+      "closureUnits": {},
+      "parameters": {},
+      "parameterUnits": {},
+      "unitWeightStdDev": 0,
+      "unitWeightStdDevUnit": "dimensionless",
+      "varianceFactor": 0,
+      "varianceFactorUnit": "dimensionless",
+      "varianceFactorEstimated": false,
+      "statisticalSummary": {
+        "schemaVersion": 1,
+        "scope": "descriptive-screening",
+        "numericalStatus": "review-required",
+        "availableCount": 0,
+        "unavailableCount": 0,
+        "flaggedCount": 0,
+        "varianceBasis": "not-estimated",
+        "varianceLog10RatioToUnit": null,
+        "standardDeviationLog10RatioToUnit": null,
+        "significance": "not-evaluated",
+        "standardsConformity": "not-evaluated"
+      },
+      "points": [],
+      "observations": [],
+      "displacements": [],
+      "precision": {
+        "maxPointStdDev": 0,
+        "passed": false
+      },
+      "qualityFindings": [
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_ba6a333e-6498-4635-b7f4-1b2214dff261",
+          "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+          "code": "parse_error",
+          "severity": "blocking",
+          "message": "WorkWise JSON 未显式声明网络坐标/高程单位；不得默认以米制解释点位或进入平差。",
+          "suggestion": "请将点位坐标和高程以 m 重新导出，或等待具备点位单位映射与双来源验证的导入工作流。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.581Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_585eb4a0-d12a-4cbd-bb9c-da65e786d7eb",
+          "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+          "code": "source_not_adjustment_ready",
+          "severity": "blocking",
+          "message": "源文件处置为 archive-only，不得进入平差：冻结来源合同 workwise-survey-network@1",
+          "suggestion": "保留原始文件；补充格式映射或验证证据后，通过显式重新检测/导入流程再进入平差。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.581Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_c91f969d-184f-4ba8-899d-c802ce64cd26",
+          "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+          "code": "unit_conflict",
+          "severity": "blocking",
+          "message": "源文件未提供可审计的米制线性单位证据（linearUnitCanonical=unverified，linearUnitRaw=m, not-declared），不得进入平差。",
+          "suggestion": "保留原始单位声明，并通过受审计的换算或映射将线性量明确确认到 m 后重新导入。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.581Z"
+        }
+      ],
+      "inputHash": "c4de085da920b840a12d66d007fd359d7ed7f49f88e19a2b8f3ab273ac23b5e2",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "validation": "invalid",
+      "strategyId": "leveling",
+      "createdAt": "2026-09-30T11:19:37.581Z"
+    },
+    "rawSourceIntegrity": {
+      "status": "verified",
+      "ledgerEntryCount": 2,
+      "errors": []
+    },
+    "sourceEligibility": {
+      "eligible": false,
+      "findings": [
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_9f13cff6-801d-462f-852f-d5f92000e0cc",
+          "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+          "code": "parse_error",
+          "severity": "blocking",
+          "message": "WorkWise JSON 未显式声明网络坐标/高程单位；不得默认以米制解释点位或进入平差。",
+          "suggestion": "请将点位坐标和高程以 m 重新导出，或等待具备点位单位映射与双来源验证的导入工作流。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.582Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_525289f0-8201-4bc9-b9b2-df79c4033e7e",
+          "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+          "code": "source_not_adjustment_ready",
+          "severity": "blocking",
+          "message": "源文件处置为 archive-only，不得进入平差：冻结来源合同 workwise-survey-network@1",
+          "suggestion": "保留原始文件；补充格式映射或验证证据后，通过显式重新检测/导入流程再进入平差。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.582Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_8ac8245b-4e38-4dc6-8b5f-f333751a9772",
+          "networkId": "network_a8c2ee11-ff3a-4f27-ac79-ff27cabb20d5",
+          "code": "unit_conflict",
+          "severity": "blocking",
+          "message": "源文件未提供可审计的米制线性单位证据（linearUnitCanonical=unverified，linearUnitRaw=m, not-declared），不得进入平差。",
+          "suggestion": "保留原始单位声明，并通过受审计的换算或映射将线性量明确确认到 m 后重新导入。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.582Z"
+        }
+      ]
+    }
+  },
+  {
+    "run": {
+      "schemaVersion": 1,
+      "id": "adjustment_1d8446d2-07ba-47f8-ade0-1597db734ba2",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+      "method": "weighted-least-squares",
+      "constraint": "fixed-known-points",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "inputHash": "a1de2f76d1b0d9feb64401d1ba6cea3e1f16c68b4ff5fa933360cb51e9b657dc",
+      "status": "needs_attention",
+      "revision": 1,
+      "idempotencyKey": "packaged-calculate-network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+      "resumeCount": 0,
+      "createdAt": "2026-09-30T11:19:37.619Z",
+      "updatedAt": "2026-09-30T11:19:37.620Z",
+      "completedAt": "2026-09-30T11:19:37.620Z"
+    },
+    "result": {
+      "schemaVersion": 1,
+      "id": "adjustment_result_39b23d36-b85f-41f7-94a9-c319c6b44387",
+      "runId": "adjustment_1d8446d2-07ba-47f8-ade0-1597db734ba2",
+      "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+      "observationCount": 2,
+      "unknownCount": 1,
+      "redundancy": 0,
+      "degreesOfFreedom": 0,
+      "linearUnit": "m",
+      "angularUnit": "rad",
+      "closure": {},
+      "closureUnits": {},
+      "parameters": {},
+      "parameterUnits": {},
+      "unitWeightStdDev": 0,
+      "unitWeightStdDevUnit": "dimensionless",
+      "varianceFactor": 0,
+      "varianceFactorUnit": "dimensionless",
+      "varianceFactorEstimated": false,
+      "statisticalSummary": {
+        "schemaVersion": 1,
+        "scope": "descriptive-screening",
+        "numericalStatus": "review-required",
+        "availableCount": 0,
+        "unavailableCount": 0,
+        "flaggedCount": 0,
+        "varianceBasis": "not-estimated",
+        "varianceLog10RatioToUnit": null,
+        "standardDeviationLog10RatioToUnit": null,
+        "significance": "not-evaluated",
+        "standardsConformity": "not-evaluated"
+      },
+      "points": [],
+      "observations": [],
+      "displacements": [],
+      "precision": {
+        "maxPointStdDev": 0,
+        "passed": false
+      },
+      "qualityFindings": [
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_d0afa419-a3d4-47ee-a855-f7864c4f0235",
+          "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+          "code": "parse_error",
+          "severity": "blocking",
+          "message": "WorkWise JSON 未显式声明网络坐标/高程单位；不得默认以米制解释点位或进入平差。",
+          "suggestion": "请将点位坐标和高程以 m 重新导出，或等待具备点位单位映射与双来源验证的导入工作流。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.619Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_696454c3-cad7-40d6-abff-b28c5ba5281f",
+          "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+          "code": "source_not_adjustment_ready",
+          "severity": "blocking",
+          "message": "源文件处置为 archive-only，不得进入平差：冻结来源合同 workwise-survey-network@1",
+          "suggestion": "保留原始文件；补充格式映射或验证证据后，通过显式重新检测/导入流程再进入平差。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.619Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_06063ce0-6a1d-4284-a36d-a147b34574fa",
+          "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+          "code": "unit_conflict",
+          "severity": "blocking",
+          "message": "源文件未提供可审计的米制线性单位证据（linearUnitCanonical=unverified，linearUnitRaw=m, not-declared），不得进入平差。",
+          "suggestion": "保留原始单位声明，并通过受审计的换算或映射将线性量明确确认到 m 后重新导入。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.619Z"
+        }
+      ],
+      "inputHash": "a1de2f76d1b0d9feb64401d1ba6cea3e1f16c68b4ff5fa933360cb51e9b657dc",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "validation": "invalid",
+      "strategyId": "leveling",
+      "createdAt": "2026-09-30T11:19:37.620Z"
+    },
+    "rawSourceIntegrity": {
+      "status": "verified",
+      "ledgerEntryCount": 2,
+      "errors": []
+    },
+    "sourceEligibility": {
+      "eligible": false,
+      "findings": [
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_25dc24ef-a845-4d89-b341-144634dece87",
+          "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+          "code": "parse_error",
+          "severity": "blocking",
+          "message": "WorkWise JSON 未显式声明网络坐标/高程单位；不得默认以米制解释点位或进入平差。",
+          "suggestion": "请将点位坐标和高程以 m 重新导出，或等待具备点位单位映射与双来源验证的导入工作流。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.620Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_c3f3bd99-606e-4dbf-994e-40940b9c761a",
+          "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+          "code": "source_not_adjustment_ready",
+          "severity": "blocking",
+          "message": "源文件处置为 archive-only，不得进入平差：冻结来源合同 workwise-survey-network@1",
+          "suggestion": "保留原始文件；补充格式映射或验证证据后，通过显式重新检测/导入流程再进入平差。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.620Z"
+        },
+        {
+          "schemaVersion": 1,
+          "id": "survey_finding_e8ed1ba2-cc22-4280-b55c-78700d87c460",
+          "networkId": "network_146e56f5-d9a9-4460-bc2f-fb24f79e45d3",
+          "code": "unit_conflict",
+          "severity": "blocking",
+          "message": "源文件未提供可审计的米制线性单位证据（linearUnitCanonical=unverified，linearUnitRaw=m, not-declared），不得进入平差。",
+          "suggestion": "保留原始单位声明，并通过受审计的换算或映射将线性量明确确认到 m 后重新导入。",
+          "status": "open",
+          "createdAt": "2026-09-30T11:19:37.620Z"
+        }
+      ]
+    }
+  }
+]

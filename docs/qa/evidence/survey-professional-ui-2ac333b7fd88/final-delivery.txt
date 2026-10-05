@@ -1,0 +1,96 @@
+Code
+Survey
+Focus mode
+Off
+Tools
+New task
+Tasks
+1
+新建内业任务
+Control network · m · 10/1
+Continue conversation
+Connect phone
+Settings
+RailWise Survey
+
+Engineering Survey Processing
+
+Current Survey job
+No Survey job selected
+新建内业任务
+Overview
+Process
+Results
+Deliver
+Work view
+Import and preflight
+Network and adjustment
+Analysis and precision
+Deliverables and review
+Open AI
+Advanced
+DOCX, PDF and XLSX preview files were created. They remain pending review.
+×
+Current source
+period-valid-2.json
+Current status
+Results ready · pending review
+Latest result
+Candidate deliverable
+More metrics
+Delivery overview
+Delivery
+
+Generate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.
+
+Generate review draft
+
+Review draft files
+
+Review draft created. Pending professional review.
+
+Source and version
+Not archived
+
+report.docx
+
+Source and version
+Preview
+Export DOCX
+Ask Survey AI
+27.2 KB
+
+report.pdf
+
+Source and version
+Preview
+Export PDF
+Ask Survey AI
+60.6 KB
+
+evidence.xlsx
+
+Source and version
+Preview
+Export XLSX
+Ask Survey AI
+33.2 KB
+
+professional.xlsx
+
+Source and version
+Preview
+Export XLSX
+Ask Survey AI
+33.6 KB
+
+professional-review.json
+
+Source and version
+Preview
+Export JSON
+Ask Survey AI
+21.2 KB
+Advanced details
+Citations
+Advanced: review, archive and provenance

@@ -5,6 +5,7 @@ export { SurveyGeneralizedWRequestV1, SurveyGeneralizedWResultV1 } from '../../k
 export { SurveyVceTrialInputV1, SurveyVceTrialOutputV1 } from '../../kun/src/contracts/survey-vce-trial.js'
 export { SurveyHuberTrialInputV1, SurveyHuberTrialOutputV1 } from '../../kun/src/contracts/survey-huber-trial.js'
 export { SurveyStatisticalFamilyInputV1, SurveyStatisticalFamilyOutputV1 } from '../../kun/src/contracts/survey-statistical-family.js'
+export { SurveyStatisticalDeclarationV1 } from '../../kun/src/contracts/survey-statistical-declaration.js'
 // This standalone lexer has no imports, Node APIs or numerical implementation.
 export { parseAdvancedTrialJson } from '../../kun/src/engineering/survey-advanced-trials-json.js'
 export {

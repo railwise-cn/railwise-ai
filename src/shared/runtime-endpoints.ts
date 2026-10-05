@@ -77,6 +77,7 @@ export const RUNTIME_ENGINEERING_AI_PLAN_RESUME_TEMPLATE = '/v1/engineering/ai/p
 export const RUNTIME_ENGINEERING_CAPABILITIES_TEMPLATE = '/v1/engineering/capabilities'
 export const RUNTIME_ENGINEERING_SKILLS_CATALOG_TEMPLATE = '/v1/engineering/skills/catalog'
 export const RUNTIME_ENGINEERING_SURVEY_COSA_GROUP_INSPECT_TEMPLATE = '/v1/engineering/survey/source-groups/cosa/inspect'
+export const RUNTIME_ENGINEERING_SURVEY_TABULAR_PROBE_TEMPLATE = '/v1/engineering/survey/tabular/probe'
 export const RUNTIME_ENGINEERING_SURVEY_NETWORK_IMPORT_TEMPLATE = '/v1/engineering/survey/networks/import'
 export const RUNTIME_ENGINEERING_SURVEY_NETWORKS_TEMPLATE = '/v1/engineering/survey/networks'
 export const RUNTIME_ENGINEERING_SURVEY_NETWORK_TEMPLATE = '/v1/engineering/survey/networks/{id}'
@@ -85,6 +86,7 @@ export const RUNTIME_ENGINEERING_SURVEY_NETWORK_CORRECTIONS_TEMPLATE = '/v1/engi
 export const RUNTIME_ENGINEERING_SURVEY_NETWORK_CORRECTIONS_REPLAY_TEMPLATE = '/v1/engineering/survey/networks/{id}/corrections/replay'
 export const RUNTIME_ENGINEERING_ADJUSTMENTS_TEMPLATE = '/v1/engineering/adjustments'
 export const RUNTIME_ENGINEERING_ADJUSTMENT_TEMPLATE = '/v1/engineering/adjustments/{id}'
+export const RUNTIME_ENGINEERING_PROFESSIONAL_REVIEW_TEMPLATE = '/v1/engineering/adjustments/{id}/professional-review'
 export const RUNTIME_ENGINEERING_ADJUSTMENT_CANCEL_TEMPLATE = '/v1/engineering/adjustments/{id}/cancel'
 export const RUNTIME_ENGINEERING_ADJUSTMENT_RESUME_TEMPLATE = '/v1/engineering/adjustments/{id}/resume'
 export const RUNTIME_ENGINEERING_ADJUSTMENT_PREVIEW_TEMPLATE = '/v1/engineering/adjustments/{id}/preview'
@@ -102,6 +104,8 @@ export function runtimeSurveyStatisticalDiagnosticsPath(projectId: string, adjus
 }
 export const RUNTIME_ENGINEERING_DEFORMATIONS_TEMPLATE = '/v1/engineering/deformations'
 export const RUNTIME_ENGINEERING_DEFORMATION_TEMPLATE = '/v1/engineering/deformations/{id}'
+export const RUNTIME_ENGINEERING_INITIAL_VALUES_TEMPLATE = '/v1/engineering/projects/{projectId}/survey/initial-values'
+export const RUNTIME_ENGINEERING_SEGMENT_COMPARISONS_TEMPLATE = '/v1/engineering/projects/{projectId}/survey/segment-comparisons'
 
 export const RUNTIME_MEMORY_PATH = '/v1/memory'
 export const RUNTIME_MEMORY_TEMPLATE = '/v1/memory'

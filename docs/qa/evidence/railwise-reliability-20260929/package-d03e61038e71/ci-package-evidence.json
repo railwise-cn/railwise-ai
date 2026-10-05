@@ -1,0 +1,13 @@
+{
+  "sourceHead": "d03e61038e71314bab2aefad50428dbfc771db86",
+  "version": "0.5.1",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headd03e61038e71",
+  "signature": "passed",
+  "stapledNotarization": "passed",
+  "gatekeeper": "passed",
+  "asarSha256": "2283918ced8e7669701df843dd951d9e02d6c11040089a7a8db882a4e5e5e494",
+  "dmgSha256": "80993e28cec02fcc92a7c90e7ad776c541b1b9ec4e6661486d44e989ec9d18f2",
+  "published": false,
+  "updaterRoundTrip": "not-tested",
+  "guiAcceptance": "not-tested"
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "turnId": "turn_ttujsfix",
+    "toolResults": [
+      {
+        "name": "survey_read_context",
+        "callId": "call_00_AHkGlqBSInZUg78JWx1t8038",
+        "status": "completed",
+        "isError": false,
+        "outputStatus": null
+      },
+      {
+        "name": "survey_read_context",
+        "callId": "call_01_H6U0HBO25MS2P1HwODz81442",
+        "status": "completed",
+        "isError": false,
+        "outputStatus": null
+      }
+    ],
+    "assistantComplete": true
+  },
+  {
+    "turnId": "turn_qn1mze7l",
+    "toolResults": [
+      {
+        "name": "survey_read_evidence",
+        "callId": "call_00_Ec6Sg0gaF7bhcqRwPqpB0641",
+        "status": "completed",
+        "isError": false,
+        "outputStatus": "resolved"
+      }
+    ],
+    "assistantComplete": true
+  }
+]

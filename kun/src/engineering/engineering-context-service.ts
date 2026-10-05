@@ -257,6 +257,8 @@ export class EngineeringContextService {
           precision: result.precision, linearUnit: result.linearUnit, angularUnit: result.angularUnit,
           unitWeightStdDev: result.unitWeightStdDev, unitWeightStdDevUnit: result.unitWeightStdDevUnit,
           varianceFactor: result.varianceFactor, varianceFactorUnit: result.varianceFactorUnit,
+          varianceFactorEstimated: result.varianceFactorEstimated,
+          statisticalSummary: result.statisticalSummary ?? null,
           degreesOfFreedom: result.degreesOfFreedom,
           qualityFindings: result.qualityFindings.slice(0, 20),
           residuals: selection?.observationId ? result.observations.filter(item => item.observationId === selection.observationId).slice(0, 20) : result.observations.slice(0, 20),

@@ -15,6 +15,7 @@ describe('engineering PDF layout', () => {
     for (const line of lines) expect(parsed.text).toContain(line)
     expect(bytes.toString('latin1')).toContain('/FontFile2')
     expect(bytes.toString('latin1')).toContain('/ToUnicode')
+    expect(bytes.toString('latin1')).toContain('NotoSansSC-Regular')
   })
 
   it('rejects oversized reports explicitly instead of publishing truncated facts', async () => {

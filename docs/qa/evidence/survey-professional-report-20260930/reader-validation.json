@@ -1,0 +1,69 @@
+{
+  "kind": "synthetic-reader-layout-and-readback",
+  "excludes": [
+    "licensed-COSA-comparison",
+    "SUC-import",
+    "professional-human-signoff",
+    "Apple-notarization"
+  ],
+  "observationRows": 45,
+  "closureRows": 44,
+  "pointRows": 2,
+  "signoff": "unsigned",
+  "standardsConformity": "not-evaluated",
+  "pdfs": [
+    {
+      "name": "synthetic-leveling-report.pdf",
+      "pages": 13,
+      "observationIdsRead": 45,
+      "closureIdsRead": 44,
+      "headerOccurrences": 7
+    },
+    {
+      "name": "docx-reader-render.pdf",
+      "pages": 14,
+      "observationIdsRead": 45,
+      "closureIdsRead": 44,
+      "headerOccurrences": 8
+    },
+    {
+      "name": "xlsx-reader-render.pdf",
+      "pages": 13,
+      "observationIdsRead": 45,
+      "closureIdsRead": 44,
+      "headerOccurrences": 3
+    }
+  ],
+  "files": [
+    {
+      "name": "synthetic-leveling-report.docx",
+      "sizeBytes": 93940,
+      "sha256": "d3194e807031c2776ff47df22a6c6fa1df4cad8646f3d954fc3fbf7ba6035c32"
+    },
+    {
+      "name": "synthetic-leveling-report.pdf",
+      "sizeBytes": 76803,
+      "sha256": "3822b74ec19649d7aacbb0eec5c90fbee1e6044773b9832d7aa20973110e086c"
+    },
+    {
+      "name": "synthetic-leveling-professional.xlsx",
+      "sizeBytes": 94686,
+      "sha256": "46cf74bcec52984114552bc86ad660078d5f4f74ffbf1f84a81a54fece3a95b4"
+    },
+    {
+      "name": "synthetic-leveling-review.json",
+      "sizeBytes": 141139,
+      "sha256": "99378df7ab2558e37bf03fe8c52d43d935e90bbc85b86e6f77cd745f696e6d65"
+    },
+    {
+      "name": "docx-reader-render.pdf",
+      "sizeBytes": 596693,
+      "sha256": "39828679fb9b4353c1eb947eccd30eaaa60ac865590903573ac24492255b6e5d"
+    },
+    {
+      "name": "xlsx-reader-render.pdf",
+      "sizeBytes": 326935,
+      "sha256": "6bf6f5aeddd7749dfbcff82cb8da48a2752435f837f99559cf2ac2fcee9c28ad"
+    }
+  ]
+}

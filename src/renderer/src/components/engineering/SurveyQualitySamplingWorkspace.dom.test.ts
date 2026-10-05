@@ -43,7 +43,18 @@ async function render(overrides: Partial<Parameters<typeof SurveyQualitySampling
   await act(async () => root.render(createElement(SurveyQualitySamplingWorkspace, { binding, runtimeReady: true, ...overrides })))
 }
 async function click(target: HTMLElement): Promise<void> { await act(async () => target.click()) }
-const button = (text: string): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent === text)!
+const samplingText = (key: string): string => i18n.t(`common:${key}`)
+const buttonKeys: Record<string, string> = {
+  'Freeze unit product population': 'samplingFreeze', 'Execute first-round selection': 'samplingDraw',
+  'Read population history': 'samplingPopulationHistory', 'Read sampling history': 'samplingRunHistory',
+  'Read population units': 'samplingViewUnits', 'Read selected samples': 'samplingViewSamples',
+  'Reverify local sampling record': 'samplingReverify', 'Retry the same request': 'samplingRetry',
+  'Next page': 'samplingNext', 'Previous page': 'samplingPrevious'
+}
+const button = (text: string): HTMLButtonElement => {
+  const label = samplingText(buttonKeys[text] ?? text)
+  return [...host.querySelectorAll('button')].find(item => item.textContent === label)!
+}
 function field<T extends HTMLElement>(text: string): T {
   return [...host.querySelectorAll('label')].find(item => item.querySelector('span')?.textContent === text)!.querySelector('input, textarea, select') as unknown as T
 }
@@ -123,6 +134,7 @@ describe('quality sampling desktop workspace', () => {
     expect(field<HTMLInputElement>('Product type').value).toBe('')
     await freeze()
     expect(JSON.parse(runtimeRequest.mock.calls[0]![2])).toEqual({ ...input, expectedProjectRevision: 2, idempotencyKey: expect.any(String) })
+    expect(host.textContent).not.toContain(populationHash)
     expect(host.textContent).toContain(definitionStatement)
     expect(button('Execute first-round selection').disabled).toBe(true)
     expect(field<HTMLSelectElement>('Inspection stage').value).toBe('')
@@ -130,17 +142,13 @@ describe('quality sampling desktop workspace', () => {
     await click(button('Execute first-round selection'))
     expect(JSON.parse(runtimeRequest.mock.calls.at(-1)![2])).toEqual({ populationId: population.id, stage: 'acceptance', inspectionMode: 'table-1-simple-random', idempotencyKey: expect.any(String) })
     expect(host.textContent).toContain('9 unit products selected')
-    expect(host.textContent).toContain('without an external witness')
-    expect(host.textContent).toContain('it does not export sampling records')
-    expect(host.textContent).toContain('Declared quality scoring calculates scores')
-    expect(host.textContent).toContain('Declared inspection linkage assessment links retained materials and unit scores within its stated limits')
-    expect(host.textContent).toContain('Stage completion and professional sign-off are not implemented')
+    expect(host.textContent).toContain('without external witnessing')
+    expect(host.textContent).toContain(i18n.t('common:samplingWorkspaceExcluded'))
+    expect(host.textContent).not.toMatch(/not implemented|runtime|population hash|request identity/i)
     await act(async () => { await i18n.changeLanguage('zh') })
-    expect(host.textContent).toContain('不代表质量批准或规范合格')
-    expect(host.textContent).toContain('不提供抽样记录导出')
-    expect(host.textContent).toContain('声明评分在“质量评分试算”中计算')
-    expect(host.textContent).toContain('在“声明检查关联评估”中按限定范围关联')
-    expect(host.textContent).toContain('阶段完成判定与专业签认尚未实施')
+    expect(host.textContent).toContain('不能据此判定质量合格')
+    expect(host.textContent).toContain(i18n.t('common:samplingWorkspaceExcluded'))
+    expect(host.textContent).not.toMatch(/未实现|运行时|总体哈希|请求身份/)
   })
 
   it.each(['process', 'final-office'])('restricts %s to an explicitly chosen census and resets acknowledgment when stage changes', async stage => {
@@ -167,7 +175,7 @@ describe('quality sampling desktop workspace', () => {
 
   it('pages ordered units and selected samples without rendering the full frame, and freshly verifies history reads', async () => {
     await render(); await open(); await click(button('Read population history'))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.startsWith('Verify and restore population'))!)
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.startsWith(samplingText('samplingRestorePopulation')))!)
     await waitForPopulation()
     expect(runtimeRequest).toHaveBeenLastCalledWith('/v1/engineering/projects/project/sampling-populations/population-1', 'GET')
     await click(button('Read population units'))
@@ -180,18 +188,19 @@ describe('quality sampling desktop workspace', () => {
     expect(host.textContent).toContain(units[49]); expect(host.textContent).not.toContain(units[50])
     await click(button('Next page')); expect(host.textContent).toContain(units[60])
     await click(button('Read sampling history'))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.startsWith('Verify and restore sampling run'))!)
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.startsWith(samplingText('samplingRestoreRun')))!)
     expect(runtimeRequest.mock.calls.at(-1)![0]).toBe('/v1/engineering/projects/project/sampling-runs/run-1')
     await click(button('Reverify local sampling record'))
     expect(runtimeRequest.mock.calls.at(-2)!.slice(0, 3)).toEqual(['/v1/engineering/projects/project/sampling-runs/run-1/verify', 'POST', '{}'])
-    expect(host.textContent).toContain('Frozen local evidence and algorithm replay were checked')
+    expect(host.textContent).toContain(samplingText('samplingVerified'))
+    expect(host.textContent).not.toMatch(/replay|runtime|hash|request identity/i)
   })
 
   it('shows unavailable history entries without restore buttons', async () => {
     await render(); await open()
     runtimeRequest.mockResolvedValueOnce(response({ populations: [], unavailable: [{ id: 'stale-pop', reason: 'stale' }, { id: 'damaged-pop', reason: 'integrity' }], nextOffset: null }))
     await click(button('Read population history'))
-    expect(host.textContent).toContain('stale-pop'); expect(host.textContent).toContain('damaged-pop')
+    expect(host.textContent).not.toContain('stale-pop'); expect(host.textContent).not.toContain('damaged-pop')
     expect([...host.querySelectorAll('button')].some(item => /stale-pop|damaged-pop/.test(item.textContent!))).toBe(false)
   })
 
@@ -233,13 +242,14 @@ describe('quality sampling desktop workspace', () => {
 
   it('does not issue the follow-up reverify read after the scope changes', async () => {
     await render(); await open(); await click(button('Read sampling history'))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.startsWith('Verify and restore sampling run'))!)
+    await click([...host.querySelectorAll('button')].find(item => item.textContent?.startsWith(samplingText('samplingRestoreRun')))!)
     let complete!: (value: unknown) => void
     runtimeRequest.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
     await click(button('Reverify local sampling record')); runtimeRequest.mockClear()
     await render({ runtimeReady: false }); await act(async () => complete(response(verification())))
     expect(runtimeRequest).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('Runtime offline')
+    expect(host.textContent).toContain(samplingText('samplingOffline'))
+    expect(host.textContent).not.toMatch(/runtime/i)
   })
 
   it('rejects multibyte and unit-count limits without silently trimming or dropping values', () => {

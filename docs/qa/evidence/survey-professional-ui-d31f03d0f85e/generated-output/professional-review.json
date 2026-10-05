@@ -1,0 +1,734 @@
+{
+  "model": {
+    "title": "professional 测量平差专业成果册",
+    "projectName": "professional",
+    "taskType": "控制网",
+    "generatedAt": "2026-09-30T13:13:56.474Z",
+    "reviewStatus": "unsigned",
+    "reportStatus": "draft",
+    "sourceBinding": [
+      {
+        "networkId": "network_474642d1-3def-4d12-a009-a20165395b84",
+        "name": "period-valid-2.json",
+        "sha256": "3ffdbe2a633b5540ad46807b591708d36c6e15036c0ca58003e6d081fba4536f",
+        "status": "bound",
+        "integrity": "verified",
+        "inputHash": "c793ce8e48d3332213ea246853daf5fb758e601f2dfe7041a4ca80f148c19523",
+        "resultHash": "4373654c3fc69d054366e9ca5ba33e72b2d3f4a0035cf80936e08c09ecb6fc24",
+        "projectionHash": "4f253a9617e37e5fcf510b66af248cce19a617031d6e7b3c2ca9800059445bc5"
+      }
+    ],
+    "tables": [
+      {
+        "id": "source-binding",
+        "title": "资料与版本绑定",
+        "columns": [
+          {
+            "key": "networkId",
+            "label": "网络编号"
+          },
+          {
+            "key": "source",
+            "label": "源文件"
+          },
+          {
+            "key": "status",
+            "label": "绑定状态"
+          },
+          {
+            "key": "integrity",
+            "label": "原件完整性"
+          }
+        ],
+        "rows": [
+          {
+            "networkId": "network_474642d1-3def-4d12-a009-a20165395b84",
+            "source": "period-valid-2.json",
+            "status": "已绑定",
+            "integrity": "已校验"
+          }
+        ],
+        "note": "完整输入、结果和投影摘要在版本附录及专业成果 JSON 中保留。"
+      },
+      {
+        "id": "network_474642d1-3def-4d12-a009-a20165395b84-reference",
+        "title": "基准与已知控制点",
+        "columns": [
+          {
+            "key": "id",
+            "label": "点号"
+          },
+          {
+            "key": "role",
+            "label": "类型"
+          },
+          {
+            "key": "height",
+            "label": "高程",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          }
+        ],
+        "rows": [
+          {
+            "id": "BM",
+            "role": "待定点",
+            "height": 10
+          }
+        ],
+        "note": "高程基准：LOCAL-BM；单位：m；状态：已声明"
+      },
+      {
+        "id": "network_474642d1-3def-4d12-a009-a20165395b84-closures",
+        "title": "闭合与附合检核",
+        "columns": [
+          {
+            "key": "id",
+            "label": "线路"
+          },
+          {
+            "key": "kind",
+            "label": "类型"
+          },
+          {
+            "key": "from",
+            "label": "起点"
+          },
+          {
+            "key": "to",
+            "label": "终点"
+          },
+          {
+            "key": "observed",
+            "label": "观测高差和",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "known",
+            "label": "已知高差",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "misclosure",
+            "label": "闭合差",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "tolerance",
+            "label": "限差",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "status",
+            "label": "状态"
+          }
+        ],
+        "rows": [
+          {
+            "id": "leveling-route",
+            "kind": "闭合环",
+            "from": "BM",
+            "to": "BM",
+            "observed": 0,
+            "known": 0,
+            "misclosure": 0,
+            "status": "未评估"
+          }
+        ],
+        "note": "闭合差与限差以 mm 显示，观测和已知高差以 m 显示；限差未配置时不得推定合格。"
+      },
+      {
+        "id": "network_474642d1-3def-4d12-a009-a20165395b84-summary",
+        "title": "平差统计与检查状态",
+        "columns": [
+          {
+            "key": "networkType",
+            "label": "网型"
+          },
+          {
+            "key": "observationCount",
+            "label": "观测数",
+            "numeric": true,
+            "decimals": 0
+          },
+          {
+            "key": "pointCount",
+            "label": "点数",
+            "numeric": true,
+            "decimals": 0
+          },
+          {
+            "key": "dof",
+            "label": "自由度",
+            "numeric": true,
+            "decimals": 0
+          },
+          {
+            "key": "unitWeightStdDev",
+            "label": "单位权中误差",
+            "unit": "无量纲",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "varianceFactor",
+            "label": "方差因子",
+            "unit": "无量纲",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "varianceBasis",
+            "label": "方差依据"
+          },
+          {
+            "key": "validation",
+            "label": "计算状态"
+          }
+        ],
+        "rows": [
+          {
+            "networkType": "水准网",
+            "observationCount": 2,
+            "pointCount": 2,
+            "dof": 1,
+            "unitWeightStdDev": 0,
+            "varianceFactor": 0,
+            "varianceBasis": "后验",
+            "validation": "计算有效"
+          }
+        ],
+        "note": "残差范数仅作描述性统计，不等同闭合差；0 m（2 条）"
+      },
+      {
+        "id": "network_474642d1-3def-4d12-a009-a20165395b84-points",
+        "title": "点位成果与精度",
+        "columns": [
+          {
+            "key": "id",
+            "label": "点号"
+          },
+          {
+            "key": "role",
+            "label": "类型"
+          },
+          {
+            "key": "height",
+            "label": "高程",
+            "unit": "m",
+            "numeric": true,
+            "decimals": 6
+          },
+          {
+            "key": "correctionHeight",
+            "label": "高程改正数",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "standardError",
+            "label": "点位中误差",
+            "unit": "mm",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "precisionBasis",
+            "label": "精度依据"
+          }
+        ],
+        "rows": [
+          {
+            "id": "BM",
+            "role": "已知点",
+            "height": 10,
+            "precisionBasis": "未记录"
+          },
+          {
+            "id": "P",
+            "role": "待定点",
+            "height": 10.998,
+            "correctionHeight": -2.0000000000000018,
+            "standardError": 0,
+            "precisionBasis": "后验"
+          }
+        ],
+        "note": "最弱点：P，点位中误差 0 m。最弱边：未评估（点间协方差不可用）。"
+      },
+      {
+        "id": "network_474642d1-3def-4d12-a009-a20165395b84-observations",
+        "title": "观测值、改正数与残差",
+        "columns": [
+          {
+            "key": "id",
+            "label": "观测号"
+          },
+          {
+            "key": "type",
+            "label": "类型"
+          },
+          {
+            "key": "fromTo",
+            "label": "起讫点"
+          },
+          {
+            "key": "observed",
+            "label": "观测值",
+            "numeric": true,
+            "decimals": 10
+          },
+          {
+            "key": "adjusted",
+            "label": "平差值",
+            "numeric": true,
+            "decimals": 10
+          },
+          {
+            "key": "unit",
+            "label": "值单位"
+          },
+          {
+            "key": "correction",
+            "label": "改正数",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "residual",
+            "label": "残差",
+            "numeric": true,
+            "decimals": 4
+          },
+          {
+            "key": "residualUnit",
+            "label": "改正/残差单位"
+          },
+          {
+            "key": "screening",
+            "label": "残差筛查"
+          },
+          {
+            "key": "source",
+            "label": "原始定位"
+          }
+        ],
+        "rows": [
+          {
+            "id": "fwd",
+            "type": "高差",
+            "fromTo": "BM → P",
+            "observed": 0.998,
+            "adjusted": 0.998,
+            "correction": 0,
+            "residual": 0,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-1"
+          },
+          {
+            "id": "back",
+            "type": "高差",
+            "fromTo": "P → BM",
+            "observed": -0.998,
+            "adjusted": -0.998,
+            "correction": 0,
+            "residual": 0,
+            "unit": "m",
+            "residualUnit": "mm",
+            "screening": "未见候选",
+            "source": "workwise-json-observation-2"
+          }
+        ],
+        "note": "观测值与平差值保持 m / rad；线性改正数和残差以 mm 显示，角度以角秒显示。"
+      },
+      {
+        "id": "network_474642d1-3def-4d12-a009-a20165395b84-checks",
+        "title": "质量检查与复核状态",
+        "columns": [
+          {
+            "key": "id",
+            "label": "检查项"
+          },
+          {
+            "key": "status",
+            "label": "状态"
+          },
+          {
+            "key": "reason",
+            "label": "依据/缺项原因"
+          }
+        ],
+        "rows": [
+          {
+            "id": "来源绑定",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "原始记录覆盖",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "基准声明",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "外业检核",
+            "status": "未评估",
+            "reason": "测站原始读数未评估"
+          },
+          {
+            "id": "独立闭合检核",
+            "status": "未评估",
+            "reason": "未配置闭合限差"
+          },
+          {
+            "id": "精度限差",
+            "status": "未评估",
+            "reason": "未配置精度限差"
+          },
+          {
+            "id": "数值结果",
+            "status": "通过",
+            "reason": "无"
+          },
+          {
+            "id": "规范符合性",
+            "status": "未评估",
+            "reason": "适用规范和符合性未评估"
+          }
+        ]
+      },
+      {
+        "id": "version-appendix",
+        "title": "版本与证据摘要附录",
+        "columns": [
+          {
+            "key": "networkId",
+            "label": "网络编号"
+          },
+          {
+            "key": "kind",
+            "label": "版本项"
+          },
+          {
+            "key": "hash",
+            "label": "完整 SHA-256"
+          }
+        ],
+        "rows": [
+          {
+            "networkId": "network_474642d1-3def-4d12-a009-a20165395b84",
+            "kind": "输入",
+            "hash": "c793ce8e48d3332213ea246853daf5fb758e601f2dfe7041a4ca80f148c19523"
+          },
+          {
+            "networkId": "network_474642d1-3def-4d12-a009-a20165395b84",
+            "kind": "结果",
+            "hash": "4373654c3fc69d054366e9ca5ba33e72b2d3f4a0035cf80936e08c09ecb6fc24"
+          },
+          {
+            "networkId": "network_474642d1-3def-4d12-a009-a20165395b84",
+            "kind": "成果投影",
+            "hash": "4f253a9617e37e5fcf510b66af248cce19a617031d6e7b3c2ca9800059445bc5"
+          }
+        ]
+      }
+    ],
+    "notes": [
+      "本成果由确定性计算结果投影生成，数值未由 AI 改写。",
+      "“未评估/不可用”表示当前资料或合同不足，不代表通过、合格或安全。",
+      "本稿未完成专业复核、审核、批准和签名；签认栏保留空白。",
+      "显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。"
+    ],
+    "signoff": [
+      {
+        "role": "编制",
+        "name": "",
+        "date": "",
+        "signature": ""
+      },
+      {
+        "role": "复核",
+        "name": "",
+        "date": "",
+        "signature": ""
+      },
+      {
+        "role": "批准",
+        "name": "",
+        "date": "",
+        "signature": ""
+      }
+    ],
+    "appendix": [
+      "项目：professional",
+      "测量平差成果报告（待审查）",
+      "单位：长度 m；角度 rad；统计量按各项标注。",
+      "",
+      "专业测量源文件",
+      "网络 network_474642d1-3def-4d12-a009-a20165395b84: period-valid-2.json；厂商=WorkWise/open；格式=workwise-json 1；置信度=99%；状态=adjustment-ready；解析器=workwise-survey-source/1；SHA-256=3ffdbe2a633b5540ad46807b591708d36c6e15036c0ca58003e6d081fba4536f",
+      "",
+      "",
+      "测量平差结果",
+      "平差运行 adjustment_8c4427ec-f38a-499a-af7c-aff40b894a24：网络=network_474642d1-3def-4d12-a009-a20165395b84，策略=leveling，观测=2，未知数=1，多余观测=1",
+      "单位权中误差=0（无量纲）；方差因子=0（无量纲，后验估计），最大点位中误差=0 m，状态=valid，输入 SHA-256=c793ce8e48d3332213ea246853daf5fb758e601f2dfe7041a4ca80f148c19523",
+      "统计口径：描述性筛查；数值状态=clear；可筛查=2；不可检验=0；需复核=0；方差尺度=estimated-posterior",
+      "筛查阈值 3 不是正态/t 检验临界值；显著性未评定；工程规范符合性未评定。",
+      "残差 fwd：0 m；方法=weight-normalized-residual；尺度=relative-weight；筛查比值=0；需复核=false",
+      "残差 back：0 m；方法=weight-normalized-residual；尺度=relative-weight；筛查比值=0；需复核=false",
+      "历史结果量=heightDifference:0 m（独立闭合检核见专业成果表；残差范数不等同闭合差）",
+      "解算参数=无",
+      "点位 BM: X=- Y=- H=10 m",
+      "点位 P: X=- Y=- H=10.998 m",
+      "位移 BM: dX=- dY=- dH=0 m 模长=0 m",
+      "位移 P: dX=- dY=- dH=-0.002000000000000668 m 模长=0.002000000000000668 m",
+      "",
+      "变形期次比较",
+      "本报告未关联变形期次比较",
+      "",
+      "质量问题",
+      "",
+      "来源引用",
+      "无",
+      "",
+      "审查记录：本报告由 RailWise AI 确定性工程分析生成；当前为待审查草稿，不代表专业复核、批准或签名。"
+    ]
+  },
+  "reviews": [
+    {
+      "schemaVersion": 1,
+      "projectionVersion": "survey-professional-review-1",
+      "projectId": "project_bb5aa9ca-b7de-4d2f-8800-e59b799924ec",
+      "networkId": "network_474642d1-3def-4d12-a009-a20165395b84",
+      "runId": "adjustment_8c4427ec-f38a-499a-af7c-aff40b894a24",
+      "resultId": "adjustment_result_57d6e7e4-53aa-4d10-acce-9633af36d3b2",
+      "inputHash": "c793ce8e48d3332213ea246853daf5fb758e601f2dfe7041a4ca80f148c19523",
+      "resultHash": "4373654c3fc69d054366e9ca5ba33e72b2d3f4a0035cf80936e08c09ecb6fc24",
+      "projectionHash": "4f253a9617e37e5fcf510b66af248cce19a617031d6e7b3c2ca9800059445bc5",
+      "algorithmVersion": "workwise-survey-adjustment-8",
+      "resultCreatedAt": "2026-09-30T13:08:52.452Z",
+      "source": {
+        "networkRevision": 2,
+        "sha256": "3ffdbe2a633b5540ad46807b591708d36c6e15036c0ca58003e6d081fba4536f",
+        "formatId": "workwise-json",
+        "name": "period-valid-2.json",
+        "status": "bound",
+        "integrity": "verified",
+        "anchoredObservationCount": 2,
+        "missingAnchorObservationIds": []
+      },
+      "reference": {
+        "coordinateSystem": "LOCAL",
+        "projection": null,
+        "ellipsoid": null,
+        "verticalDatum": "LOCAL-BM",
+        "linearUnit": "m",
+        "angularUnit": "rad",
+        "knownPoints": [
+          {
+            "id": "BM",
+            "pointClass": "unknown",
+            "height": 10,
+            "known": true,
+            "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+          }
+        ],
+        "status": "declared"
+      },
+      "summary": {
+        "networkType": "leveling",
+        "observationCount": 2,
+        "pointCount": 2,
+        "degreesOfFreedom": 1,
+        "unitWeightStdDev": 0,
+        "varianceFactor": 0,
+        "varianceBasis": "a-posteriori",
+        "validation": "valid"
+      },
+      "closures": [
+        {
+          "id": "leveling-route",
+          "kind": "loop",
+          "from": "BM",
+          "to": "BM",
+          "members": [
+            {
+              "observationId": "fwd",
+              "direction": 1,
+              "from": "BM",
+              "to": "P",
+              "heightDifferenceMetres": 0.998,
+              "routeLengthMetres": 100,
+              "sourceRecordId": "workwise-json-observation-1"
+            },
+            {
+              "observationId": "back",
+              "direction": 1,
+              "from": "P",
+              "to": "BM",
+              "heightDifferenceMetres": -0.998,
+              "routeLengthMetres": 100,
+              "sourceRecordId": "workwise-json-observation-2"
+            }
+          ],
+          "sumObservedMetres": 0,
+          "knownHeightDifferenceMetres": 0,
+          "misclosureMetres": 0,
+          "totalLengthMetres": 200,
+          "status": "not-evaluated",
+          "reason": "closure-tolerance-not-configured"
+        }
+      ],
+      "residualNorms": [
+        {
+          "unit": "m",
+          "value": 0,
+          "count": 2,
+          "status": "descriptive-only"
+        }
+      ],
+      "observations": [
+        {
+          "id": "fwd",
+          "observationId": "fwd",
+          "type": "height-difference",
+          "from": "BM",
+          "to": "P",
+          "rawValue": 0.998,
+          "rawUnit": "m",
+          "observed": 0.998,
+          "adjusted": 0.998,
+          "correction": 0,
+          "residual": 0,
+          "unit": "m",
+          "sourceRecordId": "workwise-json-observation-1",
+          "sourceLocator": "WorkWise JSON:network.observations[0]",
+          "outlierCandidate": false,
+          "screening": {
+            "schemaVersion": 1,
+            "method": "weight-normalized-residual",
+            "scaleBasis": "relative-weight",
+            "scope": "descriptive-screening",
+            "significance": "not-evaluated",
+            "status": "available",
+            "value": 0,
+            "threshold": 3,
+            "thresholdExceeded": false
+          },
+          "screeningStatus": "available"
+        },
+        {
+          "id": "back",
+          "observationId": "back",
+          "type": "height-difference",
+          "from": "P",
+          "to": "BM",
+          "rawValue": -0.998,
+          "rawUnit": "m",
+          "observed": -0.998,
+          "adjusted": -0.998,
+          "correction": 0,
+          "residual": 0,
+          "unit": "m",
+          "sourceRecordId": "workwise-json-observation-2",
+          "sourceLocator": "WorkWise JSON:network.observations[1]",
+          "outlierCandidate": false,
+          "screening": {
+            "schemaVersion": 1,
+            "method": "weight-normalized-residual",
+            "scaleBasis": "relative-weight",
+            "scope": "descriptive-screening",
+            "significance": "not-evaluated",
+            "status": "available",
+            "value": 0,
+            "threshold": 3,
+            "thresholdExceeded": false
+          },
+          "screeningStatus": "available"
+        }
+      ],
+      "points": [
+        {
+          "id": "BM",
+          "role": "known",
+          "height": 10,
+          "precisionBasis": "not-recorded",
+          "unit": "m"
+        },
+        {
+          "id": "P",
+          "role": "unknown",
+          "height": 10.998,
+          "correctionHeight": -0.0020000000000000018,
+          "standardError": 0,
+          "precisionBasis": "a-posteriori",
+          "unit": "m"
+        }
+      ],
+      "weakestPoint": {
+        "status": "available",
+        "criterion": "largest-reported-point-standard-error",
+        "pointId": "P",
+        "standardErrorMetres": 0
+      },
+      "weakestEdge": {
+        "status": "not-evaluated",
+        "reason": "cross-covariance-unavailable"
+      },
+      "checks": [
+        {
+          "id": "source-binding",
+          "status": "pass"
+        },
+        {
+          "id": "source-coverage",
+          "status": "pass"
+        },
+        {
+          "id": "reference",
+          "status": "pass"
+        },
+        {
+          "id": "field-checks",
+          "status": "not-evaluated",
+          "reason": "station-readings-not-evaluated"
+        },
+        {
+          "id": "closure",
+          "status": "not-evaluated",
+          "reason": "closure-tolerance-not-configured"
+        },
+        {
+          "id": "precision",
+          "status": "not-evaluated",
+          "reason": "precision-tolerance-not-configured"
+        },
+        {
+          "id": "numerical-result",
+          "status": "pass"
+        },
+        {
+          "id": "standards",
+          "status": "not-evaluated",
+          "reason": "standards-not-evaluated"
+        }
+      ],
+      "reviewStatus": "unsigned",
+      "standardsConformity": "not-evaluated"
+    }
+  ]
+}

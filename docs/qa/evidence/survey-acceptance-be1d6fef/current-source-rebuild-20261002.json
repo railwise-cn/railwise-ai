@@ -1,0 +1,16 @@
+{
+  "sourceState": "working-tree-with-uncommitted-changes",
+  "version": "0.5.1",
+  "platform": "macos-arm64",
+  "artifact": "/Users/wangjiawei/Documents/WorkWise/dist/WorkWise-0.5.1-mac-arm64.zip",
+  "sha256": "365fdbc9c03d809bdfff1edecc6fb6b6b12eac9a0e4f243b0b25c89e7de65174",
+  "sizeBytes": 403617960,
+  "asarIntegrity": "passed",
+  "codeSignature": "ad-hoc-valid",
+  "notarization": "not-performed",
+  "directLaunchExit": 0,
+  "exactPathComputerUse": "timed-out--10005",
+  "installedAppScreenshot": "not-accepted-for-this-artifact",
+  "updaterRoundTrip": "not-run",
+  "publicRelease": "not-performed"
+}

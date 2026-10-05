@@ -22,6 +22,11 @@ artifacts/qa/0.3.0-markitdown/
 /.codex/config.toml
 /.zcode/
 
+### Local build/test artifacts
+.pnpm-store/
+EngineeringWorkspaceView-*.js
+/index.html
+
 ### Local release secrets
 scripts/release.local.env
 release.local.env

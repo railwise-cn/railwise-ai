@@ -39,7 +39,9 @@ export function emptyWorkflow(context: WorkflowContext, key = 'create-workflow')
   return { workflow: { schemaVersion: 1, id: 'workflow-1', projectId: context.binding.projectId, createdAt, binding: fixtureBinding(context), request: {
     planId: context.plan.plan.id, recordId: context.record.record.id, expectedRetentionHeadHash: context.record.verification.headHash, expectedProjectRevision: context.binding.projectRevision, idempotencyKey: key
   }, semantics: 'caller-declared-workflow-only' }, entries: [], headHash: hash('0'), recordIntegrity: true, openIssueCount: 0, recordedCheckCount: 0,
-    semantics: 'caller-declared-workflow-only', checkpointTrust: 'local-records-only', standardConformity: 'not-evaluated', humanSignatureVerification: 'not-evaluated', deliveryApproval: 'not-granted' }
+    semantics: 'caller-declared-workflow-only', checkpointTrust: 'local-records-only', standardConformity: 'not-evaluated', humanSignatureVerification: 'not-evaluated', deliveryApproval: 'not-granted', qualityGate: {
+      schemaVersion: 1, status: 'not-evaluated', reasons: ['versioned-stage-record-missing'], completedStageKinds: [], activeApplicableRuleIds: [], revokedRuleIds: [], activeSignoffIds: [], revokedSignoffIds: [], approvalRequestIds: []
+    } }
 }
 export function appendFixture(current: QualityWorkflow, declared: WorkflowEvent, key: string, evidence: WorkflowContext, target?: WorkflowContext): QualityWorkflow {
   const evidenceSha256 = evidence.plan.artifact.members.find(member => member.id === declared.evidence.memberId)!.sha256
@@ -47,7 +49,14 @@ export function appendFixture(current: QualityWorkflow, declared: WorkflowEvent,
   if (declared.kind === 'check') actual = { kind: declared.kind, checkId: declared.checkId, outcome: declared.outcome, evidenceSha256 }
   else if (declared.kind === 'issue-opened') actual = { kind: declared.kind, checkId: declared.checkId, issueId: declared.issueId, evidenceSha256 }
   else if (declared.kind === 'correction-recorded') actual = { kind: declared.kind, issueId: declared.issueId, correctionId: declared.correctionId, correctedArtifactSha256: target!.plan.artifact.bundleHash, evidenceSha256 }
-  else actual = { kind: declared.kind, issueId: declared.issueId, correctionId: declared.correctionId, recheckedArtifactSha256: target!.plan.artifact.bundleHash, outcome: declared.outcome, evidenceSha256 }
+  else if (declared.kind === 'issue-rechecked') actual = { kind: declared.kind, issueId: declared.issueId, correctionId: declared.correctionId, recheckedArtifactSha256: target!.plan.artifact.bundleHash, outcome: declared.outcome, evidenceSha256 }
+  else if (declared.kind === 'stage-started') actual = { kind: declared.kind, stageId: declared.stageId, stageKind: declared.stageKind, policyVersion: declared.policyVersion, checkedScope: declared.checkedScope, evidenceSha256 }
+  else if (declared.kind === 'stage-completed') actual = { kind: declared.kind, stageId: declared.stageId, stageKind: declared.stageKind, outcome: declared.outcome, evidenceSha256 }
+  else if (declared.kind === 'rule-applicability') actual = { kind: declared.kind, declarationId: declared.declarationId, rule: declared.rule, status: declared.status, rationale: declared.rationale, evidenceSha256 }
+  else if (declared.kind === 'rule-revoked') actual = { kind: declared.kind, declarationId: declared.declarationId, reason: declared.reason, evidenceSha256 }
+  else if (declared.kind === 'signoff-declared') actual = { kind: declared.kind, signoffId: declared.signoffId, purpose: declared.purpose, actorKey: declared.actorKey, evidenceSha256 }
+  else if (declared.kind === 'signoff-revoked') actual = { kind: declared.kind, signoffId: declared.signoffId, reason: declared.reason, evidenceSha256 }
+  else actual = { kind: declared.kind, approvalId: declared.approvalId, requiredSignoffIds: declared.requiredSignoffIds, evidenceSha256 }
   const events = appendSurveyQualityEvent(current.entries.map(entry => entry.event), { schemaVersion: 1, id: `event-${current.entries.length + 1}`, projectId: current.workflow.projectId, artifactSha256: current.workflow.binding.artifactHash,
     occurredAt: createdAt, actor: { id: 'survey-quality-workflow', kind: 'system' }, stage: 'declared-workflow', event: actual })
   const event = events.at(-1)!, verified = verifySurveyQualityRecord(events)

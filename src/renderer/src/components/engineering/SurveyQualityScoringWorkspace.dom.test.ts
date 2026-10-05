@@ -41,7 +41,25 @@ async function render(overrides: Partial<Parameters<typeof SurveyQualityScoringW
   await act(async () => root.render(createElement(SurveyQualityScoringWorkspace, { binding, runtimeReady: true, ...overrides })))
 }
 async function click(target: HTMLElement) { await act(async () => target.click()) }
-const button = (text: string): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent === text)!
+const qualityText = (key: string, options?: Record<string, unknown>): string => i18n.t(`qualityScoring:${key}`, options)
+const buttonKeys: Record<string, string> = {
+  'Calculate and save declared record': 'scoringSave', 'Reverify and replay': 'scoringReverify',
+  'Reverify and export JSON': 'scoringExport', 'Scoring record history': 'scoringHistory',
+  'Strictly verify and restore': 'scoringRestore', 'Retry original request': 'scoringRetry',
+  'Stop waiting': 'scoringCancel', 'Next page': 'scoringNext', 'Previous page': 'scoringPrevious'
+}
+const button = (text: string): HTMLButtonElement => {
+  const label = qualityText(buttonKeys[text] ?? text)
+  return [...host.querySelectorAll('button')].find(item => item.textContent === label)!
+}
+const action = (key: string): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent === qualityText(key))!
+const importField = (): HTMLInputElement => host.querySelector<HTMLInputElement>('input[type="file"]')!
+const restoreButton = (): HTMLButtonElement => [...host.querySelectorAll('button')].find(item => item.textContent?.startsWith(i18n.t('qualityScoring:scoringRestore')))!;
+async function importDeclaration(text: string) {
+  const file = { size: new TextEncoder().encode(text).byteLength, text: async () => text } as File
+  Object.defineProperty(importField(), 'files', { configurable: true, value: [file] })
+  await act(async () => { importField().dispatchEvent(new Event('change', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 0)) })
+}
 function field<T extends HTMLElement>(text: string): T { return [...host.querySelectorAll('label')].find(label => label.querySelector('span')?.textContent === text)!.querySelector('input,textarea,select') as unknown as T }
 async function edit(label: string, value: string) {
   const target = field<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(label)
@@ -51,13 +69,13 @@ async function edit(label: string, value: string) {
     target.dispatchEvent(new Event(target instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
   })
 }
-const ack = () => field<HTMLInputElement>('I confirm saving this declared inspection trial. Evidence and classifications remain unverified; the result is not engineering approval or a signature.')
+const ack = () => field<HTMLInputElement>(qualityText('scoringAcknowledge'))
 async function fill(selected = input()) {
-  await edit('Scoring stage', selected.kind); await edit('Inspection basis and evidence statement', selected.modelBasisStatement)
-  await edit('Complete scoring declaration JSON', selected.declarationJson)
+  await edit(qualityText('scoringMethod'), selected.kind); await edit(qualityText('scoringBasis'), selected.modelBasisStatement)
+  await importDeclaration(selected.declarationJson)
 }
-async function save(selected = input()) { await fill(selected); await click(ack()); await click(button('Calculate and save declared record')); await loaded() }
-async function loaded() { await vi.waitFor(async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) }); expect(button('Reverify and replay')).toBeDefined() }) }
+async function save(selected = input()) { await fill(selected); await click(ack()); await click(action('scoringSave')); await loaded() }
+async function loaded() { await vi.waitFor(async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) }); expect(action('scoringReverify')).toBeDefined() }) }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -80,9 +98,9 @@ describe('declared advanced model desktop workflow', () => {
     await click(button('Scoring record history'))
     await vi.waitFor(async () => {
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
-      expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes(selected.record.id))).toBe(true)
+      expect(restoreButton()).toBeDefined()
     })
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes(selected.record.id))!); await loaded()
+    await click(restoreButton()); await loaded()
     const row = selected.record.result.trace[0]!
     runtimeRequest.mockClear(); await click(host.querySelector('tbody tr button')!)
     expect(runtimeRequest).not.toHaveBeenCalled(); expect(saveWorkspaceFileAs).not.toHaveBeenCalled(); expect(focus).toHaveBeenCalledOnce()
@@ -107,11 +125,41 @@ describe('declared advanced model desktop workflow', () => {
     await click(ack()); await edit('Inspection basis and evidence statement', basis + '\nchecked'); expect(ack().checked).toBe(false)
     await click(ack()); await click(button('Calculate and save declared record')); await loaded()
     expect(host.textContent).toContain('100/1'); expect(host.textContent).toContain('Declared component only')
-    expect(host.textContent).toContain('Evidence references, defect classification and prior batch qualification are unverified')
-    expect([...host.querySelectorAll('pre')].some(pre => pre.textContent === input().declarationJson)).toBe(true)
+    expect(host.textContent).toContain(qualityText('scoringBoundary'))
+    expect(host.textContent).not.toContain('schemaVersion'); expect(host.querySelectorAll('pre')).toHaveLength(0)
+    expect(host.textContent).not.toMatch(/Runtime|JSON|contextHash|inputHash|requestSha256|schemaVersion|idempotencyKey|replay environment/i)
     expect(document.activeElement).toBe(host.querySelector('h3'))
     await act(async () => { await i18n.changeLanguage('zh') })
-    expect(host.textContent).toContain('质量评分试算'); expect(host.textContent).toContain('仅本次声明单项'); expect(host.textContent).not.toContain('scoringTitle')
+    expect(host.textContent).toContain(qualityText('scoringTitle')); expect(host.textContent).toContain('仅本次声明单项'); expect(host.textContent).not.toContain('scoringTitle')
+  })
+  it('builds an accuracy assessment from professional fields without exposing declaration internals', async () => {
+    await render()
+    await edit('Scoring stage', 'accuracy')
+    expect(field<HTMLSelectElement>('Measurement unit').querySelectorAll('option')).toHaveLength(2)
+    expect(host.textContent).toContain('Enter one observed value per line using the selected unit.')
+    await edit('Unit deliverable number', 'CP-01')
+    await edit('Inspection basis', 'inspection-book/page-4')
+    await edit('Measurement unit', 'm')
+    await edit('Observed values', '0.12\n0.08')
+    await edit('Allowable standard error (m)', '0.3')
+    await edit('Class A deliverable count', '0')
+    await edit('Inspection basis and evidence statement', 'Planar control-point accuracy inspected against the declared allowable error.')
+    expect(button('Calculate and save declared record').disabled).toBe(true)
+    expect(ack().disabled).toBe(false)
+    await click(ack()); expect(button('Calculate and save declared record').disabled).toBe(false)
+    await click(button('Calculate and save declared record')); await loaded()
+    const request = JSON.parse(runtimeRequest.mock.calls[0]![2] as string)
+    const declaration = JSON.parse(request.declarationJson)
+    expect(declaration).toMatchObject({ unitId: 'CP-01', operation: 'accuracy', model: { aCount: 0 } })
+    expect(declaration.model.items.map((item: { m: string; m0: string; unit: string }) => [item.m, item.m0, item.unit])).toEqual([['0.12', '0.3', 'm'], ['0.08', '0.3', 'm']])
+    expect(host.textContent).not.toContain('requestSha256'); expect(host.textContent).not.toContain('schemaVersion')
+    expect(host.textContent).not.toMatch(/Runtime|JSON|contextHash|inputHash|requestSha256|schemaVersion|idempotencyKey|replay environment/i)
+    expect(host.querySelectorAll('pre')).toHaveLength(0)
+  })
+  it('names the deduction adjustment coefficient without presenting it as an inspection count', async () => {
+    await render(); await edit('Scoring stage', 'deduction')
+    expect(host.textContent).toContain('Deduction adjustment coefficient (t)')
+    expect(host.textContent).not.toContain('Class A deliverable count / T')
   })
   it('distinguishes exact partial grade from full-product qualification and retains pending/A veto traces', async () => {
     const model = qualityScoringTestDeclaration('unit')
@@ -123,7 +171,7 @@ describe('declared advanced model desktop workflow', () => {
     await render(); await save(input('unit', model))
     expect(host.textContent).toContain('285/4'); expect(host.textContent).toContain('Partial product scope only')
     expect(host.textContent).toContain('Grade for this partial scope (not full product)')
-    expect(host.querySelector('[aria-label="Inspect calculation trace and hierarchical weights"]')).not.toBeNull()
+    expect(host.querySelector(`[aria-label="${i18n.t('qualityScoring:scoringTrace')}"]`)).not.toBeNull()
     model.leaves[1] = { elementId: 'data-quality', subelementId: 'observation-quality', state: 'pending', reason: 'not yet inspected', evidenceRefs: ['pending'] }
     if (selection.state === 'checked' && selection.record.kind === 'deduction') selection.record.defects.a = 1
     await save(input('unit', model))
@@ -135,15 +183,17 @@ describe('declared advanced model desktop workflow', () => {
       expect(SurveyQualityScoringInputV1.safeParse(qualityScoringExample(kind, profile)).success).toBe(true)
     }
     await render(); await edit('Scoring stage', 'unit')
-    expect(field<HTMLTextAreaElement>('Complete scoring declaration JSON').value).toBe('')
+    expect(host.querySelectorAll('textarea')).toHaveLength(1)
     await edit('Product profile', 'height-control-section')
-    expect(host.textContent).toContain('"profileWeightTable": 45')
+    expect(host.textContent).not.toContain('profileWeightTable')
     expect(runtimeRequest).not.toHaveBeenCalled()
   })
   it.each(['full', 'child-veto', 'pending', 'multiple-sixty'] as const)('shows the packaged acceptance case without changing its raw JSON: %s', async name => {
     const declarationJson = readFileSync(join(process.cwd(), `docs/qa/evidence/railwise-quality-scoring-workspace/fixtures/quality-${name}.json`), 'utf8')
     await render(); await save({ kind: name === 'multiple-sixty' ? 'accuracy' : 'unit', declarationJson, modelBasisStatement: basis })
-    expect([...host.querySelectorAll('pre')].some(pre => pre.textContent === declarationJson)).toBe(true)
+    const saved = service.getRecord(binding.projectId, service.listRecords(binding.projectId).records[0]!.id)
+    expect(saved.declarationJson).toBe(declarationJson)
+    expect(host.textContent).not.toContain('schemaVersion'); expect(host.querySelectorAll('pre')).toHaveLength(0)
     expect(host.textContent).toContain(name === 'full' ? '9141/100' : name === 'child-veto' ? '52/1' : name === 'pending' ? 'Product scope has pending items' : 'exactly 60')
     expect(host.textContent).toContain(name === 'full' ? 'Full product profile' : name === 'child-veto' ? 'Declared record nonconforming' : 'Insufficient evidence or unsupported branch')
   })
@@ -153,15 +203,14 @@ describe('declared advanced model desktop workflow', () => {
     model.model.items[0]!.m = '0.3'; model.model.items[0]!.m0 = '1'; model.model.aCount = 0
     const { summary } = stored({ kind: 'accuracy', declarationJson: JSON.stringify(model), modelBasisStatement: basis })
     await render(); await click(button('Scoring record history'))
-    await vi.waitFor(() => expect(host.textContent).toContain(summary.id))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!); await loaded()
+    await vi.waitFor(() => expect(restoreButton()).toBeDefined())
+    await click(restoreButton()); await loaded()
     expect(host.textContent).toContain('Height control · Section (tables 45/46) · Mathematical accuracy · GB/T 24356-2023')
   })
   it('blocks malformed, duplicate-key and oversized UTF-8 declarations without truncation or requests', async () => {
     await render(); await fill(); const duplicate = input().declarationJson.replace('"schemaVersion": 1', '"schemaVersion": 1,"schemaVersion": 1')
-    await edit('Complete scoring declaration JSON', duplicate); expect(button('Calculate and save declared record').disabled).toBe(true)
-    const oversized = '中'.repeat(100_000); await edit('Complete scoring declaration JSON', oversized)
-    expect(field<HTMLTextAreaElement>('Complete scoring declaration JSON').value).toBe(oversized)
+    await importDeclaration(duplicate); expect(button('Calculate and save declared record').disabled).toBe(true)
+    const oversized = '中'.repeat(100_000); await importDeclaration(oversized)
     expect(runtimeRequest).not.toHaveBeenCalled(); expect(button('Calculate and save declared record').disabled).toBe(true)
   })
   it('paginates real history and isolates unavailable records', async () => {
@@ -172,27 +221,27 @@ describe('declared advanced model desktop workflow', () => {
     expect(runtimeRequest.mock.calls.at(-1)![0]).toContain('offset=10')
     await vi.waitFor(() => expect(button('Next page').disabled).toBe(true))
     runtimeRequest.mockResolvedValueOnce(response({ records: [], unavailable: [{ id: 'damaged', reason: 'integrity' }, { id: 'old', reason: 'stale' }, { id: 'other-engine', reason: 'replay-environment' }], nextOffset: null }))
-    await click(button('Scoring record history')); expect(host.textContent).toContain('damaged'); expect(host.textContent).toContain('This does not by itself mean the record was tampered with')
-    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Strictly verify and restore'))).toBe(false)
+    await click(button('Scoring record history')); expect(host.textContent).toContain(qualityText('scoringUnrestorable')); expect(host.textContent).toContain(qualityText('scoringEnvironment'))
+    expect(restoreButton()).toBeUndefined()
   })
   it('retries an uncertain save with exactly the same original body and key and suppresses double clicks', async () => {
     await render(); await fill(); await click(ack())
     runtimeRequest.mockImplementationOnce((path, method, body) => { handle(path, method, body); return Promise.reject(new Error('connection lost after save')) })
     await click(button('Calculate and save declared record'))
     const first = runtimeRequest.mock.calls[0]![2]
-    expect(field<HTMLTextAreaElement>('Complete scoring declaration JSON').disabled).toBe(true)
-    await click(button('Retry original request')); await loaded()
+    expect(importField().disabled).toBe(true)
+    await click(action('scoringRetry')); await loaded()
     expect(runtimeRequest.mock.calls[1]![2]).toBe(first)
     expect(service.listRecords(binding.projectId).records).toHaveLength(1)
   })
   it('resolves an uncertain save by restoring the same request from history', async () => {
     await render(); await fill(); await click(ack())
     runtimeRequest.mockImplementationOnce((path, method, body) => { handle(path, method, body); return Promise.reject(new Error('lost response')) })
-    await click(button('Calculate and save declared record')); expect(field<HTMLTextAreaElement>('Complete scoring declaration JSON').disabled).toBe(true)
+    await click(button('Calculate and save declared record')); expect(importField().disabled).toBe(true)
     await click(button('Scoring record history'))
-    await vi.waitFor(() => expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Strictly verify and restore'))).toBe(true))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!); await loaded()
-    expect(field<HTMLTextAreaElement>('Complete scoring declaration JSON').disabled).toBe(false)
+    await vi.waitFor(() => expect(restoreButton()).toBeDefined())
+    await click(restoreButton()); await loaded()
+    expect(importField().disabled).toBe(false)
     expect(host.textContent).not.toContain('The save outcome is not confirmed')
   })
   it.each(['project', 'revision', 'workspace', 'offline', 'cancel'] as const)('discards a late create response after %s without fetching its detail', async change => {
@@ -200,24 +249,24 @@ describe('declared advanced model desktop workflow', () => {
     runtimeRequest.mockImplementationOnce((path, method, body) => { saved = handle(path, method, body); return wait.promise })
     await render(); await fill(); await click(ack()); await click(button('Calculate and save declared record'))
     await click(button('Calculate and save declared record'))
-    if (change === 'cancel') await click(button('Stop waiting'))
+    if (change === 'cancel') await click(action('scoringCancel'))
     else await render(change === 'offline' ? { runtimeReady: false } : { binding: { ...binding, ...(change === 'project' ? { projectId: 'other' } : change === 'revision' ? { projectRevision: 2 } : { workspaceRoot: '/other-workspace' }) } })
     await act(async () => wait.resolve(saved!)); await new Promise(resolve => setTimeout(resolve, 10))
-    expect(runtimeRequest).toHaveBeenCalledTimes(1); expect(button('Reverify and replay')).toBeUndefined()
+    expect(runtimeRequest).toHaveBeenCalledTimes(1); expect(action('scoringReverify')).toBeUndefined()
   })
   it.each(['project', 'offline'] as const)('discards a late restored detail after %s', async change => {
     const { summary, record } = stored(), wait = deferred<ReturnType<typeof response>>()
     runtimeRequest.mockResolvedValueOnce(response({ records: [summary], unavailable: [], nextOffset: null })).mockReturnValueOnce(wait.promise)
-    await render(); await click(button('Scoring record history')); await vi.waitFor(() => expect(host.textContent).toContain(summary.id))
-    await click([...host.querySelectorAll('button')].find(item => item.textContent?.includes('Strictly verify and restore'))!)
+    await render(); await click(button('Scoring record history')); await vi.waitFor(() => expect(restoreButton()).toBeDefined())
+    await click(restoreButton())
     await render(change === 'offline' ? { runtimeReady: false } : { binding: { ...binding, projectId: 'other' } })
     await act(async () => wait.resolve(response(record))); await new Promise(resolve => setTimeout(resolve, 10))
-    expect(host.textContent).not.toContain(record.id); expect(button('Reverify and replay')).toBeUndefined()
+    expect(host.textContent).not.toContain(record.id); expect(action('scoringReverify')).toBeUndefined()
   })
   it('does not issue the second GET if scope changes during reverify', async () => {
     await render(); await save(); const path = runtimeRequest.mock.calls[1]![0] as string
     const wait = deferred<ReturnType<typeof response>>(), result = handle(`${path}/reverify`, 'POST', '{}')
-    runtimeRequest.mockReturnValueOnce(wait.promise); await click(button('Reverify and replay'))
+    runtimeRequest.mockReturnValueOnce(wait.promise); await click(action('scoringReverify'))
     await render({ binding: { ...binding, projectRevision: 2 } })
     await act(async () => wait.resolve(result)); await new Promise(resolve => setTimeout(resolve, 10))
     expect(runtimeRequest).toHaveBeenCalledTimes(3)
@@ -238,33 +287,33 @@ describe('declared advanced model desktop workflow', () => {
   it('maps deterministic environment/validation errors without suggesting generic network retry', async () => {
     await render()
     runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: '{"code":"quality_scoring_replay_environment"}' })
-    await click(button('Scoring record history')); expect(host.textContent).toContain('preventing exact replay'); expect(button('Retry original request')).toBeUndefined()
+    await click(button('Scoring record history')); expect(host.textContent).toContain(i18n.t('qualityScoring:scoringEnvironment')); expect(action('scoringRetry')).toBeUndefined()
     runtimeRequest.mockResolvedValueOnce({ ok: false, status: 400, body: '{"code":"quality_scoring_validation"}' })
-    await click(button('Scoring record history')); expect(host.textContent).toContain('contract'); expect(button('Retry original request')).toBeUndefined()
+    await click(button('Scoring record history')); expect(host.textContent).toContain(i18n.t('qualityScoring:scoringValidation')); expect(action('scoringRetry')).toBeUndefined()
   })
   it('exports only a freshly replayed record through native Save As, preserving UTF-8 original input', async () => {
-    await render(); await save(); await click(button('Reverify and export JSON'))
+    await render(); await save(); await click(action('scoringExport'))
     await vi.waitFor(() => expect(saveWorkspaceFileAs).toHaveBeenCalledTimes(1))
     expect(runtimeRequest.mock.calls.at(-1)![0]).toMatch(/\/export$/)
     const payload = saveWorkspaceFileAs.mock.calls[0]![0]
     expect(payload).toMatchObject({ workspaceRoot: binding.workspaceRoot, suggestedName: 'survey-quality-accuracy-declared-score.json', mimeType: 'application/json' })
     const exported = JSON.parse(Buffer.from(payload.dataBase64, 'base64').toString('utf8'))
     expect(exported.declarationJson).toBe(input().declarationJson); expect(exported.modelBasisStatement).toBe(basis)
-    expect(host.textContent).toContain('Saved as /chosen/trial.json')
+    expect(host.textContent).toContain(qualityText('scoringExportSaved', { path: 'trial.json' }))
     saveWorkspaceFileAs.mockResolvedValueOnce({ ok: false, canceled: true, message: 'cancelled' })
-    await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(host.textContent).toContain('Save As was cancelled'))
+    await click(action('scoringExport')); await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('qualityScoring:scoringExportCancelled')))
     saveWorkspaceFileAs.mockResolvedValueOnce({ ok: false, message: 'disk error' })
-    await click(button('Reverify and export JSON')); await vi.waitFor(() => expect(host.textContent).toContain('Save As failed'))
-    expect(button('Reverify and export JSON')).toBeDefined()
+    await click(action('scoringExport')); await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('qualityScoring:scoringExportFailed')))
+    expect(action('scoringExport')).toBeDefined()
   })
   it('does not open Save As for a corrupted export or a late response after the scope changes', async () => {
     await render(); await save()
     runtimeRequest.mockResolvedValueOnce(response({ tampered: true }))
-    await click(button('Reverify and export JSON')); expect(saveWorkspaceFileAs).not.toHaveBeenCalled()
+    await click(action('scoringExport')); expect(saveWorkspaceFileAs).not.toHaveBeenCalled()
     await save()
     const wait = deferred<ReturnType<typeof response>>(), latest = service.listRecords(binding.projectId).records[0]!
     const record = service.getRecord(binding.projectId, latest.id)
-    runtimeRequest.mockReturnValueOnce(wait.promise); await click(button('Reverify and export JSON'))
+    runtimeRequest.mockReturnValueOnce(wait.promise); await click(action('scoringExport'))
     await render({ binding: { ...binding, projectRevision: 2 } })
     await act(async () => wait.resolve(response(record))); await new Promise(resolve => setTimeout(resolve, 10))
     expect(saveWorkspaceFileAs).not.toHaveBeenCalled()

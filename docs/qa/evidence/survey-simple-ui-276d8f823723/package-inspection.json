@@ -1,0 +1,24 @@
+{
+  "sourceHead": "276d8f823723cf5555e7240583c41eb1d016476e",
+  "version": "0.5.1",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head276d8f823723",
+  "path": "/private/tmp/railwise-survey-ui-candidate/installed/RailWise AI Candidate 276d8f823723.app",
+  "publicRelease": false,
+  "asarSha256": "8ba3ce2ce58a3ea51c19dbe98f3ec9cc6b8ef35dd269300310a5dee302e025fa",
+  "signatureVerification": {
+    "exitCode": 0,
+    "output": ""
+  },
+  "signatureDetails": {
+    "exitCode": 0,
+    "output": "Executable=/private/tmp/railwise-survey-ui-candidate/installed/RailWise AI Candidate 276d8f823723.app/Contents/MacOS/RailWise AI Candidate 276d8f823723\nIdentifier=com.wangjiawei508.workwise.candidate.head276d8f823723\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20400 size=462 flags=0x2(adhoc) hashes=3+7 location=embedded\nVersionPlatform=1\nVersionMin=786432\nVersionSDK=1704960\nHash type=sha256 size=32\nCandidateCDHash sha256=5776ab7c2fd271893c0ff1700523a5396f16b516\nCandidateCDHashFull sha256=5776ab7c2fd271893c0ff1700523a5396f16b516b22d7d4d2e3ef00d72d186d2\nHash choices=sha256\nCMSDigest=5776ab7c2fd271893c0ff1700523a5396f16b516b22d7d4d2e3ef00d72d186d2\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=16384\nExecutable Segment flags=0x1\nPage size=16384\nCDHash=5776ab7c2fd271893c0ff1700523a5396f16b516\nSignature=adhoc\nInfo.plist entries=32\nTeamIdentifier=not set\nSealed Resources version=2 rules=13 files=9150\nInternal requirements count=0 size=12\nTotal signatures=1\nChosen signature=1"
+  },
+  "notarization": {
+    "exitCode": 65,
+    "output": "Processing: /private/tmp/railwise-survey-ui-candidate/installed/RailWise AI Candidate 276d8f823723.app\nRailWise AI Candidate 276d8f823723.app does not have a ticket stapled to it."
+  },
+  "launch": {
+    "exitCode": 0,
+    "output": ""
+  }
+}

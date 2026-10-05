@@ -1,5 +1,6 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from 'react'
 import { ChevronRight, Command, PanelLeft, Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')
@@ -48,8 +49,10 @@ export function SidebarFrame({
   onCollapse,
   className
 }: SidebarFrameProps): ReactElement {
+  const { t } = useTranslation('common')
   return (
     <aside
+      aria-label={title}
       className={cx(
         'ds-drag ds-sidebar-shell relative flex h-full w-full shrink-0 flex-col overflow-hidden px-4 pb-3',
         className
@@ -61,8 +64,8 @@ export function SidebarFrame({
           {onCollapse ? (
             <SidebarTitlebarToggleButton
               onClick={onCollapse}
-              title={title}
-              ariaLabel={title}
+              title={t('sidebarCollapse')}
+              ariaLabel={t('sidebarCollapse')}
               className="ds-sidebar-titlebar-toggle mt-[5px]"
             />
           ) : null}

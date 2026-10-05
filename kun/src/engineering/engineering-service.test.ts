@@ -4,8 +4,40 @@ import { join } from 'node:path'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { EngineeringService } from './engineering-service.js'
+import { RUNTIME_VERSION } from '../runtime-version.js'
 
 describe('EngineeringService', () => {
+  it('records the bundled Runtime version in new evidence without rewriting historical versions', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-evidence-version-'))
+    const runtime = join(root, 'runtime')
+    const legacy = new EngineeringService({ rootDir: runtime, runtimeVersion: 'legacy-runtime-version' })
+    const project = legacy.createProject({ name: 'version provenance', workspace: root, thresholds: { default: 10 }, expectedRevision: 0, idempotencyKey: 'version-project' })
+    const dataset = await legacy.importDataset({ projectId: project.id, expectedRevision: project.revision, idempotencyKey: 'version-import', name: 'data.csv', dataBase64: Buffer.from('point,time,value,unit\nP1,2026-09-01,1,mm\nP1,2026-09-02,2,mm').toString('base64') })
+    const validated = legacy.validateDataset({ datasetId: dataset.id, expectedRevision: dataset.revision, idempotencyKey: 'version-validate' })
+    const request = { projectId: project.id, datasetId: dataset.id, expectedRevision: validated.revision, acknowledgeWarnings: true }
+    const historical = await legacy.finalize({ ...request, idempotencyKey: 'version-old' })
+    const historicalPath = join(root, '.workwise/deliverables', project.id, historical.runId, 'manifest.json')
+    const historicalBytes = await readFile(historicalPath)
+    legacy.close()
+
+    const current = new EngineeringService({ rootDir: runtime })
+    try {
+      const packageJson = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }
+      expect(RUNTIME_VERSION).toBe(packageJson.version)
+      const fresh = await current.finalize({ ...request, idempotencyKey: 'version-new' })
+      expect(fresh.runtimeVersion).toBe(packageJson.version)
+      const xlsx = fresh.outputs.find(file => file.mediaType.includes('spreadsheet'))!
+      const zip = await JSZip.loadAsync(await readFile(join(root, xlsx.path)))
+      const sheets = await Promise.all(Object.keys(zip.files).filter(name => /^xl\/worksheets\/.*\.xml$/.test(name)).map(name => zip.file(name)!.async('text')))
+      expect(sheets.some(xml => xml.includes('runtimeVersion') && xml.includes(packageJson.version))).toBe(true)
+      expect(current.verifyDeliverable(project.id, fresh.id).valid).toBe(true)
+      const attempts = current.getProjectOverview(project.id).manifests
+      expect(attempts.find(manifest => manifest.id === historical.id)).toEqual(historical)
+      expect(historical.runtimeVersion).toBe('legacy-runtime-version')
+      expect(await readFile(historicalPath)).toEqual(historicalBytes)
+    } finally { current.close() }
+  })
+
   it('imports CSV, validates findings, analyses trends and writes reviewable deliverables', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-engineering-'))
     const workspace = join(root, 'workspace')
@@ -21,6 +53,8 @@ describe('EngineeringService', () => {
     expect(analysis.results[0]?.changeRate).toBe(2)
     const preview = await service.previewReport({ projectId: project.id, datasetId: dataset.id, analysisId: analysis.id, expectedRevision: validated.revision, idempotencyKey: 'preview-csv-001' })
     expect(preview.files.map((file) => file.mediaType)).toEqual(expect.arrayContaining(['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']))
+    expect(preview.files.map((file) => file.path.split('/').at(-1))).toEqual(expect.arrayContaining(['professional.xlsx', 'professional-review.json']))
+    expect(service.getProjectOverview(project.id).latestPreview).toEqual({ run: preview.run, files: preview.files })
     const evidence = await readFile(join(workspace, preview.files.find((file) => file.mediaType.includes('spreadsheet'))?.path ?? ''))
     const evidenceZip = await JSZip.loadAsync(evidence)
     const workbookXml = await evidenceZip.file('xl/workbook.xml')?.async('text')
@@ -29,12 +63,42 @@ describe('EngineeringService', () => {
     expect(workbookXml).toContain('quality_findings')
     expect(workbookXml).toContain('analysis_results')
     expect(workbookXml).toContain('manifest_summary')
+    expect(workbookXml).toContain('monitoring_daily')
+    const monitoringDailySheet = await evidenceZip.file('xl/worksheets/sheet1.xml')?.async('text')
+    expect(monitoringDailySheet).toContain('P1')
+    expect(monitoringDailySheet).toContain('periodChange')
+    expect(monitoringDailySheet).toContain('projectUnit')
+    expect(monitoringDailySheet).toContain('unitAlignment')
     const manifest = await service.finalize({ projectId: project.id, datasetId: dataset.id, analysisId: analysis.id, expectedRevision: validated.revision, idempotencyKey: 'finalize-csv-001', acknowledgeWarnings: true })
     expect(manifest.reviewStatus).toBe('draft')
     expect(service.verifyDeliverable(project.id, manifest.id)).toMatchObject({ valid: true, reviewStatus: 'draft', checks: expect.arrayContaining([{ id: 'surveyReplay', status: 'not-applicable' }, { id: 'sources', status: 'not-applicable' }]) })
     expect(manifest.validation.warnings).toContain('尚未完成复核、审核、批准与签名流程；该成果清单仅供待审查使用，不得作为已批准交付。')
     expect(await readFile(join(workspace, '.workwise', 'deliverables', project.id, manifest.runId, 'manifest.json'), 'utf8')).toContain(manifest.id)
     service.close()
+  })
+
+  it('restores recorded export descriptors after restart and isolates missing or damaged historical evidence', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-preview-readback-'))
+    const service = new EngineeringService({ rootDir: root })
+    const project = service.createProject({ name: 'recorded draft', workspace: root, thresholds: { default: 10 }, expectedRevision: 0, idempotencyKey: 'preview-read-project' })
+    const dataset = await service.importDataset({ projectId: project.id, expectedRevision: 1, idempotencyKey: 'preview-read-import', name: 'data.csv', dataBase64: Buffer.from('point,time,value,unit\nP1,2026-09-01,1,mm').toString('base64') })
+    const preview = await service.previewReport({ projectId: project.id, datasetId: dataset.id, expectedRevision: dataset.revision, idempotencyKey: 'preview-read-output' })
+    service.close()
+    const reopened = new EngineeringService({ rootDir: root })
+    try {
+      expect(reopened.getProjectOverview(project.id).latestPreview).toEqual({ run: preview.run, files: preview.files })
+      expect(reopened.getProjectOverview(project.id).manifests).toEqual([])
+      expect(reopened.getPreviewEvidence('another-project', preview.run.id)).toBeNull()
+      // Reading descriptors neither silently repairs nor claims fresh file validation.
+      await writeFile(join(root, preview.files[0]!.path), 'modified synthetic draft')
+      expect(reopened.getProjectOverview(project.id).latestPreview?.files).toEqual(preview.files)
+      const db = (reopened as unknown as { db: { prepare: (sql: string) => { run: (...args: unknown[]) => void } } }).db
+      db.prepare('UPDATE engineering_delivery_idempotency SET result_json = ? WHERE key = ?').run('{invalid', 'preview-read-output')
+      expect(reopened.getProjectOverview(project.id)).toMatchObject({ latestPreviewUnavailable: true, runs: [{ id: preview.run.id }] })
+      expect(reopened.getProjectOverview(project.id).latestPreview).toBeUndefined()
+      db.prepare('DELETE FROM engineering_delivery_idempotency WHERE key = ?').run('preview-read-output')
+      expect(reopened.getProjectOverview(project.id).latestPreview).toBeUndefined()
+    } finally { reopened.close() }
   })
 
   it('returns the original result for an idempotent import', async () => {

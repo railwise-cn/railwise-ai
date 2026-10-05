@@ -36,9 +36,15 @@ it('requests only the bound manifest and shows exact replay evidence in both lan
   expect(request).toHaveBeenCalledExactlyOnceWith('/v1/engineering/projects/project/manifests/manifest/monitoring-replay', 'POST')
   expect(host.textContent).toContain('Monitoring results match')
   expect(host.textContent).toContain('Recorded results exactly match recomputation')
-  expect(host.textContent).toContain(hash)
+  expect(host.textContent).not.toContain(hash)
+  expect(host.textContent).not.toContain('attempt_1')
+  expect(host.textContent).not.toContain('analysis_1')
+  expect(host.textContent).not.toContain('dataset_1')
+  expect(host.textContent).not.toContain('workwise-engineering-2')
+  expect(host.textContent).not.toContain('runtimeVersion')
+  expect(host.textContent).not.toContain('darwin')
+  expect(host.querySelector('details')).toBeNull()
   expect(host.textContent).toContain('does not establish source authenticity')
-  expect(host.querySelector('details')!.open).toBe(false)
   expect(host.querySelector('time')!.dateTime).toBe(result.checkedAt)
   await act(async () => { await i18n.changeLanguage('zh') })
   expect(host.textContent).toContain('监测数值一致')
@@ -76,10 +82,10 @@ it('removes prior success before a failed retry and rejects malformed envelopes'
   expect(host.textContent).toContain('Monitoring results match')
   await click()
   expect(host.textContent).not.toContain('Monitoring results match')
-  expect(host.textContent).toContain('could not be completed or its audit could not be saved')
+  expect(host.textContent).toContain(i18n.t('monitoringReplayRequestFailed'))
   expect(host.textContent).not.toContain('private raw path')
   await click()
-  expect(host.textContent).toContain('The verification version, identity, time or checks are inconsistent')
+  expect(host.textContent).toContain(i18n.t('engineeringVerifyInvalidResponse'))
 })
 
 it('invalidates pending successes and failures on every binding or connectivity change', async () => {
@@ -123,12 +129,12 @@ it('rejects incorrect identities, status/hash contradictions and unsupported res
   expect(parseMonitoringReplay(result, result).status).toBe('passed')
 })
 
-it('shows a numerical mismatch as failure with its recorded and recomputed hashes', async () => {
+it('shows a numerical mismatch and next action without exposing result hashes', async () => {
   request.mockResolvedValue({ replay: { ...result, status: 'failed', reasonCode: 'result-mismatch',
     analyses: [{ ...analysis, status: 'failed', reasonCode: 'result-mismatch', recomputedResultsHash: 'b'.repeat(64) }] } })
   await render(); await click()
   expect(host.textContent).toContain('Monitoring recomputation failed')
   expect(host.textContent).toContain('Recorded monitoring results differ')
-  expect(host.textContent).toContain('b'.repeat(64))
+  expect(host.textContent).not.toContain('b'.repeat(64))
   expect(host.textContent).not.toContain('Monitoring results match')
 })

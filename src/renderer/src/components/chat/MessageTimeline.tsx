@@ -48,6 +48,7 @@ type Props = {
   /** Opens/focuses the Plan panel (Open button on the inline card). */
   onOpenPlan?: () => void
   viewMode?: ConversationViewMode
+  professionalSurface?: boolean
 }
 
 const TURN_PAGE_SIZE = 18
@@ -88,7 +89,8 @@ export function MessageTimeline({
   planActionsBusy,
   onBuildPlan,
   onOpenPlan,
-  viewMode = 'concise'
+  viewMode = 'concise',
+  professionalSurface = false
 }: Props): ReactElement {
   const { t } = useTranslation('common')
   const {
@@ -176,7 +178,7 @@ export function MessageTimeline({
           />
         ) : null}
 
-        {activeThread?.forkedFromThreadId ? (
+        {!professionalSurface && activeThread?.forkedFromThreadId ? (
           <ThreadForkBanner parentTitle={forkedFromTitle} />
         ) : null}
 
@@ -212,13 +214,14 @@ export function MessageTimeline({
           const turnPending = turnHasPendingRuntimeWork(turn)
           const isLatestTurn = index === visibleTurns.length - 1
           const hasLiveStream = isLatestTurn && !!(liveReasoning.trim() || live.trim())
-          const showForkPoint =
+          const showForkPoint = !professionalSurface &&
             forkBoundaryTurnCount !== undefined && absoluteTurnIndex === forkBoundaryTurnCount
           return (
             <Fragment key={stableTurnKey(turn, absoluteTurnIndex)}>
               {showForkPoint ? <ThreadForkPoint parentTitle={forkedFromTitle} /> : null}
               <MemoMessageTurn
                 turn={turn}
+                professionalSurface={professionalSurface}
                 isProcessing={(busy && isLatestTurn) || turnPending || hasLiveStream}
                 liveReasoning={isLatestTurn ? liveReasoning : ''}
                 live={isLatestTurn ? live : ''}
@@ -237,7 +240,7 @@ export function MessageTimeline({
           )
         })}
 
-        {forkBoundaryTurnCount !== undefined &&
+        {!professionalSurface && forkBoundaryTurnCount !== undefined &&
         forkBoundaryTurnCount === turns.length &&
         hasContent ? (
           <ThreadForkPoint parentTitle={forkedFromTitle} />
@@ -260,6 +263,7 @@ export function MessageTimeline({
         {blocks.length === 0 && (live || liveReasoning) ? (
           <MemoMessageTurn
             turn={{ blocks: [] }}
+            professionalSurface={professionalSurface}
             isProcessing={busy}
             liveReasoning={liveReasoning}
             live={live}
@@ -302,7 +306,8 @@ function MessageTurn({
   viewportRef,
   workspaceRoot,
   activeThreadId,
-  viewMode
+  viewMode,
+  professionalSurface
 }: {
   turn: Turn
   isProcessing: boolean
@@ -318,7 +323,9 @@ function MessageTurn({
   workspaceRoot: string
   activeThreadId: string | null
   viewMode: ConversationViewMode
+  professionalSurface: boolean
 }): ReactElement {
+  const { t } = useTranslation('common')
   // Inline Review Plan card: surfaced under a turn that produced a
   // successful `create_plan` result so the user can open/build the plan
   // without leaving the conversation.
@@ -375,19 +382,21 @@ function MessageTurn({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      {turn.user ? <MessageBubble block={turn.user} /> : null}
+      {turn.user ? <MessageBubble block={turn.user} professionalSurface={professionalSurface} /> : null}
 
       {hasProcess ? (
         <div className="flex flex-col gap-1 pb-2">
-          <WorkMetaRow
-            processing={isProcessing}
-            stepCount={visibleProcessBlocks.length}
-            durationMs={durationMs}
-            reasoningDurationMs={reasoningDurationMs}
-            expanded={workExpanded}
-            onToggle={() => setWorkExpandedOverride((value) => !(value ?? false))}
-          />
-          {workExpanded && processSections.length > 0 ? (
+          {professionalSurface
+            ? <p role="status" className="py-0.5 text-[13px] font-medium text-ds-muted">{t('engineeringRuntimeProcessing')}</p>
+            : <WorkMetaRow
+              processing={isProcessing}
+              stepCount={visibleProcessBlocks.length}
+              durationMs={durationMs}
+              reasoningDurationMs={reasoningDurationMs}
+              expanded={workExpanded}
+              onToggle={() => setWorkExpandedOverride((value) => !(value ?? false))}
+            />}
+          {!professionalSurface && workExpanded && processSections.length > 0 ? (
             <div className="flex flex-col gap-1">
               {processSections.map((section) => (
                 <ProcessSectionRow
@@ -405,24 +414,25 @@ function MessageTurn({
       ) : null}
 
       {assistantContentBlocks.map((block) => (
-        <MessageBubble key={block.id} block={block} />
+        <MessageBubble key={block.id} block={block} professionalSurface={professionalSurface} />
       ))}
 
       <GeneratedFilesPanel
         blocks={generatedFileBlocks}
         workspaceRoot={workspaceRoot}
         activeThreadId={activeThreadId}
+        professionalSurface={professionalSurface}
       />
 
-      {reviewBlocks.map((review) => (
+      {!professionalSurface ? reviewBlocks.map((review) => (
         <ReviewSummaryCard key={review.id} review={review} />
-      ))}
+      )) : null}
 
-      {isProcessing ? <LiveTurnProgressRow progress={semanticProgress} /> : null}
+      {isProcessing && !professionalSurface ? <LiveTurnProgressRow progress={semanticProgress} /> : null}
 
-      {!isProcessing && devPreviewCard ? devPreviewCard : null}
+      {!isProcessing && !professionalSurface && devPreviewCard ? devPreviewCard : null}
 
-      {planResult ? (
+      {planResult && !professionalSurface ? (
         <ReviewPlanCard
           title={planResult.title?.trim() || planDisplayNameFromRelativePath(planResult.relativePath)}
           relativePath={planResult.relativePath}
@@ -432,7 +442,7 @@ function MessageTurn({
         />
       ) : null}
 
-      {!isProcessing && turnFileChanges.length > 0 ? (
+      {!isProcessing && !professionalSurface && turnFileChanges.length > 0 ? (
         <TurnChangeSummary changes={turnFileChanges} viewportRef={viewportRef} />
       ) : null}
     </div>
@@ -468,5 +478,6 @@ const MemoMessageTurn = memo(MessageTurn, (prev, next) => (
   prev.viewportRef === next.viewportRef &&
   prev.workspaceRoot === next.workspaceRoot &&
   prev.activeThreadId === next.activeThreadId &&
-  prev.viewMode === next.viewMode
+  prev.viewMode === next.viewMode &&
+  prev.professionalSurface === next.professionalSurface
 ))

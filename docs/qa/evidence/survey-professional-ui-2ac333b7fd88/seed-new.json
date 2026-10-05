@@ -1,0 +1,811 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "id": "project_e0835fd2-b989-4af1-99fe-e6d90c7b9c9f",
+    "name": "新建内业任务",
+    "taskType": "control-network",
+    "monitoringType": "control-network",
+    "unit": "m",
+    "signConvention": "positive",
+    "thresholds": {},
+    "reportPeriod": {},
+    "workspace": "/private/tmp/railwise-professional-candidate-new/home/.workwise/default_workspace",
+    "revision": 1,
+    "createdAt": "2026-10-01T04:35:24.454Z",
+    "updatedAt": "2026-10-01T04:35:24.454Z"
+  },
+  "outputs": [
+    {
+      "network": {
+        "schemaVersion": 1,
+        "id": "network_ae1113ca-0a59-4c21-800a-74690f3f0687",
+        "projectId": "project_e0835fd2-b989-4af1-99fe-e6d90c7b9c9f",
+        "networkType": "leveling",
+        "coordinateSystem": "LOCAL",
+        "projection": "待确认",
+        "ellipsoid": "待确认",
+        "verticalDatum": "LOCAL-BM",
+        "unit": "m",
+        "knownPoints": [
+          {
+            "id": "BM",
+            "pointClass": "unknown",
+            "height": 10,
+            "known": true,
+            "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+          }
+        ],
+        "unknownPoints": [
+          {
+            "id": "P",
+            "pointClass": "unknown",
+            "height": 11,
+            "known": false,
+            "sourceLocator": "WorkWise JSON:network.unknownPoints[0]"
+          }
+        ],
+        "observations": [
+          {
+            "id": "fwd",
+            "type": "height-difference",
+            "from": "BM",
+            "to": "P",
+            "value": 1,
+            "unit": "m",
+            "routeLength": 100,
+            "sourceLocator": "WorkWise JSON:network.observations[0]",
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "id": "back",
+            "type": "height-difference",
+            "from": "P",
+            "to": "BM",
+            "value": -1,
+            "unit": "m",
+            "routeLength": 100,
+            "sourceLocator": "WorkWise JSON:network.observations[1]",
+            "sourceRecordId": "workwise-json-observation-2"
+          }
+        ],
+        "instrumentParameters": {},
+        "observationEpoch": "2026-09-01T00:00:00.000Z",
+        "inputAttachmentHash": "0aee26e168ba9e05db405e96340b7257cc2b24425add425dfb314b2fb3f5f9b8",
+        "sourceFile": {
+          "schemaVersion": 1,
+          "sourcePath": "attachment://sha256/0aee26e168ba9e05db405e96340b7257cc2b24425add425dfb314b2fb3f5f9b8/period-valid-1.json",
+          "name": "period-valid-1.json",
+          "size": 516,
+          "fileSize": 516,
+          "sha256": "0aee26e168ba9e05db405e96340b7257cc2b24425add425dfb314b2fb3f5f9b8",
+          "importedAt": "2026-10-01T04:53:16.961Z",
+          "importedBy": "workwise:survey-format-registry",
+          "originalPreserved": true,
+          "formatId": "workwise-json",
+          "vendor": "WorkWise/open",
+          "formatVersion": "1",
+          "detectionMethod": "content-signature",
+          "detectionConfidence": 0.99,
+          "extensionClaimed": ".json",
+          "extensionContentConflict": false,
+          "requiresManualConfirmation": false,
+          "detection": {
+            "format": "workwise-json",
+            "vendor": "WorkWise/open",
+            "version": "1",
+            "confidence": 0.99,
+            "extension": ".json",
+            "matchedSignatures": [
+              "workwise-survey-network@1"
+            ],
+            "extensionConflict": false,
+            "method": "content-signature"
+          },
+          "disposition": "adjustment-ready",
+          "dispositionReason": "冻结来源合同 workwise-survey-network@1",
+          "parserId": "workwise-survey-source",
+          "parserVersion": "1",
+          "parserSourceHash": "ca3baaff34304760d4f666274e1bc76bb36120ef97794382ff1103771689fbb5",
+          "linearUnitRaw": "m",
+          "angularUnitRaw": "not-declared",
+          "linearUnitCanonical": "m",
+          "angularUnitCanonical": "rad",
+          "datumDeclared": "LOCAL",
+          "heightSystemDeclared": "LOCAL-BM",
+          "recordCount": 4,
+          "summary": {
+            "pointCount": 2,
+            "stationCount": 0,
+            "observationCount": 2,
+            "recordCount": 4,
+            "skippedRecordCount": 0
+          },
+          "records": [
+            {
+              "id": "workwise-json-known-point-1",
+              "sourceRecord": 1,
+              "byteOffset": 216,
+              "byteLength": 36,
+              "section": "network.knownPoints",
+              "recordType": "workwise-json-known-point",
+              "rawOffset": 216,
+              "rawLength": 36,
+              "rawSnippet": "{\"id\":\"BM\",\"height\":10,\"known\":true}"
+            },
+            {
+              "id": "workwise-json-unknown-point-1",
+              "sourceRecord": 2,
+              "byteOffset": 271,
+              "byteLength": 22,
+              "section": "network.unknownPoints",
+              "recordType": "workwise-json-unknown-point",
+              "rawOffset": 271,
+              "rawLength": 22,
+              "rawSnippet": "{\"id\":\"P\",\"height\":11}"
+            },
+            {
+              "id": "workwise-json-observation-1",
+              "sourceRecord": 3,
+              "byteOffset": 311,
+              "byteLength": 99,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 311,
+              "rawLength": 99,
+              "rawSnippet": "{\"id\":\"fwd\",\"type\":\"height-difference\",\"from\":\"BM\",\"to\":\"P\",\"value\":1,\"unit\":\"m\",\"routeLength\":100}"
+            },
+            {
+              "id": "workwise-json-observation-2",
+              "sourceRecord": 4,
+              "byteOffset": 411,
+              "byteLength": 101,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 411,
+              "rawLength": 101,
+              "rawSnippet": "{\"id\":\"back\",\"type\":\"height-difference\",\"from\":\"P\",\"to\":\"BM\",\"value\":-1,\"unit\":\"m\",\"routeLength\":100}"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "encoding_detected",
+              "severity": "info",
+              "message": "文本编码 utf-8",
+              "localized": {
+                "en": {
+                  "message": "Text encoding: utf-8"
+                }
+              }
+            },
+            {
+              "code": "format_detected",
+              "severity": "info",
+              "message": "识别为 WorkWise/open / workwise-json 1，置信度 99%",
+              "localized": {
+                "en": {
+                  "message": "Detected workwise-json 1; confidence 99%"
+                }
+              }
+            }
+          ],
+          "rawRecordAnchors": [
+            {
+              "id": "workwise-json-known-point-1",
+              "sourceRecord": 1,
+              "byteOffset": 216,
+              "byteLength": 36,
+              "section": "network.knownPoints",
+              "recordType": "workwise-json-known-point",
+              "rawOffset": 216,
+              "rawLength": 36,
+              "rawSnippet": "{\"id\":\"BM\",\"height\":10,\"known\":true}"
+            },
+            {
+              "id": "workwise-json-unknown-point-1",
+              "sourceRecord": 2,
+              "byteOffset": 271,
+              "byteLength": 22,
+              "section": "network.unknownPoints",
+              "recordType": "workwise-json-unknown-point",
+              "rawOffset": 271,
+              "rawLength": 22,
+              "rawSnippet": "{\"id\":\"P\",\"height\":11}"
+            },
+            {
+              "id": "workwise-json-observation-1",
+              "sourceRecord": 3,
+              "byteOffset": 311,
+              "byteLength": 99,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 311,
+              "rawLength": 99,
+              "rawSnippet": "{\"id\":\"fwd\",\"type\":\"height-difference\",\"from\":\"BM\",\"to\":\"P\",\"value\":1,\"unit\":\"m\",\"routeLength\":100}"
+            },
+            {
+              "id": "workwise-json-observation-2",
+              "sourceRecord": 4,
+              "byteOffset": 411,
+              "byteLength": 101,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 411,
+              "rawLength": 101,
+              "rawSnippet": "{\"id\":\"back\",\"type\":\"height-difference\",\"from\":\"P\",\"to\":\"BM\",\"value\":-1,\"unit\":\"m\",\"routeLength\":100}"
+            }
+          ],
+          "preservedRawFields": {}
+        },
+        "qualityStatus": "imported",
+        "findings": [],
+        "revision": 1,
+        "createdAt": "2026-10-01T04:53:16.970Z",
+        "updatedAt": "2026-10-01T04:53:16.970Z",
+        "rawSourceIntegrity": {
+          "status": "verified",
+          "ledgerEntryCount": 1,
+          "errors": []
+        },
+        "sourceEligibility": {
+          "eligible": true,
+          "findings": []
+        }
+      },
+      "adjustment": {
+        "run": {
+          "schemaVersion": 1,
+          "id": "adjustment_6897ca45-3e14-43de-9793-43a6a644bde9",
+          "projectId": "project_e0835fd2-b989-4af1-99fe-e6d90c7b9c9f",
+          "networkId": "network_ae1113ca-0a59-4c21-800a-74690f3f0687",
+          "method": "weighted-least-squares",
+          "constraint": "fixed-known-points",
+          "algorithmVersion": "workwise-survey-adjustment-8",
+          "inputHash": "fe1c7c62594e944951556087e1a2e538ce117570c90f152d3bbbaa9926266f45",
+          "status": "completed",
+          "revision": 1,
+          "idempotencyKey": "seed-adjust-network_ae1113ca-0a59-4c21-800a-74690f3f0687",
+          "resumeCount": 0,
+          "createdAt": "2026-10-01T04:53:16.994Z",
+          "updatedAt": "2026-10-01T04:53:16.997Z",
+          "completedAt": "2026-10-01T04:53:16.997Z"
+        },
+        "result": {
+          "schemaVersion": 1,
+          "id": "adjustment_result_d4dc3643-4106-45b9-88b3-e4f66742cef7",
+          "runId": "adjustment_6897ca45-3e14-43de-9793-43a6a644bde9",
+          "networkId": "network_ae1113ca-0a59-4c21-800a-74690f3f0687",
+          "observationCount": 2,
+          "unknownCount": 1,
+          "redundancy": 1,
+          "degreesOfFreedom": 1,
+          "linearUnit": "m",
+          "angularUnit": "rad",
+          "closure": {
+            "heightDifference": 0
+          },
+          "closureUnits": {
+            "heightDifference": "m"
+          },
+          "parameters": {},
+          "parameterUnits": {},
+          "unitWeightStdDev": 0,
+          "unitWeightStdDevUnit": "dimensionless",
+          "varianceFactor": 0,
+          "varianceFactorUnit": "dimensionless",
+          "varianceFactorEstimated": true,
+          "statisticalSummary": {
+            "schemaVersion": 1,
+            "scope": "descriptive-screening",
+            "numericalStatus": "clear",
+            "availableCount": 2,
+            "unavailableCount": 0,
+            "flaggedCount": 0,
+            "varianceBasis": "estimated-posterior",
+            "varianceLog10RatioToUnit": null,
+            "standardDeviationLog10RatioToUnit": null,
+            "significance": "not-evaluated",
+            "standardsConformity": "not-evaluated"
+          },
+          "points": [
+            {
+              "id": "BM",
+              "height": 10
+            },
+            {
+              "id": "P",
+              "height": 11,
+              "correctionHeight": 0,
+              "standardError": 0,
+              "covariance": [
+                50
+              ]
+            }
+          ],
+          "observations": [
+            {
+              "observationId": "fwd",
+              "correction": 0,
+              "residual": 0,
+              "unit": "m",
+              "standardizedResidual": 0,
+              "standardizedResidualUnit": "sigma",
+              "residualStatistic": {
+                "schemaVersion": 1,
+                "method": "weight-normalized-residual",
+                "scaleBasis": "relative-weight",
+                "scope": "descriptive-screening",
+                "significance": "not-evaluated",
+                "status": "available",
+                "value": 0,
+                "threshold": 3,
+                "thresholdExceeded": false
+              },
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-1"
+            },
+            {
+              "observationId": "back",
+              "correction": 0,
+              "residual": 0,
+              "unit": "m",
+              "standardizedResidual": 0,
+              "standardizedResidualUnit": "sigma",
+              "residualStatistic": {
+                "schemaVersion": 1,
+                "method": "weight-normalized-residual",
+                "scaleBasis": "relative-weight",
+                "scope": "descriptive-screening",
+                "significance": "not-evaluated",
+                "status": "available",
+                "value": 0,
+                "threshold": 3,
+                "thresholdExceeded": false
+              },
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-2"
+            }
+          ],
+          "displacements": [
+            {
+              "pointId": "BM",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            },
+            {
+              "pointId": "P",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            }
+          ],
+          "covariance": [
+            [
+              50
+            ]
+          ],
+          "precision": {
+            "maxPointStdDev": 0,
+            "passed": true
+          },
+          "qualityFindings": [],
+          "inputHash": "fe1c7c62594e944951556087e1a2e538ce117570c90f152d3bbbaa9926266f45",
+          "algorithmVersion": "workwise-survey-adjustment-8",
+          "validation": "valid",
+          "strategyId": "leveling",
+          "solverDiagnostics": {
+            "iterations": 1,
+            "rank": 1,
+            "conditionEstimate": 1
+          },
+          "createdAt": "2026-10-01T04:53:16.995Z"
+        },
+        "rawSourceIntegrity": {
+          "status": "verified",
+          "ledgerEntryCount": 2,
+          "errors": []
+        },
+        "sourceEligibility": {
+          "eligible": true,
+          "findings": []
+        }
+      }
+    },
+    {
+      "network": {
+        "schemaVersion": 1,
+        "id": "network_ea77c643-1218-4d59-bc20-b5d3516eccce",
+        "projectId": "project_e0835fd2-b989-4af1-99fe-e6d90c7b9c9f",
+        "networkType": "leveling",
+        "coordinateSystem": "LOCAL",
+        "projection": "待确认",
+        "ellipsoid": "待确认",
+        "verticalDatum": "LOCAL-BM",
+        "unit": "m",
+        "knownPoints": [
+          {
+            "id": "BM",
+            "pointClass": "unknown",
+            "height": 10,
+            "known": true,
+            "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+          }
+        ],
+        "unknownPoints": [
+          {
+            "id": "P",
+            "pointClass": "unknown",
+            "height": 11,
+            "known": false,
+            "sourceLocator": "WorkWise JSON:network.unknownPoints[0]"
+          }
+        ],
+        "observations": [
+          {
+            "id": "fwd",
+            "type": "height-difference",
+            "from": "BM",
+            "to": "P",
+            "value": 0.998,
+            "unit": "m",
+            "routeLength": 100,
+            "sourceLocator": "WorkWise JSON:network.observations[0]",
+            "sourceRecordId": "workwise-json-observation-1"
+          },
+          {
+            "id": "back",
+            "type": "height-difference",
+            "from": "P",
+            "to": "BM",
+            "value": -0.998,
+            "unit": "m",
+            "routeLength": 100,
+            "sourceLocator": "WorkWise JSON:network.observations[1]",
+            "sourceRecordId": "workwise-json-observation-2"
+          }
+        ],
+        "instrumentParameters": {},
+        "observationEpoch": "2026-09-02T00:00:00.000Z",
+        "inputAttachmentHash": "3ffdbe2a633b5540ad46807b591708d36c6e15036c0ca58003e6d081fba4536f",
+        "sourceFile": {
+          "schemaVersion": 1,
+          "sourcePath": "attachment://sha256/3ffdbe2a633b5540ad46807b591708d36c6e15036c0ca58003e6d081fba4536f/period-valid-2.json",
+          "name": "period-valid-2.json",
+          "size": 524,
+          "fileSize": 524,
+          "sha256": "3ffdbe2a633b5540ad46807b591708d36c6e15036c0ca58003e6d081fba4536f",
+          "importedAt": "2026-10-01T04:53:17.006Z",
+          "importedBy": "workwise:survey-format-registry",
+          "originalPreserved": true,
+          "formatId": "workwise-json",
+          "vendor": "WorkWise/open",
+          "formatVersion": "1",
+          "detectionMethod": "content-signature",
+          "detectionConfidence": 0.99,
+          "extensionClaimed": ".json",
+          "extensionContentConflict": false,
+          "requiresManualConfirmation": false,
+          "detection": {
+            "format": "workwise-json",
+            "vendor": "WorkWise/open",
+            "version": "1",
+            "confidence": 0.99,
+            "extension": ".json",
+            "matchedSignatures": [
+              "workwise-survey-network@1"
+            ],
+            "extensionConflict": false,
+            "method": "content-signature"
+          },
+          "disposition": "adjustment-ready",
+          "dispositionReason": "冻结来源合同 workwise-survey-network@1",
+          "parserId": "workwise-survey-source",
+          "parserVersion": "1",
+          "parserSourceHash": "ca3baaff34304760d4f666274e1bc76bb36120ef97794382ff1103771689fbb5",
+          "linearUnitRaw": "m",
+          "angularUnitRaw": "not-declared",
+          "linearUnitCanonical": "m",
+          "angularUnitCanonical": "rad",
+          "datumDeclared": "LOCAL",
+          "heightSystemDeclared": "LOCAL-BM",
+          "recordCount": 4,
+          "summary": {
+            "pointCount": 2,
+            "stationCount": 0,
+            "observationCount": 2,
+            "recordCount": 4,
+            "skippedRecordCount": 0
+          },
+          "records": [
+            {
+              "id": "workwise-json-known-point-1",
+              "sourceRecord": 1,
+              "byteOffset": 216,
+              "byteLength": 36,
+              "section": "network.knownPoints",
+              "recordType": "workwise-json-known-point",
+              "rawOffset": 216,
+              "rawLength": 36,
+              "rawSnippet": "{\"id\":\"BM\",\"height\":10,\"known\":true}"
+            },
+            {
+              "id": "workwise-json-unknown-point-1",
+              "sourceRecord": 2,
+              "byteOffset": 271,
+              "byteLength": 22,
+              "section": "network.unknownPoints",
+              "recordType": "workwise-json-unknown-point",
+              "rawOffset": 271,
+              "rawLength": 22,
+              "rawSnippet": "{\"id\":\"P\",\"height\":11}"
+            },
+            {
+              "id": "workwise-json-observation-1",
+              "sourceRecord": 3,
+              "byteOffset": 311,
+              "byteLength": 103,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 311,
+              "rawLength": 103,
+              "rawSnippet": "{\"id\":\"fwd\",\"type\":\"height-difference\",\"from\":\"BM\",\"to\":\"P\",\"value\":0.998,\"unit\":\"m\",\"routeLength\":100}"
+            },
+            {
+              "id": "workwise-json-observation-2",
+              "sourceRecord": 4,
+              "byteOffset": 415,
+              "byteLength": 105,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 415,
+              "rawLength": 105,
+              "rawSnippet": "{\"id\":\"back\",\"type\":\"height-difference\",\"from\":\"P\",\"to\":\"BM\",\"value\":-0.998,\"unit\":\"m\",\"routeLength\":100}"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "encoding_detected",
+              "severity": "info",
+              "message": "文本编码 utf-8",
+              "localized": {
+                "en": {
+                  "message": "Text encoding: utf-8"
+                }
+              }
+            },
+            {
+              "code": "format_detected",
+              "severity": "info",
+              "message": "识别为 WorkWise/open / workwise-json 1，置信度 99%",
+              "localized": {
+                "en": {
+                  "message": "Detected workwise-json 1; confidence 99%"
+                }
+              }
+            }
+          ],
+          "rawRecordAnchors": [
+            {
+              "id": "workwise-json-known-point-1",
+              "sourceRecord": 1,
+              "byteOffset": 216,
+              "byteLength": 36,
+              "section": "network.knownPoints",
+              "recordType": "workwise-json-known-point",
+              "rawOffset": 216,
+              "rawLength": 36,
+              "rawSnippet": "{\"id\":\"BM\",\"height\":10,\"known\":true}"
+            },
+            {
+              "id": "workwise-json-unknown-point-1",
+              "sourceRecord": 2,
+              "byteOffset": 271,
+              "byteLength": 22,
+              "section": "network.unknownPoints",
+              "recordType": "workwise-json-unknown-point",
+              "rawOffset": 271,
+              "rawLength": 22,
+              "rawSnippet": "{\"id\":\"P\",\"height\":11}"
+            },
+            {
+              "id": "workwise-json-observation-1",
+              "sourceRecord": 3,
+              "byteOffset": 311,
+              "byteLength": 103,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 311,
+              "rawLength": 103,
+              "rawSnippet": "{\"id\":\"fwd\",\"type\":\"height-difference\",\"from\":\"BM\",\"to\":\"P\",\"value\":0.998,\"unit\":\"m\",\"routeLength\":100}"
+            },
+            {
+              "id": "workwise-json-observation-2",
+              "sourceRecord": 4,
+              "byteOffset": 415,
+              "byteLength": 105,
+              "section": "network.observations",
+              "recordType": "workwise-json-observation",
+              "rawOffset": 415,
+              "rawLength": 105,
+              "rawSnippet": "{\"id\":\"back\",\"type\":\"height-difference\",\"from\":\"P\",\"to\":\"BM\",\"value\":-0.998,\"unit\":\"m\",\"routeLength\":100}"
+            }
+          ],
+          "preservedRawFields": {}
+        },
+        "qualityStatus": "imported",
+        "findings": [],
+        "revision": 1,
+        "createdAt": "2026-10-01T04:53:17.014Z",
+        "updatedAt": "2026-10-01T04:53:17.014Z",
+        "rawSourceIntegrity": {
+          "status": "verified",
+          "ledgerEntryCount": 1,
+          "errors": []
+        },
+        "sourceEligibility": {
+          "eligible": true,
+          "findings": []
+        }
+      },
+      "adjustment": {
+        "run": {
+          "schemaVersion": 1,
+          "id": "adjustment_0a3af469-c772-4b50-baa0-19effd717b76",
+          "projectId": "project_e0835fd2-b989-4af1-99fe-e6d90c7b9c9f",
+          "networkId": "network_ea77c643-1218-4d59-bc20-b5d3516eccce",
+          "method": "weighted-least-squares",
+          "constraint": "fixed-known-points",
+          "algorithmVersion": "workwise-survey-adjustment-8",
+          "inputHash": "5d7d0c0a48d57d1296f92b5fc7763426c2e60e666e9673da7926a369cd57d878",
+          "status": "completed",
+          "revision": 1,
+          "idempotencyKey": "seed-adjust-network_ea77c643-1218-4d59-bc20-b5d3516eccce",
+          "resumeCount": 0,
+          "createdAt": "2026-10-01T04:53:17.036Z",
+          "updatedAt": "2026-10-01T04:53:17.036Z",
+          "completedAt": "2026-10-01T04:53:17.036Z"
+        },
+        "result": {
+          "schemaVersion": 1,
+          "id": "adjustment_result_56d33353-a9c3-42b3-ba66-d8fc422a3958",
+          "runId": "adjustment_0a3af469-c772-4b50-baa0-19effd717b76",
+          "networkId": "network_ea77c643-1218-4d59-bc20-b5d3516eccce",
+          "observationCount": 2,
+          "unknownCount": 1,
+          "redundancy": 1,
+          "degreesOfFreedom": 1,
+          "linearUnit": "m",
+          "angularUnit": "rad",
+          "closure": {
+            "heightDifference": 0
+          },
+          "closureUnits": {
+            "heightDifference": "m"
+          },
+          "parameters": {},
+          "parameterUnits": {},
+          "unitWeightStdDev": 0,
+          "unitWeightStdDevUnit": "dimensionless",
+          "varianceFactor": 0,
+          "varianceFactorUnit": "dimensionless",
+          "varianceFactorEstimated": true,
+          "statisticalSummary": {
+            "schemaVersion": 1,
+            "scope": "descriptive-screening",
+            "numericalStatus": "clear",
+            "availableCount": 2,
+            "unavailableCount": 0,
+            "flaggedCount": 0,
+            "varianceBasis": "estimated-posterior",
+            "varianceLog10RatioToUnit": null,
+            "standardDeviationLog10RatioToUnit": null,
+            "significance": "not-evaluated",
+            "standardsConformity": "not-evaluated"
+          },
+          "points": [
+            {
+              "id": "BM",
+              "height": 10
+            },
+            {
+              "id": "P",
+              "height": 10.998,
+              "correctionHeight": -0.0020000000000000018,
+              "standardError": 0,
+              "covariance": [
+                50
+              ]
+            }
+          ],
+          "observations": [
+            {
+              "observationId": "fwd",
+              "correction": 0,
+              "residual": 0,
+              "unit": "m",
+              "standardizedResidual": 0,
+              "standardizedResidualUnit": "sigma",
+              "residualStatistic": {
+                "schemaVersion": 1,
+                "method": "weight-normalized-residual",
+                "scaleBasis": "relative-weight",
+                "scope": "descriptive-screening",
+                "significance": "not-evaluated",
+                "status": "available",
+                "value": 0,
+                "threshold": 3,
+                "thresholdExceeded": false
+              },
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-1"
+            },
+            {
+              "observationId": "back",
+              "correction": 0,
+              "residual": 0,
+              "unit": "m",
+              "standardizedResidual": 0,
+              "standardizedResidualUnit": "sigma",
+              "residualStatistic": {
+                "schemaVersion": 1,
+                "method": "weight-normalized-residual",
+                "scaleBasis": "relative-weight",
+                "scope": "descriptive-screening",
+                "significance": "not-evaluated",
+                "status": "available",
+                "value": 0,
+                "threshold": 3,
+                "thresholdExceeded": false
+              },
+              "outlier": false,
+              "sourceRecordId": "workwise-json-observation-2"
+            }
+          ],
+          "displacements": [
+            {
+              "pointId": "BM",
+              "dH": 0,
+              "magnitude": 0,
+              "kind": "vertical"
+            },
+            {
+              "pointId": "P",
+              "dH": -0.002000000000000668,
+              "magnitude": 0.002000000000000668,
+              "kind": "vertical"
+            }
+          ],
+          "covariance": [
+            [
+              50
+            ]
+          ],
+          "precision": {
+            "maxPointStdDev": 0,
+            "passed": true
+          },
+          "qualityFindings": [],
+          "inputHash": "5d7d0c0a48d57d1296f92b5fc7763426c2e60e666e9673da7926a369cd57d878",
+          "algorithmVersion": "workwise-survey-adjustment-8",
+          "validation": "valid",
+          "strategyId": "leveling",
+          "solverDiagnostics": {
+            "iterations": 1,
+            "rank": 1,
+            "conditionEstimate": 1
+          },
+          "createdAt": "2026-10-01T04:53:17.036Z"
+        },
+        "rawSourceIntegrity": {
+          "status": "verified",
+          "ledgerEntryCount": 2,
+          "errors": []
+        },
+        "sourceEligibility": {
+          "eligible": true,
+          "findings": []
+        }
+      }
+    }
+  ]
+}

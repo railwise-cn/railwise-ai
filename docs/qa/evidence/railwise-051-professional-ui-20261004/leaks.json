@@ -1,0 +1,6 @@
+{
+  "packageAsar": "43a6fdd7d6fe9caeb8e1a0d72356716dec53b794a6827e47237658699066b25c",
+  "evidenceStatus": "historical-pre-reconnect-candidate",
+  "leaks": [],
+  "processingNeedsAttention": "需要处理\n\n资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。"
+}

@@ -11,7 +11,17 @@ import type { EngineeringNavigationContext } from './engineering-evidence-naviga
 
 vi.mock('./EngineeringProjectSuggestions', () => ({ EngineeringProjectSuggestions: () => null }))
 
-vi.mock('../chat/MessageTimeline', () => ({ MessageTimeline: ({ runtimeError }: { runtimeError?: string | null }) => createElement('div', { 'data-testid': 'message-timeline' }, runtimeError) }))
+vi.mock('../chat/MessageTimeline', () => ({ MessageTimeline: ({ runtimeError, blocks, professionalSurface }: { runtimeError?: string | null; blocks: Array<{ kind: string; text: string; meta?: unknown; uiBlocks?: unknown[] }>; professionalSurface?: boolean }) => {
+  const assistant = blocks.find(block => block.kind === 'assistant')
+  return createElement('div', {
+    'data-testid': 'message-timeline',
+    'data-block-kinds': blocks.map(block => block.kind).join(','),
+    'data-professional-surface': String(professionalSurface === true),
+    'data-assistant-meta': assistant?.meta === undefined ? 'none' : 'present',
+    'data-user-text': blocks.find(block => block.kind === 'user')?.text,
+    'data-assistant-ui-block-count': String(assistant?.uiBlocks?.length ?? 0)
+  }, runtimeError)
+} }))
 vi.mock('./EngineeringComposer', () => ({ EngineeringComposer: () => createElement('textarea', { 'aria-label': 'Survey composer' }) }))
 
 type RuntimeResponse = { ok: boolean; status: number; body: string }
@@ -54,13 +64,21 @@ async function settle(): Promise<void> {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 }
 
-async function render(): Promise<void> {
+async function render(options: { expandPlan?: boolean } = {}): Promise<void> {
   await act(async () => {
     root.render(createElement(EngineeringAiCommandCenter, {
       workspaceRoot, runtimeReady: true, project, dataset: null, analysis: null,
       onCreateProject: () => undefined, onImportData: () => undefined, onSurveyFiles: () => undefined, onOpenTab: () => undefined, onRefresh
     }))
   })
+  if (options.expandPlan !== false) {
+    await settle()
+    const toggle = container.querySelector<HTMLButtonElement>('[aria-label="Engineering typed plan"]')
+      ?? [...container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find(button => button.getAttribute('aria-expanded') === 'false')
+    if (toggle?.getAttribute('aria-expanded') === 'false') {
+      await act(async () => toggle.click())
+    }
+  }
 }
 
 beforeEach(async () => {
@@ -90,9 +108,148 @@ afterEach(async () => {
 })
 
 describe('Engineering AI session recovery states', () => {
-  it('allows explicit typed continuation after zero-tool stalling without inventing completed receipts', async () => {
-    const plan = { ...resumablePlan, execution: { complete: false, completedStepIds: [], pendingStepIds: resumablePlan.steps.map(step => step.id) } }
-    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status: 'stalled' })) })
+  it('passes only professional user and assistant messages to the timeline', async () => {
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
+    useChatStore.setState({ blocks: [
+      { kind: 'user', id: 'user-a', text: '请解释控制网的平差结果。', meta: { request_id: 'request-a' } },
+      { kind: 'reasoning', id: 'reason-a', text: 'Internal reasoning text.' },
+      { kind: 'tool', id: 'tool-a', status: 'success', summary: 'survey_read_context', detail: 'sourceSha256=secret' },
+      { kind: 'system', id: 'system-a', text: 'tool_storm_suppressed', code: 'internal_state' },
+      { kind: 'assistant', id: 'assistant-a', text: 'S1 点位精度满足本项目限差。', modelLabel: 'test-model', uiBlocks: [{ kind: 'developer' }], meta: { duration_ms: 41_000, tool_calls: 2 } }
+    ] as never })
+
+    await render({ expandPlan: false })
+    const timeline = container.querySelector('[data-testid="message-timeline"]')!
+    expect(timeline.getAttribute('data-block-kinds')).toBe('user,assistant')
+    expect(timeline.getAttribute('data-professional-surface')).toBe('true')
+    expect(timeline.getAttribute('data-assistant-meta')).toBe('none')
+    expect(timeline.getAttribute('data-assistant-ui-block-count')).toBe('0')
+  })
+
+  it('preserves the user question even when it asks about a stored field or includes data', async () => {
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
+    const question = '请解释 standardConformity=not-evaluated。\n{"point":"S1","x":50}\nsourceSha256 是什么？'
+    useChatStore.setState({ blocks: [{ kind: 'user', id: 'question', text: question }] as never })
+    await render({ expandPlan: false })
+    expect(container.querySelector('[data-testid="message-timeline"]')?.getAttribute('data-user-text')).toBe(question)
+    expect(useChatStore.getState().blocks[0]).toMatchObject({ text: question })
+  })
+
+  it('keeps the execution protocol collapsed by default and reveals it on demand', async () => {
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: refreshedPlan } : { cards: [] }))
+    await render({ expandPlan: false }); await settle()
+    const toggle = [...container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find(button => button.getAttribute('aria-expanded') === 'false')!
+    expect(toggle).toBeTruthy()
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('[data-testid="engineering-plan-step-review"]')).toBeNull()
+    expect(container.querySelector('pre')).toBeNull()
+    expect(container.textContent).toContain(refreshedPlan.goal)
+    await act(async () => toggle.click())
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('[data-testid="engineering-plan-step-review"]')).not.toBeNull()
+  })
+
+  it('collapses the plan when the selected plan identity changes', async () => {
+    const historicalPlan = { ...refreshedPlan, id: 'plan-history', contextHash: 'context-history', goal: 'Review another control network' }
+    let selectedPlan = refreshedPlan
+    runtimeRequest.mockImplementation(async path => {
+      if (!path.startsWith('/v1/engineering/ai/plans?')) return response(200, { cards: [] })
+      return response(200, { plan: selectedPlan, history: [
+        { id: refreshedPlan.id, goal: refreshedPlan.goal, createdAt: '2026-09-09T00:00:00.000Z' },
+        { id: historicalPlan.id, goal: historicalPlan.goal, createdAt: '2026-09-10T00:00:00.000Z' }
+      ] })
+    })
+    await render({ expandPlan: false }); await settle()
+    const planToggle = (): HTMLButtonElement =>
+      [...container.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find(button => button.textContent?.includes(i18n.t('engineeringTypedPlan')))!
+    await act(async () => planToggle().click())
+    expect(planToggle().getAttribute('aria-expanded')).toBe('true')
+
+    const history = container.querySelector<HTMLSelectElement>(`select[aria-label="${i18n.t('engineeringPlanHistory')}"]`)!
+    selectedPlan = historicalPlan
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(history, historicalPlan.id)
+      history.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await settle()
+
+    expect(planToggle().getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('[data-testid="engineering-plan-step-review"]')).toBeNull()
+  })
+
+  it.each([
+    ['internal Survey tool ID', 'survey_quality_check', 'Check data quality', 'survey_quality_check'],
+    ['format catalog diagnostic', 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断平差。', 'Survey data recognized', 'P0']
+  ])('professionalizes the collapsed step title containing %s', async (_caseName, title, expected, internalText) => {
+    const plan = {
+      ...refreshedPlan,
+      status: 'started',
+      taskId: 'task-started',
+      executionTurnId: 'turn-started',
+      execution: { complete: false, completedStepIds: [], pendingStepIds: ['adjust'] },
+      steps: [{ ...refreshedPlan.steps[0], title }]
+    }
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
+    await render({ expandPlan: false }); await settle()
+
+    expect(container.textContent).toContain(expected)
+    expect(container.textContent).not.toContain(internalText)
+  })
+
+  it.each(['en', 'zh'])('shows blocked draft fields instead of missing execution receipts and prepares a scoped repair in %s', async language => {
+    await i18n.changeLanguage(language)
+    const parameterIssues = [{ stepId: 'adjust', code: 'invalid-parameters', fields: ['sourceSha256', 'projectId'] }]
+    const plan = { ...refreshedPlan, status: 'needs_attention', parameterIssues, execution: { complete: false, completedStepIds: [], pendingStepIds: ['adjust'] } }
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
+    await render(); await settle()
+    const diagnostics = container.querySelector('[data-testid="engineering-plan-parameter-issues"]')!
+    expect(diagnostics.textContent).toContain(i18n.t('engineeringPlanParametersBlocked'))
+    expect(diagnostics.textContent).not.toContain('sourceSha256')
+    expect(diagnostics.textContent).not.toContain('projectId')
+    expect(container.querySelector('[data-testid="engineering-plan-incomplete-evidence"]')).toBeNull()
+    expect(container.querySelector('[data-testid="engineering-replan"]')).toBeNull()
+    expect(container.textContent).not.toContain(i18n.t('engineeringPlanStepReceiptMissing'))
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0)
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-repair-plan"]')!.click())
+    const scope = JSON.stringify([workspaceRoot, project.id])
+    const draft = useEngineeringConversationDrafts.getState().drafts[scope]!
+    expect(draft.input).not.toContain(plan.id)
+    expect(draft.input).toContain(plan.goal)
+    expect(draft.evidenceContext?.projectId).toBe(project.id)
+    useEngineeringConversationDrafts.getState().update(scope, current => ({ ...current, input: 'Keep my existing question' }))
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-repair-plan"]')!.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[scope]?.input).toBe('Keep my existing question')
+    expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+  })
+
+  it('restores a failed approved plan from history and resumes that exact Task without approving the newer draft', async () => {
+    const old = { ...resumablePlan, id: 'original-failed', status: 'needs_attention', revision: 4 }
+    const history = [refreshedPlan, old].map(plan => ({ id: plan.id, goal: plan.goal, createdAt: '2026-09-29T00:00:00Z' }))
+    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: old.taskId, threadId: 'thread-a', status: 'waiting_user' })) })
+    runtimeRequest.mockImplementation(async path => {
+      if (path.endsWith('/resume')) return response(202, { plan: { ...old, status: 'started', revision: 5 } })
+      if (path.startsWith('/v1/engineering/ai/plans?')) return response(200, { plan: path.includes('planId=original-failed') ? old : refreshedPlan, history })
+      return response(200, { cards: [] })
+    })
+    await render(); await settle()
+    const select = container.querySelector<HTMLSelectElement>(`[aria-label="${i18n.t('engineeringPlanHistory')}"]`)!
+    expect(select).not.toBeNull()
+    await act(async () => { select.value = old.id; select.dispatchEvent(new Event('change', { bubbles: true })) }); await settle()
+    expect(container.textContent).not.toContain(old.id)
+    const planToggle = container.querySelector<HTMLButtonElement>(`section[aria-label="${i18n.t('engineeringTypedPlan')}"] button[aria-expanded]`)!
+    expect(planToggle.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('[data-step-state]')).toBeNull()
+    await act(async () => planToggle.click())
+    expect([...container.querySelectorAll('[data-step-state]')].map(node => node.getAttribute('data-step-state'))).toEqual(['done', 'blocked'])
+    const resume = container.querySelector<HTMLButtonElement>('[data-testid="engineering-resume"]')!
+    expect(resume).not.toBeNull()
+    await act(async () => resume.click()); await settle()
+    expect(runtimeRequest.mock.calls.filter(([, method]) => method === 'POST').map(([path]) => path)).toEqual([`/v1/engineering/ai/plans/${old.id}/resume`])
+  })
+
+  it.each(['started', 'needs_attention'])('allows explicit typed continuation of a %s plan without inventing completed receipts', async status => {
+    const plan = { ...resumablePlan, status, execution: { complete: false, completedStepIds: [], pendingStepIds: resumablePlan.steps.map(step => step.id) } }
+    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => ({ id: plan.taskId, threadId: 'thread-a', status: status === 'needs_attention' ? 'waiting_user' : 'stalled' })) })
     runtimeRequest.mockImplementation(async (path, method) => path.endsWith('/resume') && method === 'POST'
       ? response(202, { plan: { ...plan, revision: 4, executionTurnId: 'continued-zero-receipt' } })
       : response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
@@ -302,6 +459,34 @@ describe('Engineering AI session recovery states', () => {
     expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
   })
 
+  it('settles a terminal plan read without restarting the plan and evidence request', async () => {
+    const plan = { ...resumablePlan, status: 'needs_attention', execution: { complete: false, completedStepIds: ['validate'], pendingStepIds: ['adjust'] } }
+    Object.assign(window.workwise, { getTaskRun: vi.fn(async () => null) })
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
+    await render(); await settle()
+    expect(runtimeRequest.mock.calls.filter(([path]) => path.startsWith('/v1/engineering/ai/plans?'))).toHaveLength(1)
+    expect(runtimeRequest.mock.calls.filter(([path]) => path.startsWith('/v1/engineering/ai/evidence/'))).toHaveLength(1)
+    expect(container.querySelector('[data-testid="engineering-session-read-state"]')).toBeNull()
+  })
+
+  it('clears a stale plan read error after the retry succeeds', async () => {
+    const plan = { ...resumablePlan, status: 'awaiting_approval' }
+    let planReads = 0
+    runtimeRequest.mockImplementation(async path => {
+      if (path.startsWith('/v1/engineering/ai/plans?')) {
+        planReads += 1
+        return planReads === 1 ? response(503, { code: 'unavailable', message: 'temporary' }) : response(200, { plan })
+      }
+      return response(200, { cards: [] })
+    })
+    await render(); await settle()
+    expect(container.querySelector('[data-testid="engineering-session-read-state"]')?.textContent).toContain('Some survey review data is temporarily unavailable')
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-session-retry"]')!.click())
+    await settle()
+    expect(container.querySelector('[data-testid="engineering-session-read-state"]')).toBeNull()
+    expect(container.textContent).toContain(plan.goal)
+  })
+
   it('refreshes verified partial results when the execution stalls without replaying any tool', async () => {
     const steps = ['validate', 'adjust', 'report'].map(id => ({ ...refreshedPlan.steps[0], id, title: id }))
     let reads = 0
@@ -320,7 +505,7 @@ describe('Engineering AI session recovery states', () => {
     await act(async () => useChatStore.setState({ busy: false })); await settle()
     expect([...container.querySelectorAll('[data-step-state]')].map(node => node.getAttribute('data-step-state'))).toEqual(['done', 'blocked', 'blocked'])
     expect(container.textContent).toContain(i18n.t('engineeringStatusStalled'))
-    expect(container.textContent).toContain(i18n.t('runtimeEngineeringPlanStepsIncomplete'))
+    expect(container.textContent).toContain(i18n.t('engineeringPlanExecutionIncomplete', { completed: 1, total: 3 }))
     expect(container.textContent).not.toContain('engineering_plan_steps_incomplete:')
     expect(reads).toBeGreaterThan(1)
     expect(onRefresh).toHaveBeenCalledOnce()
@@ -385,11 +570,11 @@ describe('Engineering AI session recovery states', () => {
   it('distinguishes unavailable AI conversation from the available Survey service', async () => {
     useChatStore.setState({ runtimeConnection: 'idle' })
     await render()
-    expect(container.textContent).toContain('Survey processing is available, but the AI conversation is not ready.')
+    expect(container.textContent).toContain('Survey processing is available, but AI assistance is not ready.')
     expect(container.textContent).not.toContain('Runtime is not connected.')
     expect(runtimeRequest).not.toHaveBeenCalled()
     await act(async () => { await i18n.changeLanguage('zh') })
-    expect(container.textContent).toContain('内业计算服务可用，AI 对话尚未就绪')
+    expect(container.textContent).toContain('内业计算服务可用，但 AI 辅助尚未就绪')
   })
 
   it('localizes a recorded model failure in both recovery surfaces without rewriting stored state', async () => {
@@ -397,21 +582,21 @@ describe('Engineering AI session recovery states', () => {
     useChatStore.setState({ error, blocks: [{ id: 'question', kind: 'user', text: 'Explain precision' }] as never })
     runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
     await render(); await settle()
-    expect(container.querySelector('[role="status"]')?.textContent).toContain('This model or tool attempt failed.')
-    expect(container.querySelector('[data-testid="message-timeline"]')?.textContent).toContain('This model or tool attempt failed.')
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Processing did not finish.')
+    expect(container.querySelector('[data-testid="message-timeline"]')?.textContent).toContain('Processing did not finish.')
     expect(container.textContent).not.toContain(error)
     expect(useChatStore.getState().error).toBe(error)
     await act(async () => { await i18n.changeLanguage('zh') })
-    expect(container.querySelector('[data-testid="message-timeline"]')?.textContent).toBe(error)
+    expect(container.querySelector('[data-testid="message-timeline"]')?.textContent).toBe('本次处理未能完成，可从上次保存的位置继续。')
   })
 
   it('displays reviewed parameters, bindings, outputs and reversibility before enabling execution', async () => {
     const plan = { ...refreshedPlan, steps: refreshedPlan.steps.map(step => ({ ...step, parameterBindings: [{ parameter: 'expectedRevision', stepId: 'validate', output: 'network.revision' }] })) }
     runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan, approval: plan.approval } : { cards: [] }))
     await render(); await settle()
-    expect(container.textContent).toContain('net-1')
-    expect(container.textContent).toContain('expectedRevision ← validate.network.revision')
-    expect(container.textContent).toContain('control_network')
+    expect(container.textContent).not.toContain('net-1')
+    expect(container.textContent).not.toContain('expectedRevision ← validate.network.revision')
+    expect(container.textContent).not.toContain('control_network')
     expect(container.querySelector('[data-testid="engineering-plan-step-review"]')?.textContent).toContain('Expected outputs')
     const start = [...container.querySelectorAll('button')].find(button => button.textContent?.includes(i18n.t('engineeringApproveAndStart')))
     expect(start?.disabled).toBe(true)
@@ -470,7 +655,7 @@ describe('Engineering AI session recovery states', () => {
     const initialPlan = deferred<RuntimeResponse>()
     const initialEvidence = deferred<RuntimeResponse>()
     const planResponses = [initialPlan.promise, Promise.resolve(response(200, { plan: refreshedPlan, approval: refreshedPlan.approval })), Promise.resolve(response(200, { plan: refreshedPlan, approval: refreshedPlan.approval }))]
-    const evidenceResponses = [initialEvidence.promise, Promise.resolve(response(503, { message: 'Evidence index unavailable' })), Promise.resolve(response(200, { cards: [{ id: 'evidence-1', kind: 'result', title: 'Adjusted result', summary: 'Verified' }] }))]
+    const evidenceResponses = [initialEvidence.promise, Promise.resolve(response(503, { message: 'evidence route /v1/engineering/ai/evidence mismatch' })), Promise.resolve(response(200, { cards: [{ id: 'evidence-1', kind: 'result', title: 'Adjusted result', summary: 'Verified' }] }))]
     let planReads = 0
     let evidenceReads = 0
     runtimeRequest.mockImplementation((path: string) => path.startsWith('/v1/engineering/ai/plans?') ? planResponses[planReads++] : evidenceResponses[evidenceReads++])
@@ -485,19 +670,19 @@ describe('Engineering AI session recovery states', () => {
     expect(container.querySelector('[data-testid="engineering-session-read-state"]')?.getAttribute('data-state')).toBe('loading')
 
     await act(async () => {
-      initialPlan.resolve(response(503, { message: 'Plan store unavailable' }))
-      initialEvidence.resolve(response(503, { message: 'Evidence index unavailable' }))
+      initialPlan.resolve(response(503, { message: 'engineering plan scope mismatch at /v1/engineering/ai/plans' }))
+      initialEvidence.resolve(response(503, { message: 'evidence route /v1/engineering/ai/evidence mismatch' }))
     })
     await settle()
     expect(container.querySelector('[data-testid="engineering-session-read-state"]')?.getAttribute('data-state')).toBe('error')
     expect(container.textContent).toContain(i18n.t('engineeringPlanReadFailed'))
-    expect(container.textContent).not.toContain('Plan store unavailable')
+    expect(container.textContent).not.toMatch(/engineering plan scope mismatch|\/v1\/engineering/)
 
     await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-session-retry"]')?.click())
     await settle()
     expect(container.querySelector('[data-testid="engineering-session-read-state"]')?.getAttribute('data-state')).toBe('partial')
     expect(container.textContent).toContain(i18n.t('engineeringEvidenceReadFailed'))
-    expect(container.textContent).not.toContain('Evidence index unavailable')
+    expect(container.textContent).not.toMatch(/evidence route|\/v1\/engineering/)
 
     await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="engineering-session-retry"]')?.click())
     await settle()
@@ -540,4 +725,36 @@ describe('Engineering AI session recovery states', () => {
     expect(onRefresh).toHaveBeenCalledOnce()
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.input).toBe('Question in progress')
   })
+})
+
+it('starts a complete, reversible compact plan with one explicit confirmation', async () => {
+  runtimeRequest.mockImplementation(async (path, method) => {
+    if (path.startsWith('/v1/engineering/ai/plans?')) return response(200, { plan: refreshedPlan, approval: refreshedPlan.approval })
+    if (path.startsWith('/v1/engineering/ai/evidence/')) return response(200, { cards: [] })
+    if (path.endsWith('/approve') && method === 'POST') return response(200, { ...refreshedPlan, status: 'approved', revision: 2 })
+    if (path.endsWith('/start') && method === 'POST') return response(200, { plan: { ...refreshedPlan, status: 'started', revision: 3 } })
+    throw new Error('unexpected request')
+  })
+  await act(async () => root.render(createElement(EngineeringAiCommandCenter, { workspaceRoot, runtimeReady: true, project, compact: true, dataset: null, analysis: null, onCreateProject: vi.fn(), onImportData: vi.fn(), onSurveyFiles: vi.fn(), onOpenTab: vi.fn(), onRefresh })))
+  await settle()
+  expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+  expect(container.querySelector('pre')).toBeNull()
+  expect(container.textContent).toContain(i18n.t('engineeringPlanOutputs'))
+  const start = [...container.querySelectorAll('button')].find(button => button.textContent === i18n.t('engineeringApproveAndStart'))!
+  expect(start.disabled).toBe(false)
+  await act(async () => start.click())
+  expect(runtimeRequest.mock.calls.filter(([, method]) => method === 'POST').map(([path]) => path.split('/').pop())).toEqual(['approve', 'start'])
+})
+
+it('keeps threshold and archive confirmation visible while compact technical details are closed', async () => {
+  const plan = { ...refreshedPlan, steps: [{ ...refreshedPlan.steps[0], risk: 'threshold', reversibility: 'revisioned-write' }] }
+  runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan, approval: plan.approval } : { cards: [] }))
+  await act(async () => root.render(createElement(EngineeringAiCommandCenter, { workspaceRoot, runtimeReady: true, project, compact: true, dataset: null, analysis: null, onCreateProject: vi.fn(), onImportData: vi.fn(), onSurveyFiles: vi.fn(), onOpenTab: vi.fn(), onRefresh })))
+  await settle()
+  const start = [...container.querySelectorAll('button')].find(button => button.textContent === i18n.t('engineeringApproveAndStart'))!
+  expect(start.disabled).toBe(true)
+  expect(container.querySelector('pre')).toBeNull()
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+  expect(start.disabled).toBe(false)
+  expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
 })

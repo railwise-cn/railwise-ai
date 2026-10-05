@@ -1,0 +1,84 @@
+{
+  "checks": [
+    {
+      "manifestId": "manifest_f78a2365-1d8a-4f9c-ab4a-96fe649b65d0",
+      "path": ".workwise/deliverables/project_13669574-0204-4bf5-87d0-ce75cfeda637/run_fd1a4e60-4a36-462c-bb12-e36532f181b9/report.docx",
+      "format": ".docx",
+      "sha256": "2469ac216eea55365c19b70a22d9fa1ffdff0f01a6840705ddcb3787610e88e8",
+      "sizeBytes": 6410,
+      "expectedText": [
+        "BM",
+        "P1",
+        "100.5998"
+      ],
+      "textPresent": true
+    },
+    {
+      "manifestId": "manifest_f78a2365-1d8a-4f9c-ab4a-96fe649b65d0",
+      "path": ".workwise/deliverables/project_13669574-0204-4bf5-87d0-ce75cfeda637/run_fd1a4e60-4a36-462c-bb12-e36532f181b9/report.pdf",
+      "format": ".pdf",
+      "sha256": "ea1bfab5ec8bf6308b0cb45aaacf2dbe31250b8616641609373ff27fe5d6907c",
+      "sizeBytes": 40584,
+      "expectedText": [
+        "BM",
+        "P1",
+        "100.5998"
+      ],
+      "textPresent": true
+    },
+    {
+      "manifestId": "manifest_f78a2365-1d8a-4f9c-ab4a-96fe649b65d0",
+      "path": ".workwise/deliverables/project_13669574-0204-4bf5-87d0-ce75cfeda637/run_fd1a4e60-4a36-462c-bb12-e36532f181b9/evidence.xlsx",
+      "format": ".xlsx",
+      "sha256": "f7aab1a1198177369a0e9d9adfbb4f5728b6e4556a1069120ac95eabe6d2d248",
+      "sizeBytes": 40679,
+      "expectedText": [
+        "BM",
+        "P1",
+        "100.5998"
+      ],
+      "textPresent": true
+    },
+    {
+      "manifestId": "manifest_658c3233-ce80-4942-be4c-fb941b4a1b4c",
+      "path": ".workwise/deliverables/project_b548f944-9a40-4c1c-b043-c5896e99e9dd/run_2fc06b25-174a-46dd-9362-89cc58e03df1/report.docx",
+      "format": ".docx",
+      "sha256": "7dde0c71dbac27e7e68c0e7df8d97ca044add53a70e7580c03abc6ae4abbafcc",
+      "sizeBytes": 7054,
+      "expectedText": [
+        "S1",
+        "C",
+        "50"
+      ],
+      "textPresent": true
+    },
+    {
+      "manifestId": "manifest_658c3233-ce80-4942-be4c-fb941b4a1b4c",
+      "path": ".workwise/deliverables/project_b548f944-9a40-4c1c-b043-c5896e99e9dd/run_2fc06b25-174a-46dd-9362-89cc58e03df1/report.pdf",
+      "format": ".pdf",
+      "sha256": "caa58c3ce82ccbcb468afd8559ff1e506e4562067744c16df5d64d32b977209a",
+      "sizeBytes": 44680,
+      "expectedText": [
+        "S1",
+        "C",
+        "50"
+      ],
+      "textPresent": true
+    },
+    {
+      "manifestId": "manifest_658c3233-ce80-4942-be4c-fb941b4a1b4c",
+      "path": ".workwise/deliverables/project_b548f944-9a40-4c1c-b043-c5896e99e9dd/run_2fc06b25-174a-46dd-9362-89cc58e03df1/evidence.xlsx",
+      "format": ".xlsx",
+      "sha256": "0f09f7ea3575d4634113b2ea5b344cf09febd7d75302ff1a59c0201e3333f353",
+      "sizeBytes": 45668,
+      "expectedText": [
+        "S1",
+        "C",
+        "50"
+      ],
+      "textPresent": true
+    }
+  ],
+  "status": "passed",
+  "scope": "hash, size and independently extracted expected point/value text; does not certify visual layout or professional approval"
+}

@@ -1,0 +1,50 @@
+{
+  "capturedAt": "2026-09-27T19:22:34.870258+00:00",
+  "sourceHead": "20aead04af10d72cf1e33c1b61c7b81306ff05a6",
+  "candidateRun": 164,
+  "version": "0.5.1",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head20aead04af10",
+  "localPath": "/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app",
+  "sha256": {
+    "dmg": "65c5a9340876728d99d5f538f97a726b296cf11ba041038254efcd75bb6ef65d",
+    "asar": "1faff330c8e77e7963ccc2b0921c7bcd22b5613701e0e4c672116cb30553a03c",
+    "orchestrator": "6fb0de50d20b9580c632039ad36bede9d11dd2daefdc25ac62e5aebe44f1cbf4"
+  },
+  "restrictedSandboxChecks": {
+    "signature": {
+      "exitCode": 1,
+      "output": "/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app: invalid signature (code or signature have been modified)\nIn architecture: arm64\n"
+    },
+    "notarization": {
+      "exitCode": 66,
+      "output": "File /private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app does not exist. Error Domain=NSCocoaErrorDomain Code=256 \"The file \u201cRailWise AI Candidate 20aead04af10\u201d couldn\u2019t be opened.\" UserInfo={NSURL=file:///private/tmp/railwise-051-fix-candidate/local/RailWise%20AI%20Candidate%2020aead04af10.app/, NSFilePath=/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app, NSUnderlyingError=0x79511ec180 {Error Domain=NSOSStatusErrorDomain Code=-10813 \"kLSDataUnavailableErr: E.g. no kind string\"}}\n"
+    },
+    "gatekeeper": {
+      "exitCode": 0,
+      "output": "/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app: accepted\noverride=security disabled\n"
+    },
+    "gatekeeperStatus": {
+      "exitCode": 1,
+      "output": "assessments disabled\n"
+    }
+  },
+  "checks": {
+    "signature": {
+      "exitCode": 0,
+      "output": "--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper (Renderer).app\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper (Renderer).app\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Mantle.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Mantle.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper.app\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper.app\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper (Plugin).app\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper (Plugin).app\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper (GPU).app\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/RailWise AI Candidate 20aead04af10 Helper (GPU).app\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler\n--validated:/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.\n/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app: valid on disk\n/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app: satisfies its Designated Requirement\n"
+    },
+    "notarization": {
+      "exitCode": 0,
+      "output": "Processing: /private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app\nThe validate action worked!\n"
+    },
+    "gatekeeper": {
+      "exitCode": 0,
+      "output": "/private/tmp/railwise-051-fix-candidate/local/RailWise AI Candidate 20aead04af10.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+    },
+    "gatekeeperStatus": {
+      "exitCode": 1,
+      "output": "assessments disabled\n"
+    }
+  },
+  "checkEnvironment": "Host, outside restricted sandbox. Earlier restricted checks retained separately."
+}

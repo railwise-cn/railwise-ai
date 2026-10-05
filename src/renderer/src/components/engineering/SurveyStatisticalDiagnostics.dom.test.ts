@@ -34,7 +34,7 @@ async function render(overrides: Partial<Parameters<typeof SurveyStatisticalDiag
   await act(async () => root.render(createElement(SurveyStatisticalDiagnostics, { ...defaults, ...overrides })))
 }
 function readButton(): HTMLButtonElement { return host.querySelector('button')! }
-function downloadButton(): HTMLButtonElement { return host.querySelectorAll('button')[1]! }
+function downloadButton(): HTMLButtonElement | null { return host.querySelector<HTMLButtonElement>(`button[aria-label="${i18n.t('common:surveyStatsDownload')}"]`) }
 async function click(button = readButton()): Promise<void> { await act(async () => button.click()) }
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -48,6 +48,22 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
 describe('desktop leveling statistical diagnostics', () => {
+  it('labels observations professionally in the table, locator and exported CSV', async () => {
+    const observationId = 'cosa-in1-6'
+    const updated = { ...fixture, observations: fixture.observations.map((item, index) => index ? item : { ...item, observationId, sourceRow: 6 }) }
+    runtimeRequest.mockResolvedValue(response(updated))
+    await render({ observations: [{ id: observationId, from: 'BM01', to: 'P01', type: 'height-difference', sourceRow: 6 }] })
+    await click()
+    const row = host.querySelector('tbody tr')!
+    expect(row.textContent).toContain('BM01 → P01 · Height difference · source row 6')
+    expect(row.textContent).not.toContain(observationId)
+    expect(row.querySelector('button')?.getAttribute('aria-label')).not.toContain(observationId)
+    await click(downloadButton()!)
+    const csv = Buffer.from(save.mock.calls[0]![0].dataBase64, 'base64').toString('utf8')
+    expect(csv).toContain('BM01 → P01 · Height difference · source row 6')
+    expect(csv).not.toContain(observationId)
+  })
+
   it('pins the chosen diagnostic observation with its actual network revision and calculation hash', async () => {
     const focus = vi.fn()
     useEngineeringConversationDrafts.setState({ drafts: {} })
@@ -61,11 +77,12 @@ describe('desktop leveling statistical diagnostics', () => {
   it('uses the exact project-scoped Runtime payload, shows assumptions in both locales and locates original records', async () => {
     await render()
     expect(runtimeRequest).not.toHaveBeenCalled()
-    expect(downloadButton().disabled).toBe(true)
+    expect(downloadButton()).toBeNull()
     await click()
     expect(runtimeRequest).toHaveBeenCalledExactlyOnceWith('/v1/engineering/projects/project-stats/adjustments/run-stats/statistical-diagnostics', 'GET')
     expect(host.textContent).toContain('Statistical assumptions: not verified.')
     expect(host.textContent).toContain('No statistical decision has been made.')
+    expect(downloadButton()?.disabled).toBe(false)
     expect(host.textContent).toContain('-1.2345')
     expect(host.querySelector('[role="region"]')?.getAttribute('tabindex')).toBe('0')
     const locator = host.querySelector('tbody button') as HTMLButtonElement
@@ -79,27 +96,30 @@ describe('desktop leveling statistical diagnostics', () => {
     expect(host.textContent).toContain('全模型自由度')
   })
 
-  it('revalidates before native JSON save and preserves the source binding and undecided status', async () => {
+  it('revalidates before exporting professional CSV without internal run details', async () => {
     await render(); await click()
     const fresh = { ...fixture, observations: fixture.observations.map(row => ({ ...row, externallyStudentizedResidual: 2.5 })) }
     runtimeRequest.mockResolvedValueOnce(response(fresh))
-    await click(downloadButton())
+    await click(downloadButton()!)
     expect(runtimeRequest).toHaveBeenLastCalledWith('/v1/engineering/projects/project-stats/adjustments/run-stats/statistical-diagnostics?download=1', 'GET')
-    expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ suggestedName: 'survey-statistical-diagnostics.json', workspaceRoot: '/survey', mimeType: 'application/json' }))
+    expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ suggestedName: 'survey-statistical-diagnostics.csv', workspaceRoot: '/survey', mimeType: 'text/csv;charset=utf-8' }))
     const payload = save.mock.calls[0]![0] as { dataBase64: string }
-    expect(JSON.parse(Buffer.from(payload.dataBase64, 'base64').toString('utf8'))).toEqual(fresh)
-    expect(host.textContent).toContain('Diagnostics JSON saved.')
+    const csv = Buffer.from(payload.dataBase64, 'base64').toString('utf8')
+    expect(csv).toContain('"Observation","Residual (m)","Studentized residual t","Redundancy","Source row"')
+    expect(csv).toContain('"source row 1","0.00012","2.5","0.6666666666666666","1"')
+    expect(csv).not.toMatch(/run-stats|diagnosticsVersion|sourceSha256|calculationHash|inputHash|JSON/i)
+    expect(host.textContent).toContain('Statistical table saved.')
   })
 
   it('clears older diagnostics when a revalidation fails and never saves unverified output', async () => {
     await render(); await click()
     runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: 'PRIVATE raw-source values' })
-    await click(downloadButton())
+    await click(downloadButton()!)
     expect(save).not.toHaveBeenCalled()
     expect(host.querySelector('table')).toBeNull()
-    expect(host.textContent).toContain('evidence is missing, changed, or inconsistent')
+    expect(host.textContent).toContain('source or result changed or is inconsistent')
     expect(host.textContent).not.toContain('PRIVATE')
-    expect(downloadButton().disabled).toBe(true)
+    expect(downloadButton()).toBeNull()
   })
 
   it('shows a localized unavailable reason without inventing t values', async () => {
@@ -123,13 +143,13 @@ describe('desktop leveling statistical diagnostics', () => {
       await render(overrides)
       await act(async () => complete(response(fixture)))
       expect(host.querySelector('table')).toBeNull()
-      expect(downloadButton().disabled).toBe(true)
+      expect(downloadButton()).toBeNull()
     }
   })
 
   it('disables missing provenance and revoked admission, and clears results on an offline transition', async () => {
     await render({ binding: null }); expect(readButton().disabled).toBe(true)
-    expect(host.textContent).toContain('missing the input or source binding')
+    expect(host.textContent).toContain('missing the survey source')
     await render({ eligible: false }); expect(readButton().disabled).toBe(true)
     await render(); await click(); expect(host.querySelector('table')).not.toBeNull()
     await render({ runtimeReady: false }); expect(readButton().disabled).toBe(true)
@@ -140,10 +160,10 @@ describe('desktop leveling statistical diagnostics', () => {
   it('does not announce success after a canceled or failed native save', async () => {
     await render(); await click()
     save.mockResolvedValueOnce({ ok: false, canceled: true, message: 'Save cancelled.' })
-    await click(downloadButton())
-    expect(host.textContent).not.toContain('Diagnostics JSON saved.')
+    await click(downloadButton()!)
+    expect(host.textContent).not.toContain('Statistical table saved.')
     save.mockResolvedValueOnce({ ok: false, message: 'PRIVATE path' })
-    await click(downloadButton())
+    await click(downloadButton()!)
     expect(host.textContent).toContain('could not be saved')
     expect(host.textContent).not.toContain('PRIVATE')
   })

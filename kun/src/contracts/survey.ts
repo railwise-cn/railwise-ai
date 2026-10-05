@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { SurveyResidualStatisticV1, SurveyStatisticalSummaryV1 } from './survey-statistical-semantics.js'
+import { SurveyTabularMappingV1 } from './survey-tabular.js'
 
 /** Versioned contracts for deterministic engineering-survey processing. */
 export const SURVEY_SCHEMA_VERSION = 1 as const
@@ -122,13 +124,15 @@ export const SurveyRawRecordAnchorCreateV1 = z.object({
   byteLength: z.number().int().nonnegative().optional(),
   section: z.string().optional(),
   recordType: z.string().optional(),
-  /** Byte offset and length are the immutable source-record locator. */
+  /** Immutable source location. For XLSX, this is the containing ZIP member byte range. */
   rawOffset: z.number().int().nonnegative(),
   rawLength: z.number().int().positive(),
   /** Text records additionally carry the original one-based line number. */
   rawLineNo: z.number().int().positive().optional(),
   /** Bounded, review-only excerpt; the original stays in Attachment Store. */
-  rawSnippet: z.string().max(SURVEY_SOURCE_MAX_RAW_SNIPPET_CHARS)
+  rawSnippet: z.string().max(SURVEY_SOURCE_MAX_RAW_SNIPPET_CHARS),
+  /** Exact worksheet-row locator within a checksum-verified, decompressed OOXML member. */
+  containerMember: z.object({ path: z.string().min(1).max(256), sha256: z.string().regex(/^[0-9a-f]{64}$/), byteOffset: z.number().int().nonnegative(), byteLength: z.number().int().positive(), row: z.number().int().positive() }).strict().optional()
 }).strict()
 const SurveyRawRecordAnchorReadShapeV1 = SurveyRawRecordAnchorCreateV1.extend({
   // Pre-contract records had no byte length. Preserve their read path without
@@ -346,6 +350,8 @@ const SurveySourceFileCreateShapeV1 = z.object({
   diagnostics: z.array(SurveyImportDiagnosticV1).max(2_000),
   rawRecordAnchors: z.array(SurveyRawRecordAnchorCreateV1).max(100_000),
   preservedRawFields: SurveyPreservedRawFieldsV1,
+  /** Complete confirmation survives optional raw-field retention limits. */
+  tabularMapping: SurveyTabularMappingV1.optional(),
   converter: SurveyConverterProvenanceV1.optional(),
   /** Present only when this source is the actual output of a conversion. */
   conversionInput: SurveyConversionInputV1.optional()
@@ -359,6 +365,11 @@ const SurveySourceFileCreateShapeV1 = z.object({
 export const SurveySourceFileCreateV1 = SurveySourceFileCreateShapeV1.superRefine((source, context) => {
   const add = (path: Array<string | number>, message: string) => context.addIssue({ code: 'custom', path, message })
   if (source.fileSize !== source.size) add(['fileSize'], 'fileSize must equal legacy size alias')
+  if (source.tabularMapping) {
+    if (source.tabularMapping.sourceSha256 !== source.sha256) add(['tabularMapping', 'sourceSha256'], 'confirmed mapping must bind the original source sha256')
+    if (!['xlsx', 'delimited-text'].includes(source.formatId) || source.parserId !== 'survey-confirmed-tabular-parser') add(['tabularMapping'], 'confirmed tabular mapping requires its audited tabular parser and format')
+  }
+  if (source.parserId === 'survey-confirmed-tabular-parser' && source.disposition === 'adjustment-ready' && !source.tabularMapping) add(['tabularMapping'], 'ready tabular inputs require a complete confirmed mapping record')
   if (source.formatId !== source.detection.format) add(['formatId'], 'formatId must equal detection.format')
   if (source.vendor !== source.detection.vendor) add(['vendor'], 'vendor must equal detection.vendor')
   if (source.formatVersion !== (source.detection.version ?? null)) add(['formatVersion'], 'formatVersion must equal detection.version')
@@ -836,6 +847,8 @@ export const AdjustmentObservationResultV1 = z.object({
   unit: z.enum(['m', 'rad']).optional(),
   standardizedResidual: z.number().finite().optional(),
   standardizedResidualUnit: z.literal('sigma').default('sigma'),
+  /** Algorithm 8+ only; never default/backfill into hashed historical results. */
+  residualStatistic: SurveyResidualStatisticV1.optional(),
   outlier: z.boolean().default(false),
   sourceRow: z.number().int().positive().optional(),
   /** Immutable source-record anchor inherited from the adjusted observation. */
@@ -884,6 +897,7 @@ export const AdjustmentResultV1 = z.object({
    * has no redundancy; older records default to false rather than claiming
    * a posterior estimate. */
   varianceFactorEstimated: z.boolean().default(false),
+  statisticalSummary: SurveyStatisticalSummaryV1.optional(),
   points: z.array(AdjustmentPointResultV1),
   observations: z.array(AdjustmentObservationResultV1),
   displacements: z.array(AdjustmentDisplacementV1).default([]),
@@ -1077,6 +1091,7 @@ export const SurveyNetworkImportRequest = z.object({
   dataBase64: z.string().min(1).optional(),
   inputAttachmentHash: z.string().min(1).optional(),
   cosaIn1Mapping: CosaIn1MappingRequestV1.optional(),
+  tabularMapping: SurveyTabularMappingV1.optional(),
   /** Explicit, auditable control-point mapping; never inferred from a sidecar. */
   knownPoints: z.array(SurveyKnownPointInputV1).max(10_000).optional()
 }).strict().refine((value) => Boolean(value.network || (value.name && value.dataBase64)), { message: 'network or name/dataBase64 is required' })

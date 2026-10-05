@@ -23,6 +23,8 @@ let adjustments: unknown[]
 let datasets: unknown[]
 let analyses: unknown[]
 let manifests: unknown[]
+let runs: unknown[]
+let latestPreview: unknown
 let container: HTMLDivElement
 let root: Root
 const file = { path: 'new-preview/report.pdf', mediaType: 'application/pdf', sha256: 'a'.repeat(64), sizeBytes: 100 }
@@ -38,6 +40,11 @@ function button(text: string): HTMLButtonElement {
   const result = [...container.querySelectorAll('button')].find(item => item.textContent === text)
   expect(result, text).toBeDefined()
   return result!
+}
+function visibleText(element: HTMLElement): string {
+  const visible = element.cloneNode(true) as HTMLElement
+  visible.querySelectorAll('details:not([open])').forEach((details) => details.remove())
+  return visible.textContent ?? ''
 }
 function deferredResponse() {
   let resolve!: (body: unknown) => void
@@ -55,14 +62,14 @@ beforeEach(async () => {
   Object.defineProperty(window, 'localStorage', { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) } })
 
   await i18n.changeLanguage('en')
-  adjustments = [adjustment]; datasets = []; analyses = []; manifests = []
+  adjustments = [adjustment]; datasets = []; analyses = []; manifests = []; runs = []; latestPreview = undefined
   navigationFixture.target = null
   useEngineeringConversationDrafts.setState({ drafts: {} })
   request.mockReset()
   request.mockImplementation(async (path: string) => {
     let body: unknown
     if (path === '/v1/engineering/projects') body = { projects: [project] }
-    else if (path.endsWith('/overview')) body = { project, datasets, analyses, runs: [], manifests }
+    else if (path.endsWith('/overview')) body = { project, datasets, analyses, runs, manifests, latestPreview }
     else if (path.includes('/survey/networks?')) body = { networks: [network] }
     else if (path.includes('/adjustments?')) body = { adjustments }
     else if (path.endsWith('/reports/preview')) body = { run: { id: 'preview' }, files: [file], charts: [], citations: [] }
@@ -74,6 +81,168 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('Survey delivery without a monitoring dataset', () => {
+  it('saves structured monitoring limits with the existing project keys and refuses an incomplete value', async () => {
+    const limitsProject = { ...project, thresholds: { default: 8, settlement: 10, '隧道收敛': -2.5 } }
+    request.mockImplementation(async (path: string, method?: string, requestBody?: string) => {
+      const body = method === 'PATCH' ? { project: { ...limitsProject, ...JSON.parse(requestBody!), revision: 3 } }
+        : path === '/v1/engineering/projects' ? { projects: [limitsProject] }
+          : path.endsWith('/overview') ? emptyOverview(limitsProject)
+            : path.includes('/survey/networks?') ? { networks: [network] } : { adjustments: [] }
+      return { ok: true, status: 200, body: JSON.stringify(body) }
+    })
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringAdvancedNavigation')).click())
+    await act(async () => button(i18n.t('engineeringTabProject')).click())
+    const limit = container.querySelector<HTMLInputElement>('input[aria-label="Limit (m) 1"]')!
+    const setLimit = async (value: string): Promise<void> => { await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(limit, value)
+      limit.dispatchEvent(new Event('input', { bubbles: true }))
+    }) }
+    await setLimit('')
+    request.mockClear()
+    await act(async () => button(i18n.t('engineeringSaveConfig')).click())
+    expect(request.mock.calls.filter(([, method]) => method === 'PATCH')).toHaveLength(0)
+    expect(container.textContent).toContain(i18n.t('engineeringThresholdValueError'))
+    await setLimit('9')
+    await act(async () => button(i18n.t('engineeringSaveConfig')).click())
+    const saved = request.mock.calls.find(([, method]) => method === 'PATCH')!
+    expect(saved).toBeDefined()
+    expect(JSON.parse(saved[2])).toMatchObject({ thresholds: { default: 9, settlement: 10, '隧道收敛': -2.5 } })
+    expect(container.querySelector('fieldset legend')?.textContent).toBe(i18n.t('engineeringThresholds'))
+  })
+
+  it('shows professional file, source, export and review information without technical identifiers', async () => {
+    const outputPath = '/private/var/tmp/railwise-internal/manifest-internal-42/report.pdf'
+    const outputHash = 'f'.repeat(64)
+    manifests = [{
+      id: 'manifest-internal-42', runId: 'run-internal-42', reviewStatus: 'draft',
+      outputs: [{ ...file, path: outputPath, sha256: outputHash }],
+      citations: [{ id: 'citation-1', sourceType: 'attachment', source: 'COSA.in2', locator: '第 2-5 行' }],
+      validation: { valid: true, errors: [], warnings: [] }, finalizedAt: '2026-09-20T00:00:00Z'
+    }]
+    runs = [{ id: 'run-internal-42', status: 'completed', revision: 1, createdAt: project.updatedAt, updatedAt: project.updatedAt }]
+    await renderDelivery()
+
+    let text = visibleText(container)
+    expect(text).toContain('report.pdf')
+    expect(text).toContain('PDF')
+    expect(text).not.toContain('application/pdf')
+    expect(text).toContain('COSA.in2')
+    expect(text).toContain('第 2-5 行')
+    expect(text).toContain(i18n.t('engineeringDraftReady'))
+    expect(text).toContain(i18n.t('engineeringStatusDraft'))
+    expect(text).not.toContain('manifest-internal-42')
+    expect(text).not.toContain('run-internal-42')
+    expect(text).not.toContain(outputPath)
+    expect(text).not.toContain(outputHash)
+    expect(button('Export PDF')).toBeDefined()
+
+    const saveWorkspaceFileAs = vi.fn(async () => ({ ok: true as const, path: '/exports/report.pdf' }))
+    const originalWorkwise = Object.getOwnPropertyDescriptor(window, 'workwise')
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { saveWorkspaceFileAs } })
+    try {
+      await act(async () => button('Export PDF').click())
+      await settle()
+      expect(saveWorkspaceFileAs).toHaveBeenCalledWith({ workspaceRoot: '/test', sourcePath: outputPath, suggestedName: 'report.pdf', mimeType: 'application/pdf' })
+      expect(visibleText(container)).toContain(i18n.t('engineeringOutputSaved'))
+    } finally {
+      if (originalWorkwise) Object.defineProperty(window, 'workwise', originalWorkwise)
+      else Reflect.deleteProperty(window, 'workwise')
+    }
+
+    const technicalDetailSummaries = [...container.querySelectorAll('details > summary')]
+      .filter(summary => [i18n.t('engineeringSourceVersion'), i18n.t('engineeringAdvancedDetails')].includes(summary.textContent ?? ''))
+    await act(async () => {
+      for (const summary of technicalDetailSummaries) {
+        const details = summary.parentElement as HTMLDetailsElement
+        details.open = true
+        details.dispatchEvent(new Event('toggle'))
+      }
+    })
+    text = container.textContent ?? ''
+    expect(text).not.toContain('manifest-internal-42')
+    expect(text).not.toContain('run-internal-42')
+    expect(text).not.toContain(outputPath)
+    expect(text).not.toContain(outputHash)
+  })
+
+  it('keeps project revision counters out of the default delivery view', async () => {
+    await renderDelivery()
+    await act(async () => button('Deliverables').click())
+    const archiveDetails = [...container.querySelectorAll('details')].find(item => item.textContent?.includes(i18n.t('engineeringArchiveDetails')))
+    expect(archiveDetails).toBeDefined()
+    await act(async () => { archiveDetails!.open = true; archiveDetails!.dispatchEvent(new Event('toggle')) })
+    const text = visibleText(container)
+    expect(text).toContain(i18n.t('engineeringReviewStatus'))
+    expect(text).not.toMatch(/project revision|项目修订|revision 2/i)
+  })
+
+  it('maps unrecognized processing states to a professional status label', async () => {
+    manifests = [{
+      id: 'manifest-unknown-state', runId: 'run-unknown-state', reviewStatus: 'vendor_internal_state_9',
+      outputs: [{ ...file, path: 'review.pdf' }],
+      validation: { valid: true, errors: [], warnings: [] }, finalizedAt: '2026-09-20T00:00:00Z'
+    }]
+    await renderDelivery()
+
+    const text = visibleText(container)
+    expect(text).toContain(i18n.t('engineeringStatusUnknown'))
+    expect(text).not.toContain('vendor_internal_state_9')
+  })
+
+  it.each([
+    ['failed', 'engineeringStatusFailed'], ['running', 'engineeringStatusRunning'],
+    ['queued', 'engineeringStatusQueued'], ['invalid', 'surveyProfessionalFailed'],
+    ['blocked', 'engineeringStatusBlocked'], ['needs_attention', 'engineeringStatusNeedsAttention'],
+    ['waiting_user', 'engineeringStatusWaitingUser'], ['waiting_approval', 'engineeringStatusWaitingApproval'],
+    ['stalled', 'engineeringStatusStalled'], ['retrying', 'engineeringStatusRetrying']
+  ])('retains the action-relevant meaning of a %s run without exposing its internal value', async (status, key) => {
+    runs = [{ id: 'run-status', status, revision: 1, createdAt: project.updatedAt, updatedAt: project.updatedAt }]
+    await renderDelivery()
+    const details = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringAdvancedDetails'))!
+    expect(details).toBeDefined()
+    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(details)).toContain(i18n.t(key))
+    expect(visibleText(details)).not.toContain(i18n.t('engineeringStatusUnknown'))
+  })
+
+  it('uses survey language for the visible processing status', async () => {
+    const pending = deferredResponse()
+    await renderDelivery()
+    request.mockImplementation((path: string) => path.endsWith('/reports/preview') ? pending.promise : Promise.resolve({ ok: true, status: 200, body: JSON.stringify(path === '/v1/engineering/projects' ? { projects: [project] } : path.endsWith('/overview') ? { ...emptyOverview(), manifests, latestPreview } : path.includes('/survey/networks?') ? { networks: [network] } : { adjustments }) }))
+    await act(async () => button('Generate review draft').click())
+    await settle()
+    const text = visibleText(container)
+    expect(text).toContain('Processing survey data…')
+    expect(text).not.toMatch(/local processing|runtime/i)
+    await act(async () => pending.resolve({ run: { id: 'preview' }, files: [file], charts: [], citations: [] }))
+  })
+
+  it('opens monitoring data and trend analysis from stage navigation when a dataset is selected', async () => {
+    datasets = [{ id: 'data', sourceFileName: 'monitor.csv', sourceFileHash: 'a'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2, columnCount: 3, observationCount: 2, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    const stage = container.querySelector<HTMLSelectElement>('#engineering-view-select')!
+    await act(async () => { stage.value = 'import'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(i18n.t('engineeringTabData'))
+    await act(async () => { stage.value = 'analysis'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe(i18n.t('engineeringTabAnalysis'))
+    expect(container.textContent).toContain(i18n.t('engineeringRunDeterministicAnalysis'))
+  })
+
+  it.each(['zh', 'en'])('shows professional mapping labels and preserves original column headings in %s', async language => {
+    await i18n.changeLanguage(language)
+    const fieldMapping = { monitoringItem: '测量项目原始列', warningThreshold: '预警线（mm）', timestamp: '外业记录时间' }
+    datasets = [{ id: 'data', sourceFileName: 'monitor.csv', sourceFileHash: 'a'.repeat(64), fieldMapping, unknownColumns: [], rowCount: 2, columnCount: 3, observationCount: 2, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    const stage = container.querySelector<HTMLSelectElement>('#engineering-view-select')!
+    await act(async () => { stage.value = 'import'; stage.dispatchEvent(new Event('change', { bubbles: true })) })
+    const labels = [...container.querySelectorAll('dt')].map(item => item.textContent)
+    expect(labels).toEqual(expect.arrayContaining([i18n.t('engineeringFieldMonitoringItem'), i18n.t('engineeringFieldWarningThreshold'), i18n.t('engineeringFieldTimestamp')]))
+    expect(labels).not.toEqual(expect.arrayContaining(Object.keys(fieldMapping)))
+    for (const source of Object.values(fieldMapping)) expect(container.textContent).toContain(source)
+    expect(fieldMapping).toEqual({ monitoringItem: '测量项目原始列', warningThreshold: '预警线（mm）', timestamp: '外业记录时间' })
+  })
+
   it('refreshes overview and the mounted survey panel after AI execution without replacing the project draft', async () => {
     adjustments = []
     await act(async () => root.render(createElement(EngineeringWorkspaceView, { workspaceRoot: '/test', runtimeReady: true })))
@@ -112,12 +281,16 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(document.activeElement?.getAttribute('data-evidence-key')).toBe(JSON.stringify(['finding', 'finding-25']))
     expect(container.querySelector('[data-testid="engineering-persistent-chat"]')).toBe(chat)
     expect(request).not.toHaveBeenCalled()
-    await act(async () => container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label: 'finding-25' })}"]`)!.click())
+    await act(async () => container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label: 'Missing record' })}"]`)!.click())
     expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/test', 'job'])]!.evidenceContext!.typedEvidence).toEqual({ schemaVersion: 1, projectId: 'job', projectRevision: 2, kind: 'monitoring-dataset', datasetId: 'data', datasetRevision: 4, sourceFileHash: sha, selector: { path: ['findings', 0], identity: { id: 'finding-25' } } })
     expect(request).not.toHaveBeenCalled()
+    const initialNoticeClose = container.querySelector<HTMLDivElement>('[role="alert"] button')
+    if (initialNoticeClose) await act(async () => initialNoticeClose.click())
     navigationFixture.target = { ...(navigationFixture.target as object), datasetRevision: 3 }
     await act(async () => button('Locate exact test evidence').click())
-    expect(container.textContent).toContain(i18n.t('engineeringEvidenceUnavailable'))
+    await settle()
+    expect(container.querySelector('[data-testid="engineering-persistent-chat"]')).toBe(chat)
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('selects the exact monitoring result row without starting a new analysis', async () => {
@@ -141,7 +314,8 @@ describe('Survey delivery without a monitoring dataset', () => {
     request.mockClear()
     await act(async () => button('Locate exact test evidence').click())
     expect(document.activeElement?.getAttribute('data-evidence-key')).toBe(JSON.stringify(['artifact', 'second', 'second/report.pdf']))
-    expect(document.activeElement?.textContent).toContain(file.sha256)
+    expect(document.activeElement?.textContent).toContain('report.pdf')
+    expect(document.activeElement?.textContent).not.toContain(file.sha256)
     expect(request).not.toHaveBeenCalled()
   })
 
@@ -163,7 +337,7 @@ describe('Survey delivery without a monitoring dataset', () => {
       await act(async () => button('Save configuration').click())
     } else {
       await act(async () => button('Deliverables').click())
-      await act(async () => button('Generate preview').click())
+      await act(async () => button('Generate review draft').click())
     }
     await act(async () => dispatchEngineeringProjectOpen('next'))
     await settle()
@@ -301,6 +475,66 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(container.querySelector('[data-testid="engineering-summary-strip"]')!.textContent).toContain('survey.in2')
   })
 
+  it('keeps internal service diagnostics out of user notices', async () => {
+    await renderDelivery()
+    const original = request.getMockImplementation()!
+    request.mockImplementation((path: string, method?: string, payload?: string) => {
+      if (path === '/v1/engineering/projects' && method === 'POST') {
+        throw new Error(JSON.stringify({
+          error: {
+            code: 'survey_parser_contract',
+            message: 'POST /v1/engineering/projects failed: sourceSha256=deadbeef contextHash=abc123'
+          }
+        }))
+      }
+      return original(path, method, payload)
+    })
+
+    await act(async () => dispatchEngineeringProjectCreate())
+    await settle()
+
+    const notice = container.querySelector('[role="alert"]')
+    expect(notice).toBeDefined()
+    expect(notice?.textContent).toContain('This action could not be completed. Please try again.')
+    expect(notice?.textContent).not.toMatch(/survey_parser_contract|\/v1\/|sourceSha256|contextHash|deadbeef|abc123/i)
+  })
+
+  it('keeps the last valid survey snapshot when a refresh read temporarily fails', async () => {
+    await renderDelivery()
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (path.includes('/survey/networks?')) throw new Error('temporary survey read failure')
+      return original(path, method, payload)
+    })
+
+    await act(async () => button('Refresh confirmed project').click())
+    await settle()
+
+    const summary = container.querySelector('[data-testid="engineering-summary-strip"]')!.textContent!
+    expect(summary).toContain('survey.in2')
+    expect(summary).not.toContain(i18n.t('engineeringSummaryNoDataset'))
+    expect(summary).toContain(i18n.t('engineeringReadiness.candidate'))
+  })
+
+  it('keeps the last valid survey snapshot when reconnect returns an empty read model', async () => {
+    await renderDelivery()
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (path.includes('/survey/networks?')) return { ok: true, status: 200, body: JSON.stringify({ networks: [] }) }
+      if (path.includes('/adjustments?')) return { ok: true, status: 200, body: JSON.stringify({ adjustments: [] }) }
+      return original(path, method, payload)
+    })
+
+    await act(async () => button('Refresh confirmed project').click())
+    await settle()
+
+    const summary = container.querySelector('[data-testid="engineering-summary-strip"]')!.textContent!
+    expect(summary).toContain('survey.in2')
+    expect(summary).not.toContain(i18n.t('engineeringSummaryNoDataset'))
+    expect(summary).toContain(i18n.t('engineeringReadiness.candidate'))
+    expect(button('Generate review draft').disabled).toBe(false)
+  })
+
   it.each(['workspace', 'runtime'] as const)('invalidates in-flight project lists and read models on %s changes', async change => {
     await renderDelivery()
     const original = request.getMockImplementation()!
@@ -339,7 +573,7 @@ describe('Survey delivery without a monitoring dataset', () => {
     request.mockClear()
     await act(async () => button('Advanced model trials').click())
     expect(container.querySelector('section[aria-label="Advanced model trials"]')).not.toBeNull()
-    expect(container.textContent).toContain('Project job · Revision 2')
+    expect(container.textContent).not.toContain('Project job · Revision 2')
     const method = [...container.querySelectorAll('label')].find(label => label.querySelector('span')?.textContent === 'Trial method')!.querySelector('select')!
     expect(method.value).toBe('')
     expect(button('Confirm and save trial').disabled).toBe(true)
@@ -350,14 +584,16 @@ describe('Survey delivery without a monitoring dataset', () => {
     manifests = ['manifest-one', 'manifest-two'].map(id => ({ id, runId: `run-${id}`, reviewStatus: 'draft', outputs: [{ ...file, path: `${id}/report.pdf` }], citations: [], validation: { valid: true, errors: [], warnings: [] } }))
     await renderDelivery(); await act(async () => button('Review and archive').click())
     request.mockClear()
-    const entries = [...container.querySelectorAll('details')].filter(details => details.querySelector(':scope > summary')?.textContent === 'Quality evidence retention workspace')
+    const entries = [...container.querySelectorAll('details')].filter(details => details.querySelector(':scope > summary')?.textContent === i18n.t('qualityWorkspaceOpen'))
     expect(entries).toHaveLength(2)
     const samplingEntries = [...container.querySelectorAll('details')].filter(details => details.querySelector(':scope > summary')?.textContent === 'Unit product populations and first-round sampling')
     expect(samplingEntries).toHaveLength(1)
     expect(entries.every(entry => !entry.contains(samplingEntries[0]!))).toBe(true)
     await act(async () => { entries[1]!.open = true; entries[1]!.dispatchEvent(new Event('toggle')) })
-    expect(entries[1]!.textContent).toContain('Manifest manifest-two · Project revision 2')
-    expect(entries[1]!.textContent).toContain('manifest-two/report.pdf')
+    expect(entries[1]!.textContent).toContain('Deliverable files included in this review')
+    expect(entries[1]!.textContent).not.toContain('Manifest manifest-two · Project revision 2')
+    expect(entries[1]!.textContent).toContain('report.pdf')
+    expect(entries[1]!.textContent).not.toContain('manifest-two/report.pdf')
     expect(entries[1]!.textContent).not.toContain('manifest-one/report.pdf')
     expect(entries[1]!.querySelector('input')?.checked).toBe(false)
     expect(request).not.toHaveBeenCalled()
@@ -403,7 +639,7 @@ describe('Survey delivery without a monitoring dataset', () => {
       const input = [...container.querySelectorAll('label')].find(label => label.textContent === i18n.t(`engineeringTaskContext.${field}`))!.querySelector('input')!
       await act(async () => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
-        input.dispatchEvent(new Event('input', { bubbles: true }))
+        input.dispatchEvent(new Event('change', { bubbles: true }))
       })
       expect(datumText()).not.toContain(value)
     }
@@ -520,7 +756,7 @@ describe('Survey delivery without a monitoring dataset', () => {
     await act(async () => dispatchEngineeringProjectCreate())
     await settle()
     expect(creates).toBe(1)
-    expect(container.textContent).toContain('creation unavailable')
+    expect(container.textContent).toContain('This action could not be completed. Please try again.')
     await act(async () => dispatchEngineeringProjectCreate())
     await settle()
     expect(creates).toBe(2)
@@ -528,14 +764,15 @@ describe('Survey delivery without a monitoring dataset', () => {
 
   it('preserves the summary, selected result and preview when reopening the current project thread', async () => {
     await renderDelivery()
-    await act(async () => button('Generate preview').click())
+    await act(async () => button('Generate review draft').click())
     const summary = container.querySelector('[data-testid="engineering-summary-strip"]')!.textContent
     expect(summary).toContain('survey.in2')
     await act(async () => dispatchEngineeringProjectOpen(project.id))
     await settle()
     expect(container.querySelector('[data-testid="engineering-summary-strip"]')!.textContent).toBe(summary)
-    expect(container.textContent).toContain(file.path)
-    expect(button('Generate preview').disabled).toBe(false)
+    expect(container.textContent).toContain('report.pdf')
+    expect(container.textContent).not.toContain(file.path)
+    expect(button('Generate review draft').disabled).toBe(false)
   })
 
   it('uses language-independent calendar input and blocks invalid or reversed report dates before saving', async () => {
@@ -554,9 +791,10 @@ describe('Survey delivery without a monitoring dataset', () => {
     }
     await set(start, '2026-02-29')
     request.mockClear()
+    const initialNoticeClose = container.querySelector<HTMLDivElement>('[role="alert"] button')
+    if (initialNoticeClose) await act(async () => initialNoticeClose.click())
     await act(async () => button('Save configuration').click())
     expect(request).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('Enter valid dates as YYYY-MM-DD')
     await set(start, '2026-09-20'); await set(end, '2026-09-19')
     await act(async () => button('Save configuration').click())
     expect(request).not.toHaveBeenCalled()
@@ -585,33 +823,64 @@ describe('Survey delivery without a monitoring dataset', () => {
   })
   it('restores an admitted result and displays generated preview files and truthful review checks', async () => {
     await renderDelivery()
-    expect(button('Generate preview').disabled).toBe(false)
-    await act(async () => button('Generate preview').click())
-    expect(container.textContent).toContain(file.path)
+    expect(button('Generate review draft').disabled).toBe(false)
+    await act(async () => button('Generate review draft').click())
+    expect(container.textContent).toContain('report.pdf')
+    expect(container.textContent).not.toContain(file.path)
     expect(container.textContent).not.toContain('Select delivery inputs')
     const payload = request.mock.calls.find(([path]) => path.endsWith('/reports/preview'))![2]
     expect(JSON.parse(payload)).toMatchObject({ adjustmentIds: ['adjustment'] })
     await act(async () => button('Review and archive').click())
-    expect(container.textContent).toContain('1 eligible adjustment(s)')
-    expect(container.textContent).toContain('Completed deterministic Survey results')
+    expect(container.textContent).toContain('1 adjustments passed data and calculation checks')
+    expect(container.textContent).toContain('Adjustment is complete; current data passed pre-calculation checks.')
     expect(button('Generate review list').disabled).toBe(false)
     expect(container.textContent).not.toContain('Run trend and threshold analysis first')
+  })
+
+  it.each(['en', 'zh'])('restores an AI export as recorded draft evidence without a new export (%s)', async language => {
+    latestPreview = { run: { id: 'ai-export', status: 'completed' }, files: [file] }
+    await renderDelivery()
+    await act(async () => button('Deliverables').click())
+    await act(async () => { await i18n.changeLanguage(language) })
+    expect(container.textContent).toContain(i18n.t('engineeringDraftRestored'))
+    expect(container.textContent).toContain('report.pdf')
+    expect(container.textContent).not.toContain(file.path)
+    expect(container.textContent).not.toContain('ai-export')
+    expect(container.textContent).not.toContain(file.sha256)
+    expect(request.mock.calls.some(([path]) => path.endsWith('/reports/preview'))).toBe(false)
+    const ask = container.querySelector<HTMLButtonElement>(language === 'en' ? '[aria-label="Ask Survey AI about report.pdf"]' : '[aria-label="询问 report.pdf 的测量 AI"]')!
+    await act(async () => ask.click())
+    expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/test', 'job'])]?.evidenceContext).toMatchObject({ runId: 'ai-export', outputPath: file.path, outputSha256: file.sha256 })
+    await act(async () => { await i18n.changeLanguage('en') })
+    await act(async () => button('Review and archive').click())
+    expect(container.textContent).toContain(i18n.t('engineeringReviewableOutputs', { count: 1 }))
+    expect(container.textContent).not.toContain('SHA-256')
   })
 
   it('distinguishes restored manifest outputs from a session preview in both languages', async () => {
     manifests = [{ id: 'historical-manifest', runId: 'historical-run', reviewStatus: 'draft', outputs: [file], citations: [], validation: { valid: true, errors: [], warnings: [] } }]
     await renderDelivery()
     await act(async () => button('Deliverables').click())
-    expect(container.textContent).toContain(file.path)
-    expect(container.textContent).toContain('Latest review-pending manifest outputs · historical-manifest')
+    expect(container.textContent).toContain('report.pdf')
+    expect(container.textContent).toContain(i18n.t('engineeringStatusDraft'))
+    expect(container.textContent).not.toContain(file.path)
+    expect(container.textContent).not.toContain(file.sha256)
+    expect(container.textContent).not.toContain('historical-manifest')
     expect(container.textContent).not.toContain('Preview not generated')
     await act(async () => { await i18n.changeLanguage('zh') })
-    expect(container.textContent).toContain('最近待审查清单输出 · historical-manifest')
+    expect(container.textContent).toContain(i18n.t('engineeringStatusDraft'))
     expect(container.textContent).not.toContain('尚未生成预览')
+    const shown = visibleText(container)
+    expect(shown).toContain('report.pdf')
+    expect(shown).toContain(i18n.t('engineeringExportFile', { format: 'PDF' }))
+    expect(shown).toContain('100 B')
+    expect(shown).not.toContain('historical-manifest')
+    expect(shown).not.toContain(file.path)
+    expect(shown).not.toContain(file.sha256)
     await act(async () => { await i18n.changeLanguage('en') })
-    await act(async () => button('Generate preview').click())
-    expect(container.textContent).toContain('Run preview')
-    expect(container.textContent).not.toContain('Latest review-pending manifest outputs')
+    await act(async () => button('Generate review draft').click())
+    expect(container.textContent).toContain(i18n.t('engineeringDraftReady'))
+    expect(container.textContent).not.toContain('historical-manifest')
   })
 
   it.each([
@@ -622,17 +891,18 @@ describe('Survey delivery without a monitoring dataset', () => {
     await renderDelivery()
     await act(async () => button('Deliverables').click())
     expect(container.textContent).toContain('Preview not generated')
-    expect(container.textContent).not.toContain('Latest review-pending manifest outputs')
+    expect(container.textContent).not.toContain('Latest review-pending review record outputs')
   })
 
   it('keeps draft evidence readable and prevents new outputs while offline', async () => {
     await renderDelivery()
-    await act(async () => button('Generate preview').click())
+    await act(async () => button('Generate review draft').click())
     await act(async () => root.render(createElement(EngineeringWorkspaceView, { workspaceRoot: '/test', runtimeReady: false })))
     request.mockClear()
-    expect(container.textContent).toContain(file.path)
-    expect(button('Generate preview').disabled).toBe(true)
-    await act(async () => button('Generate preview').click())
+    expect(container.textContent).toContain('report.pdf')
+    expect(container.textContent).not.toContain(file.path)
+    expect(button('Generate review draft').disabled).toBe(true)
+    await act(async () => button('Generate review draft').click())
     await act(async () => button('Review and archive').click())
     expect(button('Generate review list').disabled).toBe(true)
     await act(async () => button('Generate review list').click())
@@ -643,14 +913,14 @@ describe('Survey delivery without a monitoring dataset', () => {
     manifests = [{ id: 'historical-manifest', runId: 'historical-run', reviewStatus: 'draft', outputs: [file], citations: [], validation: { valid: true, errors: [], warnings: [] } }]
     await renderDelivery()
     await act(async () => button('Deliverables').click())
-    await act(async () => button('Generate preview').click())
+    await act(async () => button('Generate review draft').click())
     request.mockClear()
-    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Ask Survey AI about new-preview/report.pdf"]')!.click())
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Ask Survey AI about report.pdf"]')!.click())
     const scope = JSON.stringify(['/test', 'job'])
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext).toMatchObject({ projectId: 'job', projectRevision: 2, runId: 'preview', outputSha256: file.sha256 })
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext?.manifestId).toBeUndefined()
     await act(async () => button('Review and archive').click())
-    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Ask Survey AI about historical-manifest"]')!.click())
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Ask Survey AI about Review draft"]')!.click())
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext).toMatchObject({ manifestId: 'historical-manifest', runId: 'historical-run', reviewStatus: 'draft' })
     expect(useEngineeringConversationDrafts.getState().drafts[scope]?.evidenceContext?.networkId).toBeUndefined()
     expect(request).not.toHaveBeenCalled()
@@ -662,7 +932,7 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(container.textContent).toContain('survey.in2')
     expect(container.textContent).not.toContain('Time-series data')
     expect(container.textContent).not.toContain('Trend and threshold analysis')
-    const adjustmentStage = [...container.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent?.startsWith('2Network and adjustment'))!
+    const adjustmentStage = button(i18n.t('engineeringTabSurvey'))
     expect(adjustmentStage).toBeDefined()
     await act(async () => adjustmentStage.click())
     expect(container.querySelector<HTMLSelectElement>('#engineering-view-select')!.value).toBe('adjustment')
@@ -686,12 +956,12 @@ describe('Survey delivery without a monitoring dataset', () => {
   ])('keeps a missing, revoked or invalid result out of new delivery', async value => {
     adjustments = [value]
     await renderDelivery()
-    expect(button('Generate preview').disabled).toBe(true)
+    expect(button('Generate review draft').disabled).toBe(true)
     await act(async () => button('Review and archive').click())
     expect(button('Generate review list').disabled).toBe(true)
     await act(async () => button('Delivery overview').click())
-    expect(container.textContent).not.toContain('Completed deterministic Survey results')
-    expect(container.textContent).not.toContain('All gates are satisfied')
+    expect(container.textContent).not.toContain('Adjustment is complete; current data passed pre-calculation checks.')
+    expect(container.textContent).not.toContain('Basic checks are complete.')
     if (value.sourceEligibility?.eligible === false || value.run.status === 'failed' || value.result.validation === 'invalid') {
       expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('Blocked')
     }
@@ -702,6 +972,73 @@ describe('Survey delivery without a monitoring dataset', () => {
     await renderDelivery()
     await act(async () => button('Review and archive').click())
     expect(button('Generate review list').disabled).toBe(true)
-    expect(container.textContent).toContain('Run deterministic analysis or an eligible survey adjustment first')
+    expect(container.textContent).toContain('Complete monitoring analysis or a survey adjustment that passes data and result checks first')
+  })
+})
+
+describe('simplified continuous task flow', () => {
+  it('automatically checks an imported CSV, acknowledges warnings once, and reaches results', async () => {
+    adjustments = []
+    let dataset = {
+      id: 'imported-data', sourceFileName: 'observations.csv', sourceFileHash: 'c'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2,
+      columnCount: 3, observationCount: 2, timeRange: {}, status: 'imported', revision: 1,
+      findings: ['warning-one', 'warning-two'].map(id => ({ id, code: 'review', severity: 'warning', status: 'open', message: id, suggestion: 'Review source' })), updatedAt: project.updatedAt
+    }
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (method !== 'POST') return original(path, method, payload)
+      const input = JSON.parse(payload ?? '{}')
+      if (path === '/v1/engineering/datasets/import') { datasets = [dataset]; return { ok: true, status: 200, body: JSON.stringify({ dataset }) } }
+      if (path.endsWith('/validate')) {
+        expect(input.expectedRevision).toBe(1)
+        dataset = { ...dataset, status: 'validated', revision: 2 }; datasets = [dataset]
+        return { ok: true, status: 200, body: JSON.stringify({ dataset }) }
+      }
+      if (path.endsWith('/accept')) {
+        expect(input.expectedRevision).toBe(dataset.revision)
+        dataset = { ...dataset, revision: dataset.revision + 1, findings: dataset.findings.map(f => path.includes(f.id) ? { ...f, status: 'accepted' } : f) }; datasets = [dataset]
+        return { ok: true, status: 200, body: JSON.stringify({ dataset }) }
+      }
+      if (path === '/v1/engineering/analyses') {
+        expect(input.expectedRevision).toBe(4)
+        const analysis = { id: 'analysis-new', datasetId: dataset.id, datasetRevision: dataset.revision, inputHash: 'd'.repeat(64), algorithmVersion: 'test', results: [] }
+        analyses = [analysis]
+        return { ok: true, status: 200, body: JSON.stringify({ analysis }) }
+      }
+      throw new Error(`Unexpected mutation: ${path}`)
+    })
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    const input = container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('engineeringUnifiedImport')}"]`)!
+    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['point,timestamp,value\nP1,2026-01-01,1'], 'observations.csv', { type: 'text/csv' })] })
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30)) })
+    await vi.waitFor(() => expect(request.mock.calls.some(([path]) => path.endsWith('/validate'))).toBe(true))
+    expect(request.mock.calls.some(([path]) => path === '/v1/engineering/analyses')).toBe(false)
+    const confirmation = button(i18n.t('engineeringConfirmContinue', { count: 2 }))
+    await act(async () => confirmation.click())
+    expect(request.mock.calls.filter(([path]) => path.endsWith('/accept'))).toHaveLength(2)
+    await act(async () => button(i18n.t('surveyStartCalculation')).click())
+    await settle()
+    expect(container.querySelector('[aria-current="step"]')?.textContent).toBe(i18n.t('engineeringPrimaryResults'))
+    expect(container.textContent).toContain(i18n.t('engineeringExportDraft'))
+  })
+
+  it('keeps calculation blocked and offers an actionable replacement when preflight finds a blocker', async () => {
+    datasets = [{ id: 'blocked-data', sourceFileName: 'bad.csv', sourceFileHash: 'e'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 1, columnCount: 3, observationCount: 0, timeRange: {}, status: 'validated', revision: 2, findings: [{ id: 'blocking', code: 'missing_identifier', severity: 'blocking', status: 'open', message: 'Missing point', suggestion: 'Fix point' }], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    expect(button(i18n.t('surveyStartCalculation')).disabled).toBe(true)
+    expect(button(i18n.t('engineeringReplaceSource')).disabled).toBe(false)
+    expect(request.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+  })
+
+  it('keeps the two legacy delivery routes on the same export and review page', async () => {
+    await renderDelivery()
+    for (const route of ['engineeringTabDeliverables', 'engineeringTabReview']) {
+      await act(async () => button(i18n.t(route)).click())
+      expect(button(i18n.t('engineeringGeneratePreview'))).toBeDefined()
+      expect(button(i18n.t('engineeringGenerateReviewManifest'))).toBeDefined()
+      expect(container.querySelector('[aria-current="step"]')?.textContent).toBe(i18n.t('engineeringPrimaryDelivery'))
+    }
   })
 })
