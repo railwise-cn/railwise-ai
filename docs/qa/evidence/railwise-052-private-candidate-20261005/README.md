@@ -18,7 +18,7 @@ This record covers the exact local arm64 package built from commit `41f7078c5b62
 
 ## Computer Use inspection
 
-The exact package was launched with an isolated user-data directory and inspected with Computer Use. The accessibility tree exposed RailWise Survey, the four work views, current source/status/result summary, delivery review-draft controls, DOCX/PDF/XLSX/JSON artifacts, AI drawer entry and settings controls. The delivery surface screenshot is [01-delivery-arm64-light.png](01-delivery-arm64-light.png); the follow-up capture is [03-process.png](03-process.png).
+The exact package was launched with an isolated user-data directory and inspected with Computer Use. The accessibility tree exposed RailWise Survey, the four work views, current source/status/result summary, delivery review-draft controls, DOCX/PDF/XLSX/JSON artifacts, AI drawer entry and settings controls. The delivery surface screenshot is [01-delivery-arm64-light.png](01-delivery-arm64-light.png); the follow-up capture is [03-process.png](03-process.png). A 960x800 narrow-window capture is [04-narrow-960x800.png](04-narrow-960x800.png); content remains readable and scrollable, while the full keyboard/focus matrix is still a release-runner gate.
 
 The visible surface contained professional survey terms and actions. It did not expose parser IDs, tool IDs, hashes, JSON execution plans or runtime protocol details. Existing retained COSA IN2 data restored a result and review-draft delivery without data loss.
 
