@@ -13,13 +13,13 @@ const serviceEnglish = { ...surveyServiceEnglish, ...engineeringEnglish, ...pars
  * available in advanced trace data; they do not belong in the work surface.
  */
 function professionalizeFormatPolicy(text: string, english: boolean): string | undefined {
-  const hasChinesePolicy = /\bP0\b[^\n。；;]*格式(?:目录|受理目录)/i.test(text)
-  const hasEnglishPolicy = /\bP0\b[^\n.;]*\b(?:format catalog|admission catalog)\b/i.test(text)
+  const hasChinesePolicy = /\bP0\b[^\n。；;]*格式(?:目录|受理目录)|(?:已保留可审计的解析对象|已保留原始源文件|策略校验)/i.test(text)
+  const hasEnglishPolicy = /\bP0\b[^\n.;]*\b(?:format catalog|admission catalog)\b|(?:auditable parsed objects retained|original source retained|strategy validation)/i.test(text)
   if (!hasChinesePolicy && !hasEnglishPolicy) return undefined
 
   // Findings may already have passed through a presentation layer that
   // translated the disposition while leaving the catalog explanation intact.
-  const readySignal = /当前资料可进入计算前检查|可进入计算前检查|开始计算前|\b(?:ready\s+to\s+calculate|before\s+calculation|calculation\s+pauses)\b/i.test(text)
+  const readySignal = /当前资料可进入计算前检查|可进入计算前检查|可进入策略校验|开始计算前|\b(?:ready\s+to\s+calculate|before\s+calculation|permit strategy validation|strategy validation|calculation\s+pauses)\b/i.test(text)
   const blockedSignal = /当前不能直接计算|不能进入计算|\b(?:cannot\s+be\s+calculated|not\s+ready\s+to\s+calculate|archive-only|converter-required|gnss-processing-required)\b/i.test(text)
   const state = /(?:当前能力策略为|当前处置为|\bpermits|\bpolicy is|\bcurrent disposition:)\s*(adjustment-ready|archive-only|converter-required|gnss-processing-required)\b/i.exec(text)?.[1]
     ?? /^(adjustment-ready|archive-only|converter-required|gnss-processing-required)\s*:/i.exec(text)?.[1]
@@ -82,7 +82,10 @@ const knownFormatPolicySentences = [
   'Registry integration with caller coordinates and companion-file provenance is incomplete; archive review only.',
   'Read-only result comparison fields are planned; no accepted parser/fixture evidence is registered yet.',
   'Authoritative DAT column order is n.a.; no default mapping may be guessed and unmapped files are archive-only.',
-  'Parser capability restrictions take precedence; the source is retained for review only.'
+  'Parser capability restrictions take precedence; the source is retained for review only.',
+  'strict structure parsing and unit conversion permit strategy validation.',
+  'strict structure parsing, record anchors and unit conversion permit strategy validation.',
+  '严格结构解析、记录锚点和单位转换成功后可进入策略校验。'
 ]
 
 function professionalDispositionText(disposition: string, english: boolean): string {
@@ -366,11 +369,24 @@ export function surveyDiagnosticText(item: SurveyDiagnosticText, language: strin
 
 export function surveySourceDiagnosticText(item: SurveyDiagnosticText, language: string, sourceDisposition?: string, sourceEligible?: boolean): string {
   const original = item.message ?? ''
-  if (item.code !== 'format_detected' && !/\bP0\b[^\n。；;]*格式(?:目录|受理目录)|\bP0\b[^\n.;]*\b(?:format catalog|admission catalog)\b/i.test(original)) {
+  // Older Runtime records sometimes omit the P0 catalog prefix while still
+  // carrying the catalog's implementation vocabulary. This is still a
+  // format-detection diagnostic, so it must use the same professional copy
+  // instead of leaking parser/catalog details into the compact work surface.
+  const hasCatalogEnvelope = /\bP0\b[^\n。；;]*格式(?:目录|受理目录)|\bP0\b[^\n.;]*\b(?:format catalog|admission catalog)\b|(?:已保留可审计的解析对象|已保留原始源文件|auditable parsed objects retained|original source retained|策略校验|strategy validation)/i.test(original)
+  if (item.code !== 'format_detected' && !hasCatalogEnvelope) {
     return removeImplementationVocabulary(surveyDiagnosticText(item, language), language)
   }
 
   const english = language.toLowerCase().startsWith('en')
+  // Legacy catalog records without the P0 prefix still carry enough evidence
+  // to show the professional disposition directly. Keep the older P0 path on
+  // its established wording for compatibility with persisted screenshots.
+  if (hasCatalogEnvelope && !/\bP0\b/i.test(original) && sourceDisposition === 'adjustment-ready' && sourceEligible === true) {
+    return english
+      ? 'Survey data recognized and is ready for professional checks. Confirm the datum, control points, observation relationships, closure and precision before adjustment.'
+      : '资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件。'
+  }
   const restriction = sourceDisposition && sourceDisposition !== 'adjustment-ready'
     ? professionalDispositionText(sourceDisposition, english)
     : sourceEligible !== true ? english

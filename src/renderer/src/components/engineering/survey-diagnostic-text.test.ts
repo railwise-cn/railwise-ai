@@ -85,6 +85,16 @@ describe('Survey diagnostic presentation compatibility', () => {
     expect(displayed).toBe('资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。')
     expect(displayed).not.toMatch(/P0|格式目录|解析对象|策略校验|adjustment-ready|workwise-survey-format-catalog|解析器|fixture/)
   })
+  it('professionalizes catalog wording when legacy records omit the P0 prefix', () => {
+    const legacy = 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；严格结构解析、记录锚点和单位转换成功后可进入策略校验。'
+    const chinese = surveySourceDiagnosticText({ code: 'format_detected', message: legacy }, 'zh-CN', 'adjustment-ready', true)
+    const english = surveySourceDiagnosticText({ code: 'format_detected', message: 'cosa-in2: auditable parsed objects retained; strict structure parsing and unit conversion permit strategy validation.' }, 'en', 'adjustment-ready', true)
+
+    expect(chinese).toContain('资料已识别')
+    expect(chinese).not.toMatch(/可审计|解析对象|策略校验|cosa-in2/)
+    expect(english).toMatch(/Survey data (?:recognized|is ready for professional checks)/)
+    expect(english).not.toMatch(/auditable parsed objects|strategy validation|cosa-in2/i)
+  })
   it('filters implementation vocabulary from legacy findings that bypass the catalog branch', () => {
     const legacy = '资料检查：P0 格式目录未完成；解析对象及原始记录锚点已保留，解析器按 adjustment-ready 策略校验。S1 残差 2 mm，未超过 3 mm 限差。'
     const displayed = surveyLegacyDiagnosticText(legacy, 'zh-CN')
