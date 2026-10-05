@@ -116,8 +116,8 @@
       "closingEvidence": "先做规则登记/撤销版本、质量材料逐条绑定和复查重抽，旧/错引用拒绝；另接可验证身份，不把caller声明升级为认证。",
       "evidenceBoundary": "AI source/public-reference review; not installed-package acceptance, licensed interoperability, field provenance or authentic professional signature.",
       "status20261006": "partially-implemented-source-not-package-accepted",
-      "currentEvidence": "现有材料绑定/声明评分/整改工作流；本轮精确规范版本/撤销替代、连续复查抽样由实现代理进行，尚未完成最终汇总或候选验收。",
-      "nextWork": "完整规则适用/撤销、分类缺陷与材料、连续整改/重抽/评分轮引用、角色认证签认链需分别验收；真实签认不能由AI冒充。"
+      "currentEvidence": "精确规范/版本/规则/来源/profile声明、撤销与同类别替代、四阶段声明、连续复查抽样已完成源码增量。Runtime10文件75/75、桌面7文件79/79及两侧typecheck通过；独立Runtime6文件68/68、桌面4文件59/59通过。4c387f51与survey-quality-refinements-20261006证据归档。",
+      "nextWork": "同一冻结包的全质量流程/源变化/重启/矩阵仍待验收；后轮重抽后的重新评分与历次评分引用仍未接线。组织角色认证、授权专业签认和正式交付仍不能由AI声明替代。"
     },
     {
       "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
@@ -183,7 +183,7 @@
       "closingEvidence": "优先真实本地transport、可信宿主身份绑定、默认拒绝、每调用查持久grants，实际client测试重启/撤销/越权/畸形；其他空间/仪器能力分开验收。",
       "evidenceBoundary": "AI source/public-reference review; not installed-package acceptance, licensed interoperability, field provenance or authentic professional signature.",
       "status20261006": "partially-implemented-source-not-package-accepted",
-      "currentEvidence": "本轮已接真实Node loopback TCP和SDK initialize/tools/list/call，持久可撤销grant、客户端token hash、零默认授权、读前后核验；targeted22项/runtime65项及kun build通过。",
+      "currentEvidence": "本轮已接真实Node loopback TCP和SDK initialize/tools/list/call，持久可撤销grant、客户端token hash、零默认授权、读前后核验；targeted22项/runtime65项及kun build通过。 独立源码AI审查与真实HTTP/reader/server复跑已归档survey-mcp-loopback-20261006/independent-review.md；该增量随4c387f51提交。",
       "nextWork": "当前冻结包/OS宿主验收仍缺；仅元数据摘要读取，不提升为任意工程数据访问；GeoCOM真实型号/固件链、工程基准工作流、DXF/点云/3D未齐。"
     },
     {
@@ -765,5 +765,6 @@
       "currentEvidence": "16来源访问/14获取回执与限定自由水准Fraction-KKT对照已完成；真实厂商wire/同源SUC参考、现场仪器或人类签认没有取得。",
       "nextWork": "继续查找合法公开/厂商资料、完成内部P1/P2接线；SUC仍archive-only。AI不得制造真实身份、证书、现场数据或签字。"
     }
-  ]
+  ],
+  "laterSourceEvidenceChecked": "2026-10-06: quality and MCP committed increment 4c387f51; source tests and independent AI reviews only, no package acceptance"
 }

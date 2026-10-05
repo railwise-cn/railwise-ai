@@ -17,17 +17,17 @@
 | 原任务 | 当前已完成的受限范围 | 仍待完成或验证 |
 | --- | --- | --- |
 | engineering:9 · P1 | 已有显式表格映射/profile、M5历史配对；官方IN2/GSI各一条实际导入/计算/三导出已跑，GSI独立闭合/高程对照通过。 | COSA/GSI更多方言独立同源参考、GSI历史转换provenance、M5当前候选链及最终包矩阵仍缺；South无确认映射不放开。 |
-| engineering:10 · P1 | 现有材料绑定/声明评分/整改工作流；本轮精确规范版本/撤销替代、连续复查抽样由实现代理进行，尚未完成最终汇总或候选验收。 | 完整规则适用/撤销、分类缺陷与材料、连续整改/重抽/评分轮引用、角色认证签认链需分别验收；真实签认不能由AI冒充。 |
+| engineering:10 · P1 | 精确规范版本/撤销替代、四阶段声明与连续复查抽样源码增量已提交4c387f51；Runtime75/75、桌面79/79及独立Runtime68/68、桌面59/59通过。 | 当前包完整质量链/源变化/重启/矩阵未验收；后轮重抽后的重新评分与历次评分引用仍未接线，角色认证签认仍须真实证据。 |
 | engineering:11 · P1 | 本轮已接限定准入固定基准独立高差网→冻结A/P/l、参数、完整先验协方差→w/VCE/Huber/static试算；恢复/保存/导出重验来源。来源模型/高级/MCP/报告10文件121项、来源高级UI/Panel/IPC3文件133项通过，两侧typecheck及4组件ESLint exit0。证据：survey-source-trials-20261006。 | 当前包验收仍缺；相对路线权、混合/缺失sigma、相关观测、非线性平面网均明确拒绝；一般自由/拟稳网不能宣称生产接线完成。 |
 | engineering:12 · P2 | 通用Write/Design/Flow保留；没有本轮跨工作区精确引用闭环证据。 | Survey冻结结果→Write/Design/Flow及编辑新draft/失效、审批/导出的完整产品闭环仍待完成。 |
 | engineering:13 · P2 | 本轮已接真实Node loopback TCP和SDK initialize/tools/list/call，持久可撤销grant、客户端token hash、零默认授权、读前后核验；targeted22项/runtime65项及kun build通过。 | 当前冻结包/OS宿主验收仍缺；仅元数据摘要读取，不提升为任意工程数据访问；GeoCOM真实型号/固件链、工程基准工作流、DXF/点云/3D未齐。 |
 | engineering:14 · P2 | 已有部分usage事件及历史合成基准；没有本轮真实生产分母或完整拆分完成证据。 | 按已实现功能拆分大文件、先实测性能、首次/重复/失败/取消/中断去重持久事件和实际分母待完成。 |
 | engineering:111 · P1 | 官方IN2/GSI实际两P0样例端到端及六份native文件已保存；GSI闭合高程独立对照通过。 | 全advertised格式家族fixtures/负例/资源界限及更多方言provenance不能由两样例代替；官方包P0失败，新的精确候选须复验。 |
-| engineering:124 · P1 | P1规范/质量/高级试算的多个受限增量已有source；本轮来源绑定高级試算和规则/重抽正在补齐。 | 聚合范围不能整项关闭；按9/10/11分别验收，second-batch格式和认证签认未全部完成。 |
+| engineering:124 · P1 | P1规范/质量/高级试算的多个受限增量已有source；本轮来源绑定高级试算与规则/连续重抽已有明确受限源码及独立回归，尚未验收最终包。 | 聚合范围不能整项关闭；按9/10/11分别验收，second-batch格式和认证签认未全部完成。 |
 | engineering:125 · P2 | 坐标数学核和MCP受限真实transport增量已存在，通用协作保持兼容。 | GeoCOM、工程基准、DXF/点云/3D、licensed binary conversion、跨工作区闭环分别完成；真实仪器/许可事实只限制相应claim。 |
 | engineering:126 · P2 | 本轮官方包IN2/GSI是实际应用操作，但来源为公开合成样例；不是工程生产KPI。 | 真实traceable project试点及首次结果/import/30分钟水准/复现/问答率的持久事件、真实分母和来源待完成。 |
 
-本轮实现代理报告的来源绑定高级试算已通过限定模型和负例回归，证据已归档 [来源试算回归](../survey-source-trials-20261006/README.md)；相关/非线性网不支持该试算适配，不删除原专业计算。MCP是真实loopback SDK transport并受持久grant约束，仅元数据摘要；当前安装包接线尚未验收。质量规则/连续复查抽样仍在实现，最终回归与证据到齐后更新。
+本轮实现代理报告的来源绑定高级试算已通过限定模型和负例回归，证据已归档 [来源试算回归](../survey-source-trials-20261006/README.md)；相关/非线性网不支持该试算适配，不删除原专业计算。MCP是真实loopback SDK transport并受持久grant约束，仅元数据摘要；当前安装包接线尚未验收。质量规则/连续复查抽样增量已随 `4c387f51` 提交，源码与独立回归见 [质量增量](../survey-quality-refinements-20261006/README.md) 和 [独立 AI 审查](../survey-quality-refinements-20261006/independent-review.md)；后轮重新评定仍未接线，最终包也未验收。
 
 ## 精确包行为验收：21 条工程条目
 

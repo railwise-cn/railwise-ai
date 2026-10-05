@@ -1,0 +1,42 @@
+{
+  "status": "prepared inputs only; no packaged acceptance performed",
+  "createdDate": "2026-10-06",
+  "provenance": "Authored synthetic software-acceptance fixtures; monitoring CSV/XLSX contain identical explicit values; height model is recreated from disclosed source-review arithmetic case, not copied instrument measurements.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1437,
+      "sha256": "fa853efda12f640bef1e9fe47fd5c30f60720a796cfa311c1a2720876a3391dc"
+    },
+    {
+      "path": "independent-expected.json",
+      "bytes": 3714,
+      "sha256": "789fb6827ddad5306fef53d128507fc01aa616c6a7e0c94774529d1ec8c20650"
+    },
+    {
+      "path": "synthetic-monitoring.csv",
+      "bytes": 262,
+      "sha256": "63e1a387ccd1f647711596ea5dd66ddb31adedc96cd1017be5c9941929a5c1da"
+    },
+    {
+      "path": "synthetic-monitoring.xlsx",
+      "bytes": 5127,
+      "sha256": "95bc12f81d2d171fcbc4820fe17e662ce11156adc888cd2b9c356b01ac411e93"
+    },
+    {
+      "path": "synthetic-source-fixed-absolute.json",
+      "bytes": 1781,
+      "sha256": "fd377732c74ee70ba3b6e896a99ac94da969bd22385f4b5f7505dc9d674a8be9"
+    },
+    {
+      "path": "synthetic-source-fixed-mixed-sigma-negative.json",
+      "bytes": 1731,
+      "sha256": "42fe64f4898e31643bc63e22831a6f48434a4a73c74afa1c4738c4bb36fae16a"
+    },
+    {
+      "path": "synthetic-source-fixed-relative-negative.json",
+      "bytes": 1661,
+      "sha256": "e3b5255b7bed3ad3703943408ef6cfa3115e500bdb884db265c514c677b104fd"
+    }
+  ]
+}
