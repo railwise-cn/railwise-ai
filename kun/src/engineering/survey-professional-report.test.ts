@@ -156,7 +156,11 @@ describe('professional survey report formats', () => {
     expect(read.text).toContain('签认栏（空白 / 未签认）')
     expect(bytes.toString('latin1')).toContain('/FontFile2')
     expect(bytes.toString('latin1')).toContain('/ToUnicode')
-  }, 20000)
+  // PDF generation embeds and subsets the bundled Chinese font.  The full
+  // KUN suite runs this integration test alongside many SQLite-backed tests
+  // on shared CI runners, so allow the artifact generation to finish without
+  // treating CPU contention as a hung test.
+  }, 60000)
 
   it('binds both periods and projects stored segment differences with ordered observation sources', async () => {
     const { input, comparison, model } = await comparisonFixture()
