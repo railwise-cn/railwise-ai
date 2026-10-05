@@ -1,0 +1,8 @@
+{
+  "scope": "official public 0.5.2 first launch",
+  "field": "agents.kun.dataDir",
+  "expected": "/private/tmp/railwise-public-052-cua/home/.workwise/runtime",
+  "actualConfiguredValue": "/private/tmp/railwise-delivery-private-7bf3e6a1/home/.workwise/runtime",
+  "productionDataAccessed": false,
+  "action": "close first launch; relaunch new isolated root with only provider copied; first answer is retained as diagnostic, not strict-isolation pass"
+}

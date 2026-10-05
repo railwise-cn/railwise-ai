@@ -1,0 +1,174 @@
+{
+  "exports": {
+    "pdfPages": 7,
+    "pdfTextLength": 6144,
+    "internalMarkers": {
+      "network_": 6,
+      "adjustment_": 2,
+      "SHA-256": 3,
+      "workwise-survey-format-catalog": 1,
+      "P0 格式目录": 1,
+      "解析器": 1,
+      "adjustment-ready": 2,
+      "format_detected": 1,
+      "observation-sigma-ratio": 5,
+      "estimated-posterior": 1,
+      "survey-xy-error-ellipse": 1
+    },
+    "docxTextLength": 5630,
+    "docxMarkers": {
+      "network_": 6,
+      "adjustment_": 2,
+      "SHA-256": 3,
+      "workwise-survey-format-catalog": 1,
+      "P0 格式目录": 1,
+      "解析器": 1,
+      "adjustment-ready": 2,
+      "format_detected": 1,
+      "observation-sigma-ratio": 5,
+      "estimated-posterior": 1,
+      "survey-xy-error-ellipse": 1
+    },
+    "xlsxSheets": [
+      {
+        "name": "01_成果说明与签认状态",
+        "rows": 17,
+        "columns": 2
+      },
+      {
+        "name": "02_资料与版本绑定",
+        "rows": 2,
+        "columns": 4
+      },
+      {
+        "name": "03_基准与已知控制点",
+        "rows": 4,
+        "columns": 5
+      },
+      {
+        "name": "04_闭合与附合检核",
+        "rows": 1,
+        "columns": 12
+      },
+      {
+        "name": "05_网形与测段索引",
+        "rows": 6,
+        "columns": 10
+      },
+      {
+        "name": "06_平差统计与检查状态",
+        "rows": 2,
+        "columns": 8
+      },
+      {
+        "name": "07_点位成果与精度",
+        "rows": 5,
+        "columns": 10
+      },
+      {
+        "name": "08_观测值、改正数与残差",
+        "rows": 6,
+        "columns": 11
+      },
+      {
+        "name": "09_XY 标准误差椭圆",
+        "rows": 2,
+        "columns": 5
+      },
+      {
+        "name": "10_质量检查与复核状态",
+        "rows": 9,
+        "columns": 3
+      },
+      {
+        "name": "11_版本与证据摘要附录",
+        "rows": 4,
+        "columns": 3
+      }
+    ]
+  },
+  "gsi-exports": {
+    "pdfPages": 7,
+    "pdfTextLength": 5575,
+    "internalMarkers": {
+      "network_": 6,
+      "adjustment_": 2,
+      "SHA-256": 4,
+      "workwise-survey-format-catalog": 1,
+      "P0 格式目录": 1,
+      "解析器": 1,
+      "adjustment-ready": 2,
+      "format_detected": 1,
+      "relative-weight": 4,
+      "weight-normalized-residual": 4,
+      "estimated-posterior": 1
+    },
+    "docxTextLength": 5065,
+    "docxMarkers": {
+      "network_": 6,
+      "adjustment_": 2,
+      "SHA-256": 3,
+      "workwise-survey-format-catalog": 1,
+      "P0 格式目录": 1,
+      "解析器": 1,
+      "adjustment-ready": 2,
+      "format_detected": 1,
+      "relative-weight": 4,
+      "weight-normalized-residual": 4,
+      "estimated-posterior": 1
+    },
+    "xlsxSheets": [
+      {
+        "name": "01_成果说明与签认状态",
+        "rows": 16,
+        "columns": 2
+      },
+      {
+        "name": "02_资料与版本绑定",
+        "rows": 2,
+        "columns": 4
+      },
+      {
+        "name": "03_基准与已知控制点",
+        "rows": 2,
+        "columns": 3
+      },
+      {
+        "name": "04_闭合与附合检核",
+        "rows": 2,
+        "columns": 12
+      },
+      {
+        "name": "05_网形与测段索引",
+        "rows": 5,
+        "columns": 10
+      },
+      {
+        "name": "06_平差统计与检查状态",
+        "rows": 2,
+        "columns": 8
+      },
+      {
+        "name": "07_点位成果与精度",
+        "rows": 5,
+        "columns": 6
+      },
+      {
+        "name": "08_观测值、改正数与残差",
+        "rows": 5,
+        "columns": 11
+      },
+      {
+        "name": "09_质量检查与复核状态",
+        "rows": 9,
+        "columns": 3
+      },
+      {
+        "name": "10_版本与证据摘要附录",
+        "rows": 4,
+        "columns": 3
+      }
+    ]
+  },
+  "markerScope": "Literal findings inventory, not proof that absent catalog entries do not appear under other spellings."
+}

@@ -1,0 +1,110 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 收起侧边栏
+						7 container
+							8 container 编程 / 内业
+								9 按钮 编程
+								10 按钮 内业
+							11 切换 Description: 专注模式, Value: off
+							12 container 工作区工具
+								13 开合三角标记 工具
+									14 文本 工具
+							15 按钮 新建任务
+						16 container
+							17 text 任务 1
+							18 切换按钮 Description: 刷新工程测量项目, Value: 0
+							19 按钮 golden-plane-control-e2e 控制网 · m · 10/5
+								20 文本 golden-plane-control-e2e
+								21 文本 控制网
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/5
+							26 按钮 继续对话
+						27 container
+							28 切换按钮 连接手机, Value: 0
+							29 按钮 设置
+					30 container
+						31 按钮 收起侧边栏
+						32 标题 RailWise Survey, Value: 1
+							33 文本 RailWise Survey
+						34 text 工程测量内业 当前内业任务
+						35 弹出式按钮 当前内业任务, Value: golden-plane-control-e2e
+							36 (selected) golden-plane-control-e2e
+						37 按钮 新建任务
+						38 container 工作视图
+							39 按钮 概览
+							40 按钮 处理
+							41 按钮 结果
+							42 按钮 交付
+						43 文本 工作视图
+						44 按钮 打开 AI
+						45 按钮 高级
+					46 container
+						47 文本 DOCX、PDF、XLSX 预览文件已生成，仍需人工审查。
+						48 按钮 关闭提示
+					49 container
+						50 text 当前来源 golden-plane-control-e2e.in2 当前状态 结果已生成 · 待审查 最近结果 候选成果
+						51 开合三角标记 更多指标
+							52 文本 更多指标
+					53 container
+						54 标题 交付, Value: 2
+							55 文本 交付
+						56 文本 生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。
+						57 按钮 生成审查稿
+						58 文本 审查稿文件
+						59 文本 审查稿已生成，待专业审查。
+						60 文本 未归档
+						61 文本 report.docx
+						62 container
+							63 text DOCX  ·  43.3 KB
+						64 按钮 预览
+						65 按钮 导出 DOCX
+						66 按钮 询问 report.docx 的测量 AI
+						67 文本 report.pdf
+						68 container
+							69 text PDF  ·  76.6 KB
+						70 按钮 预览
+						71 按钮 导出 PDF
+						72 按钮 询问 report.pdf 的测量 AI
+						73 文本 evidence.xlsx
+						74 container
+							75 text XLSX  ·  44.6 KB
+						76 按钮 预览
+						77 按钮 导出 XLSX
+						78 按钮 询问 evidence.xlsx 的测量 AI
+						79 文本 professional.xlsx
+						80 container
+							81 text XLSX  ·  49.1 KB
+						82 按钮 预览
+						83 按钮 导出 XLSX
+						84 按钮 询问 professional.xlsx 的测量 AI
+						85 文本 professional-review.json
+						86 container
+							87 text JSON  ·  36.1 KB
+						88 按钮 预览
+						89 按钮 导出 JSON
+						90 按钮 询问 professional-review.json 的测量 AI
+						91 开合三角标记 高级详情
+							92 文本 高级详情
+						93 开合三角标记 来源引用
+							94 文本 来源引用
+						95 开合三角标记 高级：审查、归档与来源记录
+							96 文本 高级：审查、归档与来源记录
+	97 关闭按钮
+	98 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	99 最小化按钮
+100 menu bar
+	101 RailWise AI
+	102 文件
+	103 编辑
+	104 显示
+	105 窗口
+	106 帮助
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html

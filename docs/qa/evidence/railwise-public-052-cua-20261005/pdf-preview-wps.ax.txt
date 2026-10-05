@@ -1,0 +1,81 @@
+Window: "report.pdf", App: WPS Office.
+0 标准窗口 report.pdf, Secondary Actions: Raise
+	1 按钮 新建, Description: 新建标签
+使用Command+N快速创建一个同类型的空白标签
+	2 按钮 稻壳素材, Secondary Actions: Raise
+	3 按钮 Secondary Actions: Raise
+	4 按钮 访问标签页
+	5 按钮
+	6 分离组
+		7 container
+			8 分离组
+				9 container
+					10 文本 书签
+					11 按钮 Secondary Actions: Raise
+					12 文本栏 (settable) Description: 书签查找, Secondary Actions: Raise
+					13 按钮 添加书签, Description: 将当前视图和选择文字生成书签, Secondary Actions: Raise
+					14 按钮 (disabled) 删除选中的书签
+					15 按钮 Description: 更多书签功能, Secondary Actions: Raise
+					16 图像
+					17 文本 该文档不包含书签
+					18 按钮 生成书签, Secondary Actions: Raise
+				19 分离组
+					20 text PDF转Word
+			21 分离组
+				22 container
+					23 文本 书签
+					24 按钮 Secondary Actions: Raise
+					25 文本栏 (settable) Description: 书签查找, Secondary Actions: Raise
+					26 按钮 添加书签, Description: 将当前视图和选择文字生成书签, Secondary Actions: Raise
+					27 按钮 (disabled) 删除选中的书签
+					28 按钮 Description: 更多书签功能, Secondary Actions: Raise
+					29 图像
+					30 文本 该文档不包含书签
+					31 按钮 生成书签, Secondary Actions: Raise
+				32 分离组
+					33 滚动条 (settable) 0
+					34 text PDF转Word
+		35 图像
+		36 text 上一次未正常关闭，已恢复到最新版本。 如没有找到您的文件， 建议使用 金山数据恢复大师 
+		37 按钮 立即恢复, Secondary Actions: Raise
+		38 按钮 不再提醒, Secondary Actions: Raise
+		39 text 发送报告
+		40 文本 1/7
+		41 按钮 130%, Description: 缩放级别，点击后调节显示比例。, Secondary Actions: Raise
+		42 按钮 Description: 缩小, Secondary Actions: Raise
+		43 按钮 Description: 放大, Secondary Actions: Raise
+		44 滑块 (settable) Description: 显示比例, Value: 3215
+		45 container
+			46 文本栏 (settable) Value: 129.69%, Secondary Actions: Raise
+			47 文本 1/7
+		48 复选框 文件, Value: 0
+		49 复选框 Description: 其他命令, Value: 0
+			50 按钮 自定义快速访问工具栏
+		51 按钮 开始
+		52 按钮 插入
+		53 按钮 编辑
+		54 按钮 页面
+		55 按钮 批注
+		56 按钮 工具
+		57 按钮 保护
+		58 按钮 特色功能
+		59 按钮 WPS AI
+		60 文本栏 (settable) Description: 输入查找内容, Secondary Actions: Raise
+		61 按钮 (disabled) 上一项
+		62 按钮 (disabled) 下一项
+		63 按钮 Secondary Actions: Raise
+	64 关闭按钮
+	65 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	66 最小化按钮
+67 menu bar
+	68 WPS Office
+	69 文件
+	70 编辑
+	71 视图
+	72 插入
+	73 批注
+	74 页面
+	75 工作区
+	76 窗口
+	77 帮助
+	78 AppMenu
