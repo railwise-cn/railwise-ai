@@ -26,3 +26,5 @@ Each matrix path installed the pinned 0.5.1 package, detected 0.5.2 on the isola
 The acceptance gate also verified the production-safe metadata cache policy (ETag, Last-Modified, Range support) for the isolated feed before cleanup.
 
 `run-summary.json` preserves the complete GitHub job status snapshot. All package builds, feed publication, three native update paths, acceptance gate, and cleanup jobs finished successfully.
+
+After the cleanup job, direct HTTPS checks for the three isolated metadata paths returned HTTP 404 (`latest.json`, `latest-mac.yml`, and `latest.yml`), confirming that this acceptance feed was removed and did not remain publicly discoverable.
