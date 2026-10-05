@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { surveyDiagnosticText, surveyLegacyDiagnosticText, surveyRuntimeErrorText, surveySourceDiagnosticText } from './survey-diagnostic-text'
 import { lexLeicaGsi } from '../../../../../kun/src/engineering/survey-leica-gsi-lexer'
+import parserEnglish from '../../locales/en/survey-parser-diagnostics.json'
 
 describe('Survey diagnostic presentation compatibility', () => {
+  it('keeps every parser translation free of implementation vocabulary on the user surface', () => {
+    const implementationVocabulary = /P0|SHA-?256|parser diagnostics|parser|JSON|hash|binary|contract|attachment store|local processing service|anchor|deterministic|solver rank|structural probe|gate|runtime|execution receipt|fixture|frozen|SourceFile|preservedRawFields|F-FMT|physical lex|semantic pars|golden|WorkWise/i
+    for (const [source, translation] of Object.entries(parserEnglish)) {
+      const displayedEnglish = surveyLegacyDiagnosticText(translation, 'en')
+      expect(displayedEnglish, `translation for ${source}`).not.toMatch(implementationVocabulary)
+    }
+  })
+
   it('translates the rejected-source envelope through nested eligibility without rewriting IDs', () => {
     const message = '无法通过内容签名安全识别测量文件；不会回退为通用 CSV'
     const envelope = `archive-only: unknown_format — ${message}`

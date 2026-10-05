@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "productName": "RailWise AI",
+  "channel": "frontier",
+  "version": "0.5.2",
+  "tag": "v0.5.2",
+  "generatedAt": "2026-10-05T13:52:46.247Z",
+  "updateBaseUrl": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/",
+  "updateMetadata": {
+    "mac": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/latest-mac.yml",
+    "win": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/latest.yml"
+  },
+  "files": [
+    {
+      "name": "WorkWise-0.5.2-mac-Apple-Silicon.dmg",
+      "url": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/WorkWise-0.5.2-mac-Apple-Silicon.dmg",
+      "size": 304059889,
+      "sha256": "8ccea166f3ef3dbd5dbe737e6ee08774dbe0ba07ba55988d37224cb49357ca94"
+    },
+    {
+      "name": "WorkWise-0.5.2-mac-Intel.dmg",
+      "url": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/WorkWise-0.5.2-mac-Intel.dmg",
+      "size": 306883962,
+      "sha256": "0420e17cf6362e5c959e059a20e6992078d1598aa5704357bc608498bc460ac9"
+    },
+    {
+      "name": "WorkWise-0.5.2-mac-arm64.zip",
+      "url": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/WorkWise-0.5.2-mac-arm64.zip",
+      "size": 310298869,
+      "sha256": "c4f90b0bea196864b43229ab49d54c59b06b23cd1520b45b15fdd72d44f318df"
+    },
+    {
+      "name": "WorkWise-0.5.2-mac-x64.zip",
+      "url": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/WorkWise-0.5.2-mac-x64.zip",
+      "size": 313313982,
+      "sha256": "47c58c6c31f18000aad27eff4f423705dbbba885d426ec2b78d4abac93a866a1"
+    },
+    {
+      "name": "WorkWise-0.5.2-win-x64.exe",
+      "url": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/WorkWise-0.5.2-win-x64.exe",
+      "size": 252425448,
+      "sha256": "a8de5603bebc543dc18fe1266711b673d08e5ce8d2d169a06aedd547463f2977"
+    },
+    {
+      "name": "WorkWise-0.5.2-win-x64.exe.blockmap",
+      "url": "https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/WorkWise-0.5.2-win-x64.exe.blockmap",
+      "size": 258571,
+      "sha256": "472952efe0809ae7479f843e21360d776af713bf49a162bbb46230c87136edbb"
+    }
+  ]
+}
