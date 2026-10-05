@@ -29,7 +29,7 @@ export function verifySurveyQualityRecord(inputs: readonly unknown[], checkpoint
   const issues = new Map<string, { correctionId?: string; correctedArtifactSha256?: string; resolved: boolean }>()
   const corrections = new Set<string>()
   const stages = new Map<string, { stageKind: 'planning' | 'process' | 'final' | 'acceptance'; status: 'started' | 'completed' | 'blocked' }>()
-  const applicability = new Map<string, { status: 'applicable' | 'not-applicable' | 'pending'; revoked: boolean }>()
+  const applicability = new Map<string, { status: 'applicable' | 'not-applicable' | 'pending'; revoked: boolean; identity: string; replacement?: string }>()
   const signoffs = new Map<string, { purpose: 'quality-review' | 'delivery-approval'; revoked: boolean }>()
   const approvals = new Set<string>()
   let previousHash = SURVEY_QUALITY_CHAIN_GENESIS
@@ -89,7 +89,14 @@ export function verifySurveyQualityRecord(inputs: readonly unknown[], checkpoint
       else stage.status = event.outcome === 'completed' ? 'completed' : 'blocked'
     } else if (event.kind === 'rule-applicability') {
       if (applicability.has(event.declarationId)) error('duplicate-applicability-id')
-      else applicability.set(event.declarationId, { status: event.status, revoked: false })
+      const ruleIdentity = JSON.stringify([event.rule.standardCode, event.rule.ruleId, event.basisBinding?.reference.profileId ?? null])
+      if (event.basisBinding && ['standardCode', 'standardVersion', 'ruleId', 'ruleVersion'].some(key => event.rule[key as keyof typeof event.rule] !== event.basisBinding!.reference[key as keyof typeof event.rule])) error('applicability-basis-mismatch')
+      if (event.replacesDeclarationId) {
+        const previous = applicability.get(event.replacesDeclarationId)
+        if (!previous || !previous.revoked || previous.replacement || previous.identity !== ruleIdentity) error('rule-replacement-without-matching-revocation')
+        else previous.replacement = event.declarationId
+      }
+      if (!applicability.has(event.declarationId)) applicability.set(event.declarationId, { status: event.status, revoked: false, identity: ruleIdentity })
     } else if (event.kind === 'rule-revoked') {
       const declaration = applicability.get(event.declarationId)
       if (!declaration || declaration.revoked) error('rule-revocation-without-active-declaration')
@@ -155,7 +162,7 @@ export function evaluateSurveyQualityGate(inputs: readonly unknown[]): SurveyQua
   const integrity = verifySurveyQualityRecord(inputs)
   const reasons = new Set<SurveyQualityGateSnapshot['reasons'][number]>()
   const stages = new Map<string, { kind: 'planning' | 'process' | 'final' | 'acceptance'; status: 'started' | 'completed' | 'blocked' }>()
-  const rules = new Map<string, { status: 'applicable' | 'not-applicable' | 'pending'; revoked: boolean }>()
+  const rules = new Map<string, { status: 'applicable' | 'not-applicable' | 'pending'; revoked: boolean; replacement?: string }>()
   const signoffs = new Map<string, { purpose: 'quality-review' | 'delivery-approval'; revoked: boolean }>()
   const requests = new Map<string, string[]>()
   const checks = new Map<string, 'passed' | 'failed' | 'not-evaluated'>()
@@ -174,6 +181,7 @@ export function evaluateSurveyQualityGate(inputs: readonly unknown[]): SurveyQua
     } else if (event.kind === 'rule-applicability') {
       hasVersionedLifecycle = true
       rules.set(event.declarationId, { status: event.status, revoked: false })
+      if (event.replacesDeclarationId) { const previous = rules.get(event.replacesDeclarationId); if (previous) previous.replacement = event.declarationId }
     } else if (event.kind === 'rule-revoked') {
       hasVersionedLifecycle = true
       const rule = rules.get(event.declarationId)
@@ -208,7 +216,7 @@ export function evaluateSurveyQualityGate(inputs: readonly unknown[]): SurveyQua
   if ([...checks.values()].some(outcome => outcome === 'failed')) reasons.add('failed-quality-check')
   if ([...checks.values()].some(outcome => outcome === 'not-evaluated')) reasons.add('quality-check-not-evaluated')
   if (!rules.size || [...rules.values()].some(rule => !rule.revoked && rule.status === 'pending')) reasons.add('applicability-not-evaluated')
-  if (revokedRuleIds.length) reasons.add('rule-revoked')
+  if ([...rules.values()].some(rule => rule.revoked && !rule.replacement)) reasons.add('rule-revoked')
   if (!activeApplicableRuleIds.length) reasons.add('applicability-not-evaluated')
   if (!activeSignoffIds.length) reasons.add('signoff-missing')
   if (revokedSignoffIds.length && !activeSignoffIds.length) reasons.add('signoff-revoked')

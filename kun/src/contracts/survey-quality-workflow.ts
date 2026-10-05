@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SurveyQualityEventV1, SurveyStandardRuleRefV1 } from './survey-standard-quality.js';
+import { SurveyStandardBasisReferenceV1 } from './survey-standard-basis.js';
 const id = z.string().trim().min(1).max(160);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const key = z.string().trim().min(8).max(160);
@@ -19,7 +20,8 @@ export const SurveyQualityWorkflowDeclaredEventV1 = z.discriminatedUnion('kind',
     z.object({ kind: z.literal('stage-completed'), stageId: id, stageKind: z.enum(['planning', 'process', 'final', 'acceptance']),
         outcome: z.enum(['completed', 'blocked']), evidence: SurveyQualityWorkflowEvidenceV1 }).strict(),
     z.object({ kind: z.literal('rule-applicability'), declarationId: id, rule: SurveyStandardRuleRefV1,
-        status: z.enum(['applicable', 'not-applicable', 'pending']), rationale: id, evidence: SurveyQualityWorkflowEvidenceV1 }).strict(),
+        status: z.enum(['applicable', 'not-applicable', 'pending']), rationale: id,
+        basis: SurveyStandardBasisReferenceV1.optional(), replacesDeclarationId: id.optional(), evidence: SurveyQualityWorkflowEvidenceV1 }).strict(),
     z.object({ kind: z.literal('rule-revoked'), declarationId: id, reason: id, evidence: SurveyQualityWorkflowEvidenceV1 }).strict(),
     z.object({ kind: z.literal('signoff-declared'), signoffId: id,
         purpose: z.enum(['quality-review', 'delivery-approval']), actorKey: id, evidence: SurveyQualityWorkflowEvidenceV1 }).strict(),

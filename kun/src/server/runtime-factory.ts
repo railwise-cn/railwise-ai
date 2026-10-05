@@ -91,6 +91,7 @@ import { stopAllBashSessions } from '../adapters/tool/builtin-bash-tool.js'
 import { HttpVisionEvidenceService, type VisionEvidenceConfig } from '../vision/vision-evidence-service.js'
 import { EngineeringService } from '../engineering/engineering-service.js'
 import { EngineeringContextService } from '../engineering/engineering-context-service.js'
+import { SurveyContextAccessStore } from '../adapters/mcp/survey-context-access-store.js'
 import { EngineeringAiOrchestrator } from '../engineering/engineering-ai-orchestrator.js'
 import { buildEngineeringConversationTools } from '../adapters/tool/engineering-conversation-tools.js'
 import { EngineeringAiRepository } from '../engineering/engineering-ai-repository.js'
@@ -391,6 +392,9 @@ export async function createKunServeRuntime(
     nowIso
   })
   const engineeringContext = new EngineeringContextService(engineeringService, nowIso, surveyService)
+  const surveyContextMcpAccess = !options.insecure && options.runtimeToken.length > 0
+    && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(options.host)
+    ? new SurveyContextAccessStore(join(options.dataDir, 'engineering', 'mcp-access'), nowIso) : undefined
   const surveyQualityWorkspaceService = new SurveyQualityWorkspaceService({
     rootDir: join(options.dataDir, 'engineering'),
     nowIso,
@@ -682,6 +686,11 @@ export async function createKunServeRuntime(
     flowService,
     engineeringService,
     engineeringContext,
+    ...(surveyContextMcpAccess ? { surveyContextMcp: {
+      access: surveyContextMcpAccess,
+      snapshot: (projectId: string) => engineeringContext.snapshot(projectId),
+      projectExists: (projectId: string) => engineeringService.getProject(projectId) !== null
+    } } : {}),
     engineeringAi,
     surveyService,
     surveyQualityAssessmentService,
@@ -756,6 +765,7 @@ export async function createKunServeRuntime(
           flowService.shutdown()
           taskRepository.close()
           engineeringAiRepository.close()
+          surveyContextMcpAccess?.close()
           await surveyService.flush()
           await engineeringService.flush()
           surveyService.close()

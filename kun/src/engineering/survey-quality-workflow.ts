@@ -9,6 +9,7 @@ import { appendSurveyQualityEvent, evaluateSurveyQualityGate, verifySurveyQualit
 import { assessmentDigest } from './survey-quality-assessment.js';
 import { parseAdvancedTrialJson } from './survey-advanced-trials-json.js';
 import type { SurveyQualityEventV1 } from '../contracts/survey-standard-quality.js';
+import { getSurveyStandardBasisCatalog, resolveSurveyStandardBasis } from './survey-standard-basis.js';
 const L = C.QUALITY_WORKFLOW_LIMITS;
 const digest = assessmentDigest;
 const projectSchema = z.object({ id: z.string().min(1).max(160), revision: z.number().int().positive(), workspace: z.string().min(1).max(4096) }).strict();
@@ -196,8 +197,18 @@ export class SurveyQualityWorkflowService {
             event = { kind: e.kind, stageId: e.stageId, stageKind: e.stageKind, policyVersion: e.policyVersion, checkedScope: e.checkedScope, evidenceSha256 };
         else if (e.kind === 'stage-completed')
             event = { kind: e.kind, stageId: e.stageId, stageKind: e.stageKind, outcome: e.outcome, evidenceSha256 };
-        else if (e.kind === 'rule-applicability')
-            event = { kind: e.kind, declarationId: e.declarationId, rule: e.rule, status: e.status, rationale: e.rationale, evidenceSha256 };
+        else if (e.kind === 'rule-applicability') {
+            let basisBinding;
+            if (e.basis) {
+                let resolved;
+                try { resolved = resolveSurveyStandardBasis(e.basis); } catch { return fail('invalid-reference'); }
+                const { standardCode, standardVersion, ruleId, ruleVersion } = resolved.reference;
+                if (!same({ standardCode, standardVersion, ruleId, ruleVersion }, e.rule)) return fail('invalid-reference');
+                basisBinding = { reference: resolved.reference, catalogDigest: getSurveyStandardBasisCatalog().catalogDigest, ruleDigest: resolved.entry.ruleDigest };
+            }
+            event = { kind: e.kind, declarationId: e.declarationId, rule: e.rule, status: e.status, rationale: e.rationale, evidenceSha256,
+                ...(basisBinding ? { basisBinding } : {}), ...(e.replacesDeclarationId ? { replacesDeclarationId: e.replacesDeclarationId } : {}) };
+        }
         else if (e.kind === 'rule-revoked')
             event = { kind: e.kind, declarationId: e.declarationId, reason: e.reason, evidenceSha256 };
         else if (e.kind === 'signoff-declared')

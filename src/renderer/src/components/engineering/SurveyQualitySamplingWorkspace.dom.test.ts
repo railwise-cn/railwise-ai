@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SurveyQualitySamplingWorkspace } from './SurveyQualitySamplingWorkspace'
 import {
   validateSamplingInput, freezeSamplingPopulation, readSamplingPopulation, readSamplingRun, readSamplingUnits, readSamplingSamples,
-  listSamplingPopulations, drawSamplingRun, verifySamplingRun, type SamplingBinding, type SamplingPopulation, type SamplingRun
+  listSamplingPopulations, drawSamplingRun, drawSamplingReinspection, verifySamplingRun, type SamplingBinding, type SamplingPopulation, type SamplingRun
 } from '../../agent/survey-quality-sampling-client'
 import { GBT24356_SAMPLING_SOURCE } from '../../../../../kun/src/engineering/survey-quality-sampling'
 import i18n from '../../i18n'
@@ -96,6 +96,7 @@ beforeEach(async () => {
     if (path.endsWith('/sampling-runs') && method === 'POST') {
       const body = JSON.parse(payload!)
       return response({ ...run, stage: body.stage, inspectionMode: body.inspectionMode,
+        ...(body.reinspection ? { id: 'run-2', round: 2, planHash: hash('1'), runHash: hash('2'), reinspection: { previousRunId: run.id, previousPlanHash: run.planHash, previousRunHash: run.runHash, reason: body.reinspection.reason, previousRoundVerification: 'stored-plan-recomputed' } } : {}),
         ...(body.inspectionMode === 'table-1-simple-random' ? { sampleSize: 9, randomSource: 'runtime-generated-local-unwitnessed', batches: [{ ...run.batches[0], sampleSize: 9, census: false }] } : {}) })
     }
     if (path.includes('/sampling-runs?')) return response({ runs: [run], unavailable: [], nextOffset: null })
@@ -115,6 +116,28 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
 describe('quality sampling desktop workspace', () => {
+  it('requires a reason and fresh acknowledgment to arrange a retained second inspection', async () => {
+    await render(); await open(); await freeze(); await choose(); await click(button('Execute first-round selection'))
+    expect(button('samplingReinspectionDraw').disabled).toBe(true)
+    await edit(samplingText('samplingReinspectionReason'), '补齐外业记录后复查')
+    await click(field(samplingText('samplingReinspectionAck')))
+    expect(button('samplingReinspectionDraw').disabled).toBe(false)
+    await click(button('samplingReinspectionDraw'))
+    expect(JSON.parse(runtimeRequest.mock.calls.at(-1)![2])).toMatchObject({ reinspection: { previousRunId: run.id, expectedPreviousPlanHash: run.planHash, reason: '补齐外业记录后复查' } })
+    expect(host.textContent).toContain(i18n.t('samplingReinspectionRecorded', { ns: 'common', reason: '补齐外业记录后复查' }))
+    expect(host.textContent).toContain('补齐外业记录后复查')
+    expect(button('samplingReinspectionDraw').disabled).toBe(true)
+    expect(host.textContent).not.toMatch(/previousRunId|previousPlanHash|runHash|hash|replay|runtime/i)
+  })
+  it('rejects a second inspection response with the wrong predecessor, frame, round or reason', async () => {
+    const second: SamplingRun = { ...run, id: 'run-2', round: 2, reinspection: { previousRunId: run.id, previousPlanHash: run.planHash, previousRunHash: run.runHash, reason: '整改后复查', previousRoundVerification: 'stored-plan-recomputed' } }
+    for (const value of [{ ...second, round: 3 }, { ...second, populationHash: hash('1') }, { ...second, reinspection: { ...second.reinspection!, previousRunId: 'other-run' } }, { ...second, reinspection: { ...second.reinspection!, reason: '其他理由' } }]) {
+      runtimeRequest.mockResolvedValueOnce(response(value))
+      await expect(drawSamplingReinspection(binding, run, '整改后复查', 'reinspection-key')).rejects.toMatchObject({ reason: 'invalid-response' })
+    }
+    runtimeRequest.mockResolvedValueOnce(response(second))
+    await expect(drawSamplingReinspection(binding, run, '整改后复查', 'reinspection-key')).resolves.toEqual(second)
+  })
   it('binds questions to the loaded run and paged sample identity without a runtime request', async () => {
     const focus = vi.fn()
     useEngineeringConversationDrafts.setState({ drafts: {} })

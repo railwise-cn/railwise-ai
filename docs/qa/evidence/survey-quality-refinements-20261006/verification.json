@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-06",
+  "reviewType": "AI source and actual SQLite/DOM/IPC verification; not installed-package acceptance",
+  "baseCommit": "5de0398b9ca37b53d6d678520ba3654a7809a8a6",
+  "branch": "codex/survey-reliability",
+  "scope": "Private working-tree increment. No public version/tag/Release/feed operation.",
+  "sourceFiles": {
+    "kun/src/contracts/survey-quality-sampling-workspace.ts": "7562918e9d09b6b3c68bafa559d5275fd6287e369ea6c0b0874af7a3a162dd61",
+    "kun/src/contracts/survey-quality-workflow.ts": "032cea73674410f9530eeb60b30faa0dddbce5ecd688b6814a7ac90f989775c5",
+    "kun/src/contracts/survey-standard-quality.ts": "a930ca78876985424ee3f521299cf06df0227f4046678a97147add9a63666350",
+    "kun/src/engineering/survey-quality-record.ts": "023564110e171b1a66fdf911e1e779d248265c2d9e4b92b8a9e685830f7c5ecd",
+    "kun/src/engineering/survey-quality-workflow.ts": "d4da5c567e8a3935f37c2ad5cc55881ddfefdd7331bf8d77d23898986763d060",
+    "kun/src/engineering/survey-quality-workflow.test.ts": "d725cc5b98df686639c81ce3806b23748dc16b583e4c1c585e2021f033697bee",
+    "kun/src/engineering/survey-sampling-workspace.ts": "95b45802a1ecfe02d32c43c9d40288478416714cec07b14f89ceecabb4431773",
+    "kun/src/engineering/survey-sampling-workspace.test.ts": "e9dd08d3fc2ffd591effb0184eb5687bea1d9586c658910d09dcb60512c9572a",
+    "src/renderer/src/agent/survey-quality-sampling-client.ts": "06b86525c938954c70e69cb136888197bf738cc90d783df531b6c80b38fa5422",
+    "src/renderer/src/agent/survey-quality-workflow-client.ts": "09cf3fa6dbb6f4432b6064ca85f73e69223b596c6f6a03d4642d946fb3c30479",
+    "src/renderer/src/agent/survey-quality-workflow-client.test.ts": "6283e856c3867da00db2ff5aba0beb1f991c13f7f5467e11e5cf74a741ef6211",
+    "src/renderer/src/agent/survey-quality-workflow-test-fixtures.ts": "dc5e5fd425a1037ff6562b1cb0369b1afec4f2990d6db8d93e75ce756c124fee",
+    "src/renderer/src/agent/survey-standard-basis-client.ts": "6cf2a757e5219631f0f4edcafe33e8ddd4848ab56eefe56076334971015f8996",
+    "src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.tsx": "f2c554fe452133a8a39cfd256c20e55090119a442bffadc19df69dfff351051a",
+    "src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.dom.test.ts": "61d7df31cdd236ec08dd38451d9ebaf30cdc9c3c6e44fb5f57d26184bec8e77f",
+    "src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.tsx": "512256a8ec59d3052ad722b3f0e55199a5fc79d841e12ed46e1ca1355b3a0278",
+    "src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts": "03e567774b0e124eda46dee87095c90731b06d2e480802db2b5b2bad034bac79",
+    "src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.tsx": "7033dc24fee554a651910d82e7d5e27c55bc2b425b4dacccd775954d9f8a7ca0",
+    "src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts": "e189f81a1a34c0736932ff9d20580c808c7da6044884e7d04d3f2107fb9f638b",
+    "src/renderer/src/locales/en/common.json": "19ead502eb74db11424f886201176c5c57918d98c130a8fb75d68862d459498e",
+    "src/renderer/src/locales/zh/common.json": "af025e6a458362fd70b7584449d78a52b6a9426e7ff50847de147996b65ce405"
+  },
+  "sharedSourceNotes": {
+    "src/renderer/src/locales/en/common.json": "Whole-file working-tree hash includes other same-round agents; this commit stages only quality and reinspection keys.",
+    "src/renderer/src/locales/zh/common.json": "Whole-file working-tree hash includes other same-round agents; this commit stages only quality and reinspection keys."
+  },
+  "checks": [
+    {
+      "cwd": "kun",
+      "command": "ELECTRON_RUN_AS_NODE=1 ../node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ../node_modules/vitest/vitest.mjs run src/engineering/survey-quality-workflow.test.ts src/engineering/survey-quality-record.test.ts src/contracts/survey-quality-sampling-workspace.test.ts src/engineering/survey-sampling-workspace.test.ts tests/runtime-sampling-wiring.test.ts tests/runtime-quality-assessment-wiring.test.ts src/server/routes/survey-quality-workflow.test.ts src/server/routes/engineering-monitoring-replay.test.ts src/server/routes/survey-professional.test.ts tests/survey-context-mcp-http.test.ts --maxWorkers=4",
+      "exitCode": 0,
+      "testFiles": 10,
+      "testsPassed": 75,
+      "log": "runtime-tests.txt"
+    },
+    {
+      "cwd": ".",
+      "command": "ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/vitest/vitest.mjs run src/renderer/src/components/engineering/SurveyQualitySamplingWorkspace.dom.test.ts src/renderer/src/components/engineering/SurveyQualityWorkflowWorkspace.dom.test.ts src/renderer/src/components/engineering/SurveyQualityAssessmentWorkspace.dom.test.ts src/renderer/src/agent/survey-quality-workflow-client.test.ts src/renderer/src/components/engineering/SurveyStandardBasis.dom.test.ts src/main/ipc/app-ipc-quality-workflow.test.ts src/main/ipc/app-ipc-standard-basis.test.ts --maxWorkers=4",
+      "exitCode": 0,
+      "testFiles": 7,
+      "testsPassed": 79,
+      "log": "desktop-tests.txt"
+    },
+    {
+      "cwd": ".",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "completedProcess": 39672
+    },
+    {
+      "cwd": "kun",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "completedProcess": 5457
+    }
+  ],
+  "logSha256": {
+    "runtime-tests.txt": "3af49b6fc978d9c384ba2279eebd602bd888bcca24a26380b276768938ec5edf",
+    "desktop-tests.txt": "52419fce573e23e213deb52be0d0bf7c8f4b4791ac4865545869f61b09a354da"
+  },
+  "independentReview": "pending",
+  "limitations": [
+    "AI review is not a real professional signature or standards conformity decision.",
+    "Reinspection records arrangements and retained sampling evidence; it does not establish successful remediation.",
+    "Linkage scoring intentionally accepts first-round sampling only.",
+    "Frozen installed-package computer-use, signature/notarization, restart and real updater acceptance remain separate."
+  ],
+  "logArchiveNote": "Console transcripts archived as UTF-8 text with trailing blank lines normalized; source hashes are separate."
+}

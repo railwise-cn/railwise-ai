@@ -6,6 +6,7 @@ import { SurveyQualityWorkflowWorkspace } from './SurveyQualityWorkflowWorkspace
 import { appendFixture, emptyWorkflow, workflowFixture } from '../../agent/survey-quality-workflow-test-fixtures'
 import { workflowSource, type QualityWorkflow, type WorkflowEvent } from '../../agent/survey-quality-workflow-client'
 import i18n from '../../i18n'
+import { getSurveyStandardBasisCatalog } from '../../../../../kun/src/engineering/survey-standard-basis'
 
 const context = workflowFixture(), corrected = workflowFixture('2')
 const runtimeRequest = vi.fn()
@@ -39,9 +40,9 @@ async function click(element: HTMLElement, settle = true): Promise<void> {
   })
 }
 async function input(text: string, value: string): Promise<void> {
-  const element = label(text).querySelector('input,select') as HTMLInputElement
+  const element = label(text).querySelector('input,select,textarea') as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
   await act(async () => {
-    Object.getOwnPropertyDescriptor(element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(element, value)
+    Object.getOwnPropertyDescriptor(element.tagName === 'SELECT' ? HTMLSelectElement.prototype : element.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!.call(element, value)
     element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
   })
 }
@@ -66,6 +67,7 @@ beforeEach(async () => {
     if (path.includes('/quality-records?')) return response({ records: [{ record: corrected.record.record, verification: corrected.record.verification }], unavailable: [], nextOffset: null })
     if (path.endsWith('/quality-plans/plan-2')) return response(corrected.plan)
     if (path.endsWith('/quality-records/record-2')) return response(corrected.record)
+    if (path === '/v1/engineering/standard-basis') return response(getSurveyStandardBasisCatalog())
     throw new Error(`unexpected path ${path}`)
   })
   Object.assign(window, { workwise: { runtimeRequest } })
@@ -74,6 +76,38 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
 describe('declared quality workflow desktop', () => {
+  it('selects an exact published rule edition and preserves revocation with one matching replacement', async () => {
+    await begin(); await input('Entry type', 'rule-applicability')
+    await click(button('qualityWorkflowLoadRules'))
+    const entry = getSurveyStandardBasisCatalog().rules[0]!, profile = entry.rule.profiles[0]!
+    await input('qualityWorkflowRuleBasis', `${entry.rule.ruleId}:${profile.profileId}`)
+    await input('qualityWorkflowDeclarationName', '项目抽查依据')
+    await input('qualityWorkflowApplicability', 'applicable')
+    await input('qualityWorkflowRationale', '本项目采用本版规范的最终内业检查要求')
+    await input('Retained evidence material', 'output-1'); await click(host.querySelector('input[type=checkbox]')!); await click(button('Save declaration'))
+    const event = stored.entries.at(-1)!.request.event
+    expect(event).toMatchObject({ kind: 'rule-applicability', basis: { ruleVersion: entry.rule.ruleVersion, sourceSha256: entry.rule.source.sha256, profileId: profile.profileId } })
+    expect(stored.entries.at(-1)!.event.event).toMatchObject({ basisBinding: { ruleDigest: entry.ruleDigest } })
+    await input('Entry type', 'rule-revoked'); await input('qualityWorkflowDeclarationName', '项目抽查依据')
+    await input('qualityWorkflowRationale', '检查范围修订'); await input('Retained evidence material', 'output-1'); await click(host.querySelector('input[type=checkbox]')!); await click(button('Save declaration'))
+    await input('Entry type', 'rule-applicability'); await input('qualityWorkflowRuleBasis', `${entry.rule.ruleId}:${profile.profileId}`)
+    await input('qualityWorkflowDeclarationName', '修订后的项目抽查依据'); await input('qualityWorkflowReplacement', '项目抽查依据')
+    await input('qualityWorkflowRationale', '按修订的检查范围重新确认'); await input('Retained evidence material', 'output-1'); await click(host.querySelector('input[type=checkbox]')!); await click(button('Save declaration'))
+    expect(stored.entries).toHaveLength(3)
+    expect(stored.entries.at(-1)!.request.event).toMatchObject({ replacesDeclarationId: '项目抽查依据' })
+    expect(stored.deliveryApproval).toBe('not-granted')
+    expect(host.textContent).not.toMatch(/sourceSha256|ruleDigest|catalogDigest|ruleVersion|profileId/)
+  })
+  it('records named planning and completion stages without a delivery approval action', async () => {
+    await begin(); await input('Entry type', 'stage-started')
+    await input('qualityWorkflowStageName', '内业检查策划'); await input('qualityWorkflowPolicyVersion', '项目检查方案第一版'); await input('qualityWorkflowCheckedScope', '控制网资料及成果')
+    await input('Retained evidence material', 'output-1'); await click(host.querySelector('input[type=checkbox]')!); await click(button('Save declaration'))
+    expect(stored.entries.at(-1)!.request.event).toMatchObject({ kind: 'stage-started', stageKind: 'planning' })
+    await input('Entry type', 'stage-completed'); await input('qualityWorkflowStageName', '内业检查策划'); await input('Declared outcome', 'completed')
+    await input('Retained evidence material', 'output-1'); await click(host.querySelector('input[type=checkbox]')!); await click(button('Save declaration'))
+    expect(stored.entries.at(-1)!.request.event).toMatchObject({ kind: 'stage-completed', outcome: 'completed' })
+    expect([...host.querySelectorAll('button')].some(item => /^(Approve|Sign|批准|签字)$/.test(item.textContent??''))).toBe(false)
+  })
   it('records a failure, issue, changed retained artifact and explicitly unresolved/resolved rechecks', async () => {
     await begin()
     expect(host.textContent).toContain(i18n.t('qualityWorkflowBoundary'))

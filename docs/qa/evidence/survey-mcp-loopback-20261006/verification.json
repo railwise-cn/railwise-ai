@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-06",
+  "reviewType": "AI source and actual loopback TCP verification; not installed-package acceptance",
+  "baseCommit": "8768dd5103f366beaa7b35096268ff58a9430993",
+  "branch": "codex/survey-reliability",
+  "scope": "Private working-tree increment; no public version/tag/feed/Release modification",
+  "desktopPackageVersion": "0.5.2",
+  "runtimeSourcePackageVersion": "0.5.1",
+  "sourceFiles": {
+    "kun/src/adapters/mcp/survey-context-access-store.ts": "1ddc16045bdd31a5e6f0195f9a5aec530b007224507aa85ee783625500397d93",
+    "kun/src/server/routes/survey-context-mcp.ts": "22b2ab719e7cbbcccc9da1434bc91fa39e5518db2db111116ff4f3113d49a3a8",
+    "kun/tests/survey-context-mcp-http.test.ts": "442a99c040d7678d8a77c8078b4f7451cbf4c7350c60e959fbbb624074139f36",
+    "kun/src/server/runtime-factory.ts": "b77d095cb0cb9ed2edaea4cc845aaecf11598d0364759b041d86033554ccbb6f",
+    "kun/src/server/routes/server-runtime.ts": "91a5f4d01acda9df0c498d86062078d004e27b5465ac722809db2b6b71b415b4",
+    "kun/src/server/routes/index.ts": "d4b7fd0daeaf51a95c554b3604372cd03c679da7b13b616f3598a825b4e63185",
+    "kun/src/adapters/mcp/survey-context-reader.ts": "11464335e84cb86eb242c9768d65a805167647b5f67f90eabf32978a872b7239",
+    "kun/src/adapters/mcp/survey-context-server.ts": "3c4f6c6d694c411b76c3c96576163820548dec46b52e8936f2347d13776bb261",
+    "kun/src/adapters/mcp/survey-context-reader.test.ts": "0473a1d7e9f03e84008f453e1b1f2079671b4843b26581d47672170843b853e4",
+    "kun/src/adapters/mcp/survey-context-server.test.ts": "c88cf5f6f6f01b7a741b439c634b10fc5a6c9b4f0e7c20c4c74b4228906855f0",
+    "kun/tests/runtime-advanced-trials-wiring.test.ts": "5f4709d400f31d392ba0c606bfafac3e646b407483043cde53b4efb5fa2fee55"
+  },
+  "checks": [
+    {
+      "cwd": "kun",
+      "command": "ELECTRON_RUN_AS_NODE=1 ../node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ../node_modules/vitest/vitest.mjs run tests/survey-context-mcp-http.test.ts src/adapters/mcp/survey-context-server.test.ts src/adapters/mcp/survey-context-reader.test.ts --maxWorkers=4",
+      "exitCode": 0,
+      "testFiles": 3,
+      "testsPassed": 22,
+      "log": "targeted.txt"
+    },
+    {
+      "cwd": "kun",
+      "command": "ELECTRON_RUN_AS_NODE=1 ../node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ../node_modules/vitest/vitest.mjs run tests/runtime-factory.test.ts tests/runtime-sampling-wiring.test.ts tests/runtime-quality-assessment-wiring.test.ts tests/runtime-advanced-trials-wiring.test.ts tests/http-server.test.ts --maxWorkers=4",
+      "exitCode": 0,
+      "testFiles": 5,
+      "testsPassed": 65,
+      "log": "runtime-regression.txt"
+    },
+    {
+      "cwd": "kun",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "log": "typecheck.txt"
+    },
+    {
+      "cwd": "kun",
+      "command": "npm run build",
+      "exitCode": 0,
+      "log": "build.txt"
+    },
+    {
+      "cwd": "kun",
+      "command": "ELECTRON_RUN_AS_NODE=1 ../node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ../node_modules/vitest/vitest.mjs run tests/survey-context-mcp-http.test.ts src/adapters/mcp/survey-context-server.test.ts src/adapters/mcp/survey-context-reader.test.ts src/server/routes/engineering-ai.test.ts src/server/routes/engineering-monitoring-replay.test.ts src/server/routes/survey-professional.test.ts --maxWorkers=4",
+      "exitCode": 0,
+      "testFiles": 6,
+      "testsPassed": 37,
+      "log": "final-regression.txt",
+      "note": "Includes guarded runtime.info compatibility for legacy router fixtures; unknown hosts remain disabled."
+    }
+  ],
+  "logSha256": {
+    "final-regression.txt": "7f84ae13e51b1ab3d1f438cb5b6cbf0f26e2d9a0540ecd9545bfec42d46c8993",
+    "targeted.txt": "ad3324c593e76acbb9135fb6efeb828895d0682a40617a5fbe1325f9fae32559",
+    "runtime-regression.txt": "aa007ba3fa51699cb3f7870792fccd73f517089687ed82a67639c3e5e5c62aec",
+    "typecheck.txt": "a62b660f256c8001c1416a2698257656b95beea60ea8f7871f1ff86f36f6d7d7",
+    "build.txt": "b53a3f53628de5b3b8047cd5e0356a1b816f159ceb5611b5afeec05752a335db"
+  },
+  "independentReview": "pending",
+  "remaining": [
+    "Exact frozen installed private package wiring/exit/restart verification",
+    "Independent AI source review",
+    "No raw/write/export/instrument interoperability or human signature claim"
+  ],
+  "finalVerificationBaseCommit": "5de0398b9ca37b53d6d678520ba3654a7809a8a6",
+  "sharedSourceNotes": {
+    "kun/src/server/runtime-factory.ts": "Whole-file working-tree hash includes source-model wiring from another same-round agent; this commit stages only MCP hunks."
+  },
+  "logArchiveNote": "Console transcripts archived as UTF-8 text with trailing blank lines normalized; source hashes are separate."
+}

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { appendQualityWorkflowEvent, createQualityWorkflow, listQualityWorkflows, parseQualityWorkflow, workflowSource } from './survey-quality-workflow-client'
 import { appendFixture, emptyWorkflow, workflowFixture } from './survey-quality-workflow-test-fixtures'
+import { createHash } from 'node:crypto'
+import { getSurveyStandardBasisCatalog } from '../../../../kun/src/engineering/survey-standard-basis'
 const runtimeRequest = vi.fn()
 vi.mock('./runtime-client', () => ({ rendererRuntimeClient: { runtimeRequest: (...args: unknown[]) => runtimeRequest(...args) } }))
 const context = workflowFixture(), corrected = workflowFixture('2')
@@ -10,6 +12,20 @@ const check = { kind: 'check' as const, checkId: 'closure', outcome: 'failed' as
 beforeEach(() => runtimeRequest.mockReset())
 
 describe('declared workflow client trust boundary', () => {
+  it('rejects a changed exact basis or replacement even when the event hash was recomputed', async () => {
+    const { rule } = getSurveyStandardBasisCatalog().rules[0]!, profile = rule.profiles[0]!
+    const declared = { kind: 'rule-applicability' as const, declarationId: 'basis-1', rule: { standardCode: rule.standardCode, standardVersion: rule.standardVersion, ruleId: rule.ruleId, ruleVersion: rule.ruleVersion },
+      basis: { standardCode: rule.standardCode, standardVersion: rule.standardVersion, ruleId: rule.ruleId, ruleVersion: rule.ruleVersion, sourceSha256: rule.source.sha256, algorithmVersion: rule.executor.algorithmVersion, profileId: profile.profileId, profileVersion: profile.profileVersion }, status: 'applicable' as const, rationale: 'Synthetic applicability', evidence }
+    const value = appendFixture(emptyWorkflow(context), declared, 'basis-declaration-key', context)
+    await expect(parseQualityWorkflow(value, context)).resolves.toEqual(value)
+    for (const mutate of [(event: typeof value.entries[0]['event']['event']) => { if(event.kind==='rule-applicability')event.basisBinding!.reference.sourceSha256='f'.repeat(64) },
+      (event: typeof value.entries[0]['event']['event']) => { if(event.kind==='rule-applicability')event.replacesDeclarationId='other-declaration' }]) {
+      const copy = structuredClone(value); mutate(copy.entries[0]!.event.event)
+      const { thisHash: ignored, ...unsigned } = copy.entries[0]!.event; void ignored
+      copy.entries[0]!.event.thisHash=createHash('sha256').update(JSON.stringify(unsigned)).digest('hex'); copy.headHash=copy.entries[0]!.event.thisHash
+      await expect(parseQualityWorkflow(copy, context)).rejects.toMatchObject({ reason: 'invalid-response' })
+    }
+  })
   it('reads actual service shape and validates the complete correction/recheck chain', async () => {
     let value = emptyWorkflow(context)
     value = appendFixture(value, check, 'append-check', context)

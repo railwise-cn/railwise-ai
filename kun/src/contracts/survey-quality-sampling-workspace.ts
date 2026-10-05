@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { isSurveySamplingUnicode, SurveySamplingIdentifierV1 as id, SurveyQualitySamplingPlanV1, SurveyQualitySamplingSourceV1 } from './survey-quality-sampling.js'
 
 export const SURVEY_SAMPLING_WORKSPACE_LIMITS = Object.freeze({ unitsPerPopulation: 10_000, requestBytes: 1024 * 1024,
-  definitionBytes: 64 * 1024, populationsPerProject: 128, runsPerProject: 512, pageSize: 100 })
+  definitionBytes: 64 * 1024, populationsPerProject: 128, runsPerProject: 512, roundsPerStage: 8, pageSize: 100 })
 const hash = z.string().regex(/^[a-f0-9]{64}$/)
 const time = z.iso.datetime({ offset: true })
 const key = z.string().min(8).max(160).refine(value => value.trim() === value && isSurveySamplingUnicode(value))
@@ -42,7 +42,12 @@ export const SurveySamplingPopulationRecordV1 = SurveySamplingPopulationSummaryV
   })
 export type SurveySamplingPopulationRecordV1 = z.infer<typeof SurveySamplingPopulationRecordV1>
 
-export const SurveySamplingRunCreateV1 = z.object({ populationId: id, idempotencyKey: key, stage, inspectionMode: mode }).strict()
+const reinspectionRequest = z.object({ previousRunId: id, expectedPreviousPlanHash: hash,
+  reason: z.string().trim().min(1).max(500).refine(isSurveySamplingUnicode) }).strict()
+const reinspectionRecord = z.object({ previousRunId: id, previousPlanHash: hash, previousRunHash: hash,
+  reason: reinspectionRequest.shape.reason, previousRoundVerification: z.literal('stored-plan-recomputed') }).strict()
+export const SurveySamplingRunCreateV1 = z.object({ populationId: id, idempotencyKey: key, stage, inspectionMode: mode,
+  reinspection: reinspectionRequest.optional() }).strict()
   .refine(value => !['process', 'final-office'].includes(value.stage) || value.inspectionMode === 'census', 'this stage requires census')
 export type SurveySamplingRunCreateV1 = z.infer<typeof SurveySamplingRunCreateV1>
 export const SurveySamplingBatchSummaryV1 = z.object({ batchIndex: z.number().int().min(0).max(9), batchSize: z.number().int().min(1).max(1000),
@@ -50,7 +55,8 @@ export const SurveySamplingBatchSummaryV1 = z.object({ batchIndex: z.number().in
 const runShape = {
   schemaVersion: z.literal(1), id, projectId: id, projectRevision: z.number().int().positive(), projectBindingHash: hash,
   populationId: id, populationHash: hash, definitionEvidenceSha256: hash,
-  unitCount: z.number().int().min(1).max(SURVEY_SAMPLING_WORKSPACE_LIMITS.unitsPerPopulation), stage, inspectionMode: mode, round: z.literal(1),
+  unitCount: z.number().int().min(1).max(SURVEY_SAMPLING_WORKSPACE_LIMITS.unitsPerPopulation), stage, inspectionMode: mode,
+  round: z.number().int().min(1).max(SURVEY_SAMPLING_WORKSPACE_LIMITS.roundsPerStage), reinspection: reinspectionRecord.optional(),
   algorithmVersion: z.literal('quality-sampling-hmac-sha256-fy-1'), source: SurveyQualitySamplingSourceV1,
   requestHash: hash, planHash: hash, runHash: hash, sampleSize: z.number().int().min(1).max(SURVEY_SAMPLING_WORKSPACE_LIMITS.unitsPerPopulation),
   batchCount: z.number().int().min(1).max(10), batches: z.array(SurveySamplingBatchSummaryV1).min(1).max(10),
@@ -62,7 +68,8 @@ export const SurveySamplingRunSummaryV1 = z.object(runShape).strict().superRefin
     || value.batches.some((batch, index) => batch.batchIndex !== index || batch.batchSize !== base + (index < remainder ? 1 : 0)
       || batch.sampleSize !== (value.inspectionMode === 'census' ? batch.batchSize : Math.min(batch.batchSize, batch.nominalTableSampleSize)) || batch.census !== (batch.sampleSize === batch.batchSize))
     || (['process', 'final-office'].includes(value.stage) && value.inspectionMode !== 'census')
-    || value.randomSource !== (value.inspectionMode === 'census' ? 'not-applicable' : 'runtime-generated-local-unwitnessed')) context.addIssue({ code: 'custom', message: 'sampling summary counts, scope or random source mismatch' })
+    || value.randomSource !== (value.inspectionMode === 'census' ? 'not-applicable' : 'runtime-generated-local-unwitnessed')
+    || (value.round === 1) !== (value.reinspection === undefined)) context.addIssue({ code: 'custom', message: 'sampling summary counts, scope or random source mismatch' })
 })
 export type SurveySamplingRunSummaryV1 = z.infer<typeof SurveySamplingRunSummaryV1>
 /** Full plan (including seed/frame) is internal, never returned by list/detail. */
@@ -71,7 +78,8 @@ export const SurveySamplingRunRecordV1 = z.object({ ...runShape, plan: SurveyQua
   if (!SurveySamplingRunSummaryV1.safeParse(summary).success
     || plan.request.projectId !== value.projectId || plan.request.populationId !== value.populationId || plan.request.populationHash !== value.populationHash
     || plan.request.definitionEvidenceSha256 !== value.definitionEvidenceSha256 || plan.request.orderedUnitProductIds.length !== value.unitCount
-    || plan.request.stage !== value.stage || plan.request.inspectionMode !== value.inspectionMode || plan.request.round !== 1 || plan.request.previousPlanHash !== undefined
+    || plan.request.stage !== value.stage || plan.request.inspectionMode !== value.inspectionMode || plan.request.round !== value.round
+    || plan.request.previousPlanHash !== value.reinspection?.previousPlanHash
     || plan.requestHash !== value.requestHash || plan.planHash !== value.planHash || plan.sampleSize !== value.sampleSize
     || JSON.stringify(plan.source) !== JSON.stringify(value.source)
     || JSON.stringify(plan.batches.map(({ batchIndex, batchSize, nominalTableSampleSize, sampleSize, census }) => ({ batchIndex, batchSize, nominalTableSampleSize, sampleSize, census }))) !== JSON.stringify(value.batches)) context.addIssue({ code: 'custom', message: 'sampling record is not bound to its stored plan' })

@@ -36,6 +36,7 @@ import type { SurveyService } from '../../engineering/survey-service.js'
 import type { SurveyAdvancedTrialsWorkspaceService } from '../../engineering/survey-advanced-trials-workspace.js'
 import type { SurveySamplingWorkspaceService } from '../../engineering/survey-sampling-workspace.js'
 import type { SurveyQualityWorkspaceService } from '../../engineering/survey-quality-workspace.js'
+import type { SurveyContextMcpHost } from './survey-context-mcp.js'
 
 export type RuntimeToolDiagnostics = {
   providers: ToolProviderPolicy[]
@@ -80,6 +81,7 @@ export type ServerRuntime = {
   flowService?: FlowRuntimeService
   engineeringService?: EngineeringService
   engineeringContext?: EngineeringContextService
+  surveyContextMcp?: SurveyContextMcpHost
   engineeringAi?: EngineeringAiOrchestrator
   surveyService?: SurveyService
   surveyQualityAssessmentService?: SurveyQualityAssessmentService

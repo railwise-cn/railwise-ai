@@ -55,12 +55,16 @@ function matches(entry: SurveyStandardBasisEntryV1, context: StandardBasisContex
     && rule.executor.algorithmVersion === context.algorithmVersion
     && rule.profiles.filter(profile => profile.profileId === context.profileId && profile.profileVersion === context.profileVersion).length === 1
 }
-export async function readResultStandardBasis(context: StandardBasisContext): Promise<SurveyStandardBasisResolvedV1> {
+export async function readStandardBasisCatalog(): Promise<ReturnType<typeof SurveyStandardBasisCatalogV1.parse>> {
   const parsed = SurveyStandardBasisCatalogV1.safeParse(await request(RUNTIME_STANDARD_BASIS_PATH))
   if (!parsed.success) return invalid()
   const catalog = parsed.data
   for (const entry of catalog.rules) if (await digest(entry.rule) !== entry.ruleDigest) return invalid()
   if (await digest(catalog.rules.map(entry => entry.ruleDigest)) !== catalog.catalogDigest) return invalid()
+  return catalog
+}
+export async function readResultStandardBasis(context: StandardBasisContext): Promise<SurveyStandardBasisResolvedV1> {
+  const catalog = await readStandardBasisCatalog()
   const candidates = catalog.rules.filter(entry => matches(entry, context))
   if (candidates.length !== 1) throw new StandardBasisRequestError('mismatch')
   const entry = candidates[0]!

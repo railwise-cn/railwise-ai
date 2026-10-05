@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SurveyStandardBasisReferenceV1 } from './survey-standard-basis.js'
 
 const identity = z.string().trim().min(1).max(200)
 const digest = z.string().regex(/^[0-9a-f]{64}$/)
@@ -114,7 +115,9 @@ export const SurveyQualityEventV1 = z.object({
       stageKind: z.enum(['planning', 'process', 'final', 'acceptance']), outcome: z.enum(['completed', 'blocked']),
       evidenceSha256: digest }).strict(),
     z.object({ kind: z.literal('rule-applicability'), declarationId: identity, rule: SurveyStandardRuleRefV1,
-      status: z.enum(['applicable', 'not-applicable', 'pending']), rationale: identity, evidenceSha256: digest }).strict(),
+      status: z.enum(['applicable', 'not-applicable', 'pending']), rationale: identity, evidenceSha256: digest,
+      basisBinding: z.object({ reference: SurveyStandardBasisReferenceV1, catalogDigest: digest, ruleDigest: digest }).strict().optional(),
+      replacesDeclarationId: identity.optional() }).strict(),
     z.object({ kind: z.literal('rule-revoked'), declarationId: identity, reason: identity, evidenceSha256: digest }).strict(),
     z.object({ kind: z.literal('signoff-declared'), signoffId: identity,
       purpose: z.enum(['quality-review', 'delivery-approval']), actorKey: identity, evidenceSha256: digest }).strict(),

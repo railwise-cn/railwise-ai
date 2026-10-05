@@ -44,6 +44,13 @@ function deferred<T>(){let resolve!:(v:T)=>void;const promise=new Promise<T>(r=>
 beforeEach(async()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});Object.defineProperty(crypto,'subtle',{configurable:true,value:webcrypto.subtle});await i18n.changeLanguage('en');f=await assessmentFixture();binding={projectId:f.project.id,projectRevision:1,workspaceRoot:f.project.workspace};runtimeRequest.mockReset().mockImplementation(handle);saveWorkspaceFileAs.mockReset().mockResolvedValue({ok:true,path:'/chosen/assessment.json'});Object.assign(window,{workwise:{runtimeRequest,saveWorkspaceFileAs}});host=document.createElement('div');document.body.append(host);root=createRoot(host)})
 afterEach(async()=>{vi.unstubAllGlobals();await act(async()=>root.unmount());host.remove();await f.close();vi.restoreAllMocks()})
 describe('declared linkage desktop integration',()=>{
+ it('keeps later inspection arrangements outside the first-round linkage assessment selector',async()=>{
+  const previous=f.sampling.getRun(f.project.id,f.planRequest.samplingRunId)
+  const later=f.sampling.createRun(f.project.id,{populationId:previous.populationId,idempotencyKey:'desktop-second-inspection',stage:previous.stage,inspectionMode:previous.inspectionMode,reinspection:{previousRunId:previous.id,expectedPreviousPlanHash:previous.planHash,reason:'整改后复查'}})
+  await render();await click(button('Load existing sampling runs'));await settled()
+  expect(host.querySelector(`option[value="${previous.id}"]`)).not.toBeNull()
+  expect(host.querySelector(`option[value="${later.id}"]`)).toBeNull()
+ })
  it('binds a unit question to the restored assessment and disables it during revalidation',async()=>{
   const record=storedRecord(),focus=vi.fn()
   useEngineeringConversationDrafts.setState({drafts:{}})
