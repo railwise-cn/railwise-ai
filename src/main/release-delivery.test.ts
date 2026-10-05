@@ -327,7 +327,7 @@ describe('R2 release delivery gates', () => {
     const macBuild = workflow.jobs['build-macos'].steps.map((step: any) => step.run || '').join('\n')
     expect(macBuild).toContain('tar -xzf')
     expect(macBuild).toContain('test -L')
-    expect(macBuild).toContain('@napi-rs/canvas-darwin-x64@0.1.100')
+    expect(macBuild).not.toContain('npm install --no-save --package-lock=false --force @napi-rs/canvas-darwin-x64')
     expect(macBuild).not.toContain('acceptance-artifacts/base-mac')
     const windowsBuild = workflow.jobs['build-windows'].steps.map((step: any) => step.run || '').join('\n')
     expect(windowsBuild).not.toContain('acceptance-artifacts/base-win')

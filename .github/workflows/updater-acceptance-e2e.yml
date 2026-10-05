@@ -171,8 +171,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Install Intel canvas binding for cross-arch macOS packaging
-        run: npm install --no-save --package-lock=false --force @napi-rs/canvas-darwin-x64@0.1.100
+      # The Intel canvas binding is already declared as an optional dependency
+      # in package-lock.json. Re-installing it after npm ci triggers an npm
+      # Arborist edgesOut crash on Apple Silicon runners.
       - run: npm run prepare:electron
 
       - uses: actions/download-artifact@v4
