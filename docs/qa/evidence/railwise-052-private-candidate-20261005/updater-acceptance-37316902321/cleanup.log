@@ -1,0 +1,399 @@
+﻿2026-10-05T14:33:04.2232226Z Current runner version: '2.337.0'
+2026-10-05T14:33:04.2254404Z ##[group]Runner Image Provisioner
+2026-10-05T14:33:04.2255224Z Hosted Compute Agent
+2026-10-05T14:33:04.2255827Z Version: 20260901.588
+2026-10-05T14:33:04.2256425Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+2026-10-05T14:33:04.2257070Z Build Date: 2026-09-01T19:56:44Z
+2026-10-05T14:33:04.2257722Z Worker ID: {323c91be-525a-4e7a-bdcb-846c8a122127}
+2026-10-05T14:33:04.2258335Z Azure Region: centralus
+2026-10-05T14:33:04.2258925Z ##[endgroup]
+2026-10-05T14:33:04.2260019Z ##[group]Operating System
+2026-10-05T14:33:04.2260621Z Ubuntu
+2026-10-05T14:33:04.2261120Z 24.04.5
+2026-10-05T14:33:04.2261613Z LTS
+2026-10-05T14:33:04.2262115Z ##[endgroup]
+2026-10-05T14:33:04.2262861Z ##[group]Runner Image
+2026-10-05T14:33:04.2263530Z Image: ***-24.04
+2026-10-05T14:33:04.2264033Z Version: 20260927.320.1
+2026-10-05T14:33:04.2265082Z Included Software: https://github.com/actions/runner-images/blob/***24/20260927.320/images/***/Ubuntu2404-Readme.md
+2026-10-05T14:33:04.2266200Z Image Release: https://github.com/actions/runner-images/releases/tag/***24%2F20260927.320
+2026-10-05T14:33:04.2267003Z ##[endgroup]
+2026-10-05T14:33:04.2267957Z ##[group]GITHUB_TOKEN Permissions
+2026-10-05T14:33:04.2269416Z Contents: read
+2026-10-05T14:33:04.2269990Z Metadata: read
+2026-10-05T14:33:04.2270477Z ##[endgroup]
+2026-10-05T14:33:04.2272109Z Secret source: Actions
+2026-10-05T14:33:04.2273198Z Cache mode: write
+2026-10-05T14:33:04.2273795Z Prepare workflow directory
+2026-10-05T14:33:04.2674249Z Prepare all required actions
+2026-10-05T14:33:04.2727309Z Getting action download info
+2026-10-05T14:33:04.5359917Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-05T14:33:04.7834792Z Download action repository 'actions/setup-node@v7' (SHA:820762786026740c76f36085b0efc47a31fe5020)
+2026-10-05T14:33:05.2686576Z Complete job name: Remove isolated updater feed
+2026-10-05T14:33:05.3289220Z ##[group]Run actions/checkout@v7
+2026-10-05T14:33:05.3289835Z with:
+2026-10-05T14:33:05.3290173Z   fetch-depth: 0
+2026-10-05T14:33:05.3290541Z   repository: railwise-cn/railwise-ai
+2026-10-05T14:33:05.3293125Z   token: ***
+2026-10-05T14:33:05.3293468Z   ssh-strict: true
+2026-10-05T14:33:05.3293815Z   ssh-user: git
+2026-10-05T14:33:05.3294165Z   persist-credentials: true
+2026-10-05T14:33:05.3294541Z   clean: true
+2026-10-05T14:33:05.3294891Z   sparse-checkout-cone-mode: true
+2026-10-05T14:33:05.3295294Z   fetch-tags: false
+2026-10-05T14:33:05.3295639Z   show-progress: true
+2026-10-05T14:33:05.3295987Z   lfs: false
+2026-10-05T14:33:05.3296329Z   submodules: false
+2026-10-05T14:33:05.3296697Z   set-safe-directory: true
+2026-10-05T14:33:05.3297084Z   allow-unsafe-pr-checkout: false
+2026-10-05T14:33:05.3297565Z env:
+2026-10-05T14:33:05.3297893Z   NODE_VERSION: 22.22.0
+2026-10-05T14:33:05.3298277Z   WORKWISE_UPDATE_CHANNEL: frontier
+2026-10-05T14:33:05.3298800Z   RELEASE_CHANNEL: frontier
+2026-10-05T14:33:05.3299259Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+2026-10-05T14:33:05.3299859Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+2026-10-05T14:33:05.3300617Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+2026-10-05T14:33:05.3301349Z   R2_ACCOUNT_ID: ***
+2026-10-05T14:33:05.3301725Z   R2_BUCKET: ***
+2026-10-05T14:33:05.3302118Z   R2_ACCESS_KEY_ID: ***
+2026-10-05T14:33:05.3302859Z   R2_SECRET_ACCESS_KEY: ***
+2026-10-05T14:33:05.3303265Z   WORKWISE_WEBSITE_SSH_HOST: ***
+2026-10-05T14:33:05.3303683Z   WORKWISE_WEBSITE_SSH_PORT: ***
+2026-10-05T14:33:05.3304118Z   WORKWISE_WEBSITE_SSH_USER: ***
+2026-10-05T14:33:05.3306130Z   WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ***
+2026-10-05T14:33:05.3309926Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ***
+2026-10-05T14:33:05.3310553Z   WORKWISE_WEBSITE_RELEASE_ROOT: ***
+2026-10-05T14:33:05.3311064Z ##[endgroup]
+2026-10-05T14:33:05.4120134Z Syncing repository: railwise-cn/railwise-ai
+2026-10-05T14:33:05.4121697Z ##[group]Getting Git version info
+2026-10-05T14:33:05.4122939Z Working directory is '/home/runner/work/railwise-ai/railwise-ai'
+2026-10-05T14:33:05.4123829Z [command]/usr/bin/git version
+2026-10-05T14:33:05.4177256Z git version 2.55.0
+2026-10-05T14:33:05.4191278Z ##[endgroup]
+2026-10-05T14:33:05.4200244Z Temporarily overriding HOME='/home/runner/work/_temp/c5652b9b-07d9-418d-87fa-5ba934f2d0cd' before making global git config changes
+2026-10-05T14:33:05.4204394Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-05T14:33:05.4205249Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/railwise-ai/railwise-ai
+2026-10-05T14:33:05.4318795Z Deleting the contents of '/home/runner/work/railwise-ai/railwise-ai'
+2026-10-05T14:33:05.4321153Z ##[group]Determining repository object format
+2026-10-05T14:33:05.4322367Z ##[endgroup]
+2026-10-05T14:33:05.4323103Z ##[group]Initializing the repository
+2026-10-05T14:33:05.4326415Z [command]/usr/bin/git init /home/runner/work/railwise-ai/railwise-ai
+2026-10-05T14:33:05.4483810Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-05T14:33:05.4485432Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-05T14:33:05.4486673Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-05T14:33:05.4487656Z hint: call:
+2026-10-05T14:33:05.4488216Z hint:
+2026-10-05T14:33:05.4488803Z hint: 	git config --global init.defaultBranch <name>
+2026-10-05T14:33:05.4489392Z hint:
+2026-10-05T14:33:05.4489970Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-05T14:33:05.4490744Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-05T14:33:05.4491394Z hint:
+2026-10-05T14:33:05.4491854Z hint: 	git branch -m <name>
+2026-10-05T14:33:05.4492501Z hint:
+2026-10-05T14:33:05.4493739Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-05T14:33:05.4495305Z Initialized empty Git repository in /home/runner/work/railwise-ai/railwise-ai/.git/
+2026-10-05T14:33:05.4497923Z [command]/usr/bin/git remote add origin https://github.com/railwise-cn/railwise-ai
+2026-10-05T14:33:05.4794583Z ##[endgroup]
+2026-10-05T14:33:05.4795318Z ##[group]Disabling automatic garbage collection
+2026-10-05T14:33:05.4797831Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-05T14:33:05.4941013Z ##[endgroup]
+2026-10-05T14:33:05.4941760Z ##[group]Setting up auth
+2026-10-05T14:33:05.4942268Z Removing SSH command configuration
+2026-10-05T14:33:05.4947114Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-05T14:33:05.4985217Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-05T14:33:05.5311858Z Removing HTTP extra header
+2026-10-05T14:33:05.5317366Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-05T14:33:05.5346868Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-05T14:33:05.5536085Z Removing includeIf entries pointing to credentials config files
+2026-10-05T14:33:05.5540385Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-05T14:33:05.5573675Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-05T14:33:05.5767919Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-05T14:33:05.5916302Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git.path /home/runner/work/_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:05.6742180Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:05.8984137Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:05.9308497Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:05.9455015Z ##[endgroup]
+2026-10-05T14:33:05.9456168Z ##[group]Fetching the repository
+2026-10-05T14:33:05.9462209Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-10-05T14:33:10.9153783Z From https://github.com/railwise-cn/railwise-ai
+2026-10-05T14:33:10.9154865Z  * [new branch]        codex/0.3.0-agent-workbench -> origin/codex/0.3.0-agent-workbench
+2026-10-05T14:33:10.9155559Z  * [new branch]        codex/fix-051-page-verification -> origin/codex/fix-051-page-verification
+2026-10-05T14:33:10.9156259Z  * [new branch]        codex/fix-website-brand-icons -> origin/codex/fix-website-brand-icons
+2026-10-05T14:33:10.9157007Z  * [new branch]        codex/fix-website-screenshot-rollback -> origin/codex/fix-website-screenshot-rollback
+2026-10-05T14:33:10.9157733Z  * [new branch]        codex/github-release-updater -> origin/codex/github-release-updater
+2026-10-05T14:33:10.9158473Z  * [new branch]        codex/menu-localization-help-updates -> origin/codex/menu-localization-help-updates
+2026-10-05T14:33:10.9159193Z  * [new branch]        codex/mit-baseline-sync -> origin/codex/mit-baseline-sync
+2026-10-05T14:33:10.9160304Z  * [new branch]        codex/ppt-master-delivery-fix -> origin/codex/ppt-master-delivery-fix
+2026-10-05T14:33:10.9161066Z  * [new branch]        codex/publish-051-download-page -> origin/codex/publish-051-download-page
+2026-10-05T14:33:10.9161795Z  * [new branch]        codex/railwise-survey-convergence -> origin/codex/railwise-survey-convergence
+2026-10-05T14:33:10.9162754Z  * [new branch]        codex/railwise-website-introduction -> origin/codex/railwise-website-introduction
+2026-10-05T14:33:10.9163553Z  * [new branch]        codex/release-0.4.2-product-page -> origin/codex/release-0.4.2-product-page
+2026-10-05T14:33:10.9164339Z  * [new branch]        codex/repair-051-live-docroot-20260928 -> origin/codex/repair-051-live-docroot-20260928
+2026-10-05T14:33:10.9165248Z  * [new branch]        codex/runtime-summary-updater-validation -> origin/codex/runtime-summary-updater-validation
+2026-10-05T14:33:10.9166195Z  * [new branch]        codex/survey-53213de-private-acceptance -> origin/codex/survey-53213de-private-acceptance
+2026-10-05T14:33:10.9167038Z  * [new branch]        codex/survey-7d4f454-private-acceptance -> origin/codex/survey-7d4f454-private-acceptance
+2026-10-05T14:33:10.9167934Z  * [new branch]        codex/survey-epoch-private-acceptance -> origin/codex/survey-epoch-private-acceptance
+2026-10-05T14:33:10.9168867Z  * [new branch]        codex/survey-legacy-routing-updater-validation -> origin/codex/survey-legacy-routing-updater-validation
+2026-10-05T14:33:10.9169697Z  * [new branch]        codex/survey-reliability -> origin/codex/survey-reliability
+2026-10-05T14:33:10.9170585Z  * [new branch]        codex/survey-schema-updater-validation -> origin/codex/survey-schema-updater-validation
+2026-10-05T14:33:10.9171047Z  * [new branch]        codex/workwise-0.3.3    -> origin/codex/workwise-0.3.3
+2026-10-05T14:33:10.9171474Z  * [new branch]        codex/workwise-0.3.4-gui-hotfix -> origin/codex/workwise-0.3.4-gui-hotfix
+2026-10-05T14:33:10.9171932Z  * [new branch]        codex/workwise-plan-final-0.4.0 -> origin/codex/workwise-plan-final-0.4.0
+2026-10-05T14:33:10.9172688Z  * [new branch]        codex/workwise-plugin-marketplace -> origin/codex/workwise-plugin-marketplace
+2026-10-05T14:33:10.9173407Z  * [new branch]        codex/workwise-plugin-marketplace-recovered -> origin/codex/workwise-plugin-marketplace-recovered
+2026-10-05T14:33:10.9173941Z  * [new branch]        feat/write-export-templates -> origin/feat/write-export-templates
+2026-10-05T14:33:10.9174311Z  * [new branch]        main                    -> origin/main
+2026-10-05T14:33:10.9174620Z  * [new tag]           v0.1.1                  -> v0.1.1
+2026-10-05T14:33:10.9174960Z  * [new tag]           v0.1.2                  -> v0.1.2
+2026-10-05T14:33:10.9175377Z  * [new tag]           v0.1.3                  -> v0.1.3
+2026-10-05T14:33:10.9175656Z  * [new tag]           v0.1.4                  -> v0.1.4
+2026-10-05T14:33:10.9175939Z  * [new tag]           v0.1.5                  -> v0.1.5
+2026-10-05T14:33:10.9176219Z  * [new tag]           v0.1.6                  -> v0.1.6
+2026-10-05T14:33:10.9176619Z  * [new tag]           v0.1.7                  -> v0.1.7
+2026-10-05T14:33:10.9176985Z  * [new tag]           v0.1.8                  -> v0.1.8
+2026-10-05T14:33:10.9177414Z  * [new tag]           v0.2.0                  -> v0.2.0
+2026-10-05T14:33:10.9177831Z  * [new tag]           v0.2.1                  -> v0.2.1
+2026-10-05T14:33:10.9178253Z  * [new tag]           v0.2.2                  -> v0.2.2
+2026-10-05T14:33:10.9178687Z  * [new tag]           v0.2.3                  -> v0.2.3
+2026-10-05T14:33:10.9179087Z  * [new tag]           v0.2.4                  -> v0.2.4
+2026-10-05T14:33:10.9179367Z  * [new tag]           v0.2.5                  -> v0.2.5
+2026-10-05T14:33:10.9179646Z  * [new tag]           v0.2.6                  -> v0.2.6
+2026-10-05T14:33:10.9179925Z  * [new tag]           v0.2.7                  -> v0.2.7
+2026-10-05T14:33:10.9180206Z  * [new tag]           v0.2.8                  -> v0.2.8
+2026-10-05T14:33:10.9180485Z  * [new tag]           v0.2.9                  -> v0.2.9
+2026-10-05T14:33:10.9180892Z  * [new tag]           v0.3.0                  -> v0.3.0
+2026-10-05T14:33:10.9181177Z  * [new tag]           v0.3.1                  -> v0.3.1
+2026-10-05T14:33:10.9181456Z  * [new tag]           v0.3.2                  -> v0.3.2
+2026-10-05T14:33:10.9181740Z  * [new tag]           v0.3.3                  -> v0.3.3
+2026-10-05T14:33:10.9182019Z  * [new tag]           v0.3.4                  -> v0.3.4
+2026-10-05T14:33:10.9182298Z  * [new tag]           v0.3.5                  -> v0.3.5
+2026-10-05T14:33:10.9182865Z  * [new tag]           v0.3.6                  -> v0.3.6
+2026-10-05T14:33:10.9183293Z  * [new tag]           v0.4.0                  -> v0.4.0
+2026-10-05T14:33:10.9183625Z  * [new tag]           v0.4.1                  -> v0.4.1
+2026-10-05T14:33:10.9183910Z  * [new tag]           v0.4.2                  -> v0.4.2
+2026-10-05T14:33:10.9184197Z  * [new tag]           v0.5.0                  -> v0.5.0
+2026-10-05T14:33:10.9184477Z  * [new tag]           v0.5.1                  -> v0.5.1
+2026-10-05T14:33:10.9184767Z  * [new tag]           v0.5.2                  -> v0.5.2
+2026-10-05T14:33:10.9185924Z [command]/usr/bin/git branch --list --remote origin/codex/survey-reliability
+2026-10-05T14:33:10.9192694Z   origin/codex/survey-reliability
+2026-10-05T14:33:10.9200771Z [command]/usr/bin/git rev-parse refs/remotes/origin/codex/survey-reliability
+2026-10-05T14:33:10.9221415Z 07a333cfb0e7af9bd8ca01eda164d8483631b36c
+2026-10-05T14:33:10.9229360Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +18f06b19110127d121cd05afa66251493da103ce:refs/remotes/origin/codex/survey-reliability
+2026-10-05T14:33:10.9291017Z From https://github.com/railwise-cn/railwise-ai
+2026-10-05T14:33:10.9292847Z  + 07a333cf...18f06b19 18f06b19110127d121cd05afa66251493da103ce -> origin/codex/survey-reliability  (forced update)
+2026-10-05T14:33:10.9298055Z [command]/usr/bin/git branch --list --remote origin/codex/survey-reliability
+2026-10-05T14:33:10.9323072Z   origin/codex/survey-reliability
+2026-10-05T14:33:10.9329153Z [command]/usr/bin/git rev-parse refs/remotes/origin/codex/survey-reliability
+2026-10-05T14:33:10.9348230Z 18f06b19110127d121cd05afa66251493da103ce
+2026-10-05T14:33:10.9352016Z ##[endgroup]
+2026-10-05T14:33:10.9352726Z ##[group]Determining the checkout info
+2026-10-05T14:33:10.9353429Z ##[endgroup]
+2026-10-05T14:33:10.9356280Z [command]/usr/bin/git sparse-checkout disable
+2026-10-05T14:33:10.9401051Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-05T14:33:10.9425562Z ##[group]Checking out the ref
+2026-10-05T14:33:10.9428294Z [command]/usr/bin/git checkout --progress --force -B codex/survey-reliability refs/remotes/origin/codex/survey-reliability
+2026-10-05T14:33:11.9581222Z Switched to a new branch 'codex/survey-reliability'
+2026-10-05T14:33:11.9595556Z branch 'codex/survey-reliability' set up to track 'origin/codex/survey-reliability'.
+2026-10-05T14:33:11.9642000Z ##[endgroup]
+2026-10-05T14:33:11.9686889Z [command]/usr/bin/git log -1 --format=%H
+2026-10-05T14:33:11.9713281Z 18f06b19110127d121cd05afa66251493da103ce
+2026-10-05T14:33:11.9929017Z ##[group]Run actions/setup-node@v7
+2026-10-05T14:33:11.9929225Z with:
+2026-10-05T14:33:11.9929390Z   node-version: 22.22.0
+2026-10-05T14:33:11.9929563Z   cache: npm
+2026-10-05T14:33:11.9929720Z   check-latest: false
+2026-10-05T14:33:11.9931052Z   token: ***
+2026-10-05T14:33:11.9931224Z   package-manager-cache: true
+2026-10-05T14:33:11.9931403Z env:
+2026-10-05T14:33:11.9931560Z   NODE_VERSION: 22.22.0
+2026-10-05T14:33:11.9931745Z   WORKWISE_UPDATE_CHANNEL: frontier
+2026-10-05T14:33:11.9931940Z   RELEASE_CHANNEL: frontier
+2026-10-05T14:33:11.9932168Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+2026-10-05T14:33:11.9932675Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+2026-10-05T14:33:11.9933063Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+2026-10-05T14:33:11.9933452Z   R2_ACCOUNT_ID: ***
+2026-10-05T14:33:11.9933635Z   R2_BUCKET: ***
+2026-10-05T14:33:11.9933865Z   R2_ACCESS_KEY_ID: ***
+2026-10-05T14:33:11.9934220Z   R2_SECRET_ACCESS_KEY: ***
+2026-10-05T14:33:11.9934421Z   WORKWISE_WEBSITE_SSH_HOST: ***
+2026-10-05T14:33:11.9934624Z   WORKWISE_WEBSITE_SSH_PORT: ***
+2026-10-05T14:33:11.9934824Z   WORKWISE_WEBSITE_SSH_USER: ***
+2026-10-05T14:33:11.9935977Z   WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ***
+2026-10-05T14:33:11.9938083Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ***
+2026-10-05T14:33:11.9938404Z   WORKWISE_WEBSITE_RELEASE_ROOT: ***
+2026-10-05T14:33:11.9938592Z ##[endgroup]
+2026-10-05T14:33:12.0903267Z Attempting to download 22.22.0...
+2026-10-05T14:33:12.8659548Z Acquiring 22.22.0 - x64 from https://github.com/actions/node-versions/releases/download/22.22.0-20981702931/node-22.22.0-linux-x64.tar.gz
+2026-10-05T14:33:13.4170149Z Extracting ...
+2026-10-05T14:33:13.4263051Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/1f3f865b-c969-498d-b8bf-d92e59dce66c -f /home/runner/work/_temp/78cd1922-3bcd-4166-bc02-3185c59b8eae
+2026-10-05T14:33:14.3940092Z Adding to the cache ...
+2026-10-05T14:33:17.4961116Z ##[group]Environment details
+2026-10-05T14:33:17.6594087Z node: v22.22.0
+2026-10-05T14:33:17.6594424Z npm: 10.9.4
+2026-10-05T14:33:17.6594610Z yarn: 1.22.22
+2026-10-05T14:33:17.6595049Z ##[endgroup]
+2026-10-05T14:33:17.6606234Z [command]/opt/hostedtoolcache/node/22.22.0/x64/bin/npm config get cache
+2026-10-05T14:33:17.7274784Z /home/runner/.npm
+2026-10-05T14:33:17.8737386Z Cache hit for: node-cache-Linux-x64-npm-5c4787d73d0257e45c3c3f6e66919630d9ebff3b089461666c00a1b91f2e2c95
+2026-10-05T14:33:19.0469856Z Received 88080384 of 160007866 (55.0%), 84.0 MBs/sec
+2026-10-05T14:33:19.4585536Z Received 160007866 of 160007866 (100.0%), 108.1 MBs/sec
+2026-10-05T14:33:19.4585850Z Cache Size: ~153 MB (160007866 B)
+2026-10-05T14:33:19.4606303Z [command]/usr/bin/tar -xf /home/runner/work/_temp/943495fc-36da-41f9-872b-f3da99bc8d61/cache.tzst -P -C /home/runner/work/railwise-ai/railwise-ai --use-compress-program unzstd
+2026-10-05T14:33:19.8130067Z Cache restored successfully
+2026-10-05T14:33:19.8204862Z Cache restored from key: node-cache-Linux-x64-npm-5c4787d73d0257e45c3c3f6e66919630d9ebff3b089461666c00a1b91f2e2c95
+2026-10-05T14:33:19.8404971Z ##[group]Run npm ci --ignore-scripts
+2026-10-05T14:33:19.8405276Z [36;1mnpm ci --ignore-scripts[0m
+2026-10-05T14:33:19.8652235Z shell: /usr/bin/bash -e {0}
+2026-10-05T14:33:19.8652604Z env:
+2026-10-05T14:33:19.8652794Z   NODE_VERSION: 22.22.0
+2026-10-05T14:33:19.8653001Z   WORKWISE_UPDATE_CHANNEL: frontier
+2026-10-05T14:33:19.8653211Z   RELEASE_CHANNEL: frontier
+2026-10-05T14:33:19.8653489Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+2026-10-05T14:33:19.8653808Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+2026-10-05T14:33:19.8654220Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+2026-10-05T14:33:19.8655085Z   R2_ACCOUNT_ID: ***
+2026-10-05T14:33:19.8655288Z   R2_BUCKET: ***
+2026-10-05T14:33:19.8655498Z   R2_ACCESS_KEY_ID: ***
+2026-10-05T14:33:19.8655820Z   R2_SECRET_ACCESS_KEY: ***
+2026-10-05T14:33:19.8656034Z   WORKWISE_WEBSITE_SSH_HOST: ***
+2026-10-05T14:33:19.8656319Z   WORKWISE_WEBSITE_SSH_PORT: ***
+2026-10-05T14:33:19.8656531Z   WORKWISE_WEBSITE_SSH_USER: ***
+2026-10-05T14:33:19.8657674Z   WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ***
+2026-10-05T14:33:19.8659862Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ***
+2026-10-05T14:33:19.8660200Z   WORKWISE_WEBSITE_RELEASE_ROOT: ***
+2026-10-05T14:33:19.8660413Z ##[endgroup]
+2026-10-05T14:33:22.7629414Z npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+2026-10-05T14:33:23.8289617Z npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+2026-10-05T14:33:26.7036224Z 
+2026-10-05T14:33:26.7037610Z added 1020 packages, and audited 1022 packages in 7s
+2026-10-05T14:33:26.7037994Z 
+2026-10-05T14:33:26.7038203Z 269 packages are looking for funding
+2026-10-05T14:33:26.7038615Z   run `npm fund` for details
+2026-10-05T14:33:26.7735518Z 
+2026-10-05T14:33:26.7736716Z 33 vulnerabilities (3 low, 11 moderate, 19 high)
+2026-10-05T14:33:26.7737111Z 
+2026-10-05T14:33:26.7737835Z To address issues that do not require attention, run:
+2026-10-05T14:33:26.7738511Z   npm audit fix
+2026-10-05T14:33:26.7762857Z 
+2026-10-05T14:33:26.7763577Z To address all issues possible (including breaking changes), run:
+2026-10-05T14:33:26.7764071Z   npm audit fix --force
+2026-10-05T14:33:26.7764258Z 
+2026-10-05T14:33:26.7764496Z Some issues need review, and may require choosing
+2026-10-05T14:33:26.7764910Z a different dependency.
+2026-10-05T14:33:26.7765085Z 
+2026-10-05T14:33:26.7765241Z Run `npm audit` for details.
+2026-10-05T14:33:26.9366507Z ##[group]Run node scripts/publish-r2.mjs cleanup-acceptance --run-id "37316902321"
+2026-10-05T14:33:26.9367194Z [36;1mnode scripts/publish-r2.mjs cleanup-acceptance --run-id "37316902321"[0m
+2026-10-05T14:33:26.9424286Z shell: /usr/bin/bash -e {0}
+2026-10-05T14:33:26.9424489Z env:
+2026-10-05T14:33:26.9424649Z   NODE_VERSION: 22.22.0
+2026-10-05T14:33:26.9424843Z   WORKWISE_UPDATE_CHANNEL: frontier
+2026-10-05T14:33:26.9425044Z   RELEASE_CHANNEL: frontier
+2026-10-05T14:33:26.9425300Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+2026-10-05T14:33:26.9425596Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+2026-10-05T14:33:26.9425993Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+2026-10-05T14:33:26.9426466Z   R2_ACCOUNT_ID: ***
+2026-10-05T14:33:26.9426653Z   R2_BUCKET: ***
+2026-10-05T14:33:26.9426848Z   R2_ACCESS_KEY_ID: ***
+2026-10-05T14:33:26.9427159Z   R2_SECRET_ACCESS_KEY: ***
+2026-10-05T14:33:26.9427416Z   WORKWISE_WEBSITE_SSH_HOST: ***
+2026-10-05T14:33:26.9427625Z   WORKWISE_WEBSITE_SSH_PORT: ***
+2026-10-05T14:33:26.9427847Z   WORKWISE_WEBSITE_SSH_USER: ***
+2026-10-05T14:33:26.9429143Z   WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ***
+2026-10-05T14:33:26.9431290Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ***
+2026-10-05T14:33:26.9431616Z   WORKWISE_WEBSITE_RELEASE_ROOT: ***
+2026-10-05T14:33:26.9431827Z ##[endgroup]
+2026-10-05T14:33:27.8752696Z Removed 23 isolated acceptance object(s) under workwise/acceptance/37316902321/
+2026-10-05T14:33:27.8854515Z ##[group]Run set -euo pipefail
+2026-10-05T14:33:27.8854970Z [36;1mset -euo pipefail[0m
+2026-10-05T14:33:27.8855333Z [36;1mssh_dir="${RUNNER_TEMP}/workwise-website-ssh"[0m
+2026-10-05T14:33:27.8855758Z [36;1minstall -d -m 700 "${ssh_dir}"[0m
+2026-10-05T14:33:27.8856148Z [36;1mexport SSH_KEY_PATH="${ssh_dir}/deploy-key"[0m
+2026-10-05T14:33:27.8856596Z [36;1mexport SSH_KNOWN_HOSTS_PATH="${ssh_dir}/known_hosts"[0m
+2026-10-05T14:33:27.8857003Z [36;1mnode - <<'NODE'[0m
+2026-10-05T14:33:27.8857301Z [36;1mconst fs = require('node:fs')[0m
+2026-10-05T14:33:27.8857912Z [36;1mfs.writeFileSync(process.env.SSH_KEY_PATH, `${process.env.WORKWISE_WEBSITE_SSH_PRIVATE_KEY.trim()}\n`, { mode: 0o600 })[0m
+2026-10-05T14:33:27.8858843Z [36;1mfs.writeFileSync(process.env.SSH_KNOWN_HOSTS_PATH, `${process.env.WORKWISE_WEBSITE_SSH_KNOWN_HOSTS.trim()}\n`, { mode: 0o600 })[0m
+2026-10-05T14:33:27.8859475Z [36;1mNODE[0m
+2026-10-05T14:33:27.8859724Z [36;1m{[0m
+2026-10-05T14:33:27.8860090Z [36;1m  echo "WORKWISE_WEBSITE_SSH_KEY_PATH=${SSH_KEY_PATH}"[0m
+2026-10-05T14:33:27.8860587Z [36;1m  echo "WORKWISE_WEBSITE_SSH_KNOWN_HOSTS_PATH=${SSH_KNOWN_HOSTS_PATH}"[0m
+2026-10-05T14:33:27.8861021Z [36;1m} >> "${GITHUB_ENV}"[0m
+2026-10-05T14:33:27.8919357Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-05T14:33:27.8919616Z env:
+2026-10-05T14:33:27.8919794Z   NODE_VERSION: 22.22.0
+2026-10-05T14:33:27.8919988Z   WORKWISE_UPDATE_CHANNEL: frontier
+2026-10-05T14:33:27.8920197Z   RELEASE_CHANNEL: frontier
+2026-10-05T14:33:27.8920456Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+2026-10-05T14:33:27.8920767Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+2026-10-05T14:33:27.8921167Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+2026-10-05T14:33:27.8921648Z   R2_ACCOUNT_ID: ***
+2026-10-05T14:33:27.8921857Z   R2_BUCKET: ***
+2026-10-05T14:33:27.8922090Z   R2_ACCESS_KEY_ID: ***
+2026-10-05T14:33:27.8922508Z   R2_SECRET_ACCESS_KEY: ***
+2026-10-05T14:33:27.8922790Z   WORKWISE_WEBSITE_SSH_HOST: ***
+2026-10-05T14:33:27.8923000Z   WORKWISE_WEBSITE_SSH_PORT: ***
+2026-10-05T14:33:27.8923209Z   WORKWISE_WEBSITE_SSH_USER: ***
+2026-10-05T14:33:27.8924462Z   WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ***
+2026-10-05T14:33:27.8926640Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ***
+2026-10-05T14:33:27.8927007Z   WORKWISE_WEBSITE_RELEASE_ROOT: ***
+2026-10-05T14:33:27.8927210Z ##[endgroup]
+2026-10-05T14:33:28.0234642Z ##[group]Run node scripts/deploy-website-release.mjs cleanup-acceptance --run-id "37316902321"
+2026-10-05T14:33:28.0235282Z [36;1mnode scripts/deploy-website-release.mjs cleanup-acceptance --run-id "37316902321"[0m
+2026-10-05T14:33:28.0290129Z shell: /usr/bin/bash -e {0}
+2026-10-05T14:33:28.0290398Z env:
+2026-10-05T14:33:28.0290588Z   NODE_VERSION: 22.22.0
+2026-10-05T14:33:28.0290785Z   WORKWISE_UPDATE_CHANNEL: frontier
+2026-10-05T14:33:28.0290995Z   RELEASE_CHANNEL: frontier
+2026-10-05T14:33:28.0291248Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+2026-10-05T14:33:28.0291587Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+2026-10-05T14:33:28.0292089Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+2026-10-05T14:33:28.0292822Z   R2_ACCOUNT_ID: ***
+2026-10-05T14:33:28.0293015Z   R2_BUCKET: ***
+2026-10-05T14:33:28.0293217Z   R2_ACCESS_KEY_ID: ***
+2026-10-05T14:33:28.0293543Z   R2_SECRET_ACCESS_KEY: ***
+2026-10-05T14:33:28.0293752Z   WORKWISE_WEBSITE_SSH_HOST: ***
+2026-10-05T14:33:28.0293972Z   WORKWISE_WEBSITE_SSH_PORT: ***
+2026-10-05T14:33:28.0294344Z   WORKWISE_WEBSITE_SSH_USER: ***
+2026-10-05T14:33:28.0295686Z   WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ***
+2026-10-05T14:33:28.0297893Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ***
+2026-10-05T14:33:28.0298282Z   WORKWISE_WEBSITE_RELEASE_ROOT: ***
+2026-10-05T14:33:28.0298586Z   WORKWISE_WEBSITE_SSH_KEY_PATH: /home/runner/work/_temp/workwise-website-ssh/deploy-key
+2026-10-05T14:33:28.0298994Z   WORKWISE_WEBSITE_SSH_KNOWN_HOSTS_PATH: /home/runner/work/_temp/workwise-website-ssh/known_hosts
+2026-10-05T14:33:28.0299329Z ##[endgroup]
+2026-10-05T14:33:32.4143505Z ***/acceptance/37316902321
+2026-10-05T14:33:32.4260204Z Post job cleanup.
+2026-10-05T14:33:32.5027798Z Cache hit occurred on the primary key node-cache-Linux-x64-npm-5c4787d73d0257e45c3c3f6e66919630d9ebff3b089461666c00a1b91f2e2c95, not saving cache.
+2026-10-05T14:33:32.5155453Z Post job cleanup.
+2026-10-05T14:33:32.5773865Z [command]/usr/bin/git version
+2026-10-05T14:33:32.5805358Z git version 2.55.0
+2026-10-05T14:33:32.5836008Z Temporarily overriding HOME='/home/runner/work/_temp/a2b242c9-150e-466c-891d-d650d45bc5c6' before making global git config changes
+2026-10-05T14:33:32.5837268Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-05T14:33:32.5840337Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/railwise-ai/railwise-ai
+2026-10-05T14:33:32.5870978Z Removing SSH command configuration
+2026-10-05T14:33:32.5875892Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-05T14:33:32.5905456Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-05T14:33:32.6101094Z Removing HTTP extra header
+2026-10-05T14:33:32.6105668Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-05T14:33:32.6134306Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-05T14:33:32.6323731Z Removing includeIf entries pointing to credentials config files
+2026-10-05T14:33:32.6330784Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-05T14:33:32.6357367Z includeif.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git.path
+2026-10-05T14:33:32.6358169Z includeif.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git/worktrees/*.path
+2026-10-05T14:33:32.6358835Z includeif.gitdir:/github/workspace/.git.path
+2026-10-05T14:33:32.6359366Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-05T14:33:32.6365424Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git.path
+2026-10-05T14:33:32.6385251Z /home/runner/work/_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:32.6393651Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-9ad44e8f\-961b\-4f41\-a74c\-ba3fde93480a\.config
+2026-10-05T14:33:32.6425744Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git/worktrees/*.path
+2026-10-05T14:33:32.6447860Z /home/runner/work/_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:32.6456422Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/railwise-ai/railwise-ai/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-9ad44e8f\-961b\-4f41\-a74c\-ba3fde93480a\.config
+2026-10-05T14:33:32.6487742Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-05T14:33:32.6508009Z /github/runner_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:32.6513689Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-9ad44e8f\-961b\-4f41\-a74c\-ba3fde93480a\.config
+2026-10-05T14:33:32.6541319Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-05T14:33:32.6560114Z /github/runner_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config
+2026-10-05T14:33:32.6567614Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-9ad44e8f\-961b\-4f41\-a74c\-ba3fde93480a\.config
+2026-10-05T14:33:32.6596818Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-05T14:33:32.6794479Z Removing credentials config '/home/runner/work/_temp/git-credentials-9ad44e8f-961b-4f41-a74c-ba3fde93480a.config'
+2026-10-05T14:33:32.7037488Z Cleaning up orphan processes

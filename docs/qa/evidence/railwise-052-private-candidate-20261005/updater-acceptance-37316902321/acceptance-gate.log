@@ -1,0 +1,60 @@
+All native updater paths passed	Set up job	﻿2026-10-05T14:32:57.5483543Z Current runner version: '2.337.0'
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5511077Z ##[group]Runner Image Provisioner
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5512042Z Hosted Compute Agent
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5512655Z Version: 20260901.588
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5513399Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5514145Z Build Date: 2026-09-01T19:56:44Z
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5514907Z Worker ID: {b3e76d40-28cd-4096-9a36-9f3796fc23a1}
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5515658Z Azure Region: westus
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5516237Z ##[endgroup]
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5518165Z ##[group]Operating System
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5518860Z Ubuntu
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5519381Z 24.04.5
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5519980Z LTS
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5520498Z ##[endgroup]
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5521121Z ##[group]Runner Image
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5521750Z Image: ubuntu-24.04
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5522351Z Version: 20260927.320.1
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5523485Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5525365Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260927.320
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5526416Z ##[endgroup]
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5527532Z ##[group]GITHUB_TOKEN Permissions
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5530073Z Contents: read
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5530742Z Metadata: read
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5531404Z ##[endgroup]
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5533433Z Secret source: Actions
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5534556Z Cache mode: write
+All native updater paths passed	Set up job	2026-10-05T14:32:57.5535275Z Prepare workflow directory
+All native updater paths passed	Set up job	2026-10-05T14:32:57.6088047Z Prepare all required actions
+All native updater paths passed	Set up job	2026-10-05T14:32:57.6153571Z Complete job name: All native updater paths passed
+All native updater paths passed	Require all three native jobs	﻿2026-10-05T14:32:57.6798471Z ##[group]Run if [[ "${RESULT}" != "success" ]]; then
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.6799512Z ^[[36;1mif [[ "${RESULT}" != "success" ]]; then^[[0m
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.6800604Z ^[[36;1m  echo "::error::macOS arm64, macOS x64, and Windows x64 updater acceptance must all pass."^[[0m
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.6801558Z ^[[36;1m  exit 1^[[0m
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.6802301Z ^[[36;1mfi^[[0m
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7795714Z shell: /usr/bin/bash -e {0}
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7796796Z env:
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7797476Z   NODE_VERSION: 22.22.0
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7798380Z   WORKWISE_UPDATE_CHANNEL: frontier
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7799200Z   RELEASE_CHANNEL: frontier
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7800020Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7801104Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7802534Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7803696Z   RESULT: success
+All native updater paths passed	Require all three native jobs	2026-10-05T14:32:57.7804403Z ##[endgroup]
+All native updater paths passed	Require production-safe metadata cache headers	﻿2026-10-05T14:32:57.8158961Z ##[group]Run if [[ "${RESULT}" != "success" ]]; then
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8159850Z ^[[36;1mif [[ "${RESULT}" != "success" ]]; then^[[0m
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8161224Z ^[[36;1m  echo "::error::latest.json, latest.yml, and latest-mac.yml must use a single short/no-cache policy with ETag, Last-Modified, and Range support."^[[0m
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8162545Z ^[[36;1m  exit 1^[[0m
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8163075Z ^[[36;1mfi^[[0m
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8286854Z shell: /usr/bin/bash -e {0}
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8287415Z env:
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8288040Z   NODE_VERSION: 22.22.0
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8288545Z   WORKWISE_UPDATE_CHANNEL: frontier
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8289090Z   RELEASE_CHANNEL: frontier
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8289712Z   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8290509Z   WORKWISE_RELEASE_PREFIX: workwise/acceptance/37316902321
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8291605Z   WORKWISE_TEST_FEED_URL: https://www.railwise.cn/downloads/workwise/acceptance/37316902321/channels/frontier/latest/
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8292636Z   RESULT: success
+All native updater paths passed	Require production-safe metadata cache headers	2026-10-05T14:32:57.8293068Z ##[endgroup]
+All native updater paths passed	Complete job	﻿2026-10-05T14:32:57.8458871Z Cleaning up orphan processes
