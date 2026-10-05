@@ -1,0 +1,20 @@
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/tmp/railwise-official-052/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+/tmp/railwise-official-052/RailWise AI.app: valid on disk
+/tmp/railwise-official-052/RailWise AI.app: satisfies its Designated Requirement
