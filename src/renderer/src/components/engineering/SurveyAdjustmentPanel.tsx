@@ -1,4 +1,4 @@
-import { recordEngineeringUsage } from './engineering-usage'
+import { recordEngineeringJourneyFailure, recordEngineeringUsage } from './engineering-usage'
 import { EngineeringDrawer } from './EngineeringDrawer'
 import type { SurveyResidualStatisticV1, SurveyStatisticalSummaryV1 } from '@shared/survey-statistical-semantics'
 import { ResidualStatisticCell, SurveyAdjustmentStatistics } from './SurveyAdjustmentStatistics'
@@ -647,7 +647,7 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
       const groupMessage = cosaSources.length ? t('surveyCosaCount', { count: cosaSources.length }) : ''
       const failureMessage = failures.length ? t('surveyImportFailures', { count: failures.length, details: failures.join('; ') }) : ''
       setMessage([importedMessage, groupMessage, groupBlockers ? t('surveyCosaBlockers', { count: groupBlockers }) : '', failureMessage].filter(Boolean).join('; '))
-    } catch (error) { if (importScope === projectScopeRef.current) setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false); setFileInputKey((value) => value + 1) }
+    } catch (error) { if (importScope === projectScopeRef.current) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } } finally { setBusy(false); setFileInputKey((value) => value + 1) }
   }
 
   const attemptedFiles = useRef(new WeakSet<File>())
@@ -673,7 +673,7 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
           ? t('surveyValidationBlocked')
           : t('surveyValidationPassed')
       setNetworks((current) => current.map((item) => item.id === result.network.id ? result.network : item)); setNetwork(result.network); setMessage(validationMessage); setSection('network')
-    } catch (error) { setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
+    } catch (error) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
   }
 
   const adjust = async (): Promise<void> => {
@@ -685,7 +685,7 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
       const currentAdjustments = await refreshAdjustments()
       const currentAdjustment = currentAdjustments?.find((item) => item.run.id === result.run.id) ?? result
       setAdjustment(currentAdjustment); setSelectedResidualSourceRecordId(null); if (isAdmissibleCompletedAdjustment(currentAdjustment)) onAdjustmentComplete?.(result.run.id); setSection('result'); setMessage(result.run.status === 'completed' && isAdmissibleCompletedAdjustment(currentAdjustment) ? t('surveyAdjustmentComplete') : result.run.status === 'completed' ? t('surveyAdjustmentAuditOnly') : t('surveyAdjustmentIncomplete'))
-    } catch (error) { setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
+    } catch (error) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
   }
 
   const compareDeformation = async (): Promise<void> => {

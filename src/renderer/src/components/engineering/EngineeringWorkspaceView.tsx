@@ -1,4 +1,4 @@
-import { beginEngineeringJourney, leaveEngineeringJourney, recordEngineeringUsage } from './engineering-usage'
+import { beginEngineeringJourney, leaveEngineeringJourney, recordEngineeringJourneyFailure, recordEngineeringUsage } from './engineering-usage'
 import { EngineeringDrawer } from './EngineeringDrawer'
 import { engineeringImportKind, type EngineeringImportKind } from './engineering-import'
 import { SURVEY_FILE_ACCEPT } from './survey-file-selection'
@@ -867,7 +867,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       }
       setNotice({ tone: 'success', message: t('engineeringNoticeWarningAccepted') })
     } catch (error) {
-      if (operationScope === requestScope.current) setNotice({ tone: 'error', message: engineeringUserError(error, locale) })
+      if (operationScope === requestScope.current) { recordEngineeringJourneyFailure(); setNotice({ tone: 'error', message: engineeringUserError(error, locale) }) }
     } finally { if (operationScope === requestScope.current) setBusy(false) }
   }
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it } from 'vitest'
-import { readEngineeringUsage, recordEngineeringUsage } from './engineering-usage'
+import { beginEngineeringJourney, leaveEngineeringJourney, readEngineeringJourneyMetrics, readEngineeringUsage, recordEngineeringUsage } from './engineering-usage'
 
 beforeEach(() => {
   const data = new Map<string, string>()
@@ -18,6 +18,17 @@ it('keeps bounded local aggregates without source identifiers and ignores bad ti
   expect(usage.recoveryAttempts).toBe(1)
   expect(usage.recoverySuccesses).toBe(1)
   expect(Object.keys(usage)).not.toContain('projectId')
+})
+
+it('retains anonymous journey denominators across reload-like reads', () => {
+  beginEngineeringJourney()
+  expect(readEngineeringJourneyMetrics()).toMatchObject({ attempts: 1, open: 1 })
+  leaveEngineeringJourney()
+  expect(readEngineeringJourneyMetrics()).toMatchObject({ attempts: 1, cancelled: 1, open: 0 })
+  beginEngineeringJourney()
+  recordEngineeringUsage('resultsReached')
+  expect(readEngineeringJourneyMetrics()).toMatchObject({ attempts: 2, completed: 1, open: 0 })
+  expect(readEngineeringUsage().journeyAttempts.every(item => !('projectId' in item))).toBe(true)
 })
 
 it('recovers from malformed historical counters without blocking the workbench', () => {
