@@ -13,9 +13,13 @@ if (!function_exists('rw_workwise_manifest')) {
 
         $fallback = [
             'name' => 'RailWise AI',
-            'version' => '0.5.1',
-            'publishedAt' => '2026-09-28',
-            'releaseUrl' => 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1',
+            // Keep the fallback aligned with the currently published manifest. The
+            // JSON file is authoritative when present, but an outdated fallback
+            // would make an unavailable or malformed manifest advertise an old
+            // release on the public page.
+            'version' => '0.5.2',
+            'publishedAt' => '2026-10-05',
+            'releaseUrl' => 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.2',
             'repositoryUrl' => 'https://github.com/railwise-cn/railwise-ai',
             'platforms' => [],
             'docs' => [],
