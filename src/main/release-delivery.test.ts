@@ -322,6 +322,10 @@ describe('R2 release delivery gates', () => {
       }
     })
     expect(workflow.jobs['build-macos'].env.MAC_CODESIGN_P12_BASE64).toContain('secrets.MAC_CODESIGN_P12_BASE64')
+    const checkouts = Object.values(workflow.jobs)
+      .flatMap((job: any) => (job.steps ?? []).filter((step: any) => step.uses === 'actions/checkout@v7'))
+    expect(checkouts.length).toBeGreaterThanOrEqual(7)
+    expect(checkouts.every((step: any) => step.with?.['fetch-depth'] === 0)).toBe(true)
     const sidecarTransfer = workflow.jobs['build-document-sidecars'].steps.map((step: any) => step.run || '').join('\n')
     expect(sidecarTransfer).toContain('tar -czf')
     const macBuild = workflow.jobs['build-macos'].steps.map((step: any) => step.run || '').join('\n')
