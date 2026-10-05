@@ -447,6 +447,8 @@
   "engineeringOpenAi": "打开 AI",
   "engineeringCloseAi": "关闭 AI",
   "engineeringAdvancedDetails": "高级详情",
+  "engineeringInternalRecords": "高级：审查记录",
+  "engineeringInternalRecordsDescription": "内部审查记录仍保留用于追溯和排查；上方仅展示专业报告与证据成果。",
   "engineeringMoreMetrics": "更多指标",
   "engineeringAdvancedNavigation": "高级",
   "engineeringAdvancedNavigationHint": "项目、原始记录、自由试算与规范",

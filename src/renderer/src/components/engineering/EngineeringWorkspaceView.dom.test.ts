@@ -166,6 +166,26 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(text).not.toContain(outputHash)
   })
 
+  it('keeps internal JSON review records out of the default delivery view', async () => {
+    manifests = [{
+      id: 'manifest-json', runId: 'run-json', reviewStatus: 'draft',
+      outputs: [
+        { ...file, path: 'report.pdf' },
+        { path: 'professional-review.json', mediaType: 'application/json', sha256: 'b'.repeat(64), sizeBytes: 220 }
+      ],
+      citations: [], validation: { valid: true, errors: [], warnings: [] }
+    }]
+    await renderDelivery()
+
+    expect(visibleText(container)).toContain('report.pdf')
+    expect(visibleText(container)).not.toContain('professional-review.json')
+    const internal = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringInternalRecords'))
+    expect(internal).toBeDefined()
+    await act(async () => { internal!.open = true; internal!.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(internal!)).toContain('professional-review.json')
+    expect(visibleText(internal!)).toContain(i18n.t('engineeringExportFile', { format: 'JSON' }))
+  })
+
   it('keeps project revision counters out of the default delivery view', async () => {
     await renderDelivery()
     await act(async () => button('Deliverables').click())

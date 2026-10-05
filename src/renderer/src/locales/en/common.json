@@ -447,6 +447,8 @@
   "engineeringOpenAi": "Open AI",
   "engineeringCloseAi": "Close AI",
   "engineeringAdvancedDetails": "Advanced details",
+  "engineeringInternalRecords": "Advanced: review records",
+  "engineeringInternalRecordsDescription": "Internal review records stay available for traceability and troubleshooting. Professional reports and evidence files are shown above.",
   "engineeringMoreMetrics": "More metrics",
   "engineeringAdvancedNavigation": "Advanced",
   "engineeringAdvancedNavigationHint": "Project, raw records, trials, and standards",
