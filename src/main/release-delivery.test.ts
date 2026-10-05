@@ -269,7 +269,7 @@ describe('R2 release delivery gates', () => {
       versions: Record<string, Record<string, { name: string; sha256: string; size: number }>>
     }
     expect(baselines.schemaVersion).toBe(1)
-    expect(Object.keys(baselines.versions)).toEqual(['0.3.5', '0.4.0', '0.4.1'])
+    expect(Object.keys(baselines.versions)).toEqual(['0.3.5', '0.4.0', '0.4.1', '0.5.1'])
     expect(baselines.versions['0.4.0']).toEqual({
       'darwin-arm64': {
         name: 'WorkWise-0.4.0-mac-Apple-Silicon.dmg',
@@ -302,6 +302,23 @@ describe('R2 release delivery gates', () => {
         name: 'WorkWise-0.4.1-win-x64.exe',
         sha256: '06e37d5d6000f909dce3bc23c476217d788457595db7dab08ff8ef061d3f374f',
         size: 232522014
+      }
+    })
+    expect(baselines.versions['0.5.1']).toEqual({
+      'darwin-arm64': {
+        name: 'WorkWise-0.5.1-mac-Apple-Silicon.dmg',
+        sha256: '81c6d25ae853cf29a4271911cb4dc8333a09bde2e80c89dab5f06d9d23e2fe9a',
+        size: 295034092
+      },
+      'darwin-x64': {
+        name: 'WorkWise-0.5.1-mac-Intel.dmg',
+        sha256: '9c4d575a3194944de5be9f740a1e1eb9048c0f1251b638d1a0c73ccf431d9e6d',
+        size: 299835593
+      },
+      'win32-x64': {
+        name: 'WorkWise-0.5.1-win-x64.exe',
+        sha256: '79dad522af4fb2c462e99bed83ffeb54f567a23802f7b20cb7f43cebe63dac2c',
+        size: 246825029
       }
     })
     expect(workflow.jobs['build-macos'].env.MAC_CODESIGN_P12_BASE64).toContain('secrets.MAC_CODESIGN_P12_BASE64')
