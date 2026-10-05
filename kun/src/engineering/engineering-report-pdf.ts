@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import type { Readable } from 'node:stream'
 import PDFDocument from 'pdfkit'
-import { professionalReportCellText, type ProfessionalReportModel, type ProfessionalReportTable } from './survey-professional-report.js'
+import { professionalReportCellText, professionalReportPresentation, type ProfessionalReportModel, type ProfessionalReportTable } from './survey-professional-report.js'
 
 const fontUrl = new URL('../../assets/fonts/NotoSansSC-Regular.ttf', import.meta.url)
 let fontBytes: Promise<Buffer> | undefined
@@ -21,6 +21,7 @@ async function reportFont(): Promise<Buffer> {
  * actual header. A pathological cell is rejected rather than clipped. */
 export async function makeProfessionalReportPdf(model: ProfessionalReportModel): Promise<Buffer> {
   if (JSON.stringify(model).length > 2_000_000) throw new Error('report exceeds the PDF layout limit; split the selected results into separate reports')
+  model = professionalReportPresentation(model)
   const font = await reportFont()
   return new Promise<Buffer>((resolve, reject) => {
     const document = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 42, bufferPages: true, info: { Title: model.title, Creator: 'RailWise Survey', Subject: '待审查草稿 · 未签认' } })

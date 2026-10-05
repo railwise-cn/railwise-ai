@@ -193,7 +193,8 @@ export function buildProfessionalReportModel(input: {
         observationId: observation.observationId, type: label(observation.type), from: observation.from, to: observation.to,
         routeLength: observation.routeLengthMetres, observed: observation.observed, adjusted: observation.adjusted, unit: observation.unit ?? observation.rawUnit,
         closurePath: closureMemberships.get(observation.observationId)?.join('；') ?? '未纳入独立闭合',
-        source: [observation.sourceRecordId, observation.sourceRow === undefined ? undefined : `第 ${observation.sourceRow} 行`].filter(Boolean).join(' / ') || '不可用'
+        source: [observation.sourceRecordId, observation.sourceLocator, observation.sourceRow === undefined ? undefined : `第 ${observation.sourceRow} 行`].filter(Boolean).join(' / ') || '不可用',
+        sourceLocator: observation.sourceLocator, sourceRow: observation.sourceRow
       })),
       note: '本表以观测为边、起讫点为节点，保留闭合/附合线路中的有向成员关系；“未纳入独立闭合”不代表观测无效。数值来自冻结的专业审查投影，不在报告层重算。'
     })
@@ -383,6 +384,103 @@ export function buildProfessionalReportModel(input: {
 }
 
 function xml(value: string): string { return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;') }
+
+/** Presentation boundary shared by all ordinary professional exports. Internal
+ * identities and the legacy report appendix remain in the evidence model/JSON;
+ * they are never substituted for source filenames, original rows or survey
+ * quantities in an engineer's report. This projection does not change numbers. */
+export function professionalReportPresentation(model: ProfessionalReportModel): ProfessionalReportModel {
+  const sourceNames = new Map(model.sourceBinding.map((source, index) => [source.networkId, `资料 ${index + 1}${source.name ? ` · ${source.name}` : ''}`]))
+  const deformationNames = new Map(model.tables.filter(table => table.id.endsWith('-deformation-epochs')).map((table, index) => [table.id.slice(0, -'-deformation-epochs'.length), `变形比较 ${index + 1}`]))
+  const observationNames = new Map<string, Map<string, string>>()
+  const closureNames = new Map<string, Map<string, string>>()
+  const observationSources = new Map<string, string>()
+  const sourceKey = (networkId: string | undefined, observationId: string) => JSON.stringify([networkId, observationId])
+  for (const table of model.tables.filter(table => table.id.endsWith('-network-topology'))) {
+    const source = model.sourceBinding.find(binding => table.id === `${binding.networkId}-network-topology`)
+    if (!source) continue
+    const names = new Map<string, string>()
+    table.rows.forEach((row, index) => {
+      const id = String(row.observationId)
+      const locator = typeof row.sourceLocator === 'string' && row.sourceLocator.trim() ? row.sourceLocator : undefined
+      const rowLabel = typeof row.sourceRow === 'number' ? `第 ${row.sourceRow} 行` : String(row.source ?? '').match(/第 \d+ 行/)?.[0]
+      const position = [locator, rowLabel].filter(Boolean).join(' · ')
+      observationSources.set(sourceKey(source.networkId, id), position ? [source.name, position].filter(Boolean).join(' · ') : '原始定位未记录')
+      // Preserve user-provided observation numbers. Parser-generated IDs are
+      // implementation identifiers; the source locator carries their evidence.
+      if (/^(?:workwise-|cosa-|gsi-|m5-|jobxml-|rw5-|obs_|observation_)/.test(id)) names.set(id, `观测 ${index + 1}`)
+    })
+    observationNames.set(source.networkId, names)
+  }
+  for (const source of model.sourceBinding) {
+    const table = model.tables.find(table => table.id === `${source.networkId}-closures`)
+    closureNames.set(source.networkId, new Map(table?.rows.map((row, index) => [String(row.id), `${row.kind === '附合路线' ? '附合路线' : '闭合环'} ${index + 1}`])))
+  }
+  const displayNote = (text: string): string => {
+    return text
+      .replaceAll('network.instrumentParameters.closureTolerance', '项目闭合限差')
+      .replaceAll('完整输入、结果和投影摘要在版本附录及专业成果 JSON 中保留。', '各项成果对应所列原始资料；完整来源与版本记录另行保存。')
+      .replaceAll('数值来自冻结的专业审查投影，不在报告层重算。', '数值来自本次平差成果。')
+      .replace(/比较记录：[^；]+；/g, '')
+      .replace(/变形比较：[^；]+；/g, '')
+      .replace(/；算法：[^。]+。数值由已冻结的变形比较结果投影，未在报告层重新计算。/g, '。数值来自所选期次的变形比较成果。')
+      .replace(/数据集 [^；]+；算法 [^；]+；所有行绑定原文件 SHA-256。/g, '各期观测对应原始资料。')
+      .replaceAll('完整源文件、结果及投影 SHA-256 见版本附录。', '完整来源与版本记录另行保存。')
+      .replaceAll('完整原始记录保留在 normalized_data 中。', '完整原始记录另行保存。')
+  }
+  // Only internally authored identity fields are renamed. A point number or
+  // filename can legitimately contain the same bytes as an internal ID.
+  const networkSuffixes = ['reference', 'closures', 'network-topology', 'summary', 'points', 'observations', 'ellipses', 'checks']
+  const tables = model.tables.filter(table => table.id !== 'version-appendix').map(table => {
+    const networkId = model.sourceBinding.find(source => networkSuffixes.some(suffix => table.id === `${source.networkId}-${suffix}`))?.networkId
+    const columns = table.columns.filter(column => !['adjustmentId', 'resultId', 'inputHash', 'resultHash'].includes(column.key)).map(column => ({
+      ...column,
+      ...(table.id === 'source-binding' && column.key === 'networkId' ? { label: '资料编号' } : {}),
+      ...(table.id === 'monitoring-daily' && column.key === 'source' ? { label: '原始行' } : {})
+    }))
+    const rows = table.rows.map((row, index) => {
+      const result = { ...row }
+      if (table.id === 'source-binding') result.networkId = sourceNames.get(String(row.networkId)) ?? '资料未记录'
+      if (networkId && table.id.endsWith('-closures')) {
+        result.id = closureNames.get(networkId)?.get(String(row.id)) ?? row.id
+        if (row.toleranceBasis === 'network.instrumentParameters.closureTolerance') result.toleranceBasis = '项目闭合限差'
+      }
+      if (table.id.endsWith('-observations') || table.id.endsWith('-network-topology')) {
+        const id = String(row.observationId ?? row.id)
+        const key = table.id.endsWith('-observations') ? 'id' : 'observationId'
+        result[key] = observationNames.get(networkId ?? '')?.get(id) ?? row[key]
+        result.source = observationSources.get(sourceKey(networkId, id)) ?? '原始定位未记录'
+        if (networkId && typeof row.closurePath === 'string') result.closurePath = row.closurePath.split('；').map(path => {
+          const direction = path.endsWith('（正向）') ? '（正向）' : path.endsWith('（反向）') ? '（反向）' : ''
+          const route = direction ? path.slice(0, -direction.length) : path
+          return `${closureNames.get(networkId)?.get(route) ?? route}${direction}`
+        }).join('；')
+      }
+      if (table.id.endsWith('-segment-members')) {
+        const binding = model.comparisonBinding?.find(item => table.id === `${item.comparisonId}-segment-members`)
+        const period = row.period === '原测期' ? binding?.reference : binding?.current
+        result.sourceRecordId = observationSources.get(sourceKey(period?.networkId, String(row.observationId))) ?? '原始定位未记录'
+        result.observationId = observationNames.get(period?.networkId ?? '')?.get(String(row.observationId)) ?? row.observationId
+      }
+      if (table.id.endsWith('-deformation-epochs')) {
+        result.comparisonId = '所选期次比较'
+        result.networkId = sourceNames.get(String(row.networkId)) ?? `第 ${index + 1} 期资料`
+      }
+      if (table.id === 'monitoring-daily' && typeof row.source === 'string') result.source = row.source.split(' / ')[0]
+      return result
+    })
+    let title = table.title
+    if (networkId && title.startsWith(`${networkId} · `)) title = `${sourceNames.get(networkId)} · ${title.slice(`${networkId} · `.length)}`
+    for (const [id, name] of deformationNames) if (title.startsWith(`变形比较 ${id} · `)) {
+      title = `${name} · ${title.slice(`变形比较 ${id} · `.length)}`
+      break
+    }
+    return { ...table, title, columns, rows, ...(table.note ? { note: displayNote(table.note) } : {}) }
+  })
+  return { ...model, tables, appendix: undefined, notes: model.notes.map(note => displayNote(note)
+    .replaceAll('本成果由确定性计算结果投影生成，数值未由 AI 改写。', '本成果采用测量平差计算值。')
+    .replaceAll('当前资料或合同不足', '当前资料或检核条件不足')) }
+}
 export function professionalReportCellText(value: unknown, decimals?: number): string { if (value === undefined || value === null || value === '') return '不可用'; if (typeof value === 'number') return Number.isFinite(value) ? decimals === undefined ? Number(value.toPrecision(10)).toString() : value.toFixed(decimals) : '不可用'; return String(value) }
 function cellText(value: unknown): string { return professionalReportCellText(value) }
 
@@ -397,6 +495,7 @@ function wordTable(table: ProfessionalReportTable): string {
 
 /** OOXML is intentionally emitted locally to avoid adding a second document runtime. */
 export async function makeProfessionalDocx(model: ProfessionalReportModel): Promise<Buffer> {
+  model = professionalReportPresentation(model)
   const body = [
     wordParagraph(model.title, 'Title'), wordParagraph(`项目：${model.projectName}`), wordParagraph(`作业类型：${model.taskType}`), wordParagraph(`生成时间：${model.generatedAt}`), wordParagraph('状态：待审查草稿；签认状态：未签认'),
     ...model.notes.map(note => wordParagraph(`说明：${note}`)),
@@ -433,6 +532,7 @@ function professionalSheet(table: ProfessionalReportTable): string {
 
 /** A separate professional workbook preserves evidence.xlsx byte/schema compatibility. */
 export async function makeProfessionalXlsx(model: ProfessionalReportModel): Promise<Buffer> {
+  model = professionalReportPresentation(model)
   const metadata: ProfessionalReportTable = { id: 'report-metadata', title: '成果说明与签认状态', columns: [{ key: 'item', label: '项目' }, { key: 'value', label: '内容' }], rows: [{ item: '成果标题', value: model.title }, { item: '项目名称', value: model.projectName }, { item: '生成时间', value: model.generatedAt }, { item: '签认状态', value: '未签认' }, ...model.notes.map(value => ({ item: '说明', value })), ...model.tables.flatMap(table => table.note ? [{ item: `${table.title}说明`, value: table.note }] : [])] }
   const sheets = [metadata, ...model.tables].map((table, index) => ({ name: `${String(index + 1).padStart(2, '0')}_${table.title.split(' · ').at(-1)}`.replaceAll('\\', '_').replaceAll('/', '_').replaceAll('?', '_').replaceAll('*', '_').replaceAll('[', '_').replaceAll(']', '_').replaceAll(':', '_').slice(0, 31), table }))
   const zip = new JSZip()
