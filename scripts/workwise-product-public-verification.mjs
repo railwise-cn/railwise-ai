@@ -60,8 +60,13 @@ for value,separator in directives(open(sys.argv[1],encoding='utf-8',errors='repl
         if server is not None and len(stack)==server['depth']+1:
             if 'www.railwise.cn' in server['names']:
                 for root in server['roots']:
-                    if re.fullmatch(r'/www/audit-releases/audit-[A-Za-z0-9_-]+/site',root):
-                        roots.add(root)
+                    # OpenResty accepts an optional trailing slash on a
+                    # server-level root directive.  Normalize it before the
+                    # allow-list check so formatting changes in the active
+                    # vhost cannot make a valid release undiscoverable.
+                    normalized=root.rstrip('/')
+                    if re.fullmatch(r'/www/audit-releases/audit-[A-Za-z0-9._-]+/site',normalized):
+                        roots.add(normalized)
             server=None
         if stack:
             stack.pop()
