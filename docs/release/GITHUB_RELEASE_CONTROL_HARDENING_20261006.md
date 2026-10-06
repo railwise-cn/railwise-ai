@@ -7,7 +7,8 @@ release approval and not evidence that a new version was published.
 ## Scope and remote snapshot
 
 - Repository: `railwise-cn/railwise-ai`
-- Audited at: 2026-10-06 09:19 UTC (17:19 Asia/Shanghai)
+- Initial remote snapshot: 2026-10-06 09:19 UTC (17:19 Asia/Shanghai)
+- Final permission/environment recheck: 2026-10-06 09:28 UTC (17:28 Asia/Shanghai)
 - Default branch: `main`
 - Main HEAD: `c20d68d47a1b7b996d9601bea0e2866eb65c4589`
 - Open pull requests at audit time: none
@@ -18,11 +19,13 @@ release approval and not evidence that a new version was published.
 ## Repository identity and permissions
 
 The active GitHub CLI/API identity used for the checks was `railwise-cn`.
-The collaborators endpoint returned only `railwise-cn` with administrator,
-maintain, push, pull, triage, and admin permissions. A direct lookup of
-`wangjiawei508` returned HTTP 404, so that account is no longer a repository
-collaborator and cannot push branches, tags, or force-update the repository.
-The repository `CODEOWNERS` file on `main` intentionally names only
+The collaborators listing returned only `railwise-cn` with administrator,
+maintain, push, pull, triage, and admin permissions. The explicit permission
+endpoint for `wangjiawei508` returned `permission=read` and `push=false`; the
+account therefore cannot push branches, tags, or force-update the repository.
+GitHub's listing endpoint does not include that read-only account in the
+owner's response, so the permission endpoint is the authoritative check used
+here. The repository `CODEOWNERS` file on `main` intentionally names only
 `@railwise-cn`; the attempted read-only reviewer entry was not merged and is
 not represented as an effective reviewer.
 
@@ -66,12 +69,11 @@ The `production-release` environment exists as id `23559877952` and has:
 
 The standalone website cache-repair workflow is also `workflow_dispatch` only.
 Its `apply` path uses `production-release`; its `inspect` path is read-only and
-uses `release-inspection`. The `release-inspection` environment is not present
-in the current environment listing, so GitHub would create it lazily without a
-protection rule if that inspection path runs. This is acceptable for a
-read-only inspection but is recorded as a follow-up to create the named
-non-production inspection environment explicitly and keep the workflow intent
-unambiguous.
+uses the explicitly created `release-inspection` environment (id
+`23566793280`). That environment has `can_admins_bypass=false`, no secrets, no
+required reviewers, and no deployment protection rules because the job only
+inspects server configuration. Keeping the environment named and explicit
+prevents a typo from silently creating an unrelated environment.
 
 Repository Actions settings were checked as follows:
 
@@ -106,11 +108,8 @@ could break the quality and release workflows.
 
 1. Keep administrator bypass exceptional and record the reason whenever it is
    used; require a real CODEOWNER approval for normal release-control changes.
-2. Create the `release-inspection` environment explicitly with no secrets and
-   no deployment permission, or remove the environment reference from the
-   read-only inspection job.
-3. Inventory and SHA-pin external Actions, then restrict `allowed_actions` to
+2. Inventory and SHA-pin external Actions, then restrict `allowed_actions` to
    the reviewed set in a separate change with its own Quality run.
-4. Keep `wangjiawei508` out of repository collaborators unless a future role
-   explicitly requires a read-only account; if restored, verify it cannot
-   bypass tag or environment protection.
+3. Keep `wangjiawei508` at read permission unless a future role explicitly
+   requires a different access level; if changed, verify it cannot bypass tag
+   or environment protection.
