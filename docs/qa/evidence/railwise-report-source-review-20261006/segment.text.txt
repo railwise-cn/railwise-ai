@@ -1,0 +1,176 @@
+公开合成水准复测成果 测量平差专业成果册
+项目：公开合成水准复测成果 作业类型：水准网
+生成时间：2026-10-06T00:00:00.000Z 状态：待审查草稿 · 未签认
+本成果采用测量平差计算值。
+“未评估/不可用”表示当前资料或检核条件不足，不代表通过、合格或安全。
+本稿未完成专业复核、审核、批准和签名；签认栏保留空白。
+显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。
+资料与版本绑定
+资料编号 源文件 绑定状态 原件完整性
+资料 1 · workwise-survey-network.json workwise-survey-network.json 已绑定 已校验
+资料 2 · workwise-survey-network.json workwise-survey-network.json 已绑定 已校验
+说明：各项成果对应所列原始资料；完整来源与版本记录另行保存。
+资料 1 · workwise-survey-network.json · 基准与已知控制点
+点号 类型 高程 (m)
+BM01 已知点 100.000000
+说明：高程基准：LOCAL-BM；单位：m；状态：已声明
+资料 1 · workwise-survey-network.json · 闭合与附合检核
+线路 类型 起点 终点 观测高差和 已知高差 (m) 线路长度 (m) 测站数 闭合差 (mm) 限差 (mm) 限差依据 状态
+(m)
+闭合环 1 闭合环 P01 P01 0.003000 0.000000 200.000000 不可用 3.0000 4.0000 项目闭合限 通过
+差
+RailWise Survey · 待审查 · 1 / 8
+说明：闭合差与限差以 mm 显示，观测和已知高差以 m 显示；线路长度、测站数和限差依据只在原始资料明确时列出，限差未配置时不得推定合格。
+资料 1 · workwise-survey-network.json · 网形与测段索引
+观测号 类型 起点 终点 测段长度 (m) 观测值 (m / rad) 平差值 (m / rad) 单位 闭合/附合路径 原始定位
+forward 高差 BM01 P01 100.000000 1.003000 1.002400 m 闭合环 1（正 workwise-
+向） survey-
+network.json
+· WorkWise JS
+ON:network.ob
+servations[0]
+back 高差 P01 BM01 100.000000 -1.000000 -1.002400 m 闭合环 1（正 workwise-
+向） survey-
+network.json
+· WorkWise JS
+ON:network.ob
+servations[1]
+说明：本表以观测为边、起讫点为节点，保留闭合/附合线路中的有向成员关系；“未纳入独立闭合”不代表观测无效。数值来自本次平差成果。
+资料 1 · workwise-survey-network.json · 平差统计与检查状态
+网型 观测数 点数 自由度 单位权中误差 (无量 方差因子 (无量纲) 方差依据 计算状态
+纲)
+水准网 2 2 1 0.670820 0.450000 后验 计算有效
+说明：残差范数仅作描述性统计，不等同闭合差；0.002473863375370507 m（2 条）
+资料 1 · workwise-survey-network.json · 点位成果与精度
+点号 类型 高程 (m) 高程改正数 (mm) 点位中误差 (mm) 精度依据
+BM01 已知点 100.000000 不可用 不可用 未记录
+RailWise Survey · 待审查 · 2 / 8
+资料 1 · workwise-survey-network.json · 点位成果与精度（续）
+点号 类型 高程 (m) 高程改正数 (mm) 点位中误差 (mm) 精度依据
+P01 待定点 101.002400 2.4000 1.2000 后验
+说明：最弱点：P01，点位中误差 0.0011999999999999567 m。最弱边：未评估（点间协方差不可用）。
+资料 1 · workwise-survey-network.json · 观测值、改正数与残差
+观测号 类型 起讫点 观测值 平差值 值单位 改正数 残差 改正/残差单位 残差筛查 原始定位
+forward 高差 BM01 → P01 1.0030000000 1.0024000000 m -0.6000 -0.6000 mm 未见候选 workwise-
+survey-
+network.json
+· WorkWise
+JSON:networ
+k.observation
+s[0]
+back 高差 P01 → BM01 -1.0000000000 -1.0024000000 m -2.4000 -2.4000 mm 未见候选 workwise-
+survey-
+network.json
+· WorkWise
+JSON:networ
+k.observation
+s[1]
+说明：观测值与平差值保持 m / rad；线性改正数和残差以 mm 显示，角度以角秒显示。
+资料 1 · workwise-survey-network.json · 质量检查与复核状态
+检查项 状态 依据/缺项原因
+来源绑定 通过 无
+原始记录覆盖 通过 无
+RailWise Survey · 待审查 · 3 / 8
+资料 1 · workwise-survey-network.json · 质量检查与复核状态（续）
+检查项 状态 依据/缺项原因
+基准声明 通过 无
+外业检核 未评估 测站原始读数未评估
+独立闭合检核 通过 无
+精度限差 未评估 未配置精度限差
+数值结果 通过 无
+规范符合性 未评估 适用规范和符合性未评估
+资料 2 · workwise-survey-network.json · 基准与已知控制点
+点号 类型 高程 (m)
+BM01 已知点 100.000000
+说明：高程基准：LOCAL-BM；单位：m；状态：已声明
+资料 2 · workwise-survey-network.json · 闭合与附合检核
+线路 类型 起点 终点 观测高差和 已知高差 (m) 线路长度 (m) 测站数 闭合差 (mm) 限差 (mm) 限差依据 状态
+(m)
+闭合环 1 闭合环 P01 P01 0.002000 0.000000 200.000000 不可用 2.0000 4.0000 项目闭合限 通过
+差
+说明：闭合差与限差以 mm 显示，观测和已知高差以 m 显示；线路长度、测站数和限差依据只在原始资料明确时列出，限差未配置时不得推定合格。
+RailWise Survey · 待审查 · 4 / 8
+资料 2 · workwise-survey-network.json · 网形与测段索引
+观测号 类型 起点 终点 测段长度 (m) 观测值 (m / rad) 平差值 (m / rad) 单位 闭合/附合路径 原始定位
+forward 高差 BM01 P01 100.000000 0.998000 0.997600 m 闭合环 1（正 workwise-
+向） survey-
+network.json
+· WorkWise JS
+ON:network.ob
+servations[0]
+back 高差 P01 BM01 100.000000 -0.996000 -0.997600 m 闭合环 1（正 workwise-
+向） survey-
+network.json
+· WorkWise JS
+ON:network.ob
+servations[1]
+说明：本表以观测为边、起讫点为节点，保留闭合/附合线路中的有向成员关系；“未纳入独立闭合”不代表观测无效。数值来自本次平差成果。
+资料 2 · workwise-survey-network.json · 平差统计与检查状态
+网型 观测数 点数 自由度 单位权中误差 (无量 方差因子 (无量纲) 方差依据 计算状态
+纲)
+水准网 2 2 1 0.447214 0.200000 后验 计算有效
+说明：残差范数仅作描述性统计，不等同闭合差；0.0016492422502470659 m（2 条）
+资料 2 · workwise-survey-network.json · 点位成果与精度
+点号 类型 高程 (m) 高程改正数 (mm) 点位中误差 (mm) 精度依据
+BM01 已知点 100.000000 不可用 不可用 未记录
+P01 待定点 100.997600 -2.4000 0.8000 后验
+RailWise Survey · 待审查 · 5 / 8
+说明：最弱点：P01，点位中误差 0.0008000000000000007 m。最弱边：未评估（点间协方差不可用）。
+资料 2 · workwise-survey-network.json · 观测值、改正数与残差
+观测号 类型 起讫点 观测值 平差值 值单位 改正数 残差 改正/残差单位 残差筛查 原始定位
+forward 高差 BM01 → P01 0.9980000000 0.9976000000 m -0.4000 -0.4000 mm 未见候选 workwise-
+survey-
+network.json
+· WorkWise
+JSON:networ
+k.observation
+s[0]
+back 高差 P01 → BM01 -0.9960000000 -0.9976000000 m -1.6000 -1.6000 mm 未见候选 workwise-
+survey-
+network.json
+· WorkWise
+JSON:networ
+k.observation
+s[1]
+说明：观测值与平差值保持 m / rad；线性改正数和残差以 mm 显示，角度以角秒显示。
+资料 2 · workwise-survey-network.json · 质量检查与复核状态
+检查项 状态 依据/缺项原因
+来源绑定 通过 无
+原始记录覆盖 通过 无
+基准声明 通过 无
+外业检核 未评估 测站原始读数未评估
+独立闭合检核 通过 无
+RailWise Survey · 待审查 · 6 / 8
+资料 2 · workwise-survey-network.json · 质量检查与复核状态（续）
+检查项 状态 依据/缺项原因
+精度限差 未评估 未配置精度限差
+数值结果 通过 无
+规范符合性 未评估 适用规范和符合性未评估
+测段观测高差比较
+测段 起点 终点 原测高差 (m) 本期高差 (m) 本期减原测 (mm) 规范符合性
+BM01-P01 BM01 P01 1.003000 0.996000 -7.0000 未评估
+说明：原测期：2026-09-01T00:00:00.000Z；本期：2026-09-02T00:00:00.000Z。差值为本期减原测的测段高差变化，不代表测点绝对沉降；规范符合性未评估。
+测段平差高差比较
+测段 起点 终点 原测高差 (m) 本期高差 (m) 本期减原测 (mm) 规范符合性
+BM01-P01 BM01 P01 1.002400 0.997600 -4.8000 未评估
+说明：原测期：2026-09-01T00:00:00.000Z；本期：2026-09-02T00:00:00.000Z。差值为本期减原测的测段高差变化，不代表测点绝对沉降；规范符合性未评估。
+测段两期成员与来源
+测段 期次 观测期 源文件 观测号 原始定位
+BM01-P01 原测期 2026-09-01T00:00:00.000Z workwise-survey- forward workwise-survey-
+network.json network.json · WorkWise
+JSON:network.observation
+s[0]
+RailWise Survey · 待审查 · 7 / 8
+测段两期成员与来源（续）
+测段 期次 观测期 源文件 观测号 原始定位
+BM01-P01 本期 2026-09-02T00:00:00.000Z workwise-survey- back workwise-survey-
+network.json network.json · WorkWise
+JSON:network.observation
+s[1]
+说明：观测编号按所选测段路线顺序逐行保留；路径方向由起讫点确定。完整来源与版本记录另行保存。
+签认栏（空白 / 未签认）
+角色 姓名 日期 签名
+编制 ________________ ________________ ________________
+复核 ________________ ________________ ________________
+批准 ________________ ________________ ________________
+RailWise Survey · 待审查 · 8 / 8

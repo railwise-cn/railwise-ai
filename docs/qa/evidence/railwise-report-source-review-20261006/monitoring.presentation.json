@@ -1,0 +1,227 @@
+{
+  "title": "公开合成监测日报 测量平差专业成果册",
+  "projectName": "公开合成监测日报",
+  "taskType": "变形监测",
+  "generatedAt": "2026-10-06T00:00:00.000Z",
+  "reviewStatus": "unsigned",
+  "reportStatus": "draft",
+  "sourceBinding": [],
+  "monitoringReport": {
+    "schemaVersion": 1,
+    "projectId": "report-audit",
+    "datasetId": "monitoring-internal-audit",
+    "sourceFileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "algorithmVersion": "monitoring-analysis-v2",
+    "rows": [
+      {
+        "schemaVersion": 1,
+        "projectId": "report-audit",
+        "datasetId": "monitoring-internal-audit",
+        "monitoringItem": "沉降",
+        "point": "P01",
+        "initialTimestamp": "2026-09-01",
+        "previousTimestamp": "2026-09-10",
+        "currentTimestamp": "2026-09-11",
+        "initialValue": 0,
+        "previousValue": 1.2,
+        "currentValue": 1.8,
+        "periodChange": 0.6,
+        "cumulativeChange": 1.8,
+        "ratePerDay": 0.6,
+        "unit": "mm",
+        "threshold": 10,
+        "thresholdStatus": "normal",
+        "continuity": "continuous",
+        "sourceRows": [
+          2,
+          3,
+          4
+        ],
+        "sourceFileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "status": "draft",
+    "generatedAt": "2026-10-06T00:00:00.000Z"
+  },
+  "tables": [
+    {
+      "id": "monitoring-daily",
+      "title": "监测日报与累计变化",
+      "columns": [
+        {
+          "key": "item",
+          "label": "监测项"
+        },
+        {
+          "key": "point",
+          "label": "测点"
+        },
+        {
+          "key": "initialEpoch",
+          "label": "初始期"
+        },
+        {
+          "key": "previousEpoch",
+          "label": "上期"
+        },
+        {
+          "key": "currentEpoch",
+          "label": "本期"
+        },
+        {
+          "key": "initial",
+          "label": "初始值",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "previous",
+          "label": "上期值",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "current",
+          "label": "本期值",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "periodChange",
+          "label": "本次变化",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "cumulative",
+          "label": "累计变化",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "cumulativeBasis",
+          "label": "累计口径"
+        },
+        {
+          "key": "rate",
+          "label": "变化速率",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "unit",
+          "label": "单位"
+        },
+        {
+          "key": "threshold",
+          "label": "控制值",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "projectUnit",
+          "label": "项目单位"
+        },
+        {
+          "key": "unitAlignment",
+          "label": "来源/项目单位"
+        },
+        {
+          "key": "status",
+          "label": "状态"
+        },
+        {
+          "key": "continuity",
+          "label": "期次连续性"
+        },
+        {
+          "key": "unitStatus",
+          "label": "单位状态"
+        },
+        {
+          "key": "unitConflictUnits",
+          "label": "单位冲突"
+        },
+        {
+          "key": "source",
+          "label": "原始行"
+        }
+      ],
+      "rows": [
+        {
+          "item": "沉降",
+          "point": "P01",
+          "initialEpoch": "2026-09-01",
+          "previousEpoch": "2026-09-10",
+          "currentEpoch": "2026-09-11",
+          "initial": 0,
+          "previous": 1.2,
+          "current": 1.8,
+          "periodChange": 0.6,
+          "cumulative": 1.8,
+          "cumulativeBasis": "未记录",
+          "rate": 0.6,
+          "unit": "mm",
+          "threshold": 10,
+          "unitAlignment": "未记录",
+          "status": "正常",
+          "continuity": "记录连续",
+          "unitStatus": "一致",
+          "source": "2,3,4"
+        }
+      ],
+      "note": "各期观测对应原始资料。日报当前状态：待审查。初始值是所选数据集的首条观测值，不代表已签认的工程基准。累计变化仅在累计字段完整一致时使用来源累计字段，否则使用全量观测值首末差；累计字段混用时待确认，不与观测值混算，也不等同于原始累计量。单位冲突仅保留证据，不跨单位计算变化或速率；来源单位与项目单位未统一时，单位关系和阈值判断待确认。同一时刻的重复记录不视为相邻期次，累计变化同样待确认。"
+    },
+    {
+      "id": "source-binding",
+      "title": "资料与版本绑定",
+      "columns": [
+        {
+          "key": "networkId",
+          "label": "资料编号"
+        },
+        {
+          "key": "source",
+          "label": "源文件"
+        },
+        {
+          "key": "status",
+          "label": "绑定状态"
+        },
+        {
+          "key": "integrity",
+          "label": "原件完整性"
+        }
+      ],
+      "rows": [],
+      "note": "各项成果对应所列原始资料；完整来源与版本记录另行保存。"
+    }
+  ],
+  "notes": [
+    "本成果采用测量平差计算值。",
+    "“未评估/不可用”表示当前资料或检核条件不足，不代表通过、合格或安全。",
+    "本稿未完成专业复核、审核、批准和签名；签认栏保留空白。",
+    "显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。",
+    "符号约定：未声明，请复核资料的正负方向。变化速率单位为各行所列单位/天。"
+  ],
+  "signoff": [
+    {
+      "role": "编制",
+      "name": "",
+      "date": "",
+      "signature": ""
+    },
+    {
+      "role": "复核",
+      "name": "",
+      "date": "",
+      "signature": ""
+    },
+    {
+      "role": "批准",
+      "name": "",
+      "date": "",
+      "signature": ""
+    }
+  ]
+}

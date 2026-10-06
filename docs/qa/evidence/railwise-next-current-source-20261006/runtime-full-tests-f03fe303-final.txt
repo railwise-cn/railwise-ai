@@ -1,0 +1,1202 @@
+
+> kun@0.5.1 test
+> vitest run --reporter=dot
+
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+········································································stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects text-only completion and projects an old false-completed task as needs_attention
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·········stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension generalized-w model within the explicit response bound
+advanced-trial-size generalized-w: 121820 bytes; 0 iterations
+
+········stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] usage-carryover done elapsedMs=3
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects partial-only completion and projects an old false-completed task as needs_attention
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+················stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > completes only after all four real tools succeed
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·················stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension vce model within the explicit response bound
+advanced-trial-size vce: 333064 bytes; 55 iterations
+
+·····stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > stops automatic continuation at the first failed step and permits explicit recovery
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+··········stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size huber result within the response bound
+advanced-new-size huber: 2925051 bytes
+
+·stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size statistical-family result within the response bound
+advanced-new-size statistical-family: 482857 bytes
+
+·····························································································································stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is progress
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·····································stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "" and fails only image turns
+[runtime startup] attachment-cleanup done elapsedMs=2
+
+······························stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > starts without an analyzer for enabled invalid endpoint "not a valid endpoint" and fails only image turns
+[runtime startup] attachment-cleanup done elapsedMs=4
+
+··································stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] mcp-connect done elapsedMs=1
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory vision evidence configuration > reports an enabled non-loopback analyzer as unavailable with its validation reason
+[runtime startup] attachment-cleanup done elapsedMs=4
+
+····stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] usage-carryover done elapsedMs=4
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > keeps an ENOTDIR export failure paused when its explanatory model is unavailable
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-flash with the unchanged model ID
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+···········stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] usage-carryover done elapsedMs=5
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > registers and executes legacy official search for deepseek-v4-pro with the unchanged model ID
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·····stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] usage-carryover done elapsedMs=4
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+···stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] usage-carryover begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] usage-carryover done elapsedMs=4
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://third-party.example/v1' / 'deepseek-flash'
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] usage-carryover done elapsedMs=3
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] mcp-connect begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] skills begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > routes duplicate model IDs to the selected endpoint, pins defaults and rejects removed providers
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+··········stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] usage-carryover done elapsedMs=4
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'http://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·····················································································stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] usage-carryover begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] mcp-connect begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] skills begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for explicit UI action turns and tasks
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+········stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] usage-carryover done elapsedMs=3
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-flash'
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·································································stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-pro'
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] usage-carryover begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] usage-carryover done elapsedMs=5
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] mcp-connect begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] skills begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·······stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] usage-carryover begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] mcp-connect begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] skills begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for legacy UI action turns and tasks
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+········stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] usage-carryover begin
+
+·stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] usage-carryover done elapsedMs=7
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] skills begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-factory.test.ts > runtime factory official Responses search wiring > keeps official search unavailable for unsupported factory settings: 'https://api.deepseek.com' / 'deepseek-chat'
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+···stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] usage-carryover begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] mcp-connect begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] skills begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > keeps the saved default after restart and replays omitted model continuation idempotently
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+··stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] usage-carryover begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] mcp-connect begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] skills begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/model-provider-routing.test.ts > configured provider identity over real HTTP > preserves saved provider and effort in generic resume and retry routes
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·············stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] usage-carryover begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] mcp-connect begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] skills begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/ui-action-service.test.ts > UiActionService > keeps the source model identity for removed UI action turns and tasks
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·············································stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > resumes the same task with persisted receipts and idempotently replays a successful step
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·····························stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] skills begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] attachment-cleanup done elapsedMs=1
+
+····························································································stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] skills begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-quality-assessment-wiring.test.ts > wires readonly assessment dependencies, authenticated dispatch, durable records and shutdown
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·························································································································································································································································································stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover done elapsedMs=3
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] usage-carryover done elapsedMs=4
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > fails closed for an execution turn without its plan binding, while ordinary consultation still completes
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·······························stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+··stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·······stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+····stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] attachment-cleanup done elapsedMs=1
+
+············································································································································································stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-advanced-trials-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·················stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+····················stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·······················································································································································································································································stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] usage-carryover begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] mcp-connect begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] skills begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > lists tools from kun exec with JSON output
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+···································································································stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] usage-carryover begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] mcp-connect begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] skills begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > invokes a direct tool through kun exec
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+···············stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] usage-carryover begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] mcp-connect begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] skills begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/cli-agent.test.ts > Kun agent CLI commands > returns config errors for invalid exec args
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·················································stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover done elapsedMs=6
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+······························stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] usage-carryover done elapsedMs=2
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] skills begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·································stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-quality-scoring-wiring.test.ts > factory wires authentication, durable experimental records, and shutdown without formal survey mutations
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] usage-carryover begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] mcp-connect begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] skills begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/runtime-sampling-wiring.test.ts > wires authenticated sampling into the real factory and restores the same draw after shutdown
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·········································stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] usage-carryover done elapsedMs=3
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·······························································································································································································································································································--------------------··································································································································································································································································································································································································································································································stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: false)
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+············································································································································································································································································································································································································································································································································································································--·stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] usage-carryover done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > recovers the same task after a real Runtime restart (legacy binding: true)
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: false)
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] usage-carryover begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] mcp-connect begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] skills begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/engineering-completion-gate.test.ts > Engineering successful-step completion gate > rejects generic HTTP resume and retry for engineering execution (legacy binding: true)
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+··
+
+ Test Files  218 passed | 2 skipped (220)
+      Tests  3166 passed | 22 skipped (3188)
+   Start at  09:42:24
+   Duration  37.29s (transform 9.15s, setup 0ms, import 37.65s, tests 291.40s, environment 11ms)
+

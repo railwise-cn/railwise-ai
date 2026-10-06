@@ -1,0 +1,10 @@
+The following is a diff from the previous accessibility tree for Window: "RailWise AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 82-83
++						100 container
++							101 开合三角标记 高级：审查记录
++								102 文本 高级：审查记录
++							103 text 内部审查记录仍保留用于追溯和排查；上方仅展示专业报告与证据成果。 professional-review.json JSON  ·  21.2 KB
++							104 按钮 预览
++							105 按钮 导出 JSON
++							106 按钮 询问 professional-review.json 的测量 AI
+The focused UI element is 101 开合三角标记 高级：审查记录

@@ -1,0 +1,88 @@
+The following is a diff from the previous accessibility tree for Window: "RailWise AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 102-126, 128-200
+~					101 container RailWise AI
++						102 按钮 收起侧边栏
++						103 container
++							104 container 编程 / 内业
++								105 按钮 编程
++								106 按钮 内业
++							107 切换 Description: 专注模式, Value: off
++							108 container 工作区工具
++								109 开合三角标记 工具
++									110 文本 工具
++							111 按钮 新建任务
++						112 container
++							113 text 任务 1
++							114 切换按钮 Description: 刷新工程测量项目, Value: 0
++							115 按钮 新建内业任务 控制网 · m · 10/1
++								116 文本 新建内业任务
++								117 文本 控制网
++								118 文本  · 
++								119 文本 m
++								120 文本  · 
++								121 文本 10/1
++							122 按钮 继续对话
++						123 container
++							124 切换按钮 连接手机, Value: 0
++							125 按钮 设置
++					126 container
++						127 按钮 收起侧边栏
++						128 标题 RailWise Survey, Value: 1
++							129 文本 RailWise Survey
++						130 text 工程测量内业 当前内业任务
++						131 弹出式按钮 当前内业任务, Value: 新建内业任务
++							132 (selected) 新建内业任务
++						133 按钮 新建任务
++						134 container 工作视图
++							135 按钮 概览
++							136 按钮 处理
++							137 按钮 结果
++							138 按钮 交付
++						139 文本 工作视图
++						140 按钮 打开 AI
++						141 按钮 高级
++					142 container
++						143 text 当前来源 period-valid-2.json 当前状态 结果已生成 · 待审查 最近结果 候选成果
++						144 开合三角标记 更多指标
++							145 文本 更多指标
++					146 container
++						147 标题 交付, Value: 2
++							148 文本 交付
++						149 文本 生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。
++						150 按钮 生成审查稿
++						151 文本 审查稿文件
++						152 文本 已恢复历史审查稿，文件尚未重新复核。
++						153 文本 未归档
++						154 文本 report.docx
++						155 container
++							156 text DOCX  ·  27.2 KB
++						157 按钮 预览
++						158 按钮 导出 DOCX
++						159 按钮 询问 report.docx 的测量 AI
++						160 文本 report.pdf
++						161 container
++							162 text PDF  ·  60.6 KB
++						163 按钮 预览
++						164 按钮 导出 PDF
++						165 按钮 询问 report.pdf 的测量 AI
++						166 文本 evidence.xlsx
++						167 container
++							168 text XLSX  ·  33.2 KB
++						169 按钮 预览
++						170 按钮 导出 XLSX
++						171 按钮 询问 evidence.xlsx 的测量 AI
++						172 文本 professional.xlsx
++						173 container
++							174 text XLSX  ·  33.6 KB
++						175 按钮 预览
++						176 按钮 导出 XLSX
++						177 按钮 询问 professional.xlsx 的测量 AI
++						178 开合三角标记 高级：审查记录
++							179 文本 高级：审查记录
++						180 开合三角标记 高级详情
++							181 文本 高级详情
++						182 开合三角标记 来源引用
++							183 文本 来源引用
++						184 开合三角标记 高级：审查、归档与来源记录
++							185 文本 高级：审查、归档与来源记录
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-delivery-private-7bf3e6a1/installed/RailWise%20AI%20Candidate%207bf3e6a12908.app/Contents/Resources/app.asar/out/renderer/index.html
