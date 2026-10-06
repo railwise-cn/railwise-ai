@@ -1,0 +1,12 @@
+# Release, delivery, and acceptance controls require maintainer review.
+# Keep this file on the default branch so branch protection can enforce it.
+.github/CODEOWNERS @railwise-cn
+.github/workflows/release.yml @railwise-cn
+.github/workflows/deploy-workwise-product-page.yml @railwise-cn
+.github/workflows/quality.yml @railwise-cn
+scripts/verify-release-approval.mjs @railwise-cn
+scripts/release-gate.test.mjs @railwise-cn
+scripts/publish-r2.mjs @railwise-cn
+scripts/deploy-website-release.mjs @railwise-cn
+docs/release/stable-release-gate.md @railwise-cn
+docs/qa/release-gates/** @railwise-cn

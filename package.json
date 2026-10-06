@@ -19,6 +19,7 @@
     "test:survey-converter-sandbox": "npm --prefix kun run test:survey-converter-sandbox",
     "test:watch": "vitest",
     "test:stability": "node ./scripts/stability-cycle.mjs",
+    "test:release-gate": "node --test ./scripts/release-gate.test.mjs",
     "test:managed-tools:live": "node ./scripts/run-managed-tool-live-test.cjs",
     "openspec": "openspec",
     "openspec:validate": "openspec validate --all --strict --no-interactive",
