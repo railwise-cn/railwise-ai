@@ -159,6 +159,9 @@ jobs:
     name: Repair website updater metadata cache
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.repair_website_cache_mode == 'apply' && 'production-release' || 'release-inspection' }}
+      url: https://www.railwise.cn/downloads
     env:
       WORKWISE_WEBSITE_SSH_HOST: ${{ secrets.WORKWISE_WEBSITE_SSH_HOST }}
       WORKWISE_WEBSITE_SSH_PORT: ${{ secrets.WORKWISE_WEBSITE_SSH_PORT }}
@@ -207,6 +210,9 @@ jobs:
     name: Roll back WorkWise Stable pointers
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
     runs-on: ubuntu-latest
+    environment:
+      name: production-release
+      url: https://www.railwise.cn/downloads
     env:
       ROLLBACK_TAG: ${{ inputs.rollback_stable_tag }}
       ROLLBACK_CONFIRMATION: ${{ inputs.rollback_stable_confirmation }}

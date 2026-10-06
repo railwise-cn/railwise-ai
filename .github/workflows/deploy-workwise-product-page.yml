@@ -43,6 +43,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Preview renders remain isolated; public deployment requires the same
+    # protected environment as Stable release promotion.
+    environment:
+      name: ${{ inputs.operation == 'deploy' && 'production-release' || 'product-page-preview' }}
+      url: https://www.railwise.cn/products/workwise/
     steps:
       - name: Validate requested source
         env:

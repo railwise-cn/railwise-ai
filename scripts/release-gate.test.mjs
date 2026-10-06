@@ -9,6 +9,8 @@ const workflowSource = readFileSync(workflowPath, 'utf8')
 const workflow = parse(workflowSource)
 const triggers = workflow.on ?? workflow['on']
 const jobs = workflow.jobs ?? {}
+const websiteWorkflowSource = readFileSync(new URL('../.github/workflows/deploy-workwise-product-page.yml', import.meta.url), 'utf8')
+const websiteWorkflow = parse(websiteWorkflowSource)
 
 function input(name) {
   const value = triggers?.workflow_dispatch?.inputs?.[name]
@@ -82,6 +84,21 @@ test('every job that can mutate stable delivery is dispatch-gated', () => {
     assert.match(String(job.if), /github\.event_name\s*==\s*['"]workflow_dispatch['"]/, `${name} must be dispatch-only`)
     assert.match(String(job.if), /confirmation|publish_release|rollback_stable_confirmation|release_approval/, `${name} must require an explicit confirmation or release opt-in`)
   }
+})
+
+test('all production website and Stable pointer mutations use the protected environment', () => {
+  const rollbackEnvironment = jobs['rollback-stable']?.environment
+  assert.equal(rollbackEnvironment?.name ?? rollbackEnvironment, 'production-release')
+
+  const repairEnvironment = jobs['repair-website-cache']?.environment
+  assert.match(String(repairEnvironment?.name ?? repairEnvironment), /production-release/)
+  assert.match(String(repairEnvironment?.name ?? repairEnvironment), /repair_website_cache_mode/)
+
+  const websiteDeploy = websiteWorkflow.jobs?.deploy
+  assert.ok(websiteDeploy, 'product page workflow must retain a deploy job')
+  const websiteEnvironment = websiteDeploy.environment
+  assert.match(String(websiteEnvironment?.name ?? websiteEnvironment), /production-release/)
+  assert.match(String(websiteEnvironment?.name ?? websiteEnvironment), /inputs\.operation/)
 })
 
 test('approval verifier rejects non-tag refs and missing exact confirmation before reading evidence', () => {
