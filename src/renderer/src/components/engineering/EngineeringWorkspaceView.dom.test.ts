@@ -17,7 +17,7 @@ vi.mock('./EngineeringAiCommandCenter', () => ({ EngineeringAiCommandCenter: ({ 
 vi.mock('./SurveyAdjustmentPanel', () => ({ SurveyAdjustmentPanel: ({ refreshToken }: { refreshToken: number }) => createElement('span', { 'data-testid': 'survey-refresh-token' }, refreshToken) }))
 vi.mock('./EngineeringSkillsPanel', () => ({ EngineeringSkillsPanel: () => null }))
 const project = { id: 'job', name: 'Test control network', taskType: 'control-network', monitoringType: 'control-network', unit: 'm', signConvention: 'positive', thresholds: {}, reportPeriod: {}, workspace: '/test', revision: 2, updatedAt: '2026-09-19T00:00:00Z' }
-const network = { id: 'net', revision: 2, networkType: 'plane-control', qualityStatus: 'validated', sourceFile: { name: 'survey.in2', disposition: 'adjustment-ready' } }
+const network = { id: 'net', revision: 2, networkType: 'plane-control', coordinateSystem: 'LOCAL', qualityStatus: 'validated', sourceFile: { name: 'survey.in2', disposition: 'adjustment-ready' } }
 const adjustment = { run: { id: 'adjustment', networkId: 'net', status: 'completed' }, result: { validation: 'valid' }, sourceEligibility: { eligible: true } }
 let adjustments: unknown[]
 let datasets: unknown[]

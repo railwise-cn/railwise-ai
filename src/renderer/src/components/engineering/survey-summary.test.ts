@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectSurveyClosureKey, surveyReadiness, surveyMeasurementNumber } from './survey-summary'
+import { selectSurveyClosureKey, surveyNetworkReferencesReady, surveyReadiness, surveyMeasurementNumber } from './survey-summary'
 
 describe('survey summary closure metric selection', () => {
   it('uses height closure for leveling even when another field is serialized first', () => {
@@ -33,6 +33,20 @@ describe('survey summary review boundaries', () => {
       expect(surveyReadiness({ ...ready, disposition, hasOutputs: true })).toBe(disposition)
     }
     expect(surveyReadiness({ ...ready, blocked: true, hasOutputs: true, manifestValid: true, reviewStatus: 'approved' })).toBe('blocked')
+  })
+})
+
+describe('survey reference readiness', () => {
+  it('requires the declared coordinate reference for plane networks', () => {
+    const network = { networkType: 'plane-control', observations: [] }
+    expect(surveyNetworkReferencesReady(network)).toBe(false)
+    expect(surveyNetworkReferencesReady({ ...network, coordinateSystem: 'CGCS2000' })).toBe(true)
+  })
+
+  it('requires the height datum for leveling networks', () => {
+    const network = { networkType: 'leveling', observations: [] }
+    expect(surveyNetworkReferencesReady(network)).toBe(false)
+    expect(surveyNetworkReferencesReady({ ...network, verticalDatum: '1985 National Height Datum' })).toBe(true)
   })
 })
 

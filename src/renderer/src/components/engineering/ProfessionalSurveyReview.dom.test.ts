@@ -132,7 +132,7 @@ describe('professional survey review', () => {
       ...review, summary: { ...review.summary, networkType: 'plane-control' }, closures: [],
       reference: { ...review.reference, projection: 'GAUSS-KRUGER', ellipsoid: 'CGCS2000', centralMeridian: 117 },
       observations: [{ ...review.observations[0], type: 'distance', observed: 5.0001, adjusted: 5, correction: -0.0001 }, { ...review.observations[0], id: 'direction2', observationId: 'dir2', type: 'direction', observed: 0.9, adjusted: 0.90001, correction: 0.00001, unit: 'rad' }],
-      points: [{ ...review.points[1], x: 103, y: 204, height: 999, xyErrorEllipse: xyEllipse }]
+      points: [{ ...review.points[1], x: 103, y: 204, height: 999, correctionX: 0.0012, correctionY: -0.0003, xyErrorEllipse: xyEllipse }]
     } }))
     await renderReview({ network: planeNetwork })
     await settle()
@@ -142,8 +142,12 @@ describe('professional survey review', () => {
     expect(knownHeaders).not.toContain('H (m)')
     const point = container.querySelector('[data-professional-point="P01"]')!
     expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('XY 标准误差椭圆')
+    expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('X 改正数（mm）')
+    expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('Y 改正数（mm）')
     expect(point.closest('table')!.querySelector('thead')!.textContent).not.toContain('H (m)')
     expect(point.textContent).toContain('8 / 4')
+    expect(point.textContent).toContain('1.2')
+    expect(point.textContent).toContain('-0.3')
     expect(point.textContent).not.toContain('999')
     expect(container.textContent).toContain('GAUSS-KRUGER')
     expect(container.textContent).toContain('CGCS2000')

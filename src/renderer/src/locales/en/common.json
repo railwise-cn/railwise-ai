@@ -3893,6 +3893,8 @@
   "surveyProfessionalObservedHeightDifference": "Observed height difference (m)",
   "surveyProfessionalAdjustedHeightDifference": "Adjusted height difference (m)",
   "surveyProfessionalHeightCorrection": "Height correction (mm)",
+  "surveyProfessionalXCorrection": "X correction (mm)",
+  "surveyProfessionalYCorrection": "Y correction (mm)",
   "surveyProfessionalHeightError": "Height standard error (mm)",
   "surveyProfessionalUnsigned": "Pending professional review and signing",
   "surveyProfessionalNeedsReview": "Needs review",

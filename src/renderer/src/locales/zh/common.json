@@ -3893,6 +3893,8 @@
   "surveyProfessionalObservedHeightDifference": "观测高差（m）",
   "surveyProfessionalAdjustedHeightDifference": "平差高差（m）",
   "surveyProfessionalHeightCorrection": "高程改正数（mm）",
+  "surveyProfessionalXCorrection": "X 改正数（mm）",
+  "surveyProfessionalYCorrection": "Y 改正数（mm）",
   "surveyProfessionalHeightError": "高程中误差（mm）",
   "surveyProfessionalUnsigned": "待专业复核与签认",
   "surveyProfessionalNeedsReview": "待复核",

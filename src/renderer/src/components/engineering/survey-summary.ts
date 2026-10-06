@@ -1,3 +1,5 @@
+import { missingSurveyReferences } from '@shared/survey-reference'
+
 /**
  * Select the primary closure metric for the compact engineering summary.
  * The result is deterministic: each network family gets the metric an
@@ -39,6 +41,23 @@ export function surveyReadiness(input: {
   if (input.hasResult) return 'candidate'
   if (input.networkValidated || input.datasetValidated) return 'adjustment-ready'
   return input.hasSource ? 'needs-confirmation' : 'not-started'
+}
+
+/** Keep compact workspace status and the adjustment panel on the same datum gate. */
+export function surveyNetworkReferencesReady(network: {
+  networkType: string
+  coordinateSystem?: string
+  verticalDatum?: string
+  heightDatum?: string
+  observations?: readonly { type?: string; targetHeight?: number }[]
+}): boolean {
+  return missingSurveyReferences({
+    networkType: network.networkType,
+    coordinateSystem: network.coordinateSystem,
+    verticalDatum: network.verticalDatum,
+    heightDatum: network.heightDatum,
+    observations: network.observations ?? []
+  }).length === 0
 }
 
 /** Translate only the legacy missing-datum sentinel; never rewrite user datum names. */

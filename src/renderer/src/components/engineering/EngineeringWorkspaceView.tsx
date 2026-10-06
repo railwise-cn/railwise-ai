@@ -41,7 +41,7 @@ import {
 } from 'lucide-react'
 import { readBrowserStorageItem, writeBrowserStorageItem } from '../../lib/browser-storage'
 import { surveyDiagnosticText, surveyRuntimeErrorText } from './survey-diagnostic-text'
-import { surveyDatumLabel } from './survey-summary'
+import { surveyDatumLabel, surveyNetworkReferencesReady } from './survey-summary'
 import appI18n from '../../i18n'
 import { ENGINEERING_TREND_RENDERER_VERSION, ENGINEERING_ANALYSIS_ALGORITHM_VERSION } from '@shared/engineering-chart'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
@@ -58,6 +58,7 @@ import { professionalCitationDisplay, professionalCitationLocator, professionalC
 import { ThresholdFields, parseThresholds } from './ThresholdFields'
 import { EngineeringManifestVerification } from './EngineeringManifestVerification'
 import { validEngineeringReportPeriod } from './engineering-report-period'
+import { surveySourceFormatLabel } from './survey-source-format-labels'
 import {
   activeEngineeringProjectId,
   chooseEngineeringProjectId,
@@ -151,7 +152,7 @@ type SurveyNetworkSummary = {
   verticalDatum?: string
   knownPoints?: Array<{ id: string }>
   unknownPoints?: Array<{ id: string }>
-  observations?: Array<{ station?: string; from?: string; to?: string }>
+  observations?: Array<{ station?: string; from?: string; to?: string; type?: string; targetHeight?: number }>
   qualityStatus?: string
   sourceFile?: {
     name: string
@@ -662,6 +663,11 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const activeSurveyNetwork = sourceMode === 'monitoring' ? null : selectedSurveyNetworkId
     ? surveyNetworks.find((network) => network.id === selectedSurveyNetworkId) ?? null
     : surveyNetworks[0] ?? null
+  const activeSurveyNetworkReferencesReady = activeSurveyNetwork ? surveyNetworkReferencesReady(activeSurveyNetwork) : false
+  const surveyAdjustmentIsAdmitted = (item: SurveyAdjustmentSummary): boolean => {
+    const network = surveyNetworks.find((candidate) => candidate.id === item.run.networkId)
+    return Boolean(network && item.run.status === 'completed' && item.result?.validation === 'valid' && item.sourceEligibility?.eligible === true && surveyNetworkReferencesReady(network))
+  }
   // A project's saved datum describes the task until a network exists. Once
   // selected, the network's own missing datum must remain visibly unresolved.
   const surveySummaryDatum = activeSurveyNetwork ?? overview?.project.taskContext
@@ -670,8 +676,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   // from the current Runtime read model; missing or revoked admission fails closed.
   const surveyAdjustmentIds = surveyAdjustments.filter((item) =>
     (requestedSurveyAdjustmentIds.includes(item.run.id) || item === latestSurveyAdjustment)
-    && item.run.status === 'completed' && item.result?.validation === 'valid'
-    && item.sourceEligibility?.eligible === true
+    && surveyAdjustmentIsAdmitted(item)
   ).map((item) => item.run.id)
   const hasSurveyDeliveryInputs = surveyAdjustmentIds.length > 0 || surveyDeformationIds.length > 0
   const hasDeliveryInputs = Boolean(activeDataset || hasSurveyDeliveryInputs)
@@ -684,7 +689,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const comparisonAdjustmentIds = [...new Set(previewComparisons.flatMap(item => [item.referenceAdjustmentId, item.currentAdjustmentId]))]
   const comparisonInputsAdmitted = previewComparisons.length > 0
     && previewComparisons.every(item => item.projectId === overview?.project.id && item.referenceAdjustmentId !== item.currentAdjustmentId)
-    && comparisonAdjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && item.run.status === 'completed' && item.result?.validation === 'valid' && item.sourceEligibility?.eligible === true))
+    && comparisonAdjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && surveyAdjustmentIsAdmitted(item)))
     && Boolean(displayedPreview?.adjustments && comparisonAdjustmentIds.length === displayedPreview.adjustments.length
       && displayedPreview.adjustments.every(item => comparisonAdjustmentIds.includes(item.runId) && item.validation === 'valid')
       && new Set(displayedPreview.adjustments.map(item => item.runId)).size === comparisonAdjustmentIds.length)
@@ -711,6 +716,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const surveyClosureUnit = surveyClosureKey ? latestSurveyAdjustment?.result?.closureUnits?.[surveyClosureKey] : undefined
   const surveyPrecision = latestSurveyAdjustment?.result?.precision
   const surveyHasBlockingAdmission = latestSurveyAdjustment?.sourceEligibility?.eligible === false
+    || Boolean(activeSurveyNetwork && !activeSurveyNetworkReferencesReady)
     || latestSurveyAdjustment?.result?.validation === 'invalid' || latestSurveyAdjustment?.run.status === 'failed'
 
   const refreshCurrent = async (preserveDraft = false): Promise<void> => {
@@ -994,7 +1000,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
     const parsed = SurveySegmentComparisonV1.parse(comparison)
     const adjustmentIds = [parsed.referenceAdjustmentId, parsed.currentAdjustmentId]
     if (!runtimeReady || busy || !overview || parsed.projectId !== overview.project.id || adjustmentIds[0] === adjustmentIds[1]
-      || !adjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && item.run.status === 'completed' && item.result?.validation === 'valid' && item.sourceEligibility?.eligible === true))) {
+      || !adjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && surveyAdjustmentIsAdmitted(item)))) {
       throw new Error(t('surveyPeriodExportStale'))
     }
     const operationScope = requestScope.current
@@ -1087,13 +1093,14 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const aiVisible = aiOpen || tab === 'ai-command'
   const closeAdvanced = (): void => { setAdvancedOpen(false); if (ADVANCED_TABS.includes(tab)) setTab(backgroundTab) }
   const closeAi = (): void => { setAiOpen(false); if (tab === 'ai-command') setTab('dashboard') }
-  const sourceFormat = activeSurveyNetwork?.sourceFile?.detection?.format?.toUpperCase()
-    ?? activeDataset?.sourceFileName.split('.').pop()?.toUpperCase()
-    ?? '—'
+  const detectedFormat = activeSurveyNetwork?.sourceFile?.detection?.format
+  const sourceFormat = detectedFormat
+    ? surveySourceFormatLabel(t, detectedFormat, locale)
+    : activeDataset?.sourceFileName.split('.').pop()?.toUpperCase() ?? '—'
   const readiness = warningFindings.length && !blockingFindings.length ? 'needs-confirmation' : surveyReadiness({
     blocked: surveyHasBlockingAdmission || blockingFindings.length > 0,
     disposition: surveySourceDisposition,
-    networkValidated: activeSurveyNetwork?.qualityStatus === 'validated',
+    networkValidated: activeSurveyNetwork?.qualityStatus === 'validated' && activeSurveyNetworkReferencesReady,
     datasetValidated: activeDataset?.status === 'validated',
     hasSource: Boolean(activeSurveyNetwork || activeDataset),
     hasResult: Boolean(activeAnalysis || (latestSurveyAdjustment && surveyAdjustmentIds.includes(latestSurveyAdjustment.run.id))),
