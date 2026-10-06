@@ -156,7 +156,10 @@ describe('professional survey report formats', () => {
     expect(read.text).toContain('签认栏（空白 / 未签认）')
     expect(bytes.toString('latin1')).toContain('/FontFile2')
     expect(bytes.toString('latin1')).toContain('/ToUnicode')
-  }, 60000)
+  // PDF pagination embeds the bundled Chinese font and can legitimately take
+  // longer when the full kun suite is running in parallel on a shared CI
+  // runner. Keep the test bounded while avoiding a false timeout.
+  }, 60_000)
 
   it('binds both periods and projects stored segment differences with ordered observation sources', async () => {
     const { input, comparison, model } = await comparisonFixture()
