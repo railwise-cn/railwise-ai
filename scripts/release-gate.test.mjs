@@ -59,6 +59,7 @@ test('release workflow verifies the recorded approval evidence before side effec
   const gateSteps = gate.steps ?? []
   const verifyIndex = gateSteps.findIndex((step) => /verify-release-approval\.mjs/.test(String(step.run ?? '')))
   assert.ok(verifyIndex >= 0, 'approval evidence must be checked in the dedicated gate job')
+  assert.doesNotMatch(JSON.stringify(gate), /publish-r2|deploy-website-release|gh release/, 'approval gate must be read-only')
 
   const publishSteps = publish.steps ?? []
   const firstSideEffectIndex = publishSteps.findIndex((step) => /publish-r2\.mjs\s+(upload|promote)|deploy-website-release\.mjs\s+(stage|promote)|gh\s+release\s+(create|edit|upload)/.test(String(step.run ?? '')))
