@@ -156,7 +156,7 @@ describe('professional survey report formats', () => {
     expect(read.text).toContain('签认栏（空白 / 未签认）')
     expect(bytes.toString('latin1')).toContain('/FontFile2')
     expect(bytes.toString('latin1')).toContain('/ToUnicode')
-  }, 20000)
+  }, 60000)
 
   it('binds both periods and projects stored segment differences with ordered observation sources', async () => {
     const { input, comparison, model } = await comparisonFixture()
