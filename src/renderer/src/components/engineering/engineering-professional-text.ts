@@ -12,6 +12,24 @@ const developerPayloadKey = /(?:["']?(?:contextHash|sourceSha256|parserSourceHas
 const professionalContent = /残差|沉降|高程|高差|坐标|观测|限差|禁止|超限|阻断|不得|方差因子|统计摘要|闭合差|精度|可计算|平差|\d+\s*(?:点|站|条|观测)\b|mm\b|\d\s*(?:m\b|rad\b|μm|[°′″]|毫米|米)|\b(?:residual|elevation|coordinate|observation|variance|statistics|closure|precision|calculable|adjustment|blocked|exceed|must not)\b|\.(?:pdf|csv|xlsx|in1|in2)\b/i
 const residualImplementationVocabulary = /\b(?:fixture|sample\s+data|data\s+reader|format\s+catalog|admission\s+catalog|parser|runtime|hash|revision)\b/gi
 
+/** Resolve the point selected by the surveyor from a legacy answer. A point
+ * label must come from the answer/reference; never invent a fixed station ID.
+ */
+function surveyPointId(text: string): string | undefined {
+  const reserved = new Set(['AI', 'CSV', 'COSA', 'DAT', 'PDF', 'XLSX', 'JSON', 'IN', 'OUT'])
+  const candidates = [
+    /(?:\bidentity\s+(?:id\s*[=:：]\s*)?|\bpoint(?:\s*id|\s*name)?\s*(?:is|=|:|：)?|点号|点位|测站|测点)\s*["“']?([A-Za-z][A-Za-z0-9_-]{0,31})/i,
+    /(?:解释|说明|结果|成果|精度)\s*["“']?([A-Za-z]{1,8}(?:[-_]?\d{1,8})?)/i,
+    /\b([A-Z]{1,8}[-_]?\d{1,8})\b/
+  ]
+  for (const pattern of candidates) {
+    const match = pattern.exec(text)
+    const value = match?.[1]
+    if (value && !reserved.has(value.toUpperCase())) return value
+  }
+  return undefined
+}
+
 /** Remove inline object/array payloads while retaining surrounding findings. */
 function removeInlineDeveloperPayload(text: string): string {
   let current = text
@@ -351,11 +369,13 @@ function stripInternalFragments(line: string, language: string): string {
  * such as "调整、网络，与一致". Rewrite those known sentence shapes before
  * the field-level filter runs so the stored answer remains readable.
  */
-function rewriteLegacyProfessionalLine(line: string, language: string): string {
+function rewriteLegacyProfessionalLine(line: string, language: string, selectedPointId?: string): string {
   const english = language.toLowerCase().startsWith('en')
   const label = (chinese: string, translated: string): string => english ? translated : chinese
   const prefix = line.match(/^(\s*(?:[-*]\s+|\d+[.)]\s+))/)?.[1] ?? ''
   const body = line.slice(prefix.length).trim()
+  const pointId = surveyPointId(body) ?? selectedPointId
+  const selectedPoint = pointId ?? label('所选点', 'selected point')
 
   // Historical answers sometimes start with a fetch/revision report and then
   // continue with empty protocol fields after the identifiers are removed.
@@ -378,18 +398,18 @@ function rewriteLegacyProfessionalLine(line: string, language: string): string {
   // Evidence and selector headings should read as survey sections, not as
   // storage-object descriptions.
   if (/(?:本条|该条).*(?:typedEvidence|所选资料|selected record).*(?:network|未知点|unknown).*(?:实际存了什么|内容)/i.test(body)) {
-    return `${prefix}${label('所选记录中的 S1 初始坐标', 'S1 initial coordinates in the selected record')}`
+    return `${prefix}${label(`所选记录中的 ${selectedPoint} 初始坐标`, `${selectedPoint} initial coordinates in the selected record`)}`
   }
-  if (/平差后的?\s*S1\s*结果.*(?:平差记录|所选资料|selected record)/i.test(body)) {
-    return `${prefix}${label('平差后的 S1 结果', 'Adjusted S1 result')}`
+  if (/平差后的?\s*(?:[A-Za-z][A-Za-z0-9_-]{0,31}|所选点)\s*结果.*(?:平差记录|所选资料|selected record)/i.test(body)) {
+    return `${prefix}${label(`平差后的 ${selectedPoint} 结果`, `Adjusted ${selectedPoint} result`)}`
   }
   if (/(?:引用完整保留|selector|选择器|path|identity).*(?:解析成功|存储值|实际存了什么)/i.test(body)) {
-    return label('以下为所选记录中的 S1 初始坐标（单位：m）：', 'The selected record contains the following S1 initial coordinates (unit: m):')
+    return label(`以下为所选记录中的 ${selectedPoint} 初始坐标（单位：m）：`, `The selected record contains the following ${selectedPoint} initial coordinates (unit: m):`)
   }
 
   // These lines only describe how the answer was fetched. The professional
   // findings and limitations follow in their own sections.
-  if (/tool_storm_suppressed/i.test(body) && /(?:已成功读取|successfully read|S1\s+仍需复核)/i.test(body)) return line
+  if (/tool_storm_suppressed/i.test(body) && /(?:已成功读取|successfully read|(?:[A-Za-z][A-Za-z0-9_-]{0,31}\s+)?仍需复核|still requires review)/i.test(body)) return line
   if (!professionalContent.test(body) && /(?:已按|随后我|本轮.*(?:读取|调用)|当前记录未过期|本次读取的是当前记录|未做任何计算|实时项目资料|严格读取|精确选择器|tool_storm_suppressed|运行时重复调用保护|调用返回)/i.test(body)) return ''
   if (!professionalContent.test(body)
     && /(?:networkRevision|projectRevision|adjustment(?:Id|[_-][a-z0-9]|\s+(?:revision|record))|sourceSha256|inputHash|parserSourceHash|sourceAdmission|sourceEligibility|contextHash|identity\s+id=|metric\s*[:=：])/i.test(body)
@@ -500,8 +520,8 @@ function cleanSurveyorVocabulary(line: string, language: string): string {
     .replace(/\bRMS\b/gi, '均方根')
     .replace(/证据边界（[^）]*）/g, '专业核查边界')
     .replace(/证据边界\(([^)]*)\)/g, '专业核查边界')
-    .replace(/引用“?S1 结果”?必须取平差记录的调整值/g, '报告中的 S1 成果应采用平差后的坐标')
-    .replace(/引用"S1 结果"必须取平差记录的调整值/g, '报告中的 S1 成果应采用平差后的坐标')
+    .replace(/引用“?([A-Za-z][A-Za-z0-9_-]{0,31}) 结果”?必须取平差记录的调整值/g, (_, point: string) => `报告中的 ${point} 成果应采用平差后的坐标`)
+    .replace(/引用"([A-Za-z][A-Za-z0-9_-]{0,31}) 结果"必须取平差记录的调整值/g, (_, point: string) => `报告中的 ${point} 成果应采用平差后的坐标`)
     .replace(/两份记录并存/g, '初始坐标和调整成果同时保留')
     .replace(/本次读取的是当前记录/g, '本次核查针对当前资料')
     .replace(/（与网络\s*一致）/g, '')
@@ -516,6 +536,7 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
   const surveyAnswer = text.replace(/<think\b[^>]*>[\s\S]*?(?:<\/think\s*>|$)/gi, '')
   if (!surveyAnswer.trim()) return ''
   const visible: string[] = []
+  const selectedPointId = surveyPointId(surveyAnswer)
   // A suppressed evidence read is a substantive limitation. Keep that fact
   // without exposing its internal diagnostic or implying fresh verification.
   if (/tool_storm_suppressed/i.test(surveyAnswer)) visible.push(language.toLowerCase().startsWith('en')
@@ -530,7 +551,7 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
       continue
     }
     const historicalLine = historicalEvidenceStatement(rawLine.trim(), language).trim()
-    const sourceLine = rewriteLegacyProfessionalLine(historicalLine, language).trim()
+    const sourceLine = rewriteLegacyProfessionalLine(historicalLine, language, selectedPointId).trim()
     if (!sourceLine) continue
     // AI may repeat a source diagnostic in its explanation. Apply the same
     // professional wording used by the Survey work surface before rendering it.

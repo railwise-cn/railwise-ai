@@ -142,8 +142,8 @@ describe('professional survey review', () => {
     expect(knownHeaders).not.toContain('H (m)')
     const point = container.querySelector('[data-professional-point="P01"]')!
     expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('XY 标准误差椭圆')
-    expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('X 改正数（mm）')
-    expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('Y 改正数（mm）')
+    expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('dX 改正数（mm）')
+    expect(point.closest('table')!.querySelector('thead')!.textContent).toContain('dY 改正数（mm）')
     expect(point.closest('table')!.querySelector('thead')!.textContent).not.toContain('H (m)')
     expect(point.textContent).toContain('8 / 4')
     expect(point.textContent).toContain('1.2')

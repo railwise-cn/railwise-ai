@@ -718,6 +718,8 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const surveyHasBlockingAdmission = latestSurveyAdjustment?.sourceEligibility?.eligible === false
     || Boolean(activeSurveyNetwork && !activeSurveyNetworkReferencesReady)
     || latestSurveyAdjustment?.result?.validation === 'invalid' || latestSurveyAdjustment?.run.status === 'failed'
+  const surveyDatumGateBlocked = Boolean(activeSurveyNetwork && !activeSurveyNetworkReferencesReady)
+  const surveyHistoricalResultAvailable = Boolean(latestSurveyAdjustment?.run.status === 'completed' && latestSurveyAdjustment.result?.validation === 'valid')
 
   const refreshCurrent = async (preserveDraft = false): Promise<void> => {
     const operationScope = requestScope.current
@@ -1094,9 +1096,8 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const closeAdvanced = (): void => { setAdvancedOpen(false); if (ADVANCED_TABS.includes(tab)) setTab(backgroundTab) }
   const closeAi = (): void => { setAiOpen(false); if (tab === 'ai-command') setTab('dashboard') }
   const detectedFormat = activeSurveyNetwork?.sourceFile?.detection?.format
-  const sourceFormat = detectedFormat
-    ? surveySourceFormatLabel(t, detectedFormat, locale)
-    : activeDataset?.sourceFileName.split('.').pop()?.toUpperCase() ?? '—'
+  const sourceFormatValue = detectedFormat ?? activeDataset?.sourceFileName.split('.').pop()
+  const sourceFormat = sourceFormatValue ? surveySourceFormatLabel(t, sourceFormatValue, locale) : '—'
   const readiness = warningFindings.length && !blockingFindings.length ? 'needs-confirmation' : surveyReadiness({
     blocked: surveyHasBlockingAdmission || blockingFindings.length > 0,
     disposition: surveySourceDisposition,
@@ -1161,8 +1162,9 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       <div className="grid grid-cols-1 gap-px bg-ds-border-muted sm:grid-cols-3">
         <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringCurrentSource')}</span><strong className="mt-0.5 block truncate text-ds-ink">{activeSurveyNetwork?.sourceFile?.name ?? activeDataset?.sourceFileName ?? t('engineeringSummaryNoDataset')}</strong></div>
         <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringCurrentStatus')}</span><strong className={`mt-0.5 block truncate ${readiness === 'blocked' ? 'text-red-700 dark:text-red-300' : readiness === 'adjustment-ready' ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'}`}>{readinessLabel}</strong></div>
-        <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringLatestResult')}</span><strong className="mt-0.5 block truncate text-ds-ink">{activeAnalysis ? t('engineeringSummaryResults', { count: activeAnalysis.results.length }) : manifestOutputs.length ? t('engineeringSummaryCandidate') : surveyResultCurrent ? t('engineeringReviewSurveyAnalysis') : '—'}</strong></div>
+        <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringLatestResult')}</span><strong className="mt-0.5 block truncate text-ds-ink">{activeAnalysis ? t('engineeringSummaryResults', { count: activeAnalysis.results.length }) : manifestOutputs.length ? t('engineeringSummaryCandidate') : surveyResultCurrent ? t('engineeringReviewSurveyAnalysis') : surveyHistoricalResultAvailable ? t('engineeringSurveyHistoricalResult') : '—'}</strong></div>
       </div>
+      {surveyDatumGateBlocked ? <p role="note" data-testid="engineering-survey-datum-gate" className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">{t('engineeringSurveyDatumGate')}</p> : null}
       <details className="engineering-advanced-metrics border-t border-ds-border-muted px-3 py-2">
         <summary className="cursor-pointer select-none text-[11px] font-medium text-ds-muted">{t('engineeringMoreMetrics')}</summary>
         <div className="mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ds-border-muted bg-ds-border-muted sm:grid-cols-4">

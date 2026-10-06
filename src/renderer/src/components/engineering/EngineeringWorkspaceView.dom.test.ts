@@ -711,6 +711,21 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(summary).not.toContain('PROJECT-HEIGHT')
   })
 
+  it('blocks new calculations when the active network datum is undeclared but keeps historical results reviewable', async () => {
+    request.mockImplementation(async (path: string) => ({ ok: true, status: 200, body: JSON.stringify(
+      path === '/v1/engineering/projects' ? { projects: [project] }
+        : path.endsWith('/overview') ? { project, datasets: [], analyses: [], runs: [], manifests: [] }
+          : path.includes('/survey/networks?') ? { networks: [{ ...network, coordinateSystem: '待确认' }] }
+            : { adjustments }
+    ) }))
+    await renderDelivery()
+    const summary = container.querySelector('[data-testid="engineering-summary-strip"]')!
+    expect(summary.textContent).toContain('Blocked')
+    expect(summary.textContent).toContain('Historical result · review only')
+    expect(container.querySelector('[data-testid="engineering-survey-datum-gate"]')?.textContent).toContain('Declare the coordinate and height reference before a new calculation')
+    expect(button('Generate review draft').disabled).toBe(true)
+  })
+
   it('exposes named data selection buttons and switches the reviewed dataset without mutating it', async () => {
     datasets = ['first.csv', 'second.csv'].map((name, index) => ({
       id: `dataset-${index}`, sourceFileName: name, sourceFileHash: 'b'.repeat(64),

@@ -468,6 +468,20 @@ describe('engineeringProfessionalText', () => {
     expect(answer).not.toMatch(/调整\s*[、，,；]\s*网络|质量提示.*策略|，）|，；|源。/)
   })
 
+  it.each(['P01', 'BM-02'])('uses the selected point instead of a hard-coded station label (%s)', pointId => {
+    const answer = engineeringProfessionalAnswerText([
+      `请解释 ${pointId} 的结果、原始依据及需要复核的问题。`,
+      `1. 本条 typedEvidence（network / unknownPoints[0] / identity id=${pointId}）实际存了什么`,
+      `引用完整保留：identity {"id":"${pointId}"}，解析成功。存储值（单位 m）：`,
+      `2. 平差后的 ${pointId} 结果（来自平差记录，非本次 typedEvidence 内容）`,
+      `网络记录与平差记录口径不同：报告中的 ${pointId} 成果应采用平差后的坐标。`
+    ].join('\n'), 'zh-CN')
+    expect(answer).toContain(`1. 所选记录中的 ${pointId} 初始坐标`)
+    expect(answer).toContain(`2. 平差后的 ${pointId} 结果`)
+    expect(answer).toContain(`报告中的 ${pointId} 成果应采用平差后的坐标`)
+    expect(answer).not.toContain('S1')
+  })
+
   it.each(['zh-CN', 'en-US'])('keeps recovery and applicability restrictions in %s', language => {
     const answer = engineeringProfessionalAnswerText([
       '1. 类型化证据引用无效：缺 inputHash，当前结论不能作为已验证依据。',
