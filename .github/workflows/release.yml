@@ -10,7 +10,7 @@ on:
         default: false
       release_confirmation:
         description: 'Type PUBLISH-STABLE-vX.Y.Z for the exact tag being published.'
-        required: true
+        required: false
         type: string
         default: ''
       release_evidence:

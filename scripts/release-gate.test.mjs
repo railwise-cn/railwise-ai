@@ -29,7 +29,7 @@ test('stable publication requires an explicit opt-in and a review evidence path'
 
   const confirmation = input('release_confirmation')
   assert.equal(confirmation.type, 'string')
-  assert.equal(confirmation.required, true)
+  assert.equal(confirmation.required, false, 'maintenance/candidate runs must not require a stable approval token')
 
   const evidence = input('release_evidence')
   assert.equal(evidence.type, 'string')
@@ -104,4 +104,11 @@ test('approval verifier rejects non-tag refs and missing exact confirmation befo
     }),
     /release confirmation must be PUBLISH-STABLE-v0.5.2/
   )
+})
+
+test('approval verifier requires a scoped, tracked evidence manifest', () => {
+  assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /scope !== 'public-release'/)
+  assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /packageIdentity\.artifactSha256/)
+  assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /requireTrackedArtifact/)
+  assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /rev-list[\s\S]*sourceHead/)
 })
