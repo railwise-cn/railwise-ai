@@ -10,7 +10,8 @@ release approval and not evidence that a new version was published.
 - Initial remote snapshot: 2026-10-06 09:19 UTC (17:19 Asia/Shanghai)
 - Final permission/environment recheck: 2026-10-06 09:28 UTC (17:28 Asia/Shanghai)
 - Default branch: `main`
-- Main HEAD: `c20d68d47a1b7b996d9601bea0e2866eb65c4589`
+- Main HEAD at the initial snapshot: `c20d68d47a1b7b996d9601bea0e2866eb65c4589`
+- Final main HEAD after audit PR #41: `5e81cccf32a472f951977631a4bcf99a6dddab4c`
 - Open pull requests at audit time: none
 - Public release state: `v0.5.2` remains the existing published release; no
   tag, release, Stable feed, or official download-page pointer was changed by
@@ -100,6 +101,9 @@ could break the quality and release workflows.
   Quality checks passed. GitHub still reported `REVIEW_REQUIRED` at merge time.
 - PR 40 merged as `c20d68d47a1b7b996d9601bea0e2866eb65c4589`; all three required
   Quality checks passed. GitHub still reported `REVIEW_REQUIRED` at merge time.
+- PR 41 (this audit record) merged as `5e81cccf32a472f951977631a4bcf99a6dddab4c`; all three required
+  Quality checks passed. It also used the administrator bypass because no effective
+  CODEOWNER approval was available.
 - `v0.5.2` remains the published release (published 2026-10-05 13:07 UTC).
 - No `v0.5.3` tag, release, feed promotion, or website Stable-pointer update
   was performed as part of this work.
