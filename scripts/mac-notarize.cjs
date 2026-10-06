@@ -34,12 +34,12 @@ function runNotaryToolJson(args) {
   try {
     output = execFileSync('xcrun', ['notarytool', ...args, '--output-format', 'json'], {
       encoding: 'utf8',
-      timeout: Number(process.env.WORKWISE_NOTARY_TIMEOUT_MS || 15 * 60_000),
+      timeout: Number(process.env.WORKWISE_NOTARY_TIMEOUT_MS || 5 * 60_000),
       killSignal: 'SIGKILL'
     })
   } catch (error) {
     if (error?.code === 'ETIMEDOUT') {
-      throw new Error(`notarytool timed out after ${process.env.WORKWISE_NOTARY_TIMEOUT_MS || 15 * 60_000} ms while running ${args[0]}`)
+      throw new Error(`notarytool timed out after ${process.env.WORKWISE_NOTARY_TIMEOUT_MS || 5 * 60_000} ms while running ${args[0]}`)
     }
     throw error
   }
