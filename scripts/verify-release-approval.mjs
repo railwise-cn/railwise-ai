@@ -44,7 +44,19 @@ function resolveEvidencePath(input, tag) {
   const path = resolve(ROOT, expanded)
   const rel = relative(ROOT, path)
   if (!rel || rel.startsWith('..') || isAbsolute(rel)) fail('release evidence path must stay inside the repository')
+  if (!rel.startsWith('docs/qa/release-gates/')) {
+    fail('release evidence path must be under docs/qa/release-gates/')
+  }
   return { path, relativePath: rel }
+}
+
+function requireTrackedArtifact(value, label) {
+  const candidate = typeof value === 'string' ? value : value?.path
+  if (!candidate || typeof candidate !== 'string') fail(`${label} must provide a repository-relative path`)
+  const { path, relativePath } = resolveEvidencePath(candidate, '')
+  if (!existsSync(path)) fail(`${label} file does not exist: ${relativePath}`)
+  ensureTracked(relativePath)
+  return relativePath
 }
 
 function ensureTracked(relativePath) {
@@ -68,6 +80,15 @@ export function verifyReleaseApproval({
     fail(`release confirmation must be PUBLISH-STABLE-${tag}`)
   }
   if (!/^[0-9a-f]{40}$/i.test(sourceHead)) fail('GITHUB_SHA must be the 40-character commit targeted by the tag')
+  let resolvedTagCommit
+  try {
+    resolvedTagCommit = execFileSync('git', ['rev-list', '-n', '1', tag], { cwd: ROOT, encoding: 'utf8' }).trim()
+  } catch {
+    fail(`release tag cannot be resolved locally: ${tag}`)
+  }
+  if (resolvedTagCommit !== sourceHead) {
+    fail(`GITHUB_SHA ${sourceHead} does not match commit ${resolvedTagCommit} resolved from ${tag}`)
+  }
 
   const version = tag.slice(1)
   const packageJson = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'))
@@ -87,6 +108,7 @@ export function verifyReleaseApproval({
   }
 
   if (manifest.schemaVersion !== 1) fail('release evidence schemaVersion must be 1')
+  if (manifest.scope !== 'public-release') fail('release evidence scope must be public-release')
   requireStatus(manifest.status, 'release evidence')
 
   const release = manifest.release
@@ -98,16 +120,26 @@ export function verifyReleaseApproval({
   if (!packageEvidence || packageEvidence.version !== version) {
     fail('release evidence package.version must match the tagged package')
   }
+  const packageIdentity = packageEvidence.identity
+  if (!packageIdentity || typeof packageIdentity !== 'object' ||
+      typeof packageIdentity.bundleId !== 'string' || packageIdentity.bundleId.length === 0 ||
+      typeof packageIdentity.artifactSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(packageIdentity.artifactSha256)) {
+    fail('release evidence package.identity must include bundleId and a 64-character artifactSha256')
+  }
   requireStatus(packageEvidence.signature, 'package.signature')
   requireStatus(packageEvidence.notarization, 'package.notarization')
   if (!Array.isArray(packageEvidence.screenshots) || packageEvidence.screenshots.length === 0) {
     fail('release evidence must list screenshots from the installed package review')
   }
+  packageEvidence.screenshots.forEach((screenshot, index) => {
+    requireTrackedArtifact(screenshot, `package.screenshots[${index}]`)
+  })
 
   const acceptance = manifest.acceptance
   if (!acceptance || typeof acceptance !== 'object') fail('release evidence acceptance section is required')
   for (const key of ['functionalChecklist', 'uiComputerUse', 'updaterRoundTrip']) {
     requireStatus(acceptance[key], `acceptance.${key}`)
+    requireTrackedArtifact(acceptance[key], `acceptance.${key}`)
   }
   const independentReview = acceptance.independentSeniorEngineerReview
   requireStatus(independentReview, 'acceptance.independentSeniorEngineerReview')
@@ -117,6 +149,7 @@ export function verifyReleaseApproval({
   if (!/ai|agent|simulat/i.test(reviewerLabel)) {
     fail('independentSeniorEngineerReview must identify the required AI/agent senior-engineer review')
   }
+  requireTrackedArtifact(independentReview, 'acceptance.independentSeniorEngineerReview')
 
   return { tag, version, sourceHead, evidence: relativePath }
 }
