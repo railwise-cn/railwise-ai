@@ -117,3 +117,29 @@ could break the quality and release workflows.
 3. Keep `wangjiawei508` at read permission unless a future role explicitly
    requires a different access level; if changed, verify it cannot bypass tag
    or environment protection.
+
+## Addendum — final remote hardening recheck (2026-10-06 09:54 UTC)
+
+The remote controls were rechecked after the audit record was merged. The
+repository is now at `main` commit `30e0a6ab99a3d281e21d4dafc809fad1801f1d7f`
+(PR #42). The following residual bypasses were closed:
+
+- `main` administrator enforcement is enabled (`enforce_admins=true`). The
+  required Quality checks, one approving review, CODEOWNER review, stale-review
+  dismissal, and force-push/deletion protections remain active.
+- `production-release.prevent_self_review=true`, so the person who starts a
+  deployment cannot approve that same deployment. The environment still has
+  `can_admins_bypass=false` and requires `railwise-cn` approval.
+- `production-release` now uses custom deployment branch policies and accepts
+  only the `v*` tag pattern. The workflow's exact `vX.Y.Z` validation remains
+  an additional application-level check.
+- `wangjiawei508` remains `permission=read` with no push, maintain, triage, or
+  admin permission. The explicit permission endpoint is the source of truth;
+  the account cannot create or rewrite release tags or dispatch a protected
+  stable publication.
+
+This hardening intentionally makes a stable publication require a second
+authorized reviewer when the initiating identity is `railwise-cn`. No tag,
+GitHub Release, Stable feed, or official download-page pointer was created or
+changed by this addendum. The existing published `v0.5.2` remains the latest
+release.
