@@ -35,6 +35,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: Verify Stable release workflow gates
+        run: npm run test:release-gate
       - name: Website audit regression checks (offline fixtures)
         run: node --test scripts/website-surface-audit.test.mjs
       - run: npm --prefix kun run typecheck
