@@ -50,6 +50,28 @@ describe('confirmed source-bound tabular measurement inputs',() => {
     await expect(parseSurveyTabular('survey.csv',csv,{...mapping(csv),confirmed:false} as unknown as SurveyTabularMappingV1)).rejects.toThrow()
   })
 
+  it('retains the prior network when the same CSV is reimported with a newly confirmed reference', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'survey-tabular-reference-'))
+    const service = new SurveyService({ rootDir: root }); onTestFinished(() => service.close())
+    const originalMapping = mapping(csv)
+    const original = await service.importNetwork({
+      projectId: 'tabular-reference', expectedRevision: 0, idempotencyKey: 'reference-original',
+      name: 'survey.csv', dataBase64: csv.toString('base64'), tabularMapping: originalMapping,
+      referenceDeclaration: { coordinateSystem: 'LOCAL', verticalDatum: 'BM-local' }
+    })
+    const revisedMapping = SurveyTabularMappingV1.parse({ ...originalMapping, coordinateSystem: 'LOCAL-2' })
+    const revised = await service.importNetwork({
+      projectId: 'tabular-reference', expectedRevision: 0, idempotencyKey: 'reference-revised',
+      name: 'survey.csv', dataBase64: csv.toString('base64'), tabularMapping: revisedMapping,
+      referenceDeclaration: { coordinateSystem: 'LOCAL-2', verticalDatum: 'BM-local' }
+    })
+
+    expect(revised.id).not.toBe(original.id)
+    expect(revised.coordinateSystem).toBe('LOCAL-2')
+    expect(service.getNetwork(original.id)?.coordinateSystem).toBe('LOCAL')
+    expect(service.listNetworks('tabular-reference').map(network => network.id)).toEqual(expect.arrayContaining([original.id, revised.id]))
+  })
+
   it('binds XLSX row addresses to the original ZIP member and uncompressed bytes',async () => {
     const bytes = await workbook()
     const probe = await probeSurveyTabular('survey.xlsx',bytes)

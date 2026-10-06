@@ -33,6 +33,7 @@ import { MAX_DEFORMATION_PAIRS, parseDeformationPairs, SurveyDeformationPairsFor
 import { missingSurveyReferences, surveyReferenceDeclared } from '@shared/survey-reference'
 
 type Project = { id: string; revision: number; workspace?: string; taskType?: string; coordinateSystem?: string; verticalDatum?: string; heightDatum?: string; taskContext?: { coordinateSystem?: string; verticalDatum?: string } }
+type RetainedImport = { file: File; baseInput: { networkType: string; name: string; knownPoints?: ReturnType<typeof parseSurveyKnownPoints>; transformType?: string; cosaIn1Mapping?: CosaIn1Mapping; tabularMapping?: SurveyTabularMapping }; referenceDeclaration: { coordinateSystem?: string; verticalDatum?: string } }
 type SurveySection = 'network' | 'observations' | 'points' | 'result' | 'deformation' | 'free-trial'
 type SurveyPoint = { id: string; pointClass?: string; x?: number; y?: number; height?: number; latitude?: number; longitude?: number; known?: boolean }
 type SurveyObservation = { id: string; type?: string; from?: string; to?: string; station?: string; target?: string; left?: string; right?: string; value?: number; unit?: string; vectorX?: number; vectorY?: number; vectorZ?: number; covariance?: number[]; sigma?: number; sigmaUnit?: string; stationHeightOffset?: number; targetHeightOffset?: number; distance?: number; direction?: number; sourceRecordId?: string; sourceRow?: number }
@@ -315,6 +316,15 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
   const [mappingBatch, setMappingBatch] = useState<{ id: string; files: readonly File[]; mappings: Map<File, CosaIn1Mapping>; tabularMappings: Map<File, SurveyTabularMapping>; tabularFile?: File; probe?: SurveyTabularProbe; probeError?: string } | null>(null)
   const projectScopeRef = useRef('')
   projectScopeRef.current = JSON.stringify([project.workspace, project.id])
+  const retainedImports = useRef(new Map<string, { networkRevision: number; sourceSha256?: string; value: RetainedImport }>())
+  const retainedImportScope = useRef(projectScopeRef.current)
+  if (retainedImportScope.current !== projectScopeRef.current) {
+    retainedImports.current.clear()
+    retainedImportScope.current = projectScopeRef.current
+  }
+  const retained = network ? retainedImports.current.get(network.id) : undefined
+  const referenceRepair = retained?.sourceSha256 && retained.networkRevision === network?.revision
+    && retained?.sourceSha256 === network?.sourceFile?.sha256 ? retained.value : undefined
   const [section, setSection] = useState<SurveySection>(preferredSection ?? 'network')
   const contentSection = compact ? preferredSection ?? 'network' : section
   const preferredSectionRef = useRef(preferredSection)
@@ -389,10 +399,10 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
   const referenceFindings = missingReferences.map(reference => ({
     code: 'reference_undeclared', severity: 'blocking',
     message: reference === 'coordinate' ? '平面坐标基准尚未声明。' : '高程基准尚未声明。',
-    suggestedAction: '确认基准后重新选择原文件导入，原记录保留。',
+    suggestedAction: referenceRepair ? '填写基准后点击修复，使用本次上传的原文件重新导入。' : '填写基准后重新选择原文件导入，原记录保留。',
     localized: { en: {
       message: reference === 'coordinate' ? 'The coordinate reference has not been declared.' : 'The height datum has not been declared.',
-      suggestedAction: 'Confirm the reference and reimport the original file. The existing record is retained.'
+      suggestedAction: referenceRepair ? 'Enter the reference, then repair using the file uploaded in this session.' : 'Enter the reference and select the original file again. The existing record is retained.'
     } }
   }))
   const currentFindings = [...(network?.findings ?? []).filter(finding => finding.code !== 'reference_undeclared' || !missingReferences.length), ...sourceEligibilityFindings, ...referenceFindings]
@@ -607,13 +617,13 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
     return SurveyTabularProbeV1.parse(response.probe)
   }
 
-  const importFiles = async (files: readonly File[], mappings = new Map<File, CosaIn1Mapping>(), tabularMappings = new Map<File, SurveyTabularMapping>()): Promise<void> => {
+  const importFiles = async (files: readonly File[], mappings = new Map<File, CosaIn1Mapping>(), tabularMappings = new Map<File, SurveyTabularMapping>(), repair?: RetainedImport): Promise<void> => {
     if (!runtimeReady || busy || !files.length) return
-    if (files.some((file) => /\.in1$/i.test(file.name) && !mappings.has(file))) {
+    if (!repair && files.some((file) => /\.in1$/i.test(file.name) && !mappings.has(file))) {
       setMappingBatch({ id: crypto.randomUUID(), files, mappings, tabularMappings }); setSection('network')
       return
     }
-    const tabularFile = files.find(file => /\.(?:csv|tsv|xlsx)$/i.test(file.name) && !tabularMappings.has(file))
+    const tabularFile = !repair && files.find(file => /\.(?:csv|tsv|xlsx)$/i.test(file.name) && !tabularMappings.has(file))
     if (tabularFile) {
       const scope = projectScopeRef.current
       setBusy(true); setMessage('')
@@ -629,26 +639,33 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
     const importScope = projectScopeRef.current
     try {
       let knownPoints: ReturnType<typeof parseSurveyKnownPoints>
-      try { knownPoints = files.some(file => !tabularMappings.has(file)) ? parseSurveyKnownPoints(knownPointsText) : [] } catch (error) {
+      try { knownPoints = !repair && files.some(file => !tabularMappings.has(file)) ? parseSurveyKnownPoints(knownPointsText) : [] } catch (error) {
         throw new Error(t('surveyKnownPointsInvalid', { row: error instanceof Error ? error.message : '?' }))
       }
       const imported: Network[] = []
+      const importedInputs = new Map<string, RetainedImport>()
       const failures: string[] = []
       for (const file of files) {
         if (importScope !== projectScopeRef.current) return
         try {
           const dataBase64 = await readFile(file)
           if (importScope !== projectScopeRef.current) return
-          const tabularMapping = tabularMappings.get(file)
-          const referenceDeclaration = {
+          const tabularMapping = repair?.baseInput.tabularMapping ?? tabularMappings.get(file)
+          const referenceDeclaration = repair ? {
+            ...repair.referenceDeclaration,
+            ...(missingReferences.includes('coordinate') && coordinateSystem.trim() ? { coordinateSystem: coordinateSystem.trim() } : {}),
+            ...(missingReferences.includes('height') && verticalDatum.trim() ? { verticalDatum: verticalDatum.trim() } : {})
+          } : {
             ...(coordinateSystem.trim() ? { coordinateSystem: coordinateSystem.trim() } : {}),
             ...(verticalDatum.trim() ? { verticalDatum: verticalDatum.trim() } : {})
           }
-          const input = { networkType: tabularMapping?.networkType ?? networkType, ...(!tabularMapping && knownPoints.length ? { knownPoints } : {}), ...(!tabularMapping && networkType === 'coordinate-transform' ? { transformType } : {}), name: file.name, dataBase64, ...(mappings.has(file) ? { cosaIn1Mapping: mappings.get(file)! } : {}), ...(tabularMapping ? { tabularMapping } : {}), ...(Object.keys(referenceDeclaration).length ? { referenceDeclaration } : {}) }
+          const baseInput = repair?.baseInput ?? { networkType: tabularMapping?.networkType ?? networkType, ...(!tabularMapping && knownPoints.length ? { knownPoints } : {}), ...(!tabularMapping && networkType === 'coordinate-transform' ? { transformType } : {}), name: file.name, ...(mappings.has(file) ? { cosaIn1Mapping: mappings.get(file)! } : {}), ...(tabularMapping ? { tabularMapping } : {}) }
+          const input = { ...baseInput, dataBase64, ...(Object.keys(referenceDeclaration).length ? { referenceDeclaration } : {}) }
           const idempotencyKey = await surveyImportKey(project.id, input)
           const result = await request<{ network: Network }>('/v1/engineering/survey/networks/import', 'POST', { projectId: project.id, ...input, expectedRevision: project.revision, idempotencyKey })
           if (importScope !== projectScopeRef.current) return
           imported.push(result.network)
+          importedInputs.set(result.network.id, { file, baseInput, referenceDeclaration })
           onRemovePendingFile?.(file)
           if (compact && (result.network as NetworkWithRawSourceIntegrity).sourceEligibility?.eligible === true) {
             const checked = await request<{ network: Network }>(`/v1/engineering/survey/networks/${result.network.id}/validate`, 'POST', { expectedRevision: result.network.revision, idempotencyKey: `survey-validate-${result.network.id}-${result.network.revision}` })
@@ -679,6 +696,10 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
       if (imported.length) {
         recordEngineeringUsage('firstImportMs', performance.now() - importStarted)
         const selected = imported.find((item) => item.sourceFile && /\.(?:in1|in2)$/i.test(item.sourceFile.name)) ?? imported[0]!
+        for (const item of imported) {
+          const originalInput = importedInputs.get(item.id)
+          if (originalInput) retainedImports.current.set(item.id, { networkRevision: item.revision, sourceSha256: item.sourceFile?.sha256, value: originalInput })
+        }
         setNetworks((current) => [...imported, ...current.filter((item) => !imported.some((candidate) => candidate.id === item.id))])
         setNetwork(selected); setNetworkType(selected.networkType); setAdjustment(null); setSelectedResidualSourceRecordId(null); setSection('network')
       }
@@ -712,6 +733,12 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
         : missingSurveyReferences(result.network).length || result.network.qualityStatus === 'blocked' || result.network.findings.some(finding => finding.severity === 'blocking') || currentEligibility?.findings?.some(finding => finding.severity === 'blocking')
           ? t('surveyValidationBlocked')
           : t('surveyValidationPassed')
+      const retainedInput = retainedImports.current.get(network.id)
+      if (retainedInput && retainedInput.networkRevision === network.revision
+        && retainedInput.sourceSha256 === network.sourceFile?.sha256
+        && result.network.id === network.id && result.network.sourceFile?.sha256 === network.sourceFile?.sha256) {
+        retainedImports.current.set(network.id, { ...retainedInput, networkRevision: result.network.revision })
+      }
       setNetworks((current) => current.map((item) => item.id === result.network.id ? result.network : item)); setNetwork(result.network); setMessage(validationMessage); setSection('network')
     } catch (error) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
   }
@@ -785,8 +812,15 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
     if (finding.code === 'reference_undeclared' || /平面坐标基准尚未声明|高程基准尚未声明|(?:coordinate reference|height datum).*not been declared/i.test(finding.message)) {
       setSection('network')
       if (compact) setAdvancedOpen(false)
-      setMessage(referenceText('surveyReferenceDeclarationRecovery', '确认基准后重新选择原文件导入，原记录保留。', 'Confirm the reference and reimport the original file. The existing record is retained.'))
-      setReferenceFocusRequested(/高程|height/i.test(finding.message) ? 'height' : 'coordinate')
+      if (referenceRepair && missingReferences.every(reference => surveyReferenceDeclared(reference === 'coordinate' ? coordinateSystem : verticalDatum))) {
+        void importFiles([referenceRepair.file], undefined, undefined, referenceRepair)
+        return
+      }
+      setMessage(referenceRepair
+        ? referenceText('surveyReferenceDeclarationRetainedRecovery', '请先补全必需的基准声明，再点击补充基准声明；本次上传的原文件会用于重新导入。', 'Complete the required reference declarations, then confirm them. The file uploaded in this session will be reimported.')
+        : referenceText('surveyReferenceDeclarationRecovery', '确认基准后重新选择原文件导入，原记录保留。', 'Confirm the reference and reimport the original file. The existing record is retained.'))
+      const nextMissing = missingReferences.find(reference => !surveyReferenceDeclared(reference === 'coordinate' ? coordinateSystem : verticalDatum))
+      setReferenceFocusRequested(nextMissing ?? (/高程|height/i.test(finding.message) ? 'height' : 'coordinate'))
       return
     }
     if (finding.code === 'missing_datum' || /缺少已知(?:高程基准点|坐标约束)|no known (?:height datum|coordinate)/i.test(finding.message)) {
@@ -804,7 +838,9 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
     : finding.code === 'missing_datum' ? t('surveyBlockingSupplyControlPoints') : t('engineeringFixIssue')
   const referenceDeclarationInputs = <fieldset disabled={busy || !runtimeReady} className="grid gap-3 sm:grid-cols-2">
     <legend className="mb-1 text-[12px] font-semibold text-ds-ink">{referenceText('surveyReferenceDeclarationTitle', '导入资料的基准声明', 'Reference declaration for imported data')}</legend>
-    <p className="text-[11px] leading-5 text-ds-muted sm:col-span-2">{referenceText('surveyReferenceDeclarationHint', '按测量资料填写实际使用的坐标与高程基准；未使用的基准可留空。确认基准后重新选择原文件导入，原记录保留。', 'Enter the coordinate and height references used by the survey data; unused references may be left blank. Reimport the original file after confirming the reference. The existing record is retained.')}</p>
+    <p className="text-[11px] leading-5 text-ds-muted sm:col-span-2">{referenceRepair
+      ? referenceText('surveyReferenceDeclarationRetainedHint', '按测量资料填写实际使用的坐标与高程基准；未使用的基准可留空。本次上传的原文件可用于补充基准声明。', 'Enter the coordinate and height references used by the survey data; unused references may be left blank. The file uploaded in this session can be used to complete the declaration.')
+      : referenceText('surveyReferenceDeclarationHint', '按测量资料填写实际使用的坐标与高程基准；未使用的基准可留空。确认基准后重新选择原文件导入，原记录保留。', 'Enter the coordinate and height references used by the survey data; unused references may be left blank. Reimport the original file after confirming the reference. The existing record is retained.')}</p>
     <label className="text-[12px] font-medium text-ds-ink">{t('surveyCoordinateSystem')}<input ref={coordinateReferenceInputRef} aria-label={t('surveyCoordinateSystem')} value={coordinateSystem} onChange={event => setCoordinateSystem(event.target.value)} placeholder={referenceText('surveyCoordinatePlaceholder', '例如：CGCS2000 / 工程独立坐标系', 'For example: CGCS2000 / local engineering coordinate system')} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card px-3 text-[12px]" /></label>
     <label className="text-[12px] font-medium text-ds-ink">{t('surveyHeightDatum')}<input ref={verticalReferenceInputRef} aria-label={t('surveyHeightDatum')} value={verticalDatum} onChange={event => setVerticalDatum(event.target.value)} placeholder={referenceText('surveyHeightPlaceholder', '例如：1985 国家高程基准 / 项目高程基准', 'For example: national height datum / project height datum')} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card px-3 text-[12px]" /></label>
   </fieldset>
