@@ -70,6 +70,7 @@ describe('M5 professional survey delivery', () => {
       expectedRevision: project.revision,
       idempotencyKey: 'm5-import-abffb',
       networkType: 'height-control',
+      referenceDeclaration: { verticalDatum: '测试已知点高程基准' },
       name: 'trimble-m5-abffb.dat',
       dataBase64: bytes.toString('base64'),
       // M5 Z records are instrument readings. The adjustment datum must be

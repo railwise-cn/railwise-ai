@@ -335,6 +335,31 @@ afterEach(async () => {
 })
 
 describe('SurveyAdjustmentPanel persisted state restoration', () => {
+  it('shows each recorded point correction with its axis, including zero values', async () => {
+    const points = [
+      adjustment.result.points[0],
+      { ...adjustment.result.points[1], correctionX: 0, correctionY: -0.0002, correctionHeight: 0.0001 },
+      { id: 'No-correction', x: 3, y: 4 }
+    ]
+    const base = runtimeRequest.getMockImplementation() as (path: string, method: string) => Promise<unknown>
+    runtimeRequest.mockImplementation(async (path: string, method: string) => path.includes('/adjustments?')
+      ? runtimeResponse({ adjustments: [{ ...adjustment, result: { ...adjustment.result, points } }] })
+      : base(path, method))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'point-correction-components', project: { id: 'project-restored-001', revision: 1 },
+      runtimeReady: true, preferredSection: 'result'
+    })))
+    await settle()
+
+    const correctionCell = (pointId: string): string | undefined => Array.from(container.querySelectorAll('.survey-result-summary tbody tr'))
+      .find(row => row.querySelector('td')?.textContent?.includes(pointId))?.querySelectorAll('td')[5]?.textContent ?? undefined
+    expect(correctionCell('P-01')).toBe('H 0.0001')
+    expect(correctionCell('XY-test')).toBe('X 0 / Y -0.0002 / H 0.0001')
+    expect(correctionCell('No-correction')).toBe('—')
+    await act(async () => i18n.changeLanguage('en'))
+    expect(correctionCell('XY-test')).toBe('X 0 / Y -0.0002 / H 0.0001')
+  })
+
   it('names COSA sources and their degree-minute-second format without internal format codes', async () => {
     const cosaNetwork = { ...network, sourceFile: { ...network.sourceFile, formatId: 'cosa-in2', detection: { ...network.sourceFile.detection, format: 'cosa-in2' }, angularUnitRaw: 'cosa-degree-dot-mmss' } }
     runtimeRequest.mockImplementation(async (path: string) => path.includes('/survey/networks?')

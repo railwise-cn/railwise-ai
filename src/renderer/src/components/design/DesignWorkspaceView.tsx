@@ -61,6 +61,8 @@ import {
   saveGeneratedWorkspaceFileAs
 } from '../../lib/generated-file-actions'
 import { registerGuiUpdateSaveHandler } from '../../lib/gui-update-install-preflight'
+import { surveyDraftSelection, clearSurveyDraftSelection } from '../../agent/survey-collaboration-client'
+import { SurveyDraftEditorNotice } from '../engineering/SurveyDraftEditorNotice'
 
 type Props = {
   leftSidebarCollapsed: boolean
@@ -403,7 +405,9 @@ export function DesignWorkspaceView({
         message: error instanceof Error ? error.message : String(error)
       })
     })
-    const rememberedDocumentId = activeDesignDocumentForWorkspace(workspaceRoot)
+    const pendingSurvey = surveyDraftSelection()
+    const rememberedDocumentId = pendingSurvey?.kind === 'design' && pendingSurvey.workspace === workspaceRoot ? pendingSurvey.documentId : activeDesignDocumentForWorkspace(workspaceRoot)
+    if (pendingSurvey?.kind === 'design' && pendingSurvey.workspace === workspaceRoot) clearSurveyDraftSelection()
     void restoreDesignDocument(rememberedDocumentId || undefined).then((result) => {
       if (rememberedDocumentId && result?.code === 'not_found') void restoreDesignDocument()
     })
@@ -943,6 +947,7 @@ export function DesignWorkspaceView({
 
   return (
     <div className="ds-opaque-work-surface ds-no-drag flex h-full min-h-0 flex-col bg-ds-main">
+      <SurveyDraftEditorNotice workspace={workspaceRoot} documentId={document?.id} save={flushDesignSave} />
       {/* 顶栏 */}
       <header className="ds-drag flex h-12 shrink-0 items-center gap-2 border-b border-ds-border-muted px-3">
         {leftSidebarCollapsed ? (

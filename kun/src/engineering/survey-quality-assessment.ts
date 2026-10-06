@@ -41,6 +41,7 @@ export interface AssessmentSources {
   getRun: (pid: string, id: string) => SurveySamplingRunSummaryV1
   listSamples: (pid: string, id: string, limit: number, offset: number) => z.infer<typeof SurveySamplingSamplePageV1>
   getScore: (pid: string, id: string) => SurveyQualityScoringRecordV1
+  getLineageScore?: (pid:string,id:string)=>SurveyQualityScoringRecordV1
 }
 /** Explicit schema positions only: arbitrary nested fields never become evidence. */
 export function assessmentEvidenceReferences(record: SurveyQualityScoringRecordV1): string[] {
@@ -154,17 +155,23 @@ export class SurveyQualityAssessmentService {
         if (record.snapshot.retentionPlanDigest!==assessmentDigest(record.snapshot.retentionPlan) || record.snapshot.sampleIdsHash!==assessmentDigest(record.snapshot.selectedUnitIds)
           || !equal(record.request.unitMaterials.map(u=>u.unitId),record.snapshot.selectedUnitIds) || record.request.retentionPlanId!==record.snapshot.retentionPlan.id
           || record.request.retentionRecordId!==record.snapshot.retentionRecordId || record.request.samplingRunId!==record.snapshot.run.id || record.request.productProfileId!==record.snapshot.profile.profileId) return fail('integrity')
+        const previous=record.snapshot.reinspection,declared=record.request.reinspection
+        if((record.snapshot.run.round===1)!==(declared===undefined) || (declared===undefined)!==(previous===undefined)
+          || declared && (!previous || declared.previousAssessmentId!==previous.previousAssessmentId || declared.expectedPreviousRecordHash!==previous.previousRecordHash || declared.reason!==previous.reason)
+          || record.algorithmPolicyVersion!==(declared?C.QUALITY_REINSPECTION_ASSESSMENT_ALGORITHM:C.QUALITY_ASSESSMENT_ALGORITHM)) return fail('integrity')
       } else {
         const plan=this.readOwn('assessment_plans',pid,record.assessmentPlanId) as C.SurveyQualityAssessmentPlanV1
         if (record.resultHash!==assessmentDigest(record.result) || record.request.assessmentPlanId!==record.assessmentPlanId || record.request.expectedPlanHash!==record.planHash || plan.planHash!==record.planHash
           || !equal(record.result.unitRows.map(u=>u.unitId),plan.snapshot.selectedUnitIds)) return fail('integrity')
+        if(!equal(record.sourceVector.reinspection??null,plan.snapshot.reinspection??null) || record.algorithmPolicyVersion!==plan.algorithmPolicyVersion) return fail('integrity')
         if (!equal(record.replayEnvironment,environment())) return fail('replay-environment')
       }
       if (!equal(this.project(pid),project)) return fail('stale')
       return record
     } catch(error) { if(error instanceof SurveyQualityAssessmentError && ['stale','not-found','rate-limit','unavailable','replay-environment'].includes(error.reason)) throw error; return fail('integrity') }
   }
-  private sourcePass(pid: string, request: C.SurveyQualityAssessmentPlanCreateV1, scoreRequest?: C.SurveyQualityAssessmentCreateV1) {
+  private sourcePass(pid: string, request: C.SurveyQualityAssessmentPlanCreateV1, scoreRequest?: C.SurveyQualityAssessmentCreateV1,
+    previous?:{record:C.SurveyQualityAssessmentV1;plan:C.SurveyQualityAssessmentPlanV1},forbidden=new Set<string>(),lineage=false) {
     const project=this.project(pid)
     if(project.revision!==request.expectedProjectRevision) return fail('stale')
     const raw=this.source(()=>this.options.sources.retentionSnapshot(pid,request.retentionPlanId,request.retentionRecordId))
@@ -182,7 +189,22 @@ export class SurveyQualityAssessmentService {
       if(!required || required.memberId!==mapping.memberId || !artifact.members.some(m=>m.id===mapping.memberId)) return fail('validation')
     }
     const run=SurveySamplingRunSummaryV1.parse(this.source(()=>this.options.sources.getRun(pid,request.samplingRunId)))
-    if(run.sampleSize>L.units || run.round!==1) return fail('unsupported-scope')
+    if(run.sampleSize>L.units) return fail('unsupported-scope')
+    if((run.round===1)!==(request.reinspection===undefined) || (request.reinspection===undefined)!==(previous===undefined)) return fail('validation')
+    let reinspection:z.infer<typeof C.AssessmentReinspectionBindingV1>|undefined
+    if(previous && request.reinspection){
+      const prior=previous.record,priorPlan=previous.plan,priorRun=priorPlan.snapshot.run
+      if(prior.id!==request.reinspection.previousAssessmentId || prior.recordHash!==request.reinspection.expectedPreviousRecordHash) return fail('conflict')
+      if(run.round!==priorRun.round+1 || run.reinspection?.previousRunId!==priorRun.id || run.reinspection.previousRunHash!==priorRun.runHash || run.reinspection.previousPlanHash!==priorRun.planHash
+        || run.populationId!==priorRun.populationId || run.populationHash!==priorRun.populationHash || run.stage!==priorRun.stage || run.inspectionMode!==priorRun.inspectionMode
+        || request.productProfileId!==priorPlan.snapshot.profile.profileId) return fail('validation')
+      if(artifact.id===priorPlan.snapshot.artifact.id || artifact.bundleHash===priorPlan.snapshot.artifact.bundleHash || plan.id===priorPlan.snapshot.retentionPlan.id || record.id===priorPlan.snapshot.retentionRecordId) return fail('validation')
+      reinspection=C.AssessmentReinspectionBindingV1.parse({previousAssessmentId:prior.id,previousRecordHash:prior.recordHash,previousPlanId:priorPlan.id,previousPlanHash:priorPlan.planHash,
+        previousRunId:priorRun.id,previousRunHash:priorRun.runHash,previousRound:priorRun.round,previousArtifactId:priorPlan.snapshot.artifact.id,previousArtifactHash:priorPlan.snapshot.artifact.bundleHash,
+        previousSourceVectorHash:assessmentDigest(prior.sourceVector),previousResultHash:prior.resultHash,previousDeclaredResultSummary:prior.result.declaredResultSummary,
+        previousOverallLinkage:prior.result.overallLinkage,previousUnitResults:prior.result.unitRows.map(row=>({unitId:row.unitId,result:row.score?.result??null})),previousScoring:prior.sourceVector.scoring,
+        reason:request.reinspection.reason,previousRoundVerification:'current-local-sources-replayed'})
+    }
     const population=SurveySamplingPopulationDetailV1.parse(this.source(()=>this.options.sources.getPopulation(pid,run.populationId)))
     const samples=SurveySamplingSamplePageV1.parse(this.source(()=>this.options.sources.listSamples(pid,run.id,100,0)))
     if(run.id!==request.samplingRunId || run.projectId!==pid || population.projectId!==pid || population.id!==run.populationId || samples.projectId!==pid || samples.runId!==run.id || samples.planHash!==run.planHash
@@ -194,31 +216,57 @@ export class SurveyQualityAssessmentService {
     const profile=C.AssessmentProfileV1.parse({profileId:request.productProfileId,profileVersion:QUALITY_PROFILE_VERSION,standardCode:'GB/T 24356-2023',sourceSha256:QUALITY_STANDARD_DIGEST,
       weightTable:request.productProfileId==='planar-control-point'?43:45,classificationTable:request.productProfileId==='planar-control-point'?44:46,
       dependencyAlgorithmVersions:{sampling:run.algorithmVersion,scoring:'gbt24356-declared-exact-quality-scoring-1'}})
-    const snapshot=C.AssessmentSnapshotV1.parse({project,retentionPlan:plan,retentionPlanDigest:assessmentDigest(plan),artifact,retentionRecordId:record.id,population,run,selectedUnitIds,sampleIdsHash:assessmentDigest(selectedUnitIds),profile})
+    const snapshot=C.AssessmentSnapshotV1.parse({project,retentionPlan:plan,retentionPlanDigest:assessmentDigest(plan),artifact,retentionRecordId:record.id,population,run,selectedUnitIds,sampleIdsHash:assessmentDigest(selectedUnitIds),profile,...(reinspection?{reinspection}:{})})
     const scores=new Map<string,ScoreProjection>()
     if(scoreRequest) {
       if(scoreRequest.unitScores.some(s=>!selectedUnitIds.includes(s.unitId))) return fail('validation')
+      if(previous && (scoreRequest.unitScores.length!==selectedUnitIds.length || scoreRequest.unitScores.some(s=>forbidden.has(s.scoringRecordId)))) return fail('validation')
       // One full source record at a time; only compact result/reference/hash projections survive.
       for(const unitId of selectedUnitIds) {
         const selected=scoreRequest.unitScores.find(s=>s.unitId===unitId)
         if(!selected) continue
-        const score=SurveyQualityScoringRecordV1.parse(this.source(()=>this.options.sources.getScore(pid,selected.scoringRecordId)))
+        const reader=lineage?this.options.sources.getLineageScore:this.options.sources.getScore
+        if(!reader)return fail('unavailable')
+        const score=SurveyQualityScoringRecordV1.parse(this.source(()=>reader(pid,selected.scoringRecordId)))
         const d=score.declaration
         if(score.id!==selected.scoringRecordId || score.projectId!==pid || score.projectBindingHash!==assessmentDigest(project)) return fail('integrity')
         if(d.operation!=='unit' || score.kind!=='unit' || d.unitId!==unitId || d.productProfileId!==profile.profileId || d.productProfileVersion!==profile.profileVersion
           || d.profileWeightTable!==profile.weightTable || d.profileClassificationTable!==profile.classificationTable || d.sourceDigest!==profile.sourceSha256) return fail('validation')
+        if(previous && (score.createdAt<previous.record.createdAt || score.scopeAssessment!=='complete-declared-product-profile' || !['calculated','nonconforming'].includes(score.result.result.state)))return fail('validation')
         scores.set(unitId,{binding:{unitId,recordId:score.id,requestSha256:score.requestSha256,declarationSha256:score.declarationSha256,modelHash:score.modelHash,resultHash:score.resultHash,recordHash:score.recordHash},
           score:{recordId:score.id,associationTiming:'existing-record-linked-after-calculation',declaredTargetAssociation:'caller-declared-not-authenticated',scopeAssessment:score.scopeAssessment,result:score.result.result},references:assessmentEvidenceReferences(score)})
       }
     }
     const sourceVector=C.AssessmentSourceVectorV1.parse({manifestId:manifest.id,manifestHash:plan.manifestHash,artifactId:artifact.id,bundleHash:artifact.bundleHash,retentionPlanId:plan.id,retentionPlanDigest:snapshot.retentionPlanDigest,
       retentionRecordId:record.id,retentionEventCount:retention.events.length,retentionHeadHash:verification.headHash,populationId:population.id,populationHash:population.populationHash,populationDefinitionHash:population.definitionEvidenceSha256,
-      samplingRunId:run.id,samplingRunHash:run.runHash,samplingPlanHash:run.planHash,sampleIdsHash:snapshot.sampleIdsHash,scoring:[...scores.values()].map(s=>s.binding),profile})
+      samplingRunId:run.id,samplingRunHash:run.runHash,samplingPlanHash:run.planHash,sampleIdsHash:snapshot.sampleIdsHash,scoring:[...scores.values()].map(s=>s.binding),profile,...(reinspection?{reinspection}:{})})
     return {snapshot,sourceVector,result:evaluateAssessment(request,retention,scores),manifestReviewStatus:manifest.reviewStatus}
   }
   private replay(pid: string, request: C.SurveyQualityAssessmentPlanCreateV1, scoreRequest?: C.SurveyQualityAssessmentCreateV1) {
     // Two bounded optimistic passes, not a cross-database transaction or ABA guarantee.
-    const a=this.sourcePass(pid,request,scoreRequest), b=this.sourcePass(pid,request,scoreRequest)
+    const pass=()=>{
+      const chain:Array<{record:C.SurveyQualityAssessmentV1;plan:C.SurveyQualityAssessmentPlanV1}>=[],seen=new Set<string>()
+      let cursor=request
+      while(cursor.reinspection){
+        const link=cursor.reinspection
+        if(chain.length>=7 || seen.has(link.previousAssessmentId))return fail('integrity')
+        seen.add(link.previousAssessmentId)
+        const record=this.readOwn('assessments',pid,link.previousAssessmentId) as C.SurveyQualityAssessmentV1
+        if(record.recordHash!==link.expectedPreviousRecordHash)return fail('conflict')
+        const plan=this.readOwn('assessment_plans',pid,record.assessmentPlanId) as C.SurveyQualityAssessmentPlanV1
+        chain.unshift({record,plan});cursor=plan.request
+      }
+      const forbidden=new Set<string>();let prior:typeof chain[number]|undefined
+      for(const item of chain){
+        const replayed=this.sourcePass(pid,item.plan.request,item.record.request,prior,forbidden,true)
+        if(!equal(replayed.snapshot,item.plan.snapshot) || !equal(replayed.sourceVector,item.record.sourceVector))return fail('source-changed')
+        if(!equal(replayed.result,item.record.result) || replayed.manifestReviewStatus!==item.record.manifestReviewStatus)return fail('integrity')
+        for(const score of item.record.sourceVector.scoring)forbidden.add(score.recordId)
+        prior=item
+      }
+      return this.sourcePass(pid,request,scoreRequest,prior,forbidden,chain.length>0)
+    }
+    const a=pass(), b=pass()
     if(!equal(a,b)) return fail('source-changed')
     if(!equal(this.project(pid),a.snapshot.project)) return fail('stale')
     return a
@@ -252,7 +300,7 @@ export class SurveyQualityAssessmentService {
     if(old) return this.verifyPlan(pid,old)
     const {snapshot}=this.replay(pid,request)
     const unsigned={schemaVersion:1,id:`assessment_plan_${randomUUID()}`,projectId:pid,projectRevision:snapshot.project.revision,projectBindingHash:assessmentDigest(snapshot.project),createdAt:this.now(),
-      requestSha256:sha(raw),requestSizeBytes:raw.byteLength,requestJson,request,snapshot,algorithmPolicyVersion:C.QUALITY_ASSESSMENT_ALGORITHM,...C.QUALITY_ASSESSMENT_BOUNDARIES}
+      requestSha256:sha(raw),requestSizeBytes:raw.byteLength,requestJson,request,snapshot,algorithmPolicyVersion:request.reinspection?C.QUALITY_REINSPECTION_ASSESSMENT_ALGORITHM:C.QUALITY_ASSESSMENT_ALGORITHM,...C.QUALITY_ASSESSMENT_BOUNDARIES}
     const plan=C.SurveyQualityAssessmentPlanV1.parse({...unsigned,planHash:assessmentDigest(unsigned)})
     this.persist('assessment_plans',plan,raw);return plan
   }
@@ -276,7 +324,7 @@ export class SurveyQualityAssessmentService {
     const unsigned={schemaVersion:1,id:`assessment_${randomUUID()}`,projectId:pid,projectRevision:plan.projectRevision,projectBindingHash:plan.projectBindingHash,createdAt:this.now(),
       requestSha256:sha(raw),requestSizeBytes:raw.byteLength,requestJson,request,projectSnapshot:plan.snapshot.project,assessmentPlanId:plan.id,planHash:plan.planHash,
       sourceVector:current.sourceVector,result:current.result,resultHash:assessmentDigest(current.result),manifestReviewStatus:current.manifestReviewStatus,replayEnvironment:environment(),
-      algorithmPolicyVersion:C.QUALITY_ASSESSMENT_ALGORITHM,...C.QUALITY_ASSESSMENT_BOUNDARIES}
+      algorithmPolicyVersion:plan.algorithmPolicyVersion,...C.QUALITY_ASSESSMENT_BOUNDARIES}
     const record=C.SurveyQualityAssessmentV1.parse({...unsigned,recordHash:assessmentDigest(unsigned)})
     this.persist('assessments',record,raw);return record
   }

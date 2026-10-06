@@ -66,6 +66,7 @@ describe('historical survey source gates', () => {
       const network = await service.importNetwork({
         projectId: 'legacy-gsi', expectedRevision: 0, idempotencyKey: 'legacy-gsi-import',
         networkType: 'leveling', name: 'loop.GSI', dataBase64: bytes.toString('base64'),
+        referenceDeclaration: { verticalDatum: '测试 BM 高程基准' },
         knownPoints: [{ id: 'BM', height: 100 }]
       })
       const adjusted = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'legacy-gsi-adjust' })
@@ -96,7 +97,7 @@ describe('historical survey source gates', () => {
     const database = new Database(join(root, 'survey.sqlite3'))
     try {
       const bytes = await readFile(new URL('./fixtures/survey-formats/cosa-in2/golden-plane-control-e2e.in2', import.meta.url))
-      const network = await service.importNetwork({ projectId: 'legacy-cosa', expectedRevision: 0, idempotencyKey: 'legacy-cosa-import', networkType: 'plane-control', name: 'network.in2', dataBase64: bytes.toString('base64') })
+      const network = await service.importNetwork({ projectId: 'legacy-cosa', expectedRevision: 0, idempotencyKey: 'legacy-cosa-import', networkType: 'plane-control', name: 'network.in2', referenceDeclaration: { coordinateSystem: '公开合成样例独立坐标系' }, dataBase64: bytes.toString('base64') })
       const adjusted = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'legacy-cosa-adjust' })
       expect(adjusted.run.status).toBe('completed')
       mutateStoredNetwork(root, network.id, (stored) => {

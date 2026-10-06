@@ -95,6 +95,35 @@ describe('professional survey report formats', () => {
     expect(missing.tables.find(table => table.id.endsWith('-network-topology'))!.rows.every(row => row.source === '原始定位未记录')).toBe(true)
   })
 
+  it('translates importer-owned JSON anchors into professional source wording', async () => {
+    const { review } = await fixture()
+    const withInternalAnchors = {
+      ...review,
+      source: { ...review.source, name: 'control-network.json' },
+      observations: review.observations.map((row, index) => ({
+        ...row,
+        sourceRecordId: `workwise-json-observation-${index + 1}`,
+        sourceLocator: `WorkWise JSON:network.observations[${index}]`,
+        sourceRow: undefined
+      }))
+    }
+    const visible = professionalReportPresentation(buildProfessionalReportModel({
+      project: { name: '专业来源定位', monitoringType: 'leveling-network', workspace: '/tmp' },
+      reviews: [{ review: withInternalAnchors }]
+    }))
+    const sources = [
+      ...visible.tables.find(table => table.id.endsWith('-network-topology'))!.rows.map(row => String(row.source)),
+      ...visible.tables.find(table => table.id.endsWith('-observations'))!.rows.map(row => String(row.source))
+    ]
+    expect(sources).toEqual(expect.arrayContaining([
+      'control-network.json · 原始观测记录第 1 条',
+      'control-network.json · 原始观测记录第 2 条'
+    ]))
+    expect(sources.join('\n')).not.toContain('WorkWise JSON:')
+    expect(sources.join('\n')).not.toContain('network.observations[')
+    expect(sources.join('\n')).not.toContain('workwise-json-observation-')
+  })
+
   it('exports professional evidence without legacy developer appendices or internal identifiers', async () => {
     const { model, review } = await fixture()
     const original = JSON.stringify(model)
@@ -145,6 +174,54 @@ describe('professional survey report formats', () => {
     expect(model.signoff.every(item => item.name === '' && item.date === '' && item.signature === '')).toBe(true)
     expect(model.tables.find(table => table.id.endsWith('-checks'))?.rows).toContainEqual(expect.objectContaining({ id: '规范符合性', status: '未评估' }))
   })
+
+  it('keeps single-period corrections distinct from displacement and missing height corrections distinct from zero', async () => {
+    const { review } = await fixture()
+    const points = review.points.map((point, index) => ({ ...point, correctionHeight: index === 0 ? undefined : 0 }))
+    const model = buildProfessionalReportModel({ project: { name: '改正数口径检查', monitoringType: 'leveling-network', workspace: '/tmp' }, reviews: [{ review: { ...review, points } }] })
+    const table = professionalReportPresentation(model).tables.find(table => table.id.endsWith('-points'))!
+    expect(table.columns.find(column => column.key === 'correctionHeight')?.label).toBe('高程改正数')
+    expect(table.rows[0]!.correctionHeight).toBeUndefined()
+    expect(table.rows[1]!.correctionHeight).toBe(0)
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(model))
+    const document = await docx.file('word/document.xml')!.async('text')
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(model))
+    const workbook = await xlsx.file('xl/workbook.xml')!.async('text')
+    const pointSheetIndex = [...workbook.matchAll(/<sheet name="([^"]+)" sheetId="(\d+)"/g)].find(match => match[1]!.includes('点位成果与精度'))![2]!
+    const sheet = await xlsx.file(`xl/worksheets/sheet${pointSheetIndex}.xml`)!.async('text')
+    for (const artifact of [document, pdf.text, sheet]) {
+      expect(artifact).toContain('高程改正数')
+      expect(artifact).toContain('不可用')
+      expect(artifact).not.toContain('位移')
+    }
+    expect(sheet).toContain('<v>0</v>')
+    expect(pdf.text).toContain('0.0000')
+  }, 20000)
+
+  it('preserves professional point numbers and source filenames that resemble implementation identities', async () => {
+    const { review } = await fixture()
+    const pointId = 'network_0001'
+    const sourceName = 'workwise-survey-inputHash.json'
+    const model = buildProfessionalReportModel({ project: { name: '原始编号检查', monitoringType: 'leveling-network', workspace: '/tmp' }, reviews: [{ review: {
+      ...review,
+      source: { ...review.source, name: sourceName },
+      reference: { ...review.reference, knownPoints: review.reference.knownPoints.map(point => ({ ...point, id: pointId })) },
+      points: review.points.map((point, index) => ({ ...point, id: index === 0 ? pointId : point.id }))
+    } }] })
+    const before = JSON.stringify(model)
+    const visible = professionalReportPresentation(model)
+    expect(visible.tables.find(table => table.id.endsWith('-points'))!.rows[0]!.id).toBe(pointId)
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(model))
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(model))
+    const sheets = (await Promise.all(Object.keys(xlsx.files).filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name)).map(name => xlsx.file(name)!.async('text')))).join('\n')
+    for (const artifact of [await docx.file('word/document.xml')!.async('text'), pdf.text, sheets]) {
+      expect(artifact).toContain(pointId)
+      expect(artifact).toContain(sourceName)
+    }
+    expect(JSON.stringify(model)).toBe(before)
+  }, 20000)
 
   it('renders real DOCX tables with repeating headers, blank signoff and page fields', async () => {
     const { model } = await fixture()

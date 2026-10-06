@@ -27,6 +27,11 @@ const originalGithubToken = process.env.GITHUB_TOKEN
 const originalGhToken = process.env.GH_TOKEN
 
 describe('skill-service', () => {
+  // PPT Master is a 13 MiB, 450+ file audited bundle. During the desktop-wide
+  // forked run, concurrent filesystem work can exceed Vitest's 5 s default.
+  // Keep the longer budget local to this recursive install case so a timeout
+  // cannot race afterEach cleanup against an in-flight copy.
+  const PPT_MASTER_INSTALL_TIMEOUT_MS = 30_000
   let tempRoot = ''
 
   beforeEach(async () => {
@@ -552,7 +557,7 @@ describe('skill-service', () => {
         overlaySkillId: 'ppt-master'
       })
     }))
-  })
+  }, PPT_MASTER_INSTALL_TIMEOUT_MS)
 
   it('prefers bundled skills unpacked beside app.asar in packaged apps', async () => {
     const workspaceRoot = join(tempRoot, 'workspace-packaged-bundled')

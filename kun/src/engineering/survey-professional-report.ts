@@ -397,15 +397,32 @@ export function professionalReportPresentation(model: ProfessionalReportModel): 
   const closureNames = new Map<string, Map<string, string>>()
   const observationSources = new Map<string, string>()
   const sourceKey = (networkId: string | undefined, observationId: string) => JSON.stringify([networkId, observationId])
+  /**
+   * Source anchors created by the frozen WorkWise JSON importer are useful in
+   * evidence JSON, but are implementation paths rather than a professional
+   * report location. Keep real vendor/XML/worksheet locators untouched and
+   * translate only the importer-owned observation identity/path pair.
+   */
+  const professionalSourcePosition = (locator: unknown, sourceRow: unknown, sourceValue: unknown): string | undefined => {
+    const locatorText = typeof locator === 'string' ? locator.trim() : ''
+    const observationPath = locatorText.match(/^WorkWise JSON:network\.observations\[(\d+)\]$/i)
+    if (observationPath) return `原始观测记录第 ${Number(observationPath[1]) + 1} 条`
+    if (locatorText) return locatorText
+    if (typeof sourceRow === 'number') return `第 ${sourceRow} 行`
+    // Legacy review projections may retain an explicit professional row
+    // anchor only inside the already-visible source text (for example
+    // "record_0 / 第 6 行"). Preserve that anchor, without inferring a row
+    // from display order.
+    const sourceText = typeof sourceValue === 'string' ? sourceValue : ''
+    return sourceText.match(/第\s*\d+\s*行/)?.[0]
+  }
   for (const table of model.tables.filter(table => table.id.endsWith('-network-topology'))) {
     const source = model.sourceBinding.find(binding => table.id === `${binding.networkId}-network-topology`)
     if (!source) continue
     const names = new Map<string, string>()
     table.rows.forEach((row, index) => {
       const id = String(row.observationId)
-      const locator = typeof row.sourceLocator === 'string' && row.sourceLocator.trim() ? row.sourceLocator : undefined
-      const rowLabel = typeof row.sourceRow === 'number' ? `第 ${row.sourceRow} 行` : String(row.source ?? '').match(/第 \d+ 行/)?.[0]
-      const position = [locator, rowLabel].filter(Boolean).join(' · ')
+      const position = professionalSourcePosition(row.sourceLocator, row.sourceRow, row.source)
       observationSources.set(sourceKey(source.networkId, id), position ? [source.name, position].filter(Boolean).join(' · ') : '原始定位未记录')
       // Preserve user-provided observation numbers. Parser-generated IDs are
       // implementation identifiers; the source locator carries their evidence.

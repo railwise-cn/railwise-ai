@@ -1,3 +1,4 @@
+import { registerSurveyCollaborationRoutes } from './survey-collaboration.js'
 import { registerSurveyQualityAssessmentRoutes } from './survey-quality-assessment.js'
 import { registerSurveyContextMcpRoutes } from './survey-context-mcp.js'
 import { registerSurveyStandardBasisRoutes } from './survey-standard-basis.js'
@@ -116,6 +117,7 @@ export function buildRouter(runtime: ServerRuntime): Router {
   registerSurveyQualityWorkflowRoutes(router, { getService: () => runtime.surveyQualityWorkflowService, authorize: request => authorize(request, runtime) })
   registerSurveyStandardBasisRoutes(router, { authorize: request => authorize(request, runtime) })
   registerSurveyQualityAssessmentRoutes(router, { getService: () => runtime.surveyQualityAssessmentService, authorize: request => authorize(request, runtime) })
+  registerSurveyCollaborationRoutes(router, { getService: () => runtime.surveyCollaborationService, getFlow: () => runtime.flowService, authorize: request => authorize(request, runtime) })
   registerSurveyQualityWorkspaceRoutes(router, {
     getService: () => runtime.surveyQualityWorkspaceService,
     authorize: (request) => authorize(request, runtime)

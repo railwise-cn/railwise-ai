@@ -29,8 +29,16 @@ export async function checkAssessmentRecord(raw:unknown,binding:AssessmentBindin
  let decoded:unknown;try{decoded=requestSchema.parse(C.parseAssessmentJson(record.requestJson))}catch{return invalid()}
  if(!equal(decoded,record.request)||record.request.expectedProjectRevision!==binding.projectRevision||bytes(record.requestJson)!==record.requestSizeBytes
    ||await hash(record.requestJson)!==record.requestSha256||await hash(canonical(unsigned))!==contentHash||await hash(canonical(project))!==record.projectBindingHash)return invalid()
- if(isPlan){if(!equal(record.snapshot.selectedUnitIds,record.request.unitMaterials.map(u=>u.unitId))||record.snapshot.sampleIdsHash!==await hash(canonical(record.snapshot.selectedUnitIds))||record.snapshot.retentionPlanDigest!==await hash(canonical(record.snapshot.retentionPlan))||record.request.productProfileId!==record.snapshot.profile.profileId)return invalid()}
- else if(record.resultHash!==await hash(canonical(record.result))||record.request.assessmentPlanId!==record.assessmentPlanId||record.request.expectedPlanHash!==record.planHash)return invalid()
+ const round= isPlan?record.snapshot.run.round:record.sourceVector.reinspection?.previousRound===undefined?1:record.sourceVector.reinspection.previousRound+1
+ const linked = isPlan?record.snapshot.reinspection:record.sourceVector.reinspection
+ if((round===1)!==(linked===undefined)||record.algorithmPolicyVersion!==(round===1?C.QUALITY_ASSESSMENT_ALGORITHM:C.QUALITY_REINSPECTION_ASSESSMENT_ALGORITHM))return invalid()
+ if(isPlan){
+  if(!equal(record.snapshot.selectedUnitIds,record.request.unitMaterials.map(u=>u.unitId))||record.snapshot.sampleIdsHash!==await hash(canonical(record.snapshot.selectedUnitIds))||record.snapshot.retentionPlanDigest!==await hash(canonical(record.snapshot.retentionPlan))||record.request.productProfileId!==record.snapshot.profile.profileId)return invalid()
+  if(linked){
+   if(!record.request.reinspection||linked.previousAssessmentId!==record.request.reinspection.previousAssessmentId||linked.previousRecordHash!==record.request.reinspection.expectedPreviousRecordHash||linked.previousRound!==record.snapshot.run.round-1||linked.previousRunId!==record.snapshot.run.reinspection?.previousRunId||linked.reason!==record.request.reinspection.reason)return invalid()
+  }
+ } else if(record.resultHash!==await hash(canonical(record.result))||record.request.assessmentPlanId!==record.assessmentPlanId||record.request.expectedPlanHash!==record.planHash){return invalid()}
+ else if(linked && (linked.previousRound!==record.sourceVector.reinspection?.previousRound||linked.previousAssessmentId!==record.sourceVector.reinspection.previousAssessmentId||linked.previousRecordHash!==record.sourceVector.reinspection.previousRecordHash))return invalid()
  return record
 }
 export async function createAssessmentPlan(binding:AssessmentBinding,input:AssessmentPlanInput,key:string):Promise<AssessmentPlan>{
@@ -42,7 +50,7 @@ export async function createAssessmentPlan(binding:AssessmentBinding,input:Asses
 export async function createAssessment(binding:AssessmentBinding,plan:AssessmentPlan,unitScores:z.infer<typeof C.SurveyQualityAssessmentCreateV1>['unitScores'],key:string):Promise<AssessmentRecord>{
  const body=C.SurveyQualityAssessmentCreateV1.parse({schemaVersion:1,acknowledged:true,expectedProjectRevision:binding.projectRevision,idempotencyKey:key,assessmentPlanId:plan.id,expectedPlanHash:plan.planHash,unitScores}),raw=JSON.stringify(body)
  const result=await checkAssessmentRecord(await request(C.assessmentPath(binding.projectId,'assessments'),'POST',raw),binding)
- if('snapshot' in result||result.requestJson!==raw||!equal(result.result.unitRows.map(u=>u.unitId),plan.snapshot.selectedUnitIds))return invalid();return result
+ if('snapshot' in result||result.requestJson!==raw||!equal(result.result.unitRows.map(u=>u.unitId),plan.snapshot.selectedUnitIds)||!equal(result.sourceVector.reinspection??null,plan.snapshot.reinspection??null)||result.algorithmPolicyVersion!==plan.algorithmPolicyVersion)return invalid();return result
 }
 export async function readAssessment(binding:AssessmentBinding,kind:'plans'|'assessments',id:string,contentHash?:string):Promise<AssessmentPlan|AssessmentRecord>{
  const record=await checkAssessmentRecord(await request(C.assessmentPath(binding.projectId,kind,id)),binding,id,contentHash)

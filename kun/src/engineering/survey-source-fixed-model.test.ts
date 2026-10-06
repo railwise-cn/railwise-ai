@@ -79,7 +79,7 @@ describe('source-backed fixed water-level model', () => {
     const root = await mkdtemp(join(tmpdir(), 'source-planar-rejection-')), project = { id: 'planar-project', revision: 1, workspace: root }
     const service = new SurveyService({ rootDir: root, getProject: id => id === project.id ? project : null }); services.push({ root, service })
     const bytes = await readFile(new URL('./fixtures/survey-formats/cosa-in2/golden-plane-control-e2e.in2', import.meta.url))
-    const network = await service.importNetwork({ projectId: project.id, expectedRevision: 0, idempotencyKey: 'planar-import', name: 'network.in2', networkType: 'plane-control', dataBase64: bytes.toString('base64') })
+    const network = await service.importNetwork({ projectId: project.id, expectedRevision: 0, idempotencyKey: 'planar-import', name: 'network.in2', networkType: 'plane-control', referenceDeclaration: { coordinateSystem: '公开合成样例独立坐标系' }, dataBase64: bytes.toString('base64') })
     const adjusted = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'planar-adjust' })
     expect(adjusted.run.status).toBe('completed')
     expect(() => service.getSourceFixedModel(project.id, { adjustmentId: adjusted.run.id, expectedProjectRevision: 1, expectedNetworkRevision: network.revision })).toThrow(/nonlinear/)

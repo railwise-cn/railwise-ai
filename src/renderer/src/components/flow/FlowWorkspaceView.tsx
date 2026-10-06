@@ -8,16 +8,20 @@ import {
 import { AlertTriangle, CheckCircle2, ChevronRight, Download, History, Loader2, Play, Save, Send, Square, TestTube2, Workflow } from 'lucide-react'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { flowMatchesFilter, type FlowListFilter } from './flow-filter'
+import { surveyDraftSelection, clearSurveyDraftSelection } from '../../agent/survey-collaboration-client'
+import { SurveyReviewFlowPanel } from './SurveyReviewFlowPanel'
+import { useChatStore } from '../../store/chat-store'
+import { useTranslation } from 'react-i18next'
 
 type PortType = 'string' | 'number' | 'boolean' | 'json' | 'table' | 'file' | 'document' | 'image' | 'agent_message'
 type RegistryPort = { id: string; label: string; type: PortType; required: boolean; multiple: boolean }
 type RegistryEntry = { type: string; category: string; label: string; inputs: RegistryPort[]; outputs: RegistryPort[]; available: boolean; disabledReason?: string; configurationRoute?: string }
 type FlowNodeData = { label: string; nodeType: string; registry?: RegistryEntry; status?: string }
 type FlowBinding = { kind: 'literal'; value: unknown } | { kind: 'variable'; variable: string } | { kind: 'port'; nodeId: string; portId: string }
-type FlowDefinition = { schemaVersion: 1; id: string; name: string; description: string; revision: number; nodes: Array<{ id: string; type: string; label: string; position: { x: number; y: number }; bindings: Record<string, unknown>; config: Record<string, unknown>; policy: NodePolicy; disabled: boolean }>; edges: Array<{ id: string; sourceNodeId: string; sourcePortId: string; targetNodeId: string; targetPortId: string; conversionId?: string; branch: 'normal' | 'error' }>; variables: Record<string, unknown>; publishedVersionId?: string; createdAt: string; updatedAt: string }
+type FlowDefinition = { schemaVersion: 1; id: string; name: string; description: string; revision: number; nodes: Array<{ id: string; type: string; label: string; position: { x: number; y: number }; bindings: Record<string, unknown>; config: Record<string, unknown>; policy: NodePolicy; disabled: boolean }>; edges: Array<{ id: string; sourceNodeId: string; sourcePortId: string; targetNodeId: string; targetPortId: string; conversionId?: string; branch: 'normal' | 'error' }>; variables: Record<string, unknown>; workspace?: string; publishedVersionId?: string; createdAt: string; updatedAt: string }
 type NodePolicy = { timeoutMs: number; retryAttempts: number; retryBackoffMs: number; errorBehavior: 'fail' | 'error_edge' | 'continue'; concurrencyLimit: number; resumable: boolean; breakpoint: boolean }
 type ValidationIssue = { code: string; severity: 'error' | 'warning'; message: string; nodeId?: string }
-type FlowRun = { id: string; status: string; startedAt: string; updatedAt: string }
+type FlowRun = { id: string; flowId?: string; status: string; input?: unknown; startedAt: string; updatedAt: string }
 type FlowNodeRun = { id: string; nodeId: string; attempt: number; status: string; input?: unknown; output?: unknown; error?: string }
 type FlowRunDetails = { run: FlowRun; nodeRuns: FlowNodeRun[]; events: Array<{ id: string; type: string; nodeId?: string; payload: unknown; createdAt: string }> }
 
@@ -88,6 +92,7 @@ export function createStarterFlowInput(id: string, options: { triggerType?: 'man
 }
 
 export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, filter }: { leftSidebarCollapsed: boolean; onToggleLeftSidebar: () => void; filter: FlowListFilter }): ReactElement {
+  const { t } = useTranslation('common')
   const [flows, setFlows] = useState<FlowDefinition[]>([]); const [registry, setRegistry] = useState<RegistryEntry[]>([])
   const [activeId, setActiveId] = useState<string | null>(null); const [draft, setDraft] = useState<FlowDefinition | null>(null)
   const activeIdRef = useRef<string | null>(null)
@@ -98,9 +103,44 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
 
   const visibleFlows = useMemo(() => flows.filter((flow) => flowMatchesFilter(flow, filter)), [filter, flows])
   const load = useCallback(async () => { setBusy('loading'); try { const result = await runtimeJson<{ flows: FlowDefinition[]; registry: RegistryEntry[] }>('/v1/flows'); setFlows(result.flows); setRegistry(result.registry); const filtered = result.flows.filter((flow) => flowMatchesFilter(flow, filter)); const selected = filtered.find((flow) => flow.id === activeIdRef.current) ?? filtered[0] ?? null; activeIdRef.current = selected?.id ?? null; setActiveId(selected?.id ?? null); setDraft(selected); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }, [filter])
-  useEffect(() => { void load() }, [load])
-  useEffect(() => { if (!activeId) { setRuns([]); return } void runtimeJson<{ runs: FlowRun[] }>(`/v1/flows/${encodeURIComponent(activeId)}/history`).then((value) => setRuns(value.runs)).catch(() => setRuns([])) }, [activeId])
-  useEffect(() => { if (!selectedRunId) { setRunDetails(null); return } void runtimeJson<FlowRunDetails>(`/v1/flow-runs/${selectedRunId}`).then(setRunDetails).catch((reason) => setError(message(reason))) }, [selectedRunId])
+  useEffect(() => {
+    const selection = surveyDraftSelection()
+    if (selection?.kind === 'flow') {
+      activeIdRef.current = selection.flowId
+      setSelectedRunId(selection.runId)
+      clearSurveyDraftSelection()
+    }
+    void load()
+  }, [load])
+  useEffect(() => {
+    let current = true
+    if (!activeId) { setRuns([]); return }
+    void runtimeJson<{ runs: FlowRun[] }>(`/v1/flows/${encodeURIComponent(activeId)}/history`).then(value => {
+      if (!current) return
+      setRuns(value.runs)
+      setSelectedRunId(previous => value.runs.some(item => item.id === previous) ? previous : value.runs[0]?.id ?? null)
+    }).catch(() => { if (current) { setRuns([]); setError('history-unavailable') } })
+    return () => { current = false }
+  }, [activeId])
+  useEffect(() => {
+    let current = true; let timer: ReturnType<typeof setTimeout> | undefined
+    setRunDetails(null)
+    if (!selectedRunId || !activeId) return
+    const refresh = async (): Promise<void> => {
+      try {
+        const value = await runtimeJson<FlowRunDetails>(`/v1/flow-runs/${encodeURIComponent(selectedRunId)}`)
+        if (!current) return
+        if (value.run.id !== selectedRunId || value.run.flowId && value.run.flowId !== activeId) throw new Error('run-selection-mismatch')
+        setRunDetails(value); setError(null)
+        setRuns(items => items.map(item => item.id === value.run.id ? value.run : item))
+        if (['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(value.run.status)) timer = setTimeout(() => void refresh(), 2000)
+      } catch (reason) {
+        if (current) { setRunDetails(null); setError(message(reason)); timer = setTimeout(() => void refresh(), 4000) }
+      }
+    }
+    void refresh()
+    return () => { current = false; clearTimeout(timer) }
+  }, [selectedRunId, activeId])
 
   const nodes = useMemo<Node<FlowNodeData>[]>(() => (draft?.nodes ?? []).map((node) => ({
     id: node.id,
@@ -132,9 +172,19 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
   const publish = async () => { if (!draft) return; setBusy('publish'); try { await save(); const result = await runtimeJson<{ published: boolean; validation: { issues: ValidationIssue[] } }>('/v1/flows/publish', 'POST', { id: draft.id }); setIssues(result.validation.issues); if (!result.published) throw new Error('发布校验未通过') } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const run = async () => { if (!draft) return; setBusy('run'); try { const input = JSON.parse(mockInput); const result = await runtimeJson<{ run: FlowRun }>('/v1/flows/run', 'POST', { flowId: draft.id, input, invocationStack: [] }); setRuns((current) => [result.run, ...current.filter((item) => item.id !== result.run.id)]) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const testNode = async () => { if (!draft || !selectedNodeId) return; setBusy('test'); try { await runtimeJson('/v1/flows/test-node', 'POST', { definition: draft, nodeId: selectedNodeId, mockInput: JSON.parse(mockInput) }) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
-  const cancelRun = async () => { const active = runs.find((item) => ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)); if (!active) return; setBusy('cancel'); try { await runtimeJson(`/v1/flow-runs/${active.id}/cancel`, 'POST', {}); setRuns((current) => current.map((item) => item.id === active.id ? { ...item, status: 'cancelled', updatedAt: new Date().toISOString() } : item)) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
+  const cancelRun = async () => { const active = runs.find((item) => item.id === selectedRunId && ['queued', 'running', 'waiting_approval', 'paused', 'interrupted'].includes(item.status)); if (!active) return; setBusy('cancel'); try { await runtimeJson(`/v1/flow-runs/${active.id}/cancel`, 'POST', {}); const details = await runtimeJson<FlowRunDetails>(`/v1/flow-runs/${active.id}`); setRunDetails(details); setRuns(current => current.map(item => item.id === active.id ? details.run : item)); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const exportRedacted = async () => { if (!draft) return; setBusy('export'); try { const result = await runtimeJson<{ flow: unknown }>(`/v1/flows/${draft.id}/export`); const json = `${JSON.stringify(result.flow, null, 2)}\n`; const saved = await window.workwise.saveWorkspaceFileAs({ suggestedName: `${safeFileName(draft.name)}.workwise-flow.json`, dataBase64: utf8Base64(json), mimeType: 'application/json' }); if (!saved.ok && !saved.canceled) throw new Error(saved.message) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
   const runAction = async (action: 'resume' | 'retry' | 'approve' | 'reject', nodeId?: string) => { if (!selectedRunId) return; setBusy(action); try { if (action === 'approve' || action === 'reject') await runtimeJson('/v1/flow-runs/decision', 'POST', { runId: selectedRunId, nodeId, decision: action }); else await runtimeJson(`/v1/flow-runs/${selectedRunId}/${action}`, 'POST', action === 'retry' ? { nodeId } : {}); const details = await runtimeJson<FlowRunDetails>(`/v1/flow-runs/${selectedRunId}`); setRunDetails(details); setRuns((current) => current.map((item) => item.id === details.run.id ? details.run : item)) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }
+
+  if (draft && typeof draft.variables.surveyDraftId === 'string') return <div className="ds-opaque-work-surface flex h-full min-h-0 flex-col bg-ds-main text-ds-ink">
+    <header className="ds-drag flex min-h-14 shrink-0 items-center gap-3 border-b border-ds-border bg-ds-card px-4">
+      {leftSidebarCollapsed ? <SidebarTitlebarToggleButton onClick={onToggleLeftSidebar} title={t('surveyReviewFlowSidebar')} ariaLabel={t('surveyReviewFlowSidebar')} /> : null}
+      <Workflow className="h-5 w-5 text-accent" aria-hidden="true" /><h1 className="text-base font-semibold">{t('surveyReviewFlowTitle')}</h1>
+    </header>
+    <SurveyReviewFlowPanel key={`${draft.id}:${selectedRunId}`} name={draft.name} draftId={draft.variables.surveyDraftId} workspace={draft.workspace} details={runDetails} busy={busy !== null} error={error !== null}
+      onAction={(action, nodeId) => void runAction(action, nodeId)} onCancel={() => void cancelRun()} onReturn={() => useChatStore.getState().openEngineering()}
+      onAdvanced={() => runDetails ? <RunDetailsPanel details={runDetails} onAction={(action, nodeId) => void runAction(action, nodeId)} busy={busy !== null} /> : <p className="pb-3 text-xs text-ds-muted">{t('surveyReviewFlowStatus.loading')}</p>} />
+  </div>
 
   return <div className="ds-opaque-work-surface flex h-full min-h-0 flex-col bg-[#f8fafc] text-[#1e293b] dark:bg-ds-main dark:text-white">
     <header className="ds-drag flex h-14 shrink-0 items-center gap-3 border-b border-[#e2e8f0] bg-white px-4 dark:border-ds-border dark:bg-ds-card">

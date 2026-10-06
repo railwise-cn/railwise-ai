@@ -383,9 +383,14 @@ export function surveySourceDiagnosticText(item: SurveyDiagnosticText, language:
   // to show the professional disposition directly. Keep the older P0 path on
   // its established wording for compatibility with persisted screenshots.
   if (hasCatalogEnvelope && !/\bP0\b/i.test(original) && sourceDisposition === 'adjustment-ready' && sourceEligible === true) {
-    return english
+    const summary = english
       ? 'Survey data recognized and is ready for professional checks. Confirm the datum, control points, observation relationships, closure and precision before adjustment.'
       : '资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件。'
+    // Legacy records may append a measured finding to the catalog sentence.
+    // Preserve that engineering evidence after removing only the catalog copy.
+    const remainder = removeKnownFormatPolicyCopy(original)
+    const detail = remainder ? surveyLegacyDiagnosticText(remainder, language) : ''
+    return detail ? `${summary}${english ? ' ' : ''}${detail}` : summary
   }
   const restriction = sourceDisposition && sourceDisposition !== 'adjustment-ready'
     ? professionalDispositionText(sourceDisposition, english)

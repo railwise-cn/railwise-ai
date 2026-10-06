@@ -32,7 +32,7 @@ function handle(path:string,method='GET',raw?:string){f.advance();const u=new UR
  }catch(error){return {ok:false,status:409,body:JSON.stringify({code:(error as Error).message.replaceAll('-','_')})}}
 }
 function storedPlan(){return f.assessment.createPlan(f.project.id,Buffer.from(JSON.stringify(f.planRequest)))}
-function storedRecord(veto=false){const plan=storedPlan();f.completeRetention();const score=f.score(f.unitIds[0]!,veto?d=>{const leaf=d.leaves[1]!;if(leaf.state==='checked'&&leaf.record.kind==='deduction')leaf.record.defects.b=4}:undefined);f.advance();return f.assessment.createAssessment(f.project.id,Buffer.from(JSON.stringify({schemaVersion:1,acknowledged:true,expectedProjectRevision:1,idempotencyKey:'desktop-assessment-key',assessmentPlanId:plan.id,expectedPlanHash:plan.planHash,unitScores:[{unitId:f.unitIds[0],scoringRecordId:score.id}]})))}
+function storedRecord(veto=false,key='desktop-assessment-key',complete=true){const plan=storedPlan();if(complete)f.completeRetention();const score=f.score(f.unitIds[0]!,veto?d=>{const leaf=d.leaves[1]!;if(leaf.state==='checked'&&leaf.record.kind==='deduction')leaf.record.defects.b=4}:undefined);f.advance();return f.assessment.createAssessment(f.project.id,Buffer.from(JSON.stringify({schemaVersion:1,acknowledged:true,expectedProjectRevision:1,idempotencyKey:key,assessmentPlanId:plan.id,expectedPlanHash:plan.planHash,unitScores:[{unitId:f.unitIds[0],scoringRecordId:score.id}]})))}
 const button=(label:string)=>[...host.querySelectorAll('button')].find(b=>b.textContent===label)!
 const containsButton=(text:string)=>host.querySelector<HTMLButtonElement>(`button[data-record-id="${CSS.escape(text)}"]`) ?? [...host.querySelectorAll('button')].find(b=>b.textContent?.includes(text))!
 async function click(el:HTMLElement){expect(el).toBeDefined();await act(async()=>el.click())}
@@ -44,12 +44,37 @@ function deferred<T>(){let resolve!:(v:T)=>void;const promise=new Promise<T>(r=>
 beforeEach(async()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});Object.defineProperty(crypto,'subtle',{configurable:true,value:webcrypto.subtle});await i18n.changeLanguage('en');f=await assessmentFixture();binding={projectId:f.project.id,projectRevision:1,workspaceRoot:f.project.workspace};runtimeRequest.mockReset().mockImplementation(handle);saveWorkspaceFileAs.mockReset().mockResolvedValue({ok:true,path:'/chosen/assessment.json'});Object.assign(window,{workwise:{runtimeRequest,saveWorkspaceFileAs}});host=document.createElement('div');document.body.append(host);root=createRoot(host)})
 afterEach(async()=>{vi.unstubAllGlobals();await act(async()=>root.unmount());host.remove();await f.close();vi.restoreAllMocks()})
 describe('declared linkage desktop integration',()=>{
- it('keeps later inspection arrangements outside the first-round linkage assessment selector',async()=>{
+ it('offers later inspection arrangements and requires the exact previous assessment',async()=>{
   const previous=f.sampling.getRun(f.project.id,f.planRequest.samplingRunId)
   const later=f.sampling.createRun(f.project.id,{populationId:previous.populationId,idempotencyKey:'desktop-second-inspection',stage:previous.stage,inspectionMode:previous.inspectionMode,reinspection:{previousRunId:previous.id,expectedPreviousPlanHash:previous.planHash,reason:'整改后复查'}})
   await render();await click(button('Load existing sampling runs'));await settled()
   expect(host.querySelector(`option[value="${previous.id}"]`)).not.toBeNull()
-  expect(host.querySelector(`option[value="${later.id}"]`)).toBeNull()
+  expect(host.querySelector(`option[value="${later.id}"]`)).not.toBeNull()
+  await edit(copy('samplingRun'),later.id)
+  await vi.waitFor(()=>expect(host.textContent).toContain(copy('previousAssessment')))
+  const previousLabel=[...host.querySelectorAll('label')].find(label=>label.firstChild?.textContent===copy('previousAssessment'))!
+  expect(previousLabel.querySelector('option[value=""]')?.textContent).toContain(copy('choosePreviousAssessment'))
+ })
+ it('creates a second-round linkage plan with the selected previous assessment',async()=>{
+  const previous=storedRecord(),base=f.sampling.getRun(f.project.id,f.planRequest.samplingRunId),corrected=await f.correctedRetention()
+  const later=f.sampling.createRun(f.project.id,{populationId:base.populationId,idempotencyKey:'desktop-second-plan',stage:base.stage,inspectionMode:base.inspectionMode,reinspection:{previousRunId:base.id,expectedPreviousPlanHash:base.planHash,reason:'整改材料已补齐，申请复查'}})
+  await render({manifests:[f.manifest,corrected.manifest]});await edit(copy('manifestSelect'),corrected.manifest.id);await click(button(copy('loadRetention')));await edit(copy('retentionPlan'),corrected.retentionPlanId);await settled();await edit(copy('retentionRecord'),corrected.retentionRecordId);await click(button(copy('loadRuns')));await edit(copy('samplingRun'),later.id)
+  await vi.waitFor(()=>expect(host.textContent).toContain(copy('previousAssessment')))
+  const prevLabel=[...host.querySelectorAll('label')].find(label=>label.firstChild?.textContent===copy('previousAssessment'))!
+  await act(async()=>{const select=prevLabel.querySelector('select')!;Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value')!.set!.call(select,previous.id);select.dispatchEvent(new Event('change',{bubbles:true}))})
+  await vi.waitFor(()=>expect(host.textContent).toContain(copy('previousAssessmentSelected')))
+  await edit(copy('basis'),'Second round linkage basis')
+  for(let i=0;i<3;i++){await edit(copy('reference'),'synthetic',i);await edit(copy('materialSelect'),'evidence:support',i);await edit(copy('locator'),`Corrected material for unit ${i}`,i)}
+  await click(host.querySelector('input[type=checkbox]')!);await click(button(copy('freeze')));await vi.waitFor(()=>expect(host.textContent).toContain(copy('frozenPlan')))
+  const request=JSON.parse(runtimeRequest.mock.calls.find(([path,method])=>method==='POST'&&String(path).endsWith('quality-assessment-plans'))?.[2] as string)
+  expect(request.reinspection).toMatchObject({previousAssessmentId:previous.id,expectedPreviousRecordHash:previous.recordHash,reason:'整改材料已补齐，申请复查'})
+ })
+ it('loads a previous assessment from a later page and matches its stored predecessor hash',async()=>{
+  const previous=storedRecord(false,'desktop-oldest-assessment');
+  for(let i=0;i<10;i++)storedRecord(false,`desktop-history-${i}`,false)
+  const base=f.sampling.getRun(f.project.id,f.planRequest.samplingRunId),later=f.sampling.createRun(f.project.id,{populationId:base.populationId,idempotencyKey:'desktop-paged-reinspection',stage:base.stage,inspectionMode:base.inspectionMode,reinspection:{previousRunId:base.id,expectedPreviousPlanHash:base.planHash,reason:'分页复查'}})
+  await render();await click(button(copy('loadRuns')));await edit(copy('samplingRun'),later.id);await vi.waitFor(()=>expect(host.textContent).toContain(copy('previousAssessment')))
+  const label=[...host.querySelectorAll('label')].find(item=>item.firstChild?.textContent===copy('previousAssessment'))!;expect(label.querySelector(`option[value="${previous.id}"]`)).toBeNull();await click([...label.querySelectorAll('button')].find(item=>item.textContent===copy('morePreviousAssessments'))!);await vi.waitFor(()=>expect(label.querySelector(`option[value="${previous.id}"]`)).not.toBeNull());await act(async()=>{const select=label.querySelector('select')!;Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value')!.set!.call(select,previous.id);select.dispatchEvent(new Event('change',{bubbles:true}))});await vi.waitFor(()=>expect(host.textContent).toContain(copy('previousAssessmentSelected')))
  })
  it('binds a unit question to the restored assessment and disables it during revalidation',async()=>{
   const record=storedRecord(),focus=vi.fn()

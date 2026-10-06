@@ -4,6 +4,7 @@ import { SurveyQualityArtifactV1, SurveyQualityPlanV1, SurveyQualityWorkspaceVer
 import { SurveySamplingPopulationDetailV1, SurveySamplingRunSummaryV1 } from './survey-quality-sampling-workspace.js'
 
 export const QUALITY_ASSESSMENT_ALGORITHM = 'declared-record-linkage-1' as const
+export const QUALITY_REINSPECTION_ASSESSMENT_ALGORITHM = 'declared-record-linkage-reinspection-1' as const
 export const QUALITY_ASSESSMENT_LIMITS = Object.freeze({ requestBytes: 256 * 1024, recordBytes: 512 * 1024, recordsPerProject: 128,
   storedBytesPerProject: 64 * 1024 * 1024, units: 8, mappings: 64, pageSize: 10, workUnitsPerMinute: 32 })
 const unicode = (v: string) => new TextDecoder().decode(new TextEncoder().encode(v)) === v
@@ -22,8 +23,9 @@ const boundaryShape = { purpose: z.literal(QUALITY_ASSESSMENT_BOUNDARIES.purpose
   formalResultsModified: z.literal(false), deliverableVerification: z.literal('not-performed-by-assessment'), deliverableNumericalReplay: z.literal('not-performed-by-assessment') }
 const commonRequest = { schemaVersion: z.literal(1), acknowledged: z.literal(true), expectedProjectRevision: revision, idempotencyKey: id.refine(v => v.length >= 8) }
 export const AssessmentMaterialV1 = z.object({ reference: id, retentionCheckId: id, memberId: id, locatorStatement: text(1000) }).strict()
+export const AssessmentReinspectionRequestV1 = z.object({previousAssessmentId:id,expectedPreviousRecordHash:hash,reason:text(4000)}).strict()
 export const SurveyQualityAssessmentPlanCreateV1 = z.object({ ...commonRequest, retentionPlanId: id, retentionRecordId: id, samplingRunId: id,
-  productProfileId: QualityProfile, basisStatement: text(16 * 1024), unitMaterials: z.array(z.object({ unitId: id,
+  productProfileId: QualityProfile, basisStatement: text(16 * 1024), reinspection:AssessmentReinspectionRequestV1.optional(), unitMaterials: z.array(z.object({ unitId: id,
     requirements: z.array(AssessmentMaterialV1).min(1).max(64).refine(v => new Set(v.map(x => x.reference)).size === v.length) }).strict()).min(1).max(8)
 }).strict().refine(v => new Set(v.unitMaterials.map(x => x.unitId)).size === v.unitMaterials.length && v.unitMaterials.reduce((n, x) => n + x.requirements.length, 0) <= 64)
 export type SurveyQualityAssessmentPlanCreateV1 = z.infer<typeof SurveyQualityAssessmentPlanCreateV1>
@@ -36,19 +38,24 @@ export const AssessmentProfileV1 = z.object({ profileId: QualityProfile, profile
   sourceSha256: z.literal(QUALITY_STANDARD_DIGEST), weightTable: z.union([z.literal(43), z.literal(45)]), classificationTable: z.union([z.literal(44), z.literal(46)]),
   dependencyAlgorithmVersions: z.object({ sampling: z.literal('quality-sampling-hmac-sha256-fy-1'), scoring: z.literal('gbt24356-declared-exact-quality-scoring-1') }).strict()
 }).strict().refine(v => v.weightTable === (v.profileId === 'planar-control-point' ? 43 : 45) && v.classificationTable === v.weightTable + 1)
+const scoreBinding = z.object({ unitId: id, recordId: id, requestSha256: hash, declarationSha256: hash, modelHash: hash, resultHash: hash, recordHash: hash }).strict()
+export const AssessmentReinspectionBindingV1 = z.object({previousAssessmentId:id,previousRecordHash:hash,previousPlanId:id,previousPlanHash:hash,
+  previousRunId:id,previousRunHash:hash,previousRound:z.number().int().min(1).max(7),previousArtifactId:id,previousArtifactHash:hash,
+  previousSourceVectorHash:hash,previousResultHash:hash,previousDeclaredResultSummary:z.enum(['contains-declared-nonconforming','all-declared-unit-results-calculated','unresolved']),
+  previousOverallLinkage:z.enum(['complete-declared-linkage','incomplete-declared-linkage']),previousUnitResults:z.array(z.object({unitId:id,result:QualityRuleResultV1.nullable()}).strict()).min(1).max(8),
+  previousScoring:z.array(scoreBinding).max(8),reason:AssessmentReinspectionRequestV1.shape.reason,previousRoundVerification:z.literal('current-local-sources-replayed')}).strict()
 export const AssessmentSnapshotV1 = z.object({ project: AssessmentProjectV1, retentionPlan: SurveyQualityPlanV1, retentionPlanDigest: hash,
   artifact: SurveyQualityArtifactV1, retentionRecordId: id, population: SurveySamplingPopulationDetailV1, run: SurveySamplingRunSummaryV1,
-  selectedUnitIds: z.array(id).min(1).max(8), sampleIdsHash: hash, profile: AssessmentProfileV1 }).strict()
+  selectedUnitIds: z.array(id).min(1).max(8), sampleIdsHash: hash, profile: AssessmentProfileV1,reinspection:AssessmentReinspectionBindingV1.optional() }).strict()
 const common = { schemaVersion: z.literal(1), id, projectId: id, projectRevision: revision, projectBindingHash: hash,
   createdAt: time, requestSha256: hash, requestSizeBytes: z.number().int().positive().max(QUALITY_ASSESSMENT_LIMITS.requestBytes),
-  requestJson: text(QUALITY_ASSESSMENT_LIMITS.requestBytes), algorithmPolicyVersion: z.literal(QUALITY_ASSESSMENT_ALGORITHM), ...boundaryShape }
+  requestJson: text(QUALITY_ASSESSMENT_LIMITS.requestBytes), algorithmPolicyVersion: z.enum([QUALITY_ASSESSMENT_ALGORITHM,QUALITY_REINSPECTION_ASSESSMENT_ALGORITHM]), ...boundaryShape }
 export const SurveyQualityAssessmentPlanV1 = z.object({ ...common, request: SurveyQualityAssessmentPlanCreateV1, snapshot: AssessmentSnapshotV1, planHash: hash }).strict()
 export type SurveyQualityAssessmentPlanV1 = z.infer<typeof SurveyQualityAssessmentPlanV1>
-const scoreBinding = z.object({ unitId: id, recordId: id, requestSha256: hash, declarationSha256: hash, modelHash: hash, resultHash: hash, recordHash: hash }).strict()
 export const AssessmentSourceVectorV1 = z.object({ manifestId: id, manifestHash: hash, artifactId: id, bundleHash: hash, retentionPlanId: id, retentionPlanDigest: hash,
   retentionRecordId: id, retentionEventCount: z.number().int().min(0).max(512), retentionHeadHash: hash,
   populationId: id, populationHash: hash, populationDefinitionHash: hash, samplingRunId: id, samplingRunHash: hash, samplingPlanHash: hash, sampleIdsHash: hash,
-  scoring: z.array(scoreBinding).max(8), profile: AssessmentProfileV1 }).strict()
+  scoring: z.array(scoreBinding).max(8), profile: AssessmentProfileV1,reinspection:AssessmentReinspectionBindingV1.optional() }).strict()
 export const AssessmentUnitRowV1 = z.object({ unitId: id, materials: z.array(AssessmentMaterialV1.extend({ status: z.enum(['retained-bytes-linked', 'missing-retention-check']), eventId: id.nullable() }).strict()).max(64),
   score: z.object({ recordId: id, associationTiming: z.literal('existing-record-linked-after-calculation'), declaredTargetAssociation: z.literal('caller-declared-not-authenticated'),
     scopeAssessment: SurveyQualityScoringOutputV1.shape.scopeAssessment, result: QualityRuleResultV1 }).strict().nullable(),

@@ -104,6 +104,16 @@ describe('Survey diagnostic presentation compatibility', () => {
     expect(english).toMatch(/Survey data (?:recognized|is ready for professional checks)/)
     expect(english).not.toMatch(/auditable parsed objects|strategy validation|cosa-in2/i)
   })
+
+  it.each([
+    ['zh-CN', 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；严格结构解析、记录锚点和单位转换成功后可进入策略校验。', 'COSA.in2 第 19 行 S1 残差 12 mm，限差 3 mm，禁止出成果。'],
+    ['en', 'cosa-in2: auditable parsed objects retained; strict structure parsing and unit conversion permit strategy validation.', 'COSA.in2 line 19: S1 residual 12 mm exceeds the 3 mm tolerance. Do not issue results.']
+  ])('retains measured failures beside legacy catalog copy without a priority prefix (%s)', (language, policy, failure) => {
+    const displayed = surveySourceDiagnosticText({ code: 'format_detected', message: `${policy}${failure}` }, language, 'adjustment-ready', true)
+
+    expect(displayed).toContain(failure)
+    expect(displayed).not.toMatch(/P0|格式目录|解析对象|解析器|fixture|记录锚点|策略校验|auditable parsed objects|strategy validation|adjustment-ready/)
+  })
   it('filters implementation vocabulary from legacy findings that bypass the catalog branch', () => {
     const legacy = '资料检查：P0 格式目录未完成；解析对象及原始记录锚点已保留，解析器按 adjustment-ready 策略校验。S1 残差 2 mm，未超过 3 mm 限差。'
     const displayed = surveyLegacyDiagnosticText(legacy, 'zh-CN')
@@ -251,6 +261,14 @@ describe('Survey diagnostic presentation compatibility', () => {
     const displayed = surveySourceDiagnosticText({ code: 'format_detected', message: installed }, 'zh-CN', 'adjustment-ready', true)
     expect(displayed).toBe('资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。')
     expect(displayed).not.toMatch(/P0|格式目录|解析对象|策略校验|解析器|cosa-in2|adjustment-ready/)
+  })
+
+  it('removes the complete needs-attention copy captured from the installed app', () => {
+    const captured = 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 当前资料可进入计算前检查：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断平差。'
+    const displayed = surveySourceDiagnosticText({ code: 'format_detected', message: captured }, 'zh-CN', 'adjustment-ready', true)
+
+    expect(displayed).toBe('资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。')
+    expect(displayed).not.toMatch(/COSA|cosa-in2|P0|格式目录|解析对象|解析器|fixture|记录锚点|策略校验|adjustment-ready|workwise-survey-format-catalog/)
   })
 
   it.each([

@@ -79,6 +79,7 @@ describe('P0 professional survey delivery', () => {
       idempotencyKey: 'p0-import-cosa-in1',
       name: 'cosa-in1-level-golden-a.in1',
       networkType: 'leveling',
+      referenceDeclaration: { verticalDatum: '公开合成样例 BM 高程基准' },
       cosaIn1Mapping,
       dataBase64: in1Bytes.toString('base64')
     })
@@ -88,6 +89,7 @@ describe('P0 professional survey delivery', () => {
       idempotencyKey: 'p0-import-cosa-in2',
       name: 'golden-plane-control-e2e.in2',
       networkType: 'plane-control',
+      referenceDeclaration: { coordinateSystem: '公开合成样例独立坐标系' },
       dataBase64: in2Bytes.toString('base64')
     })
 

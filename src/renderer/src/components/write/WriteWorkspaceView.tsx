@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { SurveyDraftEditorNotice } from '../engineering/SurveyDraftEditorNotice'
 import { useShallow } from 'zustand/react/shallow'
 import {
   Columns2,
@@ -928,6 +929,7 @@ export function WriteWorkspaceView({
 
   return (
     <div className="write-workspace-view ds-no-drag flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8">
+      <SurveyDraftEditorNotice workspace={workspaceRoot} path={activeFilePath??undefined} save={()=>flushSave(workspaceRoot)} />
       <WriteWorkspaceToolbar
         activeFileIsImage={activeFileIsImage}
         activeFileIsText={activeFileIsText}

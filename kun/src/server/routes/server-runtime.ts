@@ -1,3 +1,4 @@
+import type { SurveyCollaborationService } from '../../engineering/survey-collaboration.js'
 import type { SurveyQualityAssessmentService } from '../../engineering/survey-quality-assessment.js'
 import type { SurveyQualityWorkflowService } from '../../engineering/survey-quality-workflow.js'
 import type { SurveyQualityScoringWorkspaceService } from '../../engineering/survey-quality-scoring-workspace.js'
@@ -80,6 +81,7 @@ export type ServerRuntime = {
   memoryStore?: MemoryStore
   flowService?: FlowRuntimeService
   engineeringService?: EngineeringService
+  surveyCollaborationService?: SurveyCollaborationService
   engineeringContext?: EngineeringContextService
   surveyContextMcp?: SurveyContextMcpHost
   engineeringAi?: EngineeringAiOrchestrator

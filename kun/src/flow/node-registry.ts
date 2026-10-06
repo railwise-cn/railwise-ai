@@ -44,6 +44,8 @@ const CATALOGUE: Array<Omit<FlowNodeRegistryEntryV1, 'available' | 'disabledReas
   ,{ type: 'railwise.chart_generator', category: 'output', label: 'RailWise chart', inputs: jsonIn, outputs: jsonOut, requiredCapabilities: ['railwise'] }
   ,{ type: 'railwise.report_export', category: 'output', label: 'RailWise report', inputs: jsonIn, outputs: [port('file', 'File', 'file')], requiredCapabilities: ['railwise'] }
   ,{ type: 'railwise.archive', category: 'output', label: 'RailWise archive', inputs: jsonIn, outputs: jsonOut, requiredCapabilities: ['railwise'] }
+  ,{ type: 'railwise.survey_draft_check', category: 'tool', label: '检查成果与草稿', inputs: jsonIn, outputs: jsonOut, requiredCapabilities: ['survey_drafts'] }
+  ,{ type: 'railwise.survey_draft_export', category: 'output', label: '导出专业审查稿', inputs: jsonIn, outputs: jsonOut, requiredCapabilities: ['survey_drafts'] }
 ]
 
 export const FLOW_PORT_CONVERSIONS_V1 = Object.freeze<Record<string, { from: FlowPortTypeV1; to: FlowPortTypeV1 }>>({

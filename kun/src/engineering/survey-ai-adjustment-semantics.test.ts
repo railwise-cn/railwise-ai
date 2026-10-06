@@ -22,6 +22,7 @@ async function fixture(kind: 'plane-control' | 'leveling') {
     ? await survey.importNetwork({
       projectId: project.id, expectedRevision: project.revision, idempotencyKey: 'closure-source', networkType: kind,
       name: 'golden-plane-control-e2e.in2',
+      referenceDeclaration: { coordinateSystem: '公开合成样例独立坐标系' },
       dataBase64: (await readFile(new URL('./fixtures/survey-formats/cosa-in2/golden-plane-control-e2e.in2', import.meta.url))).toString('base64')
     })
     : await importWorkwiseSurveyNetwork(survey, {

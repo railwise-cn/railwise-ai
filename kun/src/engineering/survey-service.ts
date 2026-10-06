@@ -40,6 +40,7 @@ import { levelingNetworkClosures } from './survey-leveling-closure.js'
 import { surveyErrorEllipse } from './survey-error-ellipse.js'
 import { residualStatistic, SEMANTIC_ADJUSTMENT_VERSION, withStatisticalSemantics } from './survey-statistical-semantics.js'
 import { SurveyStatisticalDiagnosticsV1 } from '../contracts/survey-statistics.js'
+import { missingSurveyReferences, surveyReferenceDeclared } from '../contracts/survey-reference.js'
 import { SurveyProfessionalReviewV1 } from '../contracts/survey-professional.js'
 import { buildSurveyProfessionalReview, surveyProfessionalInputHash } from './survey-professional-review.js'
 import { SurveyMonitoringRecords } from './survey-monitoring-records.js'
@@ -470,6 +471,7 @@ function prepareImportRequest(request: SurveyNetworkImportRequest): PreparedImpo
     inputAttachmentHash: request.inputAttachmentHash ?? null,
     cosaIn1Mapping: request.cosaIn1Mapping ?? null,
     ...(request.tabularMapping ? { tabularMapping: request.tabularMapping } : {}),
+    ...(request.referenceDeclaration ? { referenceDeclaration: request.referenceDeclaration } : {}),
     knownPoints: request.knownPoints ?? null,
     // Retain a canonical structural compatibility request too. It is not
     // publicly accepted by Runtime, but migrated in-process callers must not
@@ -734,7 +736,16 @@ async function parseNetworkPayload(
       projection: frozenNetwork.projection ?? source.projection ?? '待确认',
       ...(frozenNetwork.centralMeridian !== undefined ? { centralMeridian: frozenNetwork.centralMeridian } : {}),
       ellipsoid: frozenNetwork.ellipsoid ?? source.ellipsoid ?? '待确认',
-      verticalDatum: frozenNetwork.verticalDatum ?? frozenNetwork.heightDatum ?? source.verticalDatum ?? '待确认',
+      // Legacy WorkWise JSON may carry the canonical field as a placeholder
+      // while retaining a confirmed `heightDatum` alias.  Treat all source
+      // metadata consistently: a placeholder must never shadow a confirmed
+      // alias or parser-level declaration.
+      verticalDatum: [frozenNetwork.verticalDatum, frozenNetwork.heightDatum, source.verticalDatum]
+        .find((value): value is string => surveyReferenceDeclared(value))
+        ?? frozenNetwork.verticalDatum
+        ?? frozenNetwork.heightDatum
+        ?? source.verticalDatum
+        ?? '待确认',
       unit: source.unit ?? frozenNetwork.unit ?? 'm',
       // The registry is the sole parser for frozen source records. Reusing
       // raw JSON arrays here would drop its sourceRecordId/sourceLocator and
@@ -2351,7 +2362,17 @@ export class SurveyService {
     const points = pointMap(network)
     const findings: SurveyQualityFindingV1[] = [
       ...sourceImportFindingsFromSourceFile(network.id, network.sourceFile, this.nowIso),
-      ...this.sourceEligibility(network, rawSourceIntegrity).findings
+      ...this.sourceEligibility(network, rawSourceIntegrity).findings,
+      ...missingSurveyReferences({ ...network, transformType: network.networkType === 'coordinate-transform' ? resolveCoordinateTransformType(network) ?? undefined : network.transformType })
+        .map(reference => ({
+          ...finding(network.id, 'reference_undeclared', 'blocking',
+            reference === 'coordinate' ? '平面坐标基准尚未声明，暂不能计算。' : '高程基准尚未声明，暂不能计算。',
+            '填写并确认基准后重新选择原文件导入；原资料和历史成果将保留。', undefined, this.nowIso),
+          localized: { en: {
+            message: reference === 'coordinate' ? 'The coordinate reference is not declared. Calculation is blocked.' : 'The height datum is not declared. Calculation is blocked.',
+            suggestedAction: 'Confirm the reference and re-import the original file. Original data and previous results are retained.'
+          } }
+        }))
     ]
     for (const observation of network.observations) {
       for (const id of observationEndpointIds(observation)) {
@@ -2932,7 +2953,7 @@ export class SurveyService {
       // source path. The public Runtime handler also rejects raw `network`
       // payloads outright.
       const { heightDatum: legacyHeightDatum, ...networkWithoutLegacyDatum } = req.network as SurveyNetworkV1 & { heightDatum?: string }
-      const requestedVerticalDatum = req.network.verticalDatum && req.network.verticalDatum !== '待确认' ? req.network.verticalDatum : legacyHeightDatum
+      const requestedVerticalDatum = surveyReferenceDeclared(req.network.verticalDatum) ? req.network.verticalDatum : legacyHeightDatum ?? req.network.verticalDatum
       network = SurveyNetworkV1.parse({ ...networkWithoutLegacyDatum, schemaVersion: 1, id: req.network.id ?? `network_${randomUUID()}`, projectId: req.projectId, networkType: req.network.networkType ?? req.networkType ?? 'leveling', transformType: req.network.transformType ?? req.transformType, coordinateSystem: req.network.coordinateSystem ?? '待确认', projection: req.network.projection ?? '待确认', ellipsoid: req.network.ellipsoid ?? '待确认', verticalDatum: requestedVerticalDatum ?? '待确认', unit: req.network.unit ?? 'm', knownPoints: req.network.knownPoints ?? [], unknownPoints: req.network.unknownPoints ?? [], observations: req.network.observations ?? [], instrumentParameters: req.network.instrumentParameters ?? {}, qualityStatus: 'imported', findings: [], revision: 1, createdAt: this.nowIso(), updatedAt: this.nowIso(), inputAttachmentHash: req.inputAttachmentHash ?? req.network.inputAttachmentHash })
     }
     else {
@@ -2958,6 +2979,21 @@ export class SurveyService {
         req.tabularMapping
       )
       persistedRawOriginal = true
+    }
+    if (req.referenceDeclaration) {
+      for (const field of ['coordinateSystem', 'verticalDatum'] as const) {
+        const declared = req.referenceDeclaration[field]
+        if (declared !== undefined && (!surveyReferenceDeclared(declared)
+          || surveyReferenceDeclared(network[field]) && network[field].trim() !== declared.trim())) {
+          throw new Error(field === 'coordinateSystem'
+            ? '平面坐标基准尚未确认，或与原资料中的声明不一致。请核对后重新导入。'
+            : '高程基准尚未确认，或与原资料中的声明不一致。请核对后重新导入。')
+        }
+      }
+      network = SurveyNetworkV1.parse({ ...network,
+        ...req.referenceDeclaration,
+        referenceDeclaration: { ...req.referenceDeclaration, origin: 'user-import', declaredAt: this.nowIso() }
+      })
     }
     if (network.knownPoints.length + network.unknownPoints.length > MAX_POINTS || network.observations.length > MAX_OBSERVATIONS) throw new Error(`survey network exceeds limits (${MAX_POINTS} points, ${MAX_OBSERVATIONS} observations)`)
     const parsed = SurveyNetworkV1.parse(network)

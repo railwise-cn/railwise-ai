@@ -166,12 +166,16 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(text).not.toContain(outputHash)
   })
 
-  it('keeps internal JSON review records out of the default delivery view', async () => {
+  it('keeps internal review records and evidence workbooks out of the default delivery view', async () => {
     manifests = [{
       id: 'manifest-json', runId: 'run-json', reviewStatus: 'draft',
       outputs: [
         { ...file, path: 'report.pdf' },
-        { path: 'professional-review.json', mediaType: 'application/json', sha256: 'b'.repeat(64), sizeBytes: 220 }
+        { path: 'professional-review.json', mediaType: 'application/json', sha256: 'b'.repeat(64), sizeBytes: 220 },
+        { path: 'nested/PROFESSIONAL-REVIEW.JSON', mediaType: 'application/json', sha256: 'e'.repeat(64), sizeBytes: 220 },
+        { path: 'metadata.json', mediaType: 'application/json', sha256: 'f'.repeat(64), sizeBytes: 100 },
+        { path: '.workwise/deliverables/example/evidence.xlsx', mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sha256: 'c'.repeat(64), sizeBytes: 500 },
+        { path: 'professional.xlsx', mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sha256: 'd'.repeat(64), sizeBytes: 500 }
       ],
       citations: [], validation: { valid: true, errors: [], warnings: [] }
     }]
@@ -179,11 +183,29 @@ describe('Survey delivery without a monitoring dataset', () => {
 
     expect(visibleText(container)).toContain('report.pdf')
     expect(visibleText(container)).not.toContain('professional-review.json')
+    expect(visibleText(container)).not.toContain('PROFESSIONAL-REVIEW.JSON')
+    expect(visibleText(container)).not.toContain('evidence.xlsx')
+    expect(visibleText(container)).toContain('professional.xlsx')
+    expect(visibleText(container)).toContain('metadata.json')
     const internal = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringInternalRecords'))
     expect(internal).toBeDefined()
     await act(async () => { internal!.open = true; internal!.dispatchEvent(new Event('toggle')) })
     expect(visibleText(internal!)).toContain('professional-review.json')
+    expect(visibleText(internal!)).toContain('PROFESSIONAL-REVIEW.JSON')
+    expect(visibleText(internal!)).toContain('evidence.xlsx')
     expect(visibleText(internal!)).toContain(i18n.t('engineeringExportFile', { format: 'JSON' }))
+
+    const archive = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringArchiveDetails'))
+    expect(archive).toBeDefined()
+    await act(async () => { archive!.open = true; archive!.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(archive!)).toContain(i18n.t('engineeringReviewOutputs', { count: 3 }))
+    expect(visibleText(archive!)).not.toContain('professional-review.json')
+    expect(visibleText(archive!)).not.toContain('evidence.xlsx')
+    const archivedRecords = [...archive!.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringInternalRecords'))
+    expect(archivedRecords).toBeDefined()
+    await act(async () => { archivedRecords!.open = true; archivedRecords!.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(archivedRecords!)).toContain('professional-review.json')
+    expect(visibleText(archivedRecords!)).toContain('evidence.xlsx')
   })
 
   it('keeps project revision counters out of the default delivery view', async () => {

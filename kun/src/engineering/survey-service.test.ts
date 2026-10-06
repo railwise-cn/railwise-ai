@@ -1311,7 +1311,8 @@ describe('SurveyService', () => {
     ].join('\n'))
     const network = await service.importNetwork({
       projectId: 'project-cosa-station-circle', expectedRevision: 0, idempotencyKey: 'survey-import-cosa-station-circle', networkType: 'plane-control',
-      name: 'target-only.in2', dataBase64: source.toString('base64')
+      name: 'target-only.in2', dataBase64: source.toString('base64'),
+      referenceDeclaration: { coordinateSystem: 'SYNTHETIC-LOCAL-GRID' }
     })
     expect(network.unknownPoints.filter((point) => ['S1', 'P'].includes(point.id))).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'S1', x: expect.any(Number), y: expect.any(Number) }),
