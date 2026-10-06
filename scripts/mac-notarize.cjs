@@ -82,9 +82,14 @@ function collectSignedCodeCandidates(appBundle) {
 
 function readCodeSignatureDetails(path) {
   const result = spawnSync('codesign', ['--display', '--verbose=4', path], {
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: Number(process.env.WORKWISE_CODESIGN_TIMEOUT_MS || 30_000),
+    killSignal: 'SIGKILL'
   })
   if (result.error) {
+    if (result.error.code === 'ETIMEDOUT') {
+      throw new Error(`codesign --display timed out after ${process.env.WORKWISE_CODESIGN_TIMEOUT_MS || 30_000} ms: ${path}`)
+    }
     throw result.error
   }
   const details = `${result.stdout || ''}${result.stderr || ''}`
@@ -170,7 +175,8 @@ function verifySecureTimestamps(appBundle) {
 
   const candidates = collectSignedCodeCandidates(appBundle)
   console.log(`[mac-notarize] Verifying secure timestamps for ${candidates.length} signed code candidate(s).`)
-  for (const candidate of candidates) {
+  for (const [index, candidate] of candidates.entries()) {
+    console.log(`[mac-notarize] Checking secure timestamp ${index + 1}/${candidates.length}: ${candidate}`)
     const details = readCodeSignatureDetails(candidate)
     if (!/^Timestamp=/m.test(details)) {
       throw new Error(
