@@ -1,11 +1,23 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
+      publish_release:
+        description: 'Publish the tagged build to GitHub Release, Stable updater feeds, and the official download page. Requires the production-release environment approval and a committed acceptance evidence manifest.'
+        required: false
+        type: boolean
+        default: false
+      release_confirmation:
+        description: 'Type PUBLISH-STABLE-vX.Y.Z for the exact tag being published.'
+        required: true
+        type: string
+        default: ''
+      release_evidence:
+        description: 'Committed release acceptance evidence JSON. ${tag} resolves to the selected tag (default: docs/qa/release-gates/${tag}.json).'
+        required: false
+        type: string
+        default: 'docs/qa/release-gates/${tag}.json'
       private_updater_acceptance:
         description: 'Only run signed candidate native updater acceptance over runner-local private HTTPS. No public uploads, releases, feeds or website changes.'
         required: false
@@ -76,7 +88,7 @@ on:
         default: ''
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -91,6 +103,27 @@ env:
   WORKWISE_GITHUB_REPO: railwise-cn/railwise-ai
 
 jobs:
+  release-approval-gate:
+    name: Stable release approval and acceptance evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.candidate_only != true && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance != true && inputs.cleanup_acceptance_run_id == '' && inputs.repair_website_cache != true && inputs.rollback_stable_tag == '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the exact release tag
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Verify explicit release approval and committed acceptance evidence
+        env:
+          RELEASE_CONFIRMATION: ${{ inputs.release_confirmation }}
+          RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
+        run: node scripts/verify-release-approval.mjs
+
   private-updater-acceptance:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true }}
     permissions:
@@ -609,9 +642,15 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    if: ${{ always() && github.ref_type == 'tag' && !(github.event_name == 'workflow_dispatch' && inputs.candidate_only == true) && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || inputs.skip_stability == true) }}
     runs-on: ubuntu-latest
+    environment:
+      name: production-release
+      url: https://www.railwise.cn/products/workwise/
+    permissions:
+      contents: write
     needs:
+      - release-approval-gate
       - prepare
       - stability
       - build-document-sidecars
