@@ -1,0 +1,143 @@
+Window: "RailWise AI", App: RailWise AI Candidate 7bf3e6a12908.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-delivery-private-7bf3e6a1/installed/RailWise%20AI%20Candidate%207bf3e6a12908.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 1
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 新建内业任务 Control network · m · 10/1
+								20 文本 新建内业任务
+								21 文本 Control network
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/1
+							26 按钮 Continue conversation
+						27 container
+							28 切换按钮 Connect phone, Value: 0
+							29 按钮 Settings
+					30 container
+						31 按钮 Collapse sidebar
+						32 标题 RailWise Survey, Value: 1
+							33 文本 RailWise Survey
+						34 text Engineering Survey Processing Current Survey job
+						35 弹出式按钮 Current Survey job, Value: 新建内业任务
+							36 (selected) 新建内业任务
+						37 按钮 New task
+						38 container Work view
+							39 按钮 Overview
+							40 按钮 Process
+							41 按钮 Results
+							42 按钮 Deliver
+						43 文本 Work view
+						44 按钮 Open AI
+						45 按钮 Advanced
+					46 container
+						47 text Current source period-valid-2.json Current status Results ready · pending review Latest result Candidate deliverable
+						48 开合三角标记 More metrics
+							49 文本 More metrics
+					50 container
+						51 container Import and preflight
+							52 按钮 Add files
+							53 container
+								54 文本 Source type
+								55 弹出式按钮 Source type, Value: Identify automatically
+									56 (selected) Identify automatically
+							57 按钮 Describe the task
+							58 文本 Survey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.
+						59 container Survey and adjustment console
+							60 标题 Data and calculation, Value: 3
+								61 文本 Data and calculation
+							62 文本 Upload your files and the app will identify the format, points, and observations before calculation.
+							63 按钮 Advanced details
+							64 container
+								65 文本 Network type
+								66 弹出式按钮 Description: Network type, Value: Leveling / height control
+								67 文本 Known control points for import (optional)
+								68 文本输入区 (settable) Description: Known control points for import (optional), Placeholder: BM-01,100.000
+								69 文本 One point per line: ID,height[,X,Y], in metres. Enter before choosing files. Explicit mappings are preserved with the import; conflicts block import and never replace source coordinates.
+							70 文本 Recognized source
+							71 文本 period-valid-2.json
+							72 文本 Survey exchange file
+							73 文本 Source size
+							74 文本 2 points · 2 observations
+							75 container
+								76 text 0 stations
+							77 文本 Datum and units
+							78 文本 LOCAL-BM
+							79 文本 m
+							80 文本 Calculation readiness
+							81 文本 Ready to calculate
+							82 文本 Survey data passed the current calculation checks.
+							83 container Professional checks
+								84 标题 Professional checks, Value: 4
+									85 文本 Professional checks
+								86 文本 Confirm the network, observations, and points before calculation. Open details when needed.
+								87 文本 Validated
+								88 按钮 Network and datum Leveling / height control · 1 Known points
+									89 文本 Network and datum
+									90 文本 Leveling / height control · 1 Known points
+								91 按钮 Observations 2 observations
+									92 文本 Observations
+									93 文本 2 observations
+								94 按钮 Points and topology 2 points
+									95 文本 Points and topology
+									96 文本 2 points
+							97 按钮 Check files
+							98 按钮 Start calculation
+							99 container Network, datum and control points
+								100 标题 Network, datum and control points, Value: 4
+									101 文本 Network, datum and control points
+								102 按钮 Ask Survey AI about Network, datum and control points
+								103 定义列表
+									104 container Network type
+										105 文本 Network type
+									106 文本 Leveling / height control
+									107 container Height datum
+										108 文本 Height datum
+									109 文本 LOCAL-BM
+								110 文本 Control network
+								111 图像 Survey network (Schematic layout)
+								112 文本 Schematic layout; edges use actual point IDs
+								113 文本 Known points
+								114 container Known points
+									115 表格
+										116 row
+											117 列标题
+												118 文本 Point ID
+											119 列标题
+												120 文本 H (m)
+											121 列标题
+												122 文本 Ask Survey AI
+										123 row
+											124 单元格
+												125 文本 BM
+											126 单元格
+												127 文本 10
+											128 单元格
+												129 按钮 Ask Survey AI about BM
+	130 关闭按钮
+	131 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	132 最小化按钮
+133 menu bar
+	134 RailWise AI Candidate 7bf3e6a12908
+	135 File
+	136 Edit
+	137 View
+	138 Window
+	139 Help
+
+The focused UI element is 40 按钮 Process

@@ -1,0 +1,23 @@
+The following is a diff from the previous accessibility tree for Window: "RailWise AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 4-81, 89-94, 105-106
++				105 container 打开 AI
++					106 container
++						107 标题 打开 AI, Value: 2
++							108 文本 打开 AI
++						109 按钮 关闭详情
++					110 container Survey AI 会话
++						111 container
++							112 标题 Survey AI 会话, Value: 2
++								113 文本 Survey AI 会话
++							114 文本 新建内业任务
++							115 按钮 导入与预检
++							116 按钮 测量平差
++							117 按钮 刷新任务资料
++						118 标题 Survey AI, Value: 2
++							119 文本 Survey AI
++						120 文本 描述目标或添加资料，系统会检查资料并引导你完成计算和交付。
++						121 container
++							122 文本输入区 (settable) 向智能体提问…
++							123 按钮 更多操作
++							124 按钮 (disabled) 发送
+The focused UI element is 109 按钮 关闭详情

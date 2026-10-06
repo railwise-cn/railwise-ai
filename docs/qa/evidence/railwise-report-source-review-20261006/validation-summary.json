@@ -1,0 +1,344 @@
+{
+  "deformation.pdf": {
+    "pages": 5,
+    "internalTermFindings": [],
+    "headings": [
+      {
+        "title": "资料与版本绑定",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "基准与已知控制点",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "闭合与附合检核",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "网形与测段索引",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "平差统计与检查状态",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "点位成果与精度",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "观测值、改正数与残差",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "质量检查与复核状态",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "多期连续性与来源",
+        "page": 4,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "点位变形成果",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "点对与结构几何变化",
+        "page": 5,
+        "firstRowOnSamePage": true
+      }
+    ]
+  },
+  "heading-boundary.pdf": {
+    "pages": 7,
+    "internalTermFindings": [],
+    "headings": [
+      {
+        "title": "专业检核段 1",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 2",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 3",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 4",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 5",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 6",
+        "page": 4,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 7",
+        "page": 4,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 8",
+        "page": 5,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 9",
+        "page": 5,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 10",
+        "page": 6,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 11",
+        "page": 6,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "专业检核段 12",
+        "page": 7,
+        "firstRowOnSamePage": true
+      }
+    ]
+  },
+  "long-table.pdf": {
+    "pages": 14,
+    "internalTermFindings": [],
+    "headings": [
+      {
+        "title": "观测值、改正数与残差",
+        "page": 1,
+        "firstRowOnSamePage": true
+      }
+    ],
+    "all145ObservationsPrinted": true,
+    "continuationsRepeatHeader": true
+  },
+  "monitoring.pdf": {
+    "pages": 2,
+    "internalTermFindings": [],
+    "headings": [
+      {
+        "title": "监测日报与累计变化",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料与版本绑定",
+        "page": 1,
+        "firstRowOnSamePage": true
+      }
+    ]
+  },
+  "segment.pdf": {
+    "pages": 8,
+    "internalTermFindings": [],
+    "headings": [
+      {
+        "title": "资料与版本绑定",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 基准与已知控制点",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 闭合与附合检核",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 网形与测段索引",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 平差统计与检查状态",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 点位成果与精度",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 观测值、改正数与残差",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 1 · workwise-survey-network.json · 质量检查与复核状态",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 基准与已知控制点",
+        "page": 4,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 闭合与附合检核",
+        "page": 4,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 网形与测段索引",
+        "page": 5,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 平差统计与检查状态",
+        "page": 5,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 点位成果与精度",
+        "page": 5,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 观测值、改正数与残差",
+        "page": 6,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "资料 2 · workwise-survey-network.json · 质量检查与复核状态",
+        "page": 6,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "测段观测高差比较",
+        "page": 7,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "测段平差高差比较",
+        "page": 7,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "测段两期成员与来源",
+        "page": 7,
+        "firstRowOnSamePage": true
+      }
+    ]
+  },
+  "standard.pdf": {
+    "pages": 4,
+    "internalTermFindings": [],
+    "headings": [
+      {
+        "title": "资料与版本绑定",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "基准与已知控制点",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "闭合与附合检核",
+        "page": 1,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "网形与测段索引",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "平差统计与检查状态",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "点位成果与精度",
+        "page": 2,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "观测值、改正数与残差",
+        "page": 3,
+        "firstRowOnSamePage": true
+      },
+      {
+        "title": "质量检查与复核状态",
+        "page": 3,
+        "firstRowOnSamePage": true
+      }
+    ]
+  },
+  "standard.docx": {
+    "tables": 9,
+    "professionalTextParsed": true,
+    "internalTermFindings": []
+  },
+  "standard.xlsx": {
+    "sheets": 9,
+    "professionalTextParsed": true,
+    "internalTermFindings": [],
+    "numericCells": 29
+  },
+  "segment.docx": {
+    "tables": 19,
+    "professionalTextParsed": true,
+    "internalTermFindings": []
+  },
+  "segment.xlsx": {
+    "sheets": 19,
+    "professionalTextParsed": true,
+    "internalTermFindings": [],
+    "numericCells": 64
+  },
+  "deformation.docx": {
+    "tables": 12,
+    "professionalTextParsed": true,
+    "internalTermFindings": []
+  },
+  "deformation.xlsx": {
+    "sheets": 12,
+    "professionalTextParsed": true,
+    "internalTermFindings": [],
+    "numericCells": 44
+  },
+  "monitoring.docx": {
+    "tables": 3,
+    "professionalTextParsed": true,
+    "internalTermFindings": []
+  },
+  "monitoring.xlsx": {
+    "sheets": 3,
+    "professionalTextParsed": true,
+    "internalTermFindings": [],
+    "numericCells": 7
+  }
+}

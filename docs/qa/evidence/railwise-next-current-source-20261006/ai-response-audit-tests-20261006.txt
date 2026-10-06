@@ -1,0 +1,19 @@
+
+> workwise@0.5.2 test
+> vitest run --run src/renderer/src/components/engineering/engineering-citation-text.test.ts src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts src/renderer/src/components/engineering/engineering-professional-text.test.ts
+
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise
+
+(node:47817) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47819) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47818) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  5 passed (5)
+      Tests  262 passed (262)
+   Start at  03:04:08
+   Duration  2.93s (transform 2.08s, setup 0ms, import 2.92s, tests 4.22s, environment 639ms)
+

@@ -1,0 +1,43 @@
+{
+  "packageVersion": "0.5.2",
+  "distribution": "private candidate; not public 0.5.2",
+  "sourceCommit": "7bf3e6a129088232c35ae3d1320f87b7ba6cd735",
+  "appPath": "/private/tmp/railwise-delivery-private-7bf3e6a1/installed/RailWise AI Candidate 7bf3e6a12908.app",
+  "asarSha256": "cc022580212df636ce04c90f997c829ab77145d069192b26722e8affe4ca54e8",
+  "observedAt": "2026-10-05T15:43:14.280216+00:00",
+  "signature": "ad-hoc; renamed candidate bundle",
+  "notarization": "not notarized",
+  "updaterRoundTrip": "not performed in this review",
+  "realModelRequests": "not performed in this private candidate review",
+  "isolation": {
+    "credentialAccess": false,
+    "inboundDisabled": true,
+    "outboundDisabled": true,
+    "userData": "/private/tmp/railwise-delivery-private-7bf3e6a1/user-data"
+  },
+  "actualLogicalSizes": [
+    [
+      1280,
+      840
+    ],
+    [
+      960,
+      840
+    ],
+    [
+      1920,
+      986
+    ]
+  ],
+  "requestedExactSizesNotCovered": [
+    [
+      1280,
+      800
+    ],
+    [
+      1440,
+      900
+    ]
+  ],
+  "codesignStrictExitCode": 0
+}

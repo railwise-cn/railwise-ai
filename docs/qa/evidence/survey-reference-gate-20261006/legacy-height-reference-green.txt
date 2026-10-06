@@ -1,0 +1,10 @@
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+·······················
+
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Start at  02:07:44
+   Duration  663ms (transform 216ms, setup 0ms, import 306ms, tests 235ms, environment 0ms)
+

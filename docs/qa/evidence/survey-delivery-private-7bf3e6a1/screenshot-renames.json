@@ -1,0 +1,38 @@
+[
+  {
+    "old": "zh-light-delivery-1280x800.png",
+    "new": "zh-light-delivery-1280x800-actual-1280x840.jpg",
+    "pixels": [
+      2560,
+      1680
+    ],
+    "detectedFormat": "JPEG"
+  },
+  {
+    "old": "zh-light-delivery-960x800.png",
+    "new": "zh-light-delivery-960x800-actual-960x840.jpg",
+    "pixels": [
+      1920,
+      1680
+    ],
+    "detectedFormat": "JPEG"
+  },
+  {
+    "old": "zh-light-delivery-default.png",
+    "new": "zh-light-delivery-default-actual-1280x840.jpg",
+    "pixels": [
+      2560,
+      1680
+    ],
+    "detectedFormat": "JPEG"
+  },
+  {
+    "old": "zh-light-delivery-resized.png",
+    "new": "zh-light-delivery-resized-actual-1280x840.jpg",
+    "pixels": [
+      2560,
+      1680
+    ],
+    "detectedFormat": "JPEG"
+  }
+]

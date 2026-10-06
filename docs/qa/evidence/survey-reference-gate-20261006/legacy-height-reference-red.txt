@@ -1,0 +1,29 @@
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+····················x··
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/engineering/survey-reference.test.ts > SurveyService reference declarations > preserves a confirmed legacy height datum when the canonical source field is only a placeholder
+AssertionError: expected '待确认' to be '旧项目 BM 高程基准' // Object.is equality
+
+Expected: "旧项目 BM 高程基准"
+Received: "待确认"
+
+ ❯ src/engineering/survey-reference.test.ts:156:36
+    154|     const request = sourceRequest({ ...levelingNetwork(), verticalDatu…
+    155|     const imported = await service.importNetwork(request)
+    156|     expect(imported.verticalDatum).toBe('旧项目 BM 高程基准')
+       |                                    ^
+    157|     const output = service.createAdjustment({ networkId: imported.id, …
+    158|     expect(output.run.status).toBe('completed')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 passed (23)
+   Start at  02:07:32
+   Duration  662ms (transform 220ms, setup 0ms, import 309ms, tests 226ms, environment 0ms)
+
