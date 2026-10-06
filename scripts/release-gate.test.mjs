@@ -11,6 +11,8 @@ const triggers = workflow.on ?? workflow['on']
 const jobs = workflow.jobs ?? {}
 const websiteWorkflowSource = readFileSync(new URL('../.github/workflows/deploy-workwise-product-page.yml', import.meta.url), 'utf8')
 const websiteWorkflow = parse(websiteWorkflowSource)
+const repairWorkflowSource = readFileSync(new URL('../.github/workflows/repair-website-cache.yml', import.meta.url), 'utf8')
+const repairWorkflow = parse(repairWorkflowSource)
 
 function input(name) {
   const value = triggers?.workflow_dispatch?.inputs?.[name]
@@ -99,6 +101,11 @@ test('all production website and Stable pointer mutations use the protected envi
   const websiteEnvironment = websiteDeploy.environment
   assert.match(String(websiteEnvironment?.name ?? websiteEnvironment), /production-release/)
   assert.match(String(websiteEnvironment?.name ?? websiteEnvironment), /inputs\.operation/)
+  const standaloneRepair = repairWorkflow.jobs?.repair
+  assert.ok(standaloneRepair, 'standalone cache repair workflow must retain a repair job')
+  const standaloneEnvironment = standaloneRepair.environment
+  assert.match(String(standaloneEnvironment?.name ?? standaloneEnvironment), /production-release/)
+  assert.match(String(standaloneEnvironment?.name ?? standaloneEnvironment), /inputs\.mode/)
 })
 
 test('approval verifier rejects non-tag refs and missing exact confirmation before reading evidence', () => {

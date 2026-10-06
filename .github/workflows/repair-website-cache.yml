@@ -28,6 +28,9 @@ jobs:
     name: ${{ inputs.mode }} WorkWise update metadata cache
     if: ${{ inputs.mode == 'inspect' || inputs.confirmation == 'REPAIR-WORKWISE-METADATA-CACHE' }}
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.mode == 'apply' && 'production-release' || 'release-inspection' }}
+      url: https://www.railwise.cn/downloads
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
