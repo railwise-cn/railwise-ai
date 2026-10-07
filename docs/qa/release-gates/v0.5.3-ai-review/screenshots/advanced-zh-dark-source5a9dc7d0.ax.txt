@@ -1,0 +1,34 @@
+Window: "RailWise AI", App: RailWise AI Candidate 5a9dc7d0e028.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-0.5.3-installed-1791339929/app/RailWise%20AI%20Candidate%205a9dc7d0e028.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container 高级
+					5 container
+						6 标题 高级, Value: 2
+							7 文本 高级
+						8 按钮 关闭详情
+					9 container 高级
+						10 按钮 项目配置
+						11 按钮 数据资产
+						12 按钮 质量校核
+						13 按钮 测量来源与预检
+						14 按钮 平差结果与精度
+						15 按钮 测量平差
+						16 按钮 高级模型试算
+						17 按钮 趋势分析
+						18 按钮 成果中心
+						19 按钮 审查归档
+						20 按钮 技能与规范
+	21 关闭按钮
+	22 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	23 最小化按钮
+24 menu bar
+	25 RailWise AI Candidate 5a9dc7d0e028
+	26 文件
+	27 编辑
+	28 显示
+	29 窗口
+	30 帮助
+
+The focused UI element is 8 按钮 关闭详情
