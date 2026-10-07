@@ -1,0 +1,426 @@
+Window: "RailWise AI", App: RailWise AI Candidate 9527ec5f1bcb.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-053-candidate-9527ec5f/runtime/RailWise%20AI%20Candidate%209527ec5f1bcb.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 1
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 golden-plane-control-e2e Control network · m · 10/7
+								20 文本 golden-plane-control-e2e
+								21 文本 Control network
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/7
+							26 按钮 Continue conversation
+						27 container
+							28 切换按钮 Connect phone, Value: 0
+							29 按钮 Settings
+					30 container
+						31 按钮 Collapse sidebar
+						32 标题 RailWise Survey, Value: 1
+							33 文本 RailWise Survey
+						34 text Engineering Survey Processing Current Survey job
+						35 弹出式按钮 Current Survey job, Value: golden-plane-control-e2e
+							36 (selected) New Survey job
+						37 按钮 New task
+						38 container Work view
+							39 按钮 Overview
+							40 按钮 Process
+							41 按钮 Results
+							42 按钮 Deliver
+						43 文本 Work view
+						44 按钮 Open AI
+						45 按钮 Advanced
+					46 container
+						47 文本 Task created. Add files or describe your goal to begin.
+						48 按钮 Close notice
+					49 container
+						50 text Current source golden-plane-control-e2e.in2 Current status Results ready · pending review Latest result Adjustment is complete; current data passed pre-calculation checks.
+						51 开合三角标记 More metrics
+							52 文本 More metrics
+					53 container Survey and adjustment console
+						54 标题 View results, Value: 3
+							55 文本 View results
+						56 按钮 Advanced details
+						57 container Survey results and review
+							58 标题 Survey results and review, Value: 3
+								59 文本 Survey results and review
+							60 文本 Pending professional review and signing
+							61 按钮 Create survey review draft
+							62 文本 Calculation
+							63 文本 Calculated
+							64 文本 Survey checks
+							65 文本 Needs review
+							66 文本 Precision basis
+							67 文本 A posteriori precision
+							68 文本 Standards and conformity
+							69 文本 Not evaluated
+							70 container Network, datum and control points
+								71 标题 Network, datum and control points, Value: 4
+									72 文本 Network, datum and control points
+								73 按钮 Ask Survey AI about Network, datum and control points
+								74 定义列表
+									75 container Network type
+										76 文本 Network type
+									77 文本 Plane control
+									78 container Coordinate system
+										79 文本 Coordinate system
+									80 文本 Local Cartesian grid — synthetic acceptance network
+								81 文本 Control network
+								82 图像 Survey network (Coordinate layout)
+								83 文本 Normalized X/Y coordinates
+								84 文本 Known points
+								85 container Known points
+									86 表格
+										87 row
+											88 列标题
+												89 文本 Point ID
+											90 列标题
+												91 文本 X (m)
+											92 列标题
+												93 文本 Y (m)
+											94 列标题
+												95 文本 Ask Survey AI
+										96 row
+											97 单元格
+												98 文本 A
+											99 单元格
+												100 文本 50
+											101 单元格
+												102 文本 150
+											103 单元格
+												104 按钮 Ask Survey AI about A
+										105 row
+											106 单元格
+												107 文本 B
+											108 单元格
+												109 文本 150
+											110 单元格
+												111 文本 50
+											112 单元格
+												113 按钮 Ask Survey AI about B
+										114 row
+											115 单元格
+												116 文本 C
+											117 单元格
+												118 文本 120.710678
+											119 单元格
+												120 文本 120.710678
+											121 单元格
+												122 按钮 Ask Survey AI about C
+							123 定义列表
+								124 container Unit
+									125 文本 Unit
+								126 文本 rad / m
+							127 container
+								128 标题 Survey checks, Value: 4
+									129 文本 Survey checks
+								130 text Inputs and result binding Passed
+								131 按钮 Ask Survey AI about Inputs and result binding
+								132 text Original record links Passed
+								133 按钮 Ask Survey AI about Original record links
+								134 text Coordinate and height datum Passed
+								135 按钮 Ask Survey AI about Coordinate and height datum
+								136 text Field observation checks Not evaluated Original station readings, rounds and forward/return observations have not been evaluated here.
+								137 按钮 Ask Survey AI about Field observation checks
+								138 text Closure checks Not evaluated Independent plane-network closure checks have not been evaluated.
+								139 按钮 Ask Survey AI about Closure checks
+								140 text Precision assessment Not evaluated No precision tolerance with a stated basis is configured.
+								141 按钮 Ask Survey AI about Precision assessment
+								142 text Numerical calculation Passed
+								143 按钮 Ask Survey AI about Numerical calculation
+								144 text Standards conformity Not evaluated Applicable standards and engineering conformity have not been evaluated.
+								145 按钮 Ask Survey AI about Standards conformity
+							146 container
+								147 标题 Independent closure checks, Value: 4
+									148 文本 Independent closure checks
+								149 文本 Independent plane-network closure checks have not been evaluated.
+							150 container
+								151 标题 Adjusted residual statistics, Value: 4
+									152 文本 Adjusted residual statistics
+								153 文本 Residual norms describe the adjusted fit. They do not replace an independent route misclosure or a tolerance assessment.
+								154 定义列表
+									155 container Linear residual norm
+										156 文本 Linear residual norm
+									157 container
+										158 text 0.00000014 m
+									159 container Angular residual norm
+										160 文本 Angular residual norm
+									161 container
+										162 text 3.1115292e-10 rad
+							163 container
+								164 标题 Observations and corrections, Value: 4
+									165 文本 Observations and corrections
+								166 container Observations and corrections
+									167 表格
+										168 row
+											169 列标题
+												170 文本 Observation
+											171 列标题
+												172 文本 Station → target
+											173 列标题
+												174 文本 Observed (rad / m)
+											175 列标题
+												176 文本 Adjusted (rad / m)
+											177 列标题
+												178 文本 Correction (rad / m)
+											179 列标题
+												180 文本 Unit
+											181 列标题
+												182 文本 Outlier screening
+											183 列标题
+												184 文本 Ask Survey AI
+										185 row
+											186 单元格
+												187 文本 S1 → A · Direction · source row 6
+											188 单元格
+												189 text S1  →  A
+											190 单元格
+												191 文本 0
+											192 单元格
+												193 文本 -2.3735414e-10
+											194 单元格
+												195 文本 -2.3735414e-10
+											196 单元格
+												197 文本 rad
+											198 单元格
+												199 文本 Screened
+											200 单元格
+												201 按钮 Ask Survey AI about S1 → A · Direction · source row 6
+										202 row
+											203 单元格
+												204 文本 S1 → B · Direction · source row 7
+											205 单元格
+												206 text S1  →  B
+											207 单元格
+												208 文本 4.71238898
+											209 单元格
+												210 文本 4.71238898
+											211 单元格
+												212 文本 1.9713298e-10
+											213 单元格
+												214 文本 rad
+											215 单元格
+												216 文本 Screened
+											217 单元格
+												218 按钮 Ask Survey AI about S1 → B · Direction · source row 7
+										219 row
+											220 单元格
+												221 文本 S1 → B · Horizontal distance · source row 8
+											222 单元格
+												223 text S1  →  B
+											224 单元格
+												225 文本 100
+											226 单元格
+												227 文本 100.00000001
+											228 单元格
+												229 文本 7.1590165e-9
+											230 单元格
+												231 文本 m
+											232 单元格
+												233 文本 Screened
+											234 单元格
+												235 按钮 Ask Survey AI about S1 → B · Horizontal distance · source row 8
+										236 row
+											237 单元格
+												238 文本 S1 → C · Direction · source row 9
+											239 单元格
+												240 text S1  →  C
+											241 单元格
+												242 文本 5.49778714
+											243 单元格
+												244 文本 5.49778714
+											245 单元格
+												246 文本 4.0221160e-11
+											247 单元格
+												248 文本 rad
+											249 单元格
+												250 文本 Screened
+											251 单元格
+												252 按钮 Ask Survey AI about S1 → C · Direction · source row 9
+										253 row
+											254 单元格
+												255 文本 S1 → C · Horizontal distance · source row 10
+											256 单元格
+												257 text S1  →  C
+											258 单元格
+												259 文本 100
+											260 单元格
+												261 文本 99.99999986
+											262 单元格
+												263 文本 -0.00000014
+											264 单元格
+												265 文本 m
+											266 单元格
+												267 文本 Screened
+											268 单元格
+												269 按钮 Ask Survey AI about S1 → C · Horizontal distance · source row 10
+							270 container
+								271 标题 Precision and weakest items, Value: 4
+									272 文本 Precision and weakest items
+								273 定义列表
+									274 container Degrees of freedom
+										275 文本 Degrees of freedom
+									276 文本 2
+									277 container Unit weight standard deviation (dimensionless)
+										278 文本 Unit weight standard deviation (dimensionless)
+									279 文本 0.00010671
+									280 container Variance factor (dimensionless)
+										281 文本 Variance factor (dimensionless)
+									282 文本 0.00000001
+									283 container Weakest point
+										284 文本 Weakest point
+									285 文本 S1 · 1.36e-4 mm
+								286 定义列表
+									287 container Normal-equation rank / parameters
+										288 文本 Normal-equation rank / parameters
+									289 文本 3 / 3
+									290 container Datum defect (algebraic)
+										291 文本 Datum defect (algebraic)
+									292 文本 0
+									293 container Datum constraint semantics
+										294 文本 Datum constraint semantics
+									295 文本 Fixed known points
+									296 container Datum status
+										297 文本 Datum status
+									298 文本 Fixed datum
+								299 text Datum defect counts parameters not independently determined by the observations and constraints: the number of unknowns minus the rank of the coefficient matrix. This value does not establish standards compliance or professional approval. The weakest point is ranked by reported point standard errors. This is not a complete engineering precision assessment. Weakest edge :  Validated cross-point covariance and weakest-edge assessment are unavailable.
+							300 container
+								301 标题 Adjusted point results, Value: 4
+									302 文本 Adjusted point results
+								303 container Adjusted point results
+									304 表格
+										305 row
+											306 列标题
+												307 文本 Point ID
+											308 列标题
+												309 文本 Role
+											310 列标题
+												311 文本 X (m)
+											312 列标题
+												313 文本 Y (m)
+											314 列标题
+												315 文本 dX correction (mm)
+											316 列标题
+												317 文本 dY correction (mm)
+											318 列标题
+												319 文本 Point standard error (mm)
+											320 列标题
+												321 文本 Precision basis
+											322 列标题
+												323 text XY standard error ellipse  (mm)
+											324 列标题
+												325 文本 Ask Survey AI
+										326 row
+											327 单元格
+												328 文本 A
+											329 单元格
+												330 文本 Known
+											331 单元格
+												332 文本 50
+											333 单元格
+												334 文本 150
+											335 单元格
+												336 文本 —
+											337 单元格
+												338 文本 —
+											339 单元格
+												340 文本 —
+											341 单元格
+												342 文本 Not evaluated
+											343 单元格
+												344 文本 —
+											345 单元格
+												346 按钮 Ask Survey AI about A
+										347 row
+											348 单元格
+												349 文本 B
+											350 单元格
+												351 文本 Known
+											352 单元格
+												353 文本 150
+											354 单元格
+												355 文本 50
+											356 单元格
+												357 文本 —
+											358 单元格
+												359 文本 —
+											360 单元格
+												361 文本 —
+											362 单元格
+												363 文本 Not evaluated
+											364 单元格
+												365 文本 —
+											366 单元格
+												367 按钮 Ask Survey AI about B
+										368 row
+											369 单元格
+												370 文本 C
+											371 单元格
+												372 文本 Known
+											373 单元格
+												374 文本 120.710678
+											375 单元格
+												376 文本 120.710678
+											377 单元格
+												378 文本 —
+											379 单元格
+												380 文本 —
+											381 单元格
+												382 文本 —
+											383 单元格
+												384 文本 Not evaluated
+											385 单元格
+												386 文本 —
+											387 单元格
+												388 按钮 Ask Survey AI about C
+										389 row
+											390 单元格
+												391 文本 S1
+											392 单元格
+												393 文本 Station
+											394 单元格
+												395 文本 50
+											396 单元格
+												397 文本 50
+											398 单元格
+												399 文本 -1.94e-5
+											400 单元格
+												401 文本 1.96e-4
+											402 单元格
+												403 文本 1.36e-4
+											404 单元格
+												405 文本 A posteriori precision
+											406 单元格
+												407 container
+													408 text 1.28e-4  /  4.44e-5
+												409 文本 Orientation: 129.401°
+											410 单元格
+												411 按钮 Ask Survey AI about S1
+						412 文本 Adjustment completed. Results are ready for review.
+	413 关闭按钮
+	414 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	415 最小化按钮
+416 menu bar
+	417 RailWise AI Candidate 9527ec5f1bcb
+	418 File
+	419 Edit
+	420 View
+	421 Window
+	422 Help
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-053-candidate-9527ec5f/runtime/RailWise%20AI%20Candidate%209527ec5f1bcb.app/Contents/Resources/app.asar/out/renderer/index.html
