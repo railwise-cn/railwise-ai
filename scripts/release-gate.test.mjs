@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { verifyReleaseApproval } from './verify-release-approval.mjs'
 
@@ -11,6 +15,72 @@ const triggers = workflow.on ?? workflow['on']
 const jobs = workflow.jobs ?? {}
 const websiteWorkflowSource = readFileSync(new URL('../.github/workflows/deploy-workwise-product-page.yml', import.meta.url), 'utf8')
 const websiteWorkflow = parse(websiteWorkflowSource)
+const verifierPath = fileURLToPath(new URL('./verify-release-approval.mjs', import.meta.url))
+
+function releaseFixture(t, packageVersion = '0.5.3') {
+  const root = mkdtempSync(join(tmpdir(), 'railwise-release-gate-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const put = (path, value) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true })
+    writeFileSync(join(root, path), value)
+  }
+  const commit = message => {
+    git('add', '-A')
+    git('commit', '-m', message)
+    return git('rev-parse', 'HEAD')
+  }
+  git('init', '-b', 'main')
+  git('config', 'user.name', 'Release gate test')
+  git('config', 'user.email', 'release-test@example.invalid')
+  put('package.json', JSON.stringify({ version: packageVersion }))
+  put('src/runtime.js', 'export const value = 1\n')
+  const reviewedSourceHead = commit('freeze reviewed source')
+  const base = 'docs/qa/release-gates/v0.5.3'
+  const manifestPath = `${base}.json`
+  const manifest = {
+    schemaVersion: 1,
+    scope: 'public-release',
+    status: 'passed',
+    release: { tag: 'v0.5.3', version: '0.5.3', sourceHead: reviewedSourceHead },
+    package: {
+      version: '0.5.3',
+      identity: { bundleId: 'com.example.railwise.test', artifactSha256: 'a'.repeat(64) },
+      signature: { status: 'passed' },
+      notarization: { status: 'passed' },
+      screenshots: [`${base}/overview.png`],
+    },
+    acceptance: {
+      functionalChecklist: { status: 'passed', path: `${base}/functional-checklist.md` },
+      uiComputerUse: { status: 'passed', path: `${base}/cua-review.md` },
+      updaterRoundTrip: { status: 'passed', path: `${base}/updater-round-trip.md` },
+      independentSeniorEngineerReview: { status: 'passed', reviewerType: 'AI review', reviewRole: 'senior engineer', path: `${base}/independent-ai-review.md` },
+    },
+  }
+  const recordEvidence = () => {
+    put(manifestPath, JSON.stringify(manifest))
+    for (const path of [manifest.package.screenshots[0], ...Object.values(manifest.acceptance).map(item => item.path)]) put(path, 'test evidence\n')
+  }
+  const tagRelease = () => {
+    const releaseHead = commit('record acceptance evidence')
+    git('tag', 'v0.5.3', releaseHead)
+    return releaseHead
+  }
+  const verify = (releaseHead, expectError) => {
+    const args = [verifierPath, '--tag=v0.5.3', '--ref-type=tag', `--source-head=${releaseHead}`, '--confirmation=PUBLISH-STABLE-v0.5.3']
+    const env = { ...process.env, GITHUB_REF_NAME: '', GITHUB_REF_TYPE: '', GITHUB_SHA: '', RELEASE_CONFIRMATION: '', RELEASE_EVIDENCE: '' }
+    if (!expectError) return execFileSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    let failure
+    try {
+      execFileSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (error) {
+      failure = error
+    }
+    assert.ok(failure, 'release verification must fail')
+    assert.match(String(failure.stderr), expectError)
+  }
+  return { root, git, put, commit, reviewedSourceHead, base, manifestPath, manifest, recordEvidence, tagRelease, verify }
+}
 
 function input(name) {
   const value = triggers?.workflow_dispatch?.inputs?.[name]
@@ -59,6 +129,8 @@ test('release workflow verifies the recorded approval evidence before side effec
   const gate = jobs[gateName]
   assert.ok(gate, `approval gate job ${gateName} must exist`)
   const gateSteps = gate.steps ?? []
+  const checkout = gateSteps.find(step => /actions\/checkout@/.test(String(step.uses ?? '')))
+  assert.equal(checkout?.with?.['fetch-depth'], 0, 'the gate needs full history to verify the reviewed-source ancestor')
   const verifyIndex = gateSteps.findIndex((step) => /verify-release-approval\.mjs/.test(String(step.run ?? '')))
   assert.ok(verifyIndex >= 0, 'approval evidence must be checked in the dedicated gate job')
   assert.doesNotMatch(JSON.stringify(gate), /publish-r2|deploy-website-release|gh release/, 'approval gate must be read-only')
@@ -128,4 +200,118 @@ test('approval verifier requires a scoped, tracked evidence manifest', () => {
   assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /packageIdentity\.artifactSha256/)
   assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /requireTrackedArtifact/)
   assert.match(readFileSync(new URL('./verify-release-approval.mjs', import.meta.url), 'utf8'), /rev-list[\s\S]*sourceHead/)
+})
+
+test('release evidence can follow a frozen reviewed commit without self-referencing its own hash', t => {
+  const f = releaseFixture(t)
+  f.put('docs/qa/evidence/first-pass.md', 'first pass\n')
+  f.commit('record first evidence')
+  f.recordEvidence()
+  const releaseHead = f.tagRelease()
+  assert.notEqual(releaseHead, f.reviewedSourceHead)
+  assert.match(f.verify(releaseHead), new RegExp(`reviewed source ${f.reviewedSourceHead}`))
+})
+
+test('unknown reviewed commits are rejected', t => {
+  const f = releaseFixture(t)
+  f.manifest.release.sourceHead = 'b'.repeat(40)
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /reviewed source commit cannot be resolved/)
+})
+
+test('a reviewed commit from an unrelated branch is rejected', t => {
+  const f = releaseFixture(t)
+  f.git('checkout', '-b', 'other-review')
+  f.put('docs/qa/evidence/unrelated.md', 'other branch\n')
+  f.manifest.release.sourceHead = f.commit('unrelated review')
+  f.git('checkout', 'main')
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /must be an ancestor of the exact release tag/)
+})
+
+test('runtime, build, config and non-QA documentation changes require fresh package acceptance', async t => {
+  for (const path of ['src/runtime.js', 'scripts/package.cjs', 'electron-builder.cjs', 'package.json', '.github/workflows/release.yml', 'docs/qa-lookalike.md', 'docs/reference.md']) {
+    await t.test(path, st => {
+      const f = releaseFixture(st)
+      f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.3', extra: true }) : 'unreviewed change\n')
+      f.commit('change after acceptance')
+      f.recordEvidence()
+      f.verify(f.tagRelease(), /changes after the reviewed package must be limited to docs\/qa evidence/)
+    })
+  }
+})
+
+test('reverting an unreviewed runtime edit does not bypass the release gate', t => {
+  const f = releaseFixture(t)
+  f.put('src/runtime.js', 'export const value = 2\n')
+  const change = f.commit('unreviewed runtime change')
+  f.git('revert', '--no-edit', change)
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /changes after the reviewed package must be limited to docs\/qa evidence/)
+})
+
+test('merge histories cannot hide unreviewed changes', t => {
+  const f = releaseFixture(t)
+  f.git('checkout', '-b', 'runtime-change')
+  f.put('src/runtime.js', 'export const value = 2\n')
+  f.commit('unreviewed branch runtime change')
+  f.git('checkout', 'main')
+  f.put('docs/qa/evidence/main.md', 'main evidence\n')
+  f.commit('record main evidence')
+  f.git('merge', '--no-ff', 'runtime-change', '-m', 'merge unreviewed branch')
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /changes after the reviewed package must be limited to docs\/qa evidence/)
+})
+
+test('merging only acceptance evidence is allowed after the reviewed source', t => {
+  const f = releaseFixture(t)
+  f.git('checkout', '-b', 'extra-evidence')
+  f.put('docs/qa/evidence/extra.md', 'extra evidence\n')
+  f.commit('record extra evidence')
+  f.git('checkout', 'main')
+  f.put('docs/qa/evidence/main.md', 'main evidence\n')
+  f.commit('record main evidence')
+  f.git('merge', '--no-ff', 'extra-evidence', '-m', 'merge acceptance evidence')
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.3/)
+})
+
+test('staged evidence and reports absent from the exact tag are rejected', t => {
+  const f = releaseFixture(t)
+  f.recordEvidence()
+  const report = f.manifest.acceptance.updaterRoundTrip.path
+  f.git('add', '-A')
+  f.git('reset', '--', report)
+  f.git('commit', '-m', 'incomplete acceptance evidence')
+  const releaseHead = f.git('rev-parse', 'HEAD')
+  f.git('tag', 'v0.5.3', releaseHead)
+  f.git('add', report)
+  f.verify(releaseHead, /regular file committed in the exact release tag/)
+})
+
+test('symlink reports are rejected as acceptance evidence', t => {
+  const f = releaseFixture(t)
+  f.recordEvidence()
+  const report = join(f.root, f.manifest.acceptance.updaterRoundTrip.path)
+  rmSync(report)
+  symlinkSync('cua-review.md', report)
+  f.verify(f.tagRelease(), /regular file committed in the exact release tag/)
+})
+
+test('uncommitted edits cannot replace the tagged manifest', t => {
+  const f = releaseFixture(t)
+  f.manifest.status = 'failed'
+  f.recordEvidence()
+  const releaseHead = f.tagRelease()
+  f.manifest.status = 'passed'
+  f.put(f.manifestPath, JSON.stringify(f.manifest))
+  f.verify(releaseHead, /release evidence must have status=passed/)
+})
+
+test('uncommitted edits cannot replace the tagged package version', t => {
+  const f = releaseFixture(t, '0.5.2')
+  f.recordEvidence()
+  const releaseHead = f.tagRelease()
+  f.put('package.json', JSON.stringify({ version: '0.5.3' }))
+  f.verify(releaseHead, /package\.json version 0\.5\.2 does not match v0\.5\.3/)
 })

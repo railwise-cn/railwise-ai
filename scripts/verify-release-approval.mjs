@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, relative, resolve } from 'node:path'
 
@@ -37,6 +37,40 @@ function requireStatus(value, label) {
   if (statusOf(value) !== 'passed') fail(`${label} must have status=passed`)
 }
 
+function git(args) {
+  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+}
+
+function requireReviewedSource(reviewedSourceHead, releaseHead) {
+  if (typeof reviewedSourceHead !== 'string' || !/^[0-9a-f]{40}$/.test(reviewedSourceHead)) {
+    fail('release.sourceHead must be the 40-character lowercase commit of the reviewed package')
+  }
+  try {
+    if (git(['rev-parse', '--verify', `${reviewedSourceHead}^{commit}`]).trim() !== reviewedSourceHead) throw new Error('not a commit')
+  } catch {
+    fail(`reviewed source commit cannot be resolved locally: ${reviewedSourceHead}`)
+  }
+  try {
+    git(['merge-base', '--is-ancestor', reviewedSourceHead, releaseHead])
+  } catch {
+    fail('reviewed source commit must be an ancestor of the exact release tag')
+  }
+
+  // Evidence is recorded after inspecting a frozen package. Only QA records
+  // may follow that source commit; even a runtime edit later reverted requires
+  // a fresh package review. Inspect every parent diff, including merge commits.
+  const commits = git(['rev-list', `${reviewedSourceHead}..${releaseHead}`]).trim().split('\n').filter(Boolean)
+  for (const commit of commits) {
+    const changes = git(['diff-tree', '--root', '-r', '-m', '--no-commit-id', '--name-only', '-z', '--no-renames', commit])
+      .split('\0').filter(Boolean)
+    const unreviewed = changes.find(path => !path.startsWith('docs/qa/'))
+    if (unreviewed) {
+      fail(`changes after the reviewed package must be limited to docs/qa evidence: ${unreviewed} at ${commit}`)
+    }
+  }
+  return reviewedSourceHead
+}
+
 function resolveEvidencePath(input, tag) {
   const requested = input || `docs/qa/release-gates/${tag}.json`
   const expanded = requested.replaceAll('${tag}', tag).replaceAll('<tag>', tag)
@@ -50,20 +84,31 @@ function resolveEvidencePath(input, tag) {
   return { path, relativePath: rel }
 }
 
-function requireTrackedArtifact(value, label) {
+function requireTrackedArtifact(value, label, releaseHead) {
   const candidate = typeof value === 'string' ? value : value?.path
   if (!candidate || typeof candidate !== 'string') fail(`${label} must provide a repository-relative path`)
   const { path, relativePath } = resolveEvidencePath(candidate, '')
   if (!existsSync(path)) fail(`${label} file does not exist: ${relativePath}`)
-  ensureTracked(relativePath)
+  ensureTracked(relativePath, releaseHead)
   return relativePath
 }
 
-function ensureTracked(relativePath) {
+function ensureTracked(relativePath, releaseHead) {
   try {
-    execFileSync('git', ['ls-files', '--error-unmatch', '--', relativePath], { cwd: ROOT, stdio: 'pipe' })
+    const entry = git(['ls-tree', releaseHead, '--', relativePath]).trim()
+    // A staged addition or a symlink to an unrelated file is not committed
+    // acceptance evidence from the selected release tag.
+    if (!/^100(?:644|755) blob [0-9a-f]{40}\t/.test(entry)) throw new Error('not a committed regular file')
   } catch {
-    fail(`release evidence must be committed and tracked by git: ${relativePath}`)
+    fail(`release evidence must be a regular file committed in the exact release tag: ${relativePath}`)
+  }
+}
+
+function readCommittedJson(relativePath, releaseHead, label) {
+  try {
+    return JSON.parse(git(['show', `${releaseHead}:${relativePath}`]))
+  } catch (error) {
+    fail(`${label} is not valid committed JSON: ${error.message}`)
   }
 }
 
@@ -82,7 +127,7 @@ export function verifyReleaseApproval({
   if (!/^[0-9a-f]{40}$/i.test(sourceHead)) fail('GITHUB_SHA must be the 40-character commit targeted by the tag')
   let resolvedTagCommit
   try {
-    resolvedTagCommit = execFileSync('git', ['rev-list', '-n', '1', tag], { cwd: ROOT, encoding: 'utf8' }).trim()
+    resolvedTagCommit = git(['rev-list', '-n', '1', tag]).trim()
   } catch {
     fail(`release tag cannot be resolved locally: ${tag}`)
   }
@@ -91,30 +136,25 @@ export function verifyReleaseApproval({
   }
 
   const version = tag.slice(1)
-  const packageJson = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'))
+  const packageJson = readCommittedJson('package.json', sourceHead, 'package.json')
   if (packageJson.version !== version) {
     fail(`package.json version ${packageJson.version} does not match ${tag}`)
   }
 
   const { path: evidencePath, relativePath } = resolveEvidencePath(evidence, tag)
   if (!existsSync(evidencePath)) fail(`release evidence file does not exist: ${relativePath}`)
-  ensureTracked(relativePath)
-
-  let manifest
-  try {
-    manifest = JSON.parse(readFileSync(evidencePath, 'utf8'))
-  } catch (error) {
-    fail(`release evidence is not valid JSON: ${error.message}`)
-  }
+  ensureTracked(relativePath, sourceHead)
+  const manifest = readCommittedJson(relativePath, sourceHead, 'release evidence')
 
   if (manifest.schemaVersion !== 1) fail('release evidence schemaVersion must be 1')
   if (manifest.scope !== 'public-release') fail('release evidence scope must be public-release')
   requireStatus(manifest.status, 'release evidence')
 
   const release = manifest.release
-  if (!release || release.tag !== tag || release.version !== version || release.sourceHead !== sourceHead) {
-    fail('release evidence must bind release.tag, release.version and release.sourceHead to this run')
+  if (!release || release.tag !== tag || release.version !== version) {
+    fail('release evidence must bind release.tag and release.version to this run')
   }
+  const reviewedSourceHead = requireReviewedSource(release.sourceHead, sourceHead)
 
   const packageEvidence = manifest.package
   if (!packageEvidence || packageEvidence.version !== version) {
@@ -132,14 +172,14 @@ export function verifyReleaseApproval({
     fail('release evidence must list screenshots from the installed package review')
   }
   packageEvidence.screenshots.forEach((screenshot, index) => {
-    requireTrackedArtifact(screenshot, `package.screenshots[${index}]`)
+    requireTrackedArtifact(screenshot, `package.screenshots[${index}]`, sourceHead)
   })
 
   const acceptance = manifest.acceptance
   if (!acceptance || typeof acceptance !== 'object') fail('release evidence acceptance section is required')
   for (const key of ['functionalChecklist', 'uiComputerUse', 'updaterRoundTrip']) {
     requireStatus(acceptance[key], `acceptance.${key}`)
-    requireTrackedArtifact(acceptance[key], `acceptance.${key}`)
+    requireTrackedArtifact(acceptance[key], `acceptance.${key}`, sourceHead)
   }
   const independentReview = acceptance.independentSeniorEngineerReview
   requireStatus(independentReview, 'acceptance.independentSeniorEngineerReview')
@@ -149,9 +189,9 @@ export function verifyReleaseApproval({
   if (!/ai|agent|simulat/i.test(reviewerLabel)) {
     fail('independentSeniorEngineerReview must identify the required AI/agent senior-engineer review')
   }
-  requireTrackedArtifact(independentReview, 'acceptance.independentSeniorEngineerReview')
+  requireTrackedArtifact(independentReview, 'acceptance.independentSeniorEngineerReview', sourceHead)
 
-  return { tag, version, sourceHead, evidence: relativePath }
+  return { tag, version, sourceHead, reviewedSourceHead, evidence: relativePath }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -163,7 +203,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       confirmation: process.env.RELEASE_CONFIRMATION || arg('confirmation'),
       evidence: process.env.RELEASE_EVIDENCE || arg('evidence'),
     })
-    console.log(`[release-gate] verified ${result.tag} at ${result.sourceHead} using ${result.evidence}`)
+    console.log(`[release-gate] verified ${result.tag} at ${result.sourceHead}; reviewed source ${result.reviewedSourceHead}; evidence ${result.evidence}`)
   } catch (error) {
     console.error(error.message)
     process.exitCode = 1

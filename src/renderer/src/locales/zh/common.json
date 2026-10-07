@@ -4067,6 +4067,12 @@
     "flow": "复核与导出"
   },
   "surveyDraftSourceRequired": "先生成并保留所选成果的审查记录，再建立编辑草稿。",
+  "surveyDraftSelectOrSource": "请选择已保存的草稿，或先保留审查记录后再建立新草稿。",
+  "surveyDraftListUnavailable": "无法读取已保存的编辑草稿，现有测量成果未受影响。",
+  "surveyDraftListRetry": "重试读取草稿",
+  "surveyDraftListLoading": "正在读取已保存的编辑草稿…",
+  "surveyDraftCreateFailed": "无法根据这份审查记录建立编辑草稿，原测量成果未受影响。",
+  "surveyDraftSelectedSourceUnavailable": "这份已保存草稿对应的审查记录不可用，已停用编辑与复核操作。",
   "surveyDraftUnavailable": "草稿无法继续。请确认资料和成果仍有效，并保存编辑后重新检查；原成果不受影响。",
   "surveyDraftUnsigned": "独立待审草稿 · 尚未专业签认。修改说明或图件后需要重新确认。",
   "surveyDraftEditorNotice": "测量成果编辑草稿。修改后需重新复核；通用编辑器导出仅是草稿。请通过“复核与导出”生成专业审查稿。",

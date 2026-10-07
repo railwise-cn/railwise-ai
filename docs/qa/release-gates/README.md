@@ -20,7 +20,7 @@ The file name must be `vX.Y.Z.json` and the JSON must contain:
   "release": {
     "tag": "vX.Y.Z",
     "version": "X.Y.Z",
-    "sourceHead": "40-character commit sha"
+    "sourceHead": "40-character commit sha of the reviewed package source"
   },
   "package": {
     "version": "X.Y.Z",
@@ -57,8 +57,23 @@ The file name must be `vX.Y.Z.json` and the JSON must contain:
 }
 ```
 
-Every screenshot and report path must exist in the repository and be tracked by
-Git. The independent review must be labeled as AI review; it cannot be
+`release.sourceHead` identifies the frozen source used to build the installed
+package that was reviewed. Commit the acceptance evidence after that review,
+then create the approved release tag on the evidence commit. The verifier
+requires the reviewed source to be a resolvable ancestor of the exact tag, and
+allows only `docs/qa/` changes in every intervening commit, including merge
+histories. Runtime, build, dependency, workflow, version, configuration or other
+documentation changes require a newly frozen package and renewed acceptance.
+Changing runtime code and reverting it before tagging also fails this check.
+This avoids requiring an evidence manifest to contain the hash of its own
+commit while preserving the reviewed runtime/build/configuration tree.
+
+The workflow must check out the exact tag with full Git history. `GITHUB_SHA`
+continues to identify that tag's commit; it need not equal the earlier reviewed
+source commit. Version and manifest JSON are read from the committed tag tree.
+Every screenshot and report path must exist in the repository as a regular file
+committed in that same tag. A staged addition, a symlink, or a working-copy edit
+cannot substitute for tagged evidence. The independent review must be labeled as AI review; it cannot be
 presented as a licensed vendor result, regulatory conformity certificate,
 professional signature, or human approval. The environment approval by the
 current release maintainer remains a separate required decision.

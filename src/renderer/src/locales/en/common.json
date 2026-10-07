@@ -4067,6 +4067,12 @@
     "flow": "Review and export"
   },
   "surveyDraftSourceRequired": "Generate and retain a review record for the selected result before creating an editing draft.",
+  "surveyDraftSelectOrSource": "Select a saved draft or retain a review record to create a new one.",
+  "surveyDraftListUnavailable": "Could not load saved editing drafts. Existing results remain unchanged.",
+  "surveyDraftListRetry": "Retry draft list",
+  "surveyDraftListLoading": "Loading saved editing drafts…",
+  "surveyDraftCreateFailed": "Could not prepare an editing draft from this review record. The original result is unchanged.",
+  "surveyDraftSelectedSourceUnavailable": "The review record for this saved draft is unavailable. Editing and review are disabled.",
   "surveyDraftUnavailable": "This draft cannot continue. Check that its source and result remain valid, save your edits, and check again. The original result is preserved.",
   "surveyDraftUnsigned": "Separate review draft · No professional signoff. Changes to notes or figures require a new confirmation.",
   "surveyDraftEditorNotice": "Survey editing draft. Changes require another review; generic editor exports remain drafts. Use Review and export for the professional review package.",

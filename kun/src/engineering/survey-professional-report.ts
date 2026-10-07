@@ -499,7 +499,16 @@ export function professionalReportPresentation(model: ProfessionalReportModel): 
     .replaceAll('本成果由确定性计算结果投影生成，数值未由 AI 改写。', '本成果采用测量平差计算值。')
     .replaceAll('当前资料或合同不足', '当前资料或检核条件不足')) }
 }
-export function professionalReportCellText(value: unknown, decimals?: number): string { if (value === undefined || value === null || value === '') return '不可用'; if (typeof value === 'number') return Number.isFinite(value) ? decimals === undefined ? Number(value.toPrecision(10)).toString() : value.toFixed(decimals) : '不可用'; return String(value) }
+export function professionalReportCellText(value: unknown, decimals?: number): string {
+  if (value === undefined || value === null || value === '') return '不可用'
+  if (typeof value !== 'number') return String(value)
+  if (!Number.isFinite(value)) return '不可用'
+  if (value === 0) return decimals === undefined ? '0' : (0).toFixed(decimals)
+  if (decimals === undefined) return Number(value.toPrecision(10)).toString()
+  const rounded = value.toFixed(decimals)
+  if (Number(rounded) === 0) return value.toExponential(4)
+  return rounded
+}
 function cellText(value: unknown): string { return professionalReportCellText(value) }
 
 function wordRun(value: unknown, bold = false): string { return `<w:r>${bold ? '<w:rPr><w:b/></w:rPr>' : ''}<w:t xml:space="preserve">${xml(cellText(value))}</w:t></w:r>` }
@@ -534,7 +543,11 @@ export async function makeProfessionalDocx(model: ProfessionalReportModel): Prom
 type XlsxCell = string | number | boolean | null | undefined
 function columnName(index: number): string { let n = index + 1; let result = ''; while (n > 0) { const remainder = (n - 1) % 26; result = String.fromCharCode(65 + remainder) + result; n = Math.floor((n - 1) / 26) } return result }
 function xlsxCell(value: XlsxCell, address: string, header: boolean, decimals: number = 6): string {
-  if (typeof value === 'number' && Number.isFinite(value)) return `<c r="${address}" s="${decimals === 0 ? 4 : decimals === 4 ? 5 : decimals === 10 ? 6 : 2}"><v>${value}</v></c>`
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const scientific = value !== 0 && Math.abs(value) < 0.5 * 10 ** -decimals
+    const style = scientific ? 7 : decimals === 0 ? 4 : decimals === 4 ? 5 : decimals === 10 ? 6 : 2
+    return `<c r="${address}" s="${style}"><v>${value}</v></c>`
+  }
   if (typeof value === 'boolean') return `<c r="${address}" s="1" t="b"><v>${value ? 1 : 0}</v></c>`
   return `<c r="${address}" s="${header ? 3 : 1}" t="inlineStr"><is><t xml:space="preserve">${xml(value === undefined || value === null || value === '' ? '不可用' : String(value))}</t></is></c>`
 }
@@ -558,7 +571,7 @@ export async function makeProfessionalXlsx(model: ProfessionalReportModel): Prom
   zip.file('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')
   zip.file('xl/_rels/workbook.xml.rels', `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, index) => `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`).join('')}<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`)
   const numericStyle = (numberFormat: number): string => `<xf numFmtId="${numberFormat}" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1" applyNumberFormat="1"><alignment wrapText="1" vertical="top" horizontal="right"/></xf>`
-  zip.file('xl/styles.xml', `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="0.000000"/><numFmt numFmtId="165" formatCode="0.0000"/><numFmt numFmtId="166" formatCode="0.0000000000"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Noto Sans SC"/></font><font><b/><sz val="11"/><name val="Noto Sans SC"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FFB5BEC8"/></left><right style="thin"><color rgb="FFB5BEC8"/></right><top style="thin"><color rgb="FFB5BEC8"/></top><bottom style="thin"><color rgb="FFB5BEC8"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>${numericStyle(164)}<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>${numericStyle(1)}${numericStyle(165)}${numericStyle(166)}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`)
+  zip.file('xl/styles.xml', `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="4"><numFmt numFmtId="164" formatCode="0.000000"/><numFmt numFmtId="165" formatCode="0.0000"/><numFmt numFmtId="166" formatCode="0.0000000000"/><numFmt numFmtId="167" formatCode="0.0000E+00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Noto Sans SC"/></font><font><b/><sz val="11"/><name val="Noto Sans SC"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FFB5BEC8"/></left><right style="thin"><color rgb="FFB5BEC8"/></right><top style="thin"><color rgb="FFB5BEC8"/></top><bottom style="thin"><color rgb="FFB5BEC8"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>${numericStyle(164)}<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>${numericStyle(1)}${numericStyle(165)}${numericStyle(166)}${numericStyle(167)}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`)
   zip.file('xl/workbook.xml', `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.map((sheet, index) => `<sheet name="${xml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join('')}</sheets><definedNames>${sheets.flatMap((sheet, index) => [`<definedName name="_xlnm.Print_Titles" localSheetId="${index}">'${xml(sheet.name)}'!$1:$1</definedName>`, `<definedName name="_xlnm.Print_Area" localSheetId="${index}">'${xml(sheet.name)}'!$A$1:$${columnName(Math.max(0, sheet.table.columns.length - 1))}$${sheet.table.rows.length + 1}</definedName>`]).join('')}</definedNames></workbook>`)
   sheets.forEach((sheet, index) => zip.file(`xl/worksheets/sheet${index + 1}.xml`, professionalSheet(sheet.table)))
   return zip.generateAsync({ type: 'nodebuffer' })

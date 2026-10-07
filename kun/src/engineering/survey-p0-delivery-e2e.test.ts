@@ -8,6 +8,7 @@ import type { CosaIn1Mapping } from './survey-cosa-in1.js'
 import { EngineeringService } from './engineering-service.js'
 import { SurveyService } from './survey-service.js'
 import type { AdjustmentRunV1, AdjustmentResultV1, SurveyNetworkV1 } from '../contracts/survey.js'
+import { professionalReportCellText } from './survey-professional-report.js'
 import { readReportPdf } from '../../tests/helpers/report-pdf.js'
 
 const fixtures = new URL('./fixtures/survey-formats/', import.meta.url)
@@ -217,7 +218,7 @@ describe('P0 professional survey delivery', () => {
     const ellipse = planeAdjustment.result.points.find(point => point.id === 'S1')!.xyErrorEllipse!
     expect(ellipse).toBeDefined()
     const pointRows = [...documentXml.matchAll(/<w:tr>([\s\S]*?)<\/w:tr>/g)].map(match => match[1]!.replace(/<[^>]+>/g, ''))
-    expect(pointRows).toContain(`S1${(ellipse.semiMajor * 1000).toFixed(4)}${(ellipse.semiMinor * 1000).toFixed(4)}${ellipse.orientationRad!.toFixed(6)}后验`)
+    expect(pointRows).toContain(`S1${professionalReportCellText(ellipse.semiMajor * 1000, 4)}${professionalReportCellText(ellipse.semiMinor * 1000, 4)}${professionalReportCellText(ellipse.orientationRad, 6)}后验`)
     expect(documentXml).toContain('单位马氏半径，非置信百分比')
     expect(pdf.text).toContain('XY 标准误差椭圆')
     for (const text of [documentXml, pdf.text]) {

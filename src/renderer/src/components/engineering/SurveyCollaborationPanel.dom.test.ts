@@ -101,4 +101,49 @@ describe('Survey collaboration draft identity', () => {
     expect(flow.disabled).toBe(true)
     expect(createSurveyDraft).not.toHaveBeenCalled()
   })
+
+  it('reports a draft-list read failure without claiming that a nonexistent draft is invalid', async () => {
+    vi.mocked(listSurveyDrafts).mockRejectedValueOnce(new Error('temporary read failure')).mockResolvedValue([draft('saved', earlier.id)])
+    await act(async () => root.render(createElement(SurveyCollaborationPanel, { binding, manifests: [], enabled: true })))
+    await settle()
+
+    expect(host.textContent).toContain('Could not load saved editing drafts')
+    expect(host.textContent).not.toContain('Generate and retain a review record')
+    expect(host.textContent).not.toContain('This draft cannot continue')
+    expect([...host.querySelectorAll('button')].filter(button => /Edit review notes|Edit results figure|Review and export/.test(button.textContent ?? '')).every(button => (button as HTMLButtonElement).disabled)).toBe(true)
+    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Retry draft list')!.click())
+    await settle()
+    expect(host.querySelector('select')?.querySelector('option[value="saved"]')).toBeDefined()
+    expect(host.textContent).not.toContain('Could not load saved editing drafts')
+  })
+
+  it('keeps a saved historical editing draft available for explicit selection without a current source', async () => {
+    const savedDraft = draft('saved', earlier.id)
+    vi.mocked(listSurveyDrafts).mockResolvedValue([savedDraft])
+    await act(async () => root.render(createElement(SurveyCollaborationPanel, { binding, manifests: [earlier], enabled: true })))
+    await settle()
+
+    const selector = host.querySelector('select')!
+    expect(selector.value).toBe('')
+    expect(host.textContent).toContain('Select a saved draft or retain a review record')
+    await act(async () => { selector.value = savedDraft.id; selector.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(host.textContent).toContain('earlier-leveling-report.docx')
+    expect(host.textContent).toContain('Separate review draft')
+    expect(host.textContent).not.toContain('Generate and retain a review record')
+    expect(host.textContent).not.toContain('This draft cannot continue')
+    expect([...host.querySelectorAll('button')].filter(button => /Edit review notes|Edit results figure|Review and export/.test(button.textContent ?? '')).every(button => !(button as HTMLButtonElement).disabled)).toBe(true)
+  })
+
+  it('blocks an explicitly selected editing draft when its review record is unavailable', async () => {
+    const orphanedDraft = draft('orphaned', earlier.id)
+    vi.mocked(listSurveyDrafts).mockResolvedValue([orphanedDraft])
+    await act(async () => root.render(createElement(SurveyCollaborationPanel, { binding, manifests: [], enabled: true })))
+    await settle()
+    const selector = host.querySelector('select')!
+    await act(async () => { selector.value = orphanedDraft.id; selector.dispatchEvent(new Event('change', { bubbles: true })) })
+
+    expect(host.textContent).toContain('The review record for this saved draft is unavailable')
+    expect(host.textContent).not.toContain('This draft cannot continue')
+    expect([...host.querySelectorAll('button')].filter(button => /Edit review notes|Edit results figure|Review and export/.test(button.textContent ?? '')).every(button => (button as HTMLButtonElement).disabled)).toBe(true)
+  })
 })

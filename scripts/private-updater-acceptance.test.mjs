@@ -122,9 +122,11 @@ test('release dispatch private mode excludes public jobs even with conflicting s
     assert.equal(evaluate(release.jobs[name].if, inputs), false, name)
   }
   assert.equal(release.jobs['private-updater-acceptance'].permissions.contents, 'read')
-  const privateWorkflow = readFileSync(new URL('../.github/workflows/private-updater-acceptance.yml', import.meta.url), 'utf8')
-  assert.doesNotMatch(privateWorkflow, /publish-r2|deploy-website|secrets\.R2_|secrets\.WORKWISE_WEBSITE_|--publish always|gh release/)
-  assert.match(privateWorkflow, /--publish never/)
+  const privateWorkflow = parse(readFileSync(new URL('../.github/workflows/private-updater-acceptance.yml', import.meta.url), 'utf8'))
+  assert.ok(privateWorkflow.jobs['native-macos']['timeout-minutes'] >= 150, 'two notarizations plus setup and updater execution need a 150-minute runner budget')
+  const privateWorkflowSource = readFileSync(new URL('../.github/workflows/private-updater-acceptance.yml', import.meta.url), 'utf8')
+  assert.doesNotMatch(privateWorkflowSource, /publish-r2|deploy-website|secrets\.R2_|secrets\.WORKWISE_WEBSITE_|--publish always|gh release/)
+  assert.match(privateWorkflowSource, /--publish never/)
 })
 
 function request(url, options = {}) {

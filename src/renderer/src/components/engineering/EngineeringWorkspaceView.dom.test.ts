@@ -819,6 +819,26 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(creates).toBe(2)
   })
 
+  it('clears the task-created notice when navigating to another work view', async () => {
+    const created = { ...project, id: 'created-job', name: 'New survey task' }
+    request.mockImplementation(async (path: string, method?: string, body?: string) => {
+      if (path === '/v1/engineering/projects' && method === 'POST') return { ok: true, status: 200, body: JSON.stringify({ project: created }) }
+      if (path === '/v1/engineering/projects') return { ok: true, status: 200, body: JSON.stringify({ projects: [project, created] }) }
+      if (path.endsWith('/overview')) return { ok: true, status: 200, body: JSON.stringify(emptyOverview(created)) }
+      if (path.includes('/survey/networks?')) return { ok: true, status: 200, body: JSON.stringify({ networks: [network] }) }
+      if (path.includes('/adjustments?')) return { ok: true, status: 200, body: JSON.stringify({ adjustments: [] }) }
+      throw new Error(`Unexpected request: ${path} ${method ?? 'GET'} ${body ?? ''}`)
+    })
+    await renderDelivery()
+
+    await act(async () => dispatchEngineeringProjectCreate())
+    await settle()
+    expect(container.textContent).toContain(i18n.t('engineeringNoticeJobCreated'))
+
+    await act(async () => button(i18n.t('engineeringPrimaryResults')).click())
+    expect(container.textContent).not.toContain(i18n.t('engineeringNoticeJobCreated'))
+  })
+
   it('preserves the summary, selected result and preview when reopening the current project thread', async () => {
     await renderDelivery()
     await act(async () => button('Generate review draft').click())

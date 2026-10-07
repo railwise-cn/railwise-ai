@@ -63,6 +63,52 @@ async function comparisonFixture() {
 }
 
 describe('professional survey report formats', () => {
+  it('shows small non-zero precision values and variance factors without rounding them to zero', async () => {
+    const ellipses: ProfessionalReportModel['tables'][number] = {
+      id: 'layout-ellipses', title: 'XY 标准误差椭圆',
+      columns: [
+        { key: 'point', label: '点号' },
+        { key: 'minor', label: '短半轴', unit: 'mm', numeric: true, decimals: 4 },
+        { key: 'varianceFactor', label: '方差因子', numeric: true, decimals: 6 },
+        { key: 'negativeZero', label: '改正数', unit: 'mm', numeric: true, decimals: 4 }
+      ],
+      rows: [{ point: 'P01', minor: 4.4355e-5, varianceFactor: 1.1387378096796804e-8, negativeZero: -0 }],
+      note: '解算 XY 平面；短半轴为非零值。轴向由 +X 转向 +Y，模 π；单位马氏半径，非置信百分比。'
+    }
+    const report: ProfessionalReportModel = {
+      title: '数值格式回归', projectName: '合成平面控制网', taskType: '平面控制网', generatedAt: '2026-10-07T00:00:00.000Z',
+      reviewStatus: 'unsigned', reportStatus: 'draft', sourceBinding: [], tables: [ellipses], notes: [],
+      signoff: [{ role: '编制', name: '', date: '', signature: '' }]
+    }
+
+    expect(professionalReportCellText(-0, 4)).toBe('0.0000')
+    expect(professionalReportCellText(4.4355e-5, 4)).toBe('4.4355e-5')
+    expect(professionalReportCellText(1.1387378096796804e-8, 6)).toBe('1.1387e-8')
+
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(report))
+    const document = await docx.file('word/document.xml')!.async('text')
+    expect(document).toContain('4.4355e-5')
+    expect(document).toContain('1.1387e-8')
+    expect(document).toContain('0.0000')
+    expect(document).not.toContain('-0.0000')
+
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(report))
+    const sheets = await Promise.all(Object.keys(xlsx.files).filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name)).map(name => xlsx.file(name)!.async('text')))
+    const ellipseSheet = sheets.find(sheet => sheet.includes('<v>0.000044355</v>'))!
+    expect(ellipseSheet).toContain('<c r="B2" s="7"><v>0.000044355</v></c>')
+    expect(ellipseSheet).toContain('<c r="C2" s="7"><v>1.1387378096796804e-8</v></c>')
+    const styles = await xlsx.file('xl/styles.xml')!.async('text')
+    expect(styles).toContain('formatCode="0.0000E+00"')
+
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(report))
+    expect(pdf.text).toContain('4.4355e-5')
+    expect(pdf.text).toContain('1.1387e-8')
+    expect(pdf.text).toContain('0.0000')
+    expect(pdf.text).not.toContain('-0.0000')
+    const ellipsePage = pdf.pages.find(page => page.includes('XY 标准误差椭圆'))!
+    expect(ellipsePage).toContain('解算 XY 平面')
+  }, 30000)
+
   it('keeps each PDF table heading with its header and first observation on the same page', async () => {
     const { model } = await fixture()
     const tables = Array.from({ length: 12 }, (_, index) => ({

@@ -10,7 +10,7 @@ jobs:
   native-macos:
     name: Private macOS arm64 native updater round-trip
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 150
     env:
       WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
       WORKWISE_SIDECAR_ARCH: arm64
@@ -111,6 +111,8 @@ jobs:
             ${{ runner.temp }}/private-updater-evidence/native-updater.json
             ${{ runner.temp }}/private-updater-evidence/tls-preflight.json
             ${{ runner.temp }}/private-updater-evidence/native-updater.redacted.log
+            ${{ runner.temp }}/private-updater-build/baseline/**/notarization-*.json
+            ${{ runner.temp }}/private-updater-build/target/**/notarization-*.json
       - name: Retain authenticated exact target package
         if: ${{ always() && steps.signed.outcome == 'success' }}
         uses: actions/upload-artifact@v4

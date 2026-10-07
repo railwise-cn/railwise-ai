@@ -403,6 +403,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const savedSourceMode = readBrowserStorageItem(`workwise.survey.source-kind.v1:${stageScope}`)
   const sourceMode = sourceModes[stageScope] ?? (savedSourceMode === 'survey' || savedSourceMode === 'monitoring' ? savedSourceMode : ['source', 'survey', 'precision'].includes(tab) ? 'survey' : 'auto')
   const setTab = useCallback((next: TabId): void => {
+    setNotice((current) => current && (current.tone === 'success' || current.tone === 'info') ? null : current)
     if (!ADVANCED_TABS.includes(next)) { setBackgroundTab(next); setAdvancedOpen(false) }
     const mode = ['source', 'survey', 'precision'].includes(next) ? 'survey' : ['data', 'quality', 'analysis'].includes(next) ? 'monitoring' : null
     if (mode) {
