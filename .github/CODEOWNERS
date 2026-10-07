@@ -3,6 +3,7 @@
 .github/CODEOWNERS @railwise-cn
 .github/workflows/release.yml @railwise-cn
 .github/workflows/deploy-workwise-product-page.yml @railwise-cn
+.github/workflows/repair-website-cache.yml @railwise-cn
 .github/workflows/quality.yml @railwise-cn
 scripts/verify-release-approval.mjs @railwise-cn
 scripts/release-gate.test.mjs @railwise-cn
