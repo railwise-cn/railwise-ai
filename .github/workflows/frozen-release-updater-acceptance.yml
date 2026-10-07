@@ -1,0 +1,69 @@
+name: Frozen public package native updater acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_build:
+        description: 'Exact package.reviewedBuild JSON from a successful release.yml candidate_only + prepare_public_artifacts freeze run. Includes immutable artifact IDs/digests and every file SHA256/size.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: frozen-updater-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  native-macos:
+    name: Official 0.5.2 to exact frozen 0.5.3 native updater
+    runs-on: macos-15
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install verification tools without application startup
+        run: npm ci --ignore-scripts
+      - name: Test frozen updater boundaries
+        run: node --test scripts/frozen-release-updater-acceptance.test.mjs
+      - name: Record immutable build reference without shell interpolation
+        env:
+          REVIEWED_BUILD_JSON: ${{ inputs.reviewed_build }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          import { validateReviewedBuild } from './scripts/verify-reviewed-release-artifacts.mjs'
+          const build = JSON.parse(process.env.REVIEWED_BUILD_JSON)
+          validateReviewedBuild(build, { version: '0.5.3', sourceHead: build.sourceHead })
+          writeFileSync(join(process.env.RUNNER_TEMP, 'frozen-reviewed-build.json'), JSON.stringify(build), { mode: 0o600, flag: 'wx' })
+          NODE
+      - name: Run default-trust HTTPS download, Squirrel install and historical data readback
+        timeout-minutes: 50
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/run-frozen-release-updater-acceptance.mjs \
+            --build-file="${RUNNER_TEMP}/frozen-reviewed-build.json" \
+            --evidence-dir="${RUNNER_TEMP}/frozen-updater-evidence"
+      - name: Retain durable updater evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frozen-updater-arm64-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/frozen-updater-evidence/frozen-updater.json
+            ${{ runner.temp }}/frozen-updater-evidence/native-updater.json
+            ${{ runner.temp }}/frozen-updater-evidence/*.redacted.log
+            ${{ runner.temp }}/frozen-updater-evidence/seed-data.json
+            ${{ runner.temp }}/frozen-updater-evidence/verify-data.json

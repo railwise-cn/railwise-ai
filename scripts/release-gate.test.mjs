@@ -7,6 +7,9 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { verifyReleaseApproval } from './verify-release-approval.mjs'
+import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
+// Keep the existing npm run test:release-gate entry point covering byte/provenance gates.
+import './verify-reviewed-release-artifacts.test.mjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')
@@ -45,7 +48,13 @@ function releaseFixture(t, packageVersion = '0.5.3') {
     release: { tag: 'v0.5.3', version: '0.5.3', sourceHead: reviewedSourceHead },
     package: {
       version: '0.5.3',
-      identity: { bundleId: 'com.example.railwise.test', artifactSha256: 'a'.repeat(64) },
+      identity: { bundleId: PUBLIC_IDENTITY.bundleId, artifactSha256: 'a'.repeat(64) },
+      reviewedBuild: {
+        repository: RELEASE_REPOSITORY, workflowPath: RELEASE_WORKFLOW, sourceHead: reviewedSourceHead,
+        runId: 1234, runAttempt: 1, publicIdentity: { ...PUBLIC_IDENTITY },
+        artifacts: [{ name: 'release-mac', id: 11, digest: `sha256:${'b'.repeat(64)}` }, { name: 'release-win', id: 12, digest: `sha256:${'c'.repeat(64)}` }],
+        files: expectedReleaseFiles('0.5.3').map(file => ({ ...file, sha256: 'a'.repeat(64), size: 100 })),
+      },
       signature: { status: 'passed' },
       notarization: { status: 'passed' },
       screenshots: [`${base}/overview.png`],
@@ -68,7 +77,7 @@ function releaseFixture(t, packageVersion = '0.5.3') {
   }
   const verify = (releaseHead, expectError) => {
     const args = [verifierPath, '--tag=v0.5.3', '--ref-type=tag', `--source-head=${releaseHead}`, '--confirmation=PUBLISH-STABLE-v0.5.3']
-    const env = { ...process.env, GITHUB_REF_NAME: '', GITHUB_REF_TYPE: '', GITHUB_SHA: '', RELEASE_CONFIRMATION: '', RELEASE_EVIDENCE: '' }
+    const env = { ...process.env, GITHUB_ACTIONS: '', GITHUB_OUTPUT: '', GITHUB_REF_NAME: '', GITHUB_REF_TYPE: '', GITHUB_SHA: '', RELEASE_CONFIRMATION: '', RELEASE_EVIDENCE: '' }
     if (!expectError) return execFileSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
     let failure
     try {
@@ -139,6 +148,44 @@ test('release workflow verifies the recorded approval evidence before side effec
   const firstSideEffectIndex = publishSteps.findIndex((step) => /publish-r2\.mjs\s+(upload|promote)|deploy-website-release\.mjs\s+(stage|promote)|gh\s+release\s+(create|edit|upload)/.test(String(step.run ?? '')))
   assert.ok(firstSideEffectIndex >= 0, 'publish job must contain a detectable publication side effect')
   assert.ok(gateSteps.length > verifyIndex, 'approval evidence gate must complete before publish can run')
+  const artifactCheck = publishSteps.findIndex(step => /verify-reviewed-release-artifacts\.mjs verify/.test(step.run ?? ''))
+  assert.ok(artifactCheck >= 0 && artifactCheck < firstSideEffectIndex, 'downloaded artifact bytes must pass before any public write')
+})
+
+test('publication downloads exact reviewed IDs from the verified source run and never rebuilds', () => {
+  const publish = jobs.publish
+  assert.deepEqual(publish.needs, ['release-approval-gate', 'prepare'])
+  const download = publish.steps.find(step => step.name === 'Download immutable reviewed release artifacts')
+  assert.equal(download.with['merge-multiple'], false, 'separate directories prevent duplicate filenames being silently overwritten')
+  assert.equal(download.with.pattern, undefined)
+  for (const field of ['repository', 'run-id', 'artifact-ids']) assert.match(download.with[field], /needs\.release-approval-gate\.outputs\./)
+  for (const job of ['stability', 'build-document-sidecars', 'build-macos', 'build-windows']) {
+    assert.match(jobs[job].if, /inputs\.publish_release != true/, `${job} must not rebuild published bytes`)
+  }
+  assert.doesNotMatch(JSON.stringify(publish.steps), /npm run (?:build|dist)|electron-builder/)
+  assert.equal(jobs['release-approval-gate'].permissions.actions, 'read')
+  assert.equal(publish.permissions.actions, 'read')
+})
+
+test('only an explicit private final-package build records public-identity receipts', () => {
+  assert.equal(input('prepare_public_artifacts').default, false)
+  for (const job of ['build-macos', 'build-windows']) {
+    const build = jobs[job]
+    const record = build.steps.find(step => step.name === 'Record frozen public package identity')
+    assert.match(record.if, /inputs\.candidate_only == true/)
+    assert.match(record.if, /inputs\.prepare_public_artifacts == true/)
+    assert.match(record.if, /inputs\.publish_release != true/)
+    assert.match(build.env.WORKWISE_UPDATE_URL, /inputs\.prepare_public_artifacts != true/)
+    assert.match(build.steps.find(step => /Upload .*installer/.test(step.name))?.with.path, /reviewed-build\.json/)
+  }
+})
+
+test('release source checkout cannot move while stability or acceptance is running', () => {
+  for (const [name, job] of Object.entries(jobs)) {
+    for (const step of job.steps ?? []) {
+      if (/actions\/checkout@/.test(step.uses ?? '')) assert.equal(step.with?.ref, '${{ github.sha }}', `${name} checkout must use the dispatch commit`)
+    }
+  }
 })
 
 test('stable publication does not inherit write permission globally', () => {
@@ -314,4 +361,11 @@ test('uncommitted edits cannot replace the tagged package version', t => {
   const releaseHead = f.tagRelease()
   f.put('package.json', JSON.stringify({ version: '0.5.3' }))
   f.verify(releaseHead, /package\.json version 0\.5\.2 does not match v0\.5\.3/)
+})
+
+test('evidence paths reject line breaks before writing workflow outputs', t => {
+  const f = releaseFixture(t)
+  f.manifest.package.screenshots[0] = `${f.base}/overview\nartifact_ids=999.png`
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /must not contain line breaks/)
 })

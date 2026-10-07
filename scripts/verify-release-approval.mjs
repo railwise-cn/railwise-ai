@@ -11,9 +11,10 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { appendFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, relative, resolve } from 'node:path'
+import { PUBLIC_IDENTITY, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
 
 const ROOT = process.cwd()
 
@@ -74,6 +75,7 @@ function requireReviewedSource(reviewedSourceHead, releaseHead) {
 function resolveEvidencePath(input, tag) {
   const requested = input || `docs/qa/release-gates/${tag}.json`
   const expanded = requested.replaceAll('${tag}', tag).replaceAll('<tag>', tag)
+  if (/[\r\n]/.test(expanded)) fail('release evidence path must not contain line breaks')
   if (isAbsolute(expanded)) fail('release evidence path must be repository-relative')
   const path = resolve(ROOT, expanded)
   const rel = relative(ROOT, path)
@@ -162,9 +164,13 @@ export function verifyReleaseApproval({
   }
   const packageIdentity = packageEvidence.identity
   if (!packageIdentity || typeof packageIdentity !== 'object' ||
-      typeof packageIdentity.bundleId !== 'string' || packageIdentity.bundleId.length === 0 ||
+      packageIdentity.bundleId !== PUBLIC_IDENTITY.bundleId ||
       typeof packageIdentity.artifactSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(packageIdentity.artifactSha256)) {
-    fail('release evidence package.identity must include bundleId and a 64-character artifactSha256')
+    fail('release evidence package.identity must include the public bundleId and a 64-character artifactSha256')
+  }
+  const reviewedBuild = validateReviewedBuild(packageEvidence.reviewedBuild, { version, sourceHead: reviewedSourceHead })
+  if (!reviewedBuild.files.some(file => file.sha256 === packageIdentity.artifactSha256 && /\.(dmg|zip|exe)$/.test(file.name))) {
+    fail('installed package identity hash must identify a reviewed installer or updater artifact')
   }
   requireStatus(packageEvidence.signature, 'package.signature')
   requireStatus(packageEvidence.notarization, 'package.notarization')
@@ -191,7 +197,7 @@ export function verifyReleaseApproval({
   }
   requireTrackedArtifact(independentReview, 'acceptance.independentSeniorEngineerReview', sourceHead)
 
-  return { tag, version, sourceHead, reviewedSourceHead, evidence: relativePath }
+  return { tag, version, sourceHead, reviewedSourceHead, evidence: relativePath, reviewedBuild }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -203,6 +209,21 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       confirmation: process.env.RELEASE_CONFIRMATION || arg('confirmation'),
       evidence: process.env.RELEASE_EVIDENCE || arg('evidence'),
     })
+    // This cannot be disabled in Actions. Unit fixtures can exercise the pure
+    // local evidence checks without network access; production always checks GitHub.
+    if (process.env.GITHUB_ACTIONS === 'true' || process.argv.includes('--verify-source')) {
+      verifyReviewedBuildSource(result.reviewedBuild, { version: result.version, sourceHead: result.reviewedSourceHead })
+    } else if (process.env.GITHUB_OUTPUT) {
+      fail('workflow outputs require authenticated GitHub provenance verification')
+    }
+    if (process.env.GITHUB_OUTPUT) {
+      appendFileSync(process.env.GITHUB_OUTPUT, [
+        `artifact_run_id=${result.reviewedBuild.runId}`,
+        `artifact_ids=${result.reviewedBuild.artifacts.map(artifact => artifact.id).join(',')}`,
+        `artifact_repository=${result.reviewedBuild.repository}`,
+        `evidence_path=${result.evidence}`,
+      ].join('\n') + '\n')
+    }
     console.log(`[release-gate] verified ${result.tag} at ${result.sourceHead}; reviewed source ${result.reviewedSourceHead}; evidence ${result.evidence}`)
   } catch (error) {
     console.error(error.message)

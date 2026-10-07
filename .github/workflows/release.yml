@@ -33,6 +33,11 @@ on:
         required: false
         type: boolean
         default: true
+      prepare_public_artifacts:
+        description: 'Privately freeze final public-identity packages for local acceptance. Requires candidate_only=true and publish_release=false. Does not publish a release or feed; isolated candidate packages cannot be promoted.'
+        required: false
+        type: boolean
+        default: false
       skip_stability:
         description: 'Emergency release: skip the two-hour pre-release stability gate after quality checks have passed.'
         required: false
@@ -109,17 +114,25 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
+    outputs:
+      artifact_run_id: ${{ steps.approval.outputs.artifact_run_id }}
+      artifact_ids: ${{ steps.approval.outputs.artifact_ids }}
+      artifact_repository: ${{ steps.approval.outputs.artifact_repository }}
+      evidence_path: ${{ steps.approval.outputs.evidence_path }}
     steps:
       - name: Check out the exact release tag
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Verify explicit release approval and committed acceptance evidence
+        id: approval
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_CONFIRMATION: ${{ inputs.release_confirmation }}
           RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
         run: node scripts/verify-release-approval.mjs
@@ -173,7 +186,7 @@ jobs:
       - name: Check out requested branch
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -231,7 +244,7 @@ jobs:
       - name: Check out requested branch
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -302,14 +315,25 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Compute release version from tag
         id: version
         env:
           CANDIDATE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_only == true }}
+          PREPARE_PUBLIC_ARTIFACTS: ${{ inputs.prepare_public_artifacts }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+          SKIP_STABILITY: ${{ inputs.skip_stability }}
         run: |
           set -euo pipefail
+          if [[ "${PREPARE_PUBLIC_ARTIFACTS}" == "true" && ( "${CANDIDATE_ONLY}" != "true" || "${PUBLISH_RELEASE}" == "true" ) ]]; then
+            echo '::error::Final package freezing requires candidate_only=true and publish_release=false'
+            exit 1
+          fi
+          if [[ "${PREPARE_PUBLIC_ARTIFACTS}" == "true" && "${SKIP_STABILITY}" == "true" ]]; then
+            echo '::error::Frozen public packages require the complete stability gate'
+            exit 1
+          fi
           if [[ "${CANDIDATE_ONLY}" == "true" ]]; then
             node ./scripts/compute-ci-release-version.cjs --no-fetch --candidate
           else
@@ -318,7 +342,7 @@ jobs:
 
   stability:
     name: Two-hour pre-release stability
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_stability == true) }}
+    if: ${{ inputs.publish_release != true && !(github.event_name == 'workflow_dispatch' && inputs.skip_stability == true) }}
     runs-on: ubuntu-latest
     needs: prepare
     timeout-minutes: 130
@@ -327,7 +351,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -340,7 +364,7 @@ jobs:
 
   build-document-sidecars:
     name: MarkItDown ${{ matrix.platform }} ${{ matrix.arch }}
-    if: ${{ always() && needs.prepare.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ always() && inputs.publish_release != true && needs.prepare.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
     needs: [prepare, stability]
     strategy:
       fail-fast: false
@@ -364,7 +388,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -422,13 +446,14 @@ jobs:
 
   build-macos:
     name: Build macOS
-    if: ${{ always() && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
     runs-on: macos-latest
     needs: [prepare, stability, build-document-sidecars]
     env:
       WORKWISE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      WORKWISE_UPDATE_CHANNEL: ${{ inputs.candidate_only == true && 'frontier' || 'stable' }}
-      WORKWISE_UPDATE_URL: ${{ inputs.candidate_only == true && 'https://127.0.0.1/' || '' }}
+      WORKWISE_UPDATE_CHANNEL: ${{ inputs.candidate_only == true && inputs.prepare_public_artifacts != true && 'frontier' || 'stable' }}
+      WORKWISE_UPDATE_URL: ${{ inputs.candidate_only == true && inputs.prepare_public_artifacts != true && 'https://127.0.0.1/' || '' }}
+      WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
       WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
       RELEASE_CHANNEL: stable
       # Mapped to env so steps can branch on presence (secrets are not allowed
@@ -444,7 +469,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -508,12 +533,14 @@ jobs:
             echo "Apple signing credentials present: building a signed, notarized package."
           else
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" == "tag" || "${PREPARE_PUBLIC_ARTIFACTS}" == "true" ]]; then
               echo "::error::Stable macOS publication requires Developer ID signing and Apple notarization credentials."
               exit 1
             fi
             echo "::warning::Candidate build is unsigned and cannot be promoted to Stable."
           fi
+        env:
+          PREPARE_PUBLIC_ARTIFACTS: ${{ inputs.prepare_public_artifacts }}
 
       - name: Decode Apple signing credentials
         if: steps.signing.outputs.enabled == 'true'
@@ -567,6 +594,14 @@ jobs:
         if: steps.signing.outputs.enabled == 'true'
         run: node scripts/verify-mac-release-artifacts.cjs dist arm64 x64
 
+      - name: Record frozen public package identity
+        if: ${{ inputs.candidate_only == true && inputs.prepare_public_artifacts == true && inputs.publish_release != true }}
+        env:
+          CANDIDATE_ONLY: ${{ inputs.candidate_only }}
+          PREPARE_PUBLIC_ARTIFACTS: ${{ inputs.prepare_public_artifacts }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        run: node scripts/verify-reviewed-release-artifacts.mjs record --platform=mac --dist=dist --version="${WORKWISE_APP_VERSION}"
+
       - name: Upload macOS installers
         uses: actions/upload-artifact@v4
         with:
@@ -577,10 +612,11 @@ jobs:
             dist/WorkWise-*-mac-*.dmg
             dist/WorkWise-*-mac-*.zip
             dist/latest-mac.yml
+            dist/reviewed-build.json
 
   build-windows:
     name: Build Windows
-    if: ${{ always() && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
     # node-gyp 11.x supports the VS 2022 toolchain used to rebuild
     # better-sqlite3 for Electron ABI 148. Pin the release image so a
     # windows-latest Visual Studio upgrade cannot break installer builds.
@@ -588,8 +624,9 @@ jobs:
     needs: [prepare, stability, build-document-sidecars]
     env:
       WORKWISE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      WORKWISE_UPDATE_CHANNEL: ${{ inputs.candidate_only == true && 'frontier' || 'stable' }}
-      WORKWISE_UPDATE_URL: ${{ inputs.candidate_only == true && 'https://127.0.0.1/' || '' }}
+      WORKWISE_UPDATE_CHANNEL: ${{ inputs.candidate_only == true && inputs.prepare_public_artifacts != true && 'frontier' || 'stable' }}
+      WORKWISE_UPDATE_URL: ${{ inputs.candidate_only == true && inputs.prepare_public_artifacts != true && 'https://127.0.0.1/' || '' }}
+      WORKWISE_CANDIDATE_SOURCE_HEAD: ${{ github.sha }}
       WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
       RELEASE_CHANNEL: stable
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -598,7 +635,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -635,6 +672,14 @@ jobs:
       - name: Verify packaged Windows Runtime native dependency
         run: node scripts/verify-packaged-runtime-native.cjs dist win
 
+      - name: Record frozen public package identity
+        if: ${{ inputs.candidate_only == true && inputs.prepare_public_artifacts == true && inputs.publish_release != true }}
+        env:
+          CANDIDATE_ONLY: ${{ inputs.candidate_only }}
+          PREPARE_PUBLIC_ARTIFACTS: ${{ inputs.prepare_public_artifacts }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        run: node scripts/verify-reviewed-release-artifacts.mjs record --platform=win --dist=dist --version="${env:WORKWISE_APP_VERSION}"
+
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
@@ -645,23 +690,21 @@ jobs:
             dist/WorkWise-*-win-x64.exe
             dist/WorkWise-*-win-x64.exe.blockmap
             dist/latest.yml
+            dist/reviewed-build.json
 
   publish:
     name: Publish GitHub Release
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || inputs.skip_stability == true) }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: production-release
       url: https://www.railwise.cn/products/workwise/
     permissions:
       contents: write
+      actions: read
     needs:
       - release-approval-gate
       - prepare
-      - stability
-      - build-document-sidecars
-      - build-macos
-      - build-windows
     env:
       GH_TOKEN: ${{ github.token }}
       TAG_NAME: ${{ needs.prepare.outputs.tag }}
@@ -687,7 +730,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -698,12 +741,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download release artifacts
+      - name: Download immutable reviewed release artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: release-*
-          path: release-artifacts
-          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ needs.release-approval-gate.outputs.artifact_repository }}
+          run-id: ${{ needs.release-approval-gate.outputs.artifact_run_id }}
+          artifact-ids: ${{ needs.release-approval-gate.outputs.artifact_ids }}
+          path: reviewed-downloads
+          merge-multiple: false
+
+      - name: Verify every reviewed installer and updater byte before publication
+        env:
+          RELEASE_EVIDENCE_PATH: ${{ needs.release-approval-gate.outputs.evidence_path }}
+        run: node scripts/verify-reviewed-release-artifacts.mjs verify --evidence="${RELEASE_EVIDENCE_PATH}" --downloads=reviewed-downloads --output=release-artifacts
 
       - name: Prepare public installer names
         run: |
@@ -982,7 +1033,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Download candidate artifacts
         uses: actions/download-artifact@v4
@@ -1037,7 +1088,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Download final candidate installers
         uses: actions/download-artifact@v4
