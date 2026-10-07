@@ -21,9 +21,9 @@ Window: "RailWise AI", App: RailWise AI Candidate 9527ec5f1bcb.
 							19 按钮 golden-plane-control-e2e Control network · m · 10/7
 								20 文本 golden-plane-control-e2e
 								21 文本 Control network
-								22 文本  · 
+						22 文本  ·
 								23 文本 m
-								24 文本  · 
+						24 文本  ·
 								25 文本 10/7
 							26 按钮 Continue conversation
 						27 container
