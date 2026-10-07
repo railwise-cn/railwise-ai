@@ -9,6 +9,7 @@ import { SurveyTabularProbeRequestV1 } from '../../shared/survey-tabular'
 import { SurveyInitialValueChangeRequestV1, SurveySegmentComparisonRequestV1 } from '../../shared/survey-monitoring'
 import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQualityRecordCreateV1, SurveyQualityCheckAppendV1 } from '../../shared/survey-quality-workspace'
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
+import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
 import {
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
@@ -239,6 +240,20 @@ const SAMPLING_ENDPOINTS = [
   { suffix: 'sampling-runs/{runId}/verify', methods: ['POST'], schema: SurveySamplingVerifyRequestV1, paginated: false }
 ].map(entry => ({ ...entry, endpoint: compileEndpoint(`/v1/engineering/projects/{id}/${entry.suffix}`, entry.methods, entry.paginated ? ['limit', 'offset'] : []) }))
 
+const surveyDraftSelectionSchema = z.object({
+  workspace: z.string().min(1).max(MAX_PATH_LENGTH),
+  path: z.string().min(1).max(MAX_PATH_LENGTH).optional(),
+  documentId: z.string().min(1).max(180).optional()
+}).strict().refine(value => value.path !== undefined || value.documentId !== undefined)
+
+const COLLABORATION_ENDPOINTS = [
+  { path: '/v1/engineering/projects/{id}/collaboration-drafts', methods: ['GET', 'POST'], schema: SurveyDraftCreateV1 },
+  { path: '/v1/engineering/projects/{id}/collaboration-drafts/{id}', methods: ['GET'] },
+  { path: '/v1/engineering/projects/{id}/collaboration-drafts/{id}/review', methods: ['POST'], schema: SurveyDraftSealV1 },
+  { path: '/v1/engineering/projects/{id}/collaboration-drafts/{id}/seal', methods: ['POST'], schema: SurveyDraftSealV1 },
+  { path: '/v1/engineering/collaboration-drafts/resolve', methods: ['POST'], schema: surveyDraftSelectionSchema }
+].map(entry => ({ ...entry, endpoint: compileEndpoint(entry.path, entry.methods, []) }))
+
 const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_STANDARD_BASIS_PATH, ['GET'], []),
   compileEndpoint(`${RUNTIME_STANDARD_BASIS_PATH}/{id}/{recordId}`, ['GET'], STANDARD_BASIS_QUERY_KEYS),
@@ -260,6 +275,7 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   ...QUALITY_ENDPOINTS.map(entry => entry.endpoint),
   ...QUALITY_WORKFLOW_ENDPOINTS.map(entry => entry.endpoint),
   ...SAMPLING_ENDPOINTS.map(entry => entry.endpoint),
+  ...COLLABORATION_ENDPOINTS.map(entry => entry.endpoint),
   compileEndpoint(RUNTIME_HEALTH_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_INFO_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TOOLS_TEMPLATE, ['GET']),
@@ -395,6 +411,16 @@ export const runtimeRequestPayloadSchema = z
     if (/^\/v1\/engineering\/adjustments\/[^/]+\/professional-review$/.test(url.pathname)
       && ((payload.method ?? 'GET') !== 'GET' || payload.body !== undefined || url.search || url.hash)) {
       context.addIssue({ code: 'custom', message: 'invalid read-only professional review request' })
+    }
+    const collaboration = COLLABORATION_ENDPOINTS.find(entry => entry.endpoint.match(url.pathname))
+    if (collaboration) {
+      const method = payload.method ?? 'GET'
+      let valid = !url.search && !url.hash && method === 'GET' && payload.body === undefined
+      if (method === 'POST' && !url.search && !url.hash && collaboration.schema && payload.body !== undefined
+        && Buffer.byteLength(payload.body, 'utf8') <= 8192) {
+        try { valid = collaboration.schema.safeParse(JSON.parse(payload.body)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid survey collaboration request' })
     }
     if (url.pathname === RUNTIME_ENGINEERING_SURVEY_TABULAR_PROBE_TEMPLATE) {
       let valid = (payload.method ?? 'GET') === 'POST' && !url.search && !url.hash
