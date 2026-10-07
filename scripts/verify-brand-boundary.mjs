@@ -92,6 +92,12 @@ for (const absolute of files) {
         (rel === 'electron-builder.cjs' || rel === 'src/main/index.ts') &&
         line.includes("com.wangjiawei508.workgpt")
       ) continue
+      // Acceptance records must retain the exact identity of historical packages.
+      if (rel.startsWith('docs/qa/release-gates/') && rule.name === 'old product name') {
+        const withoutPackageIdentity = line.replace(/\bcom\.wangjiawei508\.workgpt(?:\.candidate\.head[a-f0-9]{12})?\b/g, '')
+        rule.pattern.lastIndex = 0
+        if (!rule.pattern.test(withoutPackageIdentity)) continue
+      }
       violations.push(`${rel}:${index + 1}: ${rule.name}: ${line.trim()}`)
     }
   }
