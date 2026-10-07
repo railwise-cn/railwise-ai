@@ -43,6 +43,10 @@ const allowedFiles = [
   /^src\/shared\/app-settings-(?:runtime|types)(?:\.test)?\.ts$/,
   /^src\/shared\/legacy-agent-name\.ts$/,
   /^scripts\/authorize-workwise-candidate\.sh$/,
+  // Release verification must preserve historical bundle IDs and storage paths
+  // so it can validate and migrate existing installations without exposing them
+  // in product UI or user-facing copy.
+  /^scripts\/(?:run-frozen-release-updater-acceptance|verify-reviewed-release-artifacts)\.mjs$/,
   /^src\/main\/claw-schedule-mcp-config\.test\.ts$/,
   /^src\/main\/services\/(?:agent-pack|skill)-service\.test\.ts$/,
   /^src\/preload\/index(?:\.d)?\.ts$/,
