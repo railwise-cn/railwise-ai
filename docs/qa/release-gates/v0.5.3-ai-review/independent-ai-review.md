@@ -31,6 +31,8 @@ TeamIdentifier=not set
 
 本轮随后将 `dist/mac-arm64/RailWise AI.app` 复制到隔离目录并直接启动。窗口启动成功，版本和 Bundle 身份与上述包一致；切换到 Survey 后界面显示“Connect to the survey service to load jobs and deliverables”，任务与成果无法加载。该结果进一步确认：最终包实例尚未完成可用 Survey 服务的本地联通，不能据此验收导入、平差、结果或交付主流程。
 
+隔离包日志进一步记录了本机已有 RailWise 进程占用 `127.0.0.1:8787` 和 `127.0.0.1:8788`，导致 webhook 与 schedule 服务报 `EADDRINUSE`。这次检查没有停止用户正在使用的进程，也没有把端口冲突当作产品功能通过；后续必须在不共享生产实例端口的隔离启动方案中重复验收。
+
 ## 已检查的候选运行
 
 Computer Use 检查到的候选实例如下：
