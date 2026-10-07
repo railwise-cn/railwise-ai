@@ -29,6 +29,8 @@ TeamIdentifier=not set
 
 因此尚未满足 Apple Developer ID 签名、公证和 staple 要求。当前记录也没有证明从本次 `dist/mac-arm64` 包安装并启动后完成了完整 UI 验收；不能把候选运行身份与最终包身份合并解释。
 
+本轮随后将 `dist/mac-arm64/RailWise AI.app` 复制到隔离目录并直接启动。窗口启动成功，版本和 Bundle 身份与上述包一致；切换到 Survey 后界面显示“Connect to the survey service to load jobs and deliverables”，任务与成果无法加载。该结果进一步确认：最终包实例尚未完成可用 Survey 服务的本地联通，不能据此验收导入、平差、结果或交付主流程。
+
 ## 已检查的候选运行
 
 Computer Use 检查到的候选实例如下：
@@ -75,7 +77,7 @@ Computer Use 检查到的候选实例如下：
 | 概览 / 处理 / 结果 / 交付四个工作视图 | 已通过（候选） | Computer Use 与归档截图 |
 | AI 默认界面隐藏开发协议和代码信息 | 已通过（候选） | AI 抽屉和文案层检查 |
 | 专业测量结果、复核边界和交付动作可见 | 已通过（候选） | 结果、交付无障碍树 |
-| 当前 `dist` 0.5.3 包安装后验收 | 未完成 | 候选 App ID 与最终包 Bundle 不同 |
+| 当前 `dist` 0.5.3 包安装后验收 | 阻断 | 包窗口可启动，但 Survey 服务未联通；候选 App ID 与最终包 Bundle 不同 |
 | Developer ID 签名 | 未通过 | 当前为 adhoc，未设置 TeamIdentifier |
 | 公证与 staple | 未完成 | 没有有效公证回执 |
 | 中文 / 英文矩阵 | 未完成 | 本轮仅有英文候选证据 |
