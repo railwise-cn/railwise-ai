@@ -10,8 +10,8 @@
 - 工作树：`/Users/wangjiawei/.codex/worktrees/railwise-053-remediation/WorkWise`。
 - 分支：`codex/railwise-053-remediation`。
 - 审计开始时提交：`e83e4d9bfbf98316e4593211bd7b2b4b98a5e020`，已合入最新 main 发布控制；`package.json` 为 `0.5.3`。
-- PR：[44](https://github.com/railwise-cn/railwise-ai/pull/44)。本次 GitHub API 读取为 `OPEN`、`MERGEABLE`、`BLOCKED`、`REVIEW_REQUIRED`，作者为 `railwise-cn`，审查列表为空。
-- 已有质量 CI 成功记录：`37605322140`、`37605324527`。它们是源码检查，不能替代最终安装包验收或独立审核。
+- PR：[44](https://github.com/railwise-cn/railwise-ai/pull/44)。本次 GitHub API 读取为 `OPEN`、`MERGEABLE`、`BLOCKED`、`REVIEW_REQUIRED`，作者为 `railwise-cn`，审查列表为空；整改已提交 `b0008c9c` 和 `ff01a178` 并推送。
+- 最新质量 CI 成功记录：`37722185209`（push）和 `37722189688`（PR），对应 `ff01a1784797bed097d576aa0c9e2175cd85bc12`；三类 Linux/Windows/Electron 检查全部通过。它们是源码检查，不能替代最终安装包验收或独立审核。
 - 本次已完成 GitHub REST 运行来源校验字段适配、updater machine/native 报告不可变来源绑定及发布事务回归；两路独立 AI 源码审查均未发现剩余确定缺陷，边界见 `source-gate-independent-ai-review-20261008.md`。这些修复不能冒充上述 e83 提交内容。后续最终冻结须采用包含全部修复、经审核合并的实际受保护 main 提交。
 
 ## 候选证据的有效范围
@@ -35,7 +35,7 @@
 
 ## GitHub 独立审核的账户配置门禁
 
-本次只读访问 collaborator、main protection、PR 和环境 API 确认：
+本次访问 collaborator、main protection、PR 和环境 API，并修正实际检查名称后确认：
 
 | 控制 | 当前设置 | 实际影响 |
 | --- | --- | --- |
@@ -43,7 +43,7 @@
 | PR #44 作者 | `railwise-cn` | 该账户不能批准自己提交的 PR |
 | CODEOWNERS | 发布控制及 `docs/qa/release-gates/**` 均为 `@railwise-cn` | 唯一 CODEOWNER 与 PR 作者相同 |
 | main review | 必须 1 个批准、CODEOWNER 审查、旧批准失效，`enforce_admins.enabled=true` | 绿色 CI 不能满足空缺的独立批准；管理员也受保护约束 |
-| main checks | 三个 Quality 检查，strict=true | 必须基于最新 main 通过，但检查成功不等于人工审核 |
+| main checks | 三个实际 job 名称、app_id=15368（GitHub Actions）、strict=true | 原 Quality / 前缀导致所有真实检查 isRequired=false，现已修正；GraphQL 确认 6 个实际 check 均 isRequired=true 且 SUCCESS，检查成功不等于独立审核 |
 | production-release | `prevent_self_review=true`，唯一 required reviewer 为 `railwise-cn`，`can_admins_bypass=false` | 若该账户发起发布工作流，不能审批自己的发布部署；当前没有另一位有效 reviewer |
 
 本机 GitHub CLI 仅发现激活的 `railwise-cn` 和未激活的 `wangjiawei508`。本次实时权限 API 确认后者仍为 `permission=read`、`push=false`，不具备有效 CODEOWNER 资格；pending invitations API 返回空。未切换账户或修改权限。只读检查 25 个实际存在的 registered worktree，未发现 `docs/release/stable-release-gate.md` 的未提交旧修改；本轮明确修正其旧有“从 tag 生成候选/发布重新构建”说明。
@@ -52,7 +52,9 @@
 
 需要实际增加可独立批准的受信任维护者及适用 CODEOWNER/环境 reviewer，或通过受授权的治理调整建立等效独立审核。当前缺少可用受信任维护者的真实用户名；既有治理问题正在等待该具体信息，并非重新请求 0.5.3 发布批准。任何配置调整须使用真实账户并保留审计；单纯重复运行 CI 无法解决。用户已有“继续推进 0.5.3 发布”指令仍然有效。
 
-本次只读核验命令：
+检查名称整改的独立复审、PATCH 范围与回读记录见 [`github-required-checks-correction-20261008.md`](github-required-checks-correction-20261008.md)。仅修改 required_status_checks 子资源，未减少检查数量或更改审批、CODEOWNER、enforce_admins、force-push/delete 或 production 自审保护。
+
+本次核验命令：
 
 ```text
 gh api repos/railwise-cn/railwise-ai/collaborators
