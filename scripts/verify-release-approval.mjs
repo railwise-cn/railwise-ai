@@ -6,8 +6,8 @@
  * This check deliberately lives in the repository so the workflow cannot
  * treat a successful build as release approval. It requires a committed,
  * version-bound evidence manifest and an explicit confirmation for the exact
- * tag. GitHub's protected `production-release` environment supplies the
- * independent human approval after this job passes.
+ * tag. The production environment's reviewer policy follows the repository's
+ * authorized governance mode; this check never represents a human review.
  */
 
 import { execFileSync } from 'node:child_process'

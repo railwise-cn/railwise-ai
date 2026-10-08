@@ -4,6 +4,11 @@ This record captures the repository controls that were checked after the
 release-control changes landed. It is an operational audit record, not a
 release approval and not evidence that a new version was published.
 
+The human PR/CODEOWNER and production-reviewer requirements below are a
+historical snapshot. They were superseded on 2026-10-08 by the explicitly
+authorized [single-maintainer policy](../qa/release-gates/v0.5.3-ai-review/single-maintainer-mode-20261008.md).
+PR-based merging and the other protections remain required under that policy.
+
 ## Scope and remote snapshot
 
 - Repository: `railwise-cn/railwise-ai`

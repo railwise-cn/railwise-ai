@@ -115,9 +115,11 @@ Repository administrators should also enforce the following settings:
 2. Protect `v*` tags so they cannot be force-moved or deleted by ordinary
    collaborators. Tag creation should be limited to the release maintainers.
 3. Keep the default workflow token read-only. Only the `publish` job receives
-   `contents: write` after the evidence gate and environment approval pass.
-4. Require pull-request review and the workflow checks for changes to release
-   workflows, release scripts, and this document.
+   `contents: write` after the evidence gate passes and the selected tag is
+   admitted by the production environment's deployment policy.
+4. Require the workflow checks for changes to release workflows, release
+   scripts, and this document. Record a separate AI review before merging;
+   human PR and CODEOWNER approvals are not required in single-maintainer mode.
 
 These settings are intentionally external repository controls; this workflow
 fails closed when the committed evidence or exact confirmation is missing.

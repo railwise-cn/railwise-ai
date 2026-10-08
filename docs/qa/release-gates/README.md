@@ -299,11 +299,12 @@ Every screenshot and report path must exist in the repository as a regular file
 committed in that same tag. A staged addition, a symlink, or a working-copy edit
 cannot substitute for tagged evidence. The independent review must be labeled as AI review; it cannot be
 presented as a licensed vendor result, regulatory conformity certificate,
-professional signature, or human approval. The environment approval by the
-current release maintainer remains a separate required decision. Branch
-CODEOWNER review and the `production-release` environment review are independent
-GitHub controls; user authorization and AI acceptance do not impersonate or
-bypass either control.
+professional signature, or human approval. In the user-authorized
+single-maintainer mode, human PR/CODEOWNER approvals and a production environment
+reviewer are not required. Strict required CI, tag protection, the production
+environment's tag deployment policy, immutable package evidence, installed-package
+acceptance, and exact-version user approval remain required. Adding a second
+maintainer should be followed by a deliberate review of the governance policy.
 
 The repository intentionally contains no passing `v0.5.2.json`: the historical
 0.5.2 publication predates this gate and must not be backfilled with fabricated
