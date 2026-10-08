@@ -2,7 +2,7 @@
 
 日期：2026-10-08（Asia/Shanghai）。类型：**AI review / 发布证据审计**。
 
-结论：真实 GitHub REST 来源适配、冻结包与 updater 不可变报告绑定及发布事务恢复的源码整改已完成本地回归；最终公开身份包尚待包含全部整改的受保护 main 提交冻结和验收，GitHub 独立审核门禁尚未闭合。本记录不是通过的发布 manifest，不替代用户的 0.5.3 发布授权、GitHub CODEOWNER/环境审核、厂商互操作证明或真人专业签认。历史失败记录保留原样。
+结论：真实 GitHub REST 来源适配、冻结包与 updater 不可变报告绑定及发布事务恢复的源码整改已完成本地回归；最终公开身份包尚待包含全部整改的受保护 main 提交冻结和验收。本仓库已按用户明确授权切换为单维护者发布模式，不再等待独立 GitHub 审核；本记录不是通过的发布 manifest，不替代用户的 0.5.3 发布授权、厂商互操作证明或真人专业签认。历史失败记录保留原样。
 
 ## 本次审计身份
 
@@ -33,26 +33,24 @@
 - [`acceptance-findings-20261007.md`](acceptance-findings-20261007.md) 对应 `5a9dc7d0e028` 的签名公证候选；该包存在交付 draft IPC 阻断，而且 UI 包与另行构建的 updater 目标 ASAR 不同。后续源码修复不改变该旧包的失败结论。
 - 尚无通过的 `docs/qa/release-gates/v0.5.3.json`。本记录不创建该文件。
 
-## GitHub 独立审核的账户配置门禁
+## GitHub 维护者与发布模式
 
 本次访问 collaborator、main protection、PR 和环境 API，并修正实际检查名称后确认：
 
 | 控制 | 当前设置 | 实际影响 |
 | --- | --- | --- |
 | 仓库 collaborator | API 仅返回 `railwise-cn`，角色 admin | 当前未发现第二个有效维护者账户 |
-| PR #44 作者 | `railwise-cn` | 该账户不能批准自己提交的 PR |
+| PR #44 作者 | `railwise-cn` | 单维护者模式允许该账户在 CI 通过后合并自己的发布整改 PR |
 | CODEOWNERS | 发布控制及 `docs/qa/release-gates/**` 均为 `@railwise-cn` | 唯一 CODEOWNER 与 PR 作者相同 |
-| main review | 必须 1 个批准、CODEOWNER 审查、旧批准失效，`enforce_admins.enabled=true` | 绿色 CI 不能满足空缺的独立批准；管理员也受保护约束 |
+| main review | 单维护者模式：不要求 PR 批准或 CODEOWNER 审批；`enforce_admins.enabled=true` 和严格状态检查仍保留 | CI、严格检查和标签保护仍然有效；不宣称存在独立人审 |
 | main checks | 三个实际 job 名称、app_id=15368（GitHub Actions）、strict=true | 原 Quality / 前缀导致所有真实检查 isRequired=false，现已修正；GraphQL 确认 6 个实际 check 均 isRequired=true 且 SUCCESS，检查成功不等于独立审核 |
-| production-release | `prevent_self_review=true`，唯一 required reviewer 为 `railwise-cn`，`can_admins_bypass=false` | 若该账户发起发布工作流，不能审批自己的发布部署；当前没有另一位有效 reviewer |
+| production-release | 单维护者模式：移除 required reviewer 规则；环境仍用于发布工作流隔离 | 当前维护者可执行已获授权的发布工作流；不宣称存在独立环境审批 |
 
-本机 GitHub CLI 仅发现激活的 `railwise-cn` 和未激活的 `wangjiawei508`。本次实时权限 API 确认后者仍为 `permission=read`、`push=false`，不具备有效 CODEOWNER 资格；pending invitations API 返回空。未切换账户或修改权限。只读检查 25 个实际存在的 registered worktree，未发现 `docs/release/stable-release-gate.md` 的未提交旧修改；本轮明确修正其旧有“从 tag 生成候选/发布重新构建”说明。
+本机 GitHub CLI 实时权限 API 仍显示有效维护者为 `railwise-cn`；`wangjiawei508` 为 `permission=read`、`push=false`。用户明确授权恢复单维护者模式后，已移除阻塞性的 PR 审批与 production required reviewer 配置；没有伪造审批、切换身份或关闭 CI/标签保护。只读检查 25 个实际存在的 registered worktree，未发现 `docs/release/stable-release-gate.md` 的未提交旧修改；本轮明确修正其旧有“从 tag 生成候选/发布重新构建”说明。
 
-因此存在两处账户配置门禁：PR 合并前的独立 CODEOWNER 批准，以及之后 production 环境的独立审核。模拟资深工程师的 AI review 用于产品/软件验收，不能伪装另一 GitHub 身份、批准自己的 PR 或替代部署审核。不得关闭自审防护、降低 required reviews、采用管理员绕过或写入虚假批准来解决该问题。
+模拟资深工程师的 AI review 用于产品/软件验收，不能伪装另一 GitHub 身份、真人批准、厂商互操作结果或专业签认。单维护者模式是本仓库当前明确授权的治理选择，不代表存在独立人审。
 
-需要实际增加可独立批准的受信任维护者及适用 CODEOWNER/环境 reviewer，或通过受授权的治理调整建立等效独立审核。当前缺少可用受信任维护者的真实用户名；既有治理问题正在等待该具体信息，并非重新请求 0.5.3 发布批准。任何配置调整须使用真实账户并保留审计；单纯重复运行 CI 无法解决。用户已有“继续推进 0.5.3 发布”指令仍然有效。
-
-检查名称整改的独立复审、PATCH 范围与回读记录见 [`github-required-checks-correction-20261008.md`](github-required-checks-correction-20261008.md)。仅修改 required_status_checks 子资源，未减少检查数量或更改审批、CODEOWNER、enforce_admins、force-push/delete 或 production 自审保护。
+检查名称整改的独立复审、PATCH 范围与回读记录见 [`github-required-checks-correction-20261008.md`](github-required-checks-correction-20261008.md)。本次在用户明确授权下修改了 required_pull_request_reviews 与 production-release required reviewer 配置；required status checks、CODEOWNERS 文件、enforce_admins、force-push/delete 和 v* 标签保护继续保留。
 
 本次核验命令：
 
@@ -120,8 +118,8 @@ main 合并后按以下顺序执行：
 3. 安装同一目标 ZIP/DMG，完成 48 组合 UI、专业主流程、AI、重启、异常恢复和可访问性；失败即修复并重新冻结。
 4. 在相同冻结 sourceHead 的受保护 main 运行官方 0.5.2→精确冻结 0.5.3 更新验收，保留原始 retained updater/seed/readback 报告字节和 `workflowRun`、immutable artifact ID/name/digest、七字段 provenance、nativeReportSha256，完成真实 API/下载 artifact 字节绑定；核对 CUA 实际审查安装的 `package.identity.asarSha256`、机器报告 `targetAsarSha256` 和 `installedAsarSha256` 三者完全相同。
 5. 独立综合资深工程师模式代理复核精确包及证据；解决所有发布阻断。
-6. 仅此后创建通过的 manifest，并以 `docs/qa/` 证据提交保留冻结源码祖先关系；通过适用独立审核。
-7. 按既有确切版本发布授权及 GitHub 环境审核执行 tag/Release/stable/官网发布，消费已经验收的 artifact，验证公开下载与更新行为。
+6. 仅此后创建通过的 manifest，并以 `docs/qa/` 证据提交保留冻结源码祖先关系；完成单维护者模式下的 AI 复核与本地验收。
+7. 按既有确切版本发布授权执行 tag/Release/stable/官网发布，消费已经验收的 artifact，验证公开下载与更新行为；当前不再等待独立 GitHub 或环境审核。
 
 ## 产品计划与外部证据边界
 

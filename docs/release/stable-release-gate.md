@@ -94,32 +94,20 @@ before another publication attempt. Recovery never deletes or rewrites a
 published GitHub Release.
 
 The final publication job is protected by the GitHub environment
-`production-release`. Configure required reviewers for that environment in the
-`railwise-cn/railwise-ai` repository. The environment approval is an additional
-release decision; a green build, user release instruction or AI review never
-substitutes for the required independent GitHub approval. AI review is product
-and software acceptance evidence, not a human approval, licensed vendor/SUC
-interoperability result, regulatory certificate or professional signature.
+`production-release`. This repository currently operates in **single-maintainer
+mode**, explicitly authorized for the 0.5.3 release: the environment has no
+required reviewer, and branch protection keeps CI, strict status checks, admin
+enforcement, and tag protection while requiring no human PR approval. The
+computer-use inspection, separate senior-engineer-mode AI review, immutable
+evidence, and explicit user release approval remain mandatory. AI review is
+product and software acceptance evidence, not a human approval, licensed
+vendor/SUC interoperability result, regulatory certificate or professional
+signature.
 
-The 2026-10-08 read-only audit found an account deadlock: PR #44 is authored by
-`railwise-cn`, the only effective release CODEOWNER and repository maintainer;
-`main` requires an independent CODEOWNER approval and enforces that requirement
-for admins. The `production-release` environment also lists only `railwise-cn`,
-prevents self-review and disallows admin bypass. If that identity starts the
-publication run, it cannot approve its own deployment. The inactive local
-`wangjiawei508` identity has only read permission and is not an effective
-CODEOWNER; it must not be used to impersonate independent review. No pending
-collaborator invitation or second effective reviewer was found.
-
-Resolve this through a real, authorized independent maintainer and appropriate
-CODEOWNER/environment reviewer configuration, or an explicitly authorized
-governance change that retains equivalent independent review and an audit trail.
-Do not self-approve, weaken required review or self-review protections, fabricate
-approvals, switch identities to impersonate another reviewer, or use an admin
-bypass to work around the deadlock. Until a valid independent review path and
-required package acceptance exist, keep the package private. Create the approved
-tag only after the evidence and source have passed their required review; public
-publication and promotion must additionally wait for the environment approval.
+This mode is a governance choice for a repository with one effective maintainer;
+it is not a claim that the package has independent human approval. If a second
+maintainer is added later, restore CODEOWNER and environment reviewer gates
+before the next consequential release.
 
 Repository administrators should also enforce the following settings:
 
