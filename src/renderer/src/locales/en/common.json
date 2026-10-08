@@ -727,6 +727,7 @@
   "engineeringPreviewOutput": "Review draft files",
   "engineeringPlanHistory": "Advanced details",
   "engineeringPlanLatest": "Latest plan",
+  "engineeringPlanHistoryItem": "Processing plan {{number}}",
   "engineeringRecordedPreviewRun": "Recorded draft export · {{id}} (files have not been reverified)",
   "engineeringRecordedPreviewUnavailable": "The saved export descriptors could not be read. Keep the original files and inspect the run before generating another draft.",
   "engineeringPreviewNotGenerated": "Preview not generated",
