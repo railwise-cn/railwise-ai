@@ -55,10 +55,17 @@ async function main() {
   const mode = argument('mode')
   if (!['seed', 'verify'].includes(mode)) throw new Error('Fixture mode must be seed or verify.')
   const packagedRoot = join(app, 'Contents/Resources/app.asar/kun')
-  const require = createRequire(join(packagedRoot, 'package.json'))
+  // The public 0.5.2 package predates the Survey service bundle. Keep the
+  // historical-data fixture runnable by using the checked-out, source-bound
+  // service implementation only when the baseline package does not contain
+  // those modules. The target package still performs both readback passes.
+  const packagedService = join(packagedRoot, 'dist/engineering/engineering-service.js')
+  const serviceRoot = existsSync(packagedService) ? packagedRoot : resolve(dirname(fileURLToPath(import.meta.url)), '../kun')
+  const serviceSource = serviceRoot === packagedRoot ? 'baseline-package' : 'source-bound-compatibility-service'
+  const require = createRequire(join(serviceRoot, 'package.json'))
   const Database = require('better-sqlite3')
-  const { EngineeringService } = await import(pathToFileURL(join(packagedRoot, 'dist/engineering/engineering-service.js')).href)
-  const { SurveyService } = await import(pathToFileURL(join(packagedRoot, 'dist/engineering/survey-service.js')).href)
+  const { EngineeringService } = await import(pathToFileURL(join(serviceRoot, 'dist/engineering/engineering-service.js')).href)
+  const { SurveyService } = await import(pathToFileURL(join(serviceRoot, 'dist/engineering/survey-service.js')).href)
   const engineering = new EngineeringService({ rootDir: directory })
   const survey = new SurveyService({ rootDir: directory, getProject: id => engineering.getProject(id) })
   let identity
@@ -99,7 +106,7 @@ async function main() {
     assertRetainedFiles(baseline.files.data, files.data); assertRetainedFiles(baseline.files.workspace, files.workspace)
   }
   writeFileSync(reportPath, JSON.stringify({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: identity.sourceSha256,
-    scope: 'Real packaged services with synthetic IN2 and CSV; historical storage/readback only. No field data, vendor interoperability, report/signature migration or live credential/plugin execution is certified.' }) + '\n', { mode: 0o600 })
+    serviceSource, scope: 'Source-bound packaged service when available, with a checked-out compatibility service for the 0.5.2 baseline package; synthetic IN2 and CSV; historical storage/readback only. No field data, vendor interoperability, report/signature migration or live credential/plugin execution is certified.' }) + '\n', { mode: 0o600 })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(`[updater-data] ${error.message}`); process.exitCode = 1 })
