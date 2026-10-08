@@ -727,6 +727,7 @@
   "engineeringPreviewOutput": "审查稿文件",
   "engineeringPlanHistory": "高级详情",
   "engineeringPlanLatest": "最新计划",
+  "engineeringPlanHistoryItem": "处理方案 {{number}}",
   "engineeringRecordedPreviewRun": "已记录草稿导出 · {{id}}（尚未重新核验文件）",
   "engineeringRecordedPreviewUnavailable": "无法读取已保存的导出描述。请保留原文件并检查运行记录，再决定是否生成新草稿。",
   "engineeringPreviewNotGenerated": "尚未生成预览",
