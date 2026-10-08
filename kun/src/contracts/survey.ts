@@ -894,12 +894,16 @@ export const AdjustmentResultV1 = z.object({
   parameters: z.record(z.string(), z.number().finite()).default({}),
   parameterUnits: z.record(z.string(), z.enum(['m', 'rad', 'ppm', 'ratio'])).default({}),
   unitWeightStdDev: z.number().nonnegative(),
-  /** Unit-weight standard deviation and variance factor are statistical
-   * scale values, never coordinate or height measurements. Defaults keep
-   * legacy records readable without rewriting their stored JSON. */
-  unitWeightStdDevUnit: z.literal('dimensionless').default('dimensionless'),
+  /** Absolute-prior precision gives dimensionless scale factors. Relative
+   * leveling weights P=L0/L give metre/metre-squared scales. The old default
+   * is retained for reading historical records, not as evidence of a unit. */
+  unitWeightStdDevUnit: z.enum(['dimensionless', 'm']).default('dimensionless'),
   varianceFactor: z.number().nonnegative(),
-  varianceFactorUnit: z.literal('dimensionless').default('dimensionless'),
+  varianceFactorUnit: z.enum(['dimensionless', 'm2']).default('dimensionless'),
+  /** Recorded for algorithm-9 and later; never inferred during history reads. */
+  weightingBasis: z.enum(['absolute-prior', 'relative-route-length']).optional(),
+  relativeWeightReferenceLengthMetres: z.literal(1).optional(),
+  relativeWeightDefaultLengthObservationIds: z.array(z.string().min(1)).optional(),
   /** False means the a-priori unit variance is retained because the network
    * has no redundancy; older records default to false rather than claiming
    * a posterior estimate. */

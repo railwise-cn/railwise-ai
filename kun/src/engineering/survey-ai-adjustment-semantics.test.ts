@@ -12,7 +12,7 @@ import { surveyAiAdjustmentSemantics } from './survey-ai-adjustment-semantics.js
 import { buildSurveyProfessionalReview } from './survey-professional-review.js'
 import { SurveyNetworkV1 } from '../contracts/survey.js'
 
-async function fixture(kind: 'plane-control' | 'leveling') {
+async function fixture(kind: 'plane-control' | 'leveling', options: { noRedundancy?: boolean } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'survey-ai-closure-'))
   const engineering = new EngineeringService({ rootDir: root })
   const survey = new SurveyService({ rootDir: root, getProject: id => engineering.getProject(id) })
@@ -32,7 +32,7 @@ async function fixture(kind: 'plane-control' | 'leveling') {
         knownPoints: [{ id: 'A', known: true, height: 10 }], unknownPoints: [{ id: 'P', height: 11 }],
         instrumentParameters: { closureTolerance: 0.004 }, observations: [
           { id: 'forward', type: 'height-difference', from: 'A', to: 'P', value: 1000, unit: 'mm', routeLength: 100 },
-          { id: 'back', type: 'height-difference', from: 'P', to: 'A', value: -0.998, unit: 'm', routeLength: 200 }
+          ...(!options.noRedundancy ? [{ id: 'back', type: 'height-difference', from: 'P', to: 'A', value: -0.998, unit: 'm', routeLength: 200 }] : [])
         ]
       }
     })
@@ -48,6 +48,30 @@ async function fixture(kind: 'plane-control' | 'leveling') {
 }
 
 describe('professional closure meaning in real AI inputs', () => {
+  it('provides the relative weighting model and actual scale units to both real AI read paths', async () => {
+    const { output, contextEvidence, toolEvidence } = await fixture('leveling')
+    for (const evidence of [contextEvidence, toolEvidence]) {
+      expect(evidence).toMatchObject({ weightingBasis: 'relative-route-length', relativeWeightReferenceLengthMetres: 1,
+        relativeWeightDefaultLengthObservationIds: [], unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2' })
+      expect(evidence.weightingSemantics).toMatchObject({ status: 'recorded', scaleStatus: 'estimated-posterior', precisionStatus: 'available' })
+      expect(evidence.unitWeightStdDev).toBeCloseTo(output.result.unitWeightStdDev, 15)
+      expect(evidence.varianceFactor).toBeCloseTo(output.result.varianceFactor, 15)
+      expect(evidence.weightingSemantics.meaning).toContain('not per kilometre')
+      expect(evidence.weightingSemantics.meaning).toContain('not be compared with dimensionless 1')
+    }
+  })
+
+  it('does not give AI nominal scale numbers or an absolute precision pass for a nonredundant relative network', async () => {
+    const { output, contextEvidence, toolEvidence } = await fixture('leveling', { noRedundancy: true })
+    expect(output.result.points.find(point => point.id === 'P')!.height).toBe(11)
+    for (const evidence of [contextEvidence, toolEvidence]) {
+      expect(evidence).toMatchObject({ weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2',
+        unitWeightStdDev: null, varianceFactor: null, precision: { maxPointStdDev: null, passed: null, assessmentStatus: 'not-evaluated' } })
+      expect(evidence.weightingSemantics).toMatchObject({ status: 'recorded', scaleStatus: 'not-evaluated', precisionStatus: 'not-evaluated',
+        unitWeightStdDev: null, varianceFactor: null })
+    }
+  })
+
   it('marks IN2 fitted plane norms as post-adjustment while independent closure remains unevaluated in both read paths', async () => {
     const { survey, output, contextEvidence, toolEvidence } = await fixture('plane-control')
     const storedBefore = JSON.stringify(survey.getAdjustment(output.run.id)?.result)

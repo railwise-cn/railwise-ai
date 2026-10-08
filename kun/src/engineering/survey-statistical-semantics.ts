@@ -1,7 +1,8 @@
 import type { AdjustmentResultV1, SurveyNetworkV1 } from '../contracts/survey.js'
 import { SurveyResidualStatisticV1, SurveyStatisticalSummaryV1 } from '../contracts/survey-statistical-semantics.js'
 
-export const SEMANTIC_ADJUSTMENT_VERSION = 'workwise-survey-adjustment-8'
+export const SEMANTIC_ADJUSTMENT_VERSION = 'workwise-survey-adjustment-9'
+export const LEGACY_SEMANTIC_ADJUSTMENT_VERSION = 'workwise-survey-adjustment-8'
 
 type Basis = Pick<SurveyResidualStatisticV1, 'method' | 'scaleBasis'>
 
@@ -17,9 +18,10 @@ export function residualStatistic(
     : { ...common, status: 'available', value, threshold: 3, thresholdExceeded: value! > 3 })
 }
 
-/** Decorate only newly computed algorithm-8 results. No historical read migration. */
+/** Preserve algorithm-8 replay exactly; new weighting semantics apply to 9. */
 export function withStatisticalSemantics(network: SurveyNetworkV1, result: AdjustmentResultV1): AdjustmentResultV1 {
-  if (result.algorithmVersion !== SEMANTIC_ADJUSTMENT_VERSION) return result
+  if (![SEMANTIC_ADJUSTMENT_VERSION, LEGACY_SEMANTIC_ADJUSTMENT_VERSION].includes(result.algorithmVersion)) return result
+  const currentWeighting = result.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION
   const sources = new Map(network.observations.map((observation) => [observation.id, observation]))
   const observations = result.observations.map((observation) => {
     const sourceId = network.networkType === 'coordinate-transform' || network.networkType === 'gnss'
@@ -29,7 +31,8 @@ export function withStatisticalSemantics(network: SurveyNetworkV1, result: Adjus
     const statistic = observation.residualStatistic ?? residualStatistic({
       method: relativeWeight ? 'weight-normalized-residual' : 'observation-sigma-ratio',
       scaleBasis: relativeWeight ? 'relative-weight' : source?.sigma === undefined ? 'default-prior' : 'declared-prior'
-    }, source ? observation.standardizedResidual : undefined, result.degreesOfFreedom)
+    }, source ? observation.standardizedResidual : undefined, result.degreesOfFreedom,
+    currentWeighting && relativeWeight ? 'missing-absolute-precision' : undefined)
     // Old numeric aliases remain compatible when meaningful. Never serialize
     // an untestable component as zero, which looks like a successful check.
     const { standardizedResidual: _legacy, ...rest } = observation
@@ -38,6 +41,8 @@ export function withStatisticalSemantics(network: SurveyNetworkV1, result: Adjus
   const available = observations.filter((row) => row.residualStatistic.status === 'available')
   const flaggedCount = available.filter((row) => row.residualStatistic.status === 'available' && row.residualStatistic.thresholdExceeded).length
   const estimated = result.varianceFactorEstimated && result.degreesOfFreedom > 0
+  const absoluteScale = !currentWeighting || result.weightingBasis === 'absolute-prior'
+  const uncalibratedFallback = currentWeighting && result.weightingBasis === 'relative-route-length' && !estimated
   const statisticalSummary = SurveyStatisticalSummaryV1.parse({
     schemaVersion: 1,
     scope: 'descriptive-screening',
@@ -46,9 +51,9 @@ export function withStatisticalSemantics(network: SurveyNetworkV1, result: Adjus
     availableCount: available.length,
     unavailableCount: observations.length - available.length,
     flaggedCount,
-    varianceBasis: estimated ? 'estimated-posterior' : result.unknownCount > 0 && result.points.length > 0 ? 'prior-fallback' : 'not-estimated',
-    varianceLog10RatioToUnit: estimated && result.varianceFactor > 0 ? Math.log10(result.varianceFactor) : null,
-    standardDeviationLog10RatioToUnit: estimated && result.unitWeightStdDev > 0 ? Math.log10(result.unitWeightStdDev) : null,
+    varianceBasis: estimated ? 'estimated-posterior' : !uncalibratedFallback && result.unknownCount > 0 && result.points.length > 0 ? 'prior-fallback' : 'not-estimated',
+    varianceLog10RatioToUnit: absoluteScale && estimated && result.varianceFactor > 0 ? Math.log10(result.varianceFactor) : null,
+    standardDeviationLog10RatioToUnit: absoluteScale && estimated && result.unitWeightStdDev > 0 ? Math.log10(result.unitWeightStdDev) : null,
     significance: 'not-evaluated',
     standardsConformity: 'not-evaluated'
   })

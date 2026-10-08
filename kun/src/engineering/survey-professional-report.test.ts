@@ -13,7 +13,7 @@ import { MonitoringProfessionalReportV1 } from '../contracts/engineering-monitor
 import { buildMonitoringProfessionalReport } from './engineering-monitoring-report.js'
 import type { MonitoringObservationV1, RailwiseProjectV1 } from '../contracts/engineering.js'
 
-async function fixture() {
+async function fixture(options: { relative?: boolean; noRedundancy?: boolean } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'survey-report-'))
   const survey = new SurveyService({ rootDir: root })
   try {
@@ -21,8 +21,10 @@ async function fixture() {
       coordinateSystem: 'LOCAL', projection: 'none', ellipsoid: 'none', verticalDatum: '1985-height',
       knownPoints: [{ id: 'BM01', height: 100, known: true, pointClass: 'known' }], unknownPoints: [{ id: 'P01', height: 101, known: false, pointClass: 'unknown' }],
       observations: [
-        { id: 'forward', type: 'height-difference', from: 'BM01', to: 'P01', value: 1.23456789, unit: 'm', sigma: 0.002, sigmaUnit: 'm', routeLength: 1 },
-        { id: 'back', type: 'height-difference', from: 'P01', to: 'BM01', value: -1.23356789, unit: 'm', sigma: 0.004, sigmaUnit: 'm', routeLength: 4 }
+        { id: 'forward', type: 'height-difference', from: 'BM01', to: 'P01', value: 1.23456789, unit: 'm', routeLength: 1,
+          ...(!options.relative ? { sigma: 0.002, sigmaUnit: 'm' } : {}) },
+        ...(!options.noRedundancy ? [{ id: 'back', type: 'height-difference', from: 'P01', to: 'BM01', value: -1.23356789, unit: 'm', routeLength: 4,
+          ...(!options.relative ? { sigma: 0.004, sigmaUnit: 'm' } : {}) }] : [])
       ], instrumentParameters: { closureTolerance: 0.002 }
     } })
     const checked = survey.validateNetwork(network.id, { expectedRevision: network.revision, idempotencyKey: 'report-network-check' })
@@ -63,6 +65,43 @@ async function comparisonFixture() {
 }
 
 describe('professional survey report formats', () => {
+  it('carries relative route-weight scale units and reference length into every deliverable format', async () => {
+    const { model } = await fixture({ relative: true })
+    const summary = model.tables.find(table => table.id.endsWith('-summary'))!
+    expect(summary.columns.find(column => column.key === 'unitWeightStdDev')).toMatchObject({ unit: 'm' })
+    expect(summary.columns.find(column => column.key === 'varianceFactor')).toMatchObject({ label: '方差尺度', unit: 'm²' })
+    expect(summary.rows[0]!.varianceFactor).toBeCloseTo(2e-7, 15)
+    expect(summary.note).toContain('参考路长 L0=1 m')
+    expect(summary.note).toContain('不是每千米中误差')
+    expect(summary.note).toContain('未做 σ 比值筛查')
+
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(model))
+    const document = await docx.file('word/document.xml')!.async('text')
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(model))
+    const worksheets = (await Promise.all(Object.keys(xlsx.files).filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
+      .map(name => xlsx.file(name)!.async('text')))).join('\n')
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
+    for (const text of [document, worksheets, pdf.text]) {
+      expect(text).toContain('单位权中误差 (m)')
+      expect(text).toContain('方差尺度 (m²)')
+      expect(text).toContain('参考路长 L0=1 m')
+      expect(text).not.toContain('单位权中误差 (无量纲)')
+    }
+  }, 30000)
+
+  it('exports a nonredundant relative solution with unassessed scale and precision cells', async () => {
+    const { model } = await fixture({ relative: true, noRedundancy: true })
+    const summary = model.tables.find(table => table.id.endsWith('-summary'))!
+    expect(summary.rows[0]!.dof).toBe(0)
+    expect(summary.rows[0]!.unitWeightStdDev).toBeUndefined()
+    expect(summary.rows[0]!.varianceFactor).toBeUndefined()
+    expect(summary.note).toContain('绝对点位精度及方差尺度未评定')
+    const point = model.tables.find(table => table.id.endsWith('-points'))!.rows.find(row => row.id === 'P01')!
+    expect(point.height).toBeCloseTo(101.23456789, 12)
+    expect(point.standardError).toBeUndefined()
+    expect(point.precisionBasis).toBe('未记录')
+  })
+
   it('shows small non-zero precision values and variance factors without rounding them to zero', async () => {
     const ellipses: ProfessionalReportModel['tables'][number] = {
       id: 'layout-ellipses', title: 'XY 标准误差椭圆',

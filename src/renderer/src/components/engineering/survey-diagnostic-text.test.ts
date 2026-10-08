@@ -75,6 +75,30 @@ describe('Survey diagnostic presentation compatibility', () => {
     expect(surveyLegacyDiagnosticText('来源准入证据无效：持久化记录哈希不匹配。', 'en')).toBe('Original data does not meet calculation requirements: The saved data does not match the original record. Check the original file and import it again.')
     expect(surveyLegacyDiagnosticText('原始资料完整性校验失败：自定义错误内容', 'en')).toContain('自定义错误内容')
   })
+  it.each([
+    ['水准观测的定权依据不一致：部分测段有先验中误差，部分没有。', 'message', /inconsistent weighting.*absolute prior standard deviation/],
+    ['为所有测段填写同一口径的先验中误差，或统一采用测段路长相对定权后重新导入。', 'action', /every segment.*relative weights based on route length.*re-import/],
+    ['水准相对定权缺少部分测段的路长。', 'message', /Route lengths are missing.*relative weighting/],
+    ['补齐所有测段路长；全部未提供路长时才可明确采用等权假设。', 'action', /every segment.*equal-weight assumption.*only when no segment lengths/],
+    ['水准网采用相对定权且没有多余观测，高程可解算，绝对点位精度及单位权中误差未评定。', 'message', /relative weights.*no redundant observations.*Heights can be calculated.*have not been evaluated/]
+  ] as const)('translates stored leveling weighting guidance without changing its source (%s)', (source, field, professionalEnglish) => {
+    const diagnostic = Object.freeze({ message: source, suggestion: source })
+    for (const language of ['en', 'en-US']) {
+      const displayed = surveyDiagnosticText(diagnostic, language, field)
+      expect(displayed).toMatch(professionalEnglish)
+      expect(displayed).not.toMatch(/\p{Script=Han}/u)
+      expect(displayed).not.toMatch(/parser|runtime|JSON|contextHash|survey_[a-z_-]+/i)
+    }
+    expect(surveyDiagnosticText(diagnostic, 'zh-CN', field)).toBe(source)
+    expect(diagnostic).toEqual({ message: source, suggestion: source })
+  })
+  it('retains unknown engineering source evidence beside weighting recovery actions', () => {
+    const source = '桥墩甲：独立复测高差 2.7 mm，项目复核要求保留原记录。'
+    const diagnostic = Object.freeze({ message: source, suggestion: '补齐所有测段路长；全部未提供路长时才可明确采用等权假设。' })
+    expect(surveyDiagnosticText(diagnostic, 'en')).toBe(source)
+    expect(surveyDiagnosticText(diagnostic, 'en', 'action')).toContain('Provide a route length for every segment.')
+    expect(diagnostic.message).toBe(source)
+  })
   it('keeps format policy diagnostics out of the professional work surface', () => {
     const chinese = 'COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断平差。'
     const english = 'cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: strict structure parsing, record anchors and unit conversion are required before policy checks.'

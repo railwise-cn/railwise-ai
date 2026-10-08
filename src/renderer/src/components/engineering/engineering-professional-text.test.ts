@@ -6,6 +6,103 @@ import historicalSyntheticAnswers from './fixtures/historical-survey-synthetic-a
 describe('engineeringProfessionalText', () => {
   beforeEach(async () => { await appI18n.changeLanguage('zh-CN') })
   it.each([
+    ['zh-CN', '定权依据：按测段路长相对定权', '相对定权参考路长（m）：1', '方差尺度单位：m²', '单位权中误差单位：m', '方差尺度评定：未评定', '点位精度评定：未评定'],
+    ['en-US', 'Weighting basis: Relative weights based on route length', 'Relative-weight reference route length (m): 1', 'Variance scale unit: m²', 'Unit weight standard deviation unit: m', 'Variance scale assessment: Not evaluated', 'Point precision assessment: Not evaluated']
+  ])('presents recorded weighting fields as professional findings in %s', (language, ...expected) => {
+    const answer = engineeringProfessionalAnswerText([
+      '本次采用 weightingBasis=relative-route-length；relativeWeightReferenceLengthMetres=1；单位权中误差 0.000447 m，varianceFactorUnit=m2；unitWeightStdDevUnit=m。',
+      'weightingSemantics.scaleStatus=not-evaluated；precision.assessmentStatus=not-evaluated；GSI.gsi 第 4 行，高程 10.9998 m。'
+    ].join('\n'), language)
+    for (const finding of expected) expect(answer).toContain(finding)
+    for (const retained of ['0.000447 m', 'GSI.gsi 第 4 行', '10.9998 m']) expect(answer).toContain(retained)
+    expect(answer).not.toMatch(/weightingBasis|relativeWeightReferenceLengthMetres|varianceFactorUnit|unitWeightStdDevUnit|weightingSemantics|assessmentStatus|relative-route-length|not-evaluated|\bm2\b/)
+  })
+  it.each(['zh-CN', 'en-US'])('keeps complete weighting field/value tables readable in %s', (language) => {
+    const answer = engineeringProfessionalAnswerText([
+      '| 项目 | 值 |', '| --- | --- |',
+      '| weightingBasis | absolute-prior |',
+      '| relativeWeightReferenceLengthMetres | 1 |',
+      '| varianceFactorUnit | dimensionless |',
+      '| unitWeightStdDevUnit | dimensionless |',
+      '| weightingSemantics.scaleStatus | estimated-posterior |',
+      '| precision.assessmentStatus | available |',
+      '', 'BM 高程 100.000 m，原件 GSI.gsi:4；先验精度尚需核查。'
+    ].join('\n'), language)
+    expect(answer.split('\n').filter(line => line.startsWith('|'))).toHaveLength(8)
+    expect(answer).toContain('| 1 |')
+    expect(answer).toContain(language.startsWith('en') ? 'Absolute prior observation precision' : '绝对先验观测精度定权')
+    expect(answer).toContain(language.startsWith('en') ? 'Dimensionless' : '无量纲')
+    expect(answer).toContain(language.startsWith('en') ? 'Posterior estimate' : '后验估计')
+    expect(answer).toContain(language.startsWith('en') ? 'Available for assessment' : '可评定')
+    expect(answer).toContain('BM 高程 100.000 m，原件 GSI.gsi:4；先验精度尚需核查。')
+    expect(answer).not.toMatch(/weightingBasis|relativeWeightReferenceLengthMetres|varianceFactorUnit|unitWeightStdDevUnit|weightingSemantics|assessmentStatus|absolute-prior|dimensionless|estimated-posterior|\bavailable\b/)
+  })
+  it('preserves weighting-like point names, original quotations and source filenames', () => {
+    const original = [
+      '点号 weightingBasis，高程 10.9998 m。',
+      '原件 sources/varianceFactorUnit=m2.in2 第 5 行。',
+      '原注：“weightingBasis=relative-route-length；relativeWeightReferenceLengthMetres=1”。',
+      '| 点号 | weightingBasis |',
+      '| 原件 | precision.assessmentStatus.in2 |'
+    ].join('\n')
+    expect(engineeringProfessionalAnswerText(original, 'zh-CN')).toBe(original)
+    expect(engineeringProfessionalUserText(original)).toBe(original)
+  })
+  it('retains prior and unknown weighting states without asserting an assessment', () => {
+    const answer = engineeringProfessionalAnswerText('weightingBasis=not-recorded；weightingSemantics.scaleStatus=prior-fallback；precision.assessmentStatus=custom-review-required。', 'en-US')
+    expect(answer).toContain('Weighting basis: Not recorded; not established')
+    expect(answer).toContain('Variance scale assessment: Prior scale used')
+    expect(answer).toContain('Point precision assessment: custom-review-required')
+    expect(answer).not.toMatch(/check passed|verified|conformity/i)
+  })
+  it.each(['zh-CN', 'en-US'])('covers nested weighting context and Markdown assignments in %s', (language) => {
+    const answer = engineeringProfessionalAnswerText([
+      '**weightingBasis** = `relative-route-length`；relativeWeightReferenceLengthMetres=1。',
+      'weightingSemantics.status=recorded；weightingSemantics.precisionStatus=not-evaluated；precision.assessmentStatus=not-evaluated。',
+      'weightingSemantics.unitWeightStdDev=0.000447；unitWeightStdDevUnit=m；weightingSemantics.varianceFactor=2e-7；varianceFactorUnit=m2。',
+      'relativeWeightDefaultLengthObservationIds=["out","back"]；GSI.gsi:4，高程 10.9998 m。'
+    ].join('\n'), language)
+    for (const retained of ['0.000447', '2e-7', 'm²', 'out', 'back', 'GSI.gsi:4', '10.9998 m']) expect(answer).toContain(retained)
+    expect(answer).toContain(language.startsWith('en') ? 'Not evaluated' : '未评定')
+    expect(answer).toContain(language.startsWith('en') ? 'Observations without route lengths' : '未提供路长的观测')
+    expect(answer).not.toMatch(/weightingSemantics|weightingBasis|relativeWeight|assessmentStatus|unitWeightStdDev|varianceFactor|relative-route-length|not-evaluated|\bm2\b/)
+  })
+  it.each(['zh-CN', 'en-US'])('translates weighting table labels only within a field/value table in %s', (language) => {
+    const answer = engineeringProfessionalAnswerText([
+      '| **Field** | **Value** |', '| --- | --- |',
+      '| weightingSemantics.status | recorded |',
+      '| weightingSemantics.unitWeightStdDev | 0.000447 |',
+      '| weightingSemantics.varianceFactor | 2e-7 |',
+      '| weightingSemantics.precisionStatus | not-evaluated |',
+      '| scaleStatus | prior-fallback |',
+      '| precisionStatus | not-evaluated |',
+      '| assessmentStatus | not-evaluated |',
+      '| relativeWeightDefaultLengthObservationIds | [] |',
+      '| weightingSemantics.method | inverse-absolute-prior-observation-covariance |',
+      '| 点号 | 高程 (m) |', '| --- | --- |', '| weightingBasis | 10.9998 |',
+      '| scaleStatus | 10.5 |'
+    ].join('\n'), language)
+    expect(answer).toContain('0.000447')
+    expect(answer).toContain('2e-7')
+    expect(answer).toContain(language.startsWith('en') ? 'Inverse absolute prior observation covariance' : '按绝对先验观测协方差的逆定权')
+    expect(answer).toContain(language.startsWith('en') ? 'Not evaluated' : '未评定')
+    expect(answer).toContain('| weightingBasis | 10.9998 |')
+    expect(answer).toContain('| scaleStatus | 10.5 |')
+    expect(answer).not.toMatch(/weightingSemantics|relativeWeightDefaultLengthObservationIds|inverse-absolute-prior-observation-covariance|not-evaluated|prior-fallback/)
+  })
+  it.each(['zh-CN', 'en-US'])('retains complete quoted weighting declarations and historical unit limitations in %s', (language) => {
+    const answer = engineeringProfessionalAnswerText([
+      'weightingSemantics.meaning="Historical weighting and scale units were not recorded. Schema defaults are not verified units."',
+      'weightingSemantics.method="P=L0/L; L0=1 metre; missing lengths are an explicit all-observation equal-weight assumption"',
+      'GSI.gsi:4，原注：“weightingBasis=relative-route-length”。'
+    ].join('\n'), language)
+    expect(answer).toContain('Historical weighting and scale units were not recorded.')
+    expect(answer).toContain(language.startsWith('en') ? 'The scale units have not been established for this historical record.' : '该历史记录的尺度单位尚未核定。')
+    expect(answer).toContain('P=L0/L; L0=1 metre; missing lengths are an explicit all-observation equal-weight assumption')
+    expect(answer).toContain('GSI.gsi:4，原注：“weightingBasis=relative-route-length”。')
+    expect(answer).not.toMatch(/weightingSemantics|Schema defaults/)
+  })
+  it.each([
     ['zh-CN', '尚未核查规范符合性', '尚未核验专业签认', '所提供声明未经独立核实', '未提供统计检验摘要'],
     ['en-US', 'Standards conformity has not been evaluated', 'Professional signoff has not been verified', 'Provided declarations have not been independently verified', 'No statistical test summary is available']
   ])('preserves unevaluated professional limitations in %s', (language, standards, signoff, declarations, statistics) => {

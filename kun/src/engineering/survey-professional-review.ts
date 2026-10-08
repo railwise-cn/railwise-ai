@@ -7,6 +7,7 @@ import {
   type SurveyProfessionalClosureMemberV1,
   type SurveyProfessionalReasonV1
 } from '../contracts/survey-professional.js'
+import { surveyWeightingSemantics } from './survey-weighting-semantics.js'
 
 type SourceIntegrity = 'verified' | 'failed' | 'not-verified'
 export type SurveyProfessionalReviewInput = Readonly<{
@@ -367,7 +368,13 @@ export function buildSurveyProfessionalReview(input: SurveyProfessionalReviewInp
       ...(network ? { networkType: network.networkType } : result.strategyId ? { networkType: result.strategyId } : {}),
       observationCount: result.observationCount, pointCount: result.points.length, degreesOfFreedom: result.degreesOfFreedom,
       unitWeightStdDev: result.unitWeightStdDev, varianceFactor: result.varianceFactor,
-      varianceBasis: result.varianceFactorEstimated ? 'a-posteriori' as const : result.points.length && result.unknownCount ? 'a-priori' as const : 'not-estimated' as const,
+      ...(surveyWeightingSemantics(result).weightingSemantics.status === 'recorded' ? {
+        weightingBasis: result.weightingBasis, unitWeightStdDevUnit: result.unitWeightStdDevUnit, varianceFactorUnit: result.varianceFactorUnit,
+        ...(result.relativeWeightReferenceLengthMetres === undefined ? {} : { relativeWeightReferenceLengthMetres: result.relativeWeightReferenceLengthMetres }),
+        ...(result.relativeWeightDefaultLengthObservationIds === undefined ? {} : { relativeWeightDefaultLengthObservationIds: result.relativeWeightDefaultLengthObservationIds })
+      } : {}),
+      varianceBasis: result.weightingBasis === 'relative-route-length' && !result.varianceFactorEstimated ? 'not-estimated' as const
+        : result.varianceFactorEstimated ? 'a-posteriori' as const : result.points.length && result.unknownCount ? 'a-priori' as const : 'not-estimated' as const,
       validation: result.validation
     }, solver,
     closures, residualNorms, observations, points,

@@ -18,7 +18,7 @@ export const SurveyResidualStatisticV1 = z.discriminatedUnion('status', [
   }).strict(),
   ResidualBasis.extend({
     status: z.literal('not-testable'),
-    reason: z.enum(['no-redundancy', 'residual-variance-unresolved', 'numeric-unavailable'])
+    reason: z.enum(['no-redundancy', 'residual-variance-unresolved', 'numeric-unavailable', 'missing-absolute-precision'])
   }).strict()
 ])
 export type SurveyResidualStatisticV1 = z.infer<typeof SurveyResidualStatisticV1>

@@ -213,7 +213,8 @@ report, a passing status string, or an unrelated successful run fails this gate.
 ## Freeze, inspect and publish the same bytes
 
 1. Complete the release-control code review and required checks, then merge to
-   protected `main` through a valid independent approval. Dispatch `release.yml`
+   protected `main` through a PR under the authorized single-maintainer mode.
+   No second GitHub maintainer approval is required. Dispatch `release.yml`
    on that exact main commit with `candidate_only=true`,
    `prepare_public_artifacts=true`, `publish_release=false`, and
    `skip_stability=false`. The complete two-hour stability and three-client
@@ -273,8 +274,9 @@ report, a passing status string, or an unrelated successful run fails this gate.
    creating a passing manifest. Authentic vendor/SUC interoperability,
    regulatory conformity and professional signatures require their own evidence.
 7. Commit the completed manifest and all referenced evidence under `docs/qa/`.
-   Only after exact-version/action user authorization and required GitHub
-   approvals are satisfied, tag the evidence commit and dispatch publication
+   Only after exact-version/action user authorization, package acceptance and
+   the required CI checks pass under single-maintainer mode, tag the evidence
+   commit and dispatch publication
    with `publish_release=true`, `candidate_only=false`,
    `release_confirmation=PUBLISH-STABLE-vX.Y.Z`, and the committed manifest
    path. Publication verifies and downloads the recorded immutable artifact IDs,

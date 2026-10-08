@@ -39,14 +39,22 @@ describe('versioned residual semantics', () => {
       const first = output.result.observations[0]!
       // WLS with a 4:1 weight ratio gives residuals -0.0002, -0.0008.
       expect(first.residual).toBeCloseTo(-0.0002, 13)
-      expect(first.residualStatistic).toMatchObject({ status: 'available', significance: 'not-evaluated',
-        method: kind === 'relative' ? 'weight-normalized-residual' : 'observation-sigma-ratio',
-        scaleBasis: kind === 'relative' ? 'relative-weight' : 'declared-prior' })
-      expect(first.standardizedResidual).toBeCloseTo(kind === 'relative' ? 0.0002 : 0.1, 12)
       const summary = output.result.statisticalSummary!
-      expect(summary).toMatchObject({ numericalStatus: 'clear', availableCount: 2, unavailableCount: 0, standardsConformity: 'not-evaluated' })
-      expect(summary.varianceLog10RatioToUnit).toBeCloseTo(Math.log10(kind === 'relative' ? 2e-7 : 0.05), 12)
-      expect(summary.standardDeviationLog10RatioToUnit).toBeCloseTo(summary.varianceLog10RatioToUnit! / 2, 12)
+      if (kind === 'relative') {
+        // |v|√p has length units for relative route weights; it is not a σ ratio.
+        expect(first.residualStatistic).toMatchObject({ status: 'not-testable', reason: 'missing-absolute-precision',
+          scaleBasis: 'relative-weight' })
+        expect(first.standardizedResidual).toBeUndefined()
+        expect(summary).toMatchObject({ numericalStatus: 'not-evaluated', availableCount: 0, unavailableCount: 2,
+          standardsConformity: 'not-evaluated', varianceLog10RatioToUnit: null, standardDeviationLog10RatioToUnit: null })
+      } else {
+        expect(first.residualStatistic).toMatchObject({ status: 'available', significance: 'not-evaluated',
+          method: 'observation-sigma-ratio', scaleBasis: 'declared-prior' })
+        expect(first.standardizedResidual).toBeCloseTo(0.1, 12)
+        expect(summary).toMatchObject({ numericalStatus: 'clear', availableCount: 2, unavailableCount: 0, standardsConformity: 'not-evaluated' })
+        expect(summary.varianceLog10RatioToUnit).toBeCloseTo(Math.log10(0.05), 12)
+        expect(summary.standardDeviationLog10RatioToUnit).toBeCloseTo(summary.varianceLog10RatioToUnit! / 2, 12)
+      }
       expect(service.getAdjustmentForNewUse(output.run.id)?.result).toEqual(output.result)
     }
   })
@@ -66,7 +74,7 @@ describe('versioned residual semantics', () => {
     expect(service.getAdjustmentForNewUse(output.run.id)?.result).toEqual(output.result)
   })
 
-  it('keeps unavailable numeric values out of strict contracts and leaves absent legacy semantics absent', async () => {
+  it('keeps unavailable numeric values out of strict contracts and leaves absent stored semantics absent', async () => {
     const { output } = await fixture('prior')
     const { statisticalSummary: _summary, ...legacy } = output.result
     legacy.observations = legacy.observations.map(({ residualStatistic: _statistic, ...row }) => row)

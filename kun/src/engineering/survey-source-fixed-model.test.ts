@@ -73,6 +73,11 @@ describe('source-backed fixed water-level model', () => {
   })
   it.each([{ mixedSigma: true }, { correlation: true }])('refuses partially declared or correlated prior precision (%j)', async options => {
     const f = await sourceFixedFixture(true, options)
+    if ('mixedSigma' in options) {
+      expect(f.adjustment.run.status).toBe('needs_attention')
+      expect(f.adjustment.result.validation).toBe('invalid')
+      expect(f.adjustment.result.qualityFindings).toContainEqual(expect.objectContaining({ code: 'invalid_observation', severity: 'blocking' }))
+    }
     expect(() => f.service.getSourceFixedModel(f.project.id, { adjustmentId: f.adjustment.run.id, expectedProjectRevision: 1, expectedNetworkRevision: f.network.revision })).toThrow()
   })
   it('rejects an admitted nonlinear COSA planar result instead of claiming a fixed height model', async () => {

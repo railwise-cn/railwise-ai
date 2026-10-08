@@ -1,5 +1,6 @@
 import type { AdjustmentResultV1 } from '../contracts/survey.js'
 import type { SurveyProfessionalReviewV1 } from '../contracts/survey-professional.js'
+import { surveyWeightingSemantics } from './survey-weighting-semantics.js'
 
 /** Read-only interpretation of historical fields; never changes result bytes. */
 export function surveyAiAdjustmentSemantics(result: AdjustmentResultV1, review?: SurveyProfessionalReviewV1 | null) {
@@ -14,6 +15,7 @@ export function surveyAiAdjustmentSemantics(result: AdjustmentResultV1, review?:
   })
   const fittedPlaneStrategy = ['plane-control', 'triangulation', 'cpiii-free-station', 'cpiii-resection'].includes(result.strategyId ?? '')
   return {
+    ...surveyWeightingSemantics(result),
     independentClosureCheck: {
       status: verifiedSource ? closureCheck?.status ?? 'not-evaluated' : 'not-evaluated',
       reason: !review ? 'professional-review-unavailable' : !verifiedSource ? review.source.status === 'mismatch' ? 'input-mismatch' : 'source-unverified' : closureCheck?.reason,

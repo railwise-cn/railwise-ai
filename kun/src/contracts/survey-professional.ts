@@ -147,6 +147,11 @@ export const SurveyProfessionalReviewV1 = z.object({
     degreesOfFreedom: z.number().int().nonnegative(),
     unitWeightStdDev: z.number().finite().nonnegative(),
     varianceFactor: z.number().finite().nonnegative(),
+    unitWeightStdDevUnit: z.enum(['dimensionless', 'm']).optional(),
+    varianceFactorUnit: z.enum(['dimensionless', 'm2']).optional(),
+    weightingBasis: z.enum(['absolute-prior', 'relative-route-length']).optional(),
+    relativeWeightReferenceLengthMetres: z.literal(1).optional(),
+    relativeWeightDefaultLengthObservationIds: z.array(z.string().min(1)).optional(),
     varianceBasis: z.enum(['a-priori', 'a-posteriori', 'not-estimated']),
     validation: z.enum(['valid', 'invalid', 'pending'])
   }).strict(),

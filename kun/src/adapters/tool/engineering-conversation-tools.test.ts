@@ -56,11 +56,15 @@ describe('Survey continuous conversation capabilities', () => {
     expect(calculate).not.toHaveBeenCalled()
   })
 
-  it('instructs the model to distinguish variance and standard-deviation orders of magnitude', async () => {
+  it('requires recorded weighting units before comparing statistical scales or interpreting precision', async () => {
     const policy = await orchestrator.conversationPolicy('survey-thread', projectId, 'question-turn')
-    expect(policy.instruction).toContain('varianceFactor is a variance (a squared scale)')
-    expect(policy.instruction).toContain('1.14e-8 is about 8 orders below 1 as a variance')
-    expect(policy.instruction).toContain('Never describe the standard-deviation order as a variance order')
+    expect(policy.instruction).toContain('Use recorded weightingSemantics and scale units')
+    expect(policy.instruction).toContain('only these may be compared to dimensionless 1')
+    expect(policy.instruction).toContain('L0=1 metre')
+    expect(policy.instruction).toContain('not per kilometre')
+    expect(policy.instruction).toContain('nominal fallback numbers are not assessed precision')
+    expect(policy.instruction).toContain('Historical units and weighting without recorded metadata remain unknown')
+    expect(policy.instruction).toContain('Variance is a squared scale; never confuse its order of magnitude with the standard-deviation order')
   })
 
   it('persists project suggestions without writes or token exposure and applies only after confirmation', async () => {

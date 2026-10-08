@@ -131,10 +131,79 @@ function removeInlineDeveloperReferences(text: string): string {
     .trim()
 }
 
-function stripInternalFragments(line: string, language: string): string {
+/** Translate recorded weighting fields only when used as labels/assignments.
+ * A point name, source filename or quoted original note is not a field. */
+function professionalWeightingFields(line: string, language: string, fieldValueTable: boolean): string {
+  const english = language.toLowerCase().startsWith('en')
+  const labels: Record<string, [string, string]> = {
+    weightingBasis: ['定权依据', 'Weighting basis'],
+    relativeWeightReferenceLengthMetres: ['相对定权参考路长（m）', 'Relative-weight reference route length (m)'],
+    varianceFactorUnit: ['方差尺度单位', 'Variance scale unit'],
+    unitWeightStdDevUnit: ['单位权中误差单位', 'Unit weight standard deviation unit'],
+    unitWeightStdDev: ['单位权中误差', 'Unit weight standard deviation'],
+    relativeWeightDefaultLengthObservationIds: ['未提供路长的观测', 'Observations without route lengths'],
+    'weightingSemantics.scaleStatus': ['方差尺度评定', 'Variance scale assessment'],
+    scaleStatus: ['方差尺度评定', 'Variance scale assessment'],
+    'weightingSemantics.precisionStatus': ['点位精度评定', 'Point precision assessment'],
+    precisionStatus: ['点位精度评定', 'Point precision assessment'],
+    assessmentStatus: ['点位精度评定', 'Point precision assessment'],
+    'precision.assessmentStatus': ['点位精度评定', 'Point precision assessment'],
+    'weightingSemantics.status': ['定权记录状态', 'Weighting record status'],
+    'weightingSemantics.method': ['定权方法', 'Weighting method'],
+    'weightingSemantics.meaning': ['定权说明', 'Weighting interpretation'],
+    'weightingSemantics.unitWeightStdDev': ['单位权中误差', 'Unit weight standard deviation'],
+    'weightingSemantics.varianceFactor': ['方差尺度', 'Variance scale']
+  }
+  const values: Record<string, [string, string]> = {
+    'relative-route-length': ['按测段路长相对定权', 'Relative weights based on route length'],
+    'absolute-prior': ['绝对先验观测精度定权', 'Absolute prior observation precision'],
+    'not-recorded': ['未记录，未核定', 'Not recorded; not established'],
+    'not-evaluated': ['未评定', 'Not evaluated'],
+    'estimated-posterior': ['后验估计', 'Posterior estimate'],
+    'prior-fallback': ['采用先验尺度', 'Prior scale used'],
+    recorded: ['已记录', 'Recorded'],
+    unknown: ['未明确', 'Not established'],
+    'inverse-absolute-prior-observation-covariance': ['按绝对先验观测协方差的逆定权', 'Inverse absolute prior observation covariance'],
+    available: ['可评定', 'Available for assessment'],
+    dimensionless: ['无量纲', 'Dimensionless'],
+    m2: ['m²', 'm²']
+  }
+  const label = (field: string): string => labels[field][english ? 1 : 0]
+  const value = (input: string, field: string): string => {
+    if (input.startsWith('[')) {
+      try {
+        const items: unknown = JSON.parse(input)
+        if (Array.isArray(items) && items.every(item => typeof item === 'string')) {
+          return items.length ? items.join(english ? ', ' : '、') : english ? 'None' : '无'
+        }
+      } catch { /* Keep an unrecognized original declaration. */ }
+    }
+    const scalar = input.replace(/^["“']|["”']$/g, '')
+    if (field === 'weightingSemantics.meaning') return scalar.replace('Schema defaults are not verified units.', english
+      ? 'The scale units have not been established for this historical record.' : '该历史记录的尺度单位尚未核定。')
+    return values[scalar]?.[english ? 1 : 0] ?? scalar
+  }
+  // Protect quotations before converting assignments outside them. A quoted
+  // value following an unquoted field is still part of that assignment.
+  const quoted = [...line.matchAll(/"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’|'[^'\n]*'/g)]
+    .map(match => [match.index!, match.index! + match[0].length])
+  const fieldPattern = Object.keys(labels).map(field => field.replaceAll('.', '\\.')).join('|')
+  const fields = new RegExp(`(?<![\\w./-])(?:\\*\\*|__)?(${fieldPattern})(?:\\*\\*|__)?\\s*(?:[:=：]|为|是|\\bis\\b)\\s*(\\[[^\\]\\n]*\\]|"[^"\\n]*"|“[^”\\n]*”|'[^'\\n]*'|[\\w.+-]+)`, 'g')
+  const converted = line.replace(fields, (match, field: string, input: string, offset: number) =>
+    quoted.some(([start, end]) => offset >= start && offset < end) ? match
+      : `${label(field)}${english ? ': ' : '：'}${value(input, field)}`)
+  // Only a field in the first cell of a field/value table owns the next cell;
+  // a point whose name equals a field in the value cell must remain unchanged.
+  const row = converted.match(/^(\s*\|\s*)([^|]+)(\|\s*)([^|]*)(\|.*)$/)
+  const field = row?.[2].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, '')
+  if (!fieldValueTable || !row || !field || !Object.hasOwn(labels, field)) return converted
+  return `${row[1]}${label(field)} ${row[3]}${value(row[4].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, ''), field)} ${row[5]}`
+}
+
+function stripInternalFragments(line: string, language: string, fieldValueTable = false): string {
   const english = language.toLowerCase().startsWith('en')
   const label = (chinese: string, translated: string): string => english ? translated : chinese
-  return line
+  return professionalWeightingFields(line.replace(/`([^`]+)`/g, '$1'), language, fieldValueTable)
     .replace(/`([^`]+)`/g, '$1')
     .replace(/(?:^|(?<=。))选择器中[^。]*(?:原样传入|核验来源|定位到该点精度记录作答|点位精度即对应 point-precision)[。]?/g, '')
     .replace(/原因：该引用缺少\s*statistics\s*类型证据的必需字段[^。]*。/g, '所选资料的定位信息不完整，未能完成核查。')
@@ -543,10 +612,12 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
     ? 'Further verification of the selected record was not completed. The related conclusions still require review.'
     : '本次对所选记录的进一步核查未完成，相关结论仍需复核。')
   let fence: 'code' | 'text' | null = null
+  let weightingFieldValueTable = false
   for (const rawLine of surveyAnswer.split(/\r?\n/)) {
     // Markdown tables and paragraphs need their original blank separators;
     // dropping them can turn the following engineering conclusion into a row.
     if (!rawLine.trim()) {
+      weightingFieldValueTable = false
       if (fence !== 'code') visible.push('')
       continue
     }
@@ -592,7 +663,10 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
       && !professionalContent.test(line)) continue
     const developerSafeLine = removeInlineDeveloperPayload(removeInlineDeveloperReferences(line))
     if (!developerSafeLine) continue
-    const cleaned = cleanSurveyorVocabulary(cleanResidualProfessionalFragments(stripInternalFragments(developerSafeLine, language), language), language)
+    const tableHeader = developerSafeLine.replace(/[*`]/g, '')
+    if (!developerSafeLine.startsWith('|') || /^\|\s*(?:点号|点名|测点|测站|观测号|point(?:\s*(?:id|name))?|station|observation(?:\s*(?:id|number))?)\s*\|/i.test(tableHeader)) weightingFieldValueTable = false
+    else if (/^\|\s*(?:字段|项目|参数|指标|field|item|parameter|metric)\s*\|\s*(?:值|数值|结果|说明|value|result|details|meaning)\s*\|/i.test(tableHeader)) weightingFieldValueTable = true
+    const cleaned = cleanSurveyorVocabulary(cleanResidualProfessionalFragments(stripInternalFragments(developerSafeLine, language, weightingFieldValueTable), language), language)
       // A trace token in a mixed sentence is not grounds to discard measured
       // values or a blocking conclusion. Remove the residual token only.
       .replace(new RegExp(internalPhrase.source, 'gi'), '')
