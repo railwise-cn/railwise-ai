@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, readlink, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -44,7 +44,14 @@ async function fingerprint(path) {
   const entries = []
   async function visit(current, name) {
     const s = await lstat(current)
-    if (s.isSymbolicLink()) fail(`Symlink target is not supported: ${current}`)
+    if (s.isSymbolicLink()) {
+      // Existing user roots can contain intentional toolchain links (for
+      // example python -> python3.12). Record the link itself and never
+      // follow its target; installation assets and direct target paths still
+      // go through assertNoSymlinks before they are accepted.
+      entries.push({ path: name, mode: s.mode & 0o7777, uid: s.uid, gid: s.gid, type: 'symlink', target: await readlink(current) })
+      return
+    }
     const item = { path: name, mode: s.mode & 0o7777, uid: s.uid, gid: s.gid, type: s.isDirectory() ? 'directory' : 'file' }
     if (s.isDirectory()) {
       entries.push(item)
