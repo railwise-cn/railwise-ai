@@ -824,6 +824,52 @@ describe('SurveyAdjustmentPanel persisted state restoration', () => {
     }
   })
 
+  it.each(['dimensionless', 'm'])('does not infer a historical weighting basis from the recorded %s unit', async unit => {
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<unknown>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path.includes('/adjustments?')
+      ? runtimeResponse({ adjustments: [{ ...adjustment, result: { ...adjustment.result, unitWeightStdDevUnit: unit, varianceFactorUnit: unit === 'm' ? 'm2' : unit } }] })
+      : original(path, method))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: `historical-unit-${unit}`, project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'result'
+    })))
+    await settle()
+    expect(visibleText(container)).toContain(i18n.t('surveyWeightingUnconfirmed', { ns: 'common' }))
+    expect(container.textContent).toContain('单位未核定')
+    expect(container.textContent).not.toContain(i18n.t('surveyWeightingAbsolute', { ns: 'common' }))
+  })
+
+  it('renders relative-weight scales with metre units and withholds precision when no redundant observations remain', async () => {
+    const relativeResult = { ...adjustment.result, weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2',
+      relativeWeightReferenceLengthMetres: 1, relativeWeightDefaultLengthObservationIds: [], degreesOfFreedom: 0, redundancy: 0,
+      unitWeightStdDev: 0, varianceFactor: 0, varianceFactorEstimated: false, precision: { maxPointStdDev: 0, passed: true },
+      points: [{ id: 'P-01', height: 100.2001, correctionHeight: 0.0001 }],
+      observations: [{ observationId: 'obs-1', residual: 0, unit: 'm', outlier: false, residualStatistic: { schemaVersion: 1, status: 'not-testable', reason: 'no-redundancy', method: 'weight-normalized-residual', scaleBasis: 'relative-weight', scope: 'descriptive-screening', significance: 'not-evaluated' } }] }
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<unknown>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path.includes('/adjustments?')
+      ? runtimeResponse({ adjustments: [{ ...adjustment, result: relativeResult }] }) : original(path, method))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, {
+      key: 'relative-no-redundancy', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'result'
+    })))
+    await settle()
+    expect(visibleText(container)).toContain(i18n.t('surveyWeightingRouteLength', { ns: 'common' }))
+    expect(container.textContent).not.toContain(i18n.t('surveyPrecisionMet', { ns: 'common' }))
+    const pointError = Array.from(container.querySelectorAll('p')).find(item => item.textContent === i18n.t('surveyMaxPointError', { ns: 'common' }))?.parentElement
+    expect(pointError?.textContent).toContain(i18n.t('surveyPrecisionNotAssessed', { ns: 'common' }))
+    expect(container.querySelector('.survey-result-summary tbody tr')!.querySelectorAll('td')[6].textContent).toBe('—')
+    expect(container.querySelector('.survey-result-summary')!.textContent).toContain(`${i18n.t('surveyOutliers', { ns: 'common' })} · ${i18n.t('surveyPrecisionNotAssessed', { ns: 'common' })}`)
+  })
+
+  it('does not report zero outlier candidates for a redundant relative-weight network without absolute precision', async () => {
+    const result = { ...adjustment.result, weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2',
+      relativeWeightReferenceLengthMetres: 1, relativeWeightDefaultLengthObservationIds: [], degreesOfFreedom: 1, redundancy: 1,
+      observations: [{ observationId: 'obs-1', residual: 0.0001, unit: 'm', outlier: false, residualStatistic: { schemaVersion: 1, status: 'not-testable', reason: 'missing-absolute-precision', method: 'weight-normalized-residual', scaleBasis: 'relative-weight', scope: 'descriptive-screening', significance: 'not-evaluated' } }] }
+    const original = runtimeRequest.getMockImplementation() as (path: string, method?: string) => Promise<ReturnType<typeof runtimeResponse>>
+    runtimeRequest.mockImplementation(async (path: string, method?: string) => path.startsWith('/v1/engineering/adjustments?') ? runtimeResponse({ adjustments: [{ ...adjustment, result }] }) : original(path, method))
+    await act(async () => root.render(createElement(SurveyAdjustmentPanel, { key: 'relative-unscreened', project: { id: 'project-restored-001', revision: 1 }, runtimeReady: true, preferredSection: 'result' })))
+    await settle()
+    expect(container.querySelector('.survey-result-summary')!.textContent).toContain(`${i18n.t('surveyOutliers', { ns: 'common' })} · ${i18n.t('surveyPrecisionNotAssessed', { ns: 'common' })}`)
+  })
+
   it('keeps duplicate point IDs bound to their displayed collection and offset and disables them during project loading', async () => {
     const focus = vi.fn(), scope = JSON.stringify(['/survey', 'project-restored-001'])
     const duplicated = { ...network, knownPoints: [{ id: 'DUP', height: 100 }, { id: 'DUP', height: 101 }], unknownPoints: [{ id: 'DUP', height: 102 }] }

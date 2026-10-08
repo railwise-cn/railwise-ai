@@ -1,5 +1,36 @@
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { SurveyResidualStatisticV1, SurveyStatisticalSummaryV1 } from '@shared/survey-statistical-semantics'
+
+export type SurveyWeightingMetadata = {
+  observationCount: number
+  unitWeightStdDevUnit?: 'dimensionless' | 'm'
+  varianceFactorUnit?: 'dimensionless' | 'm2'
+  weightingBasis?: 'absolute-prior' | 'relative-route-length'
+  relativeWeightReferenceLengthMetres?: 1
+  relativeWeightDefaultLengthObservationIds?: string[]
+}
+
+function recordedWeighting(metadata: SurveyWeightingMetadata): 'absolute' | 'route-length' | 'equal' | null {
+  if (metadata.weightingBasis === 'absolute-prior' && metadata.unitWeightStdDevUnit === 'dimensionless' && metadata.varianceFactorUnit === 'dimensionless') return 'absolute'
+  if (metadata.weightingBasis !== 'relative-route-length' || metadata.unitWeightStdDevUnit !== 'm' || metadata.varianceFactorUnit !== 'm2' || metadata.relativeWeightReferenceLengthMetres !== 1) return null
+  const defaultLengths = metadata.relativeWeightDefaultLengthObservationIds
+  if (!defaultLengths) return null
+  if (!defaultLengths.length) return 'route-length'
+  return metadata.observationCount > 0 && new Set(defaultLengths).size === metadata.observationCount && defaultLengths.length === metadata.observationCount ? 'equal' : null
+}
+
+export function surveyWeightingDescription(t: TFunction, metadata: SurveyWeightingMetadata): string {
+  const basis = recordedWeighting(metadata)
+  return t(basis === 'absolute' ? 'surveyWeightingAbsolute' : basis === 'route-length' ? 'surveyWeightingRouteLength' : basis === 'equal' ? 'surveyWeightingEqual' : 'surveyWeightingUnconfirmed')
+}
+
+export function surveyScaleLabel(t: TFunction, formattedValue: string, metadata: SurveyWeightingMetadata, quantity: 'stddev' | 'variance', assessed = true): string {
+  if (!assessed) return t('surveyPrecisionNotAssessed')
+  if (!recordedWeighting(metadata)) return `${formattedValue} · ${t('surveyWeightingUnitUnconfirmed')}`
+  const unit = quantity === 'stddev' ? metadata.unitWeightStdDevUnit : metadata.varianceFactorUnit
+  return `${formattedValue} ${unit === 'dimensionless' ? t('surveyUnitDimensionless') : unit === 'm2' ? 'm²' : 'm'}`
+}
 
 const methodKeys = {
   'observation-sigma-ratio': 'surveyStatisticObservationRatio',
@@ -17,7 +48,8 @@ const basisKeys = {
 const reasonKeys = {
   'no-redundancy': 'surveyStatisticNoRedundancy',
   'residual-variance-unresolved': 'surveyStatisticVarianceUnresolved',
-  'numeric-unavailable': 'surveyStatisticNumericUnavailable'
+  'numeric-unavailable': 'surveyStatisticNumericUnavailable',
+  'missing-absolute-precision': 'surveyStatisticMissingAbsolutePrecision'
 } as const
 const statusKeys = {
   clear: 'surveyStatisticClear',

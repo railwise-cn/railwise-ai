@@ -24,7 +24,7 @@ const review = SurveyProfessionalReviewV1.parse({
   inputHash: adjustment.result.inputHash, algorithmVersion: adjustment.result.algorithmVersion, resultHash: 'b'.repeat(64), projectionHash: 'c'.repeat(64), resultCreatedAt: '2026-09-30T00:00:00Z',
   source: { networkRevision: network.revision, sha256: sourceSha256, formatId: 'leica-gsi8', status: 'bound', integrity: 'verified', anchoredObservationCount: 2, missingAnchorObservationIds: [] },
   reference: { coordinateSystem: 'LOCAL', projection: null, ellipsoid: null, verticalDatum: 'PROJECT-DATUM', linearUnit: 'm', angularUnit: 'rad', knownPoints: [{ id: 'BM01', pointClass: 'known', height: 100, known: true }], status: 'declared' },
-  summary: { networkType: 'leveling', observationCount: 2, pointCount: 2, degreesOfFreedom: 1, unitWeightStdDev: 0.8, varianceFactor: 0.64, varianceBasis: 'a-posteriori', validation: 'valid' },
+  summary: { networkType: 'leveling', observationCount: 2, pointCount: 2, degreesOfFreedom: 1, unitWeightStdDev: 0.8, varianceFactor: 0.64, unitWeightStdDevUnit: 'dimensionless', varianceFactorUnit: 'dimensionless', weightingBasis: 'absolute-prior', varianceBasis: 'a-posteriori', validation: 'valid' },
   closures: [{ id: 'loop1', kind: 'loop', from: 'BM01', to: 'BM01', members: [{ observationId: 'obs1', direction: 1, from: 'BM01', to: 'P01', heightDifferenceMetres: 0.2, sourceRecordId: 'raw1' }, { observationId: 'obs2', direction: 1, from: 'P01', to: 'BM01', heightDifferenceMetres: -0.198, sourceRecordId: 'raw2' }], sumObservedMetres: 0.002, knownHeightDifferenceMetres: 0, misclosureMetres: 0.002, status: 'not-evaluated', reason: 'closure-tolerance-not-configured' }],
   residualNorms: [{ unit: 'm', value: 0.00141421356, count: 2, status: 'descriptive-only' }],
   observations: [{ id: 'observation1', observationId: 'obs1', type: 'height-difference', from: 'BM01', to: 'P01', observed: 0.2, adjusted: 0.199, correction: -0.001, residual: -0.001, unit: 'm', sourceRecordId: 'raw1', outlierCandidate: true, screeningStatus: 'legacy-not-recorded' }],
@@ -173,11 +173,61 @@ describe('professional survey review', () => {
     expect(closure.textContent).toContain('未配置具有明确依据的闭合限差')
     expect(closure.querySelectorAll('td')[3].textContent).toBe('2')
     expect(container.textContent).toContain('残差范数描述平差后的拟合量')
-    expect(container.textContent).toContain('单位权中误差（无量纲）')
+    expect(container.textContent).toContain('单位权中误差')
+    expect(container.textContent).toContain('0.8 无量纲')
+    expect(container.textContent).toContain('按观测精度模型定权')
     expect(container.querySelector('[data-professional-point="P01"]')?.textContent).toContain('0.4')
     expect(container.textContent).toContain('异常候选 · 待核实')
     expect(container.textContent).toContain('待专业复核与签认')
     expect(container.textContent).not.toContain('projectionHash')
+  })
+  it.each(['zh', 'en'])('shows recorded route weighting and dimensional scales in %s', async language => {
+    await i18n.changeLanguage(language)
+    runtimeRequest.mockResolvedValue(response({ review: { ...review, summary: {
+      ...review.summary, weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2',
+      relativeWeightReferenceLengthMetres: 1, relativeWeightDefaultLengthObservationIds: []
+    } } }))
+    await renderReview()
+    const datumValue = (key: string): string | null | undefined => Array.from(container.querySelectorAll('dt')).find(item => item.textContent === i18n.t(key, { ns: 'common' }))?.nextElementSibling?.textContent
+    expect(datumValue('surveyProfessionalSigma0')).toBe('0.8 m')
+    expect(datumValue('surveyProfessionalVarianceFactor')).toBe('0.64 m²')
+    expect(container.textContent).toContain(i18n.t('surveyWeightingRouteLength', { ns: 'common' }))
+    expect(container.textContent).not.toContain(i18n.t('surveyWeightingAbsolute', { ns: 'common' }))
+  })
+  it('distinguishes nominal equal weights from recorded route lengths without inferring partial records', async () => {
+    const summary = { ...review.summary, weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2', relativeWeightReferenceLengthMetres: 1 }
+    runtimeRequest.mockResolvedValue(response({ review: { ...review, summary: { ...summary, relativeWeightDefaultLengthObservationIds: ['obs1', 'obs2'] } } }))
+    await renderReview()
+    expect(container.textContent).toContain(i18n.t('surveyWeightingEqual', { ns: 'common' }))
+    runtimeRequest.mockResolvedValue(response({ review: { ...review, resultId: 'partial', summary: { ...summary, relativeWeightDefaultLengthObservationIds: ['obs1'] } } }))
+    await renderReview({ adjustment: { ...adjustment, result: { ...adjustment.result, id: 'partial' } } })
+    expect(container.textContent).toContain(i18n.t('surveyWeightingUnconfirmed', { ns: 'common' }))
+    expect(container.textContent).toContain('0.8 · 单位未核定')
+    expect(container.textContent).not.toContain(i18n.t('surveyWeightingRouteLength', { ns: 'common' }))
+  })
+  it('keeps historical units unconfirmed even when old defaults declare dimensionless scales', async () => {
+    const { weightingBasis: _basis, ...historicalSummary } = review.summary
+    runtimeRequest.mockResolvedValue(response({ review: { ...review, summary: historicalSummary } }))
+    await renderReview()
+    expect(container.textContent).toContain(i18n.t('surveyWeightingUnconfirmed', { ns: 'common' }))
+    expect(container.textContent).toContain('0.8 · 单位未核定')
+    expect(container.textContent).not.toContain('0.8 无量纲')
+  })
+  it('does not present unestimated zero scales as absolute prior precision', async () => {
+    runtimeRequest.mockResolvedValue(response({ review: {
+      ...review, summary: { ...review.summary, degreesOfFreedom: 0, unitWeightStdDev: 0, varianceFactor: 0,
+        weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2',
+        relativeWeightReferenceLengthMetres: 1, relativeWeightDefaultLengthObservationIds: [], varianceBasis: 'not-estimated' },
+      points: review.points.map(({ standardError: _error, ...point }) => ({ ...point, precisionBasis: 'not-recorded' })),
+      weakestPoint: { status: 'not-evaluated', criterion: 'largest-reported-point-standard-error', reason: 'no-redundancy' }
+    } }))
+    await renderReview()
+    for (const key of ['surveyProfessionalSigma0', 'surveyProfessionalVarianceFactor']) {
+      const value = Array.from(container.querySelectorAll('dt')).find(item => item.textContent === i18n.t(key, { ns: 'common' }))?.nextElementSibling
+      expect(value?.textContent).toBe(i18n.t('surveyPrecisionNotAssessed', { ns: 'common' }))
+    }
+    expect(container.querySelector('[data-professional-point="P01"]')!.textContent).not.toContain('0.4')
+    expect(container.textContent).not.toContain('0 m²')
   })
   it('binds an AI explanation to the exact projection, source and selected observation', async () => {
     const ask = vi.fn()

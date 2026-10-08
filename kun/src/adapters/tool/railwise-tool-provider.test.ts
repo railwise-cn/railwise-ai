@@ -76,15 +76,19 @@ describe('RailWise survey tool bridge', () => {
     expect(adjusted.output).toMatchObject({
       result: {
         strategyId: 'leveling',
-        unitWeightStdDevUnit: 'dimensionless',
-        varianceFactorUnit: 'dimensionless',
-        statisticalSummary: expect.objectContaining({ numericalStatus: 'clear', availableCount: 2, standardsConformity: 'not-evaluated' }),
+        weightingBasis: 'relative-route-length', relativeWeightReferenceLengthMetres: 1,
+        unitWeightStdDevUnit: 'm',
+        varianceFactorUnit: 'm2',
+        statisticalSummary: expect.objectContaining({ numericalStatus: 'not-evaluated', availableCount: 0, unavailableCount: 2, standardsConformity: 'not-evaluated' }),
         observations: expect.arrayContaining([expect.objectContaining({ standardizedResidualUnit: 'sigma',
-          residualStatistic: expect.objectContaining({ method: 'weight-normalized-residual', scaleBasis: 'relative-weight', significance: 'not-evaluated' }) })])
+          residualStatistic: expect.objectContaining({ status: 'not-testable', reason: 'missing-absolute-precision',
+            method: 'weight-normalized-residual', scaleBasis: 'relative-weight', significance: 'not-evaluated' }) })])
       },
       boundedOutput: { observationsReturned: 2, observationsTotal: 2, covarianceStored: true }
     })
     const adjustedRunId = (adjusted.output as { run: { id: string } }).run.id
+    const adjustedOutput = adjusted.output as { result: { observations: Array<{ standardizedResidual?: number }> } }
+    expect(adjustedOutput.result.observations.every(row => row.standardizedResidual === undefined)).toBe(true)
 
     const read = await execute('survey_adjustment_read', { networkId: network.id })
     expect(read.output).toMatchObject({

@@ -36,7 +36,7 @@ async function fixture(options: { count?: number; perfect?: boolean; routeWeight
     }
   })
   const created = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'statistics-adjust' })
-  expect(created.result.validation).toBe('valid')
+  expect(created.result.validation).toBe(options.mixed ? 'invalid' : 'valid')
   return { root, service, network, created, values, relativeWeights }
 }
 
@@ -78,16 +78,24 @@ describe('read-only leveling statistical diagnostics', () => {
     expect(diagnostic).toMatchObject({ status: 'available', weightBasis: 'inverse-route-length-with-unit-default', varianceBasis: 'deleted-observation-posterior', assumptionsVerified: false })
   })
 
-  it('reports insufficient redundancy, degenerate deletion, mixed weights and correlation as unavailable', async () => {
+  it('reports insufficient redundancy, degenerate deletion and correlation as unavailable', async () => {
     for (const [options, reason] of [
       [{ count: 2 }, 'insufficient-redundancy'],
       [{ perfect: true }, 'zero-or-unresolved-deleted-variance'],
-      [{ mixed: true }, 'inconsistent-weight-basis'],
       [{ covariance: true }, 'correlated-observations']
     ] as const) {
       const { service, created, network } = await fixture(options)
       expect(service.getAdjustmentStatisticalDiagnostics(network.projectId, created.run.id)).toMatchObject({ status: 'unavailable', reason, decision: 'not-evaluated' })
     }
+  })
+
+  it('blocks mixed absolute and relative weights before exposing new diagnostics', async () => {
+    const { service, created, network } = await fixture({ mixed: true })
+    expect(created.run.status).toBe('needs_attention')
+    expect(created.result.qualityFindings).toContainEqual(expect.objectContaining({ code: 'invalid_observation', severity: 'blocking' }))
+    expect(created.result.points).toEqual([])
+    expect(() => service.getAdjustmentStatisticalDiagnostics(network.projectId, created.run.id)).toThrow()
+    expect(service.getAdjustment(created.run.id)?.result).toEqual(created.result)
   })
 
   it('reports the diagnostic matrix limit without allocating a dense covariance', async () => {

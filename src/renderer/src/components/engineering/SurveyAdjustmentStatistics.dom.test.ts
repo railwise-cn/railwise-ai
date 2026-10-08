@@ -40,6 +40,16 @@ describe('statistical interpretation in the result surface', () => {
     expect(host.textContent).toContain('Available 5 · Not testable 0 · Review 0')
   })
 
+  it.each(['zh', 'en'])('explains why relative weights alone cannot supply an absolute screening ratio in %s', async language => {
+    await i18n.changeLanguage(language)
+    const statistic: SurveyResidualStatisticV1 = { ...basis, method: 'weight-normalized-residual', scaleBasis: 'relative-weight', status: 'not-testable', reason: 'missing-absolute-precision' }
+    await act(async () => root.render(createElement(ResidualStatisticCell, { statistic, legacyValue: 0 })))
+    expect(host.textContent).toContain(i18n.t('surveyStatisticMissingAbsolutePrecision', { ns: 'common' }))
+    expect(host.textContent).toContain(i18n.t('surveyStatisticNotTestable', { ns: 'common' }))
+    expect(host.textContent).not.toContain('0.0000')
+    expect(host.querySelector('[class*="text-red"]')).toBeNull()
+  })
+
   it('uses the recorded threshold decision rather than independently reclassifying a legacy ratio', async () => {
     const statistic: SurveyResidualStatisticV1 = { ...basis, status: 'available', value: 4, threshold: 3, thresholdExceeded: true }
     await act(async () => root.render(createElement(ResidualStatisticCell, { statistic, legacyValue: 0 })))

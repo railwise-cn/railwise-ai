@@ -4,6 +4,7 @@ import type { RailwiseProjectV1, SurveySourceEvidenceV1 } from '../contracts/eng
 import type { SurveyProfessionalReviewV1 } from '../contracts/survey-professional.js'
 import type { SurveySegmentComparisonV1, SurveySegmentContinuityV1 } from '../contracts/survey-monitoring.js'
 import type { MonitoringProfessionalReportV1 } from '../contracts/engineering-monitoring-report.js'
+import { surveyWeightingReportLine } from './survey-weighting-semantics.js'
 
 /** A stable, human-facing table projection. Numerical values are never
  * recomputed by the renderer; they are copied from the frozen review. */
@@ -202,10 +203,10 @@ export function buildProfessionalReportModel(input: {
       id: `${review.networkId}-summary`, title: `${prefix}平差统计与检查状态`,
       columns: [
         { key: 'networkType', label: '网型' }, { key: 'observationCount', label: '观测数', numeric: true }, { key: 'pointCount', label: '点数', numeric: true },
-        { key: 'dof', label: '自由度', numeric: true }, { key: 'unitWeightStdDev', label: '单位权中误差', unit: adjustment?.unitWeightStdDevUnit === 'dimensionless' ? '无量纲' : adjustment?.unitWeightStdDevUnit ?? '未记录', numeric: true },
-        { key: 'varianceFactor', label: '方差因子', unit: adjustment?.varianceFactorUnit === 'dimensionless' ? '无量纲' : adjustment?.varianceFactorUnit ?? '未记录', numeric: true }, { key: 'varianceBasis', label: '方差依据' }, { key: 'validation', label: '计算状态' }
-      ], rows: [{ networkType: label(review.summary.networkType ?? '不可用'), observationCount: review.summary.observationCount, pointCount: review.summary.pointCount, dof: review.summary.degreesOfFreedom, unitWeightStdDev: review.summary.unitWeightStdDev, varianceFactor: review.summary.varianceFactor, varianceBasis: label(review.summary.varianceBasis), validation: label(review.summary.validation) }],
-      note: `残差范数仅作描述性统计，不等同闭合差；${review.residualNorms.length ? review.residualNorms.map(item => `${item.value} ${item.unit}（${item.count} 条）`).join('，') : '残差范数不可用'}`
+        { key: 'dof', label: '自由度', numeric: true }, { key: 'unitWeightStdDev', label: '单位权中误差', unit: review.summary.unitWeightStdDevUnit === 'dimensionless' ? '无量纲' : review.summary.unitWeightStdDevUnit ?? '未核定', numeric: true },
+        { key: 'varianceFactor', label: review.summary.weightingBasis === 'relative-route-length' ? '方差尺度' : '方差因子', unit: review.summary.varianceFactorUnit === 'dimensionless' ? '无量纲' : review.summary.varianceFactorUnit === 'm2' ? 'm²' : '未核定', numeric: true }, { key: 'varianceBasis', label: '方差依据' }, { key: 'validation', label: '计算状态' }
+      ], rows: [{ networkType: label(review.summary.networkType ?? '不可用'), observationCount: review.summary.observationCount, pointCount: review.summary.pointCount, dof: review.summary.degreesOfFreedom, unitWeightStdDev: review.summary.varianceBasis === 'not-estimated' ? undefined : review.summary.unitWeightStdDev, varianceFactor: review.summary.varianceBasis === 'not-estimated' ? undefined : review.summary.varianceFactor, varianceBasis: label(review.summary.varianceBasis), validation: label(review.summary.validation) }],
+      note: `${adjustment ? surveyWeightingReportLine(adjustment) : '定权依据及尺度单位未核定。'} 残差范数仅作描述性统计，不等同闭合差；${review.residualNorms.length ? review.residualNorms.map(item => `${item.value} ${item.unit}（${item.count} 条）`).join('，') : '残差范数不可用'}`
     })
     tables.push({
       id: `${review.networkId}-points`, title: `${prefix}点位成果与精度`,

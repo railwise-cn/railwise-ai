@@ -38,7 +38,7 @@ import { isGnssSurveyFormat, SurveyFormatRegistry, type SurveySourceEnvelope } f
 import type { CosaIn1Mapping } from './survey-cosa-in1.js'
 import { levelingNetworkClosures } from './survey-leveling-closure.js'
 import { surveyErrorEllipse } from './survey-error-ellipse.js'
-import { residualStatistic, SEMANTIC_ADJUSTMENT_VERSION, withStatisticalSemantics } from './survey-statistical-semantics.js'
+import { residualStatistic, SEMANTIC_ADJUSTMENT_VERSION, LEGACY_SEMANTIC_ADJUSTMENT_VERSION, withStatisticalSemantics } from './survey-statistical-semantics.js'
 import { SurveyStatisticalDiagnosticsV1 } from '../contracts/survey-statistics.js'
 import { missingSurveyReferences, surveyReferenceDeclared } from '../contracts/survey-reference.js'
 import { SurveyProfessionalReviewV1 } from '../contracts/survey-professional.js'
@@ -1210,7 +1210,7 @@ function levelingClosures(network: SurveyNetworkV1, observations: SurveyObservat
   }
 }
 
-function levelingStrategyFindings(network: SurveyNetworkV1, nowIso: () => string): SurveyQualityFindingV1[] {
+function levelingStrategyFindings(network: SurveyNetworkV1, nowIso: () => string, checkWeighting = true): SurveyQualityFindingV1[] {
   const observations = network.observations.filter((item) => item.type === 'height-difference')
   const points = pointMap(network)
   const findings: SurveyQualityFindingV1[] = []
@@ -1227,6 +1227,17 @@ function levelingStrategyFindings(network: SurveyNetworkV1, nowIso: () => string
     const last = observations[observations.length - 1]!
     const ordered = observations.every((observation, index) => index === 0 || observations[index - 1]!.to === observation.from)
     if (!ordered || !first.from || first.from !== last.to) findings.push(finding(network.id, 'malformed_geometry', 'blocking', '声明的水准闭合路线不是首尾相接的连续观测序列', '按测段顺序整理观测，并确保最后一点回到起点', undefined, nowIso))
+  }
+  if (checkWeighting && observations.length) {
+    const absoluteCount = observations.filter(observation => observation.sigma !== undefined).length
+    if (absoluteCount > 0 && absoluteCount < observations.length) {
+      findings.push(finding(network.id, 'invalid_observation', 'blocking', '水准观测的定权依据不一致：部分测段有先验中误差，部分没有。', '为所有测段填写同一口径的先验中误差，或统一采用测段路长相对定权后重新导入。', undefined, nowIso))
+    } else if (absoluteCount === 0) {
+      const lengthCount = observations.filter(observation => observation.routeLength !== undefined).length
+      if (lengthCount > 0 && lengthCount < observations.length) {
+        findings.push(finding(network.id, 'invalid_observation', 'blocking', '水准相对定权缺少部分测段的路长。', '补齐所有测段路长；全部未提供路长时才可明确采用等权假设。', undefined, nowIso))
+      }
+    }
   }
   return findings
 }
@@ -1466,24 +1477,36 @@ function levelingEquations(network: SurveyNetworkV1) {
 }
 
 function buildLevelingResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso: () => string): AdjustmentResultV1 {
-  const baseFindings = mergeFindings(network.findings.filter((item) => item.status === 'open'), levelingStrategyFindings(network, nowIso))
+  const currentWeighting = run.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION
+  const relativeWeighting = currentWeighting && network.observations.filter(item => item.type === 'height-difference').every(item => item.sigma === undefined)
+  const baseFindings = mergeFindings(network.findings.filter((item) => item.status === 'open'), levelingStrategyFindings(network, nowIso, currentWeighting))
   if (baseFindings.some((item) => item.severity === 'blocking')) return invalidAdjustmentResult(network, run, baseFindings, nowIso)
   const { points, unknownIds, index, rows } = levelingEquations(network)
   const solved = weightedLeastSquares(rows)
   if (!solved) return invalidAdjustmentResult(network, run, baseFindings.concat(finding(network.id, 'rank_deficient', 'blocking', '水准网法方程秩亏或网形不连通', '补充已知点或观测，检查点号和网形')), nowIso)
+  const precisionAvailable = !relativeWeighting || solved.varianceFactorEstimated
   const pointResults: AdjustmentResultV1['points'] = [...network.knownPoints, ...network.unknownPoints].map((point) => {
     const i = index.get(point.id); const correction = i === undefined ? 0 : solved.corrections[i]!
     const q = i === undefined ? undefined : solved.covariance[i]?.[i]
-    return { id: point.id, ...(point.height === undefined ? {} : { height: point.height }), ...(i === undefined ? {} : { correctionHeight: correction, height: (point.height ?? 0) + correction, standardError: Math.sqrt(Math.max(0, (q ?? 0) * solved.varianceFactor)), covariance: solved.covariance[i] }) }
+    return { id: point.id, ...(point.height === undefined ? {} : { height: point.height }), ...(i === undefined ? {} : { correctionHeight: correction, height: (point.height ?? 0) + correction, ...(precisionAvailable ? { standardError: Math.sqrt(Math.max(0, (q ?? 0) * solved.varianceFactor)), covariance: solved.covariance[i] } : {}) }) }
   })
   const displacements = [...network.knownPoints, ...network.unknownPoints].map((point) => displacement(point, pointResults.find((candidate) => candidate.id === point.id) ?? {}))
-  const observationResults = rows.map((row, i) => ({ observationId: row.observation.id, correction: solved.residuals[i]!, residual: solved.residuals[i]!, unit: 'm' as const, standardizedResidual: Math.abs(solved.residuals[i]!) / Math.max(1e-12, Math.sqrt(1 / row.weight)), outlier: Math.abs(solved.residuals[i]!) / Math.max(1e-12, Math.sqrt(1 / row.weight)) > 3, sourceRow: row.observation.sourceRow }))
+  const observationResults = rows.map((row, i) => ({ observationId: row.observation.id, correction: solved.residuals[i]!, residual: solved.residuals[i]!, unit: 'm' as const,
+    ...(!relativeWeighting ? { standardizedResidual: Math.abs(solved.residuals[i]!) / Math.max(1e-12, Math.sqrt(1 / row.weight)) } : {}),
+    outlier: !relativeWeighting && Math.abs(solved.residuals[i]!) / Math.max(1e-12, Math.sqrt(1 / row.weight)) > 3, sourceRow: row.observation.sourceRow }))
   const outlierFindings = observationResults.filter((item) => item.outlier).map((item) => finding(network.id, 'outlier_candidate', 'warning', `观测 ${item.observationId} 的标准化残差超过 3σ`, '复核原始观测、仪器和录入值', item.sourceRow, nowIso))
   const maxStd = pointResults.reduce((max, point) => Math.max(max, point.standardError ?? 0), 0)
   const closure = levelingClosures(network, rows.map((row) => row.observation), points)
   const closureUnits = Object.fromEntries(Object.keys(closure).map((key) => [key, 'm' as const]))
-  const reliabilityFindings = solved.varianceFactorEstimated ? [] : [finding(network.id, 'insufficient_redundancy', 'warning', '水准网没有多余观测，单位权中误差采用先验值，不能进行后验精度检验', '增加独立复测路线或闭合观测', undefined, nowIso)]
-  return AdjustmentResultV1.parse({ schemaVersion: 1, id: `adjustment_result_${randomUUID()}`, runId: run.id, networkId: network.id, observationCount: rows.length, unknownCount: unknownIds.length, redundancy: solved.dof, degreesOfFreedom: solved.dof, linearUnit: 'm', angularUnit: 'rad', closure, closureUnits, unitWeightStdDev: solved.unitWeightStdDev, varianceFactor: solved.varianceFactor, varianceFactorEstimated: solved.varianceFactorEstimated, points: pointResults, observations: observationResults, displacements, covariance: solved.covariance, precision: { maxPointStdDev: maxStd, passed: outlierFindings.length === 0 }, qualityFindings: [...baseFindings, ...outlierFindings, ...reliabilityFindings], inputHash: run.inputHash, algorithmVersion: ALGORITHM_VERSION, validation: outlierFindings.length ? 'invalid' : 'valid', solverDiagnostics: { iterations: 1, rank: solved.rank, conditionEstimate: solved.conditionEstimate }, createdAt: nowIso() })
+  const reliabilityFindings = solved.varianceFactorEstimated ? [] : [finding(network.id, 'insufficient_redundancy', 'warning', relativeWeighting
+    ? '水准网采用相对定权且没有多余观测，高程可解算，绝对点位精度及单位权中误差未评定。'
+    : '水准网没有多余观测，单位权中误差采用先验值，不能进行后验精度检验', '增加独立复测路线或闭合观测', undefined, nowIso)]
+  const weighting = !currentWeighting ? {} : relativeWeighting ? {
+    weightingBasis: 'relative-route-length', unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2',
+    relativeWeightReferenceLengthMetres: 1,
+    relativeWeightDefaultLengthObservationIds: rows.filter(row => row.observation.routeLength === undefined).map(row => row.observation.id)
+  } : { weightingBasis: 'absolute-prior', unitWeightStdDevUnit: 'dimensionless', varianceFactorUnit: 'dimensionless' }
+  return AdjustmentResultV1.parse({ schemaVersion: 1, id: `adjustment_result_${randomUUID()}`, runId: run.id, networkId: network.id, observationCount: rows.length, unknownCount: unknownIds.length, redundancy: solved.dof, degreesOfFreedom: solved.dof, linearUnit: 'm', angularUnit: 'rad', closure, closureUnits, unitWeightStdDev: solved.unitWeightStdDev, varianceFactor: solved.varianceFactor, ...weighting, varianceFactorEstimated: solved.varianceFactorEstimated, points: pointResults, observations: observationResults, displacements, ...(precisionAvailable ? { covariance: solved.covariance } : {}), precision: { maxPointStdDev: maxStd, passed: precisionAvailable && outlierFindings.length === 0 }, qualityFindings: [...baseFindings, ...outlierFindings, ...reliabilityFindings], inputHash: run.inputHash, algorithmVersion: ALGORITHM_VERSION, validation: outlierFindings.length ? 'invalid' : 'valid', solverDiagnostics: { iterations: 1, rank: solved.rank, conditionEstimate: solved.conditionEstimate }, createdAt: nowIso() })
 }
 
 function displacement(point: SurveyPointV1, adjusted: { x?: number; y?: number; height?: number }): AdjustmentDisplacementV1 {
@@ -1553,7 +1576,7 @@ function buildGnssResult(network: SurveyNetworkV1, run: AdjustmentRunV1, nowIso:
       residual,
       unit: 'm' as const,
       standardizedResidual: residualVariances[component]! > 1e-24 ? Math.abs(residual) / Math.sqrt(residualVariances[component]!) : 0,
-      ...(run.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION ? { residualStatistic: residualStatistic(
+      ...([SEMANTIC_ADJUSTMENT_VERSION, LEGACY_SEMANTIC_ADJUSTMENT_VERSION].includes(run.algorithmVersion) ? { residualStatistic: residualStatistic(
         { method: 'residual-sigma-ratio', scaleBasis: solved.varianceFactorEstimated ? 'estimated-posterior' : 'declared-prior' },
         residualVariances[component]! > 1e-24 ? Math.abs(residual) / Math.sqrt(residualVariances[component]!) : undefined,
         solved.dof,
@@ -2357,7 +2380,7 @@ export class SurveyService {
   private evaluateCurrentNetworkFindings(
     network: SurveyNetworkV1,
     rawSourceIntegrity: SurveyRawSourceIntegrity = this.checkRawSourceIntegrity(network, false),
-    options: { includeConnectivity?: boolean } = {}
+    options: { includeConnectivity?: boolean; checkWeighting?: boolean } = {}
   ): SurveyQualityFindingV1[] {
     const points = pointMap(network)
     const findings: SurveyQualityFindingV1[] = [
@@ -2398,7 +2421,7 @@ export class SurveyService {
     if (!network.observations.length && network.networkType !== 'coordinate-transform') {
       findings.push(finding(network.id, 'invalid_observation', 'blocking', '网络没有观测记录', '导入至少一条有效观测', undefined, this.nowIso))
     }
-    if (network.networkType === 'leveling' || network.networkType === 'height-control') findings.push(...levelingStrategyFindings(network, this.nowIso))
+    if (network.networkType === 'leveling' || network.networkType === 'height-control') findings.push(...levelingStrategyFindings(network, this.nowIso, options.checkWeighting !== false))
     if (network.networkType === 'traverse') findings.push(...traverseStrategyFindings(network, this.nowIso))
     if (network.networkType === 'plane-control') findings.push(...planeControlStrategyFindings(network, this.nowIso))
     if (network.networkType === 'triangulation') findings.push(...triangulationStrategyFindings(network, this.nowIso))
@@ -3142,7 +3165,7 @@ export class SurveyService {
     // solver's own rank diagnosis. That preserves the more specific numerical
     // cause (for example `rank_deficient`) while all raw/source and closure
     // gates are still freshly re-evaluated.
-    const currentFindings = this.evaluateCurrentNetworkFindings(network, undefined, { includeConnectivity: false })
+    const currentFindings = this.evaluateCurrentNetworkFindings(network, undefined, { includeConnectivity: false, checkWeighting: run.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION })
     const solverNetwork = SurveyNetworkV1.parse({ ...network, findings: currentFindings })
     const dimensionIssue = adjustmentDimensionIssue(solverNetwork)
     let result: AdjustmentResultV1
@@ -3167,7 +3190,13 @@ export class SurveyService {
     } else {
       result = invalidAdjustmentResult(solverNetwork, run, [finding(solverNetwork.id, 'invalid_observation', 'blocking', `暂不支持网型 ${solverNetwork.networkType} 的确定性平差`, '选择受支持的测量网型或补充适配策略', undefined, this.nowIso)], this.nowIso)
     }
-    return withStatisticalSemantics(solverNetwork, retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType })))
+    // Add explicit units only to new solved models. Historical replay must
+    // preserve its stored JSON and calculation hash without inferred fields.
+    const weighting = run.algorithmVersion === SEMANTIC_ADJUSTMENT_VERSION && result.validation === 'valid'
+      && solverNetwork.networkType !== 'leveling' && solverNetwork.networkType !== 'height-control'
+      && result.unknownCount > 0
+      ? { weightingBasis: 'absolute-prior', unitWeightStdDevUnit: 'dimensionless', varianceFactorUnit: 'dimensionless' } : {}
+    return withStatisticalSemantics(solverNetwork, retainResidualSourceAnchors(solverNetwork, AdjustmentResultV1.parse({ ...result, ...weighting, algorithmVersion: run.algorithmVersion, strategyId: solverNetwork.networkType })))
   }
 
   createAdjustment(input: unknown): { run: AdjustmentRunV1; result: AdjustmentResultV1 } {
@@ -3321,7 +3350,7 @@ export class SurveyService {
       || stored.result.networkId !== network.id
       || stored.run.inputHash !== inputHash
       || stored.result.inputHash !== inputHash
-      || ![ALGORITHM_VERSION, LEGACY_STATISTICS_ALGORITHM, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
+      || ![ALGORITHM_VERSION, LEGACY_SEMANTIC_ADJUSTMENT_VERSION, LEGACY_STATISTICS_ALGORITHM, LEGACY_ELLIPSE_FREE_ALGORITHM].includes(stored.run.algorithmVersion)
       || stored.result.algorithmVersion !== stored.run.algorithmVersion
       || stored.run.status !== 'completed'
       || stored.result.validation !== 'valid') {
