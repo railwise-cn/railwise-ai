@@ -61,6 +61,10 @@ function parseArgs(argv) {
   for (let index = 1; index < argv.length; index += 1) {
     const arg = argv[index]
     if (!arg.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`)
+    if (arg === '--skip-retention') {
+      flags.set('skip-retention', true)
+      continue
+    }
     const value = argv[index + 1]
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${arg}`)
     flags.set(arg.slice(2), value)
@@ -697,6 +701,7 @@ if [[ -z "$relative" && "$channel" == stable ]]; then
   atomic_latest "$root/latest" "$root/.latest-$deploy_id"
 fi
 
+if [[ "$6" != skip-retention ]]; then
 python3 - "$channel_dir/releases" <<'PY'
 import pathlib
 import re
@@ -712,6 +717,7 @@ for path in root.iterdir():
 for _, path in sorted(versions, reverse=True)[3:]:
     shutil.rmtree(path)
 PY
+fi
 printf '%s\n' "$channel_dir/latest"
 `
 
@@ -818,7 +824,8 @@ function promoteRelease(flags) {
     releasePrefix.relative,
     channel,
     tag,
-    deployId
+    deployId,
+    flags.has('skip-retention') ? 'skip-retention' : ''
   ]))
 }
 
@@ -979,6 +986,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 }
 
 export const _internals = {
+  parseArgs,
   normalizeTag,
   normalizeChannel,
   normalizeRunId,

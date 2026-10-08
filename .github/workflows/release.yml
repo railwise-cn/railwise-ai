@@ -170,6 +170,9 @@ jobs:
 
   repair-website-cache:
     name: Repair website updater metadata cache
+    concurrency:
+      group: production-release-public
+      cancel-in-progress: false
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
     runs-on: ubuntu-latest
     environment:
@@ -221,6 +224,9 @@ jobs:
 
   rollback-stable:
     name: Roll back WorkWise Stable pointers
+    concurrency:
+      group: production-release-public
+      cancel-in-progress: false
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
     runs-on: ubuntu-latest
     environment:
@@ -694,6 +700,9 @@ jobs:
 
   publish:
     name: Publish GitHub Release
+    concurrency:
+      group: production-release-public
+      cancel-in-progress: false
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
@@ -810,6 +819,9 @@ jobs:
             [[ -n "${!name:-}" ]] || { echo "::error::Missing ${name}; Stable promotion is blocked"; exit 1; }
           done
 
+      - name: Refuse to modify an already-published GitHub Release
+        run: node scripts/release-promotion-recovery.mjs draft --tag="${TAG_NAME}"
+
       - name: Prepare website update channel assets
         run: |
           set -euo pipefail
@@ -874,26 +886,6 @@ jobs:
             --release-prefix workwise \
             --target release
 
-      - name: Promote verified R2 and official website latest pointers
-        run: |
-          set -euo pipefail
-          node ./scripts/publish-r2.mjs promote --tag "${TAG_NAME}" --channel stable --platforms mac,win
-          node ./scripts/deploy-website-release.mjs promote \
-            --tag "${TAG_NAME}" \
-            --channel stable \
-            --release-prefix workwise \
-            --deploy-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-
-      - name: Verify promoted official updater feed
-        run: |
-          set -euo pipefail
-          node ./scripts/deploy-website-release.mjs verify-public \
-            --source website-release-assets \
-            --tag "${TAG_NAME}" \
-            --channel stable \
-            --release-prefix workwise \
-            --target latest
-
       - name: Upload website update channel artifact
         uses: actions/upload-artifact@v4
         with:
@@ -940,6 +932,7 @@ jobs:
       - name: Create or update draft GitHub Release
         run: |
           set -euo pipefail
+          node scripts/release-promotion-recovery.mjs draft --tag="${TAG_NAME}"
           if gh release view "${TAG_NAME}" > /dev/null 2>&1; then
             gh release edit "${TAG_NAME}" \
               --title "${RELEASE_NAME}" \
@@ -1010,11 +1003,58 @@ jobs:
               find downloaded-release -maxdepth 1 -type f -print | sort
               exit 1
             }
+            cmp "public-release-assets/${file}" "downloaded-release/${file}" || {
+              echo "::error::GitHub download differs from the exact reviewed installer: ${file}"
+              exit 1
+            }
           done
           test "$(find downloaded-release -maxdepth 1 -type f -name 'WorkWise-*' | wc -l | tr -d ' ')" = 3
 
+      - name: Snapshot current official pointers before this attempt can change them
+        id: capture_promotion
+        run: node scripts/release-promotion-recovery.mjs capture --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json"
+
+      - name: Promote verified R2 and official website latest pointers
+        id: stable_promotion
+        run: |
+          set -euo pipefail
+          node scripts/release-promotion-recovery.mjs start --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json"
+          promotion_time="$(jq -er '.generatedAt' "${RUNNER_TEMP}/official-promotion-state.json")"
+          node ./scripts/publish-r2.mjs promote --tag "${TAG_NAME}" --channel stable --platforms mac,win --skip-retention --generated-at "${promotion_time}"
+          node ./scripts/deploy-website-release.mjs promote \
+            --tag "${TAG_NAME}" \
+            --channel stable \
+            --release-prefix workwise \
+            --deploy-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --skip-retention
+
+      - name: Verify promoted official updater feed
+        run: |
+          set -euo pipefail
+          node ./scripts/deploy-website-release.mjs verify-public \
+            --source website-release-assets \
+            --tag "${TAG_NAME}" \
+            --channel stable \
+            --release-prefix workwise \
+            --target latest
+
       - name: Publish GitHub Release
-        run: gh release edit "${TAG_NAME}" --draft=false --prerelease=false --latest
+        run: node scripts/release-promotion-recovery.mjs publish --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json" --result="${RUNNER_TEMP}/official-promotion-result.json"
+
+      - name: Restore the previous official pointers if this promotion attempt fails
+        if: ${{ always() && (failure() || cancelled()) && steps.capture_promotion.outcome == 'success' && steps.stable_promotion.outcome != 'skipped' }}
+        run: node scripts/release-promotion-recovery.mjs restore --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json" --result="${RUNNER_TEMP}/official-promotion-result.json"
+
+      - name: Preserve private publication transaction evidence
+        if: ${{ always() && steps.capture_promotion.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-promotion-transaction-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/official-promotion-state.json
+            ${{ runner.temp }}/official-promotion-result.json
 
   verify-candidate:
     name: Verify three-client candidate

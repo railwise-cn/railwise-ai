@@ -85,19 +85,33 @@ export function verifyReviewedBuildSource(build, expected, api = githubApi) {
   const workflow = api(`${root}/actions/workflows/release.yml`)
   const run = api(`${root}/actions/runs/${build.runId}`)
   equal(repository.full_name, RELEASE_REPOSITORY, 'API repository')
+  equal(repository.default_branch, 'main', 'protected default branch')
   equal(workflow.path, RELEASE_WORKFLOW, 'trusted workflow path')
   equal(run.workflow_id, workflow.id, 'trusted workflow ID')
   equal(run.path, RELEASE_WORKFLOW, 'run workflow path')
   equal(run.repository?.id, repository.id, 'run repository ID')
   equal(run.head_repository?.id, repository.id, 'run head repository ID')
   equal(run.head_branch, 'main', 'run protected head branch')
-  equal(run.workflow_ref, RELEASE_WORKFLOW_REF, 'run protected workflow ref')
   equal(run.head_sha, build.sourceHead, 'run source HEAD')
   equal(run.event, 'workflow_dispatch', 'run event')
   equal(run.status, 'completed', 'source run status')
   equal(run.conclusion, 'success', 'source run conclusion')
   equal(run.run_attempt, build.runAttempt, 'source run attempt')
   equal(run.id, build.runId, 'source run ID')
+  // The workflow-run REST response does not expose GITHUB_WORKFLOW_REF.
+  // Bind the real API fields to protected main and prove the source belongs
+  // to that history; the immutable build receipt separately carries the
+  // exact runner workflow ref/SHA. This also rejects a tag named "main" that
+  // points to code outside the protected branch.
+  const branch = api(`${root}/branches/main`)
+  equal(branch.name, 'main', 'protected branch name')
+  equal(branch.protected, true, 'main branch protection')
+  if (!/^[a-f0-9]{40}$/.test(branch.commit?.sha ?? '')) fail('invalid protected main commit')
+  const ancestry = api(`${root}/compare/${build.sourceHead}...${branch.commit.sha}`)
+  if (!['ahead', 'identical'].includes(ancestry.status)) fail('source is not an ancestor of protected main')
+  equal(ancestry.base_commit?.sha, build.sourceHead, 'comparison source commit')
+  equal(ancestry.merge_base_commit?.sha, build.sourceHead, 'protected source ancestry')
+  if (ancestry.status === 'identical') equal(branch.commit.sha, build.sourceHead, 'identical protected source')
   const jobs = []
   for (let page = 1; ; page += 1) {
     const result = api(`${root}/actions/runs/${build.runId}/attempts/${build.runAttempt}/jobs?per_page=100&page=${page}`)
@@ -177,8 +191,10 @@ export async function recordReviewedBuild({ dist, platform, version, env = proce
   equal(env.PREPARE_PUBLIC_ARTIFACTS, 'true', 'final public identity mode')
   equal(env.PUBLISH_RELEASE, 'false', 'publication disabled during freezing')
   if (env.WORKWISE_CANDIDATE === '1') fail('isolated candidates cannot be frozen for publication')
-  if (!String(env.GITHUB_WORKFLOW_REF).startsWith(`${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@`)) fail('untrusted build workflow')
+  equal(env.GITHUB_REF, 'refs/heads/main', 'build protected branch ref')
+  equal(env.GITHUB_WORKFLOW_REF, RELEASE_WORKFLOW_REF, 'build protected workflow ref')
   if (!/^[a-f0-9]{40}$/.test(env.GITHUB_SHA)) fail('invalid build source HEAD')
+  equal(env.GITHUB_WORKFLOW_SHA, env.GITHUB_SHA, 'build workflow source SHA')
   verifySource(env.GITHUB_SHA)
   const artifact = platform === 'mac' ? 'release-mac' : platform === 'win' ? 'release-win' : ''
   if (!artifact) fail('build platform must be mac or win')
@@ -199,6 +215,7 @@ export async function recordReviewedBuild({ dist, platform, version, env = proce
   const identities = Object.fromEntries(Object.entries(apps).map(([key, path]) => [key, inspect(path, key, version, env.GITHUB_SHA)]))
   const receipt = { schemaVersion: 1, purpose: 'frozen-public-release', repository: RELEASE_REPOSITORY, workflowPath: RELEASE_WORKFLOW,
     runId: Number(env.GITHUB_RUN_ID), runAttempt: Number(env.GITHUB_RUN_ATTEMPT), sourceHead: env.GITHUB_SHA,
+    workflowRef: env.GITHUB_WORKFLOW_REF, workflowSha: env.GITHUB_WORKFLOW_SHA,
     candidateOnly: true, preparePublicArtifacts: true, publishRelease: false, artifact, version, identities, files }
   positive(receipt.runId, 'build run ID'); positive(receipt.runAttempt, 'build run attempt')
   writeFileSync(join(dist, RECEIPT), `${JSON.stringify(receipt, null, 2)}\n`)
@@ -217,6 +234,8 @@ export async function verifyDownloadedReleaseArtifacts({ build, version, sourceH
     plainFile(join(root, RECEIPT))
     const receipt = JSON.parse(readFileSync(join(root, RECEIPT), 'utf8'))
     for (const key of ['repository', 'workflowPath', 'sourceHead', 'runId', 'runAttempt']) equal(receipt[key], build[key], `build receipt ${key}`)
+    equal(receipt.workflowRef, RELEASE_WORKFLOW_REF, 'build receipt protected workflow ref')
+    equal(receipt.workflowSha, sourceHead, 'build receipt workflow source SHA')
     for (const [key, value] of Object.entries({ schemaVersion: 1, purpose: 'frozen-public-release', artifact, version, candidateOnly: true, preparePublicArtifacts: true, publishRelease: false })) equal(receipt[key], value, `build receipt ${key}`)
     const platforms = artifact === 'release-mac' ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64']
     exactSet(Object.keys(receipt.identities ?? {}), platforms, 'packaged identities')

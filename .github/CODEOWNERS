@@ -2,10 +2,17 @@
 # Keep this file on the default branch so branch protection can enforce it.
 .github/CODEOWNERS @railwise-cn
 .github/workflows/release.yml @railwise-cn
+.github/workflows/frozen-release-updater-acceptance.yml @railwise-cn
 .github/workflows/deploy-workwise-product-page.yml @railwise-cn
 .github/workflows/repair-website-cache.yml @railwise-cn
 .github/workflows/quality.yml @railwise-cn
 scripts/verify-release-approval.mjs @railwise-cn
+scripts/verify-reviewed-release-artifacts* @railwise-cn
+scripts/verify-frozen-updater-evidence* @railwise-cn
+scripts/run-frozen-release-updater-acceptance.mjs @railwise-cn
+scripts/frozen-release-updater-* @railwise-cn
+scripts/updater-acceptance-process.mjs @railwise-cn
+scripts/release-promotion-recovery* @railwise-cn
 scripts/release-gate.test.mjs @railwise-cn
 scripts/publish-r2.mjs @railwise-cn
 scripts/deploy-website-release.mjs @railwise-cn

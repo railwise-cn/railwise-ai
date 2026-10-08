@@ -44,15 +44,42 @@ export function sanitizeRetainedText(value, secrets = [], env = process.env) {
 }
 
 export function requireFrozenRunner(env = process.env, platform = process.platform, home = homedir()) {
+  const positiveInteger = value => /^[1-9][0-9]*$/.test(value ?? '') && Number.isSafeInteger(Number(value))
   if (platform !== 'darwin' || env.GITHUB_ACTIONS !== 'true' || env.RUNNER_OS !== 'macOS'
     || env.RUNNER_ENVIRONMENT !== 'github-hosted' || !isAbsolute(env.RUNNER_TEMP ?? '') || !isAbsolute(home)
     || env.GITHUB_REPOSITORY !== RELEASE_REPOSITORY
-    || env.GITHUB_WORKFLOW_REF !== FROZEN_UPDATER_WORKFLOW_REF) {
+    || env.GITHUB_WORKFLOW_REF !== FROZEN_UPDATER_WORKFLOW_REF || env.GITHUB_REF !== 'refs/heads/main'
+    || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '') || env.GITHUB_WORKFLOW_SHA !== env.GITHUB_SHA
+    || !positiveInteger(env.GITHUB_RUN_ID) || !positiveInteger(env.GITHUB_RUN_ATTEMPT)) {
     throw new Error('Historical public updater acceptance requires its trusted fresh GitHub-hosted macOS workflow.')
   }
   if (Object.keys(env).some(name => /^(?:WORKWISE_CANDIDATE|WORKWISE_UPDATE_|WORKWISE_PUBLIC_BASE_URL|RELEASE_CHANNEL)/.test(name) && env[name])) {
     throw new Error('Candidate or external updater overrides are forbidden for the public baseline.')
   }
+  return {
+    repository: env.GITHUB_REPOSITORY,
+    workflowPath: '.github/workflows/frozen-release-updater-acceptance.yml',
+    workflowRef: env.GITHUB_WORKFLOW_REF,
+    workflowSha: env.GITHUB_WORKFLOW_SHA,
+    sourceHead: env.GITHUB_SHA,
+    runId: Number(env.GITHUB_RUN_ID),
+    runAttempt: Number(env.GITHUB_RUN_ATTEMPT)
+  }
+}
+
+export function validateUpdaterBuildProvenance(provenance, build) {
+  equal(provenance.repository, build.repository, 'Updater/build repository')
+  equal(provenance.sourceHead, build.sourceHead, 'Updater/build source HEAD')
+}
+
+export function retainNativeUpdaterReport(source, destination, secrets = [], env = process.env) {
+  if (!existsSync(source)) throw new Error('Required native updater report is missing.')
+  if (!lstatSync(source).isFile()) throw new Error('Native report must be a regular JSON file.')
+  const bytes = Buffer.from(sanitizeRetainedText(readFileSync(source, 'utf8'), secrets, env) + '\n')
+  // Redaction and retention limits must never turn required JSON evidence into an unreadable file.
+  JSON.parse(bytes.toString('utf8'))
+  writeFileSync(destination, bytes, { mode: 0o600 })
+  return createHash('sha256').update(bytes).digest('hex')
 }
 
 export function productPaths(home) {
@@ -270,12 +297,12 @@ export async function stopOwnedApplications(nativeRoot, run, {
 
 export async function main() {
   const evidence = resolve(argument('evidence-dir') ?? '')
-  requireFrozenRunner()
+  const provenance = requireFrozenRunner()
   const runnerTemp = realpathSync(process.env.RUNNER_TEMP)
   if (!argument('evidence-dir') || !evidence.startsWith(runnerTemp + '/') || existsSync(evidence)) throw new Error('Evidence must be a new directory beneath RUNNER_TEMP.')
   mkdirSync(evidence, { mode: 0o700 })
   const root = mkdtempSync(join(runnerTemp, 'railwise-frozen-update-'))
-  const report = { schemaVersion: 1, status: 'running', baseVersion: BASE_VERSION, targetVersion: TARGET_VERSION, platform: 'darwin', arch: process.arch,
+  const report = { schemaVersion: 1, status: 'running', baseVersion: BASE_VERSION, targetVersion: TARGET_VERSION, platform: 'darwin', arch: process.arch, provenance,
     productionTouched: false, systemTrustModified: false, officialFeedsModified: false, publicReleasePerformed: false,
     transport: 'Temporary externally reachable Cloudflare Quick Tunnel with default CA TLS and a 256-bit bearer capability path; no persistent remote storage.', steps: [] }
   const secrets = []
@@ -290,6 +317,7 @@ export async function main() {
     if (!['arm64', 'x64'].includes(process.arch)) throw new Error('Unsupported runner architecture.')
     assertFreshProfile(home)
     const build = JSON.parse(readFileSync(resolve(argument('build-file')), 'utf8'))
+    validateUpdaterBuildProvenance(provenance, build)
     validateReviewedBuild(build, { version: TARGET_VERSION, sourceHead: build.sourceHead })
     verifyReviewedBuildSource(build, { version: TARGET_VERSION, sourceHead: build.sourceHead })
     report.reviewedBuild = build
@@ -356,8 +384,15 @@ export async function main() {
     progress({ operation: 'acceptance', status: 'failed' })
   } finally {
     for (const name of ['native-updater.json', 'native-updater.log', 'harness.log', 'cloudflared.log', 'seed-data.json', 'verify-data.json']) {
-      const path = join(root, name)
-      if (existsSync(path)) writeFileSync(join(evidence, name.endsWith('.log') ? name.replace('.log', '.redacted.log') : name), sanitizeRetainedText(readFileSync(path, 'utf8'), secrets) + '\n', { mode: 0o600 })
+      try {
+        const path = join(root, name)
+        if (name !== 'native-updater.json' && !existsSync(path)) continue
+        const destination = join(evidence, name.endsWith('.log') ? name.replace('.log', '.redacted.log') : name)
+        if (name === 'native-updater.json') report.nativeReportSha256 = retainNativeUpdaterReport(path, destination, secrets)
+        else writeFileSync(destination, sanitizeRetainedText(readFileSync(path, 'utf8'), secrets) + '\n', { mode: 0o600 })
+      } catch (error) {
+        report.status = 'failed'; report.failure = `${report.failure ?? ''} Evidence retention: ${sanitizeRetainedText(error.message, secrets)}`.trim()
+      }
     }
     let ownedApplicationsStopped = false
     const actions = [async () => { harness?.stop(); await harness?.completed.catch(() => {}) }, async () => { tunnel?.stop(); await tunnel?.completed.catch(() => {}) }, () => feed?.close(),

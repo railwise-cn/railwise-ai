@@ -8,10 +8,15 @@ import { test } from 'node:test'
 import { parse, stringify } from 'yaml'
 import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './frozen-release-updater-feed.mjs'
 import { assertHistoricalRowsPreserved, assertRetainedFiles, snapshotFiles } from './frozen-release-updater-data.mjs'
-import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl } from './run-frozen-release-updater-acceptance.mjs'
+import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
 
 function temporary(t) { const root = mkdtempSync(join(tmpdir(), 'railwise-frozen-updater-test-')); t.after(() => rmSync(root, { recursive: true, force: true })); return root }
+function hostedEnvironment() {
+  return { GITHUB_ACTIONS: 'true', RUNNER_OS: 'macOS', RUNNER_ENVIRONMENT: 'github-hosted', RUNNER_TEMP: '/runner/temp', GITHUB_REPOSITORY: RELEASE_REPOSITORY,
+    GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`,
+    GITHUB_REF: 'refs/heads/main', GITHUB_SHA: 'a'.repeat(40), GITHUB_WORKFLOW_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
+}
 function fixture(t) {
   const root = temporary(t); const zipPath = join(root, 'WorkWise-0.5.3-mac-arm64.zip'); const manifestPath = join(root, 'latest-mac.yml')
   const bytes = Buffer.from('test-only HTTP transport bytes, not a signed application or native updater test')
@@ -29,12 +34,32 @@ function request(url, options = {}) {
 }
 
 test('historical public updater runs only in its trusted fresh hosted macOS workflow', () => {
-  const env = { GITHUB_ACTIONS: 'true', RUNNER_OS: 'macOS', RUNNER_ENVIRONMENT: 'github-hosted', RUNNER_TEMP: '/runner/temp', GITHUB_REPOSITORY: RELEASE_REPOSITORY, GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main` }
+  const env = hostedEnvironment()
   assert.doesNotThrow(() => requireFrozenRunner(env, 'darwin', '/Users/runner'))
   for (const patch of [{ GITHUB_ACTIONS: 'false' }, { RUNNER_ENVIRONMENT: 'self-hosted' }, { RUNNER_TEMP: 'relative' }, { GITHUB_REPOSITORY: 'attacker/repo' }, { GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/other.yml@refs/heads/main` }, { GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/codex/feature` }, { GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/tags/v0.5.3` }, { WORKWISE_CANDIDATE: '1' }, { WORKWISE_UPDATE_URL: 'https://example.test' }, { RELEASE_CHANNEL: 'stable' }]) {
     assert.throws(() => requireFrozenRunner({ ...env, ...patch }, 'darwin', '/Users/runner'))
   }
   assert.throws(() => requireFrozenRunner(env, 'linux', '/Users/runner'))
+})
+
+test('hosted updater provenance identifies the exact main workflow execution and rejects malformed or mixed revisions', () => {
+  const env = hostedEnvironment()
+  assert.deepEqual(requireFrozenRunner(env, 'darwin', '/Users/runner'), {
+    repository: RELEASE_REPOSITORY, workflowPath: '.github/workflows/frozen-release-updater-acceptance.yml', workflowRef: env.GITHUB_WORKFLOW_REF,
+    workflowSha: env.GITHUB_WORKFLOW_SHA, sourceHead: env.GITHUB_SHA, runId: 123, runAttempt: 2
+  })
+  const patches = [{ GITHUB_REF: 'refs/tags/v0.5.3' }, { GITHUB_REF: 'refs/heads/codex/feature' }, { GITHUB_REF: undefined },
+    { GITHUB_SHA: undefined }, { GITHUB_SHA: 'not-a-sha', GITHUB_WORKFLOW_SHA: 'not-a-sha' }, { GITHUB_SHA: 'A'.repeat(40), GITHUB_WORKFLOW_SHA: 'A'.repeat(40) },
+    { GITHUB_WORKFLOW_SHA: undefined }, { GITHUB_WORKFLOW_SHA: 'b'.repeat(40) }]
+  for (const name of ['GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT']) for (const value of [undefined, '', '0', '-1', '1.5', '1e2', '0x10', ' 2', '02', '9007199254740993']) patches.push({ [name]: value })
+  for (const patch of patches) assert.throws(() => requireFrozenRunner({ ...env, ...patch }, 'darwin', '/Users/runner'), /trusted fresh/)
+})
+
+test('a current updater execution cannot accept an older build or another repository', () => {
+  const provenance = requireFrozenRunner(hostedEnvironment(), 'darwin', '/Users/runner')
+  const build = { repository: RELEASE_REPOSITORY, sourceHead: provenance.sourceHead }
+  assert.doesNotThrow(() => validateUpdaterBuildProvenance(provenance, build))
+  for (const patch of [{ sourceHead: 'b'.repeat(40) }, { sourceHead: undefined }, { repository: 'other/repo' }]) assert.throws(() => validateUpdaterBuildProvenance(provenance, { ...build, ...patch }), /Updater\/build/)
 })
 
 test('existing public, legacy, runtime or updater profiles block acceptance without deleting them', t => {
@@ -110,6 +135,35 @@ test('retained logs/report fields remove feed capabilities, temporary origins an
   const retained = sanitizeRetainedText(text, [secret], { GH_TOKEN: 'Bearer-token-sensitive' })
   assert.doesNotMatch(retained, /trycloudflare|a{64}|Bearer-token-sensitive|abc123/)
   assert.match(retained, /failed/)
+})
+
+test('native report fingerprint binds the final redacted retained bytes including their newline', t => {
+  const root = temporary(t); const source = join(root, 'original.json'); const destination = join(root, 'native-updater.json')
+  const secret = 'only-this-run-sensitive-token'
+  const original = JSON.stringify({ schemaVersion: 1, status: 'passed', note: `Read ${secret} at https://ephemeral-words.trycloudflare.com/private-${'a'.repeat(64)}/latest-mac.yml` })
+  writeFileSync(source, original)
+  const fingerprint = retainNativeUpdaterReport(source, destination, [secret], {})
+  const retained = readFileSync(destination)
+  assert.equal(fingerprint, createHash('sha256').update(retained).digest('hex'))
+  assert.notEqual(fingerprint, createHash('sha256').update(original).digest('hex'))
+  assert.notEqual(fingerprint, createHash('sha256').update(retained.subarray(0, retained.length - 1)).digest('hex'))
+  assert.equal(retained.at(-1), 10)
+  assert.doesNotMatch(retained.toString(), /only-this-run-sensitive-token|trycloudflare|a{64}/)
+  assert.equal(JSON.parse(retained).status, 'passed')
+  writeFileSync(destination, retained.toString().replace('passed', 'failed'))
+  assert.notEqual(fingerprint, createHash('sha256').update(readFileSync(destination)).digest('hex'))
+})
+
+test('native evidence retention rejects unreadable or linked reports before creating a substitute', t => {
+  const root = temporary(t); const source = join(root, 'source.json'); const destination = join(root, 'retained.json')
+  assert.throws(() => retainNativeUpdaterReport(source, destination, [], {}), /Required native updater report is missing/)
+  assert.equal(existsSync(destination), false)
+  for (const text of ['not JSON', JSON.stringify({ padding: 'x'.repeat(260_000) })]) {
+    writeFileSync(source, text); assert.throws(() => retainNativeUpdaterReport(source, destination, [], {})); assert.equal(existsSync(destination), false)
+  }
+  const linked = join(root, 'linked.json'); symlinkSync(source, linked)
+  assert.throws(() => retainNativeUpdaterReport(linked, destination, [], {}), /regular JSON/)
+  assert.equal(existsSync(destination), false)
 })
 
 test('native round trip requires the real six stages and strict nonce verification', () => {

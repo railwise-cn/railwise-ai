@@ -8,8 +8,11 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { verifyReleaseApproval } from './verify-release-approval.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
+import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF } from './verify-frozen-updater-evidence.mjs'
 // Keep the existing npm run test:release-gate entry point covering byte/provenance gates.
 import './verify-reviewed-release-artifacts.test.mjs'
+import './verify-frozen-updater-evidence.test.mjs'
+import './release-promotion-recovery.test.mjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')
@@ -48,7 +51,7 @@ function releaseFixture(t, packageVersion = '0.5.3') {
     release: { tag: 'v0.5.3', version: '0.5.3', sourceHead: reviewedSourceHead },
     package: {
       version: '0.5.3',
-      identity: { bundleId: PUBLIC_IDENTITY.bundleId, artifactSha256: 'a'.repeat(64) },
+      identity: { bundleId: PUBLIC_IDENTITY.bundleId, artifactSha256: 'a'.repeat(64), asarSha256: 'e'.repeat(64) },
       reviewedBuild: {
         repository: RELEASE_REPOSITORY, workflowPath: RELEASE_WORKFLOW, sourceHead: reviewedSourceHead,
         runId: 1234, runAttempt: 1, publicIdentity: { ...PUBLIC_IDENTITY },
@@ -62,13 +65,40 @@ function releaseFixture(t, packageVersion = '0.5.3') {
     acceptance: {
       functionalChecklist: { status: 'passed', path: `${base}/functional-checklist.md` },
       uiComputerUse: { status: 'passed', path: `${base}/cua-review.md` },
-      updaterRoundTrip: { status: 'passed', path: `${base}/updater-round-trip.md` },
+      updaterRoundTrip: { status: 'passed', path: `${base}/updater-round-trip.md`, machineReportPath: `${base}/frozen-updater.json`, nativeReportPath: `${base}/native-updater.json`,
+        workflowRun: { repository: RELEASE_REPOSITORY, workflowPath: UPDATER_WORKFLOW, sourceHead: reviewedSourceHead, runId: 4321, runAttempt: 1,
+          artifact: { id: 21, name: 'frozen-updater-arm64-4321', digest: `sha256:${'d'.repeat(64)}` } } },
       independentSeniorEngineerReview: { status: 'passed', reviewerType: 'AI review', reviewRole: 'senior engineer', path: `${base}/independent-ai-review.md` },
     },
   }
+  // These synthetic unit reports mirror the existing runner schema. They are
+  // temporary fixtures only and must never be copied into release evidence.
+  const identity = version => ({ version, bundleId: PUBLIC_IDENTITY.bundleId, signature: 'verified', stapledNotarization: 'verified', gatekeeper: 'accepted', designatedRequirement: 'designated => synthetic-unit-fixture' })
+  const data = mode => ({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: 'd'.repeat(64) })
+  const machineReport = {
+    schemaVersion: 1, status: 'passed', baseVersion: '0.5.2', targetVersion: '0.5.3', platform: 'darwin', arch: 'arm64',
+    productionTouched: false, systemTrustModified: false, officialFeedsModified: false, publicReleasePerformed: false,
+    reviewedBuild: structuredClone(manifest.package.reviewedBuild),
+    provenance: { repository: RELEASE_REPOSITORY, workflowPath: UPDATER_WORKFLOW, workflowRef: UPDATER_WORKFLOW_REF, workflowSha: reviewedSourceHead,
+      sourceHead: reviewedSourceHead, runId: 4321, runAttempt: 1 },
+    baselineAsset: { tag: 'v0.5.2', name: 'WorkWise-0.5.2-mac-Apple-Silicon.dmg', size: 301766076, sha256: '09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0', assetId: 612608487 },
+    baselineIdentity: identity('0.5.2'), targetIdentity: identity('0.5.3'), installedIdentity: identity('0.5.3'),
+    targetZipSha256: 'a'.repeat(64), frozenManifestSha256: 'a'.repeat(64), targetAsarSha256: 'e'.repeat(64), installedAsarSha256: 'e'.repeat(64),
+    strictNonceProbe: { strictProbeRequired: true, nonceSha256: 'f'.repeat(64) }, separateSentinelPreserved: true,
+    dataSeed: data('seed'), dataReadback: data('verify'), dataRestartReadback: data('verify'), configReferences: { status: 'byte-preserved' },
+    feedRequests: { manifest: 2, zip: 1, bytesServed: 100 },
+    steps: [{ operation: 'real-native-update-and-historical-readback', status: 'completed' }, { operation: 'owned-resource-cleanup', status: 'completed' }],
+  }
+  const nativeReport = {
+    schemaVersion: 1, status: 'passed', baseVersion: '0.5.2', targetVersion: '0.5.3', platform: 'darwin', arch: 'arm64', browserOpened: false, userDataPreserved: true,
+    stages: ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved'].map(name => ({ name, detail: name === 'user_data_preserved' ? '0.5.2' : 'synthetic unit fixture' })),
+  }
   const recordEvidence = () => {
+    machineReport.nativeReportSha256 = reportSha256(Buffer.from(JSON.stringify(nativeReport)))
     put(manifestPath, JSON.stringify(manifest))
     for (const path of [manifest.package.screenshots[0], ...Object.values(manifest.acceptance).map(item => item.path)]) put(path, 'test evidence\n')
+    if (manifest.acceptance.updaterRoundTrip.machineReportPath) put(manifest.acceptance.updaterRoundTrip.machineReportPath, JSON.stringify(machineReport))
+    if (manifest.acceptance.updaterRoundTrip.nativeReportPath) put(manifest.acceptance.updaterRoundTrip.nativeReportPath, JSON.stringify(nativeReport))
   }
   const tagRelease = () => {
     const releaseHead = commit('record acceptance evidence')
@@ -88,7 +118,7 @@ function releaseFixture(t, packageVersion = '0.5.3') {
     assert.ok(failure, 'release verification must fail')
     assert.match(String(failure.stderr), expectError)
   }
-  return { root, git, put, commit, reviewedSourceHead, base, manifestPath, manifest, recordEvidence, tagRelease, verify }
+  return { root, git, put, commit, reviewedSourceHead, base, manifestPath, manifest, machineReport, nativeReport, recordEvidence, tagRelease, verify }
 }
 
 function input(name) {
@@ -220,6 +250,21 @@ test('all production website and Stable pointer mutations use the protected envi
   assert.match(String(websiteEnvironment?.name ?? websiteEnvironment), /inputs\.operation/)
 })
 
+test('independent release-control review covers frozen evidence and recovery dependencies', () => {
+  const rules = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8').split(/\r?\n/)
+    .filter(line => line.trim() && !line.trim().startsWith('#')).map(line => line.trim().split(/\s+/))
+  for (const path of [
+    '.github/workflows/frozen-release-updater-acceptance.yml',
+    'scripts/verify-reviewed-release-artifacts.mjs', 'scripts/verify-frozen-updater-evidence.mjs',
+    'scripts/run-frozen-release-updater-acceptance.mjs', 'scripts/frozen-release-updater-data.mjs',
+    'scripts/frozen-release-updater-feed.mjs', 'scripts/updater-acceptance-process.mjs',
+    'scripts/release-promotion-recovery.mjs',
+  ]) {
+    const rule = rules.find(([pattern]) => pattern.endsWith('*') ? path.startsWith(pattern.slice(0, -1)) : path === pattern)
+    assert.ok(rule && rule.slice(1).some(owner => /^@[A-Za-z0-9-]+(?:\/[A-Za-z0-9-]+)?$/.test(owner)), `${path} must declare a release CODEOWNER`)
+  }
+})
+
 test('approval verifier rejects non-tag refs and missing exact confirmation before reading evidence', () => {
   const sourceHead = 'a'.repeat(40)
   assert.throws(
@@ -257,6 +302,120 @@ test('release evidence can follow a frozen reviewed commit without self-referenc
   const releaseHead = f.tagRelease()
   assert.notEqual(releaseHead, f.reviewedSourceHead)
   assert.match(f.verify(releaseHead), new RegExp(`reviewed source ${f.reviewedSourceHead}`))
+})
+
+test('a passing prose updater report without both machine reports blocks release', t => {
+  const f = releaseFixture(t)
+  delete f.manifest.acceptance.updaterRoundTrip.machineReportPath
+  delete f.manifest.acceptance.updaterRoundTrip.nativeReportPath
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /updaterRoundTrip\.machineReportPath must provide/)
+})
+
+test('a same-version native report cannot be exchanged after the machine report was recorded', t => {
+  const f = releaseFixture(t)
+  f.recordEvidence()
+  f.put(f.manifest.acceptance.updaterRoundTrip.nativeReportPath, JSON.stringify({ ...f.nativeReport, startedAt: 'old-run' }))
+  f.verify(f.tagRelease(), /retained native report digest mismatch/)
+})
+
+test('the committed updater reports require a matching immutable trusted workflow run', async t => {
+  const changes = {
+    missingRun: f => { delete f.manifest.acceptance.updaterRoundTrip.workflowRun },
+    changedRun: f => { f.manifest.acceptance.updaterRoundTrip.workflowRun.runId += 1 },
+    changedAttempt: f => { f.machineReport.provenance.runAttempt += 1 },
+    branchWorkflow: f => { f.machineReport.provenance.workflowRef = UPDATER_WORKFLOW_REF.replace('main', 'codex/feature') },
+    wrongSource: f => { f.machineReport.provenance.sourceHead = 'a'.repeat(40) },
+    unknownArtifact: f => { f.manifest.acceptance.updaterRoundTrip.workflowRun.artifact.name = 'old-updater-report' },
+    noArtifactDigest: f => { delete f.manifest.acceptance.updaterRoundTrip.workflowRun.artifact.digest },
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
+    const f = releaseFixture(st)
+    change(f); f.recordEvidence()
+    f.verify(f.tagRelease(), /updater-evidence/)
+  })
+})
+
+test('updater reports must bind the real official baseline, frozen bytes and completed native path', async t => {
+  const changes = {
+    oldSameSourceProbe: f => { f.machineReport.baseVersion = '0.0.0' },
+    differentTarget: f => { f.machineReport.targetVersion = '0.5.4' },
+    differentBuildRun: f => { f.machineReport.reviewedBuild.runId += 1 },
+    differentBuildAttempt: f => { f.machineReport.reviewedBuild.runAttempt += 1 },
+    differentSource: f => { f.machineReport.reviewedBuild.sourceHead = 'b'.repeat(40) },
+    differentArtifactId: f => { f.machineReport.reviewedBuild.artifacts[0].id += 1 },
+    differentFileHash: f => { f.machineReport.reviewedBuild.files[0].sha256 = 'b'.repeat(64) },
+    differentFileSize: f => { f.machineReport.reviewedBuild.files[0].size += 1 },
+    unpinnedBaseline: f => { f.machineReport.baselineAsset.sha256 = 'b'.repeat(64) },
+    differentZip: f => { f.machineReport.targetZipSha256 = 'b'.repeat(64) },
+    differentManifest: f => { f.machineReport.frozenManifestSha256 = 'b'.repeat(64) },
+    differentInstalledAsar: f => { f.machineReport.installedAsarSha256 = 'b'.repeat(64) },
+    differentUiReviewedAsar: f => { f.manifest.package.identity.asarSha256 = 'b'.repeat(64) },
+    isolatedCandidateIdentity: f => { f.machineReport.installedIdentity.bundleId = 'com.example.candidate' },
+    unsignedInstallation: f => { f.machineReport.installedIdentity.signature = 'unverified' },
+    missingNotarization: f => { f.machineReport.targetIdentity.stapledNotarization = 'unverified' },
+    rejectedGatekeeper: f => { f.machineReport.baselineIdentity.gatekeeper = 'rejected' },
+    differentSigningIdentity: f => { f.machineReport.installedIdentity.designatedRequirement = 'designated => different' },
+    noStrictProbe: f => { f.machineReport.strictNonceProbe.strictProbeRequired = false },
+    noIndependentSentinel: f => { f.machineReport.separateSentinelPreserved = false },
+    failedHistoricalReadback: f => { f.machineReport.dataReadback.status = 'failed' },
+    failedRestartReadback: f => { f.machineReport.dataRestartReadback.status = 'failed' },
+    changedHistoricalSource: f => { f.machineReport.dataReadback.sourceSha256 = 'b'.repeat(64) },
+    noConfigPreservation: f => { f.machineReport.configReferences.status = 'failed' },
+    incompleteDownload: f => { f.machineReport.feedRequests.bytesServed = 99 },
+    absentNativeRequests: f => { f.machineReport.feedRequests.zip = 0 },
+    incompleteCleanup: f => { f.machineReport.steps.pop() },
+    retainedMachineFailure: f => { f.machineReport.failure = 'Cleanup failed' },
+    nativeBaselineWrong: f => { f.nativeReport.baseVersion = '0.0.0' },
+    nativeTargetWrong: f => { f.nativeReport.targetVersion = '0.5.4' },
+    nativeArchWrong: f => { f.nativeReport.arch = 'x64' },
+    browserFallback: f => { f.nativeReport.browserOpened = true },
+    userDataLost: f => { f.nativeReport.userDataPreserved = false },
+    incompleteNativeStages: f => { f.nativeReport.stages.splice(3, 1) },
+    legacyStateFallback: f => { f.nativeReport.stages.at(-1).detail = 'legacy-state:0.5.2' },
+    retainedNativeFailure: f => { f.nativeReport.failure = 'Install failed' },
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
+    const f = releaseFixture(st)
+    change(f)
+    f.recordEvidence()
+    f.verify(f.tagRelease(), /updater evidence|native updater evidence/)
+  })
+})
+
+test('the installed UI review must identify its application ASAR hash', t => {
+  const f = releaseFixture(t)
+  delete f.manifest.package.identity.asarSha256
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /package\.identity must include.*asarSha256/)
+})
+
+test('prose or uncommitted substitutions cannot replace tagged native machine reports', async t => {
+  await t.test('plain prose is not a machine report', st => {
+    const f = releaseFixture(st)
+    f.recordEvidence()
+    f.put(f.manifest.acceptance.updaterRoundTrip.machineReportPath, 'Native updater passed\n')
+    f.verify(f.tagRelease(), /frozen updater machine report is not valid committed JSON/)
+  })
+  await t.test('uncommitted passing JSON cannot replace a tagged failure', st => {
+    const f = releaseFixture(st)
+    f.machineReport.status = 'failed'
+    f.recordEvidence()
+    const head = f.tagRelease()
+    f.machineReport.status = 'passed'
+    f.put(f.manifest.acceptance.updaterRoundTrip.machineReportPath, JSON.stringify(f.machineReport))
+    f.verify(head, /updater evidence machine status mismatch/)
+  })
+  await t.test('native machine report must also be a committed file', st => {
+    const f = releaseFixture(st)
+    f.recordEvidence()
+    f.git('add', '-A')
+    f.git('reset', '--', f.manifest.acceptance.updaterRoundTrip.nativeReportPath)
+    f.git('commit', '-m', 'missing native machine evidence')
+    const head = f.git('rev-parse', 'HEAD')
+    f.git('tag', 'v0.5.3', head)
+    f.verify(head, /regular file committed in the exact release tag/)
+  })
 })
 
 test('unknown reviewed commits are rejected', t => {

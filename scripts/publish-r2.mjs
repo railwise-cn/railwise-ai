@@ -123,7 +123,7 @@ function readArgs(argv) {
       continue
     }
     const name = arg.slice(2)
-    if (name === 'dry-run' || name === 'help' || name === 'h' || name === 'stable' || name === 'frontier') {
+    if (name === 'dry-run' || name === 'help' || name === 'h' || name === 'stable' || name === 'frontier' || name === 'skip-retention') {
       flags.set(name, true)
       continue
     }
@@ -703,9 +703,33 @@ async function verifyRemoteRelease({ flags }) {
   }
 }
 
+export function buildLatestManifest({ platformManifests, channel, tag, publicBaseUrl, basePath, generatedAt }) {
+  const releaseDates = platformManifests.map(manifest => manifest.releaseDate).filter(Boolean).sort()
+  return {
+    schemaVersion: 1,
+    productName: PRODUCT_NAME,
+    channel,
+    version: tag.slice(1),
+    tag,
+    releaseDate: releaseDates.at(-1) ?? generatedAt,
+    generatedAt,
+    githubReleaseUrl: `https://github.com/railwise-cn/railwise-ai/releases/tag/${tag}`,
+    updateBaseUrl: joinUrl(publicBaseUrl, basePath, 'latest') + '/',
+    updateMetadata: Object.fromEntries(platformManifests.map(manifest => [manifest.platform, {
+      fileName: manifest.updateMetadata.fileName,
+      url: joinUrl(publicBaseUrl, basePath, 'latest', manifest.updateMetadata.fileName)
+    }])),
+    downloads: platformManifests.flatMap(manifest => manifest.downloads.map(download => ({
+      ...download, url: joinUrl(publicBaseUrl, basePath, 'latest', download.fileName)
+    })))
+  }
+}
+
 async function promoteRelease({ flags, dryRun }) {
   const tag = normalizeTag(requireFlag(flags, 'tag'))
   const channel = readChannel(flags)
+  const generatedAt = flags.get('generated-at') || new Date().toISOString()
+  if (new Date(generatedAt).toISOString() !== generatedAt) throw new Error('Invalid --generated-at timestamp')
   const requestedPlatforms = flags.has('platforms')
   const platforms = String(flags.get('platforms') || '')
     .split(',')
@@ -783,42 +807,9 @@ async function promoteRelease({ flags, dryRun }) {
   if (versions.size > 1) {
     throw new Error(`Cannot promote mixed versions: ${Array.from(versions).join(', ')}`)
   }
-  const version = platformManifests[0].version
-  const releaseDates = platformManifests
-    .map((manifest) => manifest.releaseDate)
-    .filter(Boolean)
-    .sort()
-  const releaseDate = releaseDates[releaseDates.length - 1] ?? new Date().toISOString()
-
   for (const target of latestTargets) {
-    const downloads = platformManifests.flatMap((manifest) =>
-      manifest.downloads.map((download) => ({
-        ...download,
-        url: joinUrl(config.publicBaseUrl, target.basePath, 'latest', download.fileName)
-      }))
-    )
-
-    const latestManifest = {
-      schemaVersion: 1,
-      productName: PRODUCT_NAME,
-      channel,
-      version,
-      tag,
-      releaseDate,
-      generatedAt: new Date().toISOString(),
-      githubReleaseUrl: `https://github.com/railwise-cn/railwise-ai/releases/tag/${tag}`,
-      updateBaseUrl: joinUrl(config.publicBaseUrl, target.basePath, 'latest') + '/',
-      updateMetadata: Object.fromEntries(
-        platformManifests.map((manifest) => [
-          manifest.platform,
-          {
-            fileName: manifest.updateMetadata.fileName,
-            url: joinUrl(config.publicBaseUrl, target.basePath, 'latest', manifest.updateMetadata.fileName)
-          }
-        ])
-      ),
-      downloads
-    }
+    const latestManifest = buildLatestManifest({ platformManifests, channel, tag,
+      publicBaseUrl: config.publicBaseUrl, basePath: target.basePath, generatedAt })
 
     const latestKey = `${target.basePath}/latest/latest.json`
     await putObject({
@@ -832,7 +823,7 @@ async function promoteRelease({ flags, dryRun }) {
     console.log(`  ${target.label}/latest.json`)
     console.log(`Latest manifest: ${joinUrl(config.publicBaseUrl, target.basePath, 'latest', 'latest.json')}`)
   }
-  await enforceReleaseRetention(config, channel, 3, dryRun)
+  if (!flags.has('skip-retention')) await enforceReleaseRetention(config, channel, 3, dryRun)
 }
 
 async function main() {

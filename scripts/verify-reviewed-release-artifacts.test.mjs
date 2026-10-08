@@ -31,6 +31,7 @@ function fixture(t) {
     const platforms = artifact.name === 'release-mac' ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64']
     receipts[artifact.name] = { schemaVersion: 1, purpose: 'frozen-public-release', repository: RELEASE_REPOSITORY,
       workflowPath: RELEASE_WORKFLOW, runId: build.runId, runAttempt: build.runAttempt, sourceHead,
+      workflowRef: RELEASE_WORKFLOW_REF, workflowSha: sourceHead,
       candidateOnly: true, preparePublicArtifacts: true, publishRelease: false, artifact: artifact.name, version,
       identities: Object.fromEntries(platforms.map(platform => [platform, { ...PUBLIC_IDENTITY, version, sourceHead, updateUrl: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/' }])),
       files: structuredClone(files) }
@@ -45,16 +46,20 @@ function fixture(t) {
 
 function githubFixture(build) {
   const root = `repos/${RELEASE_REPOSITORY}`
+  const mainHead = 'd'.repeat(40)
   const jobs = ['Build macOS', 'Build Windows', 'Two-hour pre-release stability', 'Verify three-client candidate', 'Verify final candidate on macOS'].map(name => ({ name, conclusion: 'success', steps: [{ name: 'Record frozen public package identity', conclusion: 'success' }] }))
   const responses = {
-    [root]: { id: 98, full_name: RELEASE_REPOSITORY },
+    [root]: { id: 98, full_name: RELEASE_REPOSITORY, default_branch: 'main' },
     [`${root}/actions/workflows/release.yml`]: { id: 55, path: RELEASE_WORKFLOW },
-    [`${root}/actions/runs/${build.runId}`]: { id: build.runId, run_attempt: build.runAttempt, workflow_id: 55, path: RELEASE_WORKFLOW, workflow_ref: RELEASE_WORKFLOW_REF, head_branch: 'main', repository: { id: 98 }, head_repository: { id: 98 }, head_sha: sourceHead, event: 'workflow_dispatch', status: 'completed', conclusion: 'success' },
+    // Match GitHub REST: workflow_ref is absent, not a runner context field.
+    [`${root}/actions/runs/${build.runId}`]: { id: build.runId, run_attempt: build.runAttempt, workflow_id: 55, path: RELEASE_WORKFLOW, head_branch: 'main', repository: { id: 98 }, head_repository: { id: 98 }, head_sha: sourceHead, event: 'workflow_dispatch', status: 'completed', conclusion: 'success' },
+    [`${root}/branches/main`]: { name: 'main', protected: true, commit: { sha: mainHead } },
+    [`${root}/compare/${sourceHead}...${mainHead}`]: { status: 'ahead', base_commit: { sha: sourceHead }, merge_base_commit: { sha: sourceHead } },
     [`${root}/actions/runs/${build.runId}/attempts/${build.runAttempt}/jobs?per_page=100&page=1`]: { total_count: jobs.length, jobs },
   }
   for (const artifact of build.artifacts) responses[`${root}/actions/artifacts/${artifact.id}`] = { ...artifact, expired: false, workflow_run: { id: build.runId, run_attempt: build.runAttempt, head_sha: sourceHead, repository_id: 98, head_repository_id: 98 } }
   const api = path => { assert.ok(responses[path], `unexpected API request: ${path}`); return responses[path] }
-  return { root, responses, jobs, api, run: responses[`${root}/actions/runs/${build.runId}`], artifacts: build.artifacts.map(artifact => responses[`${root}/actions/artifacts/${artifact.id}`]) }
+  return { root, responses, jobs, api, branch: responses[`${root}/branches/main`], ancestry: responses[`${root}/compare/${sourceHead}...${mainHead}`], run: responses[`${root}/actions/runs/${build.runId}`], artifacts: build.artifacts.map(artifact => responses[`${root}/actions/artifacts/${artifact.id}`]) }
 }
 
 test('a frozen exact installer/update file set is copied without changing bytes', async t => {
@@ -114,6 +119,9 @@ test('build receipt cannot substitute a different source, candidate or unreviewe
     head: r => { r.sourceHead = 'e'.repeat(40) },
     run: r => { r.runId += 1 },
     attempt: r => { r.runAttempt += 1 },
+    workflowRef: r => { r.workflowRef = `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/heads/codex/feature` },
+    missingWorkflowRef: r => { delete r.workflowRef },
+    workflowSha: r => { r.workflowSha = 'e'.repeat(40) },
     notCandidateBuild: r => { r.candidateOnly = false },
     notPublicIdentityBuild: r => { r.preparePublicArtifacts = false },
     publishingBuild: r => { r.publishRelease = true },
@@ -141,6 +149,16 @@ test('verified output cannot overwrite previous files', async t => {
 
 test('source provenance requires successful trusted workflow and immutable artifact identities', t => {
   const f = fixture(t); const g = githubFixture(f.build)
+  assert.equal(Object.hasOwn(g.run, 'workflow_ref'), false)
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
+})
+
+test('a freeze at the current protected main head uses the real identical comparison shape', t => {
+  const f = fixture(t); const g = githubFixture(f.build)
+  g.branch.commit.sha = sourceHead
+  g.responses[`${g.root}/compare/${sourceHead}...${sourceHead}`] = {
+    status: 'identical', base_commit: { sha: sourceHead }, merge_base_commit: { sha: sourceHead }, commits: [], total_commits: 0,
+  }
   assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
 })
 
@@ -149,7 +167,14 @@ test('wrong repository, workflow, source, attempt, failed runs and arbitrary art
     workflowId: g => { g.run.workflow_id += 1 },
     workflowPath: g => { g.run.path = '.github/workflows/other.yml' },
     headBranch: g => { g.run.head_branch = 'codex/feature' },
-    workflowRef: g => { g.run.workflow_ref = `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/heads/codex/feature` },
+    defaultBranch: g => { g.responses[g.root].default_branch = 'develop' },
+    unprotectedMain: g => { g.branch.protected = false },
+    malformedMain: g => { g.branch.commit.sha = 'main' },
+    divergentSource: g => { g.ancestry.status = 'diverged' },
+    sourceAheadOfMain: g => { g.ancestry.status = 'behind' },
+    wrongMergeBase: g => { g.ancestry.merge_base_commit.sha = 'f'.repeat(40) },
+    wrongComparedSource: g => { g.ancestry.base_commit.sha = 'f'.repeat(40) },
+    falseIdenticalSource: g => { g.ancestry.status = 'identical' },
     fork: g => { g.run.head_repository.id += 1 },
     repository: g => { g.run.repository.id += 1 },
     source: g => { g.run.head_sha = 'f'.repeat(40) },
@@ -179,11 +204,15 @@ test('receipt generation is limited to private public-identity builds and hashes
   const f = fixture(t)
   const dist = join(f.downloads, 'release-win')
   const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: RELEASE_REPOSITORY, CANDIDATE_ONLY: 'true', PREPARE_PUBLIC_ARTIFACTS: 'true', PUBLISH_RELEASE: 'false',
-    GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/heads/codex/test`, GITHUB_SHA: sourceHead, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
+    GITHUB_REF: 'refs/heads/main', GITHUB_WORKFLOW_REF: RELEASE_WORKFLOW_REF, GITHUB_WORKFLOW_SHA: sourceHead, GITHUB_SHA: sourceHead, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
   const inspect = () => f.receipts['release-win'].identities['win32-x64']
   const receipt = await recordReviewedBuild({ dist, platform: 'win', version, env, inspect, verifySource })
   assert.deepEqual(receipt.files, f.build.files.filter(file => file.artifact === 'release-win'))
-  for (const patch of [{ CANDIDATE_ONLY: 'false' }, { PREPARE_PUBLIC_ARTIFACTS: 'false' }, { PUBLISH_RELEASE: 'true' }, { WORKWISE_CANDIDATE: '1' }, { GITHUB_REPOSITORY: 'other/repo' }, { GITHUB_WORKFLOW_REF: 'other/workflow' }]) {
+  assert.equal(receipt.workflowRef, RELEASE_WORKFLOW_REF)
+  assert.equal(receipt.workflowSha, sourceHead)
+  for (const patch of [{ CANDIDATE_ONLY: 'false' }, { PREPARE_PUBLIC_ARTIFACTS: 'false' }, { PUBLISH_RELEASE: 'true' }, { WORKWISE_CANDIDATE: '1' }, { GITHUB_REPOSITORY: 'other/repo' }, { GITHUB_WORKFLOW_REF: 'other/workflow' },
+    { GITHUB_REF: 'refs/tags/main' }, { GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/heads/codex/test` },
+    { GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/tags/main` }, { GITHUB_WORKFLOW_SHA: 'e'.repeat(40) }, { GITHUB_WORKFLOW_SHA: undefined }]) {
     await assert.rejects(() => recordReviewedBuild({ dist, platform: 'win', version, env: { ...env, ...patch }, inspect, verifySource }))
   }
 })
@@ -195,7 +224,7 @@ test('freezing inspects the actual packaged ASAR and updater identity', async t 
   const input = join(f.root, 'asar-input')
   mkdirSync(resources, { recursive: true }); mkdirSync(input)
   const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: RELEASE_REPOSITORY, CANDIDATE_ONLY: 'true', PREPARE_PUBLIC_ARTIFACTS: 'true', PUBLISH_RELEASE: 'false',
-    GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@refs/heads/codex/test`, GITHUB_SHA: sourceHead, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
+    GITHUB_REF: 'refs/heads/main', GITHUB_WORKFLOW_REF: RELEASE_WORKFLOW_REF, GITHUB_WORKFLOW_SHA: sourceHead, GITHUB_SHA: sourceHead, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
   const metadata = { name: 'workwise', productName: 'RailWise AI', version, updateChannel: 'stable', buildProvenance: { sourceHead } }
   const updater = { provider: 'generic', url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', updaterCacheDirName: 'workwise-updater' }
   const pack = async () => {
