@@ -13,7 +13,7 @@ Repository: `railwise-cn/railwise-ai`. Effective maintainer: `railwise-cn`.
 
 | Control | Before | Verified After |
 | --- | --- | --- |
-| main PR reviews | One approval and CODEOWNER approval required | Required-review subresource removed; no fabricated self-approval |
+| main PR reviews | One approval and CODEOWNER approval required | PR-based merge retained; zero approvals, no CODEOWNER or last-pusher approval requirement |
 | Required CI | Three GitHub Actions checks, app 15368, strict | Unchanged |
 | Administrator enforcement | Enabled | Unchanged |
 | Force pushes and branch deletion | Disabled | Unchanged |
@@ -23,10 +23,17 @@ Repository: `railwise-cn/railwise-ai`. Effective maintainer: `railwise-cn`.
 | Default workflow token | contents read; Actions cannot approve PRs | Unchanged |
 | Package acceptance | Computer use, separate AI review, signing, notarization and real updater | Unchanged |
 
-REST readback confirmed `required_pull_request_reviews=null`, all three
-required status checks with `strict=true`, and `enforce_admins.enabled=true`.
+REST readback confirmed `required_approving_review_count=0`,
+`require_code_owner_reviews=false`, `require_last_push_approval=false`, and
+`dismiss_stale_reviews=true`. PR-based merging remains required, together with
+all three required status checks with `strict=true` and
+`enforce_admins.enabled=true`.
 The production environment retained its branch policy and no longer contains
 a `required_reviewers` rule. No collaborator gained write permission.
+
+The required-review subresource was initially removed to clear the deadlock,
+then restored with zero required approvals. The final readback above records
+the effective policy, not the intermediate configuration.
 
 PR #44 merged normally after CI passed, without an administrator bypass, at
 `64b8ab24df502ac321e0f8365493539bf44ff18c` on 2026-10-08 05:34 UTC.

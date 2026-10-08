@@ -42,7 +42,7 @@
 | 仓库 collaborator | API 仅返回 `railwise-cn`，角色 admin | 当前未发现第二个有效维护者账户 |
 | PR #44 作者 | `railwise-cn` | 单维护者模式允许该账户在 CI 通过后合并自己的发布整改 PR |
 | CODEOWNERS | 发布控制及 `docs/qa/release-gates/**` 均为 `@railwise-cn` | 唯一 CODEOWNER 与 PR 作者相同 |
-| main review | 单维护者模式：不要求 PR 批准或 CODEOWNER 审批；`enforce_admins.enabled=true` 和严格状态检查仍保留 | CI、严格检查和标签保护仍然有效；不宣称存在独立人审 |
+| main review | 单维护者模式：保留 PR 合并，人工批准数为 0，不要求 CODEOWNER 或最后推送者审批；`enforce_admins.enabled=true` 和严格状态检查仍保留 | CI、严格检查和标签保护仍然有效；不宣称存在独立人审 |
 | main checks | 三个实际 job 名称、app_id=15368（GitHub Actions）、strict=true | 原 Quality / 前缀导致所有真实检查 isRequired=false，现已修正；GraphQL 确认 6 个实际 check 均 isRequired=true 且 SUCCESS，检查成功不等于独立审核 |
 | production-release | 单维护者模式：移除 required reviewer 规则；环境仍用于发布工作流隔离 | 当前维护者可执行已获授权的发布工作流；不宣称存在独立环境审批 |
 

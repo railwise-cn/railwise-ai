@@ -2,6 +2,8 @@
 
 日期：2026-10-08。仓库：`railwise-cn/railwise-ai`；分支：`main`。类型：仓库门禁配置审计，包含独立 AI 只读复核。
 
+治理状态更新：本文的人工审批配置是修正检查名称时的历史快照，已被用户明确授权的[单维护者发布规则](single-maintainer-mode-20261008.md)取代。三个严格必需检查继续有效；PR 合并的人工批准数为 0，生产环境不再要求审核人。原回读记录保留以便追溯。
+
 ## 问题与证据
 
 REST 与 GraphQL 的 branch protection 配置将三个必需检查写为 `Quality / ...` 且 app 未限定。真实 GitHub Actions CheckRun 名称没有该前缀。独立代理 `transaction_independent_review` 读取 PR #44，确认当时全部 6 个真实 check 的 `isRequired(pullRequestNumber:44)=false`。历史成功提交 `e83e4d9b` 的真实检查也使用相同裸名称，因此该配置不能匹配实际 CI。

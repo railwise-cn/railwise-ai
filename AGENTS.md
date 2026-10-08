@@ -2,6 +2,7 @@
 
 ## Release gate
 
+- Single-maintainer publication mode is explicitly authorized. The current maintainer may review, merge, and publish approved releases after the required checks and package acceptance pass; no second GitHub maintainer, human PR/CODEOWNER approval, or production-environment reviewer is required. Keep PR-based merging, strict required CI, administrator enforcement, tag protection, and the production tag deployment policy.
 - Do not change the public version, create or move a Git tag, publish or edit a GitHub Release, promote a stable or frontier feed, or update the official download page without explicit user approval naming the exact version and action.
 - CI success, unit tests, a successful build, or a green GitHub Action is necessary evidence but is never release approval.
 - Candidate builds must use a private, isolated feed and must never be promoted to `stable` or advertised as an official release.
