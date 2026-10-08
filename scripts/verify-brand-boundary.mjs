@@ -47,6 +47,9 @@ const allowedFiles = [
   // so it can validate and migrate existing installations without exposing them
   // in product UI or user-facing copy.
   /^scripts\/(?:run-frozen-release-updater-acceptance|verify-reviewed-release-artifacts)\.mjs$/,
+  // This private QA tool protects/restores exact legacy storage names and
+  // detects old application processes. It is never bundled as product UI.
+  /^docs\/qa\/release-gates\/v0\.5\.3\/normal-profile-protection\.mjs$/,
   /^src\/main\/claw-schedule-mcp-config\.test\.ts$/,
   /^src\/main\/services\/(?:agent-pack|skill)-service\.test\.ts$/,
   /^src\/preload\/index(?:\.d)?\.ts$/,
