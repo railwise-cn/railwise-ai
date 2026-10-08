@@ -1,5 +1,6 @@
-import { beginEngineeringJourney, leaveEngineeringJourney, recordEngineeringUsage } from './engineering-usage'
+import { beginEngineeringJourney, leaveEngineeringJourney, recordEngineeringJourneyFailure, recordEngineeringUsage } from './engineering-usage'
 import { EngineeringDrawer } from './EngineeringDrawer'
+import { SurveyCollaborationPanel } from './SurveyCollaborationPanel'
 import { engineeringImportKind, type EngineeringImportKind } from './engineering-import'
 import { SURVEY_FILE_ACCEPT } from './survey-file-selection'
 import { openGeneratedWorkspaceFile, saveGeneratedWorkspaceFileAs } from '../../lib/generated-file-actions'
@@ -40,7 +41,7 @@ import {
 } from 'lucide-react'
 import { readBrowserStorageItem, writeBrowserStorageItem } from '../../lib/browser-storage'
 import { surveyDiagnosticText, surveyRuntimeErrorText } from './survey-diagnostic-text'
-import { surveyDatumLabel } from './survey-summary'
+import { surveyDatumLabel, surveyNetworkReferencesReady } from './survey-summary'
 import appI18n from '../../i18n'
 import { ENGINEERING_TREND_RENDERER_VERSION, ENGINEERING_ANALYSIS_ALGORITHM_VERSION } from '@shared/engineering-chart'
 import { rendererRuntimeClient } from '../../agent/runtime-client'
@@ -53,9 +54,11 @@ import { engineeringTaskTypes, engineeringTaskLabel, surveyNetworkTypeLabel } fr
 import { prepareEngineeringQuestion, type EngineeringEvidenceReference } from './engineering-conversation-drafts'
 import { EngineeringEvidenceQuestion, EngineeringEvidenceQuestions } from './EngineeringEvidenceQuestion'
 import { EngineeringSkillsPanel } from './EngineeringSkillsPanel'
+import { professionalCitationDisplay, professionalCitationLocator, professionalCitationSource } from './engineering-citation-text'
 import { ThresholdFields, parseThresholds } from './ThresholdFields'
 import { EngineeringManifestVerification } from './EngineeringManifestVerification'
 import { validEngineeringReportPeriod } from './engineering-report-period'
+import { surveySourceFormatLabel } from './survey-source-format-labels'
 import {
   activeEngineeringProjectId,
   chooseEngineeringProjectId,
@@ -126,6 +129,15 @@ type Analysis = {
 }
 
 type Output = { path: string; mediaType: string; sha256: string; sizeBytes: number }
+// Internal review records remain in the manifest for traceability, but belong
+// in the advanced archive view rather than the ordinary delivery list.
+function isInternalDeliveryOutput(output: Output): boolean {
+  const name = output.path.split(/[\\/]/).pop()?.toLowerCase() ?? ''
+  return name === 'professional-review.json'
+    || name === 'evidence.xlsx'
+    || name.endsWith('.sha256')
+    || name.endsWith('.hash')
+}
 type Chart = { id: string; chartType: string; relativePath: string; sha256: string; validation: string }
 type Citation = { id: string; sourceType: 'attachment' | 'knowledge-base' | 'standard' | 'other'; source: string; locator?: string }
 type Run = { id: string; datasetId?: string; analysisId?: string; status: string; revision: number; createdAt: string; updatedAt: string; error?: string }
@@ -140,7 +152,7 @@ type SurveyNetworkSummary = {
   verticalDatum?: string
   knownPoints?: Array<{ id: string }>
   unknownPoints?: Array<{ id: string }>
-  observations?: Array<{ station?: string; from?: string; to?: string }>
+  observations?: Array<{ station?: string; from?: string; to?: string; type?: string; targetHeight?: number }>
   qualityStatus?: string
   sourceFile?: {
     name: string
@@ -391,6 +403,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const savedSourceMode = readBrowserStorageItem(`workwise.survey.source-kind.v1:${stageScope}`)
   const sourceMode = sourceModes[stageScope] ?? (savedSourceMode === 'survey' || savedSourceMode === 'monitoring' ? savedSourceMode : ['source', 'survey', 'precision'].includes(tab) ? 'survey' : 'auto')
   const setTab = useCallback((next: TabId): void => {
+    setNotice((current) => current && (current.tone === 'success' || current.tone === 'info') ? null : current)
     if (!ADVANCED_TABS.includes(next)) { setBackgroundTab(next); setAdvancedOpen(false) }
     const mode = ['source', 'survey', 'precision'].includes(next) ? 'survey' : ['data', 'quality', 'analysis'].includes(next) ? 'monitoring' : null
     if (mode) {
@@ -651,6 +664,11 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const activeSurveyNetwork = sourceMode === 'monitoring' ? null : selectedSurveyNetworkId
     ? surveyNetworks.find((network) => network.id === selectedSurveyNetworkId) ?? null
     : surveyNetworks[0] ?? null
+  const activeSurveyNetworkReferencesReady = activeSurveyNetwork ? surveyNetworkReferencesReady(activeSurveyNetwork) : false
+  const surveyAdjustmentIsAdmitted = (item: SurveyAdjustmentSummary): boolean => {
+    const network = surveyNetworks.find((candidate) => candidate.id === item.run.networkId)
+    return Boolean(network && item.run.status === 'completed' && item.result?.validation === 'valid' && item.sourceEligibility?.eligible === true && surveyNetworkReferencesReady(network))
+  }
   // A project's saved datum describes the task until a network exists. Once
   // selected, the network's own missing datum must remain visibly unresolved.
   const surveySummaryDatum = activeSurveyNetwork ?? overview?.project.taskContext
@@ -659,8 +677,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   // from the current Runtime read model; missing or revoked admission fails closed.
   const surveyAdjustmentIds = surveyAdjustments.filter((item) =>
     (requestedSurveyAdjustmentIds.includes(item.run.id) || item === latestSurveyAdjustment)
-    && item.run.status === 'completed' && item.result?.validation === 'valid'
-    && item.sourceEligibility?.eligible === true
+    && surveyAdjustmentIsAdmitted(item)
   ).map((item) => item.run.id)
   const hasSurveyDeliveryInputs = surveyAdjustmentIds.length > 0 || surveyDeformationIds.length > 0
   const hasDeliveryInputs = Boolean(activeDataset || hasSurveyDeliveryInputs)
@@ -673,7 +690,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const comparisonAdjustmentIds = [...new Set(previewComparisons.flatMap(item => [item.referenceAdjustmentId, item.currentAdjustmentId]))]
   const comparisonInputsAdmitted = previewComparisons.length > 0
     && previewComparisons.every(item => item.projectId === overview?.project.id && item.referenceAdjustmentId !== item.currentAdjustmentId)
-    && comparisonAdjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && item.run.status === 'completed' && item.result?.validation === 'valid' && item.sourceEligibility?.eligible === true))
+    && comparisonAdjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && surveyAdjustmentIsAdmitted(item)))
     && Boolean(displayedPreview?.adjustments && comparisonAdjustmentIds.length === displayedPreview.adjustments.length
       && displayedPreview.adjustments.every(item => comparisonAdjustmentIds.includes(item.runId) && item.validation === 'valid')
       && new Set(displayedPreview.adjustments.map(item => item.runId)).size === comparisonAdjustmentIds.length)
@@ -700,7 +717,10 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const surveyClosureUnit = surveyClosureKey ? latestSurveyAdjustment?.result?.closureUnits?.[surveyClosureKey] : undefined
   const surveyPrecision = latestSurveyAdjustment?.result?.precision
   const surveyHasBlockingAdmission = latestSurveyAdjustment?.sourceEligibility?.eligible === false
+    || Boolean(activeSurveyNetwork && !activeSurveyNetworkReferencesReady)
     || latestSurveyAdjustment?.result?.validation === 'invalid' || latestSurveyAdjustment?.run.status === 'failed'
+  const surveyDatumGateBlocked = Boolean(activeSurveyNetwork && !activeSurveyNetworkReferencesReady)
+  const surveyHistoricalResultAvailable = Boolean(latestSurveyAdjustment?.run.status === 'completed' && latestSurveyAdjustment.result?.validation === 'valid')
 
   const refreshCurrent = async (preserveDraft = false): Promise<void> => {
     const operationScope = requestScope.current
@@ -856,7 +876,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       }
       setNotice({ tone: 'success', message: t('engineeringNoticeWarningAccepted') })
     } catch (error) {
-      if (operationScope === requestScope.current) setNotice({ tone: 'error', message: engineeringUserError(error, locale) })
+      if (operationScope === requestScope.current) { recordEngineeringJourneyFailure(); setNotice({ tone: 'error', message: engineeringUserError(error, locale) }) }
     } finally { if (operationScope === requestScope.current) setBusy(false) }
   }
 
@@ -983,7 +1003,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
     const parsed = SurveySegmentComparisonV1.parse(comparison)
     const adjustmentIds = [parsed.referenceAdjustmentId, parsed.currentAdjustmentId]
     if (!runtimeReady || busy || !overview || parsed.projectId !== overview.project.id || adjustmentIds[0] === adjustmentIds[1]
-      || !adjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && item.run.status === 'completed' && item.result?.validation === 'valid' && item.sourceEligibility?.eligible === true))) {
+      || !adjustmentIds.every(id => surveyAdjustments.some(item => item.run.id === id && surveyAdjustmentIsAdmitted(item)))) {
       throw new Error(t('surveyPeriodExportStale'))
     }
     const operationScope = requestScope.current
@@ -1038,6 +1058,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
         || result.manifest.deformations?.length)) throw new Error(t('surveyPeriodExportMismatch'))
       await loadOverview(overview.project.id)
       if (operationScope !== requestScope.current) return
+      setPreview(null)
       setNotice({ tone: 'success', message: t('engineeringNoticeManifestCreated') })
     } catch (error) {
       if (operationScope !== requestScope.current) return
@@ -1066,6 +1087,8 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   }
 
   const manifestOutputs = displayedPreview?.files ?? latestManifest?.outputs ?? []
+  const professionalOutputs = manifestOutputs.filter((output) => !isInternalDeliveryOutput(output))
+  const internalOutputs = manifestOutputs.filter(isInternalDeliveryOutput)
   const deliveryCitations = displayedPreview?.citations ?? latestManifest?.citations ?? citations
   const displayTab = ADVANCED_TABS.includes(tab) ? backgroundTab : tab
   const currentStage = stageForTab(displayTab)
@@ -1073,17 +1096,17 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const aiVisible = aiOpen || tab === 'ai-command'
   const closeAdvanced = (): void => { setAdvancedOpen(false); if (ADVANCED_TABS.includes(tab)) setTab(backgroundTab) }
   const closeAi = (): void => { setAiOpen(false); if (tab === 'ai-command') setTab('dashboard') }
-  const sourceFormat = activeSurveyNetwork?.sourceFile?.detection?.format?.toUpperCase()
-    ?? activeDataset?.sourceFileName.split('.').pop()?.toUpperCase()
-    ?? '—'
+  const detectedFormat = activeSurveyNetwork?.sourceFile?.detection?.format
+  const sourceFormatValue = detectedFormat ?? activeDataset?.sourceFileName.split('.').pop()
+  const sourceFormat = sourceFormatValue ? surveySourceFormatLabel(t, sourceFormatValue, locale) : '—'
   const readiness = warningFindings.length && !blockingFindings.length ? 'needs-confirmation' : surveyReadiness({
     blocked: surveyHasBlockingAdmission || blockingFindings.length > 0,
     disposition: surveySourceDisposition,
-    networkValidated: activeSurveyNetwork?.qualityStatus === 'validated',
+    networkValidated: activeSurveyNetwork?.qualityStatus === 'validated' && activeSurveyNetworkReferencesReady,
     datasetValidated: activeDataset?.status === 'validated',
     hasSource: Boolean(activeSurveyNetwork || activeDataset),
     hasResult: Boolean(activeAnalysis || (latestSurveyAdjustment && surveyAdjustmentIds.includes(latestSurveyAdjustment.run.id))),
-    hasOutputs: manifestOutputs.length > 0,
+    hasOutputs: professionalOutputs.length > 0,
     reviewStatus: latestManifest?.reviewStatus,
     manifestValid: latestManifest?.validation.valid === true
   })
@@ -1091,6 +1114,11 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const monitoringWorkflow = Boolean(activeDataset) || overview?.project.taskType === 'deformation-monitoring'
   const surveyResultCurrent = Boolean(latestSurveyAdjustment && surveyAdjustmentIds.includes(latestSurveyAdjustment.run.id))
   const overviewSource = activeDataset?.sourceFileName ?? activeSurveyNetwork?.sourceFile?.name
+  const renderDeliveryOutput = (output: Output): ReactElement => {
+    const outputName = output.path.split(/[\\/]/).pop() ?? output.path
+    const outputFormat = outputName.includes('.') ? outputName.split('.').pop()?.toUpperCase() ?? '' : output.mediaType.split('/').pop()?.toUpperCase() ?? ''
+    return <div key={output.path + output.sha256} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-3"><div className="min-w-0"><p className="break-all text-[13px] font-medium text-ds-ink">{outputName}</p><p className="mt-1 text-[11px] text-ds-muted">{outputFormat} · {formatBytes(output.sizeBytes, locale)}</p><div className="mt-2 flex gap-3"><button type="button" disabled={!runtimeReady} onClick={() => void exportOutput(output, true)} className="min-h-11 text-[12px] text-accent disabled:opacity-50">{t('engineeringPreviewFile')}</button><button type="button" disabled={!runtimeReady} onClick={() => void exportOutput(output)} className="min-h-11 text-[12px] text-accent disabled:opacity-50">{t('engineeringExportFile', { format: outputFormat })}</button></div><button type="button" aria-label={t('surveyAskEvidence', { label: outputName })} onClick={() => askAboutDelivery(outputName, { section: 'deliverables', runId: displayedPreview?.run.id ?? latestManifest?.runId, manifestId: displayedPreview ? undefined : latestManifest?.id, outputPath: output.path, outputSha256: output.sha256 })} className="mt-1 text-[11px] text-accent">{t('surveyAskAgent')}</button></div></div>
+  }
 
   return <EngineeringEvidenceQuestions scope={overview ? { workspace: overview.project.workspace, projectId: overview.project.id, projectRevision: overview.project.revision, ready: runtimeReady, focus: () => { setAiOpen(true); window.requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.engineering-persistent-chat textarea')?.focus()) } } : null}><div ref={workspaceElement} className={`engineering-workspace ds-no-drag flex min-h-0 flex-1 flex-col bg-ds-main text-ds-ink ${tab === 'ai-command' ? 'engineering-agent-route' : 'engineering-classic-route'}`}>
     <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-ds-border-muted bg-ds-card px-3 py-2" data-testid="engineering-workspace-header">
@@ -1135,8 +1163,9 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       <div className="grid grid-cols-1 gap-px bg-ds-border-muted sm:grid-cols-3">
         <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringCurrentSource')}</span><strong className="mt-0.5 block truncate text-ds-ink">{activeSurveyNetwork?.sourceFile?.name ?? activeDataset?.sourceFileName ?? t('engineeringSummaryNoDataset')}</strong></div>
         <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringCurrentStatus')}</span><strong className={`mt-0.5 block truncate ${readiness === 'blocked' ? 'text-red-700 dark:text-red-300' : readiness === 'adjustment-ready' ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'}`}>{readinessLabel}</strong></div>
-        <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringLatestResult')}</span><strong className="mt-0.5 block truncate text-ds-ink">{activeAnalysis ? t('engineeringSummaryResults', { count: activeAnalysis.results.length }) : manifestOutputs.length ? t('engineeringSummaryCandidate') : surveyResultCurrent ? t('engineeringReviewSurveyAnalysis') : '—'}</strong></div>
+        <div className="bg-ds-card px-3 py-2.5"><span className="block text-ds-faint">{t('engineeringLatestResult')}</span><strong className="mt-0.5 block truncate text-ds-ink">{activeAnalysis ? t('engineeringSummaryResults', { count: activeAnalysis.results.length }) : manifestOutputs.length ? t('engineeringSummaryCandidate') : surveyResultCurrent ? t('engineeringReviewSurveyAnalysis') : surveyHistoricalResultAvailable ? t('engineeringSurveyHistoricalResult') : '—'}</strong></div>
       </div>
+      {surveyDatumGateBlocked ? <p role="note" data-testid="engineering-survey-datum-gate" className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">{t('engineeringSurveyDatumGate')}</p> : null}
       <details className="engineering-advanced-metrics border-t border-ds-border-muted px-3 py-2">
         <summary className="cursor-pointer select-none text-[11px] font-medium text-ds-muted">{t('engineeringMoreMetrics')}</summary>
         <div className="mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ds-border-muted bg-ds-border-muted sm:grid-cols-4">
@@ -1257,7 +1286,8 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
             {(displayTab === 'deliverables' || displayTab === 'review') ? <section>
               {previewComparisons.length ? <div role="status" tabIndex={-1} data-comparison-delivery className="border-b border-ds-border-muted px-5 py-3 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><p className="font-medium text-ds-ink">{t('surveyPeriodComparisonTitle')}</p>{previewComparisons.map(item => <p key={item.id} className="mt-1 break-words text-ds-muted">{t('surveyPeriodExportScope', { reference: item.referenceEpoch, current: item.currentEpoch, count: item.segments.length })}</p>)}{comparisonPreviewStale ? <p className="mt-2 text-amber-700 dark:text-amber-300">{t('surveyPeriodExportStale')}</p> : null}</div> : null}
               <PanelHeading title={t('engineeringDeliverablesTitle')} description={t('engineeringDeliverablesDescription')} action={<button type="button" onClick={() => void previewDeliverables()} disabled={!runtimeReady || busy || !hasDeliveryInputs} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-semibold text-white disabled:opacity-50"><FileOutput className="h-3.5 w-3.5" />{t('engineeringGeneratePreview')}</button>} />
-              {!hasDeliveryInputs ? <EmptyState title={t('engineeringChooseDataset')} detail={t('engineeringDeliverablesEmptyDetail')} /> : <div className="p-5"><div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,360px),1fr))] gap-5"><div><div className="border border-ds-border-muted"><div className="flex flex-wrap items-start justify-between gap-2 border-b border-ds-border-muted px-3 py-3"><div className="min-w-0 flex-1"><p className="text-[13px] font-semibold text-ds-ink">{t('engineeringPreviewOutput')}</p><p className="mt-0.5 text-[11px] text-ds-faint">{t(manifestOutputs.length ? displayedPreview && !preview ? 'engineeringDraftRestored' : 'engineeringDraftReady' : 'engineeringPreviewNotGenerated')}</p></div>{!displayedPreview && latestManifest ? <span className="shrink-0 whitespace-nowrap rounded bg-blue-100 px-1.5 py-0.5 text-[10.5px] text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">{t('engineeringReviewStatus')}: {statusLabel(latestManifest.reviewStatus, t)}</span> : displayedPreview ? <span className="shrink-0 whitespace-nowrap rounded bg-blue-100 px-1.5 py-0.5 text-[10.5px] text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">{t('engineeringNotArchived')}</span> : null}</div>{deliveryCitations.length ? <div className="border-b border-ds-border-muted px-3 py-3"><p className="mb-1 text-[11px] font-medium text-ds-muted">{t('engineeringSourceCitations')}</p>{deliveryCitations.map((citation) => <p key={citation.id} className="text-[11px] leading-5 text-ds-muted">{citation.source}{citation.locator ? ' · ' + citation.locator : ''}</p>)}</div> : null}{manifestOutputs.length ? <div className="divide-y divide-ds-border-muted">{manifestOutputs.map((output) => { const outputName = output.path.split(/[\\/]/).pop() ?? output.path; const outputFormat = outputName.includes('.') ? outputName.split('.').pop()?.toUpperCase() ?? '' : output.mediaType.split('/').pop()?.toUpperCase() ?? ''; return <div key={output.path + output.sha256} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-3"><div className="min-w-0"><p className="break-all text-[13px] font-medium text-ds-ink">{outputName}</p><p className="mt-1 text-[11px] text-ds-muted">{outputFormat} · {formatBytes(output.sizeBytes, locale)}</p><div className="mt-2 flex gap-3"><button type="button" disabled={!runtimeReady} onClick={() => void exportOutput(output, true)} className="min-h-11 text-[12px] text-accent disabled:opacity-50">{t('engineeringPreviewFile')}</button><button type="button" disabled={!runtimeReady} onClick={() => void exportOutput(output)} className="min-h-11 text-[12px] text-accent disabled:opacity-50">{t('engineeringExportFile', { format: outputFormat })}</button></div><button type="button" aria-label={t('surveyAskEvidence', { label: outputName })} onClick={() => askAboutDelivery(output.path, { section: 'deliverables', runId: displayedPreview?.run.id ?? latestManifest?.runId, manifestId: displayedPreview ? undefined : latestManifest?.id, outputPath: output.path, outputSha256: output.sha256 })} className="mt-1 text-[11px] text-accent">{t('surveyAskAgent')}</button></div></div>})}</div> : <div className="px-3 py-12 text-center text-[12px] text-ds-muted">{t(overview.latestPreviewUnavailable ? 'engineeringRecordedPreviewUnavailable' : 'engineeringPreviewEmpty')}</div>}</div>{latestRun ? <details className="mt-4 border border-ds-border-muted px-3 py-3 text-[12px]"><summary className="cursor-pointer">{t('engineeringAdvancedDetails')}</summary><div><p className="font-medium text-ds-ink">{t('engineeringLatestRun')}</p><p className="mt-1 text-ds-muted">{statusLabel(latestRun.status, t)} · {formatDate(latestRun.updatedAt, locale)}</p>{latestRun.error ? <p className="mt-1 text-red-700 dark:text-red-300">{surveyRuntimeErrorText(latestRun.error, locale)}</p> : null}</div></details> : null}</div><details className="self-start border border-ds-border-muted bg-ds-card"><summary className="cursor-pointer px-3 py-3 text-sm text-ds-muted">{t('engineeringCitations')}</summary><div className="border-b border-ds-border-muted px-3 py-3"><p className="text-[13px] font-semibold text-ds-ink">{t('engineeringCitations')}</p><p className="mt-1 text-[11px] leading-4 text-ds-faint">{t('engineeringCitationsDescription')}</p></div><div className="space-y-2 px-3 py-3"><select aria-label={t('engineeringCitationType')} value={citationType} onChange={(event) => setCitationType(event.target.value as Citation['sourceType'])} className="h-8 w-full rounded-md border border-ds-border bg-ds-card px-2 text-[12px] text-ds-ink outline-none focus:border-accent"><option value="standard">{t('engineeringStandardClause')}</option><option value="knowledge-base">{t('engineeringKnowledgeBase')}</option><option value="attachment">{t('engineeringLocalAttachment')}</option><option value="other">{t('engineeringOtherSource')}</option></select><input aria-label={t('engineeringSourceNamePlaceholder')} value={citationSource} onChange={(event) => setCitationSource(event.target.value)} placeholder={t('engineeringSourceNamePlaceholder')} className="h-8 w-full rounded-md border border-ds-border bg-ds-card px-2.5 text-[12px] text-ds-ink outline-none focus:border-accent" /><input aria-label={t('engineeringLocatorPlaceholder')} value={citationLocator} onChange={(event) => setCitationLocator(event.target.value)} placeholder={t('engineeringLocatorPlaceholder')} className="h-8 w-full rounded-md border border-ds-border bg-ds-card px-2.5 text-[12px] text-ds-ink outline-none focus:border-accent" /><button type="button" onClick={addCitation} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-ds-border px-2.5 text-[12px] font-medium text-ds-ink hover:bg-ds-hover"><Plus className="h-3.5 w-3.5" />{t('engineeringAddCitation')}</button></div><div className="divide-y divide-ds-border-muted border-t border-ds-border-muted">{citations.length ? citations.map((citation) => <div key={citation.id} className="group flex gap-2 px-3 py-2.5"><FileCheck2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" /><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-medium text-ds-ink">{citation.source}</p><p className="mt-0.5 truncate text-[10.5px] text-ds-faint">{t(({ standard: 'engineeringStandardClause', 'knowledge-base': 'engineeringKnowledgeBase', attachment: 'engineeringLocalAttachment', other: 'engineeringOtherSource' } as const)[citation.sourceType])}{citation.locator ? ` · ${citation.locator}` : ''}</p></div><button type="button" onClick={() => setCitations((current) => current.filter((item) => item.id !== citation.id))} className="text-ds-faint opacity-0 transition hover:text-red-600 group-hover:opacity-100 focus-visible:opacity-100" aria-label={t('engineeringRemoveCitation', { source: citation.source })}>×</button></div>) : <p className="px-3 py-4 text-[11px] text-ds-faint">{t('engineeringNoCitations')}</p>}</div></details></div></div>}
+              <SurveyCollaborationPanel binding={{projectId:overview.project.id,projectRevision:overview.project.revision,workspaceRoot:overview.project.workspace}} manifestId={displayedPreview ? undefined : latestManifest?.id} manifests={overview.manifests} enabled={runtimeReady&&!busy} />
+              {!hasDeliveryInputs ? <EmptyState title={t('engineeringChooseDataset')} detail={t('engineeringDeliverablesEmptyDetail')} /> : <div className="p-5"><div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,360px),1fr))] gap-5"><div><div className="border border-ds-border-muted"><div className="flex flex-wrap items-start justify-between gap-2 border-b border-ds-border-muted px-3 py-3"><div className="min-w-0 flex-1"><p className="text-[13px] font-semibold text-ds-ink">{t('engineeringPreviewOutput')}</p><p className="mt-0.5 text-[11px] text-ds-faint">{t(manifestOutputs.length ? displayedPreview && !preview ? 'engineeringDraftRestored' : 'engineeringDraftReady' : 'engineeringPreviewNotGenerated')}</p></div>{!displayedPreview && latestManifest ? <span className="shrink-0 whitespace-nowrap rounded bg-blue-100 px-1.5 py-0.5 text-[10.5px] text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">{t('engineeringReviewStatus')}: {statusLabel(latestManifest.reviewStatus, t)}</span> : displayedPreview ? <span className="shrink-0 whitespace-nowrap rounded bg-blue-100 px-1.5 py-0.5 text-[10.5px] text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">{t('engineeringNotArchived')}</span> : null}</div>{deliveryCitations.length ? <div className="border-b border-ds-border-muted px-3 py-3"><p className="mb-1 text-[11px] font-medium text-ds-muted">{t('engineeringSourceCitations')}</p>{deliveryCitations.map((citation) => <p key={citation.id} className="text-[11px] leading-5 text-ds-muted">{professionalCitationDisplay(citation.source, citation.sourceType, citation.locator, locale.startsWith('en'))}</p>)}</div> : null}{professionalOutputs.length ? <div className="divide-y divide-ds-border-muted">{professionalOutputs.map(renderDeliveryOutput)}</div> : <div className="px-3 py-12 text-center text-[12px] text-ds-muted">{t(overview.latestPreviewUnavailable ? 'engineeringRecordedPreviewUnavailable' : 'engineeringPreviewEmpty')}</div>}{internalOutputs.length ? <details className="border-t border-ds-border-muted px-3 py-3"><summary className="cursor-pointer text-[12px] font-medium text-ds-muted">{t('engineeringInternalRecords')}</summary><p className="mt-2 text-[11px] leading-5 text-ds-faint">{t('engineeringInternalRecordsDescription')}</p><div className="mt-2 divide-y divide-ds-border-muted">{internalOutputs.map(renderDeliveryOutput)}</div></details> : null}</div>{latestRun ? <details className="mt-4 border border-ds-border-muted px-3 py-3 text-[12px]"><summary className="cursor-pointer">{t('engineeringAdvancedDetails')}</summary><div><p className="font-medium text-ds-ink">{t('engineeringLatestRun')}</p><p className="mt-1 text-ds-muted">{statusLabel(latestRun.status, t)} · {formatDate(latestRun.updatedAt, locale)}</p>{latestRun.error ? <p className="mt-1 text-red-700 dark:text-red-300">{surveyRuntimeErrorText(latestRun.error, locale)}</p> : null}</div></details> : null}</div><details className="self-start border border-ds-border-muted bg-ds-card"><summary className="cursor-pointer px-3 py-3 text-sm text-ds-muted">{t('engineeringCitations')}</summary><div className="border-b border-ds-border-muted px-3 py-3"><p className="text-[13px] font-semibold text-ds-ink">{t('engineeringCitations')}</p><p className="mt-1 text-[11px] leading-4 text-ds-faint">{t('engineeringCitationsDescription')}</p></div><div className="space-y-2 px-3 py-3"><select aria-label={t('engineeringCitationType')} value={citationType} onChange={(event) => setCitationType(event.target.value as Citation['sourceType'])} className="h-8 w-full rounded-md border border-ds-border bg-ds-card px-2 text-[12px] text-ds-ink outline-none focus:border-accent"><option value="standard">{t('engineeringStandardClause')}</option><option value="knowledge-base">{t('engineeringKnowledgeBase')}</option><option value="attachment">{t('engineeringLocalAttachment')}</option><option value="other">{t('engineeringOtherSource')}</option></select><input aria-label={t('engineeringSourceNamePlaceholder')} value={citationSource} onChange={(event) => setCitationSource(event.target.value)} placeholder={t('engineeringSourceNamePlaceholder')} className="h-8 w-full rounded-md border border-ds-border bg-ds-card px-2.5 text-[12px] text-ds-ink outline-none focus:border-accent" /><input aria-label={t('engineeringLocatorPlaceholder')} value={citationLocator} onChange={(event) => setCitationLocator(event.target.value)} placeholder={t('engineeringLocatorPlaceholder')} className="h-8 w-full rounded-md border border-ds-border bg-ds-card px-2.5 text-[12px] text-ds-ink outline-none focus:border-accent" /><button type="button" onClick={addCitation} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-ds-border px-2.5 text-[12px] font-medium text-ds-ink hover:bg-ds-hover"><Plus className="h-3.5 w-3.5" />{t('engineeringAddCitation')}</button></div><div className="divide-y divide-ds-border-muted border-t border-ds-border-muted">{citations.length ? citations.map((citation) => <div key={citation.id} className="group flex gap-2 px-3 py-2.5"><FileCheck2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" /><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-medium text-ds-ink">{professionalCitationSource(citation.source, citation.sourceType, locale.startsWith('en'))}</p><p className="mt-0.5 truncate text-[10.5px] text-ds-faint">{t(({ standard: 'engineeringStandardClause', 'knowledge-base': 'engineeringKnowledgeBase', attachment: 'engineeringLocalAttachment', other: 'engineeringOtherSource' } as const)[citation.sourceType])}{professionalCitationLocator(citation.locator) ? ` · ${professionalCitationLocator(citation.locator)}` : ''}</p></div><button type="button" onClick={() => setCitations((current) => current.filter((item) => item.id !== citation.id))} className="text-ds-faint opacity-0 transition hover:text-red-600 group-hover:opacity-100 focus-visible:opacity-100" aria-label={t('engineeringRemoveCitation', { source: professionalCitationSource(citation.source, citation.sourceType, locale.startsWith('en')) })}>×</button></div>) : <p className="px-3 py-4 text-[11px] text-ds-faint">{t('engineeringNoCitations')}</p>}</div></details></div></div>}
             </section> : null}
 
             {(displayTab === 'review' || displayTab === 'deliverables') ? <details className="m-4 rounded-lg border border-ds-border p-3" open={evidenceNavigation?.kind === 'artifact' ? true : undefined}><summary className="min-h-11 cursor-pointer text-sm font-medium text-ds-muted">{t('engineeringArchiveDetails')}</summary><section>
@@ -1278,7 +1308,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
                         <ReviewRow ok={previewComparisons.length ? comparisonPreviewCurrent : blockingFindings.length === 0 && hasDeliveryInputs} label={t('engineeringReviewBlockersCleared')} detail={previewComparisons.length ? t(comparisonPreviewCurrent ? 'engineeringReviewNoBlockers' : 'surveyPeriodExportStale') : blockingFindings.length ? t('engineeringReviewBlockersRemaining', { count: blockingFindings.length }) : t('engineeringReviewNoBlockers')} />
                         <ReviewRow ok={previewComparisons.length ? comparisonPreviewCurrent : warningFindings.length === 0 && hasDeliveryInputs} label={t('engineeringReviewWarningsConfirmed')} detail={previewComparisons.length ? t('surveyProfessionalNotEvaluated') : warningFindings.length ? t('engineeringReviewWarningsRemaining', { count: warningFindings.length }) : acceptedWarnings ? t('engineeringReviewWarningsAccepted', { count: acceptedWarnings }) : t('engineeringReviewNoWarnings')} />
                         <ReviewRow ok={previewComparisons.length ? comparisonPreviewCurrent : hasDeliveryAnalysis} label={t('engineeringReviewAnalysisDone')} detail={previewComparisons.length ? t('engineeringReviewSurveyAnalysis') : activeAnalysis ? `${activeAnalysis.results.length.toLocaleString(locale)} ${t('engineeringAnalysisResultUnit')}` : hasDeliveryAnalysis ? t('engineeringReviewSurveyAnalysis') : t('engineeringReviewRunAnalysis')} />
-                        <ReviewRow ok={manifestOutputs.length > 0} label={t('engineeringReviewDeliverablesReady')} detail={manifestOutputs.length ? t('engineeringReviewableOutputs', { count: manifestOutputs.length }) : t('engineeringReviewGenerateDeliverables')} />
+                        <ReviewRow ok={professionalOutputs.length > 0} label={t('engineeringReviewDeliverablesReady')} detail={professionalOutputs.length ? t('engineeringReviewableOutputs', { count: professionalOutputs.length }) : t('engineeringReviewGenerateDeliverables')} />
                       </div>
                     </div>
                     <div className="mt-5 border border-ds-border-muted">
@@ -1286,7 +1316,12 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
                         <p className="text-[13px] font-semibold text-ds-ink">{t('engineeringReviewManifestTitle')}</p>
                         <p className="mt-1 text-[11px] text-ds-faint">{t('engineeringReviewManifestHint')}</p>
                       </div>
-                      {overview.manifests.length ? <div className="divide-y divide-ds-border-muted">{overview.manifests.map((manifest) => <div key={manifest.id} className="px-3 py-3"><div className="flex items-start gap-2"><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" /><div className="min-w-0"><p className="text-[12px] font-medium text-ds-ink">{t('engineeringReviewDraftLabel')}</p>{manifest.outputs.map(output => <div key={output.path} tabIndex={-1} data-evidence-key={JSON.stringify(['artifact', manifest.id, output.path])} className="my-1 break-all border-l-2 border-ds-border pl-2 text-[11px] focus:outline focus:outline-2 focus:outline-accent"><p className="font-medium">{output.path.split('/').pop() ?? output.path}</p><p className="text-[10px] text-ds-muted">{formatBytes(output.sizeBytes, locale)}</p></div>)}<button type="button" aria-label={t('surveyAskEvidence', { label: t('engineeringReviewDraftLabel') })} onClick={() => askAboutDelivery(manifest.id, { section: 'review', manifestId: manifest.id, runId: manifest.runId, reviewStatus: manifest.reviewStatus })} className="mt-1 text-[11px] text-accent">{t('surveyAskAgent')}</button><p className="mt-1 text-[11px] text-ds-muted">{t('engineeringReviewOutputs', { count: manifest.outputs.length })} · {statusLabel(manifest.reviewStatus, t)} · {formatDate(manifest.finalizedAt, locale)}</p><EngineeringManifestVerification projectId={overview.project.id} manifestId={manifest.id} reviewStatus={manifest.reviewStatus} contextRevision={overview.project.revision} runtimeReady={runtimeReady} request={runtimeRequest} /><SurveyQualityWorkspace binding={{ projectId: overview.project.id, projectRevision: overview.project.revision, manifestId: manifest.id, outputs: manifest.outputs }} runtimeReady={runtimeReady} />{manifest.validation.warnings.length ? <p className="mt-1 text-[10.5px] text-amber-700 dark:text-amber-300">{t('engineeringReviewNotes', { count: manifest.validation.warnings.length })}</p> : null}</div></div></div>)}</div> : <p className="px-3 py-8 text-center text-[12px] text-ds-muted">{t('engineeringReviewNone')}</p>}
+                      {overview.manifests.length ? <div className="divide-y divide-ds-border-muted">{overview.manifests.map((manifest) => {
+                        const deliverableOutputs = manifest.outputs.filter((output) => !isInternalDeliveryOutput(output))
+                        const recordOutputs = manifest.outputs.filter(isInternalDeliveryOutput)
+                        const renderArchivedOutput = (output: Output) => <div key={output.path} tabIndex={-1} data-evidence-key={JSON.stringify(['artifact', manifest.id, output.path])} className="my-1 break-all border-l-2 border-ds-border pl-2 text-[11px] focus:outline focus:outline-2 focus:outline-accent"><p className="font-medium">{output.path.split('/').pop() ?? output.path}</p><p className="text-[10px] text-ds-muted">{formatBytes(output.sizeBytes, locale)}</p></div>
+                        return <div key={manifest.id} className="px-3 py-3"><div className="flex items-start gap-2"><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" /><div className="min-w-0"><p className="text-[12px] font-medium text-ds-ink">{t('engineeringReviewDraftLabel')}</p>{deliverableOutputs.map(renderArchivedOutput)}{recordOutputs.length ? <details className="mt-2"><summary className="cursor-pointer text-[11px] text-ds-muted">{t('engineeringInternalRecords')}</summary>{recordOutputs.map(renderArchivedOutput)}</details> : null}<button type="button" aria-label={t('surveyAskEvidence', { label: t('engineeringReviewDraftLabel') })} onClick={() => askAboutDelivery(manifest.id, { section: 'review', manifestId: manifest.id, runId: manifest.runId, reviewStatus: manifest.reviewStatus })} className="mt-1 text-[11px] text-accent">{t('surveyAskAgent')}</button><p className="mt-1 text-[11px] text-ds-muted">{t('engineeringReviewOutputs', { count: deliverableOutputs.length })} · {statusLabel(manifest.reviewStatus, t)} · {formatDate(manifest.finalizedAt, locale)}</p><EngineeringManifestVerification projectId={overview.project.id} manifestId={manifest.id} reviewStatus={manifest.reviewStatus} contextRevision={overview.project.revision} runtimeReady={runtimeReady} request={runtimeRequest} /><SurveyQualityWorkspace binding={{ projectId: overview.project.id, projectRevision: overview.project.revision, manifestId: manifest.id, outputs: manifest.outputs }} runtimeReady={runtimeReady} />{manifest.validation.warnings.length ? <p className="mt-1 text-[10.5px] text-amber-700 dark:text-amber-300">{t('engineeringReviewNotes', { count: manifest.validation.warnings.length })}</p> : null}</div></div></div>
+                      })}</div> : <p className="px-3 py-8 text-center text-[12px] text-ds-muted">{t('engineeringReviewNone')}</p>}
                     </div>
                   </div>
                   <aside className="border border-ds-border-muted bg-ds-card">
@@ -1318,7 +1353,8 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
               <PanelHeading title={t('engineeringSkillsPanelTitle')} description={t('engineeringSkillsPanelDescription')} />
               <EngineeringSkillsPanel runtimeReady={runtimeReady} />
             </section> : null}
-            {tab === 'advanced-models' ? <SurveyAdvancedModelWorkspace binding={{ projectId: overview.project.id, projectRevision: overview.project.revision, workspaceRoot }} runtimeReady={runtimeReady} /> : null}      </> : null}
+            {tab === 'advanced-models' ? <SurveyAdvancedModelWorkspace binding={{ projectId: overview.project.id, projectRevision: overview.project.revision, workspaceRoot }} runtimeReady={runtimeReady}
+                sourceSelection={activeSurveyNetwork && latestSurveyAdjustment ? { adjustmentId: latestSurveyAdjustment.run.id, networkId: activeSurveyNetwork.id, networkRevision: activeSurveyNetwork.revision } : undefined} /> : null}      </> : null}
     </EngineeringDrawer>
     {busy ? <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center"><span role="status" className="inline-flex items-center gap-2 rounded-md border border-ds-border bg-ds-card px-3 py-2 text-[12px] text-ds-muted shadow-panel"><Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />{t('engineeringRuntimeProcessing')}</span></div> : null}
   </div></EngineeringEvidenceQuestions>

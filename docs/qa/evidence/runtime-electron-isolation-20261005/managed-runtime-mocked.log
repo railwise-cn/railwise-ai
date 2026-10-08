@@ -1,0 +1,39 @@
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise
+
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > waits for the explicit runtime ready marker before resolving 256ms
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > starts without a Flow key when protected storage is unavailable 65ms
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > routes host requests through the ephemeral Runtime port reported by a listening child 74ms
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > does not route fixed-port production through a mismatched ready-marker port 66ms
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > clears the actual Runtime port when the child exits unexpectedly 157ms
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > rejects when the child exits before reporting ready 85ms
+ ✓ src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > passes a process-scoped Flow key to an isolated candidate Runtime 59ms
+ ✓ src/main/managed-runtime-process.test.ts > reclaimManagedRuntimePort > reports a port as unavailable when another listener owns it 3ms
+ ✓ src/main/managed-runtime-process.test.ts > reclaimManagedRuntimePort > allows non-positive ports so WorkWise Runtime can request an ephemeral port 0ms
+ ✓ src/main/managed-runtime-process.test.ts > resolveManagedRuntimeDataDir > forces candidate runs into the guarded approval and sandbox policy 0ms
+ ✓ src/main/managed-runtime-process.test.ts > resolveManagedRuntimeDataDir > expands Windows-style home-relative data directories 0ms
+ ✓ src/main/managed-runtime-process.test.ts > resolveManagedRuntimeDataDir > does not expand non-home tilde prefixes 0ms
+ ✓ src/main/managed-runtime-process.test.ts > resolveManagedRuntimeDataDir > expands candidate runtime data under the explicitly supplied home 0ms
+ ✓ src/main/managed-runtime-process.test.ts > resolveManagedRuntimeDataDir > rejects candidate Runtime paths outside the candidate root before spawning 1ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > adds common npm and npx lookup directories to the MCP runtime PATH 0ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > creates GUI-managed config with attachments enabled for image paste/upload 9ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > adds GIF only to the historical default attachment MIME list 9ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > preserves a custom attachment MIME list without adding GIF 10ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > writes the image generation capability and omits cleared fields 17ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > keeps the config stable across repeated syncs with imageGen configured 36ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > adds the built-in schedule MCP server to WorkWise Runtime runtime capabilities 13ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > adds GUI project and configured global skill roots to WorkWise Runtime runtime capabilities 11ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > writes GUI-managed MCP search settings without removing existing servers 10ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > imports GUI-managed MCP servers into runtime capabilities 9ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > merges MCP V2 runtime snapshots without writing credential values to config 10ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > normalizes legacy recommended MCP configs before importing them into runtime capabilities 10ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > replaces unparsable historical WorkWise Runtime config with a valid GUI-managed config 9ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > does not enable MCP when the capability is explicitly disabled 14ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > does not override an explicitly disabled attachment capability 9ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > does not override explicitly disabled web fetch capability 9ms
+ ✓ src/main/managed-runtime-process.test.ts > syncManagedRuntimeConfig > does not enable DeepSeek Responses search for a third-party provider 8ms
+
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+   Start at  23:27:25
+   Duration  1.33s (transform 201ms, setup 0ms, import 157ms, tests 961ms, environment 0ms)

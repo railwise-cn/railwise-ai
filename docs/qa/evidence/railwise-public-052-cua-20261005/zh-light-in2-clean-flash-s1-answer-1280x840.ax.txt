@@ -1,0 +1,146 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container 打开 AI
+					5 container
+						6 标题 打开 AI, Value: 2
+							7 文本 打开 AI
+						8 按钮 关闭详情
+					9 container Survey AI 会话
+						10 container
+							11 标题 Survey AI 会话, Value: 2
+								12 文本 Survey AI 会话
+							13 文本 golden-plane-control-e2e
+							14 按钮 导入与预检
+							15 按钮 测量平差
+							16 按钮 刷新任务资料
+						17 container
+							18 文本 请解释 S1 的结果、原始依据及需要复核的问题。
+							19 按钮 复制消息
+							20 按钮 编辑并重发
+							21 text 以下解读基于本项目已存档的平差成果记录（该记录目前是 未签署的复核稿 ），只做解释性核对，未进行任何新的计算。S1 的数值取自该成果记录中的 S1 点位条目，并结合本项目平面控制网的观测与平差摘要说明。
+							22 标题 一、S1 的结果概要, Value: 2
+								23 文本 一、S1 的结果概要
+							24 内容列表
+								25 container
+									26 AXListMarker • 
+									27 text 点的角色 ：S1 是本平面控制网中的测站点（待求点，非已知点）；网内 A、B、C 为按源文件声明采用的已知点。
+								28 container
+									29 AXListMarker • 
+									30 text 平差后坐标 ：x ≈ 49.9999999928 m，y ≈ 49.9999999637 m，基本落在 (50.000, 50.000) m 附近。
+								31 container
+									32 AXListMarker • 
+									33 text 坐标改正数 ：Δx ≈ −1.94×10⁻⁸ m（约 −0.019 µm）、Δy ≈ +1.96×10⁻⁷ m（约 +0.196 µm）。这是对初始近似坐标的修正， 不是点位位移或形变 。
+								34 container
+									35 AXListMarker • 
+									36 text 精度 ：点位标准误差 ≈ 1.36×10⁻⁷ m（约 0.14 µm），为全网最大点位中误差；误差椭圆长半轴 ≈ 1.28×10⁻⁷ m、短半轴 ≈ 4.44×10⁻⁸ m，方位约 129.4°（自 x 轴正向向 y 轴正向量取、模 π，按 1σ 单位马氏半径给出）；协方差单位为 m²。
+								37 container
+									38 AXListMarker • 
+									39 text 精度基准 ：为 后验基准 ，即由本次平差估计的方差因子定标（见下文第四部分）。
+							40 标题 二、原始依据（数据链）, Value: 2
+								41 文本 二、原始依据（数据链）
+							42 内容列表
+								43 container
+									44 AXListMarker • 
+									45 text 来源文件与记录位置 ：原始观测文件 COSA.in2。
+								46 container
+									47 AXListMarker • 
+									48 文本 第 2–4 行：已知点 A (50.000000, 150.000000) m、B (150.000000, 50.000000) m、C (120.710678, 120.710678) m
+								49 container
+									50 AXListMarker • 
+									51 文本 第 5 行：测站 S1（初始坐标由该站极坐标刚性初始化给出）
+								52 container
+									53 AXListMarker • 
+									54 文本 第 6–10 行：S1 上的观测——以 A 后视归零（方向 0），B 方向 270.00000° 与 B 距离 100.000 m，C 方向 315.00000° 与 C 距离 100.000 m。
+								55 container
+									56 AXListMarker • 
+									57 text 先验精度 ：方向 1.0″/条；距离 1 mm 常数项 + 1 ppm（100 m 处合成约 1.005 mm）。
+								58 container
+									59 AXListMarker • 
+									60 text 平差配置 ：平面控制网解算；4 个点、5 条观测、3 个未知数、自由度 2；平差前观测路线闭合：水平 1.37×10⁻⁷ m、角度 3.1×10⁻¹⁰ rad。
+								61 container
+									62 AXListMarker • 
+									63 text 源文件状态 ：当前"可准入"，原始源完整性校验未发现错误；格式识别提示为 警告级且尚未关闭 （格式本身可审计解析并允许进入平差，但基准、控制点、观测角色、拓扑、闭合与精度任一不满足仍会阻断）。
+								64 container
+									65 AXListMarker • 
+									66 text 成果状态 ：复核记录 未签署 ，标准符合性标注为 未评估 。
+							67 标题 三、统计口径与检核信息（解释数字时务必区分）, Value: 2
+								68 文本 三、统计口径与检核信息（解释数字时务必区分）
+							69 内容列表
+								70 container
+									71 AXListMarker • 
+									72 text 方差因子 ≈ 1.14×10⁻⁸ （后验估计，无量纲）。作为 方差 ，它比 1 低约 8 个数量级；其平方根 ≈ 1.07×10⁻⁴ 是对应的 标准差尺度 ，比 1 低约 4 个数量级。方差是平方尺度，两者不可混用。
+								73 container
+									74 AXListMarker • 
+									75 text 残差（平差后拟合汇总） ：最大残差约 −1.37×10⁻⁷ m，出现在 S1→C 的 100 m 距离上；全部标准化残差远小于 3（最大约 1.4×10⁻⁴ σ），但这是 以声明先验为尺度的描述性筛查 ，且记录明确标注"显著性未评估"——数值偏小不等于显著性检验通过。
+								76 container
+									77 AXListMarker • 
+									78 text 闭合与残差是两类口径 ：闭合是平差 前 的观测路线检核；残差是平差 后 的拟合描述。二者不可互换使用。
+								79 container
+									80 AXListMarker • 
+									81 text 统计汇总 ：5 条观测全部可用、0 条被标记，数值状态为"无异常"（仍属描述性筛查口径）。
+								82 container
+									83 AXListMarker • 
+									84 text 精度标记 ：记录显示精度项"通过"，其指标就是 S1 的点位中误差（全网最大）；但所用限差阈值未在证据中给出，整体标准符合性为"未评估"，该标记是内部数值标志，不构成规范限差判定或专业验收。
+							85 标题 四、需要复核的问题, Value: 2
+								86 文本 四、需要复核的问题
+							87 内容列表
+								88 container
+									89 AXListMarker 1. 
+									90 text 成果授权状态 ：复核稿未签署、标准符合性未评估， 不能作为已批准成果交付 ，需人工复核与签署。
+								91 container
+									92 AXListMarker 2. 
+									93 text 基准与坐标系 ：项目的坐标系统与高程基准均标注"待确认"；A、B、C 的已知坐标按文件声明直接固定，未独立核验；源文件记录的坐标轴顺序与解算 x-y 平面的对应关系也需确认。
+								94 container
+									95 AXListMarker 3. 
+									96 text 先验与实际离散度的严重不匹配 ：观测实际离散度比声明先验小约 4 个数量级（标准差口径；方差口径低约 8 个数量级）。可能的解释需逐条排查：数据本身接近理想闭合/经过仿真处理、先验设置过于宽松、或解析中单位/数值处理有偏。 这是本次最需要专业判断的一点。
+								97 container
+									98 AXListMarker 4. 
+									99 text 精度结论的口径依赖 ：S1 的标准误差与误差椭圆均按后验方差因子定标；若方差因子本身不可信，绝对精度结论随之受影响。项目限差（阈值）目前为空，缺少符合性判定的依据。
+								100 container
+									101 AXListMarker 5. 
+									102 text 几何与冗余度偏低 ：仅 5 条观测、自由度 2；S1 主要靠单站的 4 条观测加 1 个后视定向支持，缺乏重复观测与多余检核，内/外部可靠性未评估。
+								103 container
+									104 AXListMarker 6. 
+									105 text 未应用的改正 ：记录显示 ppm、棱镜/加常数、气象、斜距归算、曲率折光、对中与投影改化均 未应用 。对 100 m 短边和所要求的精度目标是否可接受，需专业判断。
+								106 container
+									107 AXListMarker 7. 
+									108 text 定向与观测量角色 ：后视归零 A 用于测站度盘定向（定向已启用），需与仪器/软件设置及现场记录核对；B、C 的方向与距离角色也建议与实际观测记录复核。
+								109 container
+									110 AXListMarker 8. 
+									111 text 其他未评估项 ：相对点位精度/相对协方差、显著性检验、规范限差、格式警告的关闭确认，均尚未完成。
+							112 标题 五、建议的下一步, Value: 2
+								113 文本 五、建议的下一步
+							114 内容列表
+								115 container
+									116 AXListMarker • 
+									117 text 先完成 基准与起算数据核验 （坐标系统、轴顺序、A/B/C 坐标来源），并核对 COSA.in2 原记录的角色与单位。
+								118 container
+									119 AXListMarker • 
+									120 文本 复核先验精度设定是否与实际仪器等级一致，并解释方差因子过小的成因。
+								121 container
+									122 AXListMarker • 
+									123 文本 由专业人员依据适用规范确定限差，完成符合性判定后再签署复核。
+								124 container
+									125 AXListMarker • 
+									126 文本 如需基于现有数据做进一步的确定性核验、出图或成果导出，请提出具体需求，我会先给出执行方案供你在界面确认后再运行。
+							127 文本 10月6日 00:00
+							128 按钮 复制消息
+						129 container
+							130 文本输入区 (settable) 继续输入，发送后会在当前回复结束后依次发送…
+							131 按钮 更多操作
+							132 按钮 (disabled) 发送
+	133 关闭按钮
+	134 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	135 最小化按钮
+136 menu bar
+	137 RailWise AI
+	138 文件
+	139 编辑
+	140 显示
+	141 窗口
+	142 帮助
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html

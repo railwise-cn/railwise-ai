@@ -61,7 +61,9 @@ export async function runRestrictedCode(request: RestrictedCodeRequest, timeoutM
   if (Buffer.byteLength(payload, 'utf8') > PROTOCOL_BYTES) throw restrictedError('restricted_code_protocol_limit', 'Restricted code input exceeds the protocol limit')
   return await new Promise<unknown>((resolve, reject) => {
     const child = spawn(process.execPath, [`--max-old-space-size=${MEMORY_MIB}`, '-e', CHILD_PROGRAM], {
-      stdio: ['pipe', 'pipe', 'pipe'], env: {}, windowsHide: true
+      // Packaged Runtime uses Electron as process.execPath. Only this bootstrap
+      // flag is needed; host credentials and NODE_OPTIONS remain isolated.
+      stdio: ['pipe', 'pipe', 'pipe'], env: { ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true
     })
     let stdout = ''; let stderr = ''; let settled = false
     const finish = (error?: Error, output?: unknown) => {

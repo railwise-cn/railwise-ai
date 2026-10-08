@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { filterAuditedAgentPackAssets, installBundledAgentPack } from './agent-pack-service'
 
 describe('agent-pack-service', () => {
+  // These cases exercise the full atomic recursive pack replacement (100 assets).
+  // Under the desktop-wide forked suite, concurrent filesystem work can exceed
+  // Vitest's 5 s default; keep a bounded, test-local budget so cleanup cannot
+  // race an in-flight install after a timeout.
+  const BUNDLED_PACK_INSTALL_TIMEOUT_MS = 30_000
   let tempRoot = ''
 
   beforeEach(async () => {
@@ -129,7 +134,7 @@ describe('agent-pack-service', () => {
 
     expect(secondInstall.ok).toBe(true)
     expect(await readFile(managedSkill, 'utf8')).not.toBe('# stale managed copy\n')
-  })
+  }, BUNDLED_PACK_INSTALL_TIMEOUT_MS)
 
   it('can upgrade a WORKWISE bundled skill into the bundled agent pack', async () => {
     const codexRoot = join(tempRoot, 'codex-legacy-bundled')
@@ -158,7 +163,7 @@ describe('agent-pack-service', () => {
       kind: 'skill',
       name: 'di-bao-monitoring'
     })
-  })
+  }, BUNDLED_PACK_INSTALL_TIMEOUT_MS)
 
   it('removes obsolete assets from an earlier managed pack layout', async () => {
     const codexRoot = join(tempRoot, 'codex-obsolete')
@@ -195,5 +200,5 @@ describe('agent-pack-service', () => {
     expect(installed.ok).toBe(true)
     expect(existsSync(oldAgentDir)).toBe(false)
     expect(existsSync(join(codexRoot, 'agents', 'data_analyst.md'))).toBe(true)
-  })
+  }, BUNDLED_PACK_INSTALL_TIMEOUT_MS)
 })

@@ -1,0 +1,181 @@
+{
+  "review": "AI source/behavior review, not packaged-app acceptance",
+  "reviewer": "fresh_quality_checks",
+  "date": "2026-10-06",
+  "baselineHead": "2c7bf48be4bffa03d8000ddab9179292a51e2c24",
+  "desktopSourceVersion": "0.5.2",
+  "runtimePackageVersion": "0.5.1",
+  "files": [
+    {
+      "path": "kun/src/contracts/survey-source-fixed-model.ts",
+      "sha256": "530f29575ed6bbf71f3acfd82172c97b1f0cd3286d91d5c20b2ebc965944eed1"
+    },
+    {
+      "path": "kun/src/contracts/survey-source-trial-adapter.ts",
+      "sha256": "2649c1389a621fd8e0022a6fa46859d649c295d0e0b9dd70f4aabdb3cad06537"
+    },
+    {
+      "path": "kun/src/engineering/survey-source-fixed-model.test.ts",
+      "sha256": "16d831c1ca6ac31836d174e19749484627d7b28193acff802c5209f240207d6d"
+    },
+    {
+      "path": "kun/src/engineering/survey-source-trials-workspace.test.ts",
+      "sha256": "e01084cfa4c2397c2f2e6601da1b0ca00c1694e551a9961c4b29673cf301c565"
+    },
+    {
+      "path": "kun/src/engineering/survey-source-fixed-model-test-helpers.ts",
+      "sha256": "c164f69d9cb5c8b0c38bad59e2f8d726445d31ce87def435c5ada18a71298421"
+    },
+    {
+      "path": "kun/src/engineering/survey-service.ts",
+      "sha256": "55f33e685bb4e55968b6c36666d0a9656f70672610b5145f9f2cefefdf53e2e4"
+    },
+    {
+      "path": "kun/tests/runtime-advanced-trials-wiring.test.ts",
+      "sha256": "5f4709d400f31d392ba0c606bfafac3e646b407483043cde53b4efb5fa2fee55"
+    },
+    {
+      "path": "kun/tests/survey-report-independent-review.test.ts",
+      "sha256": "6de8d9bdc4532a92c19751393cbba860074b5c284baaa6746eb314052dbe3411"
+    },
+    {
+      "path": "kun/src/engineering/survey-professional-report.ts",
+      "sha256": "7d55f6cef74d16135247d6de8723267aa8929ed2e2b8b46ecd57ae1683efaffc"
+    },
+    {
+      "path": "kun/src/engineering/survey-ai-adjustment-semantics.ts",
+      "sha256": "0baf4cd81832f3c601c36f909e0aee1f62eec240cdae46efd0183e25c9ffbd4a"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.tsx",
+      "sha256": "ae3190a575cd308d2f261475de3b1550449df4ca44990bac2e2dab0b87115624"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdvancedModelWorkspace.dom.test.ts",
+      "sha256": "56390720d2a6dadb1272234488f7508dbddf23c30da9a905752b497cfb143656"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdvancedModelResult.tsx",
+      "sha256": "b920018c996c6a3b0afb59040092c9e8bbe9685700314014e1df7b1c89334c2f"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.tsx",
+      "sha256": "3010c580c67cd582c999316a217828191e65fdc0641a2b1edcd412f2633b7ecd"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts",
+      "sha256": "a604084e21412ef5728a015441d489e310af42097582a3646fa8ecdbf8219636"
+    },
+    {
+      "path": "src/shared/survey-advanced-trials.ts",
+      "sha256": "277172bff350a6c72915d99743940297f63562fb7ee8326947b179eeb1f42e4d"
+    },
+    {
+      "path": "src/main/ipc/app-ipc-schemas.ts",
+      "sha256": "eb29cf5f66df1d63dc1719a7bc1a486184707a7ad237760d932918f431210cd2"
+    },
+    {
+      "path": "src/renderer/src/agent/survey-advanced-trials-client.ts",
+      "sha256": "54941378373957d39fe3292fd27d010f8526641ba62ec981063eed6173abb454"
+    },
+    {
+      "path": "src/renderer/src/locales/zh/common.json",
+      "sha256": "af025e6a458362fd70b7584449d78a52b6a9426e7ff50847de147996b65ce405"
+    },
+    {
+      "path": "src/renderer/src/locales/en/common.json",
+      "sha256": "19ead502eb74db11424f886201176c5c57918d98c130a8fb75d68862d459498e"
+    }
+  ],
+  "checks": [
+    {
+      "kind": "source-mcp-report-runtime",
+      "files": 10,
+      "passed": 121,
+      "failed": 0,
+      "exitCode": 0,
+      "log": "survey-source-mcp-report-review-final-20261006.log"
+    },
+    {
+      "kind": "source-ui-blockers-ipc",
+      "files": 3,
+      "passed": 133,
+      "failed": 0,
+      "exitCode": 0,
+      "log": "survey-source-ui-blockers-final-20261006.log"
+    },
+    {
+      "kind": "desktop-typecheck",
+      "exitCode": 0,
+      "log": "survey-source-desktop-typecheck-final-20261006.log"
+    },
+    {
+      "kind": "runtime-typecheck",
+      "exitCode": 0,
+      "log": "survey-source-runtime-typecheck-final-20261006.log"
+    },
+    {
+      "kind": "affected-ui-eslint",
+      "exitCode": 0,
+      "log": "survey-source-ui-lint-final-20261006.log"
+    }
+  ],
+  "evidenceFiles": [
+    {
+      "name": "README.md",
+      "sha256": "79b3aa5e04c7f3b258714f650e74e2355b5e7c37185a0d0c0f231103c0d5b761"
+    },
+    {
+      "name": "survey-calculation-blockers-green-20261006.log",
+      "sha256": "de76caa5dfa2c641118d59b4361cf62aa2fd82022c71e8b7bd2938da8256b8c9"
+    },
+    {
+      "name": "survey-calculation-blockers-red-20261006.log",
+      "sha256": "27b9be431299b5b58ea2c593ca1026416aaedc1fa6caf439457e84607286acd6"
+    },
+    {
+      "name": "survey-calculation-blockers-severity-red-20261006.log",
+      "sha256": "d2502f89397f4fce91e6733c7115690f1ce5d3f4fe7d803c820c230cb70a725e"
+    },
+    {
+      "name": "survey-report-independent-green-20261006.log",
+      "sha256": "ca881df8195c8b9452cf2e51ec3298a25a6c8a0ea85ff08977d27ef0c9bc05fd"
+    },
+    {
+      "name": "survey-report-independent-red-20261006.log",
+      "sha256": "bc9490617e2ae6782e179e4fae692ebd220299d8086b8609983485011ca05fe5"
+    },
+    {
+      "name": "survey-source-desktop-typecheck-final-20261006.log",
+      "sha256": "46ad469197adf175dd5840bb501a69c69165bc5d30afc00d853aee60a7a82dfd"
+    },
+    {
+      "name": "survey-source-display-green-20261006.log",
+      "sha256": "d539ff5d0ee2b5724c4af96a4d11b9f834574c19c3cb710fbaab15c96d0e8417"
+    },
+    {
+      "name": "survey-source-display-red-20261006.log",
+      "sha256": "ec463f72f87ec6e249feffac441573e52f7ea0a8f338b542b0530ed09528a9f7"
+    },
+    {
+      "name": "survey-source-mcp-report-review-final-20261006.log",
+      "sha256": "e4879dc877bb02d1726642d3a5fa2e177adfab6696fca7ae10866d26f9fc0218"
+    },
+    {
+      "name": "survey-source-mcp-review-final-20261006.log",
+      "sha256": "1970d891e48f06a5df7ad3da4830e4a14cebe43cea57feabeb32722b5b9aae71"
+    },
+    {
+      "name": "survey-source-runtime-typecheck-final-20261006.log",
+      "sha256": "369fb1b91d4bc5be75374f253acfa1ccd86ab16e2a1c4ddce423943f6f1d18b6"
+    },
+    {
+      "name": "survey-source-ui-blockers-final-20261006.log",
+      "sha256": "ea1ae7c8f99e0bce4f52a72f1c67732f1be5b977a95a091bbde8c2fb2f509b74"
+    },
+    {
+      "name": "survey-source-ui-lint-final-20261006.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

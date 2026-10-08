@@ -12,6 +12,17 @@ const declaration = {
 const create = { kind: 'vce', acknowledged: true, expectedProjectRevision: 1, idempotencyKey: 'test-create-1', declarationJson: JSON.stringify(declaration), modelBasisStatement: '独立合成模型，非工程签认。' }
 
 describe('advanced trial strict desktop IPC', () => {
+  it('permits only exact scoped source-model POST selections and rejects latest, queries and duplicate fields', () => {
+    const path = '/v1/engineering/projects/project-1/advanced-trial-model'
+    const selection = { adjustmentId: 'adjustment-1', expectedProjectRevision: 1, expectedNetworkRevision: 2 }
+    expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'POST', body: JSON.stringify(selection) }).success).toBe(true)
+    for (const payload of [
+      {path}, {path,method:'GET',body:JSON.stringify(selection)}, {path:path+'?latest=true',method:'POST',body:JSON.stringify(selection)},
+      {path,method:'POST',body:JSON.stringify({...selection,latest:true})}, {path,method:'POST',body:JSON.stringify({...selection,expectedNetworkRevision:0})},
+      {path,method:'POST',body:JSON.stringify(selection).replace('"expectedProjectRevision":1','"expectedProjectRevision":2,"expectedProjectRevision":1')},
+      {path,method:'POST',body:' '.repeat(4096)+JSON.stringify(selection)}, {path,method:'POST',body:JSON.stringify({...selection,projectId:'other'})}
+    ]) expect(runtimeRequestPayloadSchema.safeParse(payload).success).toBe(false)
+  })
   it('allows only bounded create, history, restore, reverify and export requests', () => {
     for (const payload of [
       { path: base, method: 'POST', body: JSON.stringify(create) },

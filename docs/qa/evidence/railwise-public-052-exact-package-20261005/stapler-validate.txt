@@ -1,0 +1,2 @@
+Processing: /tmp/railwise-official-052/RailWise AI.app
+The validate action worked!

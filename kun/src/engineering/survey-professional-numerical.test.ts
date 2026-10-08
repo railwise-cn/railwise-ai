@@ -21,7 +21,7 @@ describe('professional projection against independent numerical references', () 
   it('matches the exact GSI route-length distribution, cofactor and posterior precision', async () => withService(async service => {
     const bytes = await readFile(new URL('professional/leica-gsi-cumulative-leveling.gsi', fixtures))
     const network = await service.importNetwork({ projectId: 'gsi', expectedRevision: 0, idempotencyKey: 'gsi-source',
-      name: 'loop.GSI', networkType: 'leveling', dataBase64: bytes.toString('base64'), knownPoints: [{ id: 'BM', height: 100 }] })
+      name: 'loop.GSI', networkType: 'leveling', referenceDeclaration: { verticalDatum: '测试 BM 高程基准' }, dataBase64: bytes.toString('base64'), knownPoints: [{ id: 'BM', height: 100 }] })
     const output = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'gsi-calculate' })
     expect(output.run.status).toBe('completed')
     const review = service.getProfessionalReview(output.run.id)!
@@ -58,7 +58,7 @@ describe('professional projection against independent numerical references', () 
     const bytes = await readFile(new URL('professional/cosa-in1-level-golden-a.in1', fixtures))
     const mapping = JSON.parse(await readFile(new URL('professional/cosa-in1-mapping.json', fixtures), 'utf8'))
     const network = await service.importNetwork({ projectId: 'in1', expectedRevision: 0, idempotencyKey: 'in1-source',
-      name: 'attached.in1', networkType: 'leveling', dataBase64: bytes.toString('base64'), cosaIn1Mapping: mapping })
+      name: 'attached.in1', networkType: 'leveling', referenceDeclaration: { verticalDatum: '公开合成样例 BM 高程基准' }, dataBase64: bytes.toString('base64'), cosaIn1Mapping: mapping })
     const output = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'in1-calculate' })
     expect(output.run.status).toBe('completed')
     const review = service.getProfessionalReview(output.run.id)!
@@ -79,7 +79,7 @@ describe('professional projection against independent numerical references', () 
     const oracle = JSON.parse(await readFile(new URL('../../../docs/qa/evidence/railwise-convergence-53213de739d0/oracle/independent-oracle.json', import.meta.url), 'utf8'))
     expect(createHash('sha256').update(bytes).digest('hex')).toBe(oracle.sourceFileSha256)
     const network = await service.importNetwork({ projectId: 'in2', expectedRevision: 0, idempotencyKey: 'in2-source',
-      name: 'plane.in2', networkType: 'plane-control', dataBase64: bytes.toString('base64') })
+      name: 'plane.in2', networkType: 'plane-control', referenceDeclaration: { coordinateSystem: '公开合成样例独立坐标系' }, dataBase64: bytes.toString('base64') })
     const output = service.createAdjustment({ networkId: network.id, expectedRevision: network.revision, idempotencyKey: 'in2-calculate' })
     expect(output.run.status).toBe('completed')
     const review = service.getProfessionalReview(output.run.id)!, reference = oracle.solutions.rss

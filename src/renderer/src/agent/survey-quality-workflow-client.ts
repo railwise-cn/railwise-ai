@@ -107,7 +107,8 @@ export async function parseQualityWorkflow(value: unknown, context: WorkflowCont
     } else if (declared.kind === 'stage-completed' && actual.kind === 'stage-completed') {
       if (actual.stageId !== declared.stageId || actual.stageKind !== declared.stageKind || actual.outcome !== declared.outcome || entry.targetBinding !== null) return invalid()
     } else if (declared.kind === 'rule-applicability' && actual.kind === 'rule-applicability') {
-      if (actual.declarationId !== declared.declarationId || !equal(actual.rule, declared.rule) || actual.status !== declared.status || actual.rationale !== declared.rationale || entry.targetBinding !== null) return invalid()
+      if (actual.declarationId !== declared.declarationId || !equal(actual.rule, declared.rule) || actual.status !== declared.status || actual.rationale !== declared.rationale
+        || !equal(actual.basisBinding?.reference, declared.basis) || actual.replacesDeclarationId !== declared.replacesDeclarationId || entry.targetBinding !== null) return invalid()
     } else if (declared.kind === 'rule-revoked' && actual.kind === 'rule-revoked') {
       if (actual.declarationId !== declared.declarationId || actual.reason !== declared.reason || entry.targetBinding !== null) return invalid()
     } else if (declared.kind === 'signoff-declared' && actual.kind === 'signoff-declared') {

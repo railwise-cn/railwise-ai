@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { safeStorage } from 'electron'
+import brand from '../../shared/product-brand.json'
 import type {
   McpCredentialReferenceV1,
   McpServerConfigV2,
@@ -448,7 +449,7 @@ export class McpConfigService {
           pending.createdAt + (callback === 'loopback' ? this.oauthCallbackTimeoutMs : OAUTH_STATE_TTL_MS)
         ).toISOString(),
         message: callback === 'loopback'
-          ? 'Complete authorization in the browser. WorkWise is waiting for the local callback.'
+          ? `Complete authorization in the browser. ${brand.platform} is waiting for the local callback.`
           : 'Open the authorization URL and return the authorization code.'
       }
     }
@@ -496,7 +497,7 @@ export class McpConfigService {
         id: pending.serverId,
         state: 'error',
         authorized: false,
-        message: 'OAuth authorization stopped because WorkWise is closing.'
+        message: `OAuth authorization stopped because ${brand.platform} is closing.`
       })
     }
     this.pendingOAuth.clear()
@@ -660,7 +661,7 @@ export class McpConfigService {
     response.setHeader('Content-Type', 'text/html; charset=utf-8')
     response.setHeader('Cache-Control', 'no-store')
     response.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
-    response.end(`<!doctype html><html><head><meta charset="utf-8"><title>WorkWise</title><style>body{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;display:grid;min-height:100vh;place-items:center;background:#f5f7fa;color:#20242b}.message{max-width:360px;padding:28px;text-align:center}</style></head><body><main class="message"><h1>WorkWise</h1><p>${ok ? 'Authorization completed. You can return to WorkWise.' : 'Authorization could not be completed. Return to WorkWise for details.'}</p></main></body></html>`)
+    response.end(`<!doctype html><html><head><meta charset="utf-8"><title>${brand.platform}</title><style>body{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;display:grid;min-height:100vh;place-items:center;background:#f5f7fa;color:#20242b}.message{max-width:360px;padding:28px;text-align:center}</style></head><body><main class="message"><h1>${brand.platform}</h1><p>${ok ? `Authorization completed. You can return to ${brand.platform}.` : `Authorization could not be completed. Return to ${brand.platform} for details.`}</p></main></body></html>`)
   }
 
   private settleOAuthCallback(pending: PendingOAuth, status: McpServerStatusV1): void {
@@ -867,7 +868,7 @@ export class McpConfigService {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        client_name: 'WorkWise',
+        client_name: brand.platform,
         redirect_uris: [redirectUri],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],

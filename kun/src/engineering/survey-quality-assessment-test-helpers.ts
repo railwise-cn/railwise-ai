@@ -35,7 +35,7 @@ export async function assessmentFixture(unitCount=3) {
   const unitIds=Array.from({length:unitCount},(_,i)=>`unit-${i+1}`)
   const population=sampling.createPopulation(project.id,{idempotencyKey:'assessment-population',expectedProjectRevision:project.revision,productType:'synthetic control',unitProductType:'declared point',definitionStatement:'Synthetic census; no professional inspection authenticated.',orderedUnitProductIds:unitIds})
   const run=sampling.createRun(project.id,{populationId:population.id,idempotencyKey:'assessment-sampling',stage:'final-office',inspectionMode:'census'})
-  const sources:AssessmentSources={getProject,getManifest,retentionSnapshot:(pid,p,r)=>retention.getAssessmentSnapshot(pid,p,r),getPopulation:(pid,id)=>sampling.getPopulation(pid,id),getRun:(pid,id)=>sampling.getRun(pid,id),listSamples:(pid,id,l,o)=>sampling.listSamples(pid,id,l,o),getScore:(pid,id)=>scoring.getRecord(pid,id)}
+  const sources:AssessmentSources={getProject,getManifest,retentionSnapshot:(pid,p,r)=>retention.getAssessmentSnapshot(pid,p,r),getPopulation:(pid,id)=>sampling.getPopulation(pid,id),getRun:(pid,id)=>sampling.getRun(pid,id),listSamples:(pid,id,l,o)=>sampling.listSamples(pid,id,l,o),getScore:(pid,id)=>scoring.getRecord(pid,id),getLineageScore:(pid,id)=>scoring.getAssessmentLineageRecord(pid,id)}
   const options={rootDir:runtime,nowIso,clockMs,sources}
   let assessment=new SurveyQualityAssessmentService(options)
   const planRequest={schemaVersion:1 as const,acknowledged:true as const,expectedProjectRevision:project.revision,idempotencyKey:'assessment-plan-key',retentionPlanId:frozen.plan.id,retentionRecordId:retained.record.id,samplingRunId:run.id,productProfileId:'planar-control-point' as const,basisStatement:' 合成资料 😀\n仅声明关联。 ',unitMaterials:unitIds.map(unitId=>({unitId,requirements:[{reference:'synthetic',retentionCheckId:'evidence:support',memberId:'output-1',locatorStatement:' Explicit synthetic row; shared file. '}]}))}
@@ -46,7 +46,19 @@ export async function assessmentFixture(unitCount=3) {
   }
   const auditCount=()=>{const db=new Database(join(runtime,'engineering.sqlite3'));try{return (db.prepare('SELECT count(*) AS n FROM engineering_verification_attempts').get() as {n:number}).n}finally{db.close()}}
   const outputBytes=()=>Promise.all([...manifest.outputs.map(o=>join(workspace,o.path)),join(workspace,'.workwise','deliverables',project.id,manifest.runId,'manifest.json')].map(p=>readFile(p)))
+  let correction=0
+  const correctedRetention=async()=>{
+    const key=`assessment-correction-${++correction}`
+    const data=await engineering.importDataset({projectId:project.id,expectedRevision:project.revision,idempotencyKey:`${key}-import`,name:'corrected.csv',dataBase64:Buffer.from(`point,time,value\nP1,2026-09-01,1\nP1,2026-09-02,${2+correction}`).toString('base64')})
+    const checked=engineering.validateDataset({datasetId:data.id,expectedRevision:data.revision,idempotencyKey:`${key}-validate`})
+    const calculated=engineering.createAnalysis({projectId:project.id,datasetId:data.id,expectedRevision:checked.revision,idempotencyKey:`${key}-analysis`})
+    const updated=await engineering.finalize({projectId:project.id,datasetId:data.id,analysisId:calculated.id,expectedRevision:checked.revision,idempotencyKey:`${key}-finalize`,acknowledgeWarnings:true})
+    const nextPlan=retention.createPlan(project.id,{manifestId:updated.id,expectedProjectRevision:project.revision,idempotencyKey:`${key}-retention-plan`,requiredEvidence:[{id:'support',title:'Corrected synthetic source reference',memberId:'output-1'}]})
+    let nextRecord=retention.createRecord(project.id,{planId:nextPlan.plan.id,idempotencyKey:`${key}-retention-record`})
+    for(const checkId of nextPlan.plan.requiredCheckIds){const requirement=nextPlan.plan.requiredEvidence.find(r=>`evidence:${r.id}`===checkId),evidence=requirement?retention.retainEvidence(project.id,{artifactId:nextPlan.artifact.id,memberId:requirement.memberId,idempotencyKey:`${key}-evidence-${checkId}`}):null;nextRecord=retention.appendCheck(project.id,nextRecord.record.id,{checkId,expectedHeadHash:nextRecord.verification.headHash,idempotencyKey:`${key}-check-${checkId}`,...(evidence?{evidenceId:evidence.id}:{})})}
+    return {manifest:updated,plan:nextPlan,record:nextRecord,retentionPlanId:nextPlan.plan.id,retentionRecordId:nextRecord.record.id}
+  }
   const close=async()=>{assessment.close();scoring.close();sampling.close();retention.close();await engineering.flush();engineering.close();await rm(root,{recursive:true,force:true})}
-  return {root,runtime,project,manifest,engineering,retention,sampling,scoring,sources,planRequest,unitIds,score,advance,append,completeRetention,auditCount,outputBytes,close,
+  return {root,runtime,project,manifest,engineering,retention,sampling,scoring,sources,planRequest,unitIds,score,advance,append,completeRetention,correctedRetention,auditCount,outputBytes,close,
     get assessment(){return assessment}, restart(){assessment.close();assessment=new SurveyQualityAssessmentService(options);return assessment}}
 }

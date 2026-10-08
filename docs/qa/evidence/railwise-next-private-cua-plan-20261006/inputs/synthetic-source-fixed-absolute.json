@@ -1,0 +1,85 @@
+{
+  "format": "workwise-survey-network",
+  "formatVersion": 1,
+  "network": {
+    "networkType": "leveling",
+    "coordinateSystem": "合成验收局部网（无平面坐标）",
+    "verticalDatum": "合成验收 BM=10.000 m，仅软件核对",
+    "unit": "m",
+    "knownPoints": [
+      {
+        "id": "BM",
+        "pointClass": "known",
+        "known": true,
+        "height": 10
+      }
+    ],
+    "unknownPoints": [
+      {
+        "id": "P",
+        "pointClass": "unknown",
+        "known": false,
+        "height": 10.1
+      },
+      {
+        "id": "Q",
+        "pointClass": "unknown",
+        "known": false,
+        "height": 10.2
+      }
+    ],
+    "observations": [
+      {
+        "id": "bp-1",
+        "type": "height-difference",
+        "from": "BM",
+        "to": "P",
+        "value": 0.1,
+        "unit": "m",
+        "sigma": 0.002,
+        "sigmaUnit": "m"
+      },
+      {
+        "id": "pq-1",
+        "type": "height-difference",
+        "from": "P",
+        "to": "Q",
+        "value": 0.1005,
+        "unit": "m",
+        "sigma": 0.003,
+        "sigmaUnit": "m"
+      },
+      {
+        "id": "bq-1",
+        "type": "height-difference",
+        "from": "BM",
+        "to": "Q",
+        "value": 0.1995,
+        "unit": "m",
+        "sigma": 0.004,
+        "sigmaUnit": "m"
+      },
+      {
+        "id": "bp-2",
+        "type": "height-difference",
+        "from": "BM",
+        "to": "P",
+        "value": 0.101,
+        "unit": "m",
+        "sigma": 0.002,
+        "sigmaUnit": "m"
+      },
+      {
+        "id": "pq-2",
+        "type": "height-difference",
+        "from": "P",
+        "to": "Q",
+        "value": 0.099,
+        "unit": "m",
+        "sigma": 0.003,
+        "sigmaUnit": "m"
+      }
+    ],
+    "instrumentParameters": {}
+  }
+}

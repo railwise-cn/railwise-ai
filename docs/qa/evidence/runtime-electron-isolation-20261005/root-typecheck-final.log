@@ -1,0 +1,3 @@
+
+> workwise@0.5.2 typecheck
+> tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json

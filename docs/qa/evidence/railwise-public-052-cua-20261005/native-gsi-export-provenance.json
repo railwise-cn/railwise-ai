@@ -1,0 +1,26 @@
+{
+  "note": "Native Save Dialog accepted absolute path as a file name, converting slash characters to colons. Exact native-export bytes were copied without modification from the isolated workspace to this evidence directory.",
+  "files": [
+    {
+      "source": "/private/tmp/railwise-public-052-cua-clean/home/.workwise/default_workspace/:Users:wangjiawei:Documents:WorkWise:docs:qa:evidence:railwise-public-052-cua-20261005:gsi-exports:professional.xlsx",
+      "evidenceFile": "docs/qa/evidence/railwise-public-052-cua-20261005/gsi-exports/professional.xlsx",
+      "size": 44224,
+      "sha256": "10ca03e4db3076dcffbba60a56f352d52d4e584d8ca3e0d8ec3bdb27fef1d4cb",
+      "copyVerified": true
+    },
+    {
+      "source": "/private/tmp/railwise-public-052-cua-clean/home/.workwise/default_workspace/:Users:wangjiawei:Documents:WorkWise:docs:qa:evidence:railwise-public-052-cua-20261005:gsi-exports:report.pdf",
+      "evidenceFile": "docs/qa/evidence/railwise-public-052-cua-20261005/gsi-exports/report.pdf",
+      "size": 73630,
+      "sha256": "fa91341aebbeff4ed9261e2cf3f4820a5994aa430ae225e1b8ddbb02446a7b05",
+      "copyVerified": true
+    },
+    {
+      "source": "/private/tmp/railwise-public-052-cua-clean/home/.workwise/default_workspace/:Users:wangjiawei:Documents:WorkWise:docs:qa:evidence:railwise-public-052-cua-20261005:gsi-exports:report.docx",
+      "evidenceFile": "docs/qa/evidence/railwise-public-052-cua-20261005/gsi-exports/report.docx",
+      "size": 38606,
+      "sha256": "a6eb3a86aca99f95f7a559c36d83ad10b580b46c3053d9896e0322007dabc868",
+      "copyVerified": true
+    }
+  ]
+}

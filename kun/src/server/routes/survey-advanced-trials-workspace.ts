@@ -39,6 +39,14 @@ function failure(error: unknown): JsonResponse {
 export function registerSurveyAdvancedTrialsWorkspaceRoutes(router: Router, dependencies: {
   getService: () => SurveyAdvancedTrialsWorkspaceService | undefined; authorize: (request: Request) => boolean
 }): void {
+  router.add('POST', '/v1/engineering/projects/:projectId/advanced-trial-model', async (request, context) => {
+    if (!dependencies.authorize(request)) return noStore(ERRORS.unauthorized())
+    const service = dependencies.getService()
+    if (!service) return noStore(ERRORS.unavailable('advanced trial workspace is unavailable'))
+    if (new URL(request.url).search) return noStore(ERRORS.validation('invalid source model query'))
+    try { return noStore(jsonResponse(service.getSourceModel(context.params.projectId!, await body(request)))) }
+    catch (error) { return failure(error) }
+  })
   const base = '/v1/engineering/projects/:projectId/advanced-trials'
   for (const operation of ['create', 'list', 'detail', 'reverify', 'export'] as const) {
     const method = operation === 'create' || operation === 'reverify' ? 'POST' : 'GET'

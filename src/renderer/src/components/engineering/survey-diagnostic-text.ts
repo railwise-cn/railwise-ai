@@ -181,11 +181,19 @@ function removeImplementationVocabulary(text: string, language: string): string 
       ? professionalCheck
       : match
   })
-  return replaceCatalogP0(text
+  const implementationEnvelope = replaceCatalogP0(text
     .replace(/(?:\btool(?:\s+(?:id|name))?|工具(?:名|名称|ID)?)\s*[:=：]\s*[a-z][a-z0-9_.:/-]*/gi, '')
     .replace(/\bP0\s+(?:blocking\s+rule|blocking\s+policy|policy|gate|rule)\b/gi, professionalCheck)
     .replace(/\bP0\s+(?:格式目录|格式受理目录|format catalog|admission catalog)\b/gi, '')
   )
+  // Older findings may contain the complete catalog preamble. Strip only
+  // that implementation-owned envelope on the final rendering pass while
+  // preserving any trailing measured point/row/residual evidence.
+  return implementationEnvelope
+    .replace(/(?:COSA(?:\(科傻\))?|SOUTH(?:\(南方\))?|Trimble\/Zeiss|Leica\/Hexagon|科傻|天宝|徕卡|南方测绘)\s*\/\s*[a-z][a-z0-9-]*\s+已保留(?:可审计的解析对象|原始源文件)(?:及原始记录锚点)?[；;]\s*/gi, '')
+    .replace(/\bP0\s+(?:格式目录|格式受理目录|format catalog|admission catalog)\b(?:\s+[a-z][a-z0-9._-]*)?\s*/gi, '')
+    .replace(/(?:当前资料可进入计算前检查|可进入计算前检查)\s*[:：]?\s*严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断(?:平差)?。?/gi, '')
+    .replace(/严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断(?:平差)?。?/gi, '')
     .replace(/\bworkwise-survey-format-catalog-[a-z0-9._-]+\b/gi, '')
     .replace(/(?:可审计的|auditable\s+)?解析对象(?:及原始记录锚点|and raw-record anchors)?/gi, english ? 'survey data' : '测量资料')
     .replace(/原始记录锚点|raw[- ]record anchors?/gi, english ? 'source record location' : '原始记录位置')
@@ -383,9 +391,14 @@ export function surveySourceDiagnosticText(item: SurveyDiagnosticText, language:
   // to show the professional disposition directly. Keep the older P0 path on
   // its established wording for compatibility with persisted screenshots.
   if (hasCatalogEnvelope && !/\bP0\b/i.test(original) && sourceDisposition === 'adjustment-ready' && sourceEligible === true) {
-    return english
+    const summary = english
       ? 'Survey data recognized and is ready for professional checks. Confirm the datum, control points, observation relationships, closure and precision before adjustment.'
       : '资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件。'
+    // Legacy records may append a measured finding to the catalog sentence.
+    // Preserve that engineering evidence after removing only the catalog copy.
+    const remainder = removeKnownFormatPolicyCopy(original)
+    const detail = remainder ? surveyLegacyDiagnosticText(remainder, language) : ''
+    return detail ? `${summary}${english ? ' ' : ''}${detail}` : summary
   }
   const restriction = sourceDisposition && sourceDisposition !== 'adjustment-ready'
     ? professionalDispositionText(sourceDisposition, english)

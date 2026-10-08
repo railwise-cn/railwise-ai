@@ -17,7 +17,7 @@ vi.mock('./EngineeringAiCommandCenter', () => ({ EngineeringAiCommandCenter: ({ 
 vi.mock('./SurveyAdjustmentPanel', () => ({ SurveyAdjustmentPanel: ({ refreshToken }: { refreshToken: number }) => createElement('span', { 'data-testid': 'survey-refresh-token' }, refreshToken) }))
 vi.mock('./EngineeringSkillsPanel', () => ({ EngineeringSkillsPanel: () => null }))
 const project = { id: 'job', name: 'Test control network', taskType: 'control-network', monitoringType: 'control-network', unit: 'm', signConvention: 'positive', thresholds: {}, reportPeriod: {}, workspace: '/test', revision: 2, updatedAt: '2026-09-19T00:00:00Z' }
-const network = { id: 'net', revision: 2, networkType: 'plane-control', qualityStatus: 'validated', sourceFile: { name: 'survey.in2', disposition: 'adjustment-ready' } }
+const network = { id: 'net', revision: 2, networkType: 'plane-control', coordinateSystem: 'LOCAL', qualityStatus: 'validated', sourceFile: { name: 'survey.in2', disposition: 'adjustment-ready' } }
 const adjustment = { run: { id: 'adjustment', networkId: 'net', status: 'completed' }, result: { validation: 'valid' }, sourceEligibility: { eligible: true } }
 let adjustments: unknown[]
 let datasets: unknown[]
@@ -164,6 +164,48 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(text).not.toContain('run-internal-42')
     expect(text).not.toContain(outputPath)
     expect(text).not.toContain(outputHash)
+  })
+
+  it('keeps internal review records and evidence workbooks out of the default delivery view', async () => {
+    manifests = [{
+      id: 'manifest-json', runId: 'run-json', reviewStatus: 'draft',
+      outputs: [
+        { ...file, path: 'report.pdf' },
+        { path: 'professional-review.json', mediaType: 'application/json', sha256: 'b'.repeat(64), sizeBytes: 220 },
+        { path: 'nested/PROFESSIONAL-REVIEW.JSON', mediaType: 'application/json', sha256: 'e'.repeat(64), sizeBytes: 220 },
+        { path: 'metadata.json', mediaType: 'application/json', sha256: 'f'.repeat(64), sizeBytes: 100 },
+        { path: '.workwise/deliverables/example/evidence.xlsx', mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sha256: 'c'.repeat(64), sizeBytes: 500 },
+        { path: 'professional.xlsx', mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sha256: 'd'.repeat(64), sizeBytes: 500 }
+      ],
+      citations: [], validation: { valid: true, errors: [], warnings: [] }
+    }]
+    await renderDelivery()
+
+    expect(visibleText(container)).toContain('report.pdf')
+    expect(visibleText(container)).not.toContain('professional-review.json')
+    expect(visibleText(container)).not.toContain('PROFESSIONAL-REVIEW.JSON')
+    expect(visibleText(container)).not.toContain('evidence.xlsx')
+    expect(visibleText(container)).toContain('professional.xlsx')
+    expect(visibleText(container)).toContain('metadata.json')
+    const internal = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringInternalRecords'))
+    expect(internal).toBeDefined()
+    await act(async () => { internal!.open = true; internal!.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(internal!)).toContain('professional-review.json')
+    expect(visibleText(internal!)).toContain('PROFESSIONAL-REVIEW.JSON')
+    expect(visibleText(internal!)).toContain('evidence.xlsx')
+    expect(visibleText(internal!)).toContain(i18n.t('engineeringExportFile', { format: 'JSON' }))
+
+    const archive = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringArchiveDetails'))
+    expect(archive).toBeDefined()
+    await act(async () => { archive!.open = true; archive!.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(archive!)).toContain(i18n.t('engineeringReviewOutputs', { count: 3 }))
+    expect(visibleText(archive!)).not.toContain('professional-review.json')
+    expect(visibleText(archive!)).not.toContain('evidence.xlsx')
+    const archivedRecords = [...archive!.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringInternalRecords'))
+    expect(archivedRecords).toBeDefined()
+    await act(async () => { archivedRecords!.open = true; archivedRecords!.dispatchEvent(new Event('toggle')) })
+    expect(visibleText(archivedRecords!)).toContain('professional-review.json')
+    expect(visibleText(archivedRecords!)).toContain('evidence.xlsx')
   })
 
   it('keeps project revision counters out of the default delivery view', async () => {
@@ -669,6 +711,21 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(summary).not.toContain('PROJECT-HEIGHT')
   })
 
+  it('blocks new calculations when the active network datum is undeclared but keeps historical results reviewable', async () => {
+    request.mockImplementation(async (path: string) => ({ ok: true, status: 200, body: JSON.stringify(
+      path === '/v1/engineering/projects' ? { projects: [project] }
+        : path.endsWith('/overview') ? { project, datasets: [], analyses: [], runs: [], manifests: [] }
+          : path.includes('/survey/networks?') ? { networks: [{ ...network, coordinateSystem: '待确认' }] }
+            : { adjustments }
+    ) }))
+    await renderDelivery()
+    const summary = container.querySelector('[data-testid="engineering-summary-strip"]')!
+    expect(summary.textContent).toContain('Blocked')
+    expect(summary.textContent).toContain('Historical result · review only')
+    expect(container.querySelector('[data-testid="engineering-survey-datum-gate"]')?.textContent).toContain('Declare the coordinate and height reference before a new calculation')
+    expect(button('Generate review draft').disabled).toBe(true)
+  })
+
   it('exposes named data selection buttons and switches the reviewed dataset without mutating it', async () => {
     datasets = ['first.csv', 'second.csv'].map((name, index) => ({
       id: `dataset-${index}`, sourceFileName: name, sourceFileHash: 'b'.repeat(64),
@@ -760,6 +817,26 @@ describe('Survey delivery without a monitoring dataset', () => {
     await act(async () => dispatchEngineeringProjectCreate())
     await settle()
     expect(creates).toBe(2)
+  })
+
+  it('clears the task-created notice when navigating to another work view', async () => {
+    const created = { ...project, id: 'created-job', name: 'New survey task' }
+    request.mockImplementation(async (path: string, method?: string, body?: string) => {
+      if (path === '/v1/engineering/projects' && method === 'POST') return { ok: true, status: 200, body: JSON.stringify({ project: created }) }
+      if (path === '/v1/engineering/projects') return { ok: true, status: 200, body: JSON.stringify({ projects: [project, created] }) }
+      if (path.endsWith('/overview')) return { ok: true, status: 200, body: JSON.stringify(emptyOverview(created)) }
+      if (path.includes('/survey/networks?')) return { ok: true, status: 200, body: JSON.stringify({ networks: [network] }) }
+      if (path.includes('/adjustments?')) return { ok: true, status: 200, body: JSON.stringify({ adjustments: [] }) }
+      throw new Error(`Unexpected request: ${path} ${method ?? 'GET'} ${body ?? ''}`)
+    })
+    await renderDelivery()
+
+    await act(async () => dispatchEngineeringProjectCreate())
+    await settle()
+    expect(container.textContent).toContain(i18n.t('engineeringNoticeJobCreated'))
+
+    await act(async () => button(i18n.t('engineeringPrimaryResults')).click())
+    expect(container.textContent).not.toContain(i18n.t('engineeringNoticeJobCreated'))
   })
 
   it('preserves the summary, selected result and preview when reopening the current project thread', async () => {

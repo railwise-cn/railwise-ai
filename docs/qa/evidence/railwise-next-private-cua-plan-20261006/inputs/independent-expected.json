@@ -1,0 +1,196 @@
+{
+  "role": "AI independently computed exact-rational fixture expectation; not field/vendor/professional signoff",
+  "monitoring": {
+    "sourceRows": 6,
+    "points": 2,
+    "unit": "mm",
+    "S01": {
+      "initial": 0,
+      "previous": 1,
+      "current": 3,
+      "periodChange": 2,
+      "cumulativeChange": 3,
+      "lastIntervalDays": 1
+    },
+    "S02": {
+      "initial": 0,
+      "previous": -1,
+      "current": -2,
+      "periodChange": -1,
+      "cumulativeChange": -2,
+      "lastIntervalDays": 1
+    }
+  },
+  "fixedHeightModel": {
+    "parameterOrder": [
+      "P.heightCorrection",
+      "Q.heightCorrection"
+    ],
+    "observations": [
+      "bp-1",
+      "pq-1",
+      "bq-1",
+      "bp-2",
+      "pq-2"
+    ],
+    "designMatrix": [
+      [
+        1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        -1,
+        1
+      ]
+    ],
+    "misclosuresM": [
+      {
+        "fraction": "0",
+        "decimal": 0.0
+      },
+      {
+        "fraction": "1/2000",
+        "decimal": 0.0005
+      },
+      {
+        "fraction": "-1/2000",
+        "decimal": -0.0005
+      },
+      {
+        "fraction": "1/1000",
+        "decimal": 0.001
+      },
+      {
+        "fraction": "-1/1000",
+        "decimal": -0.001
+      }
+    ],
+    "weightsMInverseSquared": [
+      {
+        "fraction": "250000",
+        "decimal": 250000.0
+      },
+      {
+        "fraction": "1000000/9",
+        "decimal": 111111.11111111111
+      },
+      {
+        "fraction": "62500",
+        "decimal": 62500.0
+      },
+      {
+        "fraction": "250000",
+        "decimal": 250000.0
+      },
+      {
+        "fraction": "1000000/9",
+        "decimal": 111111.11111111111
+      }
+    ],
+    "normalMatrix": [
+      [
+        {
+          "fraction": "6500000/9",
+          "decimal": 722222.2222222222
+        },
+        {
+          "fraction": "-2000000/9",
+          "decimal": -222222.22222222222
+        }
+      ],
+      [
+        {
+          "fraction": "-2000000/9",
+          "decimal": -222222.22222222222
+        },
+        {
+          "fraction": "2562500/9",
+          "decimal": 284722.22222222225
+        }
+      ]
+    ],
+    "priorParameterCovarianceM2": [
+      [
+        {
+          "fraction": "41/22500000",
+          "decimal": 1.8222222222222223e-06
+        },
+        {
+          "fraction": "1/703125",
+          "decimal": 1.4222222222222223e-06
+        }
+      ],
+      [
+        {
+          "fraction": "1/703125",
+          "decimal": 1.4222222222222223e-06
+        },
+        {
+          "fraction": "13/2812500",
+          "decimal": 4.622222222222222e-06
+        }
+      ]
+    ],
+    "heightCorrectionsM": [
+      {
+        "fraction": "13/30000",
+        "decimal": 0.0004333333333333333
+      },
+      {
+        "fraction": "1/30000",
+        "decimal": 3.3333333333333335e-05
+      }
+    ],
+    "adjustedHeightsM": [
+      {
+        "fraction": "303013/30000",
+        "decimal": 10.100433333333333
+      },
+      {
+        "fraction": "306001/30000",
+        "decimal": 10.200033333333334
+      }
+    ],
+    "residualsM": [
+      {
+        "fraction": "13/30000",
+        "decimal": 0.0004333333333333333
+      },
+      {
+        "fraction": "-9/10000",
+        "decimal": -0.0009
+      },
+      {
+        "fraction": "1/1875",
+        "decimal": 0.0005333333333333334
+      },
+      {
+        "fraction": "-17/30000",
+        "decimal": -0.0005666666666666667
+      },
+      {
+        "fraction": "3/5000",
+        "decimal": 0.0006
+      }
+    ],
+    "weightedSquaredResidualSum": [
+      {
+        "fraction": "11/40",
+        "decimal": 0.275
+      }
+    ],
+    "degreesOfFreedom": 3
+  }
+}

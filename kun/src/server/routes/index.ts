@@ -1,4 +1,6 @@
+import { registerSurveyCollaborationRoutes } from './survey-collaboration.js'
 import { registerSurveyQualityAssessmentRoutes } from './survey-quality-assessment.js'
+import { registerSurveyContextMcpRoutes } from './survey-context-mcp.js'
 import { registerSurveyStandardBasisRoutes } from './survey-standard-basis.js'
 import { registerSurveyQualityScoringWorkspaceRoutes } from './survey-quality-scoring-workspace.js'
 import { Router } from '../router.js'
@@ -105,10 +107,17 @@ import * as engineeringAiRoutes from './engineering-ai.js'
  */
 export function buildRouter(runtime: ServerRuntime): Router {
   const router = new Router()
+  registerSurveyContextMcpRoutes(router, {
+    getHost: () => runtime.surveyContextMcp,
+    runtimeToken: runtime.runtimeToken,
+    secureLoopback: !runtime.insecure && typeof runtime.info === 'function'
+      && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(runtime.info().host)
+  })
   registerSurveyMonitoringRoutes(router, { getService: () => runtime.surveyService, authorize: request => authorize(request, runtime) })
   registerSurveyQualityWorkflowRoutes(router, { getService: () => runtime.surveyQualityWorkflowService, authorize: request => authorize(request, runtime) })
   registerSurveyStandardBasisRoutes(router, { authorize: request => authorize(request, runtime) })
   registerSurveyQualityAssessmentRoutes(router, { getService: () => runtime.surveyQualityAssessmentService, authorize: request => authorize(request, runtime) })
+  registerSurveyCollaborationRoutes(router, { getService: () => runtime.surveyCollaborationService, getFlow: () => runtime.flowService, authorize: request => authorize(request, runtime) })
   registerSurveyQualityWorkspaceRoutes(router, {
     getService: () => runtime.surveyQualityWorkspaceService,
     authorize: (request) => authorize(request, runtime)

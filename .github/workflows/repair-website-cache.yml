@@ -20,6 +20,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production-release-public
+  cancel-in-progress: false
+
 env:
   WORKWISE_PUBLIC_BASE_URL: https://www.railwise.cn/downloads
 

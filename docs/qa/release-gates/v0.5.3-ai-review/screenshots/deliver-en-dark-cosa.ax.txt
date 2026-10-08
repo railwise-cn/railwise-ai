@@ -1,0 +1,109 @@
+Window: "RailWise AI", App: RailWise AI Candidate 9527ec5f1bcb.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-053-candidate-9527ec5f/runtime/RailWise%20AI%20Candidate%209527ec5f1bcb.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 1
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 golden-plane-control-e2e Control network · m · 10/7
+								20 文本 golden-plane-control-e2e
+								21 文本 Control network
+						22 文本  ·
+								23 文本 m
+						24 文本  ·
+								25 文本 10/7
+							26 按钮 Continue conversation
+						27 container
+							28 切换按钮 Connect phone, Value: 0
+							29 按钮 Settings
+					30 container
+						31 按钮 Collapse sidebar
+						32 标题 RailWise Survey, Value: 1
+							33 文本 RailWise Survey
+						34 text Engineering Survey Processing Current Survey job
+						35 弹出式按钮 Current Survey job, Value: golden-plane-control-e2e
+							36 (selected) New Survey job
+						37 按钮 New task
+						38 container Work view
+							39 按钮 Overview
+							40 按钮 Process
+							41 按钮 Results
+							42 按钮 Deliver
+						43 文本 Work view
+						44 按钮 Open AI
+						45 按钮 Advanced
+					46 container
+						47 文本 Review draft exported.
+						48 按钮 Close notice
+					49 container
+						50 text Current source golden-plane-control-e2e.in2 Current status Results ready · pending review Latest result Candidate deliverable
+						51 开合三角标记 More metrics
+							52 文本 More metrics
+					53 container
+						54 标题 Delivery, Value: 2
+							55 文本 Delivery
+						56 文本 Generate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.
+						57 按钮 Generate review draft
+						58 container Report and figure drafts
+							59 标题 Report and figure drafts, Value: 3
+								60 文本 Report and figure drafts
+							61 文本 Create a separate draft from the selected result. Edit review notes or a results figure, then check the source and confirm this export. The original result is preserved; draft confirmation does not constitute professional signoff.
+							62 按钮 (disabled) Edit review notes
+							63 按钮 (disabled) Edit results figure
+							64 按钮 (disabled) Review and export
+							65 文本 Generate and retain a review record for the selected result before creating an editing draft.
+							66 文本 This draft cannot continue. Check that its source and result remain valid, save your edits, and check again. The original result is preserved.
+						67 文本 Review draft files
+						68 文本 Review draft created. Pending professional review.
+						69 文本 Not archived
+						70 文本 report.docx
+						71 container
+							72 text DOCX  ·  36 KB
+						73 按钮 Preview
+						74 按钮 Export DOCX
+						75 按钮 Ask Survey AI about report.docx
+						76 文本 report.pdf
+						77 container
+							78 text PDF  ·  58.4 KB
+						79 按钮 Preview
+						80 按钮 Export PDF
+						81 按钮 Ask Survey AI about report.pdf
+						82 文本 professional.xlsx
+						83 container
+							84 text XLSX  ·  46.3 KB
+						85 按钮 Preview
+						86 按钮 Export XLSX
+						87 按钮 Ask Survey AI about professional.xlsx
+						88 开合三角标记 Advanced: review records
+							89 文本 Advanced: review records
+						90 开合三角标记 Advanced details
+							91 文本 Advanced details
+						92 开合三角标记 Citations
+							93 文本 Citations
+						94 开合三角标记 Advanced: review, archive and provenance
+							95 文本 Advanced: review, archive and provenance
+	96 关闭按钮
+	97 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	98 最小化按钮
+99 menu bar
+	100 RailWise AI Candidate 9527ec5f1bcb
+	101 File
+	102 Edit
+	103 View
+	104 Window
+	105 Help
+
+The focused UI element is 86 按钮 Export XLSX

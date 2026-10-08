@@ -37,6 +37,7 @@ const boundaries = { status: 'declared-inspection-trial-only', evidenceAuthentic
 export class SurveyQualityScoringWorkspaceService {
   private readonly db: Database.Database
   private readonly rates = new Map<string, { since: number; units: number }>()
+  private readonly lineageRates = new Map<string, { since: number; units: number }>()
   private closed = false
   constructor(private readonly options: { rootDir: string; nowIso?: () => string; clockMs?: () => number; getProject: (projectId: string) => Project | null }) {
     mkdirSync(resolve(options.rootDir), { recursive: true, mode: 0o700 })
@@ -56,7 +57,7 @@ export class SurveyQualityScoringWorkspaceService {
         WHEN EXISTS(SELECT 1 FROM quality_scoring_records WHERE id=NEW.id OR (project_id=NEW.project_id AND idempotency_key=NEW.idempotency_key))
         BEGIN SELECT RAISE(ABORT,'quality scoring records are append-only'); END;`)
   }
-  close(): void { if (!this.closed) { this.db.close(); this.closed = true; this.rates.clear() } }
+  close(): void { if (!this.closed) { this.db.close(); this.closed = true; this.rates.clear();this.lineageRates.clear() } }
   private now(): string { return this.options.nowIso?.() ?? new Date().toISOString() }
   private project(pid: string): Project {
     const p = this.options.getProject(pid)
@@ -64,19 +65,20 @@ export class SurveyQualityScoringWorkspaceService {
     if (!Number.isSafeInteger(p.revision) || p.revision < 1 || !isAbsolute(p.workspace)) return fail('integrity')
     return { id: p.id, revision: p.revision, workspace: p.workspace }
   }
-  private charge(pid: string, units: number): void {
+  private charge(pid: string, units: number, lineage=false): void {
     const now = this.options.clockMs?.() ?? Date.now()
-    for (const [key, value] of this.rates) if (now - value.since >= 60_000 || now < value.since) this.rates.delete(key)
-    const entry = this.rates.get(pid) ?? { since: now, units: 0 }
-    if (entry.units + units > L.workUnitsPerMinute || !this.rates.has(pid) && this.rates.size >= 512) fail('rate-limit')
+    const rates=lineage?this.lineageRates:this.rates,limit=lineage?2048:L.workUnitsPerMinute
+    for (const [key, value] of rates) if (now - value.since >= 60_000 || now < value.since) rates.delete(key)
+    const entry = rates.get(pid) ?? { since: now, units: 0 }
+    if (entry.units + units > limit || !rates.has(pid) && rates.size >= 512) fail('rate-limit')
     entry.units += units
-    this.rates.set(pid, entry)
+    rates.set(pid, entry)
   }
-  private chargeModel(pid: string, model: C.SurveyQualityScoringRecordV1['declaration']): void {
+  private chargeModel(pid: string, model: C.SurveyQualityScoringRecordV1['declaration'],lineage=false): void {
     const units = model.operation === 'accuracy' ? model.model.items.length
       : model.operation === 'unit' ? model.leaves.reduce((total, leaf) => total + (leaf.state === 'checked' && leaf.record.kind === 'accuracy' ? leaf.record.model.items.length : 1), 0)
         : model.operation === 'sample' ? model.declaredUnitIds.length : 1
-    this.charge(pid, Math.max(1, Math.ceil(units / 8)))
+    this.charge(pid, Math.max(1, Math.ceil(units / 8)),lineage)
   }
   private decode(raw: Uint8Array): string {
     if (raw.byteLength > L.requestBytes) return fail('limit')
@@ -105,7 +107,7 @@ export class SurveyQualityScoringWorkspaceService {
       modelBasisStatement: _b, replayEnvironment: _env, ...summary } = record
     return C.SurveyQualityScoringSummaryV1.parse(summary)
   }
-  private read(pid: string, id: string): C.SurveyQualityScoringRecordV1 {
+  private read(pid: string, id: string,lineage=false): C.SurveyQualityScoringRecordV1 {
     // Bound BLOB/TEXT materialization even when a record was corrupted outside this API.
     const row = this.db.prepare(`SELECT id,project_id,kind,project_revision,project_binding_hash,idempotency_key,request_hash,record_hash,created_at,storage_hash,
       CASE WHEN length(CAST(data_json AS BLOB))<=? THEN data_json END AS data_json,
@@ -134,7 +136,7 @@ export class SurveyQualityScoringWorkspaceService {
       const project = this.project(pid)
       if (digest(project) !== record.projectBindingHash) return fail('stale')
       if (digest(environment()) !== record.replayEnvironmentHash) return fail('replay-environment')
-      this.chargeModel(pid, parsed.declaration)
+      this.chargeModel(pid, parsed.declaration,lineage)
       const recomputed = scoreSurveyQualityV1(parsed.declaration)
       if (canonical(recomputed) !== canonical(record.result)) return fail('integrity')
       return record
@@ -190,6 +192,13 @@ export class SurveyQualityScoringWorkspaceService {
   getRecord(pid: string, id: string): C.SurveyQualityScoringRecordV1 {
     this.project(pid); this.charge(pid, 5)
     return this.db.transaction(() => this.read(pid, id))()
+  }
+  /** Internal bounded assessment-lineage replay. No HTTP/IPC route exposes this
+   * capability. Separate budget accommodates 8 rounds × 8 units × 2 passes;
+   * every stored-byte, environment and numerical replay check remains active. */
+  getAssessmentLineageRecord(pid:string,id:string):C.SurveyQualityScoringRecordV1 {
+    this.project(pid);this.charge(pid,5,true)
+    return this.db.transaction(()=>this.read(pid,id,true))()
   }
   listRecords(pid: string, limit = 10, offset = 0): C.SurveyQualityScoringListV1 {
     if (!Number.isInteger(limit) || limit < 1 || limit > L.pageSize || !Number.isInteger(offset) || offset < 0 || offset > L.recordsPerProject) return fail('validation')

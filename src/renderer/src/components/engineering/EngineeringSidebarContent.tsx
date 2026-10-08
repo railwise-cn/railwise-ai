@@ -6,6 +6,7 @@ import { rendererRuntimeClient } from '../../agent/runtime-client'
 import type { NormalizedThread } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
 import { SidebarIconButton } from '../sidebar/SidebarPrimitives'
+import { surveyRuntimeErrorText } from './survey-diagnostic-text'
 import {
   activeEngineeringProjectId,
   dispatchEngineeringProjectCreate,
@@ -153,7 +154,7 @@ export function EngineeringSidebarContent({ workspaceRoot, runtimeReady }: Props
       <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
         {error ? (
           <div role="alert" className="mx-1 my-2 rounded-lg border border-red-400/20 bg-red-500/10 px-2.5 py-2 text-[11px] leading-4 text-red-700 dark:text-red-200">
-            {error}
+            {surveyRuntimeErrorText(error, i18n.language)}
           </div>
         ) : null}
         {!runtimeReady ? (

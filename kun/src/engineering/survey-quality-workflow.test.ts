@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { QUALITY_WORKFLOW_LIMITS as L } from '../contracts/survey-quality-workflow.js';
 import { workflowFixture } from './survey-quality-workflow-test-helpers.js';
 import type { SurveyQualityWorkflowReadV1 } from '../contracts/survey-quality-workflow.js';
+import { getSurveyStandardBasisCatalog } from './survey-standard-basis.js';
 const clean: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const c of clean.splice(0))
     await c(); });
@@ -12,6 +13,29 @@ const check = (f: F, head: string, key = 'event-check-1', checkId = 'check-1') =
 function opened(f: F) { let w = f.service.createWorkflow(f.project.id, f.request); w = f.service.appendEvent(f.project.id, w.workflow.id, check(f, w.headHash)); return f.service.appendEvent(f.project.id, w.workflow.id, { expectedHeadHash: w.headHash, idempotencyKey: 'event-open-1', event: { kind: 'issue-opened', issueId: 'issue-1', checkId: 'check-1', evidence: f.original.evidence } }); }
 const correction = (f: F, w: SurveyQualityWorkflowReadV1) => ({ expectedHeadHash: w.headHash, idempotencyKey: 'event-correct-1', event: { kind: 'correction-recorded' as const, issueId: 'issue-1', correctionId: 'correction-1', corrected: f.corrected.ref, evidence: f.corrected.evidence } });
 describe('durable caller-declared quality workflow', () => {
+    it('binds exact standard/source/profile editions and retains withdrawal and matching replacement across restart', async () => {
+        const f = await fixture(), entry = getSurveyStandardBasisCatalog().rules[0]!, profile = entry.rule.profiles[0]!, rule = entry.rule;
+        let w = f.service.createWorkflow(f.project.id, f.request);
+        const basis = { standardCode: rule.standardCode, standardVersion: rule.standardVersion, ruleId: rule.ruleId, ruleVersion: rule.ruleVersion,
+            sourceSha256: rule.source.sha256, algorithmVersion: rule.executor.algorithmVersion, profileId: profile.profileId, profileVersion: profile.profileVersion };
+        const event = { kind: 'rule-applicability' as const, declarationId: 'applicability-1',
+            rule: { standardCode: rule.standardCode, standardVersion: rule.standardVersion, ruleId: rule.ruleId, ruleVersion: rule.ruleVersion },
+            basis, status: 'applicable' as const, rationale: '本项目最终内业成果按全数检查', evidence: f.original.evidence };
+        const append = (declared: unknown, key: string) => f.service.appendEvent(f.project.id, w.workflow.id, { expectedHeadHash: w.headHash, idempotencyKey: key, event: declared });
+        for (const mismatch of [{ ruleVersion: '99' }, { sourceSha256: 'f'.repeat(64) }, { profileVersion: '99' }]) expect(() => append({ ...event, basis: { ...basis, ...mismatch } }, 'wrong-basis-key')).toThrow('invalid-reference');
+        expect(() => append({ ...event, rule: { ...event.rule, ruleVersion: '2' } }, 'wrong-rule-key')).toThrow('invalid-reference');
+        w = append(event, 'declare-basis-key');
+        expect(w.entries[0]!.event.event).toMatchObject({ basisBinding: { reference: basis, ruleDigest: entry.ruleDigest, catalogDigest: getSurveyStandardBasisCatalog().catalogDigest } });
+        expect(() => append({ ...event, declarationId: 'replacement-1', replacesDeclarationId: event.declarationId }, 'premature-replacement')).toThrow('invalid-transition');
+        w = append({ kind: 'rule-revoked', declarationId: event.declarationId, reason: '检查范围调整，重新确认', evidence: f.original.evidence }, 'withdraw-basis-key');
+        expect(w.qualityGate.reasons).toContain('rule-revoked');
+        w = append({ ...event, declarationId: 'replacement-1', replacesDeclarationId: event.declarationId }, 'replacement-basis-key');
+        expect(w.qualityGate).toMatchObject({ activeApplicableRuleIds: ['replacement-1'], revokedRuleIds: ['applicability-1'] });
+        expect(w.qualityGate.reasons).not.toContain('rule-revoked');
+        expect(() => append({ ...event, declarationId: 'replacement-2', replacesDeclarationId: event.declarationId }, 'duplicate-replacement')).toThrow('invalid-transition');
+        expect(f.reopen().getWorkflow(f.project.id, w.workflow.id)).toEqual(w);
+        expect(w.deliveryApproval).toBe('not-granted');
+    });
     it('binds actual retained bytes, persists correction/recheck, reopens and never changes retention or draft approval', async () => {
         const f = await fixture(), before = f.retention.getRecord(f.project.id, f.original.record.record.id), open = opened(f);
         expect(open.openIssueCount).toBe(1);

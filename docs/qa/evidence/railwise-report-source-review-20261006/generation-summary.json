@@ -1,0 +1,78 @@
+{
+  "reviewType": "AI senior survey/software/product source review",
+  "generatedAt": "2026-10-05T18:07:19.541Z",
+  "implementation": "current TypeScript source through loader hooks",
+  "sources": [
+    {
+      "path": "kun/src/engineering/survey-professional-report.ts",
+      "sha256": "eb59bb4951b5b943547364e40e7b7a2f67e81dfc58c97c94db1260bd6c161424"
+    },
+    {
+      "path": "kun/src/engineering/engineering-report-pdf.ts",
+      "sha256": "5989d124250fa0c502b5496da0541ad3a5304d89b20315ab333399753a835bbe"
+    },
+    {
+      "path": "kun/src/engineering/survey-professional-report.test.ts",
+      "sha256": "3dd19eea2216211441d26820060fa95c0ed909d07e5c9973f8d13e6feccf09ac"
+    }
+  ],
+  "outputs": {
+    "standard.pdf": {
+      "sha256": "e60cfea7dd848e7f39e2bf700c3619200244c2ef1af4e684b784d5941f39fffa",
+      "size": 52516
+    },
+    "standard.docx": {
+      "sha256": "20b04b0317d327af1b35a36cd86e7c72128f63536126de3042f6a4344b3dbee7",
+      "size": 27097
+    },
+    "standard.xlsx": {
+      "sha256": "ebca2fbd9f5e30b879865c830aefe562443d07a3c23b7a9e728f07580c372c52",
+      "size": 36967
+    },
+    "segment.pdf": {
+      "sha256": "a05338cf34bd44bd9f207a9220088cee8b4d4d7e7823b2d4714231653ce971c4",
+      "size": 65942
+    },
+    "segment.docx": {
+      "sha256": "e40d9341e4e449e8705bbc86cf55fc777d64be9a320c8606d87ce618018347e4",
+      "size": 54461
+    },
+    "segment.xlsx": {
+      "sha256": "45898d88218dbecf183a11d8ce2b9fdc615fe201d0ecbe83da7544970e9bd2b5",
+      "size": 74565
+    },
+    "deformation.pdf": {
+      "sha256": "e3b81758c528b23f7564dd38c10969f4e9a65dc1d9952d88fac7499292b27349",
+      "size": 64327
+    },
+    "deformation.docx": {
+      "sha256": "92907ead660ad64064f448d57d12c9e44cd97dbf46baaf71b218f07a0d8fa89c",
+      "size": 35847
+    },
+    "deformation.xlsx": {
+      "sha256": "cdaf2c16b4c4d462193072ec1952f7695bacd9840a88d300279da928b78c3393",
+      "size": 48832
+    },
+    "monitoring.pdf": {
+      "sha256": "f60b69585ba9c17a84706930a0fa0ef473cf0acd4bd84cff4dad7406ea9a5435",
+      "size": 41806
+    },
+    "monitoring.docx": {
+      "sha256": "1ca8a572e89d35b2900afff18ac04920a6aa2df07d68ad9af17302461f76a807",
+      "size": 12577
+    },
+    "monitoring.xlsx": {
+      "sha256": "63b7b1064d9c001b70910322f1eb67b282410d912517d0628c3ab31282e2141d",
+      "size": 16675
+    },
+    "long-table.pdf": {
+      "sha256": "ee9adcb9b74565f478587f38a0b9bb3ba78a7d45d718c6fad82197e17dd3527f",
+      "size": 67523
+    },
+    "heading-boundary.pdf": {
+      "sha256": "0aa651a2fdc100c7293b05fa79675d7e0d92b388108bdca546eb109653991826",
+      "size": 37302
+    }
+  },
+  "fixtureBoundary": "Public synthetic data; no vendor interoperability or professional human signature is asserted."
+}

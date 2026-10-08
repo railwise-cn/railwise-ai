@@ -7,6 +7,7 @@ import {
   type WorkflowHistory, type WorkflowSourcePlan
 } from '../../agent/survey-quality-workflow-client'
 import type { QualityBinding, QualityPlan, QualityRecord } from '../../agent/survey-quality-client'
+import { readStandardBasisCatalog } from '../../agent/survey-standard-basis-client'
 
 type View = {
   workflow?: QualityWorkflow
@@ -14,9 +15,11 @@ type View = {
   sources?: Awaited<ReturnType<typeof listWorkflowSourcePlans>> & { offset: number }
   records?: Awaited<ReturnType<typeof listWorkflowSourceRecords>> & { offset: number; source: WorkflowSourcePlan }
   selectedSource?: WorkflowContext
+  catalog?: Awaited<ReturnType<typeof readStandardBasisCatalog>>
 }
 type Operation = (stillCurrent: () => boolean) => Promise<View>
-type EditableWorkflowKind = 'check' | 'issue-opened' | 'correction-recorded' | 'issue-rechecked'
+type EditableWorkflowKind = 'check' | 'issue-opened' | 'correction-recorded' | 'issue-rechecked' | 'stage-started' | 'stage-completed' | 'rule-applicability' | 'rule-revoked'
+const editableKinds: EditableWorkflowKind[] = ['check', 'issue-opened', 'correction-recorded', 'issue-rechecked', 'stage-started', 'stage-completed', 'rule-applicability', 'rule-revoked']
 const buttonClass = 'min-h-9 max-w-full rounded border border-ds-border px-3 py-2 text-left text-[11px] hover:bg-ds-hover disabled:opacity-50'
 const inputClass = 'mt-1 block min-h-9 w-full rounded border border-ds-border bg-ds-main p-2 text-[11px] text-ds-ink disabled:opacity-50'
 
@@ -30,7 +33,8 @@ function rememberQualityPlanMaterials(materialNames: Map<string, string>, source
 export function SurveyQualityWorkflowWorkspace({ binding, plan, record, runtimeReady }: {
   binding: QualityBinding; plan: QualityPlan; record: QualityRecord; runtimeReady: boolean
 }): ReactElement {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
+  const basisLabel = (text: { zh: string; en: string }): string => i18n.resolvedLanguage?.startsWith('zh') ? text.zh : text.en
   const [expanded, setExpanded] = useState(false)
   const scope = JSON.stringify([binding, plan, record, runtimeReady, expanded])
   const activeScope = useRef(scope); activeScope.current = scope
@@ -43,11 +47,18 @@ export function SurveyQualityWorkflowWorkspace({ binding, plan, record, runtimeR
   const [recheckOutcome, setRecheckOutcome] = useState<'resolved' | 'unresolved'>('unresolved')
   const [checkId, setCheckId] = useState(''), [issueId, setIssueId] = useState(''), [correctionId, setCorrectionId] = useState('')
   const [memberId, setMemberId] = useState(''), [acknowledged, setAcknowledged] = useState(false)
+  const [stageId, setStageId] = useState(''), [stageKind, setStageKind] = useState<'planning' | 'process' | 'final' | 'acceptance'>('planning')
+  const [policyVersion, setPolicyVersion] = useState(''), [checkedScope, setCheckedScope] = useState('')
+  const [stageOutcome, setStageOutcome] = useState<'completed' | 'blocked'>('blocked')
+  const [declarationId, setDeclarationId] = useState(''), [basisOption, setBasisOption] = useState(''), [rationale, setRationale] = useState('')
+  const [applicability, setApplicability] = useState<'applicable' | 'not-applicable' | 'pending'>('pending'), [replacesDeclarationId, setReplacesDeclarationId] = useState('')
   const materialNames = useRef(new Map<string, string>())
   useEffect(() => {
     generation.current += 1; inFlight.current = false; retry.current = null
     setView(null); setBusy(false); setError(''); setKind('check'); setOutcome('failed'); setRecheckOutcome('unresolved')
     setCheckId(''); setIssueId(''); setCorrectionId(''); setMemberId(''); setAcknowledged(false)
+    setStageId(''); setStageKind('planning'); setPolicyVersion(''); setCheckedScope(''); setStageOutcome('blocked')
+    setDeclarationId(''); setBasisOption(''); setRationale(''); setApplicability('pending'); setReplacesDeclarationId('')
     return () => { generation.current += 1 }
   }, [scope])
   const context: WorkflowContext = { binding, plan, record }
@@ -74,6 +85,19 @@ export function SurveyQualityWorkflowWorkspace({ binding, plan, record, runtimeR
   }
   const openIssues = [...issues].filter(([, issue]) => !issue.resolved)
   const selectedIssue = issues.get(issueId)
+  const stages = new Map<string, { kind: typeof stageKind; status: 'started' | 'completed' | 'blocked' }>()
+  const declarations = new Map<string, { event: Extract<WorkflowEvent, { kind: 'rule-applicability' }>; revoked: boolean; replacement?: string }>()
+  for (const entry of workflow?.entries ?? []) {
+    const event = entry.request.event
+    if (event.kind === 'stage-started') stages.set(event.stageId, { kind: event.stageKind, status: 'started' })
+    if (event.kind === 'stage-completed') { const stage = stages.get(event.stageId); if (stage) stage.status = event.outcome }
+    if (event.kind === 'rule-applicability') { declarations.set(event.declarationId, { event, revoked: false }); const old = event.replacesDeclarationId ? declarations.get(event.replacesDeclarationId) : undefined; if (old) old.replacement = event.declarationId }
+    if (event.kind === 'rule-revoked') { const declaration = declarations.get(event.declarationId); if (declaration) declaration.revoked = true }
+  }
+  const basisOptions = current.catalog?.rules.flatMap(entry => entry.rule.profiles.map(profile => ({
+    value: `${entry.rule.ruleId}:${profile.profileId}`, entry, profile
+  }))) ?? []
+  const selectedBasis = basisOptions.find(option => option.value === basisOption)
 
   async function execute(operation: Operation): Promise<void> {
     if (!runtimeReady || !expanded || inFlight.current) return
@@ -98,11 +122,24 @@ export function SurveyQualityWorkflowWorkspace({ binding, plan, record, runtimeR
   }
   function loadSources(offset = 0): void { void execute(async () => { const sources = await listWorkflowSourcePlans(context, offset); sources.plans.forEach(rememberMaterials); return { ...current, records: undefined, sources: { ...sources, offset } } }) }
   function loadRecords(source: WorkflowSourcePlan, offset = 0): void { rememberMaterials(source); void execute(async () => ({ ...current, records: { ...await listWorkflowSourceRecords(source, offset), source, offset } })) }
-  function eventInput(): Extract<WorkflowEvent, { kind: EditableWorkflowKind }> | null {
+  function eventInput(): WorkflowEvent | null {
     if (!workflow || !evidenceSource || !evidenceMember || !acknowledged) return null
     const evidence = { ...workflowSource(evidenceSource), memberId: evidenceMember.id }
     if (kind === 'check') return checkId.trim() && !checks.includes(checkId.trim()) ? { kind, checkId: checkId.trim(), outcome, evidence } : null
     if (kind === 'issue-opened') return checks.includes(checkId) && issueId.trim() && !issues.has(issueId.trim()) ? { kind, checkId, issueId: issueId.trim(), evidence } : null
+    if (kind === 'stage-started') return stageId.trim() && !stages.has(stageId.trim()) && policyVersion.trim() && checkedScope.trim()
+      ? { kind, stageId: stageId.trim(), stageKind, policyVersion: policyVersion.trim(), checkedScope: checkedScope.trim(), evidence } : null
+    if (kind === 'stage-completed') { const stage = stages.get(stageId); return stage?.status === 'started' ? { kind, stageId, stageKind: stage.kind, outcome: stageOutcome, evidence } : null }
+    if (kind === 'rule-revoked') return declarations.has(declarationId) && !declarations.get(declarationId)!.revoked && rationale.trim()
+      ? { kind, declarationId, reason: rationale.trim(), evidence } : null
+    if (kind === 'rule-applicability') {
+      if (!selectedBasis || !declarationId.trim() || declarations.has(declarationId.trim()) || !rationale.trim()) return null
+      const { rule } = selectedBasis.entry, profile = selectedBasis.profile
+      return { kind, declarationId: declarationId.trim(), rule: { standardCode: rule.standardCode, standardVersion: rule.standardVersion, ruleId: rule.ruleId, ruleVersion: rule.ruleVersion },
+        basis: { standardCode: rule.standardCode, standardVersion: rule.standardVersion, ruleId: rule.ruleId, ruleVersion: rule.ruleVersion,
+          sourceSha256: rule.source.sha256, algorithmVersion: rule.executor.algorithmVersion, profileId: profile.profileId, profileVersion: profile.profileVersion },
+        ...(replacesDeclarationId ? { replacesDeclarationId } : {}), status: applicability, rationale: rationale.trim(), evidence }
+    }
     if (!selectedIssue || selectedIssue.resolved || evidenceSource.plan.artifact.bundleHash === plan.artifact.bundleHash) return null
     if (kind === 'correction-recorded') return correctionId.trim() ? { kind, issueId, correctionId: correctionId.trim(), corrected: workflowSource(evidenceSource), evidence } : null
     return selectedIssue.correctionId && selectedIssue.artifactHash === evidenceSource.plan.artifact.bundleHash
@@ -136,12 +173,31 @@ export function SurveyQualityWorkflowWorkspace({ binding, plan, record, runtimeR
         <details className="min-w-0 border-t border-ds-border-muted pt-3">
           <summary className="cursor-pointer text-ds-muted">{t('qualityWorkflowAdvancedEditing')}</summary>
         <div className="grid min-w-0 gap-3 pt-3 sm:grid-cols-2">
-        <label className="text-[11px]">{t('qualityWorkflowEntryType')}<select className={inputClass} value={kind} disabled={!editing} onChange={event => { setKind(event.target.value as EditableWorkflowKind); setCheckId(''); setIssueId(''); setCorrectionId(''); setMemberId(''); setAcknowledged(false) }}>{(['check', 'issue-opened', 'correction-recorded', 'issue-rechecked'] as const).map(value => <option key={value} value={value}>{t(`qualityWorkflowKind_${value}`)}</option>)}</select></label>
+        <label className="text-[11px]">{t('qualityWorkflowEntryType')}<select className={inputClass} value={kind} disabled={!editing} onChange={event => { setKind(event.target.value as EditableWorkflowKind); setCheckId(''); setIssueId(''); setCorrectionId(''); setStageId(''); setDeclarationId(''); setRationale(''); setReplacesDeclarationId(''); setMemberId(''); setAcknowledged(false) }}>{editableKinds.map(value => <option key={value} value={value}>{t(`qualityWorkflowKind_${value}`)}</option>)}</select></label>
           {kind === 'check' ? <label className="text-[11px]">{t('qualityWorkflowCheckId')}<input className={inputClass} maxLength={160} value={checkId} disabled={!editing} onChange={event => setCheckId(event.target.value)} /></label> : kind === 'issue-opened' ? <label className="text-[11px]">{t('qualityWorkflowCheckId')}<select className={inputClass} value={checkId} disabled={!editing} onChange={event => setCheckId(event.target.value)}><option value="">{t('qualityWorkflowChoose')}</option>{checks.map(id => <option key={id}>{id}</option>)}</select></label> : null}
           {kind === 'check' ? <label className="text-[11px]">{t('qualityWorkflowDeclaredOutcome')}<select className={inputClass} value={outcome} disabled={!editing} onChange={event => setOutcome(event.target.value as typeof outcome)}><option value="failed">{t('qualityWorkflowOutcome_failed')}</option><option value="not-evaluated">{t('qualityWorkflowOutcome_not-evaluated')}</option></select></label> : null}
           {kind === 'issue-opened' ? <label className="text-[11px]">{t('qualityWorkflowIssueId')}<input className={inputClass} maxLength={160} value={issueId} disabled={!editing} onChange={event => setIssueId(event.target.value)} /></label> : needsCorrection ? <label className="text-[11px]">{t('qualityWorkflowIssueId')}<select className={inputClass} value={issueId} disabled={!editing} onChange={event => setIssueId(event.target.value)}><option value="">{t('qualityWorkflowChoose')}</option>{openIssues.filter(([, issue]) => kind !== 'issue-rechecked' || issue.correctionId).map(([id]) => <option key={id}>{id}</option>)}</select></label> : null}
           {kind === 'correction-recorded' ? <label className="text-[11px]">{t('qualityWorkflowCorrectionId')}<input className={inputClass} maxLength={160} value={correctionId} disabled={!editing} onChange={event => setCorrectionId(event.target.value)} /></label> : null}
           {kind === 'issue-rechecked' ? <label className="text-[11px]">{t('qualityWorkflowDeclaredOutcome')}<select className={inputClass} value={recheckOutcome} disabled={!editing} onChange={event => setRecheckOutcome(event.target.value as typeof recheckOutcome)}><option value="unresolved">{t('qualityWorkflowOutcome_unresolved')}</option><option value="resolved">{t('qualityWorkflowOutcome_resolved')}</option></select></label> : null}
+          {kind === 'stage-started' ? <>
+            <label>{t('qualityWorkflowStageName')}<input className={inputClass} maxLength={160} value={stageId} disabled={!editing} onChange={event => setStageId(event.target.value)} /></label>
+            <label>{t('qualityWorkflowStageType')}<select className={inputClass} value={stageKind} disabled={!editing} onChange={event => setStageKind(event.target.value as typeof stageKind)}>{(['planning', 'process', 'final', 'acceptance'] as const).map(value => <option key={value} value={value}>{t(`qualityWorkflowStage_${value}`)}</option>)}</select></label>
+            <label>{t('qualityWorkflowPolicyVersion')}<input className={inputClass} maxLength={160} value={policyVersion} disabled={!editing} onChange={event => setPolicyVersion(event.target.value)} /></label>
+            <label>{t('qualityWorkflowCheckedScope')}<input className={inputClass} maxLength={160} value={checkedScope} disabled={!editing} onChange={event => setCheckedScope(event.target.value)} /></label>
+          </> : null}
+          {kind === 'stage-completed' ? <>
+            <label>{t('qualityWorkflowStageName')}<select className={inputClass} value={stageId} disabled={!editing} onChange={event => setStageId(event.target.value)}><option value="">{t('qualityWorkflowChoose')}</option>{[...stages].filter(([, stage]) => stage.status === 'started').map(([id, stage]) => <option key={id} value={id}>{id} · {t(`qualityWorkflowStage_${stage.kind}`)}</option>)}</select></label>
+            <label>{t('qualityWorkflowDeclaredOutcome')}<select className={inputClass} value={stageOutcome} disabled={!editing} onChange={event => setStageOutcome(event.target.value as typeof stageOutcome)}><option value="blocked">{t('qualityWorkflowStageBlocked')}</option><option value="completed">{t('qualityWorkflowStageCompleted')}</option></select></label>
+          </> : null}
+          {kind === 'rule-applicability' ? <>
+            <button type="button" className={buttonClass} disabled={!editing} onClick={() => void execute(async () => ({ ...current, catalog: await readStandardBasisCatalog() }))}>{t('qualityWorkflowLoadRules')}</button>
+            <label>{t('qualityWorkflowRuleBasis')}<select className={inputClass} value={basisOption} disabled={!editing || !basisOptions.length} onChange={event => { setBasisOption(event.target.value); setReplacesDeclarationId('') }}><option value="">{t('qualityWorkflowChoose')}</option>{basisOptions.map(option => <option key={option.value} value={option.value}>{basisLabel(option.entry.rule.title)} · {basisLabel(option.profile.label)} · {option.entry.rule.standardCode}</option>)}</select></label>
+            <label>{t('qualityWorkflowDeclarationName')}<input className={inputClass} maxLength={160} value={declarationId} disabled={!editing} onChange={event => setDeclarationId(event.target.value)} /></label>
+            <label>{t('qualityWorkflowApplicability')}<select className={inputClass} value={applicability} disabled={!editing} onChange={event => setApplicability(event.target.value as typeof applicability)}>{(['pending', 'applicable', 'not-applicable'] as const).map(value => <option key={value} value={value}>{t(`qualityWorkflowApplicability_${value}`)}</option>)}</select></label>
+            <label>{t('qualityWorkflowReplacement')}<select className={inputClass} value={replacesDeclarationId} disabled={!editing || !selectedBasis} onChange={event => setReplacesDeclarationId(event.target.value)}><option value="">{t('qualityWorkflowNoReplacement')}</option>{[...declarations].filter(([, item]) => item.revoked && !item.replacement && item.event.rule.ruleId === selectedBasis?.entry.rule.ruleId && item.event.basis?.profileId === selectedBasis.profile.profileId).map(([id]) => <option key={id} value={id}>{id}</option>)}</select></label>
+          </> : null}
+          {kind === 'rule-revoked' ? <label>{t('qualityWorkflowDeclarationName')}<select className={inputClass} value={declarationId} disabled={!editing} onChange={event => setDeclarationId(event.target.value)}><option value="">{t('qualityWorkflowChoose')}</option>{[...declarations].filter(([, item]) => !item.revoked).map(([id]) => <option key={id} value={id}>{id}</option>)}</select></label> : null}
+          {kind === 'rule-applicability' || kind === 'rule-revoked' ? <label>{t('qualityWorkflowRationale')}<textarea className={inputClass} maxLength={160} value={rationale} disabled={!editing} onChange={event => setRationale(event.target.value)} /></label> : null}
         </div>
         {needsCorrection ? <div className="space-y-2 border border-ds-border-muted p-2">
           <p>{t('qualityWorkflowCorrectionSource')}</p><p className="text-ds-muted">{t('qualityWorkflowCorrectionHint')}</p>

@@ -1403,7 +1403,7 @@ export function Workbench(): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [activeSddDraft, activeWriteWorkspaceRoot, route, setRightPanelMode, setRoute, workspaceRoot])
+  }, [activeSddDraft, activeWriteWorkspaceRoot, route, setInput, setRightPanelMode, setRoute, workspaceRoot])
 
   const sendSddAssistantPrompt = async (value: string): Promise<void> => {
     const v = value.trim()

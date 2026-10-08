@@ -1,0 +1,89 @@
+The following is a diff from the previous accessibility tree for Window: "RailWise AI" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 108-124
+~				105 container
+~					106 container RailWise AI
+~						107 按钮 收起侧边栏
++						108 container
++							109 container 编程 / 内业
++								110 按钮 编程
++								111 按钮 内业
++							112 切换 Description: 专注模式, Value: off
++							113 container 工作区工具
++								114 开合三角标记 工具
++									115 文本 工具
++							116 按钮 新建任务
++						117 container
++							118 text 任务 1
++							119 切换按钮 Description: 刷新工程测量项目, Value: 0
++							120 按钮 新建内业任务 控制网 · m · 10/1
++								121 文本 新建内业任务
++								122 文本 控制网
++								123 文本  · 
++								124 文本 m
++								125 文本  · 
++								126 文本 10/1
++							127 按钮 继续对话
++						128 container
++							129 切换按钮 连接手机, Value: 0
++							130 按钮 设置
++					131 container
++						132 按钮 收起侧边栏
++						133 标题 RailWise Survey, Value: 1
++							134 文本 RailWise Survey
++						135 text 工程测量内业 当前内业任务
++						136 弹出式按钮 当前内业任务, Value: 新建内业任务
++							137 (selected) 新建内业任务
++						138 按钮 新建任务
++						139 container 工作视图
++							140 按钮 概览
++							141 按钮 处理
++							142 按钮 结果
++							143 按钮 交付
++						144 文本 工作视图
++						145 按钮 打开 AI
++						146 按钮 高级
++					147 container
++						148 text 当前来源 period-valid-2.json 当前状态 结果已生成 · 待审查 最近结果 候选成果
++						149 开合三角标记 更多指标
++							150 文本 更多指标
++					151 container
++						152 标题 交付, Value: 2
++							153 文本 交付
++						154 文本 生成审查稿，预览并导出 DOCX、PDF 或 XLSX。专业复核、批准和签署仍需完成。
++						155 按钮 生成审查稿
++						156 文本 审查稿文件
++						157 文本 已恢复历史审查稿，文件尚未重新复核。
++						158 文本 未归档
++						159 文本 report.docx
++						160 container
++							161 text DOCX  ·  27.2 KB
++						162 按钮 预览
++						163 按钮 导出 DOCX
++						164 按钮 询问 report.docx 的测量 AI
++						165 文本 report.pdf
++						166 container
++							167 text PDF  ·  60.6 KB
++						168 按钮 预览
++						169 按钮 导出 PDF
++						170 按钮 询问 report.pdf 的测量 AI
++						171 文本 evidence.xlsx
++						172 container
++							173 text XLSX  ·  33.2 KB
++						174 按钮 预览
++						175 按钮 导出 XLSX
++						176 按钮 询问 evidence.xlsx 的测量 AI
++						177 文本 professional.xlsx
++						178 container
++							179 text XLSX  ·  33.6 KB
++						180 按钮 预览
++						181 按钮 导出 XLSX
++						182 按钮 询问 professional.xlsx 的测量 AI
++						183 开合三角标记 高级：审查记录
++							184 文本 高级：审查记录
++						185 开合三角标记 高级详情
++							186 文本 高级详情
++						187 开合三角标记 来源引用
++							188 文本 来源引用
++						189 开合三角标记 高级：审查、归档与来源记录
++							190 文本 高级：审查、归档与来源记录
+The focused UI element is 145 按钮 打开 AI

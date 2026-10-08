@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import type { Readable } from 'node:stream'
 import PDFDocument from 'pdfkit'
-import { professionalReportCellText, type ProfessionalReportModel, type ProfessionalReportTable } from './survey-professional-report.js'
+import { professionalReportCellText, professionalReportPresentation, type ProfessionalReportModel, type ProfessionalReportTable } from './survey-professional-report.js'
 
 const fontUrl = new URL('../../assets/fonts/NotoSansSC-Regular.ttf', import.meta.url)
 let fontBytes: Promise<Buffer> | undefined
@@ -21,6 +21,7 @@ async function reportFont(): Promise<Buffer> {
  * actual header. A pathological cell is rejected rather than clipped. */
 export async function makeProfessionalReportPdf(model: ProfessionalReportModel): Promise<Buffer> {
   if (JSON.stringify(model).length > 2_000_000) throw new Error('report exceeds the PDF layout limit; split the selected results into separate reports')
+  model = professionalReportPresentation(model)
   const font = await reportFont()
   return new Promise<Buffer>((resolve, reject) => {
     const document = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 42, bufferPages: true, info: { Title: model.title, Creator: 'RailWise Survey', Subject: '待审查草稿 · 未签认' } })
@@ -32,8 +33,6 @@ export async function makeProfessionalReportPdf(model: ProfessionalReportModel):
     const endY = (): number => document.page.height - 54
     const ensureSpace = (height: number): void => { if (document.y + height > endY()) document.addPage() }
     const renderTable = (table: ProfessionalReportTable): void => {
-      ensureSpace(85)
-      document.fontSize(12).fillColor('#17212B').text(table.title, { paragraphGap: 8 })
       const width = document.page.width - 84
       const cellWidth = width / table.columns.length
       const headers = table.columns.map(column => column.unit ? `${column.label} (${column.unit})` : column.label)
@@ -47,18 +46,50 @@ export async function makeProfessionalReportPdf(model: ProfessionalReportModel):
       if (textColumnCount) for (let index = 0; index < columnWidths.length; index += 1) if (!table.columns[index]!.numeric) columnWidths[index] = (width - numericWidth) / textColumnCount
       const rowHeight = (cells: string[]): number => Math.max(...cells.map((cell, index) => document.heightOfString(cell, { width: columnWidths[index]! - 10, lineGap: 1 }))) + 10
       const headerHeight = rowHeight(headers)
+      const firstRowHeight = rowHeight(dataRows[0]!)
+      document.fontSize(12)
+      const titleHeight = document.heightOfString(table.title, { width }) + 8
+      const firstSectionHeight = titleHeight + headerHeight + firstRowHeight
+      if (firstSectionHeight > document.page.height - 96) throw new Error(`professional table ${table.id} contains a heading and first row too tall for one printable page; split this result before exporting`)
+      document.fontSize(9)
+      const noteHeight = table.note ? document.heightOfString(`说明：${table.note}`, { width, lineGap: 1 }) + 12 : 0
+      const shortTableHeight = headerHeight + dataRows.reduce((total, row) => total + rowHeight(row), 0)
+      const completeSectionHeight = titleHeight + shortTableHeight + noteHeight + 18
+      const canKeepShortTableTogether = dataRows.length <= 3 && completeSectionHeight <= document.page.height - 96
+      const continuationTitle = `${table.title}（续）`
+      document.fontSize(10)
+      const continuationTitleHeight = document.heightOfString(continuationTitle, { width }) + 8
+      document.fontSize(9)
+      ensureSpace(canKeepShortTableTogether ? completeSectionHeight : firstSectionHeight)
+      document.fontSize(12)
+      document.fillColor('#17212B').text(table.title, { width, paragraphGap: 8 })
+      document.fontSize(9)
       let start = 0
       while (start < dataRows.length) {
         let required = headerHeight
         let end = start
         while (end < dataRows.length) {
           const height = rowHeight(dataRows[end]!)
-          if (height + headerHeight > document.page.height - 114) throw new Error(`professional table ${table.id} contains a cell too long for one printable page; split this result before exporting`)
-          if (document.y + required + height > endY()) break
+          // Continuation pages reserve space for their title before the repeated
+          // header. Include that reservation in the pathological-row guard so a
+          // row that cannot fit after the title fails instead of retrying forever.
+          const continuationSpace = start > 0 ? continuationTitleHeight : 0
+          if (height + headerHeight + continuationSpace > document.page.height - 114) throw new Error(`professional table ${table.id} contains a cell too long for one printable page; split this result before exporting`)
+          const isFinalRow = end === dataRows.length - 1
+          const canKeepNoteWithFinalRow = table.note !== undefined && isFinalRow
+            && headerHeight + height + noteHeight + continuationSpace <= document.page.height - 126
+          if (document.y + required + height + (canKeepNoteWithFinalRow ? noteHeight : 0) > endY()) break
           required += height
           end += 1
         }
-        if (end === start) { document.addPage(); continue }
+        if (end === start) {
+          document.addPage()
+          if (start > 0) {
+            document.fontSize(10).fillColor('#17212B').text(continuationTitle, { paragraphGap: 6 })
+            document.fontSize(9)
+          }
+          continue
+        }
         const data = [headers.map(text => ({ text, type: 'TH' as const, backgroundColor: '#E8EEF3' })), ...dataRows.slice(start, end).map(row => row.map(text => ({ text }))) ]
         document.table({ maxWidth: width, columnStyles: columnWidths, defaultStyle: { border: 0.4, borderColor: '#B5BEC8', padding: 5, textOptions: { lineGap: 1 } }, data })
         start = end

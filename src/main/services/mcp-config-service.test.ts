@@ -5,6 +5,7 @@ import { createServer } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { McpServerConfigV2 } from '../../shared/agent-workbench'
 import { McpConfigService } from './mcp-config-service'
+import brand from '../../shared/product-brand.json'
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -276,7 +277,11 @@ describe('McpConfigService', () => {
     callback.searchParams.set('state', started.authorizationState!)
     const callbackResponse = await fetch(callback)
     expect(callbackResponse.status).toBe(200)
-    expect(await callbackResponse.text()).not.toContain('loopback-code')
+    const callbackPage = await callbackResponse.text()
+    expect(callbackPage).not.toContain('loopback-code')
+    expect(callbackPage).toContain(`<title>${brand.platform}</title>`)
+    expect(callbackPage).toContain(`<h1>${brand.platform}</h1>`)
+    expect(callbackPage).not.toContain('WorkWise')
     await expect(wait).resolves.toMatchObject({ state: 'connected', authorized: true })
     expect(JSON.stringify(await service.list(workspace))).not.toContain('loopback-secret')
   })
@@ -379,7 +384,7 @@ describe('McpConfigService', () => {
     service.dispose()
     await expect(waiting).resolves.toMatchObject({
       state: 'error',
-      message: expect.stringMatching(/WorkWise is closing/i)
+      message: expect.stringContaining(`${brand.platform} is closing`)
     })
     await assertLoopbackPortAvailable(port)
   })
@@ -407,7 +412,7 @@ describe('McpConfigService', () => {
         expect(init?.method).toBe('POST')
         const request = JSON.parse(String(init?.body)) as Record<string, unknown>
         expect(request).toMatchObject({
-          client_name: 'WorkWise',
+          client_name: brand.platform,
           token_endpoint_auth_method: 'none',
           redirect_uris: ['http://127.0.0.1:43119/callback']
         })

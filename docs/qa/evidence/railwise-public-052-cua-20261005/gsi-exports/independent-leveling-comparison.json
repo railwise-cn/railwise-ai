@@ -1,0 +1,52 @@
+{
+  "method": "Independent exact Fraction closed-loop leveling: cumulative source elevations give four height differences; closing error distributed by declared route length (relative inverse-length weights). This checker imports no product code.",
+  "observationsMetres": [
+    "-1/5",
+    "4/5",
+    "-7999/10000",
+    "2003/10000"
+  ],
+  "routeLengthsMetres": [
+    100,
+    200,
+    200,
+    100
+  ],
+  "closureMetres": 0.0004,
+  "closureMillimetres": 0.4,
+  "correctionsMetres": [
+    -6.666666666666667e-05,
+    -0.00013333333333333334,
+    -0.00013333333333333334,
+    -6.666666666666667e-05
+  ],
+  "closureAfterCorrectionMetres": 0.0,
+  "pointComparison": [
+    {
+      "point": "BM",
+      "expectedHeightMetres": 100.0,
+      "exportHeightMetres": 100,
+      "absoluteDifferenceMetres": 0.0
+    },
+    {
+      "point": "gsi-block-1:Z01",
+      "expectedHeightMetres": 99.79993333333333,
+      "exportHeightMetres": 99.79993333333334,
+      "absoluteDifferenceMetres": 1.4210854715202004e-14
+    },
+    {
+      "point": "P1",
+      "expectedHeightMetres": 100.5998,
+      "exportHeightMetres": 100.5998,
+      "absoluteDifferenceMetres": 0.0
+    },
+    {
+      "point": "gsi-block-1:Z02",
+      "expectedHeightMetres": 99.79976666666667,
+      "exportHeightMetres": 99.79976666666667,
+      "absoluteDifferenceMetres": 0.0
+    }
+  ],
+  "passed": true,
+  "boundary": "Synthetic/public-format fixture only; no licensed vendor result, field authenticity, formal conformity or professional signoff is asserted. Posterior standard deviations were preserved in exports but not independently certified here."
+}

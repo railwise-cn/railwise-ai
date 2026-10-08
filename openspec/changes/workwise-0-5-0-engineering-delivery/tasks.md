@@ -39,7 +39,7 @@ The 7fc5b9206057 signed target passed first-plan default-Flash GSI and explicit-
 
 - [x] Persist caller-declared checks, issues, corrections and rechecks in a separate bounded append-only workspace, binding real retained materials and exact project/retention heads; verify idempotency, stale sources, corruption, restart and unchanged legacy retention semantics.
 - [x] Expose authenticated Runtime routes, strict desktop IPC/client validation and bilingual manual controls with source selection, scope cancellation, retry and history; never promote recorded declarations to professional approval or standard conformity.
-- [ ] Verify this increment in its own signed installed candidate, including complete correction/recheck flow, source changes, restart, languages/themes/window sizes and keyboard access; obtain required human UI/professional confirmation separately.
+- [ ] Verify this increment in its own signed installed candidate, including complete correction/recheck flow, source changes, restart, languages/themes/window sizes and keyboard access; record independent senior-engineer-mode AI UI/workflow acceptance; authentic professional signature remains a separate external requirement.
 
 ## Contracts and Runtime
 
@@ -58,7 +58,7 @@ The 7fc5b9206057 signed target passed first-plan default-Flash GSI and explicit-
 
 - [x] Add typed project-scoped evidence references and an authenticated read-only model tool that resolves the exact recorded IDs, revisions and hashes across existing Survey, quality and monitoring records; reject stale, ambiguous, cross-project or oversized references without replacing them with latest results or creating new records.
 - [x] Connect the missing Q10-Q17 result-question surfaces to those references, preserving existing drafts and attachments; verify precise record/row binding, scope changes, bilingual accessible controls and no automatic model send or Runtime mutation from preparing a question.
-- [ ] Verify the exact new signed candidate's result-question preparation and explicit-send/read-back flow, including stale/error/recovery cases; preserve historical candidate evidence and keep user/professional acceptance separate.
+- [ ] Verify the exact new signed candidate's result-question preparation and explicit-send/read-back flow, including stale/error/recovery cases; preserve historical candidate evidence and keep routine AI UI/workflow acceptance and authentic professional signature distinct.
 
 ## Integrations and UI
 
@@ -120,7 +120,7 @@ The user-provided consolidated plan supersedes the earlier D-04 platform naming 
 - [ ] Centralize RailWise AI / RailWise Survey display naming, migrate menus/settings/startup/about/candidate display and brand assets; retain technical identifiers and record the migration matrix.
 - [ ] Complete Survey English/Chinese locale validation, theme/window/accessibility acceptance in the exact packaged candidate.
 - [x] Complete current-head desktop and Runtime tests, lint, typecheck, build and strict specification validation with separate command evidence.
-- [ ] Complete candidate signing/notarization, isolated install, two P0 format GUI delivery runs, restart and real private updater round trip; obtain human UI/professional confirmation.
+- [ ] Complete candidate signing/notarization, isolated install, two P0 format GUI delivery runs, restart and real private updater round trip; record independent senior-engineer-mode AI UI/workflow acceptance and separately obtain any authentic professional signature required for formal production delivery.
 - [ ] P1 professional credibility: versioned standards and GB/T 24356-2023 quality chain, residual-to-record navigation, replay/signatures, advanced adjustment methods and second-batch format admission.
 - [ ] P2 after P0 acceptance: GeoCOM, coordinate/engineering expansion, DXF/point clouds/3D, outward MCP, audited binary converters, Survey/Write/Design/Flow collaboration.
 - [ ] Record measured production metrics (traceable projects, first-result time, import success, 30-minute leveling workflow, reproducibility, provenance and one-click evidence questions).
@@ -138,7 +138,7 @@ These code and automated-test items do not close task 39: a successful real-mode
 
 - [x] Add explicit solver-indexed XY covariance, standard ellipse axes/orientation/variance basis for plane, traverse, triangulation, CPIII and GNSS; preserve ellipse-free algorithm-6 replay without rewriting old results.
 - [x] Carry ellipse values and interpretation through bilingual point views, DOCX/PDF/XLSX and manifests; validate analytic rotated/diagonal/degenerate cases, real service covariance, export and legacy replay.
-- [ ] Verify the new ellipse and parser diagnostic increment in its exact signed candidate and obtain professional interpretation/UI acceptance; this does not close the broader advanced-adjustment task.
+- [ ] Verify the new ellipse and parser diagnostic increment in its exact signed candidate and obtain independent senior-engineer-mode AI interpretation/UI acceptance; this does not close the broader advanced-adjustment task.
 
 ## P1 deliverable verification increment
 
@@ -156,14 +156,14 @@ These code and automated-test items do not close task 39: a successful real-mode
 - [x] Add a versioned fixed-linear generalized-w diagnostic with explicitly declared known absolute covariance, complete residual covariance and detectability/numerical boundaries; verify independent exact correlated models and extreme-scale counterexamples without changing formal observations or decisions.
 - [x] Add a versioned fixed-linear VCE trial for independent disjoint variance groups, preserving initial values, every candidate and explicit nonpositive/identifiability/numerical stops; verify exact and high-precision independent cases without replacing formal weights.
 - [x] Bind both advanced trials to immutable project-scoped input evidence, authenticated Runtime/IPC, strict replay, bounded history and bilingual manual UI; keep declared experimental models separate from validated production covariance.
-- [ ] Verify the advanced-trial integration in its exact signed private candidate, including damaged/stale records, restart, themes and keyboard access; obtain required human UI and professional confirmation before treating the broader advanced-adjustment task as complete.
+- [ ] Verify the advanced-trial integration in its exact signed private candidate, including damaged/stale records, restart, themes and keyboard access; record independent senior-engineer-mode AI UI/numerical review and retain external professional-signature requirements before treating the broader advanced-adjustment task as complete.
 
 ## P1 statistical-family and Huber increment
 
 - [x] Add explicitly declared normal/t/chi-square statistical families with complete-family Bonferroni correction, numerical boundaries and independent high-precision replay; do not silently use approximate upstream statistics as exact inputs.
 - [x] Add fixed-external-scale Huber QR/IRLS trials with retained observations, weights, objective/score history and explicit stopping/uniqueness limits; verify independent exact and high-precision cases.
 - [x] Extend immutable advanced-trial Runtime/IPC/history and bilingual UI for both kinds, preserving legacy records, raw bytes, bounded replay, exact distribution parameters and full critical interval display; verify independent service/client/DOM probes.
-- [ ] Verify these two new kinds in their exact signed candidate, including native export, restart, damaged records, themes/window sizes and required human confirmation; previous generalized-w/VCE package evidence does not cover them.
+- [ ] Verify these two new kinds in their exact signed candidate, including native export, restart, damaged records, themes/window sizes and independent senior-engineer-mode AI UI/numerical review; previous generalized-w/VCE package evidence does not cover them.
 
 ## P1 declared two-epoch reference datum
 

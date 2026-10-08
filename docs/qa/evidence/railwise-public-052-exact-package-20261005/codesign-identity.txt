@@ -1,0 +1,31 @@
+Executable=/private/tmp/railwise-official-052/RailWise AI.app/Contents/MacOS/RailWise AI
+Identifier=com.wangjiawei508.workgpt
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20500 size=453 flags=0x10000(runtime) hashes=3+7 location=embedded
+VersionPlatform=1
+VersionMin=786432
+VersionSDK=1704960
+Hash type=sha256 size=32
+CandidateCDHash sha256=8e19c3579c5f19983c3ec5f8cccd05bf40e83d42
+CandidateCDHashFull sha256=8e19c3579c5f19983c3ec5f8cccd05bf40e83d42dcb9e1e870bd109af719104f
+Hash choices=sha256
+CMSDigest=8e19c3579c5f19983c3ec5f8cccd05bf40e83d42dcb9e1e870bd109af719104f
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=16384
+Executable Segment flags=0x1
+Page size=16384
+CDHash=8e19c3579c5f19983c3ec5f8cccd05bf40e83d42
+Signature size=9113
+Authority=Developer ID Application: Ningbo Ruiwei Engineering Technology Co., Ltd. (R35G7F4A9U)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=Oct 5, 2026 at 20:31:16
+Notarization Ticket=stapled
+Info.plist entries=32
+TeamIdentifier=R35G7F4A9U
+Runtime Version=26.4.0
+Sealed Resources version=2 rules=13 files=9316
+Internal requirements count=1 size=188
+Total signatures=1
+Chosen signature=1

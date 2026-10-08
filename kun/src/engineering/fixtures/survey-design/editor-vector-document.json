@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "v1",
+  "id": "design_survey_export_fixture",
+  "revision": 0,
+  "name": "工程测量成果示意",
+  "format": "custom",
+  "pages": [
+    {
+      "id": "page_network",
+      "name": "控制网示意",
+      "width": 800,
+      "height": 600,
+      "elements": [
+        {
+          "id": "el_frame",
+          "type": "rect",
+          "x": 20,
+          "y": 20,
+          "w": 740,
+          "h": 500,
+          "rotation": 15,
+          "fill": "E2E8F0",
+          "zIndex": 0,
+          "stroke": "1E293B",
+          "strokeWidth": 2
+        },
+        {
+          "id": "el_point",
+          "type": "ellipse",
+          "x": 180,
+          "y": 220,
+          "w": 10,
+          "h": 10,
+          "rotation": 0,
+          "fill": "2563EB",
+          "zIndex": 1
+        },
+        {
+          "id": "el_observation",
+          "type": "line",
+          "x": 400,
+          "y": 300,
+          "w": -200,
+          "h": -100,
+          "rotation": 0,
+          "zIndex": 2,
+          "stroke": "1E293B",
+          "strokeWidth": 2,
+          "strokeLinecap": "round"
+        },
+        {
+          "id": "el_boundary",
+          "type": "path",
+          "x": 10,
+          "y": 10,
+          "w": 400,
+          "h": 200,
+          "rotation": 0,
+          "fill": "DBEAFE",
+          "zIndex": 3,
+          "pathData": "M10,10 L400,10 Q420,100 400,200 Z",
+          "opacity": 0.6
+        },
+        {
+          "id": "el_label",
+          "type": "text",
+          "x": 100,
+          "y": 80,
+          "w": 600,
+          "h": 70,
+          "rotation": 0,
+          "fill": "1E293B",
+          "zIndex": 4,
+          "text": "S1 控制网\n单位：m",
+          "textAlign": "center",
+          "letterSpacing": 1,
+          "fontSize": 24,
+          "fontFamily": "system-ui, 'Microsoft YaHei', sans-serif",
+          "fontWeight": "normal"
+        },
+        {
+          "id": "el_group",
+          "type": "group",
+          "x": 100,
+          "y": 80,
+          "w": 600,
+          "h": 220,
+          "rotation": 30,
+          "zIndex": 5,
+          "childIds": [
+            "el_point",
+            "el_observation",
+            "el_label"
+          ]
+        },
+        {
+          "id": "el_arrow",
+          "type": "preset",
+          "x": 600,
+          "y": 450,
+          "w": 100,
+          "h": 75,
+          "rotation": 10,
+          "fill": "1E3A5F",
+          "zIndex": 6,
+          "presetName": "rightArrow",
+          "presetPaths": [
+            {
+              "d": "M0,50 H120 V0 L200,75 L120,150 V100 H0 Z",
+              "fill": "2563EB"
+            },
+            {
+              "d": "M20,75 H100",
+              "fill": null,
+              "stroke": "FFFFFF",
+              "strokeWidth": 2
+            }
+          ]
+        }
+      ],
+      "background": "FFFFFF"
+    },
+    {
+      "id": "page_summary",
+      "name": "成果摘要",
+      "width": 600,
+      "height": 300,
+      "elements": [
+        {
+          "id": "el_summary",
+          "type": "text",
+          "x": 30,
+          "y": 30,
+          "w": 540,
+          "h": 60,
+          "rotation": 0,
+          "fill": "1A1A2E",
+          "zIndex": 0,
+          "text": "坐标基准：工程独立坐标系",
+          "fontSize": 24,
+          "fontFamily": "system-ui, 'Microsoft YaHei', sans-serif",
+          "fontWeight": "normal"
+        }
+      ],
+      "background": "FFFFFF"
+    }
+  ],
+  "assets": [],
+  "appliedCommands": [],
+  "createdAt": 0,
+  "updatedAt": 0
+}

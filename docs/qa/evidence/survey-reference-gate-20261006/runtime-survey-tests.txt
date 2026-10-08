@@ -1,0 +1,166 @@
+
+ RUN  v4.1.8 /Users/wangjiawei/Documents/WorkWise/kun
+
+····························································································stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension generalized-w model within the explicit response bound
+advanced-trial-size generalized-w: 121820 bytes; 0 iterations
+
+··························stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a maximum-dimension vce model within the explicit response bound
+advanced-trial-size vce: 333064 bytes; 55 iterations
+
+·stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size huber result within the response bound
+advanced-new-size huber: 2925051 bytes
+
+·stdout | tests/survey-advanced-trials-workspace-http.test.ts > authenticated advanced trials HTTP > exports a real maximum-size statistical-family result within the response bound
+advanced-new-size statistical-family: 482857 bytes
+
+·······························································································································································································································································································································································································································stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect done elapsedMs=1
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+··········································stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·············stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > persists scoped grants across runtime restart, applies revocation to a connected client, and keeps credentials private
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > denies unauthenticated, owner-as-client, forged identity, client self-authorization, nonlocal host/origin and oversized requests
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+················stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] skills done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not allow insecure runtime mode to expose grant administration or MCP data
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] usage-carryover begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] usage-carryover done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] mcp-connect begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] mcp-connect done elapsedMs=0
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] skills begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] skills done elapsedMs=1
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] attachment-cleanup begin
+
+stdout | tests/survey-context-mcp-http.test.ts > Survey MCP authenticated host over real loopback TCP > does not enable the host when the actual runtime is configured to listen beyond loopback
+[runtime startup] attachment-cleanup done elapsedMs=0
+
+·······························································································································································································································································································································································································································································································································································································································································································································--------------------·····································································································································································································································································································································································································································································································································································································································································································································································································--
+
+ Test Files  96 passed | 2 skipped (98)
+      Tests  2082 passed | 22 skipped (2104)
+   Start at  02:07:59
+   Duration  23.23s (transform 2.24s, setup 0ms, import 11.12s, tests 69.33s, environment 4ms)
+

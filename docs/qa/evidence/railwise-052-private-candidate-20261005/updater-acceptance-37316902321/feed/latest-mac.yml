@@ -1,0 +1,17 @@
+version: 0.5.2
+files:
+  - url: WorkWise-0.5.2-mac-x64.zip
+    sha512: MJCP6zzlJqx63Dw+CjOW/4y4Grvb3qQzzidSU4ItwCmAsTM5+suu1clibHnHTk98Vd9vnyI5q0QRCQq2V+tDWg==
+    size: 313313982
+  - url: WorkWise-0.5.2-mac-arm64.zip
+    sha512: mNYl5DiaMyxKYawgBxWadWeavg2tdClZLJxN50BOYtmAjiPLPi/R9r6U+GR9YT2oQZTTcQAz69JgEuRK9UILVQ==
+    size: 310298869
+  - url: WorkWise-0.5.2-mac-Intel.dmg
+    sha512: GMMwEXr1X5N3jSQ1wjlVpMFz0KWKV8gu/1a5mJkZvf6pX7AIFm9m17Tbq1Rkv00mQFMHoI7uZaRli5bav6Izew==
+    size: 306883962
+  - url: WorkWise-0.5.2-mac-Apple-Silicon.dmg
+    sha512: xJmyR+bKk68aPcvfVhcvPoi3UUNna+R821TwycpYDF0NuWTmQ8SWkgI/iSKeoB8TV8f2PBv6wYtSDxrxRSo0DQ==
+    size: 304059889
+path: WorkWise-0.5.2-mac-x64.zip
+sha512: MJCP6zzlJqx63Dw+CjOW/4y4Grvb3qQzzidSU4ItwCmAsTM5+suu1clibHnHTk98Vd9vnyI5q0QRCQq2V+tDWg==
+releaseDate: '2026-10-05T13:52:46.247Z'

@@ -6,6 +6,7 @@ import type { SurveyAdjustmentRead, SurveyRawSourceIntegrity, SurveyService, Sur
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import type { EngineeringAiOrchestrator } from '../../engineering/engineering-ai-orchestrator.js'
+import { surveyAiAdjustmentSemantics } from '../../engineering/survey-ai-adjustment-semantics.js'
 
 /**
  * Compatibility bridge for the reviewed RailWise tool IDs. The aliases call
@@ -128,6 +129,7 @@ export function buildRailwiseToolProviders(service: EngineeringService, survey?:
       statisticalSummary: adjustment.result.statisticalSummary ?? null,
       closure: adjustment.result.closure,
       closureUnits: adjustment.result.closureUnits,
+      ...surveyAiAdjustmentSemantics(adjustment.result, survey?.getProfessionalReview(adjustment.run.id)),
       parameters: adjustment.result.parameters,
       parameterUnits: adjustment.result.parameterUnits,
       precision: adjustment.result.precision,

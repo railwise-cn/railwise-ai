@@ -1,0 +1,935 @@
+{
+  "schemaVersion": 1,
+  "type": "CUA execution plan draft, not acceptance results",
+  "date": "2026-10-06",
+  "packageIdentity": null,
+  "wholeTasksClosed": 0,
+  "blocks": [
+    {
+      "id": "A",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "B",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "C",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "D",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "E",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "F",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "G",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "id": "H",
+      "status": "pending-not-executed",
+      "evidence": []
+    }
+  ],
+  "sourceTasksSha256": {
+    "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md": "417cd1d1aeec8db2d64e174738efe98b01644728434ee26dee4773851ca665de",
+    "openspec/changes/survey-professional-workflow/tasks.md": "5d4916f0931dcc7ed99d8cdc952221688345010b7fa9c6f7a0de473a4609c55c"
+  },
+  "engineeringPackageAcceptanceTasks": 21,
+  "professionalWorkflowPackageTaskIncluded": 1,
+  "tasks": [
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 6,
+      "task": "- [ ] P0: Freeze and install one private signed candidate; verify default deepseek-flash and explicit deepseek-v4-pro, IN2/GSI and monitoring CSV/XLSX, three exports, restart, exact questions, approvals, recovery and full correction/recheck flow.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 7,
+      "task": "- [ ] P0: Verify scope changes, offline/stale/cancel/retry/recovery, bilingual themes, minimum windows and keyboard operation in that exact package.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 21,
+      "task": "- [ ] Verify that repair in the next frozen signed package with the real default model, including original invalid draft readback, corrected draft approval and execution. Use the retained private-updater target package for UI acceptance to bind both checks to the same target bytes.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 31,
+      "task": "- [ ] Verify these repairs in the next frozen private-updater target package, including unaided real-model GSI planning, failed-step recovery, restored outputs, versions, restart and supported UI states.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 36,
+      "task": "- [ ] Verify this interruption/history/navigation repair in its exact frozen private target, including restoring the original failed plan obscured by an unapproved later draft; retain both records.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 42,
+      "task": "- [ ] Verify this increment in its own signed installed candidate, including complete correction/recheck flow, source changes, restart, languages/themes/window sizes and keyboard access; record independent senior-engineer-mode AI UI/workflow acceptance; authentic professional signature remains a separate external requirement.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 61,
+      "task": "- [ ] Verify the exact new signed candidate's result-question preparation and explicit-send/read-back flow, including stale/error/recovery cases; preserve historical candidate evidence and keep routine AI UI/workflow acceptance and authentic professional signature distinct.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 78,
+      "task": "- [ ] Add packaged UI acceptance for Engineering thread isolation, AI-first entry, classic fallback, loading/empty/partial/error/stale states, light/dark themes, narrow windows, keyboard/a11y, and a real CSV/XLSX-to-DOCX/PDF/XLSX/manifest run.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 101,
+      "task": "- [ ] Run typecheck, lint, full tests, build, strict OpenSpec validation, packaged GUI acceptance, and private 0.5.0-rc evidence collection.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 118,
+      "task": "- [ ] Complete four production stages, persistent AI conversation, stage tools, localized summary and readiness-driven actions; never label preview files reviewed.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 119,
+      "task": "- [ ] Verify ordinary questions, modification confirmation cards, typed execution approvals, evidence-to-record navigation and model-offline manual operation.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 120,
+      "task": "- [ ] Centralize RailWise AI / RailWise Survey display naming, migrate menus/settings/startup/about/candidate display and brand assets; retain technical identifiers and record the migration matrix.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 121,
+      "task": "- [ ] Complete Survey English/Chinese locale validation, theme/window/accessibility acceptance in the exact packaged candidate.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 123,
+      "task": "- [ ] Complete candidate signing/notarization, isolated install, two P0 format GUI delivery runs, restart and real private updater round trip; record independent senior-engineer-mode AI UI/workflow acceptance and separately obtain any authentic professional signature required for formal production delivery.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 141,
+      "task": "- [ ] Verify the new ellipse and parser diagnostic increment in its exact signed candidate and obtain independent senior-engineer-mode AI interpretation/UI acceptance; this does not close the broader advanced-adjustment task.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 159,
+      "task": "- [ ] Verify the advanced-trial integration in its exact signed private candidate, including damaged/stale records, restart, themes and keyboard access; record independent senior-engineer-mode AI UI/numerical review and retain external professional-signature requirements before treating the broader advanced-adjustment task as complete.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 166,
+      "task": "- [ ] Verify these two new kinds in their exact signed candidate, including native export, restart, damaged records, themes/window sizes and independent senior-engineer-mode AI UI/numerical review; previous generalized-w/VCE package evidence does not cover them.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 184,
+      "task": "- [ ] Verify static append in its exact signed package, including stale baseline, full parameter/covariance/row displays, export, restart and supported themes/window sizes.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 192,
+      "task": "- [ ] Verify the linkage assessment in its exact signed package, including full and incomplete coverage, changed sources, native export, restart and themes/window sizes. This does not complete professional review, signing or production approval.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 208,
+      "task": "- [ ] Verify exact-reference mapping, mismatch refusal, current/legacy result handling, authorization and stale UI states; record independent review and exact-package UI acceptance separately.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/workwise-0-5-0-engineering-delivery/tasks.md",
+      "lineAtAudit": 247,
+      "task": "- [ ] Verify the completion guard in the exact signed package, together with the provider/model, effort, localization and terminal-refresh changes introduced after fbb; retain the failing baseline separately.",
+      "status": "pending-not-executed",
+      "evidence": []
+    },
+    {
+      "source": "openspec/changes/survey-professional-workflow/tasks.md",
+      "lineAtAudit": 23,
+      "task": "- [ ] 4.2 Install an isolated frozen candidate and inspect professional workflows with computer-use tooling across supported themes/languages/window sizes; preserve screenshots, a functional checklist, accessibility findings and defects, with an independent senior-engineer-mode AI review.",
+      "status": "pending-not-executed",
+      "evidence": []
+    }
+  ],
+  "visualMatrix": [
+    {
+      "id": "zh-light-1280x800-overview",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1280x800-process",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1280x800-results",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1280x800-deliver",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1440x900-overview",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1440x900-process",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1440x900-results",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-1440x900-deliver",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-960x800-overview",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-960x800-process",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-960x800-results",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-light-960x800-deliver",
+      "locale": "zh",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1280x800-overview",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1280x800-process",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1280x800-results",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1280x800-deliver",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1440x900-overview",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1440x900-process",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1440x900-results",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-1440x900-deliver",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-960x800-overview",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-960x800-process",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-960x800-results",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "zh-dark-960x800-deliver",
+      "locale": "zh",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1280x800-overview",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1280x800-process",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1280x800-results",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1280x800-deliver",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1440x900-overview",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1440x900-process",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1440x900-results",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-1440x900-deliver",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-960x800-overview",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-960x800-process",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-960x800-results",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-light-960x800-deliver",
+      "locale": "en",
+      "theme": "light",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1280x800-overview",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1280x800-process",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1280x800-results",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1280x800-deliver",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1280,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1440x900-overview",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1440x900-process",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1440x900-results",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-1440x900-deliver",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 1440,
+        "height": 900
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-960x800-overview",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-960x800-process",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-960x800-results",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    },
+    {
+      "id": "en-dark-960x800-deliver",
+      "locale": "en",
+      "theme": "dark",
+      "requestedWindowLogicalSize": {
+        "width": 960,
+        "height": 800
+      },
+      "actualWindowLogicalSize": null,
+      "actualScreenshotPixelSize": null,
+      "screenshot": null,
+      "ax": null,
+      "status": "pending-not-executed",
+      "findings": []
+    }
+  ],
+  "visualMatrixExpectedCount": 48,
+  "releaseApprovalGrantedByThisDocument": false
+}

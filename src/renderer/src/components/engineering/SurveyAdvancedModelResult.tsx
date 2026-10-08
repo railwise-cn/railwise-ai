@@ -72,19 +72,20 @@ export function GeneralizedWResult({ result }: { result: SurveyGeneralizedWResul
   </section>
 }
 
-export function VceTrialResult({ result }: { result: SurveyVceTrialOutputV1 }): ReactElement {
+export function VceTrialResult({ result, groupLabels }: { result: SurveyVceTrialOutputV1; groupLabels?: Record<string, string> }): ReactElement {
   const { t } = useTranslation('common')
+  const groupLabel = (id: string): string => groupLabels?.[id] ?? id
   return <section className="min-w-0 space-y-3" aria-label={t('advancedVceResults')}>
     <h4 className="font-semibold">{t('advancedVceResults')}</h4>
     <p role="status">{t(advancedOutcomeKeys[result.outcome])}</p>
     <p className="leading-5 text-ds-muted">{t('advancedVceNoDecision')}</p>
     <p>{t('advancedIterationCount', { count: result.iterations.length, df: result.degreesOfFreedom })}</p>
-    {result.convergedVariances ? <Values title={t('advancedAcceptedVariances', { unit: result.squaredUnit })} ids={result.groupIds} values={result.convergedVariances} /> : null}
+    {result.convergedVariances ? <Values title={t('advancedAcceptedVariances', { unit: result.squaredUnit })} ids={result.groupIds.map(groupLabel)} values={result.convergedVariances} /> : null}
     {result.finalFit ? <><Values title={t('advancedFinalParameters', { unit: result.unit })} ids={result.parameterIds} values={result.finalFit.parameters} /><Values title={t('advancedResiduals', { unit: result.unit })} ids={result.observationIds} values={result.finalFit.residuals} /></> : null}
     <div className="space-y-2" aria-label={t('advancedIterationTrace')}>{result.iterations.map((iteration, index) => <details key={iteration.iteration} className="min-w-0 rounded border border-ds-border-muted" open={iteration.iteration === result.iterations.length}>
       <summary className="cursor-pointer break-words px-3 py-2">{t('advancedIteration', { index: iteration.iteration, change: number(iteration.relativeChange) })}</summary>
       <div className="min-w-0 space-y-3 px-3 pb-3"><EngineeringEvidenceQuestion label={t('advancedIteration', { index: iteration.iteration, change: number(iteration.relativeChange) })} selector={{ path: ['result', 'iterations', index], identity: { iteration: iteration.iteration } }} />
-        <div className={scroll} role="region" aria-label={t('advancedIterationComponents', { index: iteration.iteration })} tabIndex={0}><table className="w-full text-[11px]"><thead><tr>{['advancedGroup', 'advancedCurrentVariance', 'advancedCandidateVariance'].map(key => <th scope="col" className={cell} key={key}>{t(key)}{key === 'advancedGroup' ? '' : ` (${result.squaredUnit})`}</th>)}</tr></thead><tbody>{result.groupIds.map((id, i) => <tr key={id}><th scope="row" className={cell}>{id}</th><td className={`${cell} font-mono`}>{number(iteration.currentVariances[i]!)}</td><td className={`${cell} font-mono ${iteration.candidateVariances[i]! <= 0 ? 'text-amber-900 dark:text-amber-200' : ''}`}>{number(iteration.candidateVariances[i]!)}{iteration.candidateVariances[i]! <= 0 ? ` · ${t('advancedNonpositiveValue')}` : ''}</td></tr>)}</tbody></table></div>
+        <div className={scroll} role="region" aria-label={t('advancedIterationComponents', { index: iteration.iteration })} tabIndex={0}><table className="w-full text-[11px]"><thead><tr>{['advancedGroup', 'advancedCurrentVariance', 'advancedCandidateVariance'].map(key => <th scope="col" className={cell} key={key}>{t(key)}{key === 'advancedGroup' ? '' : ` (${result.squaredUnit})`}</th>)}</tr></thead><tbody>{result.groupIds.map((id, i) => <tr key={id}><th scope="row" className={cell}>{groupLabel(id)}</th><td className={`${cell} font-mono`}>{number(iteration.currentVariances[i]!)}</td><td className={`${cell} font-mono ${iteration.candidateVariances[i]! <= 0 ? 'text-amber-900 dark:text-amber-200' : ''}`}>{number(iteration.candidateVariances[i]!)}{iteration.candidateVariances[i]! <= 0 ? ` · ${t('advancedNonpositiveValue')}` : ''}</td></tr>)}</tbody></table></div>
         <p className="text-ds-muted">{t('advancedIterationCondition', { functional: number(iteration.fit.functionalNormalConditionInfinity), stochastic: number(iteration.stochasticNormalConditionInfinity) })}</p>
         <Values title={t('advancedResiduals', { unit: result.unit })} ids={result.observationIds} values={iteration.fit.residuals} />
       </div>

@@ -1,10 +1,11 @@
 import { SurveyStaticIncrementalResult } from './SurveyStaticIncrementalResult'
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SURVEY_ADVANCED_TRIAL_LIMITS as LIMITS } from '@shared/survey-advanced-trials'
+import { SURVEY_ADVANCED_TRIAL_LIMITS as LIMITS, buildSourceTrialDeclaration, sourceStaticBase } from '@shared/survey-advanced-trials'
 import {
   AdvancedTrialRequestError, advancedTrialSummary, createAdvancedTrial, listAdvancedTrials, exportAdvancedTrial,
-  readAdvancedTrial, reverifyAdvancedTrial, validateAdvancedTrialInput,
+  readAdvancedTrial, reverifyAdvancedTrial, validateAdvancedTrialInput, readSourceFixedModel, sourceStaticFingerprint,
+  type SourceFixedSelection, type SourceFixedModel,
   type AdvancedTrialBinding, type AdvancedTrialHistory, type AdvancedTrialInput, type AdvancedTrialKind,
   type AdvancedTrialRecord, type AdvancedTrialSummary
 } from '../../agent/survey-advanced-trials-client'
@@ -13,16 +14,16 @@ import { SurveyReferenceDatumResult } from './SurveyReferenceDatumResult'
 import { saveGeneratedWorkspaceFileAs } from '../../lib/generated-file-actions'
 import { EngineeringEvidenceQuestion, EngineeringSelectedEvidence } from './EngineeringEvidenceQuestion'
 
-const buttonClass = 'min-h-9 max-w-full rounded border border-ds-border px-3 py-2 text-left text-[12px] hover:bg-ds-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50'
+const buttonClass = 'min-h-[44px] max-w-full rounded border border-ds-border px-3 py-2 text-left text-[12px] hover:bg-ds-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50'
 const inputClass = 'block w-full min-w-0 rounded border border-ds-border bg-ds-card px-3 py-2 text-[12px] text-ds-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent'
 const errorKeys: Record<string, string> = {
   stale: 'advancedStale', integrity: 'advancedIntegrity', conflict: 'advancedConflict', limit: 'advancedLimit',
   rate_limit: 'advancedRateLimit', 'replay-environment': 'advancedEnvironment', 'invalid-response': 'advancedInvalidResponse',
   'invalid-input': 'advancedValidation', not_found: 'advancedNotFound', unavailable: 'advancedUnavailable', 'request-failed': 'advancedFailed'
 }
-type View = { record?: AdvancedTrialRecord; history?: AdvancedTrialHistory; exportStatus?: 'saved' | 'cancelled' | 'failed'; exportPath?: string }
+type View = { source?: SourceFixedModel; staticFingerprint?: string; record?: AdvancedTrialRecord; history?: AdvancedTrialHistory; exportStatus?: 'saved' | 'cancelled' | 'failed'; exportPath?: string }
 type Operation = { kind: 'save' | 'read'; idempotencyKey?: string; run: (stillCurrent: () => boolean) => Promise<View> }
-type Props = { binding: AdvancedTrialBinding; runtimeReady: boolean }
+type Props = { binding: AdvancedTrialBinding; runtimeReady: boolean; sourceSelection?: SourceFixedSelection }
 
 const methodKeys: Record<AdvancedTrialKind, string> = { 'generalized-w': 'advancedWMethod', vce: 'advancedVceMethod', huber: 'advancedHuberMethod', 'statistical-family': 'advancedStatisticalMethod', 'reference-datum': 'advancedReferenceMethod', 'static-incremental': 'advancedStaticMethod' }
 const limitKeys: Record<AdvancedTrialKind, string> = { 'generalized-w': 'advancedWLimits', vce: 'advancedVceLimits', huber: 'advancedHuberLimits', 'statistical-family': 'advancedStatisticalLimits', 'reference-datum': 'advancedReferenceLimits', 'static-incremental': 'advancedStaticLimits' }
@@ -30,12 +31,15 @@ const fileName = (path: string): string => path.split(/[\\/]/).at(-1) ?? path
 
 export function SurveyAdvancedModelWorkspace(props: Props): ReactElement {
   // A new project, revision, workspace or connection gets a fresh local session.
-  const scope = JSON.stringify([props.binding.workspaceRoot, props.binding.projectId, props.binding.projectRevision, props.runtimeReady])
+  const scope = JSON.stringify([props.binding.workspaceRoot, props.binding.projectId, props.binding.projectRevision, props.runtimeReady, props.sourceSelection])
   return <AdvancedTrialSession key={scope} {...props} />
 }
 
-function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
+function AdvancedTrialSession({ binding, runtimeReady, sourceSelection }: Props): ReactElement {
   const { t } = useTranslation('common')
+  const [source, setSource] = useState<SourceFixedModel | null>(null), [staticFingerprint, setStaticFingerprint] = useState('')
+  const [familyId, setFamilyId] = useState(''), [alpha, setAlpha] = useState('0.05')
+  const [externalScale, setExternalScale] = useState(''), [externalScaleBasis, setExternalScaleBasis] = useState(''), [huberK, setHuberK] = useState('1.345'), [appendRows, setAppendRows] = useState('')
   const [kind, setKind] = useState<AdvancedTrialKind | ''>('')
   const [declarationJson, setDeclarationJson] = useState(''), [modelBasisStatement, setBasis] = useState('')
   const [vceParameter, setVceParameter] = useState(''), [vceUnit, setVceUnit] = useState<'m' | 'mm'>('mm')
@@ -59,8 +63,20 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
       observations: values.map((value, index) => ({ id: `观测${index + 1}`, value, coefficients: [1], groupId: '观测组', relativeVariance, sourceAnchor: vceSource.trim() })),
       maxIterations: 30, relativeTolerance: 1e-8 })
   }, [kind, vceParameter, vceUnit, vceValues, vceInitialVariance, vceRelativeVariance, vceSource])
-  const effectiveDeclaration = declarationJson || professionalDeclaration
-  const input = useMemo(() => kind ? { kind, declarationJson: effectiveDeclaration, modelBasisStatement } : null, [kind, effectiveDeclaration, modelBasisStatement])
+  const sourceDeclaration = useMemo(() => {
+    if (!source || !kind) return ''
+    try {
+      const appended = appendRows.trim() ? appendRows.trim().split(/\r?\n/).map(line => {
+        const fields = line.split(',').map(v => v.trim())
+        if (fields.length !== 6) throw new Error('invalid append row')
+        return { id: fields[0]!, from: fields[1]!, to: fields[2]!, heightDifference: Number(fields[3]), sigma: Number(fields[4]), sourceAnchor: fields[5]! }
+      }) : []
+      return JSON.stringify(buildSourceTrialDeclaration(source, kind, { familyId: familyId.trim(), alpha: Number(alpha), externalScale: externalScale.trim() ? Number(externalScale) : NaN,
+        externalScaleBasis, huberK: Number(huberK), appended, staticBaseFingerprint: staticFingerprint }))
+    } catch { return '' }
+  }, [source, kind, familyId, alpha, externalScale, externalScaleBasis, huberK, appendRows, staticFingerprint])
+  const effectiveDeclaration = source ? sourceDeclaration : declarationJson || professionalDeclaration
+  const input = useMemo(() => kind ? { kind, declarationJson: effectiveDeclaration, modelBasisStatement, ...(source ? { sourceModel: source.binding } : {}) } : null, [kind, effectiveDeclaration, modelBasisStatement, source])
   const valid = useMemo(() => !!input && validateAdvancedTrialInput(binding, input), [binding, input])
   const ready = runtimeReady && !busy
   const formReady = ready && !pendingSave.current
@@ -72,12 +88,14 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
     focusKind.current = true
     invalidate(); retry.current = null; pendingSave.current = null; setCancelled(false)
     importSequence.current += 1
+    setSource(null); setStaticFingerprint(''); setFamilyId(''); setAlpha('0.05'); setExternalScale(''); setExternalScaleBasis(''); setHuberK('1.345'); setAppendRows('')
     setKind(nextKind); setDeclarationJson(''); setBasis(''); setVceParameter(''); setVceUnit('mm'); setVceValues(''); setVceInitialVariance(''); setVceRelativeVariance(''); setVceSource('')
   }
   function clearImportedDeclaration(): void { importSequence.current += 1; setDeclarationJson('') }
   async function importDeclaration(file: File | undefined): Promise<void> {
     const sequence = ++importSequence.current
-    setDeclarationJson(''); setAcknowledged(false); setView(null)
+    if (source) setBasis('')
+    setSource(null); setStaticFingerprint(''); setDeclarationJson(''); setAcknowledged(false); setView(null)
     if (!file) return
     if (file.size > LIMITS.declarationBytes) { setError('invalid-input'); return }
     try {
@@ -96,6 +114,10 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
     try {
       const result = await operation.run(stillCurrent)
       if (stillCurrent()) {
+        if (result.source) {
+          setSource(result.source); setStaticFingerprint(result.staticFingerprint ?? ''); setDeclarationJson('')
+          setBasis(t('advancedSourceBasis', { name: result.source.sourceName }))
+        }
         setView(result); retry.current = null
         if (operation.kind === 'save' || result.record?.idempotencyKey === pendingSave.current?.idempotencyKey) pendingSave.current = null
       }
@@ -114,6 +136,17 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
     pendingSave.current = operation
     void execute(operation)
   }
+  function loadSource(): void {
+    if (!sourceSelection || !kind || !formReady) return
+    setSource(null); setStaticFingerprint(''); setDeclarationJson(''); setBasis('')
+    void execute({ kind: 'read', run: async stillCurrent => {
+      const selected = await readSourceFixedModel(binding, sourceSelection)
+      if (!stillCurrent()) throw new AdvancedTrialRequestError('stale')
+      const fingerprint = await sourceStaticFingerprint(sourceStaticBase(selected))
+      return { source: selected, staticFingerprint: fingerprint }
+    } })
+  }
+  function changeSourceOption(setter: (value: string) => void, value: string): void { setter(value); setAcknowledged(false); setView(null) }
   function history(offset = 0): void { void execute({ kind: 'read', run: async () => ({ history: await listAdvancedTrials(binding, offset) }) }) }
   function restore(summary: AdvancedTrialSummary): void { void execute({ kind: 'read', run: async () => ({ record: await readAdvancedTrial(binding, summary) }) }) }
   function exportRecord(selected: AdvancedTrialRecord): void {
@@ -139,7 +172,25 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
       <label className="block space-y-1"><span>{t('advancedMethod')}</span><select ref={kindControl} className={inputClass} value={kind} disabled={!formReady} onChange={event => resetDraft(event.target.value as AdvancedTrialKind | '')}><option value="">{t('advancedChooseMethod')}</option>{(Object.entries(methodKeys) as Array<[AdvancedTrialKind, string]>).map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label>
       {kind ? <>
         <p className="leading-5">{t(limitKeys[kind])}</p>
-        {kind === 'vce' ? <fieldset className="grid min-w-0 gap-3 rounded border border-ds-border-muted p-3 sm:grid-cols-2"><legend className="px-1 font-medium">{t('advancedProfessionalInput')}</legend>
+        {['generalized-w', 'vce', 'huber', 'static-incremental'].includes(kind) ? <div className="space-y-3 rounded border border-ds-border-muted p-3">
+          <button type="button" className={buttonClass} disabled={!formReady || !sourceSelection} onClick={loadSource}>{t('advancedUseSource')}</button>
+          <p className="leading-5 text-ds-muted">{t(sourceSelection ? 'advancedSourceScope' : 'advancedSourceMissing')}</p>
+          {source ? <>
+            <p className="break-words font-medium">{source.sourceName}</p>
+            <p>{t('advancedSourceCounts', { points: source.model.referencePoints.length, observations: source.model.observations.length, parameters: source.model.parameterIds.length, redundancy: source.model.degreesOfFreedom })}</p>
+            <p className="leading-5">{t('advancedSourcePrior')}</p>
+            <p className="leading-5">{t('advancedSourceDatum', { points: source.model.referencePoints.filter(p => p.fixed).map(p => p.id).join('、') })}</p>
+            {kind === 'generalized-w' ? <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-1"><span>{t('advancedSourceFamily')}</span><input className={inputClass} value={familyId} disabled={!formReady} onChange={e => changeSourceOption(setFamilyId, e.target.value)} /></label>
+              <label className="block space-y-1"><span>{t('advancedSourceAlpha')}</span><input inputMode="decimal" className={inputClass} value={alpha} disabled={!formReady} onChange={e => changeSourceOption(setAlpha, e.target.value)} /></label>
+            </div> : kind === 'huber' ? <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-1"><span>{t('advancedSourceScale')}</span><input inputMode="decimal" className={inputClass} value={externalScale} disabled={!formReady} onChange={e => changeSourceOption(setExternalScale, e.target.value)} /></label>
+              <label className="block space-y-1"><span>{t('advancedSourceHuberK')}</span><input inputMode="decimal" className={inputClass} value={huberK} disabled={!formReady} onChange={e => changeSourceOption(setHuberK, e.target.value)} /></label>
+              <label className="block space-y-1 sm:col-span-2"><span>{t('advancedSourceScaleBasis')}</span><textarea className={inputClass} value={externalScaleBasis} disabled={!formReady} onChange={e => changeSourceOption(setExternalScaleBasis, e.target.value)} /></label>
+            </div> : kind === 'static-incremental' ? <label className="block space-y-1"><span>{t('advancedSourceAppend')}</span><textarea rows={4} className={inputClass} value={appendRows} disabled={!formReady} onChange={e => changeSourceOption(setAppendRows, e.target.value)} /><span className="block leading-5 text-ds-muted">{t('advancedSourceAppendHint')}</span></label> : <p className="leading-5 text-ds-muted">{t('advancedSourceVceGroup')}</p>}
+          </> : null}
+        </div> : null}
+        {!source && kind === 'vce' ? <fieldset className="grid min-w-0 gap-3 rounded border border-ds-border-muted p-3 sm:grid-cols-2"><legend className="px-1 font-medium">{t('advancedProfessionalInput')}</legend>
           <label className="block space-y-1"><span>{t('advancedParameter')}</span><input className={inputClass} value={vceParameter} disabled={!formReady} onChange={event => { setVceParameter(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
           <label className="block space-y-1"><span>{t('advancedObservationUnit')}</span><select className={inputClass} value={vceUnit} disabled={!formReady} onChange={event => { setVceUnit(event.target.value as 'm' | 'mm'); clearImportedDeclaration(); setAcknowledged(false); setView(null) }}><option value="m">m</option><option value="mm">mm</option></select></label>
           <label className="block space-y-1"><span>{t('advancedObservationRows')}</span><textarea rows={5} className={inputClass} value={vceValues} disabled={!formReady} onChange={event => { setVceValues(event.target.value); clearImportedDeclaration(); setAcknowledged(false); setView(null) }} /></label>
@@ -150,7 +201,8 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
           </div>
           <p className="leading-5 text-ds-muted sm:col-span-2">{t('advancedVceProfessionalHint')}</p>
         </fieldset> : null}
-        <label className="block space-y-1"><span>{t('advancedImportModel')}</span><input type="file" accept="application/json,.json" className={inputClass} disabled={!formReady} onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void importDeclaration(file) }} /></label>
+        <details className="rounded border border-ds-border-muted p-3"><summary className="min-h-[44px] cursor-pointer py-3">{t('advancedManualModel')}</summary>
+        <label className="block space-y-1"><span>{t('advancedImportModel')}</span><input type="file" accept="application/json,.json" className={inputClass} disabled={!formReady} onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void importDeclaration(file) }} /></label></details>
         <label className="block space-y-1"><span>{t('advancedBasis')}</span><textarea rows={4} className={inputClass} value={modelBasisStatement} disabled={!formReady} onChange={event => { setBasis(event.target.value); setAcknowledged(false); setView(null) }} /></label>
         <p className="leading-5 text-ds-muted">{t('advancedBasisHint', { limit: LIMITS.basisBytes / 1024 })}</p>
         {!valid && (declarationJson || modelBasisStatement) ? <p role="status" className="text-amber-900 dark:text-amber-200">{t('advancedValidation')}</p> : null}
@@ -172,8 +224,8 @@ function AdvancedTrialSession({ binding, runtimeReady }: Props): ReactElement {
       {view?.exportStatus ? <p role={view.exportStatus === 'failed' ? 'alert' : 'status'} className="break-words leading-5">{t(view.exportStatus === 'saved' ? 'advancedExportSaved' : view.exportStatus === 'cancelled' ? 'advancedExportCancelled' : 'advancedExportFailed', { path: view.exportPath ? fileName(view.exportPath) : undefined })}</p> : null}
       <h5 className="font-medium">{t('advancedBasis')}</h5><p className="whitespace-pre-wrap break-words leading-5">{record.modelBasisStatement}</p>
       {record.kind === 'static-incremental' ? <SurveyStaticIncrementalResult result={record.result} /> : record.kind === 'reference-datum' ? <SurveyReferenceDatumResult result={record.result} /> : record.kind === 'generalized-w' ? <GeneralizedWResult result={record.result} /> : record.kind === 'huber' ? <HuberTrialResult result={record.result} /> : record.kind === 'statistical-family' ? <StatisticalFamilyResult result={record.result} /> : <>
-        <div className="min-w-0 space-y-2" aria-label={t('advancedInitialGroups')}><h5 className="font-medium">{t('advancedInitialGroups')}</h5>{record.declaration.groups.map(group => <p key={group.id} className="break-all">{group.id} · {group.initialVariance} {record.declaration.unit}² · {group.sourceAnchor}</p>)}<p>{t('advancedStoppingPolicy', { iterations: record.declaration.maxIterations, tolerance: record.declaration.relativeTolerance })}</p></div>
-        <VceTrialResult result={record.result} />
+        <div className="min-w-0 space-y-2" aria-label={t('advancedInitialGroups')}><h5 className="font-medium">{t('advancedInitialGroups')}</h5>{record.declaration.groups.map(group => <p key={group.id} className="break-all">{record.sourceModel ? t('advancedSourceObservationGroup') : group.id} · {group.initialVariance} {record.declaration.unit}² · {record.sourceModel ? source?.binding.fixedModelHash === record.sourceModel.fixedModelHash ? source.sourceName : t('advancedSourceRecordedReference') : group.sourceAnchor}</p>)}<p>{t('advancedStoppingPolicy', { iterations: record.declaration.maxIterations, tolerance: record.declaration.relativeTolerance })}</p></div>
+        <VceTrialResult result={record.result} groupLabels={record.sourceModel ? Object.fromEntries(record.result.groupIds.map(id => [id, t('advancedSourceObservationGroup')])) : undefined} />
       </>}
     </div></EngineeringSelectedEvidence> : null}
     {page ? <section className="min-w-0 space-y-3 border-t border-ds-border-muted pt-4" aria-label={t('advancedHistory')}>

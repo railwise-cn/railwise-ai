@@ -96,6 +96,24 @@ http {
   }
 })
 
+test('normalizes a trailing slash and accepts release identifiers with dots', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
+  const dumpPath = join(directory, 'nginx-dump.txt')
+  try {
+    writeFileSync(dumpPath, String.raw`http {
+  server {
+    server_name www.railwise.cn;
+    root "/www/audit-releases/audit-20260924-final.1/site/";
+  }
+}
+`)
+    const roots = execFileSync('python3', ['-c', NGINX_VHOST_ROOTS_PYTHON, dumpPath], { encoding: 'utf8' })
+    assert.deepEqual(roots.trim().split('\n'), ['/www/audit-releases/audit-20260924-final.1/site'])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('keeps conflicting active host roots visible so deployment fails closed', () => {
   const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
   const dumpPath = join(directory, 'nginx-dump.txt')

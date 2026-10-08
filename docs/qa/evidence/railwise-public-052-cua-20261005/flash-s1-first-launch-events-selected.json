@@ -1,0 +1,615 @@
+[
+  {
+    "seq": 1,
+    "timestamp": "2026-10-05T15:47:28.858Z",
+    "threadId": "thr_xnevvmkr",
+    "kind": "thread_created",
+    "title": "Survey AI · 新建内业任务"
+  },
+  {
+    "seq": 2,
+    "timestamp": "2026-10-05T15:49:56.484Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "kind": "turn_started"
+  },
+  {
+    "seq": 3,
+    "timestamp": "2026-10-05T15:49:56.488Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_turn_7rkq1x67_user",
+    "kind": "item_created",
+    "item": {
+      "id": "item_turn_7rkq1x67_user",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "user",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:49:56.473Z",
+      "finishedAt": "2026-10-05T15:49:56.473Z",
+      "kind": "user_message",
+      "text": "请解释 S1 的结果、原始依据及需要复核的问题。\n\nSelected Survey evidence (reference only, not execution approval): {\"projectId\":\"project_f671a401-59c8-429c-ba96-1c23fd25ac17\",\"projectRevision\":2,\"networkId\":\"network_2404e148-cf16-4a9e-ae0f-a0eabd09b894\",\"networkRevision\":2,\"sourceSha256\":\"4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0\",\"parserId\":\"cosa-in2-parser\",\"parserVersion\":\"0.3.0\",\"parserSourceHash\":\"14b059f893c664ab6a6060e8287243d115a858e82a78bf5f9df01ada10a9cd04\",\"adjustmentId\":\"adjustment_5417f6fc-5e8a-4722-b8e3-3f948cf568b5\",\"algorithmVersion\":\"workwise-survey-adjustment-8\",\"section\":\"result\",\"typedEvidence\":{\"schemaVersion\":1,\"projectId\":\"project_f671a401-59c8-429c-ba96-1c23fd25ac17\",\"projectRevision\":2,\"selector\":{\"path\":[\"points\",3],\"identity\":{\"id\":\"S1\"}},\"kind\":\"professional-review\",\"networkId\":\"network_2404e148-cf16-4a9e-ae0f-a0eabd09b894\",\"networkRevision\":2,\"sourceSha256\":\"4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0\",\"adjustmentId\":\"adjustment_5417f6fc-5e8a-4722-b8e3-3f948cf568b5\",\"resultId\":\"adjustment_result_c8200279-7c1f-4176-a5fb-040b2424e09a\",\"inputHash\":\"036b0851b9f0d5f0940b98c20381c3c2a15772cc671c2ebd9633ceedcc311c2f\",\"resultHash\":\"a5fbe700fe93a35ef061a01880fa6ed4b810a17758a117c4e7a980c55bcd0bdf\",\"projectionHash\":\"db3bd0e075c52bf7e0cbbbd50a38945eae0254d6c9152bcd0e7263c85295e1c8\",\"projectionVersion\":\"survey-professional-review-1\"},\"metric\":\"professional-point\",\"pointId\":\"S1\"}\nRead this exact typedEvidence using survey_read_evidence before answering. Do not substitute another record or execute a calculation. If unavailable or stale, report that limitation.",
+      "displayText": "请解释 S1 的结果、原始依据及需要复核的问题。"
+    }
+  },
+  {
+    "seq": 610,
+    "timestamp": "2026-10-05T15:49:59.814Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_tool_turn_7rkq1x67_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+    "kind": "item_created",
+    "item": {
+      "id": "item_tool_turn_7rkq1x67_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "tool",
+      "status": "pending",
+      "createdAt": "2026-10-05T15:49:59.804Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_yJRpqm7YpuYUy7PTHBXy1358",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_evidence\nParameters: 14 field(s); sensitive values omitted"
+    }
+  },
+  {
+    "seq": 611,
+    "timestamp": "2026-10-05T15:49:59.817Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_tool_turn_7rkq1x67_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+    "kind": "tool_call_ready",
+    "toolName": "survey_read_evidence",
+    "callId": "call_00_yJRpqm7YpuYUy7PTHBXy1358",
+    "readyCount": 1
+  },
+  {
+    "seq": 612,
+    "timestamp": "2026-10-05T15:49:59.832Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_tool_turn_7rkq1x67_call_01_rDSXahLG1C93BSJxOwLI4677",
+    "kind": "item_created",
+    "item": {
+      "id": "item_tool_turn_7rkq1x67_call_01_rDSXahLG1C93BSJxOwLI4677",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "tool",
+      "status": "pending",
+      "createdAt": "2026-10-05T15:49:59.822Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_context",
+      "callId": "call_01_rDSXahLG1C93BSJxOwLI4677",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_context\nParameters: 0 field(s); sensitive values omitted"
+    }
+  },
+  {
+    "seq": 613,
+    "timestamp": "2026-10-05T15:49:59.835Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_tool_turn_7rkq1x67_call_01_rDSXahLG1C93BSJxOwLI4677",
+    "kind": "tool_call_ready",
+    "toolName": "survey_read_context",
+    "callId": "call_01_rDSXahLG1C93BSJxOwLI4677",
+    "readyCount": 2
+  },
+  {
+    "seq": 614,
+    "timestamp": "2026-10-05T15:49:59.840Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "kind": "usage",
+    "model": "deepseek-flash",
+    "usage": {
+      "promptTokens": 20926,
+      "completionTokens": 749,
+      "totalTokens": 21675,
+      "cachedTokens": 2304,
+      "cacheHitTokens": 2304,
+      "cacheMissTokens": 18622,
+      "cacheHitRate": 0.11010226512472522,
+      "turns": 1,
+      "costUsd": 0.003249612,
+      "costCny": 0.02166408,
+      "cacheSavingsUsd": 0.00033868799999999997,
+      "cacheSavingsCny": 0.00225792,
+      "tokenEconomySavingsTokens": 0,
+      "tokenEconomySavingsUsd": 0,
+      "tokenEconomySavingsCny": 0
+    }
+  },
+  {
+    "seq": 617,
+    "timestamp": "2026-10-05T15:49:59.872Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_text_wh0z2x1i",
+    "kind": "item_created",
+    "item": {
+      "id": "item_text_wh0z2x1i",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "assistant",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:49:59.863Z",
+      "kind": "assistant_text",
+      "text": "I'll read the exact selected evidence and the current project context before explaining."
+    }
+  },
+  {
+    "seq": 618,
+    "timestamp": "2026-10-05T15:49:59.891Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_tool_turn_7rkq1x67_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+    "kind": "item_updated",
+    "item": {
+      "id": "item_tool_turn_7rkq1x67_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:49:59.804Z",
+      "finishedAt": "2026-10-05T15:49:59.883Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_yJRpqm7YpuYUy7PTHBXy1358",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_evidence\nParameters: 14 field(s); sensitive values omitted"
+    }
+  },
+  {
+    "seq": 619,
+    "timestamp": "2026-10-05T15:49:59.905Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+    "kind": "item_created",
+    "item": {
+      "id": "item_call_00_yJRpqm7YpuYUy7PTHBXy1358",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:49:59.883Z",
+      "finishedAt": "2026-10-05T15:49:59.883Z",
+      "kind": "tool_result",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_yJRpqm7YpuYUy7PTHBXy1358",
+      "toolKind": "tool_call",
+      "output": {
+        "status": "resolved",
+        "reference": {
+          "schemaVersion": 1,
+          "projectId": "project_f671a401-59c8-429c-ba96-1c23fd25ac17",
+          "projectRevision": 2,
+          "selector": {
+            "path": [
+              "points",
+              3
+            ],
+            "identity": {
+              "id": "S1"
+            }
+          },
+          "kind": "professional-review",
+          "networkId": "network_2404e148-cf16-4a9e-ae0f-a0eabd09b894",
+          "networkRevision": 2,
+          "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "adjustmentId": "adjustment_5417f6fc-5e8a-4722-b8e3-3f948cf568b5",
+          "resultId": "adjustment_result_c8200279-7c1f-4176-a5fb-040b2424e09a",
+          "inputHash": "036b0851b9f0d5f0940b98c20381c3c2a15772cc671c2ebd9633ceedcc311c2f",
+          "resultHash": "a5fbe700fe93a35ef061a01880fa6ed4b810a17758a117c4e7a980c55bcd0bdf",
+          "projectionHash": "db3bd0e075c52bf7e0cbbbd50a38945eae0254d6c9152bcd0e7263c85295e1c8",
+          "projectionVersion": "survey-professional-review-1"
+        },
+        "boundaries": {
+          "readOnly": true,
+          "newComputationStarted": false,
+          "approvalCapability": "none",
+          "callerDeclarationsAuthenticated": false,
+          "standardConformity": "not-evaluated",
+          "humanSignatureVerification": "not-evaluated",
+          "interpretation": "Explain the selected stored evidence and its original limits. Caller declarations and trial outputs are not professional acceptance or authenticated field facts."
+        },
+        "provenance": {
+          "record": {
+            "projectId": "project_f671a401-59c8-429c-ba96-1c23fd25ac17",
+            "networkId": "network_2404e148-cf16-4a9e-ae0f-a0eabd09b894",
+            "algorithmVersion": "workwise-survey-adjustment-8",
+            "inputHash": "036b0851b9f0d5f0940b98c20381c3c2a15772cc671c2ebd9633ceedcc311c2f",
+            "resultHash": "a5fbe700fe93a35ef061a01880fa6ed4b810a17758a117c4e7a980c55bcd0bdf",
+            "runId": "adjustment_5417f6fc-5e8a-4722-b8e3-3f948cf568b5",
+            "resultId": "adjustment_result_c8200279-7c1f-4176-a5fb-040b2424e09a",
+            "projectionVersion": "survey-professional-review-1",
+            "projectionHash": "db3bd0e075c52bf7e0cbbbd50a38945eae0254d6c9152bcd0e7263c85295e1c8",
+            "reviewStatus": "unsigned",
+            "standardsConformity": "not-evaluated"
+          }
+        },
+        "value": {
+          "id": "S1",
+          "role": "station",
+          "x": 49.99999999284098,
+          "y": 49.999999963710295,
+          "correctionX": -1.9446147803137137e-08,
+          "correctionY": 1.95930319080162e-07,
+          "standardError": 1.3592152495710963e-07,
+          "xyErrorEllipse": {
+            "algorithmVersion": "survey-xy-error-ellipse-1",
+            "coordinatePlane": "solution-xy",
+            "covarianceUnit": "m2",
+            "covarianceXY": [
+              7.825502380945158e-15,
+              -7.131580093523458e-15,
+              -7.131580093523458e-15,
+              1.064915856572102e-14
+            ],
+            "semiMajor": 1.284808010949112e-07,
+            "semiMinor": 4.435475957184348e-08,
+            "axisUnit": "m",
+            "orientationRad": 2.2584737816163187,
+            "orientationConvention": "positive-x-toward-positive-y-mod-pi",
+            "scale": "unit-mahalanobis-radius",
+            "varianceBasis": "a-posteriori"
+          },
+          "precisionBasis": "a-posteriori",
+          "unit": "m"
+        }
+      },
+      "isError": false
+    }
+  },
+  {
+    "seq": 620,
+    "timestamp": "2026-10-05T15:49:59.925Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_tool_turn_7rkq1x67_call_01_rDSXahLG1C93BSJxOwLI4677",
+    "kind": "item_updated",
+    "item": {
+      "id": "item_tool_turn_7rkq1x67_call_01_rDSXahLG1C93BSJxOwLI4677",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:49:59.822Z",
+      "finishedAt": "2026-10-05T15:49:59.916Z",
+      "kind": "tool_call",
+      "toolName": "survey_read_context",
+      "callId": "call_01_rDSXahLG1C93BSJxOwLI4677",
+      "toolKind": "tool_call",
+      "arguments": {},
+      "argumentSummary": "Run survey_read_context\nParameters: 0 field(s); sensitive values omitted"
+    }
+  },
+  {
+    "seq": 621,
+    "timestamp": "2026-10-05T15:49:59.939Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_call_01_rDSXahLG1C93BSJxOwLI4677",
+    "kind": "item_created",
+    "item": {
+      "id": "item_call_01_rDSXahLG1C93BSJxOwLI4677",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:49:59.916Z",
+      "finishedAt": "2026-10-05T15:49:59.916Z",
+      "kind": "tool_result",
+      "toolName": "survey_read_context",
+      "callId": "call_01_rDSXahLG1C93BSJxOwLI4677",
+      "toolKind": "tool_call",
+      "output": {
+        "context": {
+          "schemaVersion": 1,
+          "projectId": "project_f671a401-59c8-429c-ba96-1c23fd25ac17",
+          "projectRevision": 2,
+          "generatedAt": "2026-10-05T15:49:59.915Z",
+          "project": {
+            "name": "golden-plane-control-e2e",
+            "taskType": "control-network",
+            "monitoringType": "control-network",
+            "unit": "m",
+            "reportPeriod": {},
+            "thresholds": {}
+          },
+          "datasets": [],
+          "analyses": [],
+          "runs": [],
+          "surveyNetworks": [
+            {
+              "id": "network_2404e148-cf16-4a9e-ae0f-a0eabd09b894",
+              "networkType": "plane-control",
+              "coordinateSystem": "待确认",
+              "verticalDatum": "待确认",
+              "pointCount": 4,
+              "observationCount": 5,
+              "qualityStatus": "validated",
+              "revision": 2,
+              "inputAttachmentHash": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+            }
+          ],
+          "surveyAdjustments": [
+            {
+              "id": "adjustment_5417f6fc-5e8a-4722-b8e3-3f948cf568b5",
+              "networkId": "network_2404e148-cf16-4a9e-ae0f-a0eabd09b894",
+              "status": "completed",
+              "revision": 1,
+              "strategyId": "plane-control",
+              "algorithmVersion": "workwise-survey-adjustment-8",
+              "inputHash": "036b0851b9f0d5f0940b98c20381c3c2a15772cc671c2ebd9633ceedcc311c2f",
+              "validation": "valid",
+              "observationCount": 5,
+              "unknownCount": 3,
+              "degreesOfFreedom": 2,
+              "sourceAdmission": {
+                "status": "current-admissible",
+                "rawSourceIntegrity": {
+                  "status": "verified",
+                  "ledgerEntryCount": 2,
+                  "errors": []
+                },
+                "sourceEligibility": {
+                  "eligible": true,
+                  "findings": []
+                }
+              }
+            }
+          ],
+          "citations": [],
+          "watchDrafts": [],
+          "contextHash": "sha256-ea34fdbe319910108291e3ce607722d97131d2cc723dd02c35a1c2ee32f5e9a3"
+        },
+        "evidence": [],
+        "adjustments": [
+          {
+            "runId": "adjustment_5417f6fc-5e8a-4722-b8e3-3f948cf568b5",
+            "networkId": "network_2404e148-cf16-4a9e-ae0f-a0eabd09b894",
+            "inputHash": "036b0851b9f0d5f0940b98c20381c3c2a15772cc671c2ebd9633ceedcc311c2f",
+            "sourceAdmission": {
+              "status": "current-admissible",
+              "rawSourceIntegrity": {
+                "status": "verified",
+                "ledgerEntryCount": 2,
+                "errors": []
+              },
+              "sourceEligibility": {
+                "eligible": true,
+                "findings": []
+              }
+            },
+            "validation": "valid",
+            "algorithmVersion": "workwise-survey-adjustment-8",
+            "closure": {
+              "horizontal": 1.3726709029343796e-07,
+              "angular": 3.111529177070756e-10
+            },
+            "closureUnits": {
+              "horizontal": "m",
+              "angular": "rad"
+            },
+            "precision": {
+              "maxPointStdDev": 1.3592152495710963e-07,
+              "passed": true
+            },
+            "linearUnit": "m",
+            "angularUnit": "rad",
+            "unitWeightStdDev": 0.00010671165867325277,
+            "unitWeightStdDevUnit": "dimensionless",
+            "varianceFactor": 1.1387378096796804e-08,
+            "varianceFactorUnit": "dimensionless",
+            "varianceFactorEstimated": true,
+            "statisticalSummary": {
+              "schemaVersion": 1,
+              "scope": "descriptive-screening",
+              "numericalStatus": "clear",
+              "availableCount": 5,
+              "unavailableCount": 0,
+              "flaggedCount": 0,
+              "varianceBasis": "estimated-posterior",
+              "varianceLog10RatioToUnit": -7.943576259166857,
+              "standardDeviationLog10RatioToUnit": -3.9717881295834285,
+              "significance": "not-evaluated",
+              "standardsConformity": "not-evaluated"
+            },
+            "degreesOfFreedom": 2,
+            "qualityFindings": [
+              {
+                "schemaVersion": 1,
+                "id": "survey_finding_2b41139d-f0ef-4721-a751-90d54e92eb33",
+                "networkId": "network_2404e148-cf16-4a9e-ae0f-a0eabd09b894",
+                "code": "format_detected",
+                "severity": "warning",
+                "message": "COSA(科傻) / cosa-in2 已保留可审计的解析对象；P0 格式目录 workwise-survey-format-catalog-1.7.0 当前能力策略为 adjustment-ready：严格结构解析、记录锚点和单位转换成功后可进入策略校验；解析、基准、拓扑、闭合或精度条件不满足时仍会被阻断。",
+                "localized": {
+                  "en": {
+                    "message": "cosa-in2: auditable parsed objects retained; P0 format catalog workwise-survey-format-catalog-1.7.0 permits adjustment-ready: Strict structure parsing, record anchors and unit conversion permit strategy validation. Parsing, datum, topology, closure or precision failures still block adjustment.",
+                    "suggestedAction": "Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment."
+                  }
+                },
+                "suggestion": "继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。",
+                "status": "open",
+                "createdAt": "2026-10-05T15:49:15.401Z"
+              }
+            ],
+            "residuals": [
+              {
+                "observationId": "cosa-in2-6-backsight-reset",
+                "correction": -2.3735413634540237e-10,
+                "residual": -2.3735413634540237e-10,
+                "unit": "rad",
+                "standardizedResidual": 4.895780494523131e-05,
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "observation-sigma-ratio",
+                  "scaleBasis": "declared-prior",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "available",
+                  "value": 4.895780494523131e-05,
+                  "threshold": 3,
+                  "thresholdExceeded": false
+                },
+                "outlier": false,
+                "sourceRow": 6,
+                "sourceRecordId": "cosa-in2-record-6"
+              },
+              {
+                "observationId": "cosa-in2-7-direction",
+                "correction": 1.971329766092822e-10,
+                "residual": 1.971329766092822e-10,
+                "unit": "rad",
+                "standardizedResidual": 4.066159522522697e-05,
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "observation-sigma-ratio",
+                  "scaleBasis": "declared-prior",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "available",
+                  "value": 4.066159522522697e-05,
+                  "threshold": 3,
+                  "thresholdExceeded": false
+                },
+                "outlier": false,
+                "sourceRow": 7,
+                "sourceRecordId": "cosa-in2-record-7"
+              },
+              {
+                "observationId": "cosa-in2-8-distance",
+                "correction": 7.159016490732029e-09,
+                "residual": 7.159016490732029e-09,
+                "unit": "m",
+                "standardizedResidual": 7.123487653604974e-06,
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "observation-sigma-ratio",
+                  "scaleBasis": "declared-prior",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "available",
+                  "value": 7.123487653604974e-06,
+                  "threshold": 3,
+                  "thresholdExceeded": false
+                },
+                "outlier": false,
+                "sourceRow": 8,
+                "sourceRecordId": "cosa-in2-record-8"
+              },
+              {
+                "observationId": "cosa-in2-9-direction",
+                "correction": 4.022115973612017e-11,
+                "residual": 4.022115973612017e-11,
+                "unit": "rad",
+                "standardizedResidual": 8.296209720004341e-06,
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "observation-sigma-ratio",
+                  "scaleBasis": "declared-prior",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "available",
+                  "value": 8.296209720004341e-06,
+                  "threshold": 3,
+                  "thresholdExceeded": false
+                },
+                "outlier": false,
+                "sourceRow": 9,
+                "sourceRecordId": "cosa-in2-record-9"
+              },
+              {
+                "observationId": "cosa-in2-10-distance",
+                "correction": -1.3708027779557597e-07,
+                "residual": -1.3708027779557597e-07,
+                "unit": "m",
+                "standardizedResidual": 0.00013639997445091467,
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "observation-sigma-ratio",
+                  "scaleBasis": "declared-prior",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "available",
+                  "value": 0.00013639997445091467,
+                  "threshold": 3,
+                  "thresholdExceeded": false
+                },
+                "outlier": false,
+                "sourceRow": 10,
+                "sourceRecordId": "cosa-in2-record-10"
+              }
+            ],
+            "residualCount": 5
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "seq": 8413,
+    "timestamp": "2026-10-05T15:50:36.495Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "kind": "usage",
+    "model": "deepseek-flash",
+    "usage": {
+      "promptTokens": 45709,
+      "completionTokens": 8570,
+      "totalTokens": 54279,
+      "cachedTokens": 22016,
+      "cacheHitTokens": 22016,
+      "cacheMissTokens": 23693,
+      "cacheHitRate": 0.4816556914393227,
+      "turns": 2,
+      "costUsd": 0.008761998,
+      "costCny": 0.058413320000000005,
+      "cacheSavingsUsd": 0.0032363519999999996,
+      "cacheSavingsCny": 0.02157568,
+      "tokenEconomySavingsTokens": 0,
+      "tokenEconomySavingsUsd": 0,
+      "tokenEconomySavingsCny": 0
+    }
+  },
+  {
+    "seq": 8416,
+    "timestamp": "2026-10-05T15:50:36.527Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "itemId": "item_text_fh0nq0gh",
+    "kind": "item_created",
+    "item": {
+      "id": "item_text_fh0nq0gh",
+      "turnId": "turn_7rkq1x67",
+      "threadId": "thr_xnevvmkr",
+      "role": "assistant",
+      "status": "completed",
+      "createdAt": "2026-10-05T15:50:36.519Z",
+      "kind": "assistant_text",
+      "text": "## 一、S1 的解算结果\n\nS1 位于约 X ≈ 50.00000000 m、Y ≈ 49.99999996 m，即名义点（50, 50）附近。本次平面控制网平差后，S1 的记录为：\n\n- **坐标改正量**：ΔX ≈ −0.019 µm（−1.94×10⁻⁸ m），ΔY ≈ +0.196 µm（+1.96×10⁻⁷ m）。这是对**近似坐标的改正**，不是相对其他期次或基准的位移，不能当作变形量使用。\n- **点位中误差**：1.36×10⁻⁷ m（约 0.14 µm），基准为**后验**（a-posteriori）方差。\n- **点位误差椭圆**：长半轴 1.28×10⁻⁷ m，短半轴 4.44×10⁻⁸ m，长轴方向约 129.4°（自 +X 轴向 +Y 量取，只定轴向、不分正负）；椭圆尺度采用**单位马氏半径**（即 1σ 的相对量），并非 95% 置信椭圆。\n\n需要强调：上述数值都落在 10⁻⁷～10⁻⁸ m 量级，属于**数值解算量级的一致性表现**，不是可以用外业手段验证的物理精度。\n\n## 二、原始依据\n\n- **来源**：本项目导入的科傻（COSA）平面控制网观测文件，共 4 个点、5 条观测。观测分别位于源记录第 6 条（后视归零）、第 7 条（方向）、第 8 条（边长）、第 9 条（方向）、第 10 条（边长）。\n- **解算规模**：5 个观测、3 个未知量、**自由度仅 2**；该次平差状态为已完成且判定有效。\n- **平差前路线闭合检查**：水平闭合 1.37×10⁻⁷ m，角度闭合 3.11×10⁻¹⁰ rad（约 6.4×10⁻⁵″）。闭合差是平差前的检查量，与平差后的观测残差不是同一类指标，二者不可互换。\n- **观测残差**：5 条观测全部通过筛查（无离群标记），最大标准化残差约 1.4×10⁻⁴，远低于 3 倍相对阈值。该比例是在**声明先验**尺度下计算的。\n- **统计概要**：范围是描述性筛查，数值状态为\"clear\"，5 条可用、0 条不可用、0 条被标记；**显著性未评估、标准符合性未评估**。方差因子为 1.1387×10⁻⁸，以方差尺度与 1 相比低约 8 个数量级；其平方根（单位权标准差 1.067×10⁻⁴）以标准差尺度低约 4 个数量级。\n\n## 三、需要复核的问题\n\n1. **基准不可确认**：任务上下文中坐标系统与高程基准仍标注为\"待确认\"。S1 及其他点的已知坐标来源、方位角基准、尺度基准如何固定，本记录未体现；S1 有非零改正与精度，说明它参与了解算而非被完全固定，基准约束方式需人工核对。\n2. **自由度仅 2**：统计检验能力很弱，方差因子与点位中误差对单条观测和先验权假设非常敏感，不能据此判定观测精度合格。\n3. **后验方差因子远小于 1**（方差尺度低约 8 个数量级）：需核对先验权（仪器标称精度、测回数）与观测单位设置是否合理。一种可能假设是观测由同一套坐标反算生成、内符合天然一致；这仅为假设，须用原始观测与仪器记录佐证。\n4. **残差远小于声明先验**：全部残差约为声明先验的 10⁻⁴～10⁻⁵ 量级，属\"几乎零残差\"。此类结果通常表示内业自洽，必须用独立外业检核或重复观测确认，不能反推真实精度。\n5. **一条格式/校验提示仍未关闭**：系统保留了源文件解析的警告性提示，要求继续完成基准、控制点、观测角色、拓扑、闭合与精度校验，任一条件不满足都会阻断平差。本次平差虽已完成，但该提示仍处未处理状态，需专业人员判定。\n6. **精度表述须写清**：后验基准、单位马氏半径的椭圆尺度、方向约定和改正量符号约定都应在成果说明中明确，避免被读成 95% 置信椭圆或位移量。\n7. **审核状态**：该专业复核记录为**未签署**；标准符合性、显著性检验、签名验证均为\"未评估\"。在工程师签署前，不得作为交付依据，数值通过也不代表工程安全或规范符合。\n8. **缺失资料**：仪器标称精度、加乘常数、气象改正、对中与照准偏心、限差依据（现行规范条款）等均未出现在本记录中，因此观测权的来源与限差符合性无法核验。\n\n## 四、建议的下一步\n\n- 由专业人员在人机界面完成复核签署，并处理上述未关闭的格式/校验提示。\n- 补齐基准资料（已知点坐标来源、方位与尺度基准）与仪器、观测限差依据。\n- 增加独立检核（已知点检核、重复观测或独立路线比对）后再评估真实精度。\n- 如需正式成果文档或成果表，可在界面中提出导出需求，我会先给出待确认的执行草案。\n\n说明：以上解释基于已保存的历史解算与复核记录，本次未重新计算、未做新的校验；历史记录不等于对当前成果的重新验证。"
+    }
+  },
+  {
+    "seq": 8417,
+    "timestamp": "2026-10-05T15:50:36.539Z",
+    "threadId": "thr_xnevvmkr",
+    "turnId": "turn_7rkq1x67",
+    "kind": "turn_completed",
+    "reason": "completed"
+  }
+]

@@ -643,7 +643,7 @@ export const SurveyQualityFindingV1 = z.object({
     'invalid_observation', 'dimension_limit', 'missing_baseline', 'insufficient_redundancy',
     'malformed_geometry', 'not_converged', 'format_detected', 'format_conflict', 'unknown_format',
     'record_ignored',
-    'gnss_processing_required', 'converter_required', 'mapping_required', 'source_not_adjustment_ready', 'raw_source_integrity', 'parse_error'
+    'gnss_processing_required', 'converter_required', 'mapping_required', 'source_not_adjustment_ready', 'raw_source_integrity', 'parse_error', 'reference_undeclared'
   ]),
   severity: z.enum(['blocking', 'warning', 'info']),
   message: z.string().min(1),
@@ -673,6 +673,13 @@ export const SurveyNetworkV1 = z.object({
   verticalDatum: z.string().min(1).default('待确认'),
   /** Legacy renderer/fixture alias; normalized responses use verticalDatum. */
   heightDatum: z.string().min(1).optional(),
+  /** Explicit import declaration, kept distinct from facts read from the file. */
+  referenceDeclaration: z.object({
+    coordinateSystem: z.string().trim().min(1).max(256).optional(),
+    verticalDatum: z.string().trim().min(1).max(256).optional(),
+    origin: z.literal('user-import'),
+    declaredAt: z.string().min(1)
+  }).strict().optional(),
   unit: z.string().min(1).default('m'),
   knownPoints: z.array(SurveyPointV1).max(10_000),
   unknownPoints: z.array(SurveyPointV1).max(10_000),
@@ -1093,7 +1100,13 @@ export const SurveyNetworkImportRequest = z.object({
   cosaIn1Mapping: CosaIn1MappingRequestV1.optional(),
   tabularMapping: SurveyTabularMappingV1.optional(),
   /** Explicit, auditable control-point mapping; never inferred from a sidecar. */
-  knownPoints: z.array(SurveyKnownPointInputV1).max(10_000).optional()
+  knownPoints: z.array(SurveyKnownPointInputV1).max(10_000).optional(),
+  /** User-confirmed reference names accompany the original file; they never
+   * replace a conflicting reference already declared in that source. */
+  referenceDeclaration: z.object({
+    coordinateSystem: z.string().trim().min(1).max(256).optional(),
+    verticalDatum: z.string().trim().min(1).max(256).optional()
+  }).strict().refine(value => Boolean(value.coordinateSystem || value.verticalDatum), { message: 'at least one reference declaration is required' }).optional()
 }).strict().refine((value) => Boolean(value.network || (value.name && value.dataBase64)), { message: 'network or name/dataBase64 is required' })
 export type SurveyNetworkImportRequest = z.infer<typeof SurveyNetworkImportRequest>
 

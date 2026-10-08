@@ -27,6 +27,7 @@ describe('professional survey labels', () => {
       expect(surveySourceFormatLabel(t, format, language), format).not.toBe(t('surveyUnknownFormat'))
     }
     expect(surveySourceFormatLabel(t, 'cosa-in2', language)).toBe('COSA IN2')
+    expect(surveySourceFormatLabel(t, 'COSA-IN2', language)).toBe('COSA IN2')
     expect(surveySourceFormatLabel(t, 'south-dat', language)).toBe(language === 'en' ? 'South DAT' : '南方 DAT')
   })
 })

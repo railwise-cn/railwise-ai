@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  SurveySourceFixedModelRequestV1, SurveySourceFixedModelV1, canonicalSourceModel, runtimeSurveySourceFixedModelPath,
   SURVEY_ADVANCED_TRIAL_LIMITS as LIMITS, SurveyAdvancedTrialCreateV1, SurveyAdvancedTrialSummaryV1,
   SurveyAdvancedTrialRecordV1, SurveyAdvancedTrialListV1, SurveyAdvancedTrialVerificationV1,
   SurveyGeneralizedWRequestV1, SurveyVceTrialInputV1, SurveyHuberTrialInputV1, SurveyStatisticalFamilyInputV1, SurveyReferenceDatumInputV1, SurveyStaticIncrementalInputV1, runtimeSurveyAdvancedTrialsPath, parseAdvancedTrialJson
@@ -10,7 +11,7 @@ export type AdvancedTrialBinding = { projectId: string; projectRevision: number;
 export type AdvancedTrialRecord = z.infer<typeof SurveyAdvancedTrialRecordV1>
 export type AdvancedTrialSummary = z.infer<typeof SurveyAdvancedTrialSummaryV1>
 export type AdvancedTrialKind = AdvancedTrialRecord['kind']
-export type AdvancedTrialInput = Pick<z.infer<typeof SurveyAdvancedTrialCreateV1>, 'kind' | 'declarationJson' | 'modelBasisStatement'>
+export type AdvancedTrialInput = Pick<z.infer<typeof SurveyAdvancedTrialCreateV1>, 'kind' | 'declarationJson' | 'modelBasisStatement' | 'sourceModel'>
 export type AdvancedTrialHistory = z.infer<typeof SurveyAdvancedTrialListV1> & { offset: number }
 export type AdvancedTrialFailure = 'not_found' | 'stale' | 'integrity' | 'conflict' | 'limit' | 'rate_limit' | 'replay-environment' | 'invalid-response' | 'invalid-input' | 'unavailable' | 'request-failed'
 export class AdvancedTrialRequestError extends Error {
@@ -128,6 +129,7 @@ async function checkRecord(raw: unknown, binding: AdvancedTrialBinding, expected
   try { body = SurveyAdvancedTrialCreateV1.parse(parseAdvancedTrialJson(record.requestJson)); declaration = parseDeclaration(record.kind, record.declarationJson) }
   catch { return invalid() }
   if (body.kind !== record.kind || body.expectedProjectRevision !== record.projectRevision || body.idempotencyKey !== record.idempotencyKey
+    || !equal(body.sourceModel ?? null, record.sourceModel ?? null)
     || body.declarationJson !== record.declarationJson || body.modelBasisStatement !== record.modelBasisStatement || !equal(declaration, record.declaration)) invalid()
   const { recordHash: _recordHash, ...unsigned } = record
   const expectedHashes = await Promise.all([
@@ -175,7 +177,7 @@ export async function createAdvancedTrial(binding: AdvancedTrialBinding, input: 
   if (bytes(raw) > LIMITS.requestBytes) throw new AdvancedTrialRequestError('invalid-input')
   const summary = await checkSummary(await request(runtimeSurveyAdvancedTrialsPath(binding.projectId), 'POST', raw), binding)
   const [requestHash, declarationHash, modelHash, basisHash] = await Promise.all([hash(raw), hash(input.declarationJson), hash(canonical(parseDeclaration(input.kind, input.declarationJson))), hash(input.modelBasisStatement)])
-  if (summary.kind !== input.kind || summary.idempotencyKey !== idempotencyKey || summary.requestSha256 !== requestHash
+  if (!equal(summary.sourceModel ?? null, input.sourceModel ?? null) || summary.kind !== input.kind || summary.idempotencyKey !== idempotencyKey || summary.requestSha256 !== requestHash
     || summary.declarationSha256 !== declarationHash || summary.modelHash !== modelHash || summary.modelBasisSha256 !== basisHash
     || summary.requestSizeBytes !== bytes(raw) || summary.declarationSizeBytes !== bytes(input.declarationJson) || summary.modelBasisSizeBytes !== bytes(input.modelBasisStatement)) invalid()
   if (!stillCurrent()) throw new AdvancedTrialRequestError('stale')
@@ -189,3 +191,15 @@ export async function reverifyAdvancedTrial(binding: AdvancedTrialBinding, expec
   if (!stillCurrent()) throw new AdvancedTrialRequestError('stale')
   return readAdvancedTrial(binding, expected)
 }
+
+export type SourceFixedSelection = { adjustmentId: string; networkId: string; networkRevision: number }
+export type SourceFixedModel = z.infer<typeof SurveySourceFixedModelV1>
+export async function readSourceFixedModel(binding: AdvancedTrialBinding, selection: SourceFixedSelection): Promise<SourceFixedModel> {
+  const body = SurveySourceFixedModelRequestV1.parse({ adjustmentId: selection.adjustmentId, expectedProjectRevision: binding.projectRevision, expectedNetworkRevision: selection.networkRevision })
+  const source = decode(SurveySourceFixedModelV1, await request(runtimeSurveySourceFixedModelPath(binding.projectId), 'POST', JSON.stringify(body)))
+  const b = source.binding
+  if (b.projectId !== binding.projectId || b.projectRevision !== binding.projectRevision || b.networkId !== selection.networkId || b.networkRevision !== selection.networkRevision
+    || b.runId !== selection.adjustmentId && b.resultId !== selection.adjustmentId || b.fixedModelHash !== await hash(canonicalSourceModel(source.model))) invalid()
+  return source
+}
+export async function sourceStaticFingerprint(base: unknown): Promise<string> { return hash(JSON.stringify(base)) }

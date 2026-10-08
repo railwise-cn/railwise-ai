@@ -1,0 +1,82 @@
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise
+
+ ❯ src/main/managed-runtime-process.test.ts (30 tests | 5 failed) 25603ms
+     × waits for the explicit runtime ready marker before resolving 5004ms
+     × routes host requests through the ephemeral Runtime port reported by a listening child 5002ms
+     × does not route fixed-port production through a mismatched ready-marker port 5002ms
+     × clears the actual Runtime port when the child exits unexpectedly 5002ms
+     × rejects when the child exits before reporting ready 5008ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > waits for the explicit runtime ready marker before resolving
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/managed-runtime-process.test.ts:91:3
+     89|
+     90| describe('startManagedRuntimeChild', () => {
+     91|   it('waits for the explicit runtime ready marker before resolving', a…
+       |   ^
+     92|     const script = writeScript(
+     93|       'ready-child.js',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > routes host requests through the ephemeral Runtime port reported by a listening child
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/managed-runtime-process.test.ts:117:3
+    115|   })
+    116|
+    117|   it('routes host requests through the ephemeral Runtime port reported…
+       |   ^
+    118|     const script = writeScript(
+    119|       'ephemeral-ready-child.js',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > does not route fixed-port production through a mismatched ready-marker port
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/managed-runtime-process.test.ts:168:3
+    166|   })
+    167|
+    168|   it('does not route fixed-port production through a mismatched ready-…
+       |   ^
+    169|     const script = writeScript(
+    170|       'fixed-port-mismatch-child.js',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > clears the actual Runtime port when the child exits unexpectedly
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/managed-runtime-process.test.ts:184:3
+    182|   })
+    183|
+    184|   it('clears the actual Runtime port when the child exits unexpectedly…
+       |   ^
+    185|     const script = writeScript(
+    186|       'ephemeral-exit-child.js',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/main/managed-runtime-process.test.ts > startManagedRuntimeChild > rejects when the child exits before reporting ready
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/main/managed-runtime-process.test.ts:212:3
+    210|   })
+    211|
+    212|   it('rejects when the child exits before reporting ready', async () =…
+       |   ^
+    213|     const script = writeScript(
+    214|       'exit-child.js',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed | 349 passed | 2 skipped (352)
+      Tests  5 failed | 3107 passed | 2 skipped (3114)
+   Start at  23:17:21
+   Duration  47.10s (transform 7.38s, setup 0ms, import 22.48s, tests 127.59s, environment 4.56s)

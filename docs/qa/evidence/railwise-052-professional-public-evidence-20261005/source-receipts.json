@@ -1,0 +1,258 @@
+{
+  "date": "2026-10-05",
+  "scope": "public read-only research; no vendor software or instrument run",
+  "sources": [
+    {
+      "id": "surveycloud-suc",
+      "requestedUrl": "http://help.celiangyun.com/knowledge/outputsuc",
+      "finalUrl": "http://help.celiangyun.com/knowledge/outputsuc",
+      "acquiredAt": "2026-10-05T15:19:12.073948+00:00",
+      "httpStatus": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 17830,
+      "sha256": "c35aefedcdb04870a9cd8cac652945b4043d1c67ffb1bd03128dfd9b2c9c27bd",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/surveycloud-suc.html",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied"
+    },
+    {
+      "id": "surveycloud-level-settings",
+      "requestedUrl": "http://help.celiangyun.com/knowledge/levelset",
+      "finalUrl": "http://help.celiangyun.com/knowledge/levelset",
+      "acquiredAt": "2026-10-05T15:19:12.074315+00:00",
+      "httpStatus": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 21522,
+      "sha256": "205a21db0e7dad6a7e290ccf3e0be70d8b2db506a0aebbb4a78eb217b70e7246",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/surveycloud-level-settings.html",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied"
+    },
+    {
+      "id": "surveycloud-level-report",
+      "requestedUrl": "http://help.celiangyun.com/knowledge/1555553650",
+      "finalUrl": "http://help.celiangyun.com/knowledge/1555553650",
+      "acquiredAt": "2026-10-05T15:19:12.074392+00:00",
+      "httpStatus": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 23191,
+      "sha256": "f421c31a0bb1b6180a36c6b2adbe049fb6f57f50eb38d2084f622a106d381fa0",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/surveycloud-level-report.html",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied"
+    },
+    {
+      "id": "surveycloud-traverse",
+      "requestedUrl": "http://help.celiangyun.com/knowledge/tsprocess23",
+      "finalUrl": "http://help.celiangyun.com/knowledge/tsprocess23",
+      "acquiredAt": "2026-10-05T15:19:12.074468+00:00",
+      "httpStatus": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 32045,
+      "sha256": "886529b10f658e6ba692b6f7494d03c97b82c48c477a26a15332b73e92200f5c",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/surveycloud-traverse.html",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied"
+    },
+    {
+      "id": "surveycloud-repeat",
+      "requestedUrl": "http://help.celiangyun.com/knowledge/cdgczc",
+      "finalUrl": "http://help.celiangyun.com/knowledge/cdgczc",
+      "acquiredAt": "2026-10-05T15:19:12.074565+00:00",
+      "httpStatus": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 23672,
+      "sha256": "d5adb7fa0d876d4782d35dcd383faef73510c03ec7ec96a2bc5e14303ad1ef1c",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/surveycloud-repeat.html",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied"
+    },
+    {
+      "id": "surveycloud-monitoring",
+      "requestedUrl": "http://help.celiangyun.com/knowledge/leveldataimport",
+      "finalUrl": "http://help.celiangyun.com/knowledge/leveldataimport",
+      "acquiredAt": "2026-10-05T15:19:12.074710+00:00",
+      "httpStatus": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 33424,
+      "sha256": "bcaaa35de00e44941c19d39cab4bb0f7a0d996f5b9a6b32c8178419714c982cc",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/surveycloud-monitoring.html",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied"
+    },
+    {
+      "id": "trimble-dini-import",
+      "requestedUrl": "https://help.fieldsystems.trimble.com/tbc/4652.htm",
+      "acquiredAt": "2026-10-05T15:19:45.853003+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.311308+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://help.fieldsystems.trimble.com/tbc/4652.htm",
+      "contentType": "text/html",
+      "bytes": 38539,
+      "sha256": "110ab49b58d279f0c13789324d8b5acc1d834b7e8c50bef813870c1b17af865e",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/trimble-dini-import.html"
+    },
+    {
+      "id": "trimble-dini-workflow",
+      "requestedUrl": "https://help.fieldsystems.trimble.com/tbc/12082.htm",
+      "acquiredAt": "2026-10-05T15:19:46.358159+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.397201+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://help.fieldsystems.trimble.com/tbc/12082.htm",
+      "contentType": "text/html",
+      "bytes": 47595,
+      "sha256": "f38f3d0423db483fb9795645db2ae95a0fcfea0cd3faaac80c51b00d292249f7",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/trimble-dini-workflow.html"
+    },
+    {
+      "id": "trimble-level-editor",
+      "requestedUrl": "https://help.fieldsystems.trimble.com/tbc/5589.htm",
+      "acquiredAt": "2026-10-05T15:19:45.833348+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.457391+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://help.fieldsystems.trimble.com/tbc/5589.htm",
+      "contentType": "text/html",
+      "bytes": 61293,
+      "sha256": "83eef980b6a74cebaf9f87733cc1c08746baaa7c52d2d387ac271cdd180d4a5f",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/trimble-level-editor.html"
+    },
+    {
+      "id": "trimble-level-report",
+      "requestedUrl": "https://help.fieldsystems.trimble.com/tbc/12481.htm",
+      "acquiredAt": "2026-10-05T15:19:46.542152+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.471481+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://help.fieldsystems.trimble.com/tbc/12481.htm",
+      "contentType": "text/html",
+      "bytes": 33570,
+      "sha256": "53658d22f8b7f995d74695e22399f4a2e81b0a92a0fdd8521a6720bea666b135",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/trimble-level-report.html"
+    },
+    {
+      "id": "trimble-jobxml-xsd",
+      "requestedUrl": "https://ww2.trimble.com/schema/JobXML/6_2/JobXMLSchema-6.27.xsd",
+      "acquiredAt": "2026-10-05T15:19:58.588002+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.471566+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://ww2.trimble.com/schema/JobXML/6_2/JobXMLSchema-6.27.xsd",
+      "contentType": "text/xml",
+      "bytes": 530241,
+      "sha256": "30e65680df92fb5c69ae4b683dee76d31e8db20c8e83e12ddc8c711b71c9f031",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/trimble-jobxml-xsd.html"
+    },
+    {
+      "id": "carlson-rw5",
+      "requestedUrl": "https://update.carlsonsw.com/manuals/SurvCE/online/source/FileFormat.html",
+      "acquiredAt": "2026-10-05T15:19:47.237451+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.479010+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://update.carlsonsw.com/manuals/SurvCE/online/source/FileFormat.html",
+      "contentType": "text/html; charset=UTF-8",
+      "bytes": 20183,
+      "sha256": "71484f68de3f7ddc3d6c61453026be7544fece81d0a0b7cbaf64b15319b9fead",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/carlson-rw5.html"
+    },
+    {
+      "id": "cosa-distributor",
+      "requestedUrl": "https://www.survey3d.com/changguicehui/changgui-kesha.html",
+      "acquiredAt": "2026-10-05T15:19:46.286257+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.765110+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://www.survey3d.com/changguicehui/changgui-kesha.html",
+      "contentType": "text/html",
+      "bytes": 30694,
+      "sha256": "bc50c4bbbceee96554b560e341a1ce4dfbc34100296fa70278d00d5646dcb935",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/cosa-distributor.html"
+    },
+    {
+      "id": "leica-surveyoffice",
+      "requestedUrl": "https://downloads.leica-geosystems.com/files/archived-files/surveyoffice_manual.pdf",
+      "acquiredAt": "2026-10-05T15:19:51.526772+00:00",
+      "repositoryContent": "receipt-and-original-review-only; source-not-copied",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.765221+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification",
+      "httpStatus": 200,
+      "finalUrl": "https://downloads.leica-geosystems.com/files/archived-files/surveyoffice_manual.pdf",
+      "contentType": "application/pdf",
+      "bytes": 400357,
+      "sha256": "5a5bab9c76e5336c86267831003002dfd4a834429d4dd4d2c766f1323d27a970",
+      "localTemporaryCopy": "/tmp/railwise-052-professional-public-evidence/leica-surveyoffice.pdf"
+    },
+    {
+      "id": "leica-gsi-author-manual-nrao",
+      "requestedUrl": "https://naic.nrao.edu/arecibo/phil/hardware/theodolites/gsi_online_for_leica_tps.pdf",
+      "acquiredAt": "2026-10-05T15:19:49.365252+00:00",
+      "error": "curl: (60) SSL certificate problem: certificate has expired\nMore details here: https://curl.se/docs/sslcerts.html\n\ncurl failed to verify the legitimacy of the server and therefore could not\nestablish a secure connection to it. To learn more about this situation and\nhow to fix it, please visit the web page mentioned above.",
+      "repositoryContent": "none",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.803420+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification"
+    },
+    {
+      "id": "south-591R10",
+      "requestedUrl": "https://pm.southsurvey.com/static/uploads/downfiles/20250911/591R10%E6%B5%8B%E9%87%8F%E6%9C%BA%E5%99%A8%E4%BA%BA%E6%93%8D%E4%BD%9C%E6%89%8B%E5%86%8C-1757582889.pdf",
+      "acquiredAt": "2026-10-05T15:20:11.552960+00:00",
+      "error": "curl: (28) Connection timed out after 25002 milliseconds",
+      "repositoryContent": "none",
+      "priorAttempts": [
+        {
+          "acquiredAt": "2026-10-05T15:19:14.815868+00:00",
+          "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+        }
+      ],
+      "transport": "curl default TLS verification"
+    }
+  ]
+}

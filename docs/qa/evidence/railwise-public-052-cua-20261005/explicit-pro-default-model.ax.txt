@@ -1,0 +1,153 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 按钮 返回
+					6 container
+						7 按钮 通用
+						8 按钮 供应商
+						9 按钮 写作
+						10 按钮 图片生成
+						11 按钮 AI 助手
+						12 按钮 键盘快捷键
+						13 按钮 连接手机
+						14 按钮 帮助
+					15 文本 RailWise AI
+					16 文本 偏好设置保存在本地。
+					17 标题 设置, Value: 1
+						18 文本 设置
+					19 文本 管理 API、界面偏好、默认目录和 AI 助手行为。
+					20 文本 修改会自动生效
+					21 container
+						22 标题 Agent 配置中心, Value: 2
+							23 文本 Agent 配置中心
+						24 文本 选择内置角色，或克隆后配置模型、工具、MCP、权限与任务预算。
+						25 按钮 刷新 Agent
+						26 按钮 General 通用执行 内置
+							27 文本 General
+							28 文本 通用执行
+							29 文本 内置
+						30 按钮 Explore 只读探索 内置
+							31 文本 Explore
+							32 文本 只读探索
+							33 文本 内置
+						34 按钮 Review 审查 内置
+							35 文本 Review
+							36 文本 审查
+							37 文本 内置
+						38 按钮 Research 调研 内置
+							39 文本 Research
+							40 文本 调研
+							41 文本 内置
+						42 按钮 招投标编制专家 招标解析、投标文件编制与合规质检 内置
+							43 文本 招投标编制专家
+							44 文本 招标解析、投标文件编制与合规质检
+							45 文本 内置
+						46 文本 内置 Agent 只读，请先克隆再修改。
+						47 按钮 克隆
+						48 按钮 (disabled) 保存
+						49 文本 标识
+						50 文本栏 (disabled) 标识, Value: general
+						51 文本 名称
+						52 文本栏 (disabled) 名称, Value: General
+						53 文本 角色
+						54 文本栏 (disabled) 角色, Value: 通用执行
+						55 文本 模型
+						56 文本栏 (disabled) 模型, Placeholder: auto
+						57 文本 作用域
+						58 弹出式按钮 (disabled) 作用域, Value: 工作区
+						59 文本 最高权限
+						60 弹出式按钮 (disabled) 最高权限, Value: 工作区写入
+						61 文本 角色提示
+						62 文本输入区 (disabled) 角色提示, Value: 可靠地完成用户目标。持续推进，验证结果，并交付可操作的最终成果。
+						63 文本 允许的工具（每行一个）
+						64 文本输入区 (disabled) 允许的工具（每行一个）, Value: *
+						65 文本 允许的 MCP（每行一个）
+						66 文本输入区 (disabled) 允许的 MCP（每行一个）, Value: *
+						67 文本 最多尝试
+						68 步进器 (disabled) 最多尝试, Value: 8, Secondary Actions: Increment, Decrement
+						69 文本 最长分钟
+						70 步进器 (disabled) 最长分钟, Value: 30, Secondary Actions: Increment, Decrement
+						71 文本 费用上限（美元）
+						72 步进器 (disabled) 费用上限（美元）, Secondary Actions: Increment, Decrement
+					73 按钮 助手运行
+					74 按钮 技能
+					75 按钮 外部工具
+					76 按钮 权限范围
+					77 container
+						78 标题 AI 助手, Value: 2
+							79 文本 AI 助手
+						80 text 自动启动 AI 助手服务 建议开启。需要对话、写作或手机连接时，应用会自动启动本地助手服务。
+						81 切换 on
+						82 text 模型供应商 从「供应商」里已有的配置中选择一个给 AI 助手使用。
+						83 弹出式按钮 DeepSeek
+							84 (selected) DeepSeek
+						85 text 默认模型 没有单独指定模型时，AI 助手默认使用的模型 ID。
+						86 组合框 (settable) deepseek-pro
+						87 text 代码提示词前缀 这些指令会注入到每次代码模式对话中。可用于全局规则、编码规范或持久偏好设置。
+						88 文本输入区 (settable) 例如：新代码必须编写单元测试。优先使用函数式组件而非类组件。遵循 TypeScript 严格模式规范。
+						89 开合三角标记 助手高级设置 模型、专用 API、本地端口和数据路径等高级玩家才需要调整的内容。
+							90 文本 助手高级设置
+							91 文本 模型、专用 API、本地端口和数据路径等高级玩家才需要调整的内容。
+						92 text 节省上下文用量 在不改变聊天记录的前提下，尽量压缩工具说明和工具结果，减少模型上下文占用。
+						93 切换 off
+						94 开合三角标记 节省上下文高级设置 控制具体压缩内容、超长历史保护和本地访问令牌。
+							95 文本 节省上下文高级设置
+							96 文本 控制具体压缩内容、超长历史保护和本地访问令牌。
+					97 container
+						98 标题 高级运行设置, Value: 2
+							99 文本 高级运行设置
+						100 开合三角标记 存储、模型上下文与工具保护 这些参数会影响助手内部运行方式。模型级上下文策略来自 models.profiles；这里主要调整兜底项。
+							101 文本 存储、模型上下文与工具保护
+							102 文本 这些参数会影响助手内部运行方式。模型级上下文策略来自 models.profiles；这里主要调整兜底项。
+					103 container
+						104 标题 助手状态, Value: 2
+							105 文本 助手状态
+						106 开合三角标记 查看详细状态 运行时能力、工具连接和记忆记录。
+							107 文本 查看详细状态
+							108 文本 运行时能力、工具连接和记忆记录。
+					109 container
+						110 标题 技能, Value: 2
+							111 文本 技能
+						112 text 技能保存位置 选择插件页「技能」默认读取和保存技能文件的目录。
+						113 弹出式按钮 全局 · ~/.agents/skills
+							114 (selected) 全局 · ~/.agents/skills
+						115 text 当前路径 这里仅管理目录位置；创建和编辑技能请到「插件 > 技能」。 ~/.agents/skills 额外技能目录 每行一个本地路径。手机连接和定时任务也会参考这些技能目录。
+						116 文本输入区 (settable) ~/.agents/skills
+						117 text 技能管理 创建、安装和编辑技能请到「插件 > 技能」；设置页只保留目录位置等基础选项。
+						118 按钮 打开目录
+						119 按钮 打开插件页
+					120 container
+						121 标题 外部工具, Value: 2
+							122 文本 外部工具
+						123 text 外部工具智能选择 连接很多外部工具时，只把最相关的工具交给模型，减少卡顿和上下文占用。
+						124 切换 off
+						125 开合三角标记 外部工具高级设置 筛选方式、候选数量、连接配置文件和保存操作。
+							126 文本 外部工具高级设置
+							127 文本 筛选方式、候选数量、连接配置文件和保存操作。
+					128 container
+						129 标题 权限, Value: 2
+							130 文本 权限
+						131 text 工具执行前确认 控制 AI 助手在修改文件、运行命令等操作前是否需要先问你。修改后会在下一轮对话生效。
+						132 弹出式按钮 自动执行
+							133 (selected) 自动执行
+						134 text 文件访问范围 限制 AI 助手可以读取或修改哪些本地文件。修改后会在下一轮对话生效。
+						135 弹出式按钮 可访问所有文件
+							136 (selected) 可访问所有文件
+						137 text sandboxFullAccessWarning PPT Master Python 环境（完全访问模式） 供完全访问模式运行上游 PPT Master 脚本（project_manager / svg_quality_checker / svg_to_pptx 等）。
+						138 按钮 已就绪
+						139 文本 路径：/Users/wangjiawei/.workwise/ppt-master-python/bin/python
+	140 关闭按钮
+	141 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	142 最小化按钮
+143 menu bar
+	144 RailWise AI
+	145 文件
+	146 编辑
+	147 显示
+	148 窗口
+	149 帮助
+
+The focused UI element is 88 文本输入区 (settable) 例如：新代码必须编写单元测试。优先使用函数式组件而非类组件。遵循 TypeScript 严格模式规范。

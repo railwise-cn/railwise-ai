@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
-import { buildProfessionalReportModel, makeProfessionalDocx, makeProfessionalXlsx, professionalReportCellText, type ProfessionalReportModel } from './survey-professional-report.js'
+import { buildProfessionalReportModel, makeProfessionalDocx, makeProfessionalXlsx, professionalReportCellText, professionalReportPresentation, type ProfessionalReportModel } from './survey-professional-report.js'
 import { makeProfessionalReportPdf } from './engineering-report-pdf.js'
 import { readReportPdf } from '../../tests/helpers/report-pdf.js'
 import { SurveyService } from './survey-service.js'
@@ -63,6 +63,136 @@ async function comparisonFixture() {
 }
 
 describe('professional survey report formats', () => {
+  it('shows small non-zero precision values and variance factors without rounding them to zero', async () => {
+    const ellipses: ProfessionalReportModel['tables'][number] = {
+      id: 'layout-ellipses', title: 'XY 标准误差椭圆',
+      columns: [
+        { key: 'point', label: '点号' },
+        { key: 'minor', label: '短半轴', unit: 'mm', numeric: true, decimals: 4 },
+        { key: 'varianceFactor', label: '方差因子', numeric: true, decimals: 6 },
+        { key: 'negativeZero', label: '改正数', unit: 'mm', numeric: true, decimals: 4 }
+      ],
+      rows: [{ point: 'P01', minor: 4.4355e-5, varianceFactor: 1.1387378096796804e-8, negativeZero: -0 }],
+      note: '解算 XY 平面；短半轴为非零值。轴向由 +X 转向 +Y，模 π；单位马氏半径，非置信百分比。'
+    }
+    const report: ProfessionalReportModel = {
+      title: '数值格式回归', projectName: '合成平面控制网', taskType: '平面控制网', generatedAt: '2026-10-07T00:00:00.000Z',
+      reviewStatus: 'unsigned', reportStatus: 'draft', sourceBinding: [], tables: [ellipses], notes: [],
+      signoff: [{ role: '编制', name: '', date: '', signature: '' }]
+    }
+
+    expect(professionalReportCellText(-0, 4)).toBe('0.0000')
+    expect(professionalReportCellText(4.4355e-5, 4)).toBe('4.4355e-5')
+    expect(professionalReportCellText(1.1387378096796804e-8, 6)).toBe('1.1387e-8')
+
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(report))
+    const document = await docx.file('word/document.xml')!.async('text')
+    expect(document).toContain('4.4355e-5')
+    expect(document).toContain('1.1387e-8')
+    expect(document).toContain('0.0000')
+    expect(document).not.toContain('-0.0000')
+
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(report))
+    const sheets = await Promise.all(Object.keys(xlsx.files).filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name)).map(name => xlsx.file(name)!.async('text')))
+    const ellipseSheet = sheets.find(sheet => sheet.includes('<v>0.000044355</v>'))!
+    expect(ellipseSheet).toContain('<c r="B2" s="7"><v>0.000044355</v></c>')
+    expect(ellipseSheet).toContain('<c r="C2" s="7"><v>1.1387378096796804e-8</v></c>')
+    const styles = await xlsx.file('xl/styles.xml')!.async('text')
+    expect(styles).toContain('formatCode="0.0000E+00"')
+
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(report))
+    expect(pdf.text).toContain('4.4355e-5')
+    expect(pdf.text).toContain('1.1387e-8')
+    expect(pdf.text).toContain('0.0000')
+    expect(pdf.text).not.toContain('-0.0000')
+    const ellipsePage = pdf.pages.find(page => page.includes('XY 标准误差椭圆'))!
+    expect(ellipsePage).toContain('解算 XY 平面')
+  }, 30000)
+
+  it('keeps each PDF table heading with its header and first observation on the same page', async () => {
+    const { model } = await fixture()
+    const tables = Array.from({ length: 12 }, (_, index) => ({
+      id: `layout-${index}`, title: `专业检核段 ${index + 1}`,
+      columns: [{ key: 'id', label: '观测编号' }, { key: 'record', label: '原始记录与现场检查说明' }, { key: 'context', label: '复核说明' }, { key: 'status', label: '状态' }],
+      rows: [{ id: `CHECK-${index + 1}`, record: '现场记录保留完整且未替换原始观测。'.repeat(14), context: '详细检查资料及基准。'.repeat(12), status: '需要复核' }]
+    }))
+    const pdf = await readReportPdf(await makeProfessionalReportPdf({ ...model, tables }))
+    expect(pdf.pageCount).toBeGreaterThan(2)
+    for (const [index, table] of tables.entries()) {
+      const page = pdf.pages.find(page => page.includes(table.title))!
+      expect(page, `${table.title} missing`).toBeDefined()
+      expect(page, `${table.title} separated from first row`).toContain(`CHECK-${index + 1}`)
+      expect(page).toContain('观测编号')
+    }
+  }, 20000)
+
+  it('preserves original XML and worksheet positions and never invents a source position from display order', async () => {
+    const { review } = await fixture()
+    const originalPositions = ['/JOBFile/FieldBook/Station[2]/Observation[3]', '观测数据!C12:F12']
+    const withPositions = { ...review, observations: review.observations.map((row, index) => ({ ...row, sourceRow: undefined, sourceLocator: originalPositions[index] })) }
+    const model = buildProfessionalReportModel({ project: { name: '定位检查', monitoringType: 'leveling-network', workspace: '/tmp' }, reviews: [{ review: withPositions }] })
+    const visible = professionalReportPresentation(model)
+    for (const suffix of ['network-topology', 'observations']) {
+      const rows = visible.tables.find(table => table.id.endsWith(`-${suffix}`))!.rows
+      originalPositions.forEach((position, index) => expect(rows[index]!.source).toContain(position))
+    }
+    const missingPositions = { ...review, observations: review.observations.map(row => ({ ...row, sourceRow: undefined, sourceLocator: undefined })) }
+    const missing = professionalReportPresentation(buildProfessionalReportModel({ project: { name: '定位检查', monitoringType: 'leveling-network', workspace: '/tmp' }, reviews: [{ review: missingPositions }] }))
+    expect(missing.tables.find(table => table.id.endsWith('-network-topology'))!.rows.every(row => row.source === '原始定位未记录')).toBe(true)
+  })
+
+  it('translates importer-owned JSON anchors into professional source wording', async () => {
+    const { review } = await fixture()
+    const withInternalAnchors = {
+      ...review,
+      source: { ...review.source, name: 'control-network.json' },
+      observations: review.observations.map((row, index) => ({
+        ...row,
+        sourceRecordId: `workwise-json-observation-${index + 1}`,
+        sourceLocator: `WorkWise JSON:network.observations[${index}]`,
+        sourceRow: undefined
+      }))
+    }
+    const visible = professionalReportPresentation(buildProfessionalReportModel({
+      project: { name: '专业来源定位', monitoringType: 'leveling-network', workspace: '/tmp' },
+      reviews: [{ review: withInternalAnchors }]
+    }))
+    const sources = [
+      ...visible.tables.find(table => table.id.endsWith('-network-topology'))!.rows.map(row => String(row.source)),
+      ...visible.tables.find(table => table.id.endsWith('-observations'))!.rows.map(row => String(row.source))
+    ]
+    expect(sources).toEqual(expect.arrayContaining([
+      'control-network.json · 原始观测记录第 1 条',
+      'control-network.json · 原始观测记录第 2 条'
+    ]))
+    expect(sources.join('\n')).not.toContain('WorkWise JSON:')
+    expect(sources.join('\n')).not.toContain('network.observations[')
+    expect(sources.join('\n')).not.toContain('workwise-json-observation-')
+  })
+
+  it('exports professional evidence without legacy developer appendices or internal identifiers', async () => {
+    const { model, review } = await fixture()
+    const original = JSON.stringify(model)
+    const legacy = { ...model, appendix: [
+      `网络 ${review.networkId}：adjustment-ready；cosa-in2-parser；P0 格式目录 workwise-survey-format-catalog-1.7.0`,
+      '位移 S1: dX=0.01 m 模长=0.01 m'
+    ] }
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(legacy))
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(legacy))
+    const workbook = (await Promise.all(Object.keys(xlsx.files).filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name)).map(name => xlsx.file(name)!.async('text')))).join('\n')
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(legacy))
+    const artifacts = [await docx.file('word/document.xml')!.async('text'), workbook, pdf.text]
+    for (const artifact of artifacts) {
+      for (const internal of [review.networkId, review.runId, review.inputHash, 'network.instrumentParameters', 'workwise-json-observation', 'leveling-cycle:', 'adjustment-ready', 'cosa-in2-parser', 'P0 格式目录', '位移 S1']) expect(artifact).not.toContain(internal)
+      expect(artifact).toContain('闭合差')
+      expect(artifact).toContain('高程改正数')
+      expect(artifact).toContain('原始定位')
+      expect(artifact).toContain('未签认')
+    }
+    expect(JSON.stringify(model)).toBe(original)
+    expect(model.tables.find(table => table.id === 'version-appendix')!.rows[0]!.hash).toBe(review.inputHash)
+  }, 60000)
+
   it('uses one frozen projection for professional rows and keeps unavailable values explicit', async () => {
     const { review, model } = await fixture()
     expect(model.taskType).toBe('水准网')
@@ -90,6 +220,54 @@ describe('professional survey report formats', () => {
     expect(model.signoff.every(item => item.name === '' && item.date === '' && item.signature === '')).toBe(true)
     expect(model.tables.find(table => table.id.endsWith('-checks'))?.rows).toContainEqual(expect.objectContaining({ id: '规范符合性', status: '未评估' }))
   })
+
+  it('keeps single-period corrections distinct from displacement and missing height corrections distinct from zero', async () => {
+    const { review } = await fixture()
+    const points = review.points.map((point, index) => ({ ...point, correctionHeight: index === 0 ? undefined : 0 }))
+    const model = buildProfessionalReportModel({ project: { name: '改正数口径检查', monitoringType: 'leveling-network', workspace: '/tmp' }, reviews: [{ review: { ...review, points } }] })
+    const table = professionalReportPresentation(model).tables.find(table => table.id.endsWith('-points'))!
+    expect(table.columns.find(column => column.key === 'correctionHeight')?.label).toBe('高程改正数')
+    expect(table.rows[0]!.correctionHeight).toBeUndefined()
+    expect(table.rows[1]!.correctionHeight).toBe(0)
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(model))
+    const document = await docx.file('word/document.xml')!.async('text')
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(model))
+    const workbook = await xlsx.file('xl/workbook.xml')!.async('text')
+    const pointSheetIndex = [...workbook.matchAll(/<sheet name="([^"]+)" sheetId="(\d+)"/g)].find(match => match[1]!.includes('点位成果与精度'))![2]!
+    const sheet = await xlsx.file(`xl/worksheets/sheet${pointSheetIndex}.xml`)!.async('text')
+    for (const artifact of [document, pdf.text, sheet]) {
+      expect(artifact).toContain('高程改正数')
+      expect(artifact).toContain('不可用')
+      expect(artifact).not.toContain('位移')
+    }
+    expect(sheet).toContain('<v>0</v>')
+    expect(pdf.text).toContain('0.0000')
+  }, 20000)
+
+  it('preserves professional point numbers and source filenames that resemble implementation identities', async () => {
+    const { review } = await fixture()
+    const pointId = 'network_0001'
+    const sourceName = 'workwise-survey-inputHash.json'
+    const model = buildProfessionalReportModel({ project: { name: '原始编号检查', monitoringType: 'leveling-network', workspace: '/tmp' }, reviews: [{ review: {
+      ...review,
+      source: { ...review.source, name: sourceName },
+      reference: { ...review.reference, knownPoints: review.reference.knownPoints.map(point => ({ ...point, id: pointId })) },
+      points: review.points.map((point, index) => ({ ...point, id: index === 0 ? pointId : point.id }))
+    } }] })
+    const before = JSON.stringify(model)
+    const visible = professionalReportPresentation(model)
+    expect(visible.tables.find(table => table.id.endsWith('-points'))!.rows[0]!.id).toBe(pointId)
+    const docx = await JSZip.loadAsync(await makeProfessionalDocx(model))
+    const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
+    const xlsx = await JSZip.loadAsync(await makeProfessionalXlsx(model))
+    const sheets = (await Promise.all(Object.keys(xlsx.files).filter(name => /^xl\/worksheets\/sheet\d+\.xml$/.test(name)).map(name => xlsx.file(name)!.async('text')))).join('\n')
+    for (const artifact of [await docx.file('word/document.xml')!.async('text'), pdf.text, sheets]) {
+      expect(artifact).toContain(pointId)
+      expect(artifact).toContain(sourceName)
+    }
+    expect(JSON.stringify(model)).toBe(before)
+  }, 20000)
 
   it('renders real DOCX tables with repeating headers, blank signoff and page fields', async () => {
     const { model } = await fixture()
@@ -156,10 +334,11 @@ describe('professional survey report formats', () => {
     expect(read.text).toContain('签认栏（空白 / 未签认）')
     expect(bytes.toString('latin1')).toContain('/FontFile2')
     expect(bytes.toString('latin1')).toContain('/ToUnicode')
-  // PDF pagination embeds the bundled Chinese font and can legitimately take
-  // longer when the full kun suite is running in parallel on a shared CI
-  // runner. Keep the test bounded while avoiding a false timeout.
-  }, 60_000)
+  // PDF generation embeds and subsets the bundled Chinese font.  The full
+  // KUN suite runs this integration test alongside many SQLite-backed tests
+  // on shared CI runners, so allow the artifact generation to finish without
+  // treating CPU contention as a hung test.
+  }, 60000)
 
   it('binds both periods and projects stored segment differences with ordered observation sources', async () => {
     const { input, comparison, model } = await comparisonFixture()
@@ -203,7 +382,7 @@ describe('professional survey report formats', () => {
     expect(workbook).toContain('测段观测高差比较')
     expect(workbook).toContain('测段平差高差比较')
     const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
-    for (const text of ['测段观测高差比较', '测段平差高差比较', '本期减原测', '-7.0000', '-4.5000', 'fwd', 'back', comparison.inputHash]) {
+    for (const text of ['测段观测高差比较', '测段平差高差比较', '本期减原测', '-7.0000', '-4.5000', 'fwd', 'back', ...model.sourceBinding.map(source => source.name!)]) {
       expect(document.replace(/<[^>]+>/g, '')).toContain(text)
       expect(pdf.text.replace(/\s+/g, '')).toContain(text.replace(/\s+/g, ''))
     }
@@ -233,7 +412,8 @@ describe('professional survey report formats', () => {
     expect(workbook).toContain('监测日报与累计变化')
     const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
     expect(pdf.text.replace(/\s+/g, '')).toContain('监测日报与累计变化')
-    expect(pdf.text).toContain(sourceFileHash)
+    expect(pdf.text).not.toContain(sourceFileHash)
+    expect(model.monitoringReport!.sourceFileHash).toBe(sourceFileHash)
   }, 20000)
 
   it('retains conflicting period units in all professional formats without publishing cross-unit conclusions', async () => {
@@ -295,6 +475,7 @@ describe('professional survey report formats', () => {
     expect(sheets.some(sheet => sheet.includes('沉降 (mm)') && sheet.includes('3'))).toBe(true)
     const pdf = await readReportPdf(await makeProfessionalReportPdf(model))
     expect(pdf.text.replace(/\s+/g, '')).toContain('点位变形成果')
-    expect(pdf.text).toContain('变形本期结果')
+    expect(pdf.text).toContain('本期')
+    expect(pdf.text).not.toContain('result-current-hash')
   }, 20000)
 })

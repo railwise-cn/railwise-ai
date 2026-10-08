@@ -14,11 +14,13 @@ import i18n from '../../i18n'
 import { EngineeringEvidenceQuestions } from './EngineeringEvidenceQuestion'
 import { useEngineeringConversationDrafts } from './engineering-conversation-drafts'
 import { selectSurveyEvidence } from '../../../../../kun/src/engineering/survey-evidence-reader'
+import { sourceFixedFixture } from '../../../../../kun/src/engineering/survey-source-fixed-model-test-helpers'
 
 const response = (body: unknown) => ({ ok: true, status: 200, body: JSON.stringify(body) })
 const runtimeRequest = vi.fn()
 const saveWorkspaceFileAs = vi.fn()
 let host: HTMLDivElement, root: Root, dir: string, binding: AdvancedTrialBinding, service: SurveyAdvancedTrialsWorkspaceService, clock: number
+const sourceCleanups: Array<() => Promise<void>> = []
 const basis = '独立声明完整线性模型；来源未核实。\nSynthetic model, not a professional signature.'
 const w = {
   schemaVersion: 1, model: 'fixed-linear-full-column-rank', purpose: 'declared-model-readonly-diagnostic', residualConvention: 'observed-minus-adjusted',
@@ -43,6 +45,7 @@ function handle(path: string, method = 'GET', raw?: string) {
   clock += 60_001
   const url = new URL(path, 'http://localhost'), parts = url.pathname.split('/'), trialId = parts[6], action = parts[7]
   try {
+    if (url.pathname.endsWith('/advanced-trial-model')) return response(service.getSourceModel(binding.projectId, Buffer.from(raw!)))
     if (method === 'POST' && !trialId) return response(service.createTrial(binding.projectId, Buffer.from(raw!)))
     if (action === 'reverify') return response(service.reverifyTrial(binding.projectId, trialId!))
     if (trialId) return response(service.getTrial(binding.projectId, trialId))
@@ -100,7 +103,111 @@ beforeEach(async () => {
   Object.assign(window, { workwise: { runtimeRequest, saveWorkspaceFileAs } })
   host = document.createElement('div'); host.style.width = '960px'; document.body.append(host); root = createRoot(host)
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); service.close(); rmSync(dir, { recursive: true, force: true }); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); service.close(); for (const close of sourceCleanups.splice(0)) await close(); rmSync(dir, { recursive: true, force: true }); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+async function sourceFixture() {
+  const f = await sourceFixedFixture()
+  sourceCleanups.push(async () => { await f.service.flush(); f.service.close(); rmSync(f.root, { recursive: true, force: true }) })
+  service.close()
+  binding = { projectId: f.project.id, projectRevision: f.project.revision, workspaceRoot: f.project.workspace }
+  service = new SurveyAdvancedTrialsWorkspaceService({ rootDir: dir, getProject: id => id === binding.projectId ? f.project : null,
+    getSourceModel: (pid, selection) => f.service.getSourceFixedModel(pid, selection), nowIso: () => new Date(clock).toISOString(), clockMs: () => clock })
+  const selection = { adjustmentId: f.adjustment.run.id, networkId: f.network.id, networkRevision: f.network.revision }
+  const source = f.service.getSourceFixedModel(binding.projectId, { adjustmentId: selection.adjustmentId, expectedProjectRevision: binding.projectRevision, expectedNetworkRevision: selection.networkRevision })!
+  return { ...f, selection, source }
+}
+async function loadSource(kind: AdvancedTrialInput['kind']) {
+  await edit(commonText('advancedMethod'), kind); await click(commonButton('advancedUseSource'))
+  await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedSourceCounts', { points: 2, observations: 3, parameters: 1, redundancy: 2 })))
+}
+
+describe('source-bound professional desktop workflow', () => {
+  it.each(['generalized-w', 'vce', 'huber', 'static-incremental'] as const)('uses admitted leveling rows for %s and preserves lineage through replay, history and export', async kind => {
+    const f = await sourceFixture(), formalBefore = JSON.stringify(f.service.getAdjustment(f.adjustment.run.id))
+    await render({ sourceSelection: f.selection }); await loadSource(kind)
+    expect(host.textContent).toContain(commonText('advancedSourcePrior'))
+    if (kind === 'generalized-w') {
+      expect(commonButton('advancedSave').disabled).toBe(true)
+      await edit(commonText('advancedSourceFamily'), 'declared-before-inspection')
+    } else if (kind === 'huber') {
+      expect(ack().disabled).toBe(true)
+      await edit(commonText('advancedSourceScale'), '0.002')
+      expect(ack().disabled).toBe(true)
+      await edit(commonText('advancedSourceScaleBasis'), 'Independent instrument calibration precision declaration, synthetic fixture only.')
+    } else if (kind === 'static-incremental') {
+      await edit(commonText('advancedSourceAppend'), 'new-dh,BM,P,0.1005,0.002,new-field-book:1')
+    }
+    expect(ack().disabled).toBe(false); await click(ack()); await click(commonButton('advancedSave')); await loaded()
+    const request = JSON.parse(runtimeRequest.mock.calls.find(call => call[0].endsWith('/advanced-trials') && call[1] === 'POST')![2])
+    expect(request.sourceModel).toEqual(f.source.binding)
+    const declaration = JSON.parse(request.declarationJson)
+    if (kind === 'generalized-w') {
+      expect(declaration.designMatrix).toEqual([[1],[1],[1]])
+      expect(declaration.covariance.matrix).toEqual(f.source.model.observationCovariance)
+    } else if (kind === 'static-incremental') {
+      expect(declaration.base.observations.map((row: { sourceAnchor: string }) => row.sourceAnchor)).toEqual(f.source.model.observations.map(row => row.sourceAnchor))
+      expect(declaration.append.observations[0].value).toBeCloseTo(.0005, 12)
+    } else {
+      expect(declaration.observations.map((row: { sourceAnchor: string }) => row.sourceAnchor)).toEqual(f.source.model.observations.map(row => row.sourceAnchor))
+      if (kind === 'huber') expect(declaration.initialParameters).toEqual(f.source.model.formalCorrections)
+    }
+    await click(commonButton('advancedReverify')); await loaded()
+    await click(commonButton('advancedExport')); await vi.waitFor(() => expect(saveWorkspaceFileAs).toHaveBeenCalledTimes(1))
+    const exported = JSON.parse(Buffer.from(saveWorkspaceFileAs.mock.calls[0]![0].dataBase64, 'base64').toString('utf8'))
+    expect(exported.sourceModel).toEqual(f.source.binding); expect(exported.declarationJson).toBe(request.declarationJson)
+    await click(commonButton('advancedHistory')); await vi.waitFor(() => expect(restoreButton()).toBeDefined())
+    await click(restoreButton()); await loaded()
+    expect(JSON.stringify(f.service.getAdjustment(f.adjustment.run.id))).toBe(formalBefore)
+    expect(host.textContent).not.toMatch(/fixedModelHash|sourceAdmissionHash|adapterVersion|schemaVersion|idempotencyKey/)
+    expect(host.textContent).not.toContain(f.source.binding.runId)
+    if (kind === 'vce') {
+      expect(host.textContent).not.toContain('source-prior')
+      expect(host.textContent).toContain(commonText('advancedSourceObservationGroup'))
+      expect(host.textContent).toContain(f.source.sourceName)
+    }
+  })
+  it.each(['network', 'run', 'project', 'offline', 'cancel'] as const)('discards late source rows after %s changes', async change => {
+    const f = await sourceFixture(), wait = deferred<ReturnType<typeof response>>()
+    await render({ sourceSelection: f.selection }); await edit(commonText('advancedMethod'), 'vce')
+    runtimeRequest.mockReturnValueOnce(wait.promise); await click(commonButton('advancedUseSource'))
+    if (change === 'cancel') await click(commonButton('advancedCancel'))
+    else await render({ sourceSelection: { ...f.selection, ...(change === 'network' ? { networkRevision: f.selection.networkRevision + 1 } : change === 'run' ? { adjustmentId: 'other-run' } : {}) },
+      ...(change === 'project' ? { binding: { ...binding, projectId: 'another-project' } } : change === 'offline' ? { runtimeReady: false } : {}) })
+    await act(async () => wait.resolve(response(f.source))); await new Promise(resolve => setTimeout(resolve, 10))
+    expect(host.textContent).not.toContain(commonText('advancedSourceCounts', { points: 2, observations: 3, parameters: 1, redundancy: 2 }))
+    expect(commonButton('advancedSave').disabled).toBe(true); expect(runtimeRequest).toHaveBeenCalledTimes(1)
+  })
+  it.each(['hash', 'project', 'network'] as const)('blocks a corrupted source response with altered %s identity before downstream save', async alteration => {
+    const f = await sourceFixture(), corrupted = structuredClone(f.source)
+    if (alteration === 'hash') corrupted.model.designMatrix[0]![0] = 2
+    else if (alteration === 'project') corrupted.binding.projectId = 'other-project'
+    else corrupted.binding.networkId = 'other-network'
+    runtimeRequest.mockResolvedValueOnce(response(corrupted))
+    await render({ sourceSelection: f.selection }); await edit(commonText('advancedMethod'), 'vce'); await click(commonButton('advancedUseSource'))
+    await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedInvalidResponse'))); expect(commonButton('advancedSave').disabled).toBe(true)
+    expect(service.listTrials(binding.projectId).trials).toHaveLength(0)
+  })
+  it('clears the source binding on manual model import instead of silently claiming provenance', async () => {
+    const f = await sourceFixture()
+    await render({ sourceSelection: f.selection }); await loadSource('vce')
+    await importDeclaration(input('vce').declarationJson)
+    expect(field<HTMLTextAreaElement>(commonText('advancedBasis')).value).toBe('')
+    await edit(commonText('advancedBasis'), basis); await click(ack()); await click(commonButton('advancedSave')); await loaded()
+    const request = JSON.parse(runtimeRequest.mock.calls.find(call => call[0].endsWith('/advanced-trials') && call[1] === 'POST')![2])
+    expect(request).not.toHaveProperty('sourceModel')
+    expect(service.getTrial(binding.projectId, service.listTrials(binding.projectId).trials[0]!.id)).not.toHaveProperty('sourceModel')
+  })
+  it('clears a previously loaded source and its verified basis when a fresh source check fails', async () => {
+    const f = await sourceFixture()
+    await render({ sourceSelection: f.selection }); await loadSource('vce')
+    runtimeRequest.mockResolvedValueOnce({ ok: false, status: 409, body: '{"code":"advanced_trials_integrity"}' })
+    await click(commonButton('advancedUseSource'))
+    await vi.waitFor(() => expect(host.textContent).toContain(commonText('advancedIntegrity')))
+    expect(host.textContent).not.toContain(commonText('advancedSourceCounts', { points: 2, observations: 3, parameters: 1, redundancy: 2 }))
+    expect(field<HTMLTextAreaElement>(commonText('advancedBasis')).value).toBe('')
+    expect(commonButton('advancedSave').disabled).toBe(true)
+  })
+})
 
 describe('declared advanced model desktop workflow', () => {
   it.each(['generalized-w', 'vce', 'huber', 'statistical-family', 'reference-datum', 'static-incremental'] as const)('prepares exact stored %s evidence and a resolvable selected result without another Runtime call', async kind => {

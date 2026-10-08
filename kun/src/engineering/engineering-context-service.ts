@@ -5,6 +5,7 @@ import { atomicWriteFile } from '../adapters/file/atomic-write.js'
 import { EngineeringEvidenceCardV1, EngineeringWatchRuleV1, type EngineeringContextSnapshotV1, type EngineeringEvidenceSelectionV1, type EngineeringEvidenceCardV1 as EngineeringEvidenceCard, type EngineeringSurveyAdjustmentAdmissionV1, type EngineeringWatchRuleV1 as EngineeringWatchRule } from '../contracts/engineering-ai.js'
 import type { EngineeringService } from './engineering-service.js'
 import type { SurveyRawSourceIntegrity, SurveyService, SurveySourceEligibility } from './survey-service.js'
+import { surveyAiAdjustmentSemantics } from './survey-ai-adjustment-semantics.js'
 
 const MAX_FINDINGS_PER_DATASET = 200
 const MAX_DATASETS = 20
@@ -76,7 +77,7 @@ export class EngineeringContextService {
   constructor(
     private readonly engineering: EngineeringService,
     private readonly nowIso: () => string = () => new Date().toISOString(),
-    private readonly survey?: Pick<SurveyService, 'listNetworks' | 'listAdjustments'>
+    private readonly survey?: Pick<SurveyService, 'listNetworks' | 'listAdjustments'> & Partial<Pick<SurveyService, 'getProfessionalReview'>>
   ) {}
 
   async addWatchDraft(input: { projectId: string; name: string; expression: string; enabled?: boolean; idempotencyKey?: string }): Promise<EngineeringWatchRule> {
@@ -254,6 +255,7 @@ export class EngineeringContextService {
         ...(result ? {
           validation: result.validation, algorithmVersion: result.algorithmVersion,
           closure: result.closure, closureUnits: result.closureUnits,
+          ...surveyAiAdjustmentSemantics(result, this.survey?.getProfessionalReview?.(run.id)),
           precision: result.precision, linearUnit: result.linearUnit, angularUnit: result.angularUnit,
           unitWeightStdDev: result.unitWeightStdDev, unitWeightStdDevUnit: result.unitWeightStdDevUnit,
           varianceFactor: result.varianceFactor, varianceFactorUnit: result.varianceFactorUnit,

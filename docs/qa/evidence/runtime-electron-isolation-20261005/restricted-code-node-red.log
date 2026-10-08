@@ -1,0 +1,150 @@
+
+ RUN  v4.1.11 /Users/wangjiawei/Documents/WorkWise/kun
+
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > uses a JSON-only child process and returns JSON 93ms
+ × src/flow/restricted-code.test.ts > restricted Flow code > runs the real child with only the Node-mode bootstrap environment 90ms
+   → expected "vi.fn()" to be called with arguments: [ …(3) ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    "/opt/homebrew/Cellar/node/26.10.0_1/bin/node",
+-   Any<Array>,
+-   ObjectContaining {
+-     "env": {
+-       "ELECTRON_RUN_AS_NODE": "1",
+-     },
++   [
++     "--max-old-space-size=64",
++     "-e",
++     "
++ const vm = require('node:vm')
++ let raw = ''
++ process.stdin.setEncoding('utf8')
++ process.stdin.on('data', (chunk) => {
++   raw += chunk
++   if (Buffer.byteLength(raw) > 1048576) fail('protocol_limit', 'Restricted code input exceeds the protocol limit')
++ })
++ process.stdin.on('end', async () => {
++   try {
++     const request = JSON.parse(raw)
++     if (!request || typeof request.source !== 'string') return fail('invalid_request', 'Invalid restricted code request')
++     const sandbox = Object.create(null)
++     sandbox.input = structuredClone(request.input)
++     const context = vm.createContext(sandbox, { codeGeneration: { strings: false, wasm: false } })
++     const script = new vm.Script('(async (input) => { \"use strict\"; ' + request.source + '\\n})(input)', { filename: 'flow-restricted-code.js' })
++     const output = await script.runInContext(context, { timeout: 30000, breakOnSigint: true })
++     const encoded = JSON.stringify({ ok: true, output })
++     if (encoded === undefined) return fail('non_json_output', 'Restricted code output must be JSON serializable')
++     if (Buffer.byteLength(encoded) > 1048576) return fail('protocol_limit', 'Restricted code output exceeds the protocol limit')
++     process.stdout.write(encoded)
++   } catch (error) {
++     fail('execution_failed', error && error.message ? error.message : String(error))
++   }
++ })
++ function fail(code, message) {
++   const encoded = JSON.stringify({ ok: false, code, error: String(message).slice(0, 4096) })
++   process.stdout.write(encoded)
++   process.exitCode = 1
++ }
++ ",
++   ],
++   {
++     "env": {},
++     "stdio": [
++       "pipe",
++       "pipe",
++       "pipe",
++     ],
++     "windowsHide": true,
+    },
+  ]
+
+
+Number of calls: 1
+
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > does not expose process, require, or fetch 86ms
+ ✓ src/flow/restricted-code.test.ts > restricted Flow code > times out CPU-bound code and rejects extra permissions 101ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/flow/restricted-code.test.ts > restricted Flow code > runs the real child with only the Node-mode bootstrap environment
+AssertionError: expected "vi.fn()" to be called with arguments: [ …(3) ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    "/opt/homebrew/Cellar/node/26.10.0_1/bin/node",
+-   Any<Array>,
+-   ObjectContaining {
+-     "env": {
+-       "ELECTRON_RUN_AS_NODE": "1",
+-     },
++   [
++     "--max-old-space-size=64",
++     "-e",
++     "
++ const vm = require('node:vm')
++ let raw = ''
++ process.stdin.setEncoding('utf8')
++ process.stdin.on('data', (chunk) => {
++   raw += chunk
++   if (Buffer.byteLength(raw) > 1048576) fail('protocol_limit', 'Restricted code input exceeds the protocol limit')
++ })
++ process.stdin.on('end', async () => {
++   try {
++     const request = JSON.parse(raw)
++     if (!request || typeof request.source !== 'string') return fail('invalid_request', 'Invalid restricted code request')
++     const sandbox = Object.create(null)
++     sandbox.input = structuredClone(request.input)
++     const context = vm.createContext(sandbox, { codeGeneration: { strings: false, wasm: false } })
++     const script = new vm.Script('(async (input) => { \"use strict\"; ' + request.source + '\\n})(input)', { filename: 'flow-restricted-code.js' })
++     const output = await script.runInContext(context, { timeout: 30000, breakOnSigint: true })
++     const encoded = JSON.stringify({ ok: true, output })
++     if (encoded === undefined) return fail('non_json_output', 'Restricted code output must be JSON serializable')
++     if (Buffer.byteLength(encoded) > 1048576) return fail('protocol_limit', 'Restricted code output exceeds the protocol limit')
++     process.stdout.write(encoded)
++   } catch (error) {
++     fail('execution_failed', error && error.message ? error.message : String(error))
++   }
++ })
++ function fail(code, message) {
++   const encoded = JSON.stringify({ ok: false, code, error: String(message).slice(0, 4096) })
++   process.stdout.write(encoded)
++   process.exitCode = 1
++ }
++ ",
++   ],
++   {
++     "env": {},
++     "stdio": [
++       "pipe",
++       "pipe",
++       "pipe",
++     ],
++     "windowsHide": true,
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/flow/restricted-code.test.ts:32:19
+     30|
+     31|     expect(result).toEqual({ total: 11 })
+     32|     expect(spawn).toHaveBeenCalledWith(process.execPath, expect.any(Ar…
+       |                   ^
+     33|       env: { ELECTRON_RUN_AS_NODE: '1' }
+     34|     }))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  23:28:52
+   Duration  532ms (transform 21ms, setup 0ms, import 29ms, tests 371ms, environment 0ms)

@@ -9,6 +9,8 @@ type Project = { id: string; revision: number; workspace: string }
 type Kind = 'population' | 'run'
 type PopulationRow = { id: string; project_id: string; idempotency_key: string; request_hash: string; record_hash: string; created_at: string; data_json: string; definition_bytes: Buffer }
 type RunRow = { id: string; project_id: string; population_id: string; stage: string; idempotency_key: string; request_hash: string; record_hash: string; created_at: string; data_json: string }
+const runColumns = 'id,project_id,population_id,stage,idempotency_key,request_hash,record_hash,created_at,data_json'
+const allRuns = `(SELECT ${runColumns} FROM sampling_runs UNION ALL SELECT ${runColumns} FROM sampling_reinspection_runs)`
 export class SurveySamplingWorkspaceError extends Error {
   constructor(readonly reason: 'not-found' | 'stale' | 'integrity' | 'conflict' | 'limit') { super(`sampling_workspace_${reason}`) }
 }
@@ -47,6 +49,14 @@ export class SurveySamplingWorkspaceService {
       UNIQUE(project_id,idempotency_key), UNIQUE(project_id,population_id,stage));
       CREATE INDEX IF NOT EXISTS sampling_populations_project ON sampling_populations(project_id,created_at,id);
       CREATE INDEX IF NOT EXISTS sampling_runs_project ON sampling_runs(project_id,created_at,id);`)
+    // Keep first-round rows and their append-only constraints untouched. Later
+    // rounds live in a new table; one child per predecessor prevents rerolls.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS sampling_reinspection_runs (
+      id TEXT PRIMARY KEY, project_id TEXT NOT NULL, population_id TEXT NOT NULL, stage TEXT NOT NULL,
+      previous_run_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL, data_json TEXT NOT NULL,
+      UNIQUE(project_id,idempotency_key), UNIQUE(project_id,previous_run_id));
+      CREATE INDEX IF NOT EXISTS sampling_reinspection_runs_project ON sampling_reinspection_runs(project_id,created_at,id);`)
     for (const table of ['sampling_populations', 'sampling_runs']) {
       const exists = 'id=NEW.id OR (project_id=NEW.project_id AND idempotency_key=NEW.idempotency_key)'
         + (table === 'sampling_runs' ? ' OR (project_id=NEW.project_id AND population_id=NEW.population_id AND stage=NEW.stage)' : '')
@@ -54,6 +64,12 @@ export class SurveySamplingWorkspaceService {
         CREATE TRIGGER IF NOT EXISTS ${table}_no_delete BEFORE DELETE ON ${table} BEGIN SELECT RAISE(ABORT,'sampling records are append-only'); END;
         CREATE TRIGGER IF NOT EXISTS ${table}_no_replace BEFORE INSERT ON ${table} WHEN EXISTS(SELECT 1 FROM ${table} WHERE ${exists}) BEGIN SELECT RAISE(ABORT,'sampling records are append-only'); END;`)
     }
+    this.db.exec(`CREATE TRIGGER IF NOT EXISTS sampling_reinspection_runs_no_update BEFORE UPDATE ON sampling_reinspection_runs BEGIN SELECT RAISE(ABORT,'sampling records are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS sampling_reinspection_runs_no_delete BEFORE DELETE ON sampling_reinspection_runs BEGIN SELECT RAISE(ABORT,'sampling records are append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS sampling_reinspection_runs_no_replace BEFORE INSERT ON sampling_reinspection_runs
+      WHEN EXISTS(SELECT 1 FROM sampling_reinspection_runs WHERE id=NEW.id OR (project_id=NEW.project_id AND (idempotency_key=NEW.idempotency_key OR previous_run_id=NEW.previous_run_id)))
+        OR EXISTS(SELECT 1 FROM sampling_runs WHERE id=NEW.id OR (project_id=NEW.project_id AND idempotency_key=NEW.idempotency_key))
+      BEGIN SELECT RAISE(ABORT,'sampling records are append-only'); END;`)
   }
   close(): void { this.db.close() }
   private now(): string { return this.options.nowIso?.() ?? new Date().toISOString() }
@@ -68,7 +84,7 @@ export class SurveySamplingWorkspaceService {
     if (serialized === undefined || Buffer.byteLength(serialized, 'utf8') > C.SURVEY_SAMPLING_WORKSPACE_LIMITS.requestBytes) fail('limit')
   }
   private countBound(kind: Kind, pid: string, maximum: number): void {
-    const table = kind === 'population' ? 'sampling_populations' : 'sampling_runs'
+    const table = kind === 'population' ? 'sampling_populations' : allRuns
     const row = this.db.prepare(`SELECT count(*) AS count FROM ${table} WHERE project_id=?`).get(pid) as { count: number }
     if (row.count >= maximum) fail('limit')
   }
@@ -141,7 +157,7 @@ export class SurveySamplingWorkspaceService {
     this.page(limit, offset)
     return this.db.transaction(() => {
       this.project(pid)
-      const table = kind === 'population' ? 'sampling_populations' : 'sampling_runs'
+      const table = kind === 'population' ? 'sampling_populations' : allRuns
       const rows = this.db.prepare(`SELECT id FROM ${table} WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`).all(pid, limit + 1, offset) as Array<{ id: string }>
       const available: T[] = [], unavailable: Array<{ id: string; reason: 'stale' | 'integrity' }> = []
       for (const { id } of rows.slice(0, limit)) {
@@ -168,8 +184,11 @@ export class SurveySamplingWorkspaceService {
     const { plan: _plan, ...summary } = record
     return C.SurveySamplingRunSummaryV1.parse(summary)
   }
-  private readRun(pid: string, id: string): C.SurveySamplingRunRecordV1 {
-    const row = this.db.prepare('SELECT * FROM sampling_runs WHERE project_id=? AND id=?').get(pid, id) as RunRow | undefined
+  private readRun(pid: string, id: string, depth = 0): C.SurveySamplingRunRecordV1 {
+    if (depth >= C.SURVEY_SAMPLING_WORKSPACE_LIMITS.roundsPerStage) return fail('integrity')
+    const rows = this.db.prepare(`SELECT * FROM ${allRuns} WHERE project_id=? AND id=?`).all(pid, id) as RunRow[]
+    if (rows.length > 1) return fail('integrity')
+    const row = rows[0]
     if (!row) return fail('not-found')
     const { record_hash, ...unsigned } = row
     if (digest(unsigned) !== record_hash) return fail('integrity')
@@ -177,11 +196,20 @@ export class SurveySamplingWorkspaceService {
     if (record.id !== row.id || record.projectId !== row.project_id || record.populationId !== row.population_id
       || record.stage !== row.stage || record.createdAt !== row.created_at) return fail('integrity')
     const population = this.readPopulation(pid, record.populationId)
+    if (record.reinspection) {
+      const previous = this.readRun(pid, record.reinspection.previousRunId, depth + 1)
+      if (previous.populationId !== record.populationId || previous.populationHash !== record.populationHash
+        || previous.stage !== record.stage || previous.inspectionMode !== record.inspectionMode || previous.round + 1 !== record.round
+        || previous.planHash !== record.reinspection.previousPlanHash || previous.runHash !== record.reinspection.previousRunHash) return fail('integrity')
+      const stored = this.db.prepare('SELECT previous_run_id FROM sampling_reinspection_runs WHERE project_id=? AND id=?').get(pid, id) as { previous_run_id: string } | undefined
+      if (stored?.previous_run_id !== previous.id) return fail('integrity')
+    }
     const expectedRequest = {
       schemaVersion: 1, projectId: pid, populationId: population.id, productType: population.productType,
       unitProductType: population.unitProductType, definitionEvidenceSha256: population.definitionEvidenceSha256,
       orderedUnitProductIds: population.orderedUnitProductIds, populationHash: population.populationHash,
-      stage: record.stage, inspectionMode: record.inspectionMode, round: 1,
+      stage: record.stage, inspectionMode: record.inspectionMode, round: record.round,
+      ...(record.reinspection ? { previousPlanHash: record.reinspection.previousPlanHash } : {}),
       ...(record.plan.request.randomSource ? { randomSource: record.plan.request.randomSource } : {})
     }
     if (digest(expectedRequest) !== digest(record.plan.request) || record.projectRevision !== population.projectRevision
@@ -197,7 +225,9 @@ export class SurveySamplingWorkspaceService {
     const { runHash, ...summary } = this.runSummary(record)
     if (runHash !== digest(summary)) return fail('integrity')
     const apiRequest = C.SurveySamplingRunCreateV1.parse({ populationId: record.populationId, idempotencyKey: row.idempotency_key,
-      stage: record.stage, inspectionMode: record.inspectionMode })
+      stage: record.stage, inspectionMode: record.inspectionMode,
+      ...(record.reinspection ? { reinspection: { previousRunId: record.reinspection.previousRunId,
+        expectedPreviousPlanHash: record.reinspection.previousPlanHash, reason: record.reinspection.reason } } : {}) })
     if (digest(apiRequest) !== row.request_hash) return fail('integrity')
     return record
   }
@@ -206,25 +236,35 @@ export class SurveySamplingWorkspaceService {
     const request = C.SurveySamplingRunCreateV1.parse(input), requestHash = digest(request)
     return this.db.transaction(() => {
       const population = this.readPopulation(pid, request.populationId)
-      const old = this.db.prepare('SELECT id,request_hash FROM sampling_runs WHERE project_id=? AND idempotency_key=?').get(pid, request.idempotencyKey) as { id: string; request_hash: string } | undefined
+      const old = this.db.prepare(`SELECT id,request_hash FROM ${allRuns} WHERE project_id=? AND idempotency_key=?`).get(pid, request.idempotencyKey) as { id: string; request_hash: string } | undefined
       if (old) {
         const result = this.runSummary(this.readRun(pid, old.id))
         if (old.request_hash !== requestHash) return fail('conflict')
         return result
       }
-      if (this.db.prepare('SELECT id FROM sampling_runs WHERE project_id=? AND population_id=? AND stage=?').get(pid, population.id, request.stage)) return fail('conflict')
+      const previous = request.reinspection ? this.readRun(pid, request.reinspection.previousRunId) : undefined
+      if (previous) {
+        if (previous.populationId !== population.id || previous.populationHash !== population.populationHash || previous.stage !== request.stage
+          || previous.inspectionMode !== request.inspectionMode) return fail('conflict')
+        if (previous.planHash !== request.reinspection!.expectedPreviousPlanHash) return fail('stale')
+        if (previous.round >= C.SURVEY_SAMPLING_WORKSPACE_LIMITS.roundsPerStage) return fail('limit')
+        if (this.db.prepare('SELECT id FROM sampling_reinspection_runs WHERE project_id=? AND previous_run_id=?').get(pid, previous.id)) return fail('conflict')
+      } else if (this.db.prepare('SELECT id FROM sampling_runs WHERE project_id=? AND population_id=? AND stage=?').get(pid, population.id, request.stage)) return fail('conflict')
       this.countBound('run', pid, C.SURVEY_SAMPLING_WORKSPACE_LIMITS.runsPerProject)
       const seed = request.inspectionMode === 'census' ? undefined : randomBytes(32)
       const plan = createQualitySamplingPlan({ schemaVersion: 1, projectId: pid, populationId: population.id,
         productType: population.productType, unitProductType: population.unitProductType,
         definitionEvidenceSha256: population.definitionEvidenceSha256, orderedUnitProductIds: population.orderedUnitProductIds,
-        populationHash: population.populationHash, stage: request.stage, inspectionMode: request.inspectionMode, round: 1,
+        populationHash: population.populationHash, stage: request.stage, inspectionMode: request.inspectionMode, round: previous ? previous.round + 1 : 1,
+        ...(previous ? { previousPlanHash: previous.planHash } : {}),
         ...(seed ? { randomSource: { seedHex: seed.toString('hex'),
           sourceDescription: 'Runtime crypto.randomBytes(32); local seed without an independent witness', receiptSha256: sha(seed), trust: 'caller-declared-not-authenticated' } } : {}) })
       const summary = { schemaVersion: 1, id: `sampling_run_${randomUUID()}`, projectId: pid,
         projectRevision: population.projectRevision, projectBindingHash: population.projectBindingHash,
         populationId: population.id, populationHash: population.populationHash, definitionEvidenceSha256: population.definitionEvidenceSha256,
-        unitCount: population.unitCount, stage: request.stage, inspectionMode: request.inspectionMode, round: 1,
+        unitCount: population.unitCount, stage: request.stage, inspectionMode: request.inspectionMode, round: previous ? previous.round + 1 : 1,
+        ...(previous ? { reinspection: { previousRunId: previous.id, previousPlanHash: previous.planHash, previousRunHash: previous.runHash,
+          reason: request.reinspection!.reason, previousRoundVerification: 'stored-plan-recomputed' } } : {}),
         algorithmVersion: plan.algorithmVersion, source: plan.source, requestHash: plan.requestHash, planHash: plan.planHash,
         sampleSize: plan.sampleSize, batchCount: plan.batches.length,
         batches: plan.batches.map(({ batchIndex, batchSize, nominalTableSampleSize, sampleSize, census }) => ({ batchIndex, batchSize, nominalTableSampleSize, sampleSize, census })),
@@ -234,7 +274,9 @@ export class SurveySamplingWorkspaceService {
       const record = C.SurveySamplingRunRecordV1.parse({ ...summary, runHash: digest(summary), plan })
       const row = { id: record.id, project_id: pid, population_id: population.id, stage: request.stage,
         idempotency_key: request.idempotencyKey, request_hash: requestHash, created_at: record.createdAt, data_json: JSON.stringify(record) }
-      this.db.prepare('INSERT INTO sampling_runs(id,project_id,population_id,stage,idempotency_key,request_hash,record_hash,created_at,data_json) VALUES (?,?,?,?,?,?,?,?,?)')
+      if (previous) this.db.prepare('INSERT INTO sampling_reinspection_runs(id,project_id,population_id,stage,idempotency_key,request_hash,record_hash,created_at,data_json,previous_run_id) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .run(row.id, pid, row.population_id, row.stage, row.idempotency_key, requestHash, digest(row), row.created_at, row.data_json, previous.id)
+      else this.db.prepare('INSERT INTO sampling_runs(id,project_id,population_id,stage,idempotency_key,request_hash,record_hash,created_at,data_json) VALUES (?,?,?,?,?,?,?,?,?)')
         .run(row.id, pid, row.population_id, row.stage, row.idempotency_key, requestHash, digest(row), row.created_at, row.data_json)
       return this.runSummary(this.readRun(pid, record.id))
     }).immediate()

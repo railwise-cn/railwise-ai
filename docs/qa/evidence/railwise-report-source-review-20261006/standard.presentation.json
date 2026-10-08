@@ -1,0 +1,545 @@
+{
+  "title": "公开合成水准复测成果 测量平差专业成果册",
+  "projectName": "公开合成水准复测成果",
+  "taskType": "水准网",
+  "generatedAt": "2026-10-06T00:00:00.000Z",
+  "reviewStatus": "unsigned",
+  "reportStatus": "draft",
+  "sourceBinding": [
+    {
+      "networkId": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324",
+      "name": "workwise-survey-network.json",
+      "sha256": "0a1808786771339999c4e3a41ae1675e22c3884141e6604065dcd4b724153597",
+      "status": "bound",
+      "integrity": "verified",
+      "inputHash": "d527a37e9b1c5abf6cf53b48bc638fb484a77e3a8b9ec8597f4f9ca95c35f49a",
+      "resultHash": "657d64b04b3eda00e23b4c701f1604c4225506eee5e2e92400cae4af68200774",
+      "projectionHash": "ecccaf19d1ef9b02b2a0fd3b2bc427b4c64827b7874db3f6707b16f83d1b91d0"
+    }
+  ],
+  "tables": [
+    {
+      "id": "source-binding",
+      "title": "资料与版本绑定",
+      "columns": [
+        {
+          "key": "networkId",
+          "label": "资料编号"
+        },
+        {
+          "key": "source",
+          "label": "源文件"
+        },
+        {
+          "key": "status",
+          "label": "绑定状态"
+        },
+        {
+          "key": "integrity",
+          "label": "原件完整性"
+        }
+      ],
+      "rows": [
+        {
+          "networkId": "资料 1 · workwise-survey-network.json",
+          "source": "workwise-survey-network.json",
+          "status": "已绑定",
+          "integrity": "已校验"
+        }
+      ],
+      "note": "各项成果对应所列原始资料；完整来源与版本记录另行保存。"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-reference",
+      "title": "基准与已知控制点",
+      "columns": [
+        {
+          "key": "id",
+          "label": "点号"
+        },
+        {
+          "key": "role",
+          "label": "类型"
+        },
+        {
+          "key": "height",
+          "label": "高程",
+          "unit": "m",
+          "numeric": true,
+          "decimals": 6
+        }
+      ],
+      "rows": [
+        {
+          "id": "BM01",
+          "role": "已知点",
+          "height": 100
+        }
+      ],
+      "note": "高程基准：LOCAL-BM；单位：m；状态：已声明"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-closures",
+      "title": "闭合与附合检核",
+      "columns": [
+        {
+          "key": "id",
+          "label": "线路"
+        },
+        {
+          "key": "kind",
+          "label": "类型"
+        },
+        {
+          "key": "from",
+          "label": "起点"
+        },
+        {
+          "key": "to",
+          "label": "终点"
+        },
+        {
+          "key": "observed",
+          "label": "观测高差和",
+          "unit": "m",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "known",
+          "label": "已知高差",
+          "unit": "m",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "length",
+          "label": "线路长度",
+          "unit": "m",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "stationCount",
+          "label": "测站数",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "misclosure",
+          "label": "闭合差",
+          "unit": "mm",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "tolerance",
+          "label": "限差",
+          "unit": "mm",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "toleranceBasis",
+          "label": "限差依据"
+        },
+        {
+          "key": "status",
+          "label": "状态"
+        }
+      ],
+      "rows": [
+        {
+          "id": "闭合环 1",
+          "kind": "闭合环",
+          "from": "P01",
+          "to": "P01",
+          "observed": 0.0029999999999998916,
+          "known": 0,
+          "length": 200,
+          "misclosure": 2.9999999999998916,
+          "tolerance": 4,
+          "toleranceBasis": "项目闭合限差",
+          "status": "通过"
+        }
+      ],
+      "note": "闭合差与限差以 mm 显示，观测和已知高差以 m 显示；线路长度、测站数和限差依据只在原始资料明确时列出，限差未配置时不得推定合格。"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-network-topology",
+      "title": "网形与测段索引",
+      "columns": [
+        {
+          "key": "observationId",
+          "label": "观测号"
+        },
+        {
+          "key": "type",
+          "label": "类型"
+        },
+        {
+          "key": "from",
+          "label": "起点"
+        },
+        {
+          "key": "to",
+          "label": "终点"
+        },
+        {
+          "key": "routeLength",
+          "label": "测段长度",
+          "unit": "m",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "observed",
+          "label": "观测值",
+          "unit": "m / rad",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "adjusted",
+          "label": "平差值",
+          "unit": "m / rad",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "unit",
+          "label": "单位"
+        },
+        {
+          "key": "closurePath",
+          "label": "闭合/附合路径"
+        },
+        {
+          "key": "source",
+          "label": "原始定位"
+        }
+      ],
+      "rows": [
+        {
+          "observationId": "forward",
+          "type": "高差",
+          "from": "BM01",
+          "to": "P01",
+          "routeLength": 100,
+          "observed": 1.003,
+          "adjusted": 1.0024,
+          "unit": "m",
+          "closurePath": "闭合环 1（正向）",
+          "source": "workwise-survey-network.json · WorkWise JSON:network.observations[0]",
+          "sourceLocator": "WorkWise JSON:network.observations[0]"
+        },
+        {
+          "observationId": "back",
+          "type": "高差",
+          "from": "P01",
+          "to": "BM01",
+          "routeLength": 100,
+          "observed": -1,
+          "adjusted": -1.0024,
+          "unit": "m",
+          "closurePath": "闭合环 1（正向）",
+          "source": "workwise-survey-network.json · WorkWise JSON:network.observations[1]",
+          "sourceLocator": "WorkWise JSON:network.observations[1]"
+        }
+      ],
+      "note": "本表以观测为边、起讫点为节点，保留闭合/附合线路中的有向成员关系；“未纳入独立闭合”不代表观测无效。数值来自本次平差成果。"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-summary",
+      "title": "平差统计与检查状态",
+      "columns": [
+        {
+          "key": "networkType",
+          "label": "网型"
+        },
+        {
+          "key": "observationCount",
+          "label": "观测数",
+          "numeric": true,
+          "decimals": 0
+        },
+        {
+          "key": "pointCount",
+          "label": "点数",
+          "numeric": true,
+          "decimals": 0
+        },
+        {
+          "key": "dof",
+          "label": "自由度",
+          "numeric": true,
+          "decimals": 0
+        },
+        {
+          "key": "unitWeightStdDev",
+          "label": "单位权中误差",
+          "unit": "无量纲",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "varianceFactor",
+          "label": "方差因子",
+          "unit": "无量纲",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "varianceBasis",
+          "label": "方差依据"
+        },
+        {
+          "key": "validation",
+          "label": "计算状态"
+        }
+      ],
+      "rows": [
+        {
+          "networkType": "水准网",
+          "observationCount": 2,
+          "pointCount": 2,
+          "dof": 1,
+          "unitWeightStdDev": 0.6708203932499127,
+          "varianceFactor": 0.44999999999996754,
+          "varianceBasis": "后验",
+          "validation": "计算有效"
+        }
+      ],
+      "note": "残差范数仅作描述性统计，不等同闭合差；0.002473863375370507 m（2 条）"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-points",
+      "title": "点位成果与精度",
+      "columns": [
+        {
+          "key": "id",
+          "label": "点号"
+        },
+        {
+          "key": "role",
+          "label": "类型"
+        },
+        {
+          "key": "height",
+          "label": "高程",
+          "unit": "m",
+          "numeric": true,
+          "decimals": 6
+        },
+        {
+          "key": "correctionHeight",
+          "label": "高程改正数",
+          "unit": "mm",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "standardError",
+          "label": "点位中误差",
+          "unit": "mm",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "precisionBasis",
+          "label": "精度依据"
+        }
+      ],
+      "rows": [
+        {
+          "id": "BM01",
+          "role": "已知点",
+          "height": 100,
+          "precisionBasis": "未记录"
+        },
+        {
+          "id": "P01",
+          "role": "待定点",
+          "height": 101.0024,
+          "correctionHeight": 2.3999999999999133,
+          "standardError": 1.1999999999999567,
+          "precisionBasis": "后验"
+        }
+      ],
+      "note": "最弱点：P01，点位中误差 0.0011999999999999567 m。最弱边：未评估（点间协方差不可用）。"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-observations",
+      "title": "观测值、改正数与残差",
+      "columns": [
+        {
+          "key": "id",
+          "label": "观测号"
+        },
+        {
+          "key": "type",
+          "label": "类型"
+        },
+        {
+          "key": "fromTo",
+          "label": "起讫点"
+        },
+        {
+          "key": "observed",
+          "label": "观测值",
+          "numeric": true,
+          "decimals": 10
+        },
+        {
+          "key": "adjusted",
+          "label": "平差值",
+          "numeric": true,
+          "decimals": 10
+        },
+        {
+          "key": "unit",
+          "label": "值单位"
+        },
+        {
+          "key": "correction",
+          "label": "改正数",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "residual",
+          "label": "残差",
+          "numeric": true,
+          "decimals": 4
+        },
+        {
+          "key": "residualUnit",
+          "label": "改正/残差单位"
+        },
+        {
+          "key": "screening",
+          "label": "残差筛查"
+        },
+        {
+          "key": "source",
+          "label": "原始定位"
+        }
+      ],
+      "rows": [
+        {
+          "id": "forward",
+          "type": "高差",
+          "fromTo": "BM01 → P01",
+          "observed": 1.003,
+          "adjusted": 1.0024,
+          "correction": -0.5999999999999781,
+          "residual": -0.5999999999999781,
+          "unit": "m",
+          "residualUnit": "mm",
+          "screening": "未见候选",
+          "source": "workwise-survey-network.json · WorkWise JSON:network.observations[0]"
+        },
+        {
+          "id": "back",
+          "type": "高差",
+          "fromTo": "P01 → BM01",
+          "observed": -1,
+          "adjusted": -1.0024,
+          "correction": -2.3999999999999133,
+          "residual": -2.3999999999999133,
+          "unit": "m",
+          "residualUnit": "mm",
+          "screening": "未见候选",
+          "source": "workwise-survey-network.json · WorkWise JSON:network.observations[1]"
+        }
+      ],
+      "note": "观测值与平差值保持 m / rad；线性改正数和残差以 mm 显示，角度以角秒显示。"
+    },
+    {
+      "id": "network_9fe10da1-7550-4093-bfa0-8d9548f2c324-checks",
+      "title": "质量检查与复核状态",
+      "columns": [
+        {
+          "key": "id",
+          "label": "检查项"
+        },
+        {
+          "key": "status",
+          "label": "状态"
+        },
+        {
+          "key": "reason",
+          "label": "依据/缺项原因"
+        }
+      ],
+      "rows": [
+        {
+          "id": "来源绑定",
+          "status": "通过",
+          "reason": "无"
+        },
+        {
+          "id": "原始记录覆盖",
+          "status": "通过",
+          "reason": "无"
+        },
+        {
+          "id": "基准声明",
+          "status": "通过",
+          "reason": "无"
+        },
+        {
+          "id": "外业检核",
+          "status": "未评估",
+          "reason": "测站原始读数未评估"
+        },
+        {
+          "id": "独立闭合检核",
+          "status": "通过",
+          "reason": "无"
+        },
+        {
+          "id": "精度限差",
+          "status": "未评估",
+          "reason": "未配置精度限差"
+        },
+        {
+          "id": "数值结果",
+          "status": "通过",
+          "reason": "无"
+        },
+        {
+          "id": "规范符合性",
+          "status": "未评估",
+          "reason": "适用规范和符合性未评估"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "本成果采用测量平差计算值。",
+    "“未评估/不可用”表示当前资料或检核条件不足，不代表通过、合格或安全。",
+    "本稿未完成专业复核、审核、批准和签名；签认栏保留空白。",
+    "显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。"
+  ],
+  "signoff": [
+    {
+      "role": "编制",
+      "name": "",
+      "date": "",
+      "signature": ""
+    },
+    {
+      "role": "复核",
+      "name": "",
+      "date": "",
+      "signature": ""
+    },
+    {
+      "role": "批准",
+      "name": "",
+      "date": "",
+      "signature": ""
+    }
+  ]
+}

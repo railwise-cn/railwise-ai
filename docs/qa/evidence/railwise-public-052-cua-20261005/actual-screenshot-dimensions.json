@@ -1,0 +1,125 @@
+{
+  "images": [
+    {
+      "file": "pdf-preview-wps.jpg",
+      "pixelWidth": 3840,
+      "pixelHeight": 1970,
+      "logicalSizeIfRetina2x": [
+        1920,
+        985
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-clean-delivery-json-exposed-1280x840.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "logicalSizeIfRetina2x": [
+        1280,
+        840
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-gsi-blocked-passed-copy.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1600,
+      "logicalSizeIfRetina2x": [
+        1280,
+        800
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-gsi-delivery-1280x800.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1600,
+      "logicalSizeIfRetina2x": [
+        1280,
+        800
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-gsi-delivery-resize-attempt-still-1280x800.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1600,
+      "logicalSizeIfRetina2x": [
+        1280,
+        800
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-gsi-result-1280x800.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1600,
+      "logicalSizeIfRetina2x": [
+        1280,
+        800
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-in2-clean-flash-s1-answer-1280x840.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "logicalSizeIfRetina2x": [
+        1280,
+        840
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-in2-clean-results-1280x840.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "logicalSizeIfRetina2x": [
+        1280,
+        840
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-in2-explicit-pro-s1-answer.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1600,
+      "logicalSizeIfRetina2x": [
+        1280,
+        800
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-in2-flash-s1-answer-public-052-1280x840.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "logicalSizeIfRetina2x": [
+        1280,
+        840
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-in2-results-1280x840.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "logicalSizeIfRetina2x": [
+        1280,
+        840
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    },
+    {
+      "file": "zh-light-survey-empty.jpg",
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "logicalSizeIfRetina2x": [
+        1280,
+        840
+      ],
+      "source": "actual image header; filename not used as dimensions"
+    }
+  ],
+  "unsupportedClaimCorrected": "The attempted 1440x900 image was actually 2560x1600 physical / 1280x800 logical and renamed accordingly. No 1440x900 acceptance is claimed."
+}

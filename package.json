@@ -1,7 +1,7 @@
 {
   "name": "workwise",
   "productName": "RailWise AI",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "AI workbench for engineering, infrastructure, and operations workflows",
   "license": "MIT",
   "engines": {

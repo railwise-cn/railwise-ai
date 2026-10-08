@@ -1,0 +1,113 @@
+{
+  "turnId": "turn_1o795poh",
+  "events": [
+    {
+      "seq": 14397,
+      "kind": "turn_started",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": null,
+      "toolName": null,
+      "status": null
+    },
+    {
+      "seq": 14398,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "user_message",
+      "toolName": null,
+      "status": "completed"
+    },
+    {
+      "seq": 18154,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "tool_call",
+      "toolName": "survey_read_evidence",
+      "status": "pending"
+    },
+    {
+      "seq": 18156,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "tool_call",
+      "toolName": "survey_read_context",
+      "status": "pending"
+    },
+    {
+      "seq": 18160,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "assistant_reasoning",
+      "toolName": null,
+      "status": "completed"
+    },
+    {
+      "seq": 18161,
+      "kind": "item_updated",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "tool_call",
+      "toolName": "survey_read_evidence",
+      "status": "completed"
+    },
+    {
+      "seq": 18162,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "tool_result",
+      "toolName": "survey_read_evidence",
+      "status": "completed"
+    },
+    {
+      "seq": 18163,
+      "kind": "item_updated",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "tool_call",
+      "toolName": "survey_read_context",
+      "status": "completed"
+    },
+    {
+      "seq": 18164,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "tool_result",
+      "toolName": "survey_read_context",
+      "status": "completed"
+    },
+    {
+      "seq": 24737,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "assistant_reasoning",
+      "toolName": null,
+      "status": "completed"
+    },
+    {
+      "seq": 24738,
+      "kind": "item_created",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": "assistant_text",
+      "toolName": null,
+      "status": "completed"
+    },
+    {
+      "seq": 24739,
+      "kind": "turn_completed",
+      "turnId": "turn_1o795poh",
+      "model": null,
+      "itemKind": null,
+      "toolName": null,
+      "status": null
+    }
+  ]
+}

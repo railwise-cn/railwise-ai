@@ -70,6 +70,7 @@ describe('M5 professional survey delivery', () => {
       expectedRevision: project.revision,
       idempotencyKey: 'm5-import-abffb',
       networkType: 'height-control',
+      referenceDeclaration: { verticalDatum: '测试已知点高程基准' },
       name: 'trimble-m5-abffb.dat',
       dataBase64: bytes.toString('base64'),
       // M5 Z records are instrument readings. The adjustment datum must be
@@ -168,9 +169,14 @@ describe('M5 professional survey delivery', () => {
     const worksheetXml = (await Promise.all(Object.keys(xlsx.files)
       .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
       .map((name) => xlsx.file(name)!.async('text')))).join('\n')
-    for (const expected of ['trimble-m5-abffb.dat', '格式=trimble-m5', 'sy730', 'S6G03']) {
+    for (const expected of ['trimble-m5-abffb.dat', 'sy730', 'S6G03', '高程 (m)', '-14.288400', '-9.297595']) {
       expect(documentXml).toContain(expected)
       expect(pdf.text).toContain(expected)
+    }
+    for (const text of [documentXml, pdf.text]) {
+      expect(text).not.toContain('格式=trimble-m5')
+      expect(text).not.toContain(network.sourceFile!.sha256)
+      expect(text).not.toContain(adjustment.run.id)
     }
     expect(workbookXml).toContain('survey_sources')
     expect(workbookXml).toContain('survey_closures')

@@ -6,7 +6,7 @@ import { samplingStandardBasisContext } from '../../agent/survey-standard-basis-
 import {
   SamplingRequestError, validateSamplingInput, freezeSamplingPopulation, listSamplingPopulations,
   readSamplingPopulation, listSamplingRuns, readSamplingRun, drawSamplingRun, readSamplingUnits,
-  readSamplingSamples, verifySamplingRun, type SamplingBinding, type SamplingPopulation,
+  readSamplingSamples, verifySamplingRun, drawSamplingReinspection, type SamplingBinding, type SamplingPopulation,
   type SamplingRun, type SamplingHistory, type SamplingPage, type SamplingStage, type SamplingMode
 } from '../../agent/survey-quality-sampling-client'
 
@@ -31,10 +31,12 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
   const [definitionStatement, setDefinition] = useState(''), [unitText, setUnitText] = useState('')
   const [freezeAck, setFreezeAck] = useState(false), [drawAck, setDrawAck] = useState(false)
   const [stage, setStage] = useState<SamplingStage | ''>(''), [mode, setMode] = useState<SamplingMode | ''>('')
+  const [reinspectionReason, setReinspectionReason] = useState(''), [reinspectionAck, setReinspectionAck] = useState(false)
   useEffect(() => {
     generation.current += 1; inFlight.current = false; retry.current = null
     setView(null); setBusy(false); setError(''); setFreezeAck(false); setDrawAck(false); setStage(''); setMode('')
     setProductType(''); setUnitProductType(''); setDefinition(''); setUnitText('')
+    setReinspectionReason(''); setReinspectionAck(false)
     return () => { generation.current += 1 }
   }, [scope])
   const current = runtimeReady && expanded && view?.scope === scope ? view.value : null
@@ -51,7 +53,7 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
     if (!runtimeReady || !expanded || inFlight.current) return
     const token = ++generation.current
     const stillCurrent = (): boolean => activeScope.current === scope && generation.current === token
-    inFlight.current = true; retry.current = operation; setBusy(true); setError(''); setView(null); setDrawAck(false)
+    inFlight.current = true; retry.current = operation; setBusy(true); setError(''); setView(null); setDrawAck(false); setReinspectionAck(false)
     heading.current?.focus()
     try {
       const value = await operation(stillCurrent)
@@ -121,12 +123,23 @@ export function SurveyQualitySamplingWorkspace({ binding, runtimeReady }: { bind
         <h5 className="font-medium">{t('samplingRun')}<EngineeringEvidenceQuestion label={t('samplingRun')} reference={runEvidence} disabled={!ready} /></h5>
         <p className="text-ds-muted">{t('samplingRunSummary', { date: new Date(run.createdAt).toLocaleString(), count: run.sampleSize })}</p>
         <p>{t(stageKeys[run.stage])} · {t(run.inspectionMode === 'census' ? 'samplingCensus' : 'samplingRandom')} · {t('samplingSelectedCount', { count: run.sampleSize })}</p>
+        <p>{t('samplingRound', { count: run.round })}</p>
+        {run.reinspection ? <p className="text-ds-muted">{t('samplingReinspectionRecorded', { reason: run.reinspection.reason })}</p> : null}
         <p className="leading-5 text-ds-muted">{t(run.randomSource === 'not-applicable' ? 'samplingSourceCensus' : 'samplingSourceRuntime')}</p>
         <div className="space-y-2" aria-label={t('samplingBatches')}><h6 className="font-medium">{t('samplingBatches')}</h6><ol className="space-y-2">{run.batches.map((batch, index) => <li key={batch.batchIndex} className="border border-ds-border-muted p-2"><p>{t('samplingBatch', { index: batch.batchIndex + 1, total: batch.batchSize, selected: batch.sampleSize })}<EngineeringEvidenceQuestion label={t('samplingBatch', { index: batch.batchIndex + 1, total: batch.batchSize, selected: batch.sampleSize })} reference={runEvidence} selector={{ path: ['batches', index], identity: { batchIndex: batch.batchIndex } }} disabled={!ready} /></p><p className="mt-1 leading-5 text-ds-muted">{t(run.inspectionMode === 'census' ? 'samplingBatchCensusMode' : batch.census ? 'samplingBatchCensusSmall' : 'samplingBatchRandom', { count: batch.nominalTableSampleSize })}</p></li>)}</ol></div>
         <p className="leading-5 text-ds-muted">{t('samplingSourceTable')}</p>
         <SurveyStandardBasis context={samplingStandardBasisContext(run)} runtimeReady={ready} parent={runEvidence} />
         <p role="status" className="leading-5">{t('samplingVerified')}</p>
         <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={!ready} onClick={() => loadSamples(run)}>{t('samplingViewSamples')}</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => void execute(async stillCurrent => ({ population, run: await verifySamplingRun(binding, run, stillCurrent) }))}>{t('samplingReverify')}</button></div>
+        <details className="min-w-0 border-t border-ds-border-muted pt-3">
+          <summary className="cursor-pointer">{t('samplingReinspection')}</summary>
+          <div className="space-y-3 pt-3">
+            <p className="leading-5 text-ds-muted">{t('samplingReinspectionHint')}</p>
+            <label className="block space-y-1"><span>{t('samplingReinspectionReason')}</span><textarea className={inputClass} rows={2} maxLength={500} value={reinspectionReason} disabled={!ready || !!retry.current} onChange={event => { setReinspectionReason(event.target.value); setReinspectionAck(false) }} /></label>
+            <label className="flex items-start gap-2"><input type="checkbox" checked={reinspectionAck} disabled={!ready || !reinspectionReason.trim() || !!retry.current} onChange={event => setReinspectionAck(event.target.checked)} /><span>{t('samplingReinspectionAck')}</span></label>
+            <button type="button" className={buttonClass} disabled={!ready || !reinspectionAck || !reinspectionReason.trim() || !!retry.current || run.round >= 8} onClick={() => { const key = crypto.randomUUID(), reason = reinspectionReason.trim(); void execute(async () => ({ population, run: await drawSamplingReinspection(binding, run, reason, key) })) }}>{t('samplingReinspectionDraw')}</button>
+          </div>
+        </details>
       </div> : null}
       {current?.units ? pageView(current.units, 'units') : null}
       {current?.samples ? pageView(current.samples, 'samples') : null}

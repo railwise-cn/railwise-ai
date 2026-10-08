@@ -1,0 +1,30 @@
+{
+  "signatureVerification": {
+    "exitCode": 0,
+    "log": "codesign-verify.txt"
+  },
+  "signatureIdentity": {
+    "exitCode": 0,
+    "log": "codesign-identity.txt"
+  },
+  "notarization": {
+    "exitCode": 0,
+    "log": "stapler-validate.txt"
+  },
+  "release": {
+    "exitCode": 0,
+    "log": "github-release.txt"
+  },
+  "observedAt": "2026-10-05T15:36:22.976441+00:00",
+  "bundleVersion": "0.5.2",
+  "bundleIdentifier": "com.wangjiawei508.workgpt",
+  "taggedSourceCommit": "ea763458567ccf069067a165d812f561e9af6b62",
+  "installer": {
+    "path": "/tmp/railwise-official-052/WorkWise-0.5.2-mac-Apple-Silicon.dmg",
+    "bytes": 301766076,
+    "sha256": "09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0",
+    "url": "https://www.railwise.cn/downloads/workwise/channels/stable/releases/v0.5.2/WorkWise-0.5.2-mac-Apple-Silicon.dmg"
+  },
+  "asarSha256": "ce33ebb88d156a129c599ab8ec8d08094014d3d578c2704fe564b2fa9d8fb3bb",
+  "bundleModified": false
+}

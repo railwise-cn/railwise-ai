@@ -1,0 +1,14 @@
+{
+  "pid": 43439,
+  "startedAt": "2026-10-05T15:54:26.033627+00:00",
+  "executable": "/tmp/railwise-official-052/RailWise AI.app/Contents/MacOS/RailWise AI",
+  "bundleModified": false,
+  "isolationRoot": "/private/tmp/railwise-public-052-cua-clean",
+  "inheritedSettingsFields": [
+    "provider"
+  ],
+  "allOtherFields": "fresh product defaults plus explicit isolated workspace/language/theme",
+  "credentialAccess": false,
+  "inboundDisabled": true,
+  "outboundDisabled": true
+}

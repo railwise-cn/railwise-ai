@@ -1,4 +1,4 @@
-import { recordEngineeringUsage } from './engineering-usage'
+import { recordEngineeringJourneyFailure, recordEngineeringUsage } from './engineering-usage'
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
@@ -254,7 +254,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
       await refreshThreads()
       if (useChatStore.getState().activeThreadId === timelineThreadId && timelineThreadId) await selectThread(timelineThreadId)
       onRefresh()
-    } catch (cause) { setNotice(engineeringProfessionalText(formatRuntimeError(cause, t('engineeringNoticeStartFailed')))) } finally { setPlanBusy(false) }
+    } catch (cause) { recordEngineeringJourneyFailure(); setNotice(engineeringProfessionalText(formatRuntimeError(cause, t('engineeringNoticeStartFailed')))) } finally { setPlanBusy(false) }
   }
   const resumeExecutionPlan = async (): Promise<void> => {
     if (!canResumePlan || !scopedPlan || !timelineThreadId || planBusy || resumeInFlight.current === actionScope) return
@@ -282,7 +282,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
       if (!isCurrent()) return
       onRefresh()
     } catch (cause) {
-      if (isCurrent()) setNotice(engineeringProfessionalText(formatRuntimeError(cause, t('engineeringNoticeResumeFailed'))))
+      if (isCurrent()) { recordEngineeringJourneyFailure(); setNotice(engineeringProfessionalText(formatRuntimeError(cause, t('engineeringNoticeResumeFailed')))) }
     } finally {
       if (resumeInFlight.current === capturedScope) {
         resumeInFlight.current = null

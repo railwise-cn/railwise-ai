@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { configureLogger } from './logger'
+import { loadOrCreateFlowSecretStoreKey } from './services/flow-secret-store-key'
 import {
   defaultClawSettings,
   defaultKeyboardShortcuts,
@@ -22,6 +23,10 @@ vi.mock('electron', () => ({
     getAppPath: () => '/tmp/workwise-test-app',
     getPath: () => '/tmp/workwise-test-user-data'
   }
+}))
+
+vi.mock('./services/flow-secret-store-key', () => ({
+  loadOrCreateFlowSecretStoreKey: vi.fn(async () => 'managed-runtime-test-flow-key')
 }))
 
 let tempRoot: string | null = null
@@ -73,6 +78,7 @@ async function readRuntimeLog(): Promise<string> {
 }
 
 beforeEach(() => {
+  vi.mocked(loadOrCreateFlowSecretStoreKey).mockReset().mockResolvedValue('managed-runtime-test-flow-key')
   tempRoot = mkdtempSync(join(tmpdir(), 'managed-runtime-process-'))
   configureLogger({ dir: tempRoot, enabled: true, retentionDays: 7 })
 })
@@ -92,6 +98,7 @@ describe('startManagedRuntimeChild', () => {
     const script = writeScript(
       'ready-child.js',
       [
+        "if (process.env.WORKWISE_FLOW_SECRET_STORE_KEY !== 'managed-runtime-test-flow-key') process.exit(31)",
         "setTimeout(() => {",
         "  process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899, message: 'kun runtime listening' }) + '\\n')",
         "}, 50)",
@@ -112,6 +119,25 @@ describe('startManagedRuntimeChild', () => {
     expect(logText).toContain('WorkWise Runtime listening')
     expect(logText).toContain('[runtime pid=')
     expect(logText).toContain('ready marker received on port 8899')
+    expect(logText).not.toContain('managed-runtime-test-flow-key')
+  })
+
+  it('starts without a Flow key when protected storage is unavailable', async () => {
+    vi.mocked(loadOrCreateFlowSecretStoreKey).mockResolvedValueOnce(null)
+    const script = writeScript(
+      'unavailable-flow-key-child.js',
+      [
+        "if (process.env.WORKWISE_FLOW_SECRET_STORE_KEY !== '') process.exit(31)",
+        "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+        'setInterval(() => {}, 1_000)'
+      ].join('\n')
+    )
+    const module = await import('./managed-runtime-process')
+    await expect(module.startManagedRuntimeChild(
+      createSettings(script),
+      { autoInstallBundledAgentPack: false }
+    )).resolves.toBeUndefined()
+    expect(module.isManagedRuntimeChildRunning()).toBe(true)
   })
 
   it('routes host requests through the ephemeral Runtime port reported by a listening child', async () => {

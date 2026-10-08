@@ -1,4 +1,4 @@
-import { recordEngineeringUsage } from './engineering-usage'
+import { recordEngineeringJourneyFailure, recordEngineeringUsage } from './engineering-usage'
 import { EngineeringDrawer } from './EngineeringDrawer'
 import type { SurveyResidualStatisticV1, SurveyStatisticalSummaryV1 } from '@shared/survey-statistical-semantics'
 import { ResidualStatisticCell, SurveyAdjustmentStatistics } from './SurveyAdjustmentStatistics'
@@ -30,8 +30,10 @@ import { SurveyTabularProbeV1 } from '@shared/survey-tabular'
 import { SurveyPeriodComparison } from './SurveyPeriodComparison'
 import type { SurveySegmentComparisonV1 } from '@shared/survey-monitoring'
 import { MAX_DEFORMATION_PAIRS, parseDeformationPairs, SurveyDeformationPairsForm, type DeformationPairDraft } from './SurveyDeformationPairsForm'
+import { missingSurveyReferences, surveyReferenceDeclared } from '@shared/survey-reference'
 
-type Project = { id: string; revision: number; workspace?: string; taskType?: string }
+type Project = { id: string; revision: number; workspace?: string; taskType?: string; coordinateSystem?: string; verticalDatum?: string; heightDatum?: string; taskContext?: { coordinateSystem?: string; verticalDatum?: string } }
+type RetainedImport = { file: File; baseInput: { networkType: string; name: string; knownPoints?: ReturnType<typeof parseSurveyKnownPoints>; transformType?: string; cosaIn1Mapping?: CosaIn1Mapping; tabularMapping?: SurveyTabularMapping }; referenceDeclaration: { coordinateSystem?: string; verticalDatum?: string } }
 type SurveySection = 'network' | 'observations' | 'points' | 'result' | 'deformation' | 'free-trial'
 type SurveyPoint = { id: string; pointClass?: string; x?: number; y?: number; height?: number; latitude?: number; longitude?: number; known?: boolean }
 type SurveyObservation = { id: string; type?: string; from?: string; to?: string; station?: string; target?: string; left?: string; right?: string; value?: number; unit?: string; vectorX?: number; vectorY?: number; vectorZ?: number; covariance?: number[]; sigma?: number; sigmaUnit?: string; stationHeightOffset?: number; targetHeightOffset?: number; distance?: number; direction?: number; sourceRecordId?: string; sourceRow?: number }
@@ -135,6 +137,16 @@ export function numberLabel(value: number | undefined, digits = 4): string {
     return value.toExponential(Math.max(0, digits - 1)).replace(/\.0+(?=e)/, '')
   }
   return value.toLocaleString(appI18n.language.startsWith('en') ? 'en-US' : 'zh-CN', { maximumFractionDigits: digits })
+}
+
+function pointCorrectionLabel(point: NonNullable<Adjustment['result']['points']>[number]): string {
+  const corrections = [
+    ['X', point.correctionX],
+    ['Y', point.correctionY],
+    ['H', point.correctionHeight]
+  ] as const
+  const available = corrections.filter(([, value]) => value !== undefined)
+  return available.length ? available.map(([axis, value]) => `${axis} ${numberLabel(value, 7)}`).join(' / ') : '—'
 }
 
 function measurementLabel(t: TFunction, value: number | undefined, unit: string | undefined, digits = 4): string {
@@ -276,9 +288,18 @@ function Stat({ label, value, detail, tone = 'neutral' }: { label: string; value
 
 export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0, onAdjustmentComplete, onDeformationComplete, onOpenAi, onNetworkSelected, pendingFiles = [], onRemovePendingFile, preferredSection, navigationTarget, compact = false, onChooseFiles, onViewDelivery, onExportComparison }: { onChooseFiles?: () => void; onViewDelivery?: () => void; onExportComparison?: (comparison: SurveySegmentComparisonV1) => Promise<void>; preferredSection?: SurveySection; project: Project; runtimeReady: boolean; refreshToken?: number; onAdjustmentComplete?: (id: string) => void; onDeformationComplete?: (id: string) => void; onOpenAi?: () => void; onNetworkSelected?: (id: string | null, revision?: number) => void; pendingFiles?: File[]; onRemovePendingFile?: (file: File) => void; navigationTarget?: SurveyEvidenceNavigationTarget | null; compact?: boolean }): ReactElement {
   const { t } = useTranslation('common')
+  const referenceText = (key: string, chinese: string, english: string): string => t(key, { defaultValue: appI18n.language.startsWith('en') ? english : chinese })
+  const declaredProjectCoordinate = surveyReferenceDeclared(project.coordinateSystem) ? project.coordinateSystem! : surveyReferenceDeclared(project.taskContext?.coordinateSystem) ? project.taskContext!.coordinateSystem! : ''
+  const declaredProjectHeight = [project.verticalDatum, project.heightDatum, project.taskContext?.verticalDatum].find(surveyReferenceDeclared) ?? ''
   const [networkType, setNetworkType] = useState(({ 'control-network': 'plane-control', 'traverse-network': 'traverse', resection: 'cpiii-resection', gnss: 'gnss' } as Record<string, string>)[project.taskType ?? ''] ?? 'leveling')
   const [transformType, setTransformType] = useState('similarity-2d')
   const [knownPointsText, setKnownPointsText] = useState('')
+  const [coordinateSystem, setCoordinateSystem] = useState(declaredProjectCoordinate)
+  const [verticalDatum, setVerticalDatum] = useState(declaredProjectHeight)
+  useEffect(() => {
+    setCoordinateSystem(declaredProjectCoordinate)
+    setVerticalDatum(declaredProjectHeight)
+  }, [project.id, project.workspace, project.revision, declaredProjectCoordinate, declaredProjectHeight])
   const [networks, setNetworks] = useState<Network[]>([])
   const [network, setNetwork] = useState<Network | null>(null)
   const [adjustment, setAdjustment] = useState<Adjustment | null>(null)
@@ -286,9 +307,24 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
   const [message, setMessage] = useState('')
   const [fileInputKey, setFileInputKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const compactKnownPointsInputRef = useRef<HTMLTextAreaElement>(null)
+  const advancedKnownPointsInputRef = useRef<HTMLTextAreaElement>(null)
+  const [knownPointsFocusRequested, setKnownPointsFocusRequested] = useState(false)
+  const coordinateReferenceInputRef = useRef<HTMLInputElement>(null)
+  const verticalReferenceInputRef = useRef<HTMLInputElement>(null)
+  const [referenceFocusRequested, setReferenceFocusRequested] = useState<'coordinate' | 'height' | null>(null)
   const [mappingBatch, setMappingBatch] = useState<{ id: string; files: readonly File[]; mappings: Map<File, CosaIn1Mapping>; tabularMappings: Map<File, SurveyTabularMapping>; tabularFile?: File; probe?: SurveyTabularProbe; probeError?: string } | null>(null)
   const projectScopeRef = useRef('')
   projectScopeRef.current = JSON.stringify([project.workspace, project.id])
+  const retainedImports = useRef(new Map<string, { networkRevision: number; sourceSha256?: string; value: RetainedImport }>())
+  const retainedImportScope = useRef(projectScopeRef.current)
+  if (retainedImportScope.current !== projectScopeRef.current) {
+    retainedImports.current.clear()
+    retainedImportScope.current = projectScopeRef.current
+  }
+  const retained = network ? retainedImports.current.get(network.id) : undefined
+  const referenceRepair = retained?.sourceSha256 && retained.networkRevision === network?.revision
+    && retained?.sourceSha256 === network?.sourceFile?.sha256 ? retained.value : undefined
   const [section, setSection] = useState<SurveySection>(preferredSection ?? 'network')
   const contentSection = compact ? preferredSection ?? 'network' : section
   const preferredSectionRef = useRef(preferredSection)
@@ -341,7 +377,6 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
 
   const points = useMemo(() => [...(network?.knownPoints ?? []), ...(network?.unknownPoints ?? [])], [network])
   const topology = useMemo(() => buildSurveyTopology(points, network?.observations ?? []), [network, points])
-  const blockers = network?.findings.filter((finding) => finding.severity === 'blocking').length ?? 0
   const selectedType = network ? surveyNetworkTypeLabel(network.networkType, t) : surveyNetworkTypeLabel(networkType, t)
   const executionMethod = (network?.networkType ?? networkType) === 'coordinate-transform'
     ? t('surveySelectedTransform')
@@ -357,12 +392,42 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
   const sourceEligibilityFindings = Array.isArray(sourceEligibility?.findings)
     ? sourceEligibility.findings.filter((finding) => typeof finding.message === 'string' && finding.message.trim())
     : []
+  // Source admission and the survey reference declaration are independent.
+  // Older, previously validated records must not permit a new calculation
+  // merely because they predate the reference declaration gate.
+  const missingReferences = network ? missingSurveyReferences(network) : []
+  const referenceFindings = missingReferences.map(reference => ({
+    code: 'reference_undeclared', severity: 'blocking',
+    message: reference === 'coordinate' ? '平面坐标基准尚未声明。' : '高程基准尚未声明。',
+    suggestedAction: referenceRepair ? '填写基准后点击修复，使用本次上传的原文件重新导入。' : '填写基准后重新选择原文件导入，原记录保留。',
+    localized: { en: {
+      message: reference === 'coordinate' ? 'The coordinate reference has not been declared.' : 'The height datum has not been declared.',
+      suggestedAction: referenceRepair ? 'Enter the reference, then repair using the file uploaded in this session.' : 'Enter the reference and select the original file again. The existing record is retained.'
+    } }
+  }))
+  const currentFindings = [...(network?.findings ?? []).filter(finding => finding.code !== 'reference_undeclared' || !missingReferences.length), ...sourceEligibilityFindings, ...referenceFindings]
+    .filter((finding): finding is SurveyDiagnosticText & { code?: string; severity: string; message: string; row?: number } => typeof finding.message === 'string' && Boolean(finding.message.trim()))
+    .map(finding => ({ ...finding, severity: finding.severity ?? (sourceIsReady ? 'warning' : 'blocking') }))
+    .sort((left, right) => ['info', 'warning', 'blocking'].indexOf(right.severity) - ['info', 'warning', 'blocking'].indexOf(left.severity))
+    .filter((finding, index, all) => all.findIndex(other => other.code === finding.code && other.message === finding.message && other.row === finding.row) === index)
+  const blockingFindings = currentFindings.filter(finding => finding.severity === 'blocking')
+  const warningFindings = currentFindings.filter(finding => finding.severity === 'warning')
+  const blockers = blockingFindings.length
+  const calculationReady = Boolean(network && sourceIsReady && network.qualityStatus === 'validated' && !blockers && !missingReferences.length)
+  const compactFindings = [...blockingFindings, ...warningFindings.slice(0, 3)]
+  const advancedFindings = [...blockingFindings, ...currentFindings.filter(finding => finding.severity !== 'blocking').slice(0, 6)]
   const sourceGateReason = !network
     ? t('engineeringUploadFirst')
-    : !sourceEligibility
+    : blockers
+      ? t('surveyCalculationBlockedReason', { count: blockers })
+      : network.qualityStatus === 'blocked'
+        ? t('surveyCalculationReviewRequired')
+        : !sourceEligibility
       ? t('surveyEligibilityPending')
-      : sourceEligibility.eligible
+      : calculationReady
         ? t('surveyEligibilityConfirmed')
+        : sourceIsReady
+          ? t('surveyCalculationCheckRequired')
         : sourceEligibilityFindings.map((finding) => surveySourceDiagnosticText(finding, appI18n.language, network?.sourceFile?.disposition, sourceEligibility.eligible).trim()).join('；') || t('surveyEligibilityDenied')
   const sourceDispositionExplanation = network?.sourceFile
     ? `${dispositionLabel(t, network.sourceFile.disposition)}：${dispositionRecovery(t, network.sourceFile.disposition)}`
@@ -552,13 +617,13 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
     return SurveyTabularProbeV1.parse(response.probe)
   }
 
-  const importFiles = async (files: readonly File[], mappings = new Map<File, CosaIn1Mapping>(), tabularMappings = new Map<File, SurveyTabularMapping>()): Promise<void> => {
+  const importFiles = async (files: readonly File[], mappings = new Map<File, CosaIn1Mapping>(), tabularMappings = new Map<File, SurveyTabularMapping>(), repair?: RetainedImport): Promise<void> => {
     if (!runtimeReady || busy || !files.length) return
-    if (files.some((file) => /\.in1$/i.test(file.name) && !mappings.has(file))) {
+    if (!repair && files.some((file) => /\.in1$/i.test(file.name) && !mappings.has(file))) {
       setMappingBatch({ id: crypto.randomUUID(), files, mappings, tabularMappings }); setSection('network')
       return
     }
-    const tabularFile = files.find(file => /\.(?:csv|tsv|xlsx)$/i.test(file.name) && !tabularMappings.has(file))
+    const tabularFile = !repair && files.find(file => /\.(?:csv|tsv|xlsx)$/i.test(file.name) && !tabularMappings.has(file))
     if (tabularFile) {
       const scope = projectScopeRef.current
       setBusy(true); setMessage('')
@@ -574,22 +639,33 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
     const importScope = projectScopeRef.current
     try {
       let knownPoints: ReturnType<typeof parseSurveyKnownPoints>
-      try { knownPoints = files.some(file => !tabularMappings.has(file)) ? parseSurveyKnownPoints(knownPointsText) : [] } catch (error) {
+      try { knownPoints = !repair && files.some(file => !tabularMappings.has(file)) ? parseSurveyKnownPoints(knownPointsText) : [] } catch (error) {
         throw new Error(t('surveyKnownPointsInvalid', { row: error instanceof Error ? error.message : '?' }))
       }
       const imported: Network[] = []
+      const importedInputs = new Map<string, RetainedImport>()
       const failures: string[] = []
       for (const file of files) {
         if (importScope !== projectScopeRef.current) return
         try {
           const dataBase64 = await readFile(file)
           if (importScope !== projectScopeRef.current) return
-          const tabularMapping = tabularMappings.get(file)
-          const input = { networkType: tabularMapping?.networkType ?? networkType, ...(!tabularMapping && knownPoints.length ? { knownPoints } : {}), ...(!tabularMapping && networkType === 'coordinate-transform' ? { transformType } : {}), name: file.name, dataBase64, ...(mappings.has(file) ? { cosaIn1Mapping: mappings.get(file)! } : {}), ...(tabularMapping ? { tabularMapping } : {}) }
+          const tabularMapping = repair?.baseInput.tabularMapping ?? tabularMappings.get(file)
+          const referenceDeclaration = repair ? {
+            ...repair.referenceDeclaration,
+            ...(missingReferences.includes('coordinate') && coordinateSystem.trim() ? { coordinateSystem: coordinateSystem.trim() } : {}),
+            ...(missingReferences.includes('height') && verticalDatum.trim() ? { verticalDatum: verticalDatum.trim() } : {})
+          } : {
+            ...(coordinateSystem.trim() ? { coordinateSystem: coordinateSystem.trim() } : {}),
+            ...(verticalDatum.trim() ? { verticalDatum: verticalDatum.trim() } : {})
+          }
+          const baseInput = repair?.baseInput ?? { networkType: tabularMapping?.networkType ?? networkType, ...(!tabularMapping && knownPoints.length ? { knownPoints } : {}), ...(!tabularMapping && networkType === 'coordinate-transform' ? { transformType } : {}), name: file.name, ...(mappings.has(file) ? { cosaIn1Mapping: mappings.get(file)! } : {}), ...(tabularMapping ? { tabularMapping } : {}) }
+          const input = { ...baseInput, dataBase64, ...(Object.keys(referenceDeclaration).length ? { referenceDeclaration } : {}) }
           const idempotencyKey = await surveyImportKey(project.id, input)
           const result = await request<{ network: Network }>('/v1/engineering/survey/networks/import', 'POST', { projectId: project.id, ...input, expectedRevision: project.revision, idempotencyKey })
           if (importScope !== projectScopeRef.current) return
           imported.push(result.network)
+          importedInputs.set(result.network.id, { file, baseInput, referenceDeclaration })
           onRemovePendingFile?.(file)
           if (compact && (result.network as NetworkWithRawSourceIntegrity).sourceEligibility?.eligible === true) {
             const checked = await request<{ network: Network }>(`/v1/engineering/survey/networks/${result.network.id}/validate`, 'POST', { expectedRevision: result.network.revision, idempotencyKey: `survey-validate-${result.network.id}-${result.network.revision}` })
@@ -620,6 +696,10 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
       if (imported.length) {
         recordEngineeringUsage('firstImportMs', performance.now() - importStarted)
         const selected = imported.find((item) => item.sourceFile && /\.(?:in1|in2)$/i.test(item.sourceFile.name)) ?? imported[0]!
+        for (const item of imported) {
+          const originalInput = importedInputs.get(item.id)
+          if (originalInput) retainedImports.current.set(item.id, { networkRevision: item.revision, sourceSha256: item.sourceFile?.sha256, value: originalInput })
+        }
         setNetworks((current) => [...imported, ...current.filter((item) => !imported.some((candidate) => candidate.id === item.id))])
         setNetwork(selected); setNetworkType(selected.networkType); setAdjustment(null); setSelectedResidualSourceRecordId(null); setSection('network')
       }
@@ -628,7 +708,7 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
       const groupMessage = cosaSources.length ? t('surveyCosaCount', { count: cosaSources.length }) : ''
       const failureMessage = failures.length ? t('surveyImportFailures', { count: failures.length, details: failures.join('; ') }) : ''
       setMessage([importedMessage, groupMessage, groupBlockers ? t('surveyCosaBlockers', { count: groupBlockers }) : '', failureMessage].filter(Boolean).join('; '))
-    } catch (error) { if (importScope === projectScopeRef.current) setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false); setFileInputKey((value) => value + 1) }
+    } catch (error) { if (importScope === projectScopeRef.current) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } } finally { setBusy(false); setFileInputKey((value) => value + 1) }
   }
 
   const attemptedFiles = useRef(new WeakSet<File>())
@@ -650,15 +730,21 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
         ? currentEligibility
           ? t('surveyValidationEligibilityLost')
           : t('surveyValidationEligibilityMissing')
-        : result.network.qualityStatus === 'blocked'
+        : missingSurveyReferences(result.network).length || result.network.qualityStatus === 'blocked' || result.network.findings.some(finding => finding.severity === 'blocking') || currentEligibility?.findings?.some(finding => finding.severity === 'blocking')
           ? t('surveyValidationBlocked')
           : t('surveyValidationPassed')
+      const retainedInput = retainedImports.current.get(network.id)
+      if (retainedInput && retainedInput.networkRevision === network.revision
+        && retainedInput.sourceSha256 === network.sourceFile?.sha256
+        && result.network.id === network.id && result.network.sourceFile?.sha256 === network.sourceFile?.sha256) {
+        retainedImports.current.set(network.id, { ...retainedInput, networkRevision: result.network.revision })
+      }
       setNetworks((current) => current.map((item) => item.id === result.network.id ? result.network : item)); setNetwork(result.network); setMessage(validationMessage); setSection('network')
-    } catch (error) { setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
+    } catch (error) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
   }
 
   const adjust = async (): Promise<void> => {
-    if (!runtimeReady || busy || !network || !sourceIsReady || network.qualityStatus !== 'validated') return
+    if (!runtimeReady || busy || !network || !calculationReady) return
     setBusy(true); setMessage('')
     try {
       recordEngineeringUsage('primaryActions')
@@ -666,7 +752,7 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
       const currentAdjustments = await refreshAdjustments()
       const currentAdjustment = currentAdjustments?.find((item) => item.run.id === result.run.id) ?? result
       setAdjustment(currentAdjustment); setSelectedResidualSourceRecordId(null); if (isAdmissibleCompletedAdjustment(currentAdjustment)) onAdjustmentComplete?.(result.run.id); setSection('result'); setMessage(result.run.status === 'completed' && isAdmissibleCompletedAdjustment(currentAdjustment) ? t('surveyAdjustmentComplete') : result.run.status === 'completed' ? t('surveyAdjustmentAuditOnly') : t('surveyAdjustmentIncomplete'))
-    } catch (error) { setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
+    } catch (error) { recordEngineeringJourneyFailure(); setMessage(surveyRuntimeErrorText(error instanceof Error ? error.message : String(error), appI18n.language)) } finally { setBusy(false) }
   }
 
   const compareDeformation = async (): Promise<void> => {
@@ -705,6 +791,59 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
   }
 
   const mappingFile = mappingBatch?.files.find((file) => /\.in1$/i.test(file.name) && !mappingBatch.mappings.has(file))
+  useEffect(() => {
+    if (!knownPointsFocusRequested) return
+    const input = compact ? compactKnownPointsInputRef.current : advancedKnownPointsInputRef.current
+    if (!input) return
+    input.focus()
+    input.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    setKnownPointsFocusRequested(false)
+  }, [compact, knownPointsFocusRequested, section, advancedOpen])
+  useEffect(() => {
+    if (!referenceFocusRequested) return
+    const input = referenceFocusRequested === 'height' ? verticalReferenceInputRef.current : coordinateReferenceInputRef.current
+    if (!input) return
+    input.focus()
+    input.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    setReferenceFocusRequested(null)
+  }, [referenceFocusRequested, section, advancedOpen, compact])
+
+  const fixBlockingFinding = (finding: typeof blockingFindings[number]): void => {
+    if (finding.code === 'reference_undeclared' || /平面坐标基准尚未声明|高程基准尚未声明|(?:coordinate reference|height datum).*not been declared/i.test(finding.message)) {
+      setSection('network')
+      if (compact) setAdvancedOpen(false)
+      if (referenceRepair && missingReferences.every(reference => surveyReferenceDeclared(reference === 'coordinate' ? coordinateSystem : verticalDatum))) {
+        void importFiles([referenceRepair.file], undefined, undefined, referenceRepair)
+        return
+      }
+      setMessage(referenceRepair
+        ? referenceText('surveyReferenceDeclarationRetainedRecovery', '请先补全必需的基准声明，再点击补充基准声明；本次上传的原文件会用于重新导入。', 'Complete the required reference declarations, then confirm them. The file uploaded in this session will be reimported.')
+        : referenceText('surveyReferenceDeclarationRecovery', '确认基准后重新选择原文件导入，原记录保留。', 'Confirm the reference and reimport the original file. The existing record is retained.'))
+      const nextMissing = missingReferences.find(reference => !surveyReferenceDeclared(reference === 'coordinate' ? coordinateSystem : verticalDatum))
+      setReferenceFocusRequested(nextMissing ?? (/高程|height/i.test(finding.message) ? 'height' : 'coordinate'))
+      return
+    }
+    if (finding.code === 'missing_datum' || /缺少已知(?:高程基准点|坐标约束)|no known (?:height datum|coordinate)/i.test(finding.message)) {
+      setSection('network')
+      setAdvancedOpen(false)
+      setMessage(t('surveyBlockingKnownPointsRecovery'))
+      setKnownPointsFocusRequested(true)
+      return
+    }
+    setSection(/weight|unit|observation|closure/i.test(finding.code ?? '') ? 'observations' : 'network')
+    setAdvancedOpen(true)
+  }
+  const blockingActionLabel = (finding: typeof blockingFindings[number]): string => finding.code === 'reference_undeclared'
+    ? referenceText('surveyReferenceDeclarationRepair', '补充基准声明', 'Declare the reference')
+    : finding.code === 'missing_datum' ? t('surveyBlockingSupplyControlPoints') : t('engineeringFixIssue')
+  const referenceDeclarationInputs = <fieldset disabled={busy || !runtimeReady} className="grid gap-3 sm:grid-cols-2">
+    <legend className="mb-1 text-[12px] font-semibold text-ds-ink">{referenceText('surveyReferenceDeclarationTitle', '导入资料的基准声明', 'Reference declaration for imported data')}</legend>
+    <p className="text-[11px] leading-5 text-ds-muted sm:col-span-2">{referenceRepair
+      ? referenceText('surveyReferenceDeclarationRetainedHint', '按测量资料填写实际使用的坐标与高程基准；未使用的基准可留空。本次上传的原文件可用于补充基准声明。', 'Enter the coordinate and height references used by the survey data; unused references may be left blank. The file uploaded in this session can be used to complete the declaration.')
+      : referenceText('surveyReferenceDeclarationHint', '按测量资料填写实际使用的坐标与高程基准；未使用的基准可留空。确认基准后重新选择原文件导入，原记录保留。', 'Enter the coordinate and height references used by the survey data; unused references may be left blank. Reimport the original file after confirming the reference. The existing record is retained.')}</p>
+    <label className="text-[12px] font-medium text-ds-ink">{t('surveyCoordinateSystem')}<input ref={coordinateReferenceInputRef} aria-label={t('surveyCoordinateSystem')} value={coordinateSystem} onChange={event => setCoordinateSystem(event.target.value)} placeholder={referenceText('surveyCoordinatePlaceholder', '例如：CGCS2000 / 工程独立坐标系', 'For example: CGCS2000 / local engineering coordinate system')} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card px-3 text-[12px]" /></label>
+    <label className="text-[12px] font-medium text-ds-ink">{t('surveyHeightDatum')}<input ref={verticalReferenceInputRef} aria-label={t('surveyHeightDatum')} value={verticalDatum} onChange={event => setVerticalDatum(event.target.value)} placeholder={referenceText('surveyHeightPlaceholder', '例如：1985 国家高程基准 / 项目高程基准', 'For example: national height datum / project height datum')} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card px-3 text-[12px]" /></label>
+  </fieldset>
   const advancedContent = <div className="survey-workbench-surface overflow-hidden border border-ds-border-muted bg-ds-card">
       <div className="survey-workbench-header flex flex-wrap items-start justify-between gap-4 border-b border-ds-border-muted px-4 py-4"><div className="min-w-0"><div className="flex items-center gap-2"><Compass className="h-4 w-4 text-accent" /><h3 className="text-[15px] font-semibold">{t('surveyWorkbenchTitle')}</h3><span className="border border-accent/25 bg-accent/5 px-2 py-0.5 text-[10px] font-medium text-accent">{t('surveyRuntimeDeterministic')}</span></div></div><div className="flex shrink-0 flex-wrap items-center justify-end gap-2"><button type="button" onClick={() => setAdvancedOpen(false)} className="inline-flex h-8 items-center gap-1.5 border border-ds-border px-2.5 text-[11px] font-medium text-ds-muted hover:bg-ds-hover" aria-label={t('surveyCloseAdvanced')}><X className="h-3.5 w-3.5" />{t('surveyCloseAdvanced')}</button><button type="button" onClick={onOpenAi} disabled={!onOpenAi} className="inline-flex h-8 items-center gap-1.5 border border-accent/40 bg-accent/5 px-2.5 text-[11px] font-semibold text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"><Bot className="h-3.5 w-3.5" />{t('surveyAskAgent')}</button>{networks.length ? <><label className="sr-only" htmlFor="survey-existing-network">{t('surveyExistingNetwork')}</label><select id="survey-existing-network" aria-label={t('surveyExistingNetwork')} value={filteredNetworks.some((item) => item.id === network?.id) ? network?.id : ''} onChange={(event) => selectExistingNetwork(event.target.value)} className="h-8 max-w-64 rounded-md border border-ds-border bg-ds-card px-2 text-[11px] text-ds-ink outline-none focus:border-accent"><option value="" disabled>{filteredNetworks.length ? t('surveySelectNetwork') : t('surveyFilterEmpty')}</option>{filteredNetworks.map((item) => <option key={item.id} value={item.id}>{item.sourceFile ? `${item.sourceFile.name} · ${surveySourceFormatLabel(t, item.sourceFile.detection.format, appI18n.language)} · ${dispositionLabel(t, item.sourceFile.disposition)}` : surveyNetworkTypeLabel(item.networkType, t)}</option>)}</select></> : null}<label className="sr-only" htmlFor="survey-network-type">{t('surveyNetworkType')}</label><select id="survey-network-type" aria-label={t('surveyNetworkType')} value={networkType} onChange={(event) => setNetworkType(event.target.value)} className="h-8 rounded-md border border-ds-border bg-ds-card px-2 text-[11px] text-ds-ink outline-none focus:border-accent"><option value="leveling">{t('surveyLeveling')}</option><option value="traverse">{t('surveyTraverse')}</option><option value="plane-control">{t('surveyPlaneControl')}</option><option value="triangulation">{t('surveyTriangulation')}</option><option value="cpiii-free-station">{t('surveyCpiiiStation')}</option><option value="cpiii-resection">{t('surveyCpiiiResection')}</option><option value="gnss">{t('surveyGnssBaseline')}</option><option value="coordinate-transform">{t('surveyCoordinateTransform')}</option></select>{networkType === 'coordinate-transform' ? <><label className="sr-only" htmlFor="survey-transform-type">{t('surveyTransformType')}</label><select id="survey-transform-type" aria-label={t('surveyTransformType')} value={transformType} onChange={(event) => setTransformType(event.target.value)} className="h-8 rounded-md border border-ds-border bg-ds-card px-2 text-[11px] text-ds-ink outline-none focus:border-accent"><option value="similarity-2d">{t('surveySimilarity2d')}</option><option value="helmert-7">{t('surveyHelmert7')}</option><option value="gauss-kruger-forward">{t('surveyGaussForward')}</option><option value="gauss-kruger-inverse">{t('surveyGaussInverse')}</option><option value="height-fit">{t('surveyHeightFit')}</option></select></> : null}<span className={`inline-flex h-8 items-center gap-1.5 px-2.5 text-[10.5px] font-medium ${runtimeReady ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'}`}><span className={`h-1.5 w-1.5 rounded-full ${runtimeReady ? 'bg-green-600' : 'bg-amber-500'}`} />{runtimeReady ? t('engineeringRuntimeOnline') : t('surveyRuntimeWaiting')}</span></div></div>
 
@@ -718,19 +857,20 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
           {network && (!network.sourceFile || network.sourceFile.detection.format === WORKWISE_SURVEY_SOURCE_FORMAT) ? <p role="note" className="border-b border-ds-border-muted bg-amber-50 px-4 py-2 text-[10px] leading-4 text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">{t('surveySourceBoundaryProfessional')}</p> : null}
 
           {section === 'network' ? <div className="p-4"><div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_260px]"><div className="border border-ds-border-muted bg-ds-main p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-[12px] font-semibold">{t('surveyImportTitle')}</p><p className="mt-0.5 text-[10.5px] text-ds-muted">{t('surveyImportHint')}</p></div><FileUp className="h-4 w-4 text-accent" /></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" aria-label={t('surveyChooseFilesAria')} disabled={!runtimeReady || busy} onClick={() => fileInputRef.current?.click()} className="inline-flex h-8 cursor-pointer items-center gap-1.5 border border-ds-border bg-ds-card px-2.5 text-[11px] font-medium text-ds-ink hover:bg-ds-hover disabled:opacity-50"><FileUp className="h-3.5 w-3.5" />{t('surveyChooseFiles')}</button><input ref={fileInputRef} key={fileInputKey} type="file" multiple accept={SURVEY_FILE_ACCEPT} aria-label={t('surveyChooseFilesAria')} hidden aria-hidden="true" tabIndex={-1} disabled={!runtimeReady || busy} onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) void importFiles(files) }} /></div><div className="mt-3 border border-dashed border-ds-border-muted px-3 py-3 text-[10.5px] leading-4 text-ds-muted">{t('surveyImportBoundary')}</div></div><div className="border border-ds-border-muted bg-ds-main p-3"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-accent" /><p className="text-[12px] font-semibold">{t('surveyProjectDatum')}</p></div><dl className="mt-3 space-y-2 text-[10.5px]"><div className="flex justify-between gap-3"><dt className="text-ds-faint">{t('surveyNetworkType')}</dt><dd className="text-right font-medium text-ds-ink">{selectedType}</dd></div><div className="flex justify-between gap-3"><dt className="text-ds-faint">{t('surveyCoordinateSystem')}</dt><dd className="text-right text-ds-ink">{surveyDatumLabel(network?.coordinateSystem, t)}</dd></div><div className="flex justify-between gap-3"><dt className="text-ds-faint">{t('surveyHeightDatum')}</dt><dd className="text-right text-ds-ink">{surveyDatumLabel(network?.verticalDatum ?? network?.heightDatum, t)}</dd></div></dl></div></div>
-            <label className="mt-3 block text-[11px] text-ds-muted">{t('surveyKnownPointsInput')}<textarea aria-label={t('surveyKnownPointsInput')} value={knownPointsText} onChange={(event) => setKnownPointsText(event.target.value)} spellCheck={false} placeholder="BM-01,100.000" className="mt-1 min-h-20 w-full rounded border border-ds-border bg-ds-card p-2 font-mono text-[11px] text-ds-ink" /><span className="mt-1 block">{t('surveyKnownPointsHint')}</span></label>
+            <div className="mt-3 border border-ds-border-muted bg-ds-main p-3">{referenceDeclarationInputs}</div>
+            <label className="mt-3 block text-[11px] text-ds-muted">{t('surveyKnownPointsInput')}<textarea ref={advancedKnownPointsInputRef} aria-label={t('surveyKnownPointsInput')} value={knownPointsText} onChange={(event) => setKnownPointsText(event.target.value)} spellCheck={false} placeholder="BM-01,100.000" className="mt-1 min-h-20 w-full rounded border border-ds-border bg-ds-card p-2 font-mono text-[11px] text-ds-ink" /><span className="mt-1 block">{t('surveyKnownPointsHint')}</span></label>
             {cosaFileGroupInspection ? <CosaFileGroupInspectionPanel inspection={cosaFileGroupInspection} /> : null}
             <div className="mt-3 flex flex-wrap items-center gap-2 border border-ds-border-muted bg-ds-main px-3 py-2" aria-label={t('surveySourceFilterAria')}><span className="text-[10px] font-semibold text-ds-muted">{t('surveyExistingSourceFilter')}</span><label className="sr-only" htmlFor="survey-format-filter">{t('surveyFormat')}</label><select id="survey-format-filter" aria-label={t('surveyFormatFilterAria')} value={formatFilter} onChange={(event) => setFormatFilter(event.target.value)} className="h-7 border border-ds-border bg-ds-card px-2 text-[10.5px] text-ds-ink"><option value="all">{t('surveyAllFormats', { count: networks.length })}</option>{formatOptions.map((format) => <option key={format} value={format}>{surveySourceFormatLabel(t, format, appI18n.language)}</option>)}</select><label className="sr-only" htmlFor="survey-readiness-filter">{t('surveyReadiness')}</label><select id="survey-readiness-filter" aria-label={t('surveyReadinessFilterAria')} value={readinessFilter} onChange={(event) => setReadinessFilter(event.target.value as typeof readinessFilter)} className="h-7 border border-ds-border bg-ds-card px-2 text-[10.5px] text-ds-ink"><option value="all">{t('surveyAllStatuses')}</option><option value="adjustment-ready">{t('surveyAdjustmentReady')}</option><option value="gnss-processing-required">{t('surveyGnssPending')}</option><option value="converter-required">{t('surveyConverterRequired')}</option><option value="archive-only">{t('surveyArchiveOnly')}</option></select><span className="ml-auto text-[10px] text-ds-faint">{t('surveyShowing', { shown: filteredNetworks.length, total: networks.length })}</span></div>
             <RawSourceIntegrityNote integrity={rawSourceIntegrity} />
             {network && !sourceIsReady ? <p role="note" className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-[10.5px] leading-4 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">{t('surveyLockedValidation', { reason: sourceGateReason })}</p> : null}
-            {network && sourceEligibilityFindings.length ? <div aria-label={t('surveySourceGateTitle')} className="mt-3 border border-red-200 bg-red-50 px-3 py-2 text-[10.5px] leading-4 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100"><p className="font-semibold">{t('surveySourceGateTitle')}</p><ul className="mt-1 list-disc space-y-1 pl-4">{sourceEligibilityFindings.map((finding, index) => <li key={`${finding.code ?? 'source-eligibility'}-${surveySourceDiagnosticText(finding, appI18n.language, network.sourceFile?.disposition, sourceEligibility?.eligible)}-${index}`}>{surveySourceDiagnosticText(finding, appI18n.language, network.sourceFile?.disposition, sourceEligibility?.eligible)}{typeof finding.suggestion === 'string' && finding.suggestion.trim() ? <span className="mt-0.5 block">{t('surveyNextStep')}{surveySourceDiagnosticText({ ...finding, message: finding.suggestion }, appI18n.language, network.sourceFile?.disposition, sourceEligibility?.eligible)}</span> : null}</li>)}</ul></div> : null}
+            {network && sourceEligibilityFindings.length ? <div aria-label={t('surveySourceGateTitle')} className="mt-3 border border-red-200 bg-red-50 px-3 py-2 text-[10.5px] leading-4 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100"><p className="font-semibold">{t('surveySourceGateTitle')}</p><ul className="mt-1 list-disc space-y-1 pl-4">{sourceEligibilityFindings.map((finding, index) => <li key={`${finding.code ?? 'source-eligibility'}-${surveySourceDiagnosticText(finding, appI18n.language, network?.sourceFile?.disposition, sourceEligibility?.eligible)}-${index}`}>{surveySourceDiagnosticText(finding, appI18n.language, network?.sourceFile?.disposition, sourceEligibility?.eligible)}{typeof finding.suggestion === 'string' && finding.suggestion.trim() ? <span className="mt-0.5 block">{t('surveyNextStep')}{surveySourceDiagnosticText({ ...finding, message: finding.suggestion }, appI18n.language, network?.sourceFile?.disposition, sourceEligibility?.eligible)}</span> : null}</li>)}</ul></div> : null}
             {network?.sourceFile ? <SurveySourcePreflight source={network.sourceFile} sourceEligible={sourceIsReady} showRecords={showSourceRecords} onToggleRecords={() => setShowSourceRecords((value) => !value)} onAsk={project.workspace && onOpenAi ? (index) => {
               const diagnostic = network.sourceFile!.diagnostics[index]!
               const anchor = (network.sourceFile!.records ?? network.sourceFile!.rawRecordAnchors).find((item) =>
                 diagnostic.byteOffset !== undefined ? item.rawOffset === diagnostic.byteOffset : diagnostic.sourceRecord !== undefined && item.sourceRecord === diagnostic.sourceRecord)
               askAboutEvidence(t('surveyExplainEvidence', { label: t('surveyDiagnosticItem', { number: index + 1 }) }), { section: 'preflight', diagnosticCode: diagnostic.code, diagnosticIndex: index, sourceRecord: diagnostic.sourceRecord, byteOffset: diagnostic.byteOffset, sourceRecordId: anchor?.id })
             } : undefined} /> : <div className="mt-3 border border-dashed border-ds-border-muted px-3 py-3 text-[10.5px] leading-4 text-ds-muted">{t('surveyNoSourcePreflight')}</div>}
-            <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4"><Stat label={t('surveyStatPoints')} value={`${points.length}`} detail={t('surveyStatKnownUnknown', { known: network?.knownPoints.length ?? 0, unknown: network?.unknownPoints.length ?? 0 })} /><Stat label={t('surveyStatObservations')} value={`${network?.observations.length ?? 0}`} detail={network ? t('surveyStatUnitsWeights') : t('surveyStatWaitingImport')} /><Stat label={t('surveyStatQuality')} value={surveyStatusLabel(network?.qualityStatus, t)} detail={blockers ? t('surveyStatBlocked', { count: blockers }) : network?.qualityStatus === 'validated' ? t('surveyValidated') : t('surveyStatNotValidated')} tone={blockers ? 'danger' : network?.qualityStatus === 'validated' ? 'good' : 'neutral'} /><Stat label={t('surveyStatRun')} value={surveyStatusLabel(adjustment?.run.status, t)} detail={adjustment ? t('surveyResultRecorded') : t('surveyNotAdjusted')} tone={adjustment?.run.status === 'completed' ? 'good' : 'neutral'} /></div><div className="mt-4 flex flex-wrap items-center gap-2"><button type="button" onClick={() => void validate()} disabled={!runtimeReady || !network || busy || !sourceIsReady} title={!sourceIsReady && network?.sourceFile ? dispositionLabel(t, network.sourceFile.disposition) : undefined} className="inline-flex h-8 items-center gap-1.5 border border-ds-border px-3 text-[11px] font-medium text-ds-ink disabled:cursor-not-allowed disabled:opacity-50"><ShieldAlert className="h-3.5 w-3.5" />{t('engineeringTabQuality')}</button>{network && sourceIsReady && network.qualityStatus !== 'blocked' && blockers === 0 ? <button type="button" onClick={() => void adjust()} disabled={!runtimeReady || !network || busy || !sourceIsReady || network.qualityStatus !== 'validated'} title={!sourceIsReady && network?.sourceFile ? dispositionLabel(t, network.sourceFile.disposition) : undefined} className="inline-flex h-8 items-center gap-1.5 bg-green-700 px-3 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('surveyRunAdjustment')}</button> : null}{!sourceIsReady && network?.sourceFile ? <><span role="note" className="max-w-xl text-[10.5px] text-amber-700 dark:text-amber-300">{t('surveyLockedCalculation', { reason: dispositionRecovery(t, network.sourceFile.disposition) })}</span><button type="button" onClick={() => askAboutEvidence(t('surveyPlanMissingData'), { section: 'preflight' })} disabled={!project.workspace || !onOpenAi} className="h-8 border border-accent/35 px-2.5 text-[10.5px] font-semibold text-accent disabled:opacity-50">{t('surveyPlanMissingData')}</button></> : null}</div></div> : null}
+            <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4"><Stat label={t('surveyStatPoints')} value={`${points.length}`} detail={t('surveyStatKnownUnknown', { known: network?.knownPoints.length ?? 0, unknown: network?.unknownPoints.length ?? 0 })} /><Stat label={t('surveyStatObservations')} value={`${network?.observations.length ?? 0}`} detail={network ? t('surveyStatUnitsWeights') : t('surveyStatWaitingImport')} /><Stat label={t('surveyStatQuality')} value={surveyStatusLabel(network?.qualityStatus, t)} detail={blockers ? t('surveyStatBlocked', { count: blockers }) : network?.qualityStatus === 'validated' ? t('surveyValidated') : t('surveyStatNotValidated')} tone={blockers ? 'danger' : network?.qualityStatus === 'validated' ? 'good' : 'neutral'} /><Stat label={t('surveyStatRun')} value={surveyStatusLabel(adjustment?.run.status, t)} detail={adjustment ? t('surveyResultRecorded') : t('surveyNotAdjusted')} tone={adjustment?.run.status === 'completed' ? 'good' : 'neutral'} /></div><div className="mt-4 flex flex-wrap items-center gap-2"><button type="button" onClick={() => void validate()} disabled={!runtimeReady || !network || busy || !sourceIsReady} title={!sourceIsReady && network?.sourceFile ? dispositionLabel(t, network.sourceFile.disposition) : undefined} className="inline-flex h-8 items-center gap-1.5 border border-ds-border px-3 text-[11px] font-medium text-ds-ink disabled:cursor-not-allowed disabled:opacity-50"><ShieldAlert className="h-3.5 w-3.5" />{t('engineeringTabQuality')}</button>{network && sourceIsReady && network.qualityStatus !== 'blocked' && blockers === 0 ? <button type="button" onClick={() => void adjust()} disabled={!runtimeReady || !network || busy || !calculationReady} title={!sourceIsReady && network?.sourceFile ? dispositionLabel(t, network.sourceFile.disposition) : undefined} className="inline-flex h-8 items-center gap-1.5 bg-green-700 px-3 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('surveyRunAdjustment')}</button> : null}{!sourceIsReady && network?.sourceFile ? <><span role="note" className="max-w-xl text-[10.5px] text-amber-700 dark:text-amber-300">{t('surveyLockedCalculation', { reason: dispositionRecovery(t, network.sourceFile.disposition) })}</span><button type="button" onClick={() => askAboutEvidence(t('surveyPlanMissingData'), { section: 'preflight' })} disabled={!project.workspace || !onOpenAi} className="h-8 border border-accent/35 px-2.5 text-[10.5px] font-semibold text-accent disabled:opacity-50">{t('surveyPlanMissingData')}</button></> : null}</div></div> : null}
 
           {section === 'observations' ? <div className="p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="text-[13px] font-semibold">{t('surveySectionObservations')}</h4></div><button type="button" onClick={() => void validate()} disabled={!runtimeReady || !network || busy || !sourceIsReady} title={!sourceIsReady && network?.sourceFile ? `${dispositionLabel(t, network.sourceFile.disposition)}：${sourceDispositionExplanation}` : undefined} className="inline-flex h-8 items-center gap-1.5 border border-ds-border px-2.5 text-[11px] font-medium disabled:opacity-50"><ShieldAlert className="h-3.5 w-3.5" />{t('surveyRevalidate')}</button></div>{network ? <div className="mt-4 overflow-x-auto border border-ds-border-muted"><table className="min-w-full text-left text-[11px]"><thead className="bg-ds-subtle text-ds-muted"><tr><th className="px-3 py-2 font-semibold">{t('surveyObservationId')}</th><th className="px-3 py-2 font-semibold">{t('surveyType')}</th><th className="px-3 py-2 font-semibold">{t('surveyStationTarget')}</th><th className="px-3 py-2 font-semibold">{t('surveyObservationValue')}</th><th className="px-3 py-2 font-semibold">{t('surveyUnit')}</th><th className="px-3 py-2 font-semibold">{t('surveyWeightCovariance')}</th></tr></thead><tbody className="divide-y divide-ds-border-muted">{network.observations.map((observation, index) => <tr key={observation.id} tabIndex={-1} data-evidence-key={JSON.stringify(['observation', observation.id])} className="hover:bg-ds-hover focus:bg-accent/10 focus:outline focus:outline-2 focus:outline-accent"><td className="px-3 py-2.5 text-ds-ink">{observationDisplay(observation.id, index + 1)}<button type="button" disabled={!project.workspace || !onOpenAi} aria-label={t('surveyAskObservation', { observationId: observationDisplay(observation.id, index + 1) })} onClick={() => askAboutObservation(observation.id, observationDisplay(observation.id, index + 1), observation.sourceRecordId)} className="mt-1 block text-accent disabled:opacity-50">{t('surveyAskAgent')}</button></td><td className="px-3 py-2.5 text-ds-muted">{surveyObservationLabel(observation.type, appI18n.language)}</td><td className="px-3 py-2.5 text-ds-ink">{observation.station ?? observation.from ?? '—'} <span className="text-ds-faint">→</span> {observation.target ?? observation.to ?? '—'}</td><td className="px-3 py-2.5 tabular-nums font-medium text-ds-ink">{observationValueLabel(observation)}</td><td className="px-3 py-2.5 text-ds-muted">{observation.unit ?? '—'}</td><td className="px-3 py-2.5 tabular-nums text-ds-muted">{observation.type === 'gnss-baseline' ? (observation.covariance?.length === 9 ? t('surveyCovarianceProvided') : t('surveyCovarianceMissing')) : numberLabel(observation.sigma, 6)}</td></tr>)}</tbody></table></div> : <div className="mt-4 border border-dashed border-ds-border-muted px-4 py-10 text-center text-[11px] text-ds-muted">{t('surveyObservationsEmpty')}</div>}</div> : null}
 
@@ -772,7 +912,7 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
           </div> : null}
         </div>
 
-        <aside className="survey-workbench-aside border-t border-ds-border-muted bg-ds-main p-3 lg:col-span-2 2xl:col-span-1 2xl:border-l 2xl:border-t-0"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ds-faint">{t('surveyQualityGate')}</p><div className="mt-3 space-y-2">{network?.findings.length ? network.findings.slice(0, 6).map((finding, index) => <div key={`${surveySourceDiagnosticText(finding, appI18n.language, network.sourceFile?.disposition, sourceEligibility?.eligible)}-${index}`} className={`flex gap-2 border px-2.5 py-2 text-[10.5px] leading-4 ${finding.severity === 'blocking' ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'}`}><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />{surveySourceDiagnosticText(finding, appI18n.language, network.sourceFile?.disposition, sourceEligibility?.eligible)}{finding.row ? <span className="ml-auto shrink-0 font-mono text-[9px]">{t('surveyRecord')}{finding.row}</span> : null}</div>) : <div className="border border-dashed border-ds-border-muted px-2.5 py-3 text-[10.5px] leading-4 text-ds-muted">{t('surveyQualityEmpty')}</div>}</div><div className="mt-4 border-t border-ds-border-muted pt-3"><p className="text-[10px] font-semibold text-ds-ink">{t('surveyCurrentInput')}</p><dl className="mt-2 space-y-2 text-[10px]"><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveySource')}</dt><dd className="max-w-[145px] truncate text-right text-ds-ink">{network?.sourceFile?.name ?? t('surveyStructuredLegacy')}</dd></div><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveyFormat')}</dt><dd className="max-w-[145px] truncate text-right text-ds-ink">{network?.sourceFile ? surveySourceFormatLabel(t, network.sourceFile.detection.format, appI18n.language) : t('surveyStructuredLegacy')}</dd></div><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveyReadiness')}</dt><dd className={`max-w-[145px] text-right ${network?.sourceFile && !sourceIsReady ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-ds-ink'}`}>{network?.sourceFile ? dispositionLabel(t, network.sourceFile.disposition) : network ? t('surveyLegacyPath') : '—'}</dd></div><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveyBlockers')}</dt><dd className={blockers ? 'font-semibold text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>{blockers}</dd></div></dl></div><div className="mt-4 border-t border-ds-border-muted pt-3"><p className="flex items-center gap-1.5 text-[10px] font-semibold text-ds-ink"><FileCode2 className="h-3.5 w-3.5 text-accent" />{t('surveyTraceability')}</p></div></aside>
+        <aside className="survey-workbench-aside border-t border-ds-border-muted bg-ds-main p-3 lg:col-span-2 2xl:col-span-1 2xl:border-l 2xl:border-t-0"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ds-faint">{t('surveyQualityGate')}</p><div className="mt-3 space-y-2">{advancedFindings.length ? advancedFindings.map((finding, index) => <div key={`${surveySourceDiagnosticText(finding, appI18n.language, network?.sourceFile?.disposition, sourceEligibility?.eligible)}-${index}`} className={`flex gap-2 border px-2.5 py-2 text-[10.5px] leading-4 ${finding.severity === 'blocking' ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'}`}><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="min-w-0 flex-1">{surveySourceDiagnosticText(finding, appI18n.language, network?.sourceFile?.disposition, sourceEligibility?.eligible)}{finding.severity === 'blocking' ? <button type="button" onClick={() => fixBlockingFinding(finding)} className="mt-1 flex min-h-11 items-center rounded-md border border-accent/30 px-3 font-medium text-accent hover:bg-accent/5">{blockingActionLabel(finding)}</button> : null}</span>{finding.row ? <span className="ml-auto shrink-0 font-mono text-[9px]">{t('surveyRecord')}{finding.row}</span> : null}</div>) : <div className="border border-dashed border-ds-border-muted px-2.5 py-3 text-[10.5px] leading-4 text-ds-muted">{t('surveyQualityEmpty')}</div>}</div><div className="mt-4 border-t border-ds-border-muted pt-3"><p className="text-[10px] font-semibold text-ds-ink">{t('surveyCurrentInput')}</p><dl className="mt-2 space-y-2 text-[10px]"><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveySource')}</dt><dd className="max-w-[145px] truncate text-right text-ds-ink">{network?.sourceFile?.name ?? t('surveyStructuredLegacy')}</dd></div><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveyFormat')}</dt><dd className="max-w-[145px] truncate text-right text-ds-ink">{network?.sourceFile ? surveySourceFormatLabel(t, network.sourceFile.detection.format, appI18n.language) : t('surveyStructuredLegacy')}</dd></div><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveyReadiness')}</dt><dd className={`max-w-[145px] text-right ${network?.sourceFile && !sourceIsReady ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-ds-ink'}`}>{network?.sourceFile ? dispositionLabel(t, network.sourceFile.disposition) : network ? t('surveyLegacyPath') : '—'}</dd></div><div className="flex justify-between gap-2"><dt className="text-ds-faint">{t('surveyBlockers')}</dt><dd className={blockers ? 'font-semibold text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>{blockers}</dd></div></dl></div><div className="mt-4 border-t border-ds-border-muted pt-3"><p className="flex items-center gap-1.5 text-[10px] font-semibold text-ds-ink"><FileCode2 className="h-3.5 w-3.5 text-accent" />{t('surveyTraceability')}</p></div></aside>
       </div>
     </div>
 
@@ -818,13 +958,14 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
         <label className="text-[12px] font-medium text-ds-ink">{t('surveyNetworkType')}<select aria-label={t('surveyNetworkType')} value={networkType} onChange={event => setNetworkType(event.target.value)} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card px-2 text-[12px]">
           <option value="leveling">{t('surveyLeveling')}</option><option value="traverse">{t('surveyTraverse')}</option><option value="plane-control">{t('surveyPlaneControl')}</option><option value="triangulation">{t('surveyTriangulation')}</option><option value="cpiii-free-station">{t('surveyCpiiiStation')}</option><option value="cpiii-resection">{t('surveyCpiiiResection')}</option><option value="gnss">{t('surveyGnssBaseline')}</option><option value="coordinate-transform">{t('surveyCoordinateTransform')}</option>
         </select></label>
-        <label className="text-[12px] font-medium text-ds-ink">{t('surveyKnownPointsInput')}<textarea aria-label={t('surveyKnownPointsInput')} value={knownPointsText} onChange={event => setKnownPointsText(event.target.value)} spellCheck={false} placeholder="BM-01,100.000" rows={2} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card p-2 font-mono text-[12px]" /><span className="mt-1 block text-[11px] font-normal text-ds-muted">{t('surveyKnownPointsHint')}</span></label>
+        <label className="text-[12px] font-medium text-ds-ink">{t('surveyKnownPointsInput')}<textarea ref={compactKnownPointsInputRef} aria-label={t('surveyKnownPointsInput')} value={knownPointsText} onChange={event => setKnownPointsText(event.target.value)} spellCheck={false} placeholder="BM-01,100.000" rows={2} className="mt-1 min-h-11 w-full rounded-md border border-ds-border bg-ds-card p-2 font-mono text-[12px]" /><span className="mt-1 block text-[11px] font-normal text-ds-muted">{t('surveyKnownPointsHint')}</span></label>
       </fieldset> : null}
+      {!advancedOpen ? <div className="border-b border-ds-border-muted px-4 py-3">{referenceDeclarationInputs}</div> : null}
       <div className="grid gap-px border-b border-ds-border-muted bg-ds-border-muted sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-ds-card px-4 py-3"><p className="text-[10px] text-ds-faint">{t('surveySourceRecognized')}</p><p className="mt-1 truncate text-[13px] font-medium text-ds-ink">{network?.sourceFile?.name ?? t('surveyNotImported')}</p><p className="mt-0.5 text-[11px] text-ds-muted">{network?.sourceFile ? surveySourceFormatLabel(t, network.sourceFile.detection.format, appI18n.language) : '—'}</p></div>
         <div className="bg-ds-card px-4 py-3"><p className="text-[10px] text-ds-faint">{t('surveyCounts')}</p><p className="mt-1 text-[13px] font-medium text-ds-ink">{network ? `${points.length} ${t('surveyPoints')} · ${network.observations.length} ${t('surveyObservations')}` : '—'}</p><p className="mt-0.5 text-[11px] text-ds-muted">{network?.sourceFile?.summary?.stationCount ?? '—'} {t('surveyStations')}</p></div>
         <div className="bg-ds-card px-4 py-3"><p className="text-[10px] text-ds-faint">{t('surveyBaseAndUnit')}</p><p className="mt-1 truncate text-[13px] font-medium text-ds-ink">{network?.networkType === 'leveling' ? surveyDatumLabel(network.verticalDatum ?? network.heightDatum, t) : `${surveyDatumLabel(network?.coordinateSystem, t)} · ${surveyDatumLabel(network?.verticalDatum ?? network?.heightDatum, t)}`}</p><p className="mt-0.5 text-[11px] text-ds-muted">{network ? canonicalUnitLabel(t, network.sourceFile?.linearUnitCanonical ?? network.unit) : '—'}{network && network.networkType !== 'leveling' ? ` · ${canonicalUnitLabel(t, network.sourceFile?.angularUnitCanonical)}` : ''}</p></div>
-        <div className="bg-ds-card px-4 py-3"><p className="text-[10px] text-ds-faint">{t('surveyCalculability')}</p><p className={`mt-1 text-[13px] font-medium ${blockers ? 'text-red-700 dark:text-red-300' : network?.qualityStatus === 'validated' && sourceIsReady ? 'text-green-700 dark:text-green-300' : 'text-ds-ink'}`}>{!network ? t('surveyNotImported') : blockers || !sourceIsReady ? t('surveyProfessionalNeedsReview') : network.qualityStatus === 'validated' ? t('surveyProfessionalCalculable') : t('surveyProfessionalNotEvaluated')}</p><p className="mt-0.5 truncate text-[11px] text-ds-muted">{sourceGateReason}</p></div>
+        <div className="bg-ds-card px-4 py-3"><p className="text-[10px] text-ds-faint">{t('surveyCalculability')}</p><p className={`mt-1 text-[13px] font-medium ${blockers ? 'text-red-700 dark:text-red-300' : network?.qualityStatus === 'validated' && sourceIsReady ? 'text-green-700 dark:text-green-300' : 'text-ds-ink'}`}>{!network ? t('surveyNotImported') : blockers || !sourceIsReady ? t('surveyProfessionalNeedsReview') : network.qualityStatus === 'validated' ? t('surveyProfessionalCalculable') : t('surveyProfessionalNotEvaluated')}</p><p role="status" aria-live="polite" className="mt-0.5 break-words text-[11px] leading-4 text-ds-muted">{sourceGateReason}</p></div>
       </div>
       <section className="border-b border-ds-border-muted px-4 py-3" aria-label={t('surveyProfessionalChecksSummary')}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -848,14 +989,14 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
           </button>)}
         </div>
       </section>
+      {compactFindings.length ? <div className="border-b border-ds-border-muted px-4 py-3" aria-label={t('surveyNeedsAttention')}><p className="text-[12px] font-semibold text-ds-ink">{t('surveyNeedsAttention')}</p><ul className="mt-2 space-y-2 text-[12px] leading-5 text-ds-muted">{compactFindings.map((finding, index) => <li key={`${finding.code}-${index}`} className={finding.severity === 'blocking' ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}><span className="font-medium">{surveySourceDiagnosticText(finding, appI18n.language, network?.sourceFile?.disposition, sourceEligibility?.eligible)}</span>{surveyDiagnosticText(finding, appI18n.language, 'action').trim() ? <span className="block text-ds-muted">{t('surveyNextStep')}{surveyDiagnosticText(finding, appI18n.language, 'action')}</span> : null}{finding.severity === 'blocking' ? <button type="button" onClick={() => fixBlockingFinding(finding)} className="mt-1 inline-flex min-h-11 items-center rounded-md border border-accent/30 px-3 font-medium text-accent hover:bg-accent/5">{blockingActionLabel(finding)}</button> : null}</li>)}</ul></div> : null}
       <div className="flex flex-wrap items-center gap-2 px-4 py-4">
         {!onChooseFiles ? <><button type="button" aria-label={t('surveyChooseFilesAria')} disabled={!runtimeReady || busy} onClick={() => fileInputRef.current?.click()} className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[12px] font-medium text-ds-ink hover:bg-ds-hover disabled:opacity-50"><FileUp className="h-3.5 w-3.5" />{t('surveyChooseFiles')}</button>
         <input ref={fileInputRef} key={fileInputKey} type="file" multiple accept={SURVEY_FILE_ACCEPT} aria-label={t('surveyChooseFilesAria')} hidden aria-hidden="true" tabIndex={-1} disabled={!runtimeReady || busy} onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) void importFiles(files) }} /></> : null}
         <button type="button" onClick={() => void validate()} disabled={!runtimeReady || busy || !network || !sourceIsReady} className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent/40 bg-accent/5 px-3 text-[12px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" />{t('surveyCheckFiles')}</button>
-        <button type="button" onClick={() => void adjust()} disabled={!runtimeReady || busy || !network || !sourceIsReady || network.qualityStatus !== 'validated'} className="inline-flex min-h-11 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('surveyStartCalculation')}</button>
+        <button type="button" onClick={() => void adjust()} disabled={!runtimeReady || busy || !network || !calculationReady} className="inline-flex min-h-11 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-semibold text-white disabled:opacity-50"><Play className="h-3.5 w-3.5" />{t('surveyStartCalculation')}</button>
       </div>
       <SurveyProfessionalInputs network={network} onAsk={project.workspace && onOpenAi ? (label, evidence) => askAboutEvidence(t('surveyExplainEvidence', { label }), evidence) : undefined} />
-      {network?.findings?.length ? <div className="border-t border-ds-border-muted px-4 py-3"><p className="text-[11px] font-medium text-ds-ink">{t('surveyNeedsAttention')}</p><ul className="mt-1 space-y-1 text-[11px] text-ds-muted">{network.findings.filter((finding) => finding.severity !== 'info').slice(0, 3).map((finding, index) => <li key={`${finding.code}-${index}`} className={finding.severity === 'blocking' ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}>{surveySourceDiagnosticText(finding, appI18n.language, network.sourceFile?.disposition, sourceEligibility?.eligible)}{finding.severity === 'blocking' ? <button type="button" onClick={() => { setSection('network'); setAdvancedOpen(true) }} className="ml-2 min-h-11 text-accent underline">{t('engineeringFixIssue')}</button> : null}</li>)}</ul></div> : null}
     </div> : null}
     {compact && contentSection === 'result' ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ds-border-muted py-3">
       <h3 className="text-base font-semibold">{t('engineeringViewResults')}</h3>
@@ -1000,6 +1141,6 @@ function SurveyResultSummary({ adjustment, onAskPoint }: { adjustment: Adjustmen
   return <section className="survey-result-summary mt-3 border border-ds-border-muted bg-ds-card" aria-label={t('surveyPointResults')}>
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ds-border-muted px-4 py-3"><div><h4 className="text-[12.5px] font-semibold text-ds-ink">{t('surveyPointSummary')}</h4><p className="mt-0.5 text-[10.5px] text-ds-muted">{admissible ? t('surveyPointResultsValid') : t('surveyPointResultsAudit')}</p></div><div className="flex items-center gap-3 text-[10.5px] text-ds-faint"><span>{t('surveyLengthUnit')}{linearUnit}</span><span>{t('surveyCovariance')}{adjustment.result.covariance?.length ? t('surveyReturned') : t('surveyNotReturned')}</span><span className={outlierCount ? 'font-semibold text-red-700 dark:text-red-300' : 'text-ds-muted'}>{t('surveyOutliers')}{outlierCount}</span></div></div>
     <p className="px-4 py-2 text-[10.5px] text-ds-muted">{t('surveyErrorEllipseHint')}</p>
-    <div role="region" aria-label={t('surveyPointResults')} tabIndex={0} className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"><table className="w-full min-w-[840px] text-left text-[10.5px]"><thead className="bg-ds-subtle text-ds-muted"><tr><th className="px-3 py-2 font-semibold">{t('surveyPointId')}</th><th className="px-3 py-2 font-semibold">{t('surveyAdjustedX', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyAdjustedY', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyLatitudeLongitude')}</th><th className="px-3 py-2 font-semibold">{t('surveyAdjustedHeight', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyCorrection', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyPointError', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyErrorEllipse')}</th></tr></thead><tbody className="divide-y divide-ds-border-muted">{pointRows.map((point) => <tr key={point.id} tabIndex={-1} data-evidence-key={JSON.stringify(['point', point.id])} className="hover:bg-ds-hover focus:bg-accent/10 focus:outline focus:outline-2 focus:outline-accent"><td className="min-w-28 px-3 py-2.5 font-medium text-ds-ink">{point.id}<button type="button" disabled={!onAskPoint} aria-label={t('surveyAskEvidence', { label: point.id })} onClick={() => onAskPoint?.(point.id)} className="mt-1 block whitespace-nowrap text-accent disabled:opacity-50">{t('surveyAskAgent')}</button></td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{numberLabel(point.x, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{numberLabel(point.y, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{point.latitude === undefined && point.longitude === undefined ? '—' : `${numberLabel(point.latitude, 8)} / ${numberLabel(point.longitude, 8)}`}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{numberLabel(point.height, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-muted">{numberLabel(point.correctionHeight ?? point.correctionX ?? point.correctionY, 7)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-muted">{numberLabel(point.standardError, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-muted">{point.xyErrorEllipse ? <div className="min-w-40" title={t('surveyErrorEllipseHint')}><p>{t('surveyErrorEllipseAxes', { major: numberLabel(point.xyErrorEllipse.semiMajor, 6), minor: numberLabel(point.xyErrorEllipse.semiMinor, 6) })}</p><p>{t('surveyErrorEllipseOrientation', { angle: point.xyErrorEllipse.orientationRad === null ? t('surveyErrorEllipseNoOrientation') : `${numberLabel(point.xyErrorEllipse.orientationRad * 180 / Math.PI, 4)}°` })}</p><p className="text-ds-faint">{t(point.xyErrorEllipse.varianceBasis === 'a-posteriori' ? 'surveyErrorEllipsePosterior' : 'surveyErrorEllipsePrior')}</p></div> : '—'}</td></tr>)}</tbody></table></div>
+    <div role="region" aria-label={t('surveyPointResults')} tabIndex={0} className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"><table className="w-full min-w-[840px] text-left text-[10.5px]"><thead className="bg-ds-subtle text-ds-muted"><tr><th className="px-3 py-2 font-semibold">{t('surveyPointId')}</th><th className="px-3 py-2 font-semibold">{t('surveyAdjustedX', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyAdjustedY', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyLatitudeLongitude')}</th><th className="px-3 py-2 font-semibold">{t('surveyAdjustedHeight', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyCorrection', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyPointError', { unit: linearUnit })}</th><th className="px-3 py-2 font-semibold">{t('surveyErrorEllipse')}</th></tr></thead><tbody className="divide-y divide-ds-border-muted">{pointRows.map((point) => <tr key={point.id} tabIndex={-1} data-evidence-key={JSON.stringify(['point', point.id])} className="hover:bg-ds-hover focus:bg-accent/10 focus:outline focus:outline-2 focus:outline-accent"><td className="min-w-28 px-3 py-2.5 font-medium text-ds-ink">{point.id}<button type="button" disabled={!onAskPoint} aria-label={t('surveyAskEvidence', { label: point.id })} onClick={() => onAskPoint?.(point.id)} className="mt-1 block whitespace-nowrap text-accent disabled:opacity-50">{t('surveyAskAgent')}</button></td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{numberLabel(point.x, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{numberLabel(point.y, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{point.latitude === undefined && point.longitude === undefined ? '—' : `${numberLabel(point.latitude, 8)} / ${numberLabel(point.longitude, 8)}`}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-ink">{numberLabel(point.height, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-muted">{pointCorrectionLabel(point)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-muted">{numberLabel(point.standardError, 6)}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ds-muted">{point.xyErrorEllipse ? <div className="min-w-40" title={t('surveyErrorEllipseHint')}><p>{t('surveyErrorEllipseAxes', { major: numberLabel(point.xyErrorEllipse.semiMajor, 6), minor: numberLabel(point.xyErrorEllipse.semiMinor, 6) })}</p><p>{t('surveyErrorEllipseOrientation', { angle: point.xyErrorEllipse.orientationRad === null ? t('surveyErrorEllipseNoOrientation') : `${numberLabel(point.xyErrorEllipse.orientationRad * 180 / Math.PI, 4)}°` })}</p><p className="text-ds-faint">{t(point.xyErrorEllipse.varianceBasis === 'a-posteriori' ? 'surveyErrorEllipsePosterior' : 'surveyErrorEllipsePrior')}</p></div> : '—'}</td></tr>)}</tbody></table></div>
   </section>
 }

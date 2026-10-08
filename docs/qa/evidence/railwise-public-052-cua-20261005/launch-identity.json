@@ -1,0 +1,17 @@
+{
+  "pid": 40718,
+  "startedAt": "2026-10-05T15:44:41.450915+00:00",
+  "executable": "/tmp/railwise-official-052/RailWise AI.app/Contents/MacOS/RailWise AI",
+  "asarSha256Before": "ce33ebb88d156a129c599ab8ec8d08094014d3d578c2704fe564b2fa9d8fb3bb",
+  "bundleModified": false,
+  "providerSettingsCopied": true,
+  "settingsMode": "600",
+  "inboundDisabled": true,
+  "outboundDisabled": true,
+  "credentialAccess": false,
+  "isolationRoot": "/private/tmp/railwise-public-052-cua",
+  "packageIdentityEvidence": "../railwise-public-052-exact-package-20261005/package-identity.json",
+  "version": "0.5.2",
+  "taggedSourceCommit": "ea763458567ccf069067a165d812f561e9af6b62",
+  "credentialDataIncludedInEvidence": false
+}

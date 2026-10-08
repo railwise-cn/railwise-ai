@@ -29,6 +29,60 @@ async function fixture(count = 101) {
 }
 
 describe('Survey sampling frozen workspace', () => {
+  it('binds reinspection to a recomputed predecessor, keeps both rounds after restart and prevents branching rerolls', async () => {
+    const f = await fixture(), population = f.freeze()
+    const first = f.service.createRun(f.project.id, { populationId: population.id, idempotencyKey: 'first-inspection', stage: 'acceptance', inspectionMode: 'table-1-simple-random' })
+    const input = { populationId: population.id, idempotencyKey: 'reinspection-two', stage: first.stage, inspectionMode: first.inspectionMode,
+      reinspection: { previousRunId: first.id, expectedPreviousPlanHash: first.planHash, reason: '整改后复查全部单位成果资料' } }
+    const second = f.service.createRun(f.project.id, input)
+    expect(second).toMatchObject({ round: 2, populationHash: first.populationHash, sampleSize: first.sampleSize,
+      reinspection: { previousRunId: first.id, previousPlanHash: first.planHash, previousRunHash: first.runHash,
+        reason: input.reinspection.reason, previousRoundVerification: 'stored-plan-recomputed' } })
+    expect(() => f.reopen().createRun(f.project.id, { ...input, idempotencyKey: 'same-previous-reroll' })).toThrow('conflict')
+    const restarted = f.restart()
+    expect(restarted.createRun(f.project.id, input)).toEqual(second)
+    expect(restarted.getRun(f.project.id, first.id)).toEqual(first)
+    expect(restarted.listRuns(f.project.id).runs.map(run => run.round).sort()).toEqual([1, 2])
+    expect(restarted.verifyRun(f.project.id, second.id)).toMatchObject({ recomputed: true, recordIntegrity: 'verified' })
+    const db = f.db()
+    try {
+      expect(db.prepare('SELECT count(*) AS n FROM sampling_runs').get()).toEqual({ n: 1 })
+      expect(db.prepare('SELECT count(*) AS n FROM sampling_reinspection_runs').get()).toEqual({ n: 1 })
+      for (const sql of ['UPDATE sampling_reinspection_runs SET stage=\'process\'', 'DELETE FROM sampling_reinspection_runs', 'INSERT OR REPLACE INTO sampling_reinspection_runs SELECT * FROM sampling_reinspection_runs']) expect(() => db.exec(sql)).toThrow('append-only')
+    } finally { db.close() }
+  })
+
+  it('rejects stale, cross-frame, cross-stage and cross-project predecessors and enforces bounded contiguous rounds', async () => {
+    const f = await fixture(), population = f.freeze()
+    let previous = f.service.createRun(f.project.id, { populationId: population.id, idempotencyKey: 'initial-census-round', stage: 'acceptance', inspectionMode: 'census' })
+    const body = () => ({ populationId: population.id, idempotencyKey: `follow-up-${previous.round}`, stage: previous.stage, inspectionMode: previous.inspectionMode,
+      reinspection: { previousRunId: previous.id, expectedPreviousPlanHash: previous.planHash, reason: '复查' } })
+    expect(() => f.service.createRun(f.project.id, { ...body(), reinspection: { ...body().reinspection, expectedPreviousPlanHash: '0'.repeat(64) } })).toThrow('stale')
+    expect(() => f.service.createRun(f.project.id, { ...body(), stage: 'final-field' })).toThrow('conflict')
+    expect(() => f.service.createRun('project-b', body())).toThrow('not-found')
+    const other = f.service.createPopulation(f.project.id, { ...f.request, idempotencyKey: 'other-population-for-recheck' })
+    expect(() => f.service.createRun(f.project.id, { ...body(), populationId: other.id })).toThrow('conflict')
+    for (let round = 2; round <= LIMITS.roundsPerStage; round++) { previous = f.service.createRun(f.project.id, body()); expect(previous.round).toBe(round) }
+    expect(() => f.service.createRun(f.project.id, body())).toThrow('limit')
+  })
+  it('invalidates every later inspection when the previous retained plan is damaged despite a repaired row digest', async () => {
+    const f = await fixture(), population = f.freeze()
+    const first = f.service.createRun(f.project.id, { populationId: population.id, idempotencyKey: 'damaged-predecessor', stage: 'acceptance', inspectionMode: 'table-1-simple-random' })
+    const second = f.service.createRun(f.project.id, { populationId: population.id, idempotencyKey: 'dependent-inspection', stage: first.stage, inspectionMode: first.inspectionMode,
+      reinspection: { previousRunId: first.id, expectedPreviousPlanHash: first.planHash, reason: '复查' } })
+    const db = f.db()
+    try {
+      db.exec('DROP TRIGGER sampling_runs_no_update')
+      const row = db.prepare('SELECT * FROM sampling_runs WHERE id=?').get(first.id) as Record<string, unknown>
+      const record = JSON.parse(row.data_json as string), selected = record.plan.batches[0].selectedUnitProductIds as string[]
+      ;[selected[0], selected[1]] = [selected[1]!, selected[0]!]; row.data_json = JSON.stringify(record)
+      const { record_hash: ignored, ...unsigned } = row; void ignored
+      db.prepare('UPDATE sampling_runs SET data_json=?,record_hash=? WHERE id=?').run(row.data_json, flatDigest(unsigned), first.id)
+      expect(() => f.service.getRun(f.project.id, second.id)).toThrow('integrity')
+      expect(() => f.service.verifyRun(f.project.id, second.id)).toThrow('integrity')
+      expect(f.service.listRuns(f.project.id).unavailable.map(value=>value.id).sort()).toEqual([first.id, second.id].sort())
+    } finally { db.close() }
+  })
   it('retains exact UTF-8 definition bytes and ordered units while returning bounded metadata', async () => {
     const f = await fixture(), population = f.freeze()
     expect(f.freeze()).toEqual(population)

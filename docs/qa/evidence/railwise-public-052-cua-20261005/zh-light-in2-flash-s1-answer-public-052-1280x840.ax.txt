@@ -1,0 +1,116 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container 打开 AI
+					5 container
+						6 标题 打开 AI, Value: 2
+							7 文本 打开 AI
+						8 按钮 关闭详情
+					9 container Survey AI 会话
+						10 container
+							11 标题 Survey AI 会话, Value: 2
+								12 文本 Survey AI 会话
+							13 文本 golden-plane-control-e2e
+							14 按钮 导入与预检
+							15 按钮 测量平差
+							16 按钮 刷新任务资料
+						17 container
+							18 文本 请解释 S1 的结果、原始依据及需要复核的问题。
+							19 按钮 复制消息
+							20 按钮 编辑并重发
+							21 text I'll read the exact selected evidence and the current project 当前资料 before explaining. 10月5日 23:49
+							22 按钮 复制消息
+							23 标题 一、S1 的解算结果, Value: 2
+								24 文本 一、S1 的解算结果
+							25 文本 S1 位于约 X ≈ 50.00000000 m、Y ≈ 49.99999996 m，即名义点（50, 50）附近。本次平面控制网平差后，S1 的记录为
+							26 内容列表
+								27 container
+									28 AXListMarker • 
+									29 text 坐标改正量 ：ΔX ≈ −0.019 µm（−1.94×10⁻⁸ m），ΔY ≈ +0.196 µm（+1.96×10⁻⁷ m）。这是对 近似坐标的改正 ，不是相对其他期次或基准的位移，不能当作变形量使用。
+								30 container
+									31 AXListMarker • 
+									32 text 点位中误差 ：1.36×10⁻⁷ m（约 0.14 µm），基准为 后验 （后验）方差。
+								33 container
+									34 AXListMarker • 
+									35 text 点位误差椭圆 ：长半轴 1.28×10⁻⁷ m，短半轴 4.44×10⁻⁸ m，长轴方向约 129.4°（自 +X 轴向 +Y 量取，只定轴向、不分正负）；椭圆尺度采用 单位马氏半径 （即 1σ 的相对量），并非 95% 置信椭圆。
+							36 text 需要强调：上述数值都落在 10⁻⁷～10⁻⁸ m 量级，属于 数值解算量级的一致性表现 ，不是可以用外业手段验证的物理精度。
+							37 标题 二、原始依据, Value: 2
+								38 文本 二、原始依据
+							39 内容列表
+								40 container
+									41 AXListMarker • 
+									42 text 来源 ：本项目导入的科傻（COSA）平面控制网观测文件，共 4 个点、5 条观测。观测分别位于源记录第 6 条（后视归零）、第 7 条（方向）、第 8 条（边长）、第 9 条（方向）、第 10 条（边长）。
+								43 container
+									44 AXListMarker • 
+									45 text 解算规模 ：5 个观测、3 个未知量、 自由度仅 2 ；该次平差状态为已完成且判定有效。
+								46 container
+									47 AXListMarker • 
+									48 text 平差前路线闭合检查 ：水平闭合 1.37×10⁻⁷ m，角度闭合 3.11×10⁻¹⁰ rad（约 6.4×10⁻⁵″）。闭合差是平差前的检查量，与平差后的观测残差不是同一类指标，二者不可互换。
+								49 container
+									50 AXListMarker • 
+									51 text 观测残差 ：5 条观测全部通过筛查（无离群标记），最大标准化残差约 1.4×10⁻⁴，远低于 3 倍相对阈值。该比例是在 声明先验 尺度下计算的。
+								52 container
+									53 AXListMarker • 
+									54 text 统计概要 ：范围是描述性筛查，数值状态为"clear"，5 条可用、0 条不可用、0 条被标记； 显著性未评估、标准符合性未评估 。方差因子为 1.1387×10⁻⁸，以方差尺度与 1 相比低约 8 个数量级；其平方根（单位权标准差 1.067×10⁻⁴）以标准差尺度低约 4 个数量级。
+							55 标题 三、需要复核的问题, Value: 2
+								56 文本 三、需要复核的问题
+							57 内容列表
+								58 container
+									59 AXListMarker 1. 
+									60 text 基准不可确认 ：任务项目资料中坐标系统与高程基准仍标注为"待确认"。S1 及其他点的已知坐标来源、方位角基准、尺度基准如何固定，本记录未体现；S1 有非零改正与精度，说明它参与了解算而非被完全固定，基准约束方式需人工核对。
+								61 container
+									62 AXListMarker 2. 
+									63 text 自由度仅 2 ：统计检验能力很弱，方差因子与点位中误差对单条观测和先验权假设非常敏感，不能据此判定观测精度合格。
+								64 container
+									65 AXListMarker 3. 
+									66 text 后验方差因子远小于 1 （方差尺度低约 8 个数量级）：需核对先验权（仪器标称精度、测回数）与观测单位设置是否合理。一种可能假设是观测由同一套坐标反算生成、内符合天然一致；这仅为假设，须用原始观测与仪器记录佐证。
+								67 container
+									68 AXListMarker 4. 
+									69 text 残差远小于声明先验 ：全部残差约为声明先验的 10⁻⁴～10⁻⁵ 量级，属"几乎零残差"。此类结果通常表示内业自洽，必须用独立外业检核或重复观测确认，不能反推真实精度。
+								70 container
+									71 AXListMarker 5. 
+									72 text 一条格式/校验提示仍未关闭 ：系统保留了源文件解析的警告性提示，要求继续完成基准、控制点、观测角色、拓扑、闭合与精度校验，任一条件不满足都会阻断平差。本次平差虽已完成，但该提示仍处未处理状态，需专业人员判定。
+								73 container
+									74 AXListMarker 6. 
+									75 text 精度表述须写清 ：后验基准、单位马氏半径的椭圆尺度、方向约定和改正量符号约定都应在成果说明中明确，避免被读成 95% 置信椭圆或位移量。
+								76 container
+									77 AXListMarker 7. 
+									78 text 审核状态 ：该专业复核记录为 未签署 ；标准符合性、显著性检验、签名验证均为"未评估"。在工程师签署前，不得作为交付依据，数值通过也不代表工程安全或规范符合。
+								79 container
+									80 AXListMarker 8. 
+									81 text 缺失资料 ：仪器标称精度、加乘常数、气象改正、对中与照准偏心、限差依据（现行规范条款）等均未出现在本记录中，因此观测权的来源与限差符合性无法核验。
+							82 标题 四、建议的下一步, Value: 2
+								83 文本 四、建议的下一步
+							84 内容列表
+								85 container
+									86 AXListMarker • 
+									87 文本 由专业人员在人机界面完成复核签署，并处理上述未关闭的格式/校验提示。
+								88 container
+									89 AXListMarker • 
+									90 文本 补齐基准资料（已知点坐标来源、方位与尺度基准）与仪器、观测限差依据。
+								91 container
+									92 AXListMarker • 
+									93 文本 增加独立检核（已知点检核、重复观测或独立路线比对）后再评估真实精度。
+								94 container
+									95 AXListMarker • 
+									96 文本 如需正式成果文档或成果表，可在界面中提出导出需求，我会先给出待确认的执行草案。
+							97 text 说明：以上解释基于已保存的历史解算与复核记录，本次未重新计算、未做新的校验；历史记录不等于对当前成果的重新验证。 10月5日 23:50
+							98 按钮 复制消息
+						99 container
+							100 文本输入区 (settable) 继续输入，发送后会在当前回复结束后依次发送…
+							101 按钮 更多操作
+							102 按钮 (disabled) 发送
+	103 关闭按钮
+	104 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	105 最小化按钮
+106 menu bar
+	107 RailWise AI
+	108 文件
+	109 编辑
+	110 显示
+	111 窗口
+	112 帮助
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-official-052/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html

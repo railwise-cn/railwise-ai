@@ -1,3 +1,4 @@
+import type { SurveyCollaborationService } from '../../engineering/survey-collaboration.js'
 import type { SurveyQualityAssessmentService } from '../../engineering/survey-quality-assessment.js'
 import type { SurveyQualityWorkflowService } from '../../engineering/survey-quality-workflow.js'
 import type { SurveyQualityScoringWorkspaceService } from '../../engineering/survey-quality-scoring-workspace.js'
@@ -36,6 +37,7 @@ import type { SurveyService } from '../../engineering/survey-service.js'
 import type { SurveyAdvancedTrialsWorkspaceService } from '../../engineering/survey-advanced-trials-workspace.js'
 import type { SurveySamplingWorkspaceService } from '../../engineering/survey-sampling-workspace.js'
 import type { SurveyQualityWorkspaceService } from '../../engineering/survey-quality-workspace.js'
+import type { SurveyContextMcpHost } from './survey-context-mcp.js'
 
 export type RuntimeToolDiagnostics = {
   providers: ToolProviderPolicy[]
@@ -79,7 +81,9 @@ export type ServerRuntime = {
   memoryStore?: MemoryStore
   flowService?: FlowRuntimeService
   engineeringService?: EngineeringService
+  surveyCollaborationService?: SurveyCollaborationService
   engineeringContext?: EngineeringContextService
+  surveyContextMcp?: SurveyContextMcpHost
   engineeringAi?: EngineeringAiOrchestrator
   surveyService?: SurveyService
   surveyQualityAssessmentService?: SurveyQualityAssessmentService

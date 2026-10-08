@@ -104,6 +104,37 @@ describe('registerAppIpcHandlers', () => {
     vi.clearAllMocks()
   })
 
+  it('forwards valid Survey draft requests through the desktop runtime handler', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"drafts":[]}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const base = '/v1/engineering/projects/project-1/collaboration-drafts'
+    const requests = [
+      { path: base, method: 'GET', body: undefined },
+      { path: base, method: 'POST', body: JSON.stringify({ manifestId: 'manifest-1', expectedProjectRevision: 2, idempotencyKey: 'draft-key-1' }) },
+      { path: `${base}/draft-1/review`, method: 'POST', body: '{"expectedRevision":1}' },
+      { path: `${base}/draft-1/seal`, method: 'POST', body: '{"expectedRevision":1}' },
+      { path: '/v1/engineering/collaboration-drafts/resolve', method: 'POST', body: '{"workspace":"/tmp/survey","path":"notes.md"}' }
+    ]
+    for (const request of requests) {
+      await expect(handlers.get('runtime:request')?.({}, request)).resolves.toEqual(response)
+      expect(runtimeRequest).toHaveBeenLastCalledWith(request.path, request.method, request.body)
+    }
+  })
+
+  it('rejects invalid Survey draft requests before reaching the runtime', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: '{}' }))
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    for (const request of [
+      { path: '/v1/engineering/projects/project-1/collaboration-drafts?latest=1' },
+      { path: '/v1/engineering/projects/project-1/collaboration-drafts/draft-1/seal', method: 'POST', body: '{"expectedRevision":1,"professionalSignature":"signed"}' },
+      { path: '/v1/engineering/projects/project-1/collaboration-drafts/draft-1/approve', method: 'POST', body: '{}' }
+    ]) await expect(handlers.get('runtime:request')?.({}, request)).rejects.toThrow(/Invalid payload for runtime:request/)
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
   it('accepts the active-thread flag for terminal notifications', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const showTurnCompleteNotification = vi.fn(async () => ({ ok: true as const, shown: true }))

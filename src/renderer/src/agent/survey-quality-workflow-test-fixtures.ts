@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { appendSurveyQualityEvent, verifySurveyQualityRecord } from '../../../../kun/src/engineering/survey-quality-record'
+import { getSurveyStandardBasisCatalog, resolveSurveyStandardBasis } from '../../../../kun/src/engineering/survey-standard-basis'
 import type { QualityPlan, QualityRecord } from './survey-quality-client'
 import type { WorkflowContext, QualityWorkflow, WorkflowBinding, WorkflowEvent } from './survey-quality-workflow-client'
 const hash = (value: string) => value.repeat(64)
@@ -52,7 +53,12 @@ export function appendFixture(current: QualityWorkflow, declared: WorkflowEvent,
   else if (declared.kind === 'issue-rechecked') actual = { kind: declared.kind, issueId: declared.issueId, correctionId: declared.correctionId, recheckedArtifactSha256: target!.plan.artifact.bundleHash, outcome: declared.outcome, evidenceSha256 }
   else if (declared.kind === 'stage-started') actual = { kind: declared.kind, stageId: declared.stageId, stageKind: declared.stageKind, policyVersion: declared.policyVersion, checkedScope: declared.checkedScope, evidenceSha256 }
   else if (declared.kind === 'stage-completed') actual = { kind: declared.kind, stageId: declared.stageId, stageKind: declared.stageKind, outcome: declared.outcome, evidenceSha256 }
-  else if (declared.kind === 'rule-applicability') actual = { kind: declared.kind, declarationId: declared.declarationId, rule: declared.rule, status: declared.status, rationale: declared.rationale, evidenceSha256 }
+  else if (declared.kind === 'rule-applicability') {
+    const resolved = declared.basis ? resolveSurveyStandardBasis(declared.basis) : undefined
+    actual = { kind: declared.kind, declarationId: declared.declarationId, rule: declared.rule, status: declared.status, rationale: declared.rationale, evidenceSha256,
+      ...(resolved ? { basisBinding: { reference: resolved.reference, ruleDigest: resolved.entry.ruleDigest, catalogDigest: getSurveyStandardBasisCatalog().catalogDigest } } : {}),
+      ...(declared.replacesDeclarationId ? { replacesDeclarationId: declared.replacesDeclarationId } : {}) }
+  }
   else if (declared.kind === 'rule-revoked') actual = { kind: declared.kind, declarationId: declared.declarationId, reason: declared.reason, evidenceSha256 }
   else if (declared.kind === 'signoff-declared') actual = { kind: declared.kind, signoffId: declared.signoffId, purpose: declared.purpose, actorKey: declared.actorKey, evidenceSha256 }
   else if (declared.kind === 'signoff-revoked') actual = { kind: declared.kind, signoffId: declared.signoffId, reason: declared.reason, evidenceSha256 }

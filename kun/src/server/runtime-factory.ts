@@ -91,6 +91,8 @@ import { stopAllBashSessions } from '../adapters/tool/builtin-bash-tool.js'
 import { HttpVisionEvidenceService, type VisionEvidenceConfig } from '../vision/vision-evidence-service.js'
 import { EngineeringService } from '../engineering/engineering-service.js'
 import { EngineeringContextService } from '../engineering/engineering-context-service.js'
+import { SurveyCollaborationService } from '../engineering/survey-collaboration.js'
+import { SurveyContextAccessStore } from '../adapters/mcp/survey-context-access-store.js'
 import { EngineeringAiOrchestrator } from '../engineering/engineering-ai-orchestrator.js'
 import { buildEngineeringConversationTools } from '../adapters/tool/engineering-conversation-tools.js'
 import { EngineeringAiRepository } from '../engineering/engineering-ai-repository.js'
@@ -391,6 +393,10 @@ export async function createKunServeRuntime(
     nowIso
   })
   const engineeringContext = new EngineeringContextService(engineeringService, nowIso, surveyService)
+  const surveyCollaborationService = new SurveyCollaborationService(join(options.dataDir, 'survey-collaboration.sqlite'), engineeringService, engineeringContext, nowIso)
+  const surveyContextMcpAccess = !options.insecure && options.runtimeToken.length > 0
+    && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(options.host)
+    ? new SurveyContextAccessStore(join(options.dataDir, 'engineering', 'mcp-access'), nowIso) : undefined
   const surveyQualityWorkspaceService = new SurveyQualityWorkspaceService({
     rootDir: join(options.dataDir, 'engineering'),
     nowIso,
@@ -410,7 +416,8 @@ export async function createKunServeRuntime(
   })
   const surveyAdvancedTrialsWorkspaceService = new SurveyAdvancedTrialsWorkspaceService({
     rootDir: join(options.dataDir, 'engineering'), nowIso,
-    getProject: (projectId) => engineeringService.getProject(projectId)
+    getProject: (projectId) => engineeringService.getProject(projectId),
+    getSourceModel: (projectId, request) => surveyService.getSourceFixedModel(projectId, request)
   })
   const surveySamplingWorkspaceService = new SurveySamplingWorkspaceService({
     rootDir: join(options.dataDir, 'engineering'),
@@ -426,7 +433,8 @@ export async function createKunServeRuntime(
       getPopulation: (pid: string, id: string) => surveySamplingWorkspaceService.getPopulation(pid, id),
       getRun: (pid: string, id: string) => surveySamplingWorkspaceService.getRun(pid, id),
       listSamples: (pid: string, id: string, limit: number, offset: number) => surveySamplingWorkspaceService.listSamples(pid, id, limit, offset),
-      getScore: (pid: string, id: string) => surveyQualityScoringWorkspaceService.getRecord(pid, id)
+      getScore: (pid: string, id: string) => surveyQualityScoringWorkspaceService.getRecord(pid, id),
+      getLineageScore: (pid: string, id: string) => surveyQualityScoringWorkspaceService.getAssessmentLineageRecord(pid, id)
     })
   })
   const visionEvidenceRuntime = createVisionEvidenceService(options.visionEvidence)
@@ -447,8 +455,8 @@ export async function createKunServeRuntime(
   let flowDelegationRuntime: DelegationRuntime | undefined
   const flowService = new FlowRuntimeService(
     flowRepository,
-    buildFlowNodeRegistry(),
-    buildCoreFlowAdapters(new Map(), {
+    buildFlowNodeRegistry({ railwise: { available: false, reason: '此历史流程尚未接入专业计算服务，请使用内业处理和草稿复核流程。' }, survey_drafts: { available: true } }),
+    buildCoreFlowAdapters(surveyCollaborationService.adapters(flowRepository), {
       model: modelClient,
       defaultModel: options.model,
       attachments: attachmentStore,
@@ -682,6 +690,12 @@ export async function createKunServeRuntime(
     flowService,
     engineeringService,
     engineeringContext,
+    surveyCollaborationService,
+    ...(surveyContextMcpAccess ? { surveyContextMcp: {
+      access: surveyContextMcpAccess,
+      snapshot: (projectId: string) => engineeringContext.snapshot(projectId),
+      projectExists: (projectId: string) => engineeringService.getProject(projectId) !== null
+    } } : {}),
     engineeringAi,
     surveyService,
     surveyQualityAssessmentService,
@@ -754,8 +768,10 @@ export async function createKunServeRuntime(
       } finally {
         try {
           flowService.shutdown()
+          surveyCollaborationService.close()
           taskRepository.close()
           engineeringAiRepository.close()
+          surveyContextMcpAccess?.close()
           await surveyService.flush()
           await engineeringService.flush()
           surveyService.close()

@@ -112,6 +112,19 @@ export async function drawSamplingRun(binding: SamplingBinding, population: Samp
   if (value.stage !== stage || value.inspectionMode !== inspectionMode) invalid()
   return value
 }
+export async function drawSamplingReinspection(binding: SamplingBinding, previous: SamplingRun, reason: string, idempotencyKey: string): Promise<SamplingRun> {
+  const body = SurveySamplingRunCreateV1.parse({ populationId: previous.populationId, idempotencyKey,
+    stage: previous.stage, inspectionMode: previous.inspectionMode,
+    reinspection: { previousRunId: previous.id, expectedPreviousPlanHash: previous.planHash, reason } })
+  const value = parseRun(await request(runtimeSurveySamplingPath(binding.projectId, 'runs'), 'POST', body), binding)
+  if (value.populationId !== previous.populationId || value.populationHash !== previous.populationHash
+    || value.definitionEvidenceSha256 !== previous.definitionEvidenceSha256 || value.unitCount !== previous.unitCount
+    || value.projectBindingHash !== previous.projectBindingHash || value.stage !== previous.stage || value.inspectionMode !== previous.inspectionMode
+    || value.round !== previous.round + 1 || value.reinspection?.previousRunId !== previous.id
+    || value.reinspection.previousPlanHash !== previous.planHash || value.reinspection.previousRunHash !== previous.runHash
+    || value.reinspection.reason !== body.reinspection!.reason) invalid()
+  return value
+}
 export async function readSamplingRun(binding: SamplingBinding, expected: SamplingRun): Promise<SamplingRun> {
   const value = parseRun(await request(runtimeSurveySamplingPath(binding.projectId, 'runs', expected.id)), binding)
   if (!equal(value, expected)) invalid()

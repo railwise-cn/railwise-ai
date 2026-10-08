@@ -16,6 +16,8 @@ import { evaluateSurveyStatisticalFamilyV1 } from './survey-statistical-family.j
 import { diagnoseGeneralizedW } from './survey-generalized-w.js'
 import { runSurveyVceTrial } from './survey-vce-trial.js'
 import { parseAdvancedTrialJson } from './survey-advanced-trials-json.js'
+import { SurveySourceFixedModelRequestV1, SurveySourceFixedModelV1, type SurveySourceFixedModelBindingV1 } from '../contracts/survey-source-fixed-model.js'
+import { declarationMatchesSource } from '../contracts/survey-source-trial-adapter.js'
 
 const L = C.SURVEY_ADVANCED_TRIAL_LIMITS
 type Project = { id: string; revision: number; workspace: string }
@@ -48,7 +50,8 @@ export class SurveyAdvancedTrialsWorkspaceService {
   private readonly db: Database.Database
   private readonly rates = new Map<string, { since: number; units: number }>()
   private closed = false
-  constructor(private readonly options: { rootDir: string; nowIso?: () => string; clockMs?: () => number; getProject: (projectId: string) => Project | null }) {
+  constructor(private readonly options: { rootDir: string; nowIso?: () => string; clockMs?: () => number; getProject: (projectId: string) => Project | null;
+    getSourceModel?: (projectId: string, request: SurveySourceFixedModelRequestV1) => SurveySourceFixedModelV1 | null }) {
     mkdirSync(resolve(options.rootDir), { recursive: true, mode: 0o700 })
     this.db = new Database(join(options.rootDir, 'survey-advanced-trials.sqlite3'))
     this.db.pragma('journal_mode = WAL')
@@ -81,6 +84,25 @@ export class SurveyAdvancedTrialsWorkspaceService {
     if (entry.units + units > L.workUnitsPerMinute || !this.rates.has(pid) && this.rates.size >= 512) fail('rate-limit')
     entry.units += units
     this.rates.set(pid, entry)
+  }
+  getSourceModel(pid: string, raw: Uint8Array): SurveySourceFixedModelV1 {
+    this.project(pid); this.charge(pid, 10)
+    let request: SurveySourceFixedModelRequestV1
+    try { request = SurveySourceFixedModelRequestV1.parse(parseAdvancedTrialJson(this.decode(raw))) } catch { return fail('validation') }
+    try {
+      const source = this.options.getSourceModel?.(pid, request)
+      if (!source) return fail('not-found')
+      const checked = SurveySourceFixedModelV1.parse(source)
+      if (checked.binding.projectId !== pid || checked.binding.projectRevision !== request.expectedProjectRevision || checked.binding.networkRevision !== request.expectedNetworkRevision
+        || checked.binding.runId !== request.adjustmentId && checked.binding.resultId !== request.adjustmentId || digest(checked.model) !== checked.binding.fixedModelHash) return fail('integrity')
+      return checked
+    } catch (e) { if (e instanceof SurveyAdvancedTrialsError) throw e; return fail(e instanceof Error && e.message.includes('stale') ? 'stale' : 'validation') }
+  }
+  private verifySource(pid: string, binding: SurveySourceFixedModelBindingV1 | undefined, kind: C.SurveyAdvancedTrialKindV1, declaration: unknown): void {
+    if (!binding) return
+    const source = this.getSourceModel(pid, Buffer.from(JSON.stringify({ adjustmentId: binding.runId, expectedProjectRevision: binding.projectRevision, expectedNetworkRevision: binding.networkRevision })))
+    if (canonical(source.binding) !== canonical(binding)) return fail('stale')
+    if (!declarationMatchesSource(source, kind, declaration)) return fail('integrity')
   }
   private chargeModel(pid: string, model: C.SurveyAdvancedTrialRecordV1['declaration']): void {
     if ('base' in model) {
@@ -153,6 +175,7 @@ export class SurveyAdvancedTrialsWorkspaceService {
         || parsed.request.kind !== record.kind || parsed.request.expectedProjectRevision !== record.projectRevision
         || parsed.request.idempotencyKey !== record.idempotencyKey || parsed.request.acknowledged !== record.acknowledged
         || parsed.request.declarationJson !== record.declarationJson || parsed.request.modelBasisStatement !== record.modelBasisStatement
+        || canonical(parsed.request.sourceModel ?? null) !== canonical(record.sourceModel ?? null)
         || !Buffer.from(record.declarationJson).equals(row.declaration_bytes) || sha(row.declaration_bytes) !== record.declarationSha256
         || sha(record.modelBasisStatement) !== record.modelBasisSha256 || digest(parsed.declaration) !== record.modelHash
         || canonical(parsed.declaration) !== canonical(record.declaration) || digest(record.result) !== record.resultHash
@@ -160,6 +183,7 @@ export class SurveyAdvancedTrialsWorkspaceService {
       const project = this.project(pid)
       if (digest(project) !== record.projectBindingHash) return fail('stale')
       if (digest(environment()) !== record.replayEnvironmentHash) return fail('replay-environment')
+      this.verifySource(pid, record.sourceModel, record.kind, parsed.declaration)
       this.chargeModel(pid, parsed.declaration)
       const recomputed = this.evaluate(record.kind, parsed.declaration)
       if (canonical(recomputed) !== canonical(record.result)) return fail('integrity')
@@ -181,6 +205,7 @@ export class SurveyAdvancedTrialsWorkspaceService {
         return this.summary(record)
       }
       if (project.revision !== request.expectedProjectRevision) return fail('stale')
+      this.verifySource(pid, request.sourceModel, request.kind, declaration)
       const usage = this.db.prepare(`SELECT count(*) AS count,coalesce(sum(length(CAST(data_json AS BLOB))+length(request_bytes)+length(declaration_bytes)),0) AS bytes
         FROM advanced_trials WHERE project_id=?`).get(pid) as { count: number; bytes: number }
       if (usage.count >= L.trialsPerProject) return fail('limit')
@@ -192,6 +217,7 @@ export class SurveyAdvancedTrialsWorkspaceService {
       const replayEnvironment = environment()
       const unsigned = { schemaVersion: 1, id: `advanced_trial_${randomUUID()}`, projectId: pid, projectRevision: project.revision,
         projectBindingHash: digest(project), kind: request.kind, acknowledged: true, idempotencyKey: request.idempotencyKey,
+        ...(request.sourceModel ? { sourceModel: request.sourceModel } : {}),
         algorithmVersion: 'diagnosticsVersion' in result ? result.diagnosticsVersion : result.algorithmVersion,
         createdAt: now, requestSha256: sha(raw), declarationSha256: sha(request.declarationJson), modelHash: digest(declaration), resultHash: digest(result),
         requestSizeBytes: raw.byteLength, declarationSizeBytes: Buffer.byteLength(request.declarationJson), modelNormalization: 'schema-normalized',

@@ -1,5 +1,6 @@
 import { SurveyStaticIncrementalInputV1, SurveyStaticIncrementalOutputV1 } from './survey-static-incremental.js'
 import { z } from 'zod'
+import { SurveySourceFixedModelBindingV1 } from './survey-source-fixed-model.js'
 import { SurveyReferenceDatumInputV1, SurveyReferenceDatumOutputV1 } from './survey-reference-datum.js'
 import { SurveyGeneralizedWRequestV1, SurveyGeneralizedWResultV1 } from './survey-generalized-w.js'
 import { SurveyVceTrialInputV1, SurveyVceTrialOutputV1 } from './survey-vce-trial.js'
@@ -21,7 +22,8 @@ export type SurveyAdvancedTrialKindV1 = z.infer<typeof SurveyAdvancedTrialKindV1
 export const SurveyAdvancedTrialCreateV1 = z.object({
   kind: SurveyAdvancedTrialKindV1, acknowledged: z.literal(true), expectedProjectRevision: revision,
   idempotencyKey: key, declarationJson: text(SURVEY_ADVANCED_TRIAL_LIMITS.declarationBytes),
-  modelBasisStatement: text(SURVEY_ADVANCED_TRIAL_LIMITS.basisBytes).refine(v => v.trim().length > 0)
+  modelBasisStatement: text(SURVEY_ADVANCED_TRIAL_LIMITS.basisBytes).refine(v => v.trim().length > 0),
+  sourceModel: SurveySourceFixedModelBindingV1.optional()
 }).strict()
 export type SurveyAdvancedTrialCreateV1 = z.infer<typeof SurveyAdvancedTrialCreateV1>
 const boundaries = {
@@ -30,6 +32,7 @@ const boundaries = {
   checkpointTrust: z.literal('local-records-only')
 }
 const common = {
+  sourceModel: SurveySourceFixedModelBindingV1.optional(),
   schemaVersion: z.literal(1), id, projectId: id, projectRevision: revision, projectBindingHash: hash,
   kind: SurveyAdvancedTrialKindV1, acknowledged: z.literal(true), idempotencyKey: key,
   algorithmVersion: z.enum(['fixed-linear-known-covariance-generalized-w-1', 'disjoint-linear-vce-trial-1', 'fixed-scale-independent-huber-irls-1', 'declared-statistical-family-1', 'declared-reference-datum-1', 'declared-static-linear-append-1']),
