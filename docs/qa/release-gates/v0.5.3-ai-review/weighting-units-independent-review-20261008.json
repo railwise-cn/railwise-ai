@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent-ai-source-review",
+  "date": "2026-10-08",
+  "repository": "/Users/wangjiawei/Documents/WorkWise",
+  "branch": "codex/survey-weighting-units-053",
+  "baseCommit": "d3f9158a6fd26cd40e4f0bd3dd4d92e4686d1f51",
+  "snapshotBasis": "uncommitted working-tree files; not a package identity",
+  "canonicalManifestSha256": "380aade8e187669c0225b649a4b6b658a6c8cd5dea178157b4a37e3bceb0063d",
+  "canonicalFormat": "path + TAB + sha256 + LF, sorted by path",
+  "files": [
+    {
+      "path": "kun/src/adapters/tool/engineering-conversation-tools.test.ts",
+      "sha256": "8b753a44161c0f56dad473f3c2aecf4a49357a8ae6cd2a13b2d11c6a6eb6af94"
+    },
+    {
+      "path": "kun/src/adapters/tool/railwise-tool-provider.test.ts",
+      "sha256": "8a41765fab99bed3e1a39951197c4b13ba1e17501b589551cc089a4a1bb7b351"
+    },
+    {
+      "path": "kun/src/adapters/tool/railwise-tool-provider.ts",
+      "sha256": "bdba0e863f218c97a517a2a92c271abda3fde0d20d3ded242387116db6011a2f"
+    },
+    {
+      "path": "kun/src/contracts/survey-professional.ts",
+      "sha256": "e053a0d03fb6633a5e5dc41ac9d49052336e247308fdde89a5eedb3cb2a6fa0c"
+    },
+    {
+      "path": "kun/src/contracts/survey-statistical-semantics.ts",
+      "sha256": "0a60153d6e815d08c4e13cf69f080e618c4217cf7ef38493cd27c4d5e01b685e"
+    },
+    {
+      "path": "kun/src/contracts/survey.ts",
+      "sha256": "13a04103b0f0f0253975218bfb0deee0ab5b6d4b891797f4df67475898e528f8"
+    },
+    {
+      "path": "kun/src/engineering/engineering-ai-orchestrator.ts",
+      "sha256": "25eb761e21f774539a8e0fb03ea5cadae296893a732d47d39a249d50f38b973b"
+    },
+    {
+      "path": "kun/src/engineering/engineering-context-service.ts",
+      "sha256": "fa3ac43ea7efbd4b19acb3fdb258890e2a866f7530684163b1ba74d84edfc7f4"
+    },
+    {
+      "path": "kun/src/engineering/engineering-service.ts",
+      "sha256": "e94a51a0b29d31b4923cbf11ef93e06bb484a808f7d3364da89474e817cd248f"
+    },
+    {
+      "path": "kun/src/engineering/survey-ai-adjustment-semantics.test.ts",
+      "sha256": "62cf991ea4c7ed98edbf2533e526e84d4a9a3db50f2e5c036ba56d1c470db02f"
+    },
+    {
+      "path": "kun/src/engineering/survey-ai-adjustment-semantics.ts",
+      "sha256": "9edc5e398511c1c15e7124cdaa01774e538579f077456297c2699ea160b1a318"
+    },
+    {
+      "path": "kun/src/engineering/survey-golden.test.ts",
+      "sha256": "564665bbc16fbea0c0cfc727062a1e171ca26b7462e4078bd0d87e2dec88954a"
+    },
+    {
+      "path": "kun/src/engineering/survey-professional-report.test.ts",
+      "sha256": "5424a1d0b9700c733c3a3749318f80e57f15952ab7317c37f73e6df47df4bb70"
+    },
+    {
+      "path": "kun/src/engineering/survey-professional-report.ts",
+      "sha256": "d9ecbc993d648b87d4d93c0f3e4ea8302340de85b83f536103b10c98ddbf0ea4"
+    },
+    {
+      "path": "kun/src/engineering/survey-professional-review.ts",
+      "sha256": "808d4a3f408091307dc1fae0f9f01b9c7a316e4af4c8700c53a25cd237615dcb"
+    },
+    {
+      "path": "kun/src/engineering/survey-service.ts",
+      "sha256": "f03612163ee876529e0e3fe29bd58e3f4b1db01f9ec1d96a6594a0d5072813f8"
+    },
+    {
+      "path": "kun/src/engineering/survey-source-fixed-model.test.ts",
+      "sha256": "2e0cf4b854e65460a6c04c10ebb29707a06624558a9e2499f50955d54c8b1071"
+    },
+    {
+      "path": "kun/src/engineering/survey-statistical-semantics.test.ts",
+      "sha256": "9259a676a977745c87044c06d4fb718b64c21dbc76bf754b334df686cb264ab7"
+    },
+    {
+      "path": "kun/src/engineering/survey-statistical-semantics.ts",
+      "sha256": "1c209a10e9f0fb9e6ccd5ff2cc96ee299e11b843d27329fe8f03b25171911f4c"
+    },
+    {
+      "path": "kun/src/engineering/survey-statistical-service.test.ts",
+      "sha256": "4b4c9b3df68fef514b047f6ff3dbaf0f0d09bff41ac87ceddee583235440b187"
+    },
+    {
+      "path": "kun/src/engineering/survey-weighting-delivery.test.ts",
+      "sha256": "22d71ee12e26272d3085cfb14a7575313d01d414bfb5008b90742dfc54e3a4a2"
+    },
+    {
+      "path": "kun/src/engineering/survey-weighting-semantics.ts",
+      "sha256": "33580b5f76d6a54d0de7cca9f862264352cc276d6259f186b21f4c49fbdce68e"
+    },
+    {
+      "path": "kun/src/engineering/survey-weighting-units.test.ts",
+      "sha256": "0ecdd25e422efcc41a35abe374384bbfb3e7ad044a916f6a49d0b9ca528195bf"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/ProfessionalSurveyReview.dom.test.ts",
+      "sha256": "5421322b70e69dcde725597534542261c2ac82b6d7bff9f221b27862ce83cf61"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/ProfessionalSurveyReview.tsx",
+      "sha256": "b744587411d4ef177c042b29cbec5aaed29a3a05b31c450c1b44f6a7eee26476"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.dom.test.ts",
+      "sha256": "b0e5ce470105a1fef84580de1a24bc04c664812894b033df5555b9fe2be42aa4"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentPanel.tsx",
+      "sha256": "aced77e6c0b8b391d3eab810e434c79a58bd0d790fc3e78acb17411e6003d19b"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentStatistics.dom.test.ts",
+      "sha256": "a79e417a8c8aaea1ee3b700b70d85c8388410859793daee7d91800dcdcabde81"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/SurveyAdjustmentStatistics.tsx",
+      "sha256": "3bb4e9bb6d4c3522c0833e79f456204ec2a133d2b8fd1572ed2b3f3f179c50d0"
+    },
+    {
+      "path": "src/renderer/src/locales/en/common.json",
+      "sha256": "df6971570d76b409fcda1a4f3544239272fdf30568f83a1eefb7c022fe5b753a"
+    },
+    {
+      "path": "src/renderer/src/locales/zh/common.json",
+      "sha256": "5af7518241e0b17ddad18188a49200e0838c3cec4362e5b46aa0a6f9c3bf6e4b"
+    }
+  ],
+  "scope": "changed product source and tests only; QA documentation excluded"
+}
