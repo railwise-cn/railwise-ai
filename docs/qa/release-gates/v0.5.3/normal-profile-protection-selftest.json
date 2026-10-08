@@ -1,0 +1,35 @@
+{
+  "schema": "railwise.profile-protection.selftest.v1",
+  "observedDate": "2026-10-08",
+  "status": "passed",
+  "testedScriptSha256": "2b65d8390f0d6641b43b28d64834b0146105d5e9e62ac128203e252ba40f5a6c",
+  "command": "node docs/qa/release-gates/v0.5.3/normal-profile-protection.mjs self-test",
+  "scope": "Temporary synthetic directories only; no live profile activation, application launch, or product acceptance.",
+  "checks": [
+    "concurrent-session-conflict",
+    "changed-original-blocks-activation",
+    "full-reversible-cycle",
+    "absence-restored",
+    "legacy-metadata-and-obsolete-union-restored",
+    "unrelated-codex-file-preserved",
+    "fresh-settings-and-migration-targets",
+    "interrupted-pack-archive-and-partial-copy-recovery",
+    "final-login-evidence-required",
+    "interrupted-unactivated-snapshot-can-be-aborted",
+    "verify-and-abort-terminal-journal-retry",
+    "snapshot-journal-and-reservation-crash-recovery",
+    "partial-activation-root-move-recovery",
+    "dead-lock-recovery-and-live-owner-rejection",
+    "symlink-escape-rejected"
+  ],
+  "additionalChecks": [
+    "node --check passed",
+    "git diff --check passed",
+    "real installed 0.5.2 bundle refused by exact-version inventory guard"
+  ],
+  "unexecuted": [
+    "Final frozen 0.5.3 installed-package inventory",
+    "Real snapshot/activate/restore/verify cycle",
+    "Final-package functional and visual acceptance"
+  ]
+}

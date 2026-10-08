@@ -15,13 +15,17 @@
 
 ## 冻结来源与验收前提
 
-本轮准备使用受保护 `main` 的冻结来源：
+**2026-10-08 状态更新：旧冻结已取消，等待源码 PR 和重新冻结。** 独立数值审查发现水准相对定权的单位权尺度、平方因子及专业说明存在口径缺口；对应产品修订尚待通过源码 PR 合入受保护 `main`。新冻结 source HEAD、run ID 和最终安装包均未记录，不能把准备材料或合成检查记作安装包验收。
 
-- source HEAD：`d3f9158a6fd26cd40e4f0bd3dd4d92e4686d1f51`。
-- freeze run：`37749218440`，由 `release.yml` 私有 dispatch。
+下列信息仅保留为已取消的历史冻结，不是当前可发布来源：
+
+- 历史 source HEAD：`d3f9158a6fd26cd40e4f0bd3dd4d92e4686d1f51`。
+- 历史 freeze run：`37749218440`，由 `release.yml` 私有 dispatch，现已取消。
 - 输入：`candidate_only=true`、`prepare_public_artifacts=true`、`publish_release=false`、`skip_stability=false`。
 
-必须从该 run 的真实完成结果确认完整两小时稳定性、macOS/Windows 构建、三客户端校验和最终 macOS 校验。记录该 run 的实际 attempt、两份 unexpired immutable artifact ID/digest、原始 receipt 与全部八个文件的真实尺寸和哈希，不借用同名其他构建。
+源码修订经 PR/严格 CI 合入后，必须从新的受保护 `main` 精确 source HEAD 重新私有 dispatch，并记录真实新 run。旧 run 的安装包和其他产物不能用于最终验收或公开发布。必须从新 run 的真实完成结果确认完整两小时稳定性、macOS/Windows 构建、三客户端校验和最终 macOS 校验。记录新 run 的实际 attempt、两份 unexpired immutable artifact ID/digest、原始 receipt 与全部八个文件的真实尺寸和哈希，不借用同名其他构建。
+
+本目录的 [用户资料保护说明](normal-profile-protection.md)、[合成自检](normal-profile-protection-selftest.json)、[独立 AI 工具审查](normal-profile-protection-independent-review.md) 与 [独立数值基准](independent-numerical-expectations-20261008.md) 仅为执行准备。尚未对新冻结安装包实际激活正常用户资料验收环境，也未完成其功能、界面、成果读回或 updater 验收。
 
 发布前必须完成同一冻结包的签名、公证、安装版本与 ASAR 核对、computer-use 48 视图矩阵、专业导入/预检/计算/交付及导出读回、恢复和可访问性检查、独立高级工程师模式 AI 审查，以及官方 pinned 0.5.2 到同一冻结 0.5.3 的真实 native updater 下载/安装/重启/历史资料读回。任何必需项目失败或不完整都阻断发布。
 

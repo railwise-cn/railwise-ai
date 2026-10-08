@@ -1,9 +1,31 @@
 # Final public-identity 0.5.3 acceptance preparation
 
 This directory currently contains preparation tools and plans. It is not a
-passing package acceptance report or publication manifest. The frozen source
-is `d3f9158a6fd26cd40e4f0bd3dd4d92e4686d1f51`; private freeze run
-`37749218440` must complete before its final artifacts are used.
+passing package acceptance report or publication manifest. The previous
+private freeze run `37749218440`, sourced from
+`d3f9158a6fd26cd40e4f0bd3dd4d92e4686d1f51`, was canceled after the independent
+numerical review identified incorrect scale-unit labeling for relative
+leveling weights. Product remediation is awaiting its source PR and a new
+freeze. No replacement source SHA, run, final package or acceptance result is
+recorded here. Do not consume the canceled run's artifacts for final acceptance
+or publication.
+
+## Preparation and evidence index
+
+- [Release execution order and current freeze status](release-execution-order-20261008.md)
+- [Normal public-identity profile protection procedure](normal-profile-protection.md)
+- [Profile protection script](normal-profile-protection.mjs)
+- [Synthetic profile protection self-test record](normal-profile-protection-selftest.json)
+- [Independent AI review of profile protection](normal-profile-protection-independent-review.md)
+- [Independent synthetic numerical expectations and comparison rules](independent-numerical-expectations-20261008.md)
+- [Independent numerical calculation script](independent-numerical-expectations-20261008.py)
+- [Original numerical expectation JSON](independent-numerical-expectations-20261008.json)
+- [Full final-package functional and visual acceptance plan](../../evidence/railwise-next-private-cua-plan-20261006/README.md)
+
+The helper self-tests and independent synthetic calculations below validate
+preparation tools only. Real profile activation, installed-package inspection,
+export readback and the native updater round-trip remain unexecuted for the new
+freeze. Their final reports must bind the actual new source and package hashes.
 
 ## Original computer-use captures
 
@@ -50,4 +72,4 @@ passed. These are helper checks and do not constitute installed-package
 screenshots, a valid PNG image fixture, or product acceptance.
 
 The actual release order, single-maintainer governance and separate product
-page deployment are documented in `release-execution-order-20261008.md`.
+page deployment are documented in the [release execution order](release-execution-order-20261008.md).

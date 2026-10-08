@@ -1,0 +1,332 @@
+{
+  "status": "independent-synthetic-expectations; not packaged acceptance",
+  "reviewType": "AI review",
+  "productParserOrSolverImported": false,
+  "pythonVersion": "3.12.7",
+  "numpyVersion": "2.4.6",
+  "in2": {
+    "source": {
+      "path": "kun/src/engineering/fixtures/survey-formats/cosa-in2/golden-plane-control-e2e.in2",
+      "sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "bytes": 141
+    },
+    "coordinateConvention": "X north, Y east; azimuth atan2(dY,dX), clockwise from north",
+    "fixedControlsM": {
+      "A": [
+        50.0,
+        150.0
+      ],
+      "B": [
+        150.0,
+        50.0
+      ],
+      "C": [
+        120.710678,
+        120.710678
+      ]
+    },
+    "station": "S1",
+    "initialParameters": [
+      50.000000000000014,
+      49.9999997626905,
+      1.5707963267948966
+    ],
+    "finalParameters": [
+      49.999999992841026,
+      49.9999999637103,
+      1.5707963269606608
+    ],
+    "independentInitialCorrection": [
+      -7.158988069022598e-09,
+      2.010198016932918e-07,
+      1.6576429118231317e-10
+    ],
+    "parameterUnits": [
+      "m",
+      "m",
+      "rad"
+    ],
+    "observations": [
+      {
+        "line": 6,
+        "target": "A",
+        "kind": "L",
+        "observed": 0.0,
+        "sigma": 4.84813681109536e-06,
+        "unit": "rad",
+        "adjustedMinusObserved": -2.3735413634540237e-10,
+        "observedMinusAdjusted": 2.3735413634540237e-10,
+        "residualOverDeclaredPriorSigma": -4.895780494523131e-05
+      },
+      {
+        "line": 7,
+        "target": "B",
+        "kind": "L",
+        "observed": 4.71238898038469,
+        "sigma": 4.84813681109536e-06,
+        "unit": "rad",
+        "adjustedMinusObserved": 1.971329766092822e-10,
+        "observedMinusAdjusted": -1.971329766092822e-10,
+        "residualOverDeclaredPriorSigma": 4.066159522522697e-05
+      },
+      {
+        "line": 8,
+        "target": "B",
+        "kind": "S",
+        "observed": 100.0,
+        "sigma": 0.001004987562112089,
+        "unit": "m",
+        "adjustedMinusObserved": 7.158973858167883e-09,
+        "observedMinusAdjusted": -7.158973858167883e-09,
+        "residualOverDeclaredPriorSigma": 7.123445232618136e-06
+      },
+      {
+        "line": 9,
+        "target": "C",
+        "kind": "L",
+        "observed": 5.497787143782138,
+        "sigma": 4.84813681109536e-06,
+        "unit": "rad",
+        "adjustedMinusObserved": 4.022115973612017e-11,
+        "observedMinusAdjusted": -4.022115973612017e-11,
+        "residualOverDeclaredPriorSigma": 8.296209720004341e-06
+      },
+      {
+        "line": 10,
+        "target": "C",
+        "kind": "S",
+        "observed": 100.0,
+        "sigma": 0.001004987562112089,
+        "unit": "m",
+        "adjustedMinusObserved": -1.370803204281401e-07,
+        "observedMinusAdjusted": 1.370803204281401e-07,
+        "residualOverDeclaredPriorSigma": -0.0001364000168719015
+      }
+    ],
+    "observationCount": 5,
+    "parameterCount": 3,
+    "rank": 3,
+    "degreesOfFreedom": 2,
+    "weightedSSE": 2.2774767161670938e-08,
+    "varianceFactor": 1.1387383580835469e-08,
+    "unitWeightStdDev": 0.00010671168436884252,
+    "varianceFactorUnit": "dimensionless with explicit absolute prior sigmas",
+    "aprioriCovariance": [
+      [
+        6.87208443807279e-07,
+        -6.262705982801548e-07,
+        7.474163269919877e-09
+      ],
+      [
+        -6.262705982801548e-07,
+        9.351721243643203e-07,
+        -8.885164872431056e-09
+      ],
+      [
+        7.474163269919877e-09,
+        -8.885164872431054e-09,
+        1.0092521025675041e-10
+      ]
+    ],
+    "posteriorCovariance": [
+      [
+        7.825506149622503e-15,
+        -7.13158352801544e-15,
+        8.511116410036915e-17
+      ],
+      [
+        -7.13158352801544e-15,
+        1.0649163694241285e-14,
+        -1.0117878058133747e-16
+      ],
+      [
+        8.511116410036915e-17,
+        -1.0117878058133746e-16,
+        1.149274082170087e-18
+      ]
+    ],
+    "covarianceUnitsByEntry": [
+      [
+        "m2",
+        "m2",
+        "m rad"
+      ],
+      [
+        "m2",
+        "m2",
+        "m rad"
+      ],
+      [
+        "m rad",
+        "m rad",
+        "rad2"
+      ]
+    ],
+    "aprioriPointStdDevM": 0.0012737270383294842,
+    "posteriorPointStdDevM": 1.359215576862765e-07,
+    "aprioriEllipse": {
+      "semiMajorM": 0.0012039996631325346,
+      "semiMinorM": 0.00041565054955857117,
+      "orientationRad": 2.2584737816162987,
+      "orientationConvention": "positive X toward positive Y modulo pi; one-sigma axes"
+    },
+    "posteriorEllipse": {
+      "semiMajorM": 1.2848083203239175e-07,
+      "semiMinorM": 4.435477025223018e-08,
+      "orientationRad": 2.2584737816162987,
+      "orientationConvention": "positive X toward positive Y modulo pi; one-sigma axes"
+    },
+    "linearResidualNormM": 1.3726713064453376e-07,
+    "angularResidualNormRad": 3.111529177070756e-10,
+    "independentClosure": "not-evaluated; residual norms are descriptive only",
+    "selfchecks": {
+      "analyticJacobianMaximumDifference": 1.928501802694882e-11,
+      "multipleStartSolutionSpread": [
+        2.1316282072803006e-14,
+        8.526512829121202e-14,
+        2.220446049250313e-16
+      ],
+      "iterations": [
+        {
+          "iteration": 0,
+          "coordinateStepM": 2.0114725122813348e-07,
+          "orientationStepRad": 1.65764326971639e-10
+        },
+        {
+          "iteration": 1,
+          "coordinateStepM": 1.2055572349657211e-14,
+          "orientationStepRad": 7.2286376501607e-17
+        }
+      ]
+    }
+  },
+  "gsi": {
+    "source": {
+      "path": "kun/src/engineering/fixtures/survey-formats/professional/leica-gsi-cumulative-leveling.gsi",
+      "sha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+      "bytes": 240
+    },
+    "knownDatum": {
+      "point": "BM",
+      "heightM": 100,
+      "status": "synthetic declared fixed datum, not independently authenticated"
+    },
+    "weightConvention": "relative P=diag(L0/L), L0=1 m; equivalent numeric 1/L_numeric_metres, no absolute per-observation sigma supplied",
+    "routeLengthM": [
+      100.0,
+      200.0,
+      200.0,
+      100.0
+    ],
+    "totalLengthM": 600.0,
+    "observationCount": 4,
+    "parameterCount": 3,
+    "rank": 3,
+    "degreesOfFreedom": 1,
+    "closureM": 0.0004,
+    "closureExactM": "1/2500",
+    "closureMm": 0.4,
+    "closureTolerance": null,
+    "closureEvaluation": "not-evaluated",
+    "heightObservationsM": [
+      -0.2,
+      0.8,
+      -0.7999,
+      0.2003
+    ],
+    "correctionsAdjustedMinusObservedM": [
+      -6.666666666666667e-05,
+      -0.00013333333333333334,
+      -0.00013333333333333334,
+      -6.666666666666667e-05
+    ],
+    "correctionsExactM": [
+      "-1/15000",
+      "-1/7500",
+      "-1/7500",
+      "-1/15000"
+    ],
+    "finalPointIds": [
+      "gsi-block-1:Z01",
+      "P1",
+      "gsi-block-1:Z02"
+    ],
+    "finalHeightsM": [
+      99.79993333333333,
+      100.5998,
+      99.79976666666667
+    ],
+    "finalHeightsExactM": [
+      "1496999/15000",
+      "502999/5000",
+      "2993993/30000"
+    ],
+    "weightedSSEUnderDeclaredNormalization": 2.666666666666667e-10,
+    "posteriorVarianceFactorUnderDeclaredNormalization": 2.666666666666667e-10,
+    "varianceFactorUnitUnderDeclaredNormalization": "m2",
+    "varianceFactorExact": "1/3750000000",
+    "unitWeightStdDevUnderDeclaredNormalization": 1.632993161855452e-05,
+    "unitWeightStdDevUnitUnderDeclaredNormalization": "m",
+    "cofactorUnderDeclaredNormalization": [
+      [
+        83.33333333333333,
+        50.0,
+        16.666666666666668
+      ],
+      [
+        50.0,
+        150.0,
+        50.0
+      ],
+      [
+        16.666666666666668,
+        50.0,
+        83.33333333333333
+      ]
+    ],
+    "cofactorUnitUnderDeclaredNormalization": "dimensionless",
+    "cofactorExact": [
+      [
+        "250/3",
+        "50",
+        "50/3"
+      ],
+      [
+        "50",
+        "150",
+        "50"
+      ],
+      [
+        "50/3",
+        "50",
+        "250/3"
+      ]
+    ],
+    "posteriorCovarianceM2": [
+      [
+        2.2222222222222224e-08,
+        1.3333333333333334e-08,
+        4.444444444444444e-09
+      ],
+      [
+        1.3333333333333334e-08,
+        4e-08,
+        1.3333333333333334e-08
+      ],
+      [
+        4.444444444444444e-09,
+        1.3333333333333334e-08,
+        2.2222222222222224e-08
+      ]
+    ],
+    "posteriorStandardErrorsM": [
+      0.00014907119849998598,
+      0.0002,
+      0.00014907119849998598
+    ],
+    "absoluteAprioriPrecision": "not available from relative route-length weights alone",
+    "normalizationBoundary": "Changing common relative-weight C rescales variance factor and cofactor inversely; posterior covariance is invariant. Numerical product labels for variance factor must not be interpreted as a calibrated instrument precision.",
+    "reviewStatus": "unsigned",
+    "standardsConformity": "not-evaluated"
+  }
+}
