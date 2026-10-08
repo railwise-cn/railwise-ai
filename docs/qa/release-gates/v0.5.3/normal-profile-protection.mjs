@@ -233,8 +233,12 @@ async function defaultsExport(ctx, destination) {
     return { present: false }
   }
   await chmod(destination, 0o600)
-  const json = command('/usr/bin/plutil', ['-convert', 'json', '-o', '-', destination])
-  return { present: true, hash: digest(canonical(JSON.parse(json))) }
+  // Some valid macOS preference values (for example opaque data objects)
+  // cannot be represented by plutil's JSON converter. XML1 is still a
+  // canonical plist representation and preserves those values for a stable
+  // before/after comparison without interpreting or rewriting them.
+  const xml = command('/usr/bin/plutil', ['-convert', 'xml1', '-o', '-', destination])
+  return { present: true, hash: digest(xml) }
 }
 
 async function snapshot(ctx, session, options = {}) {
