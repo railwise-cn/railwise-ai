@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: 'Publish the tagged build to GitHub Release, Stable updater feeds, and the official download page. Requires the production-release environment approval and a committed acceptance evidence manifest.'
+        description: 'Publish the tagged build to GitHub Release, Stable updater feeds, and the official download page. Requires exact-version user approval and a committed acceptance evidence manifest; production-release uses the configured repository governance mode.'
         required: false
         type: boolean
         default: false
