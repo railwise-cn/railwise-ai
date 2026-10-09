@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "scope": "Raw local packaged-service tree-fingerprint regression reports; not native updater acceptance",
+  "reports": [
+    {
+      "path": "baseline-seed.json",
+      "sha256": "a4468ed0e98f82d5a5a552a50b557ec17a43cb1c4f1e4ce70659f1ed70416a77",
+      "bytes": 2299
+    },
+    {
+      "path": "compatibility-staging.json",
+      "sha256": "583d2fc5132ac2dca101b3eafdac7bc9efb8b0f3d8a8e17bcfcf07b780415a48",
+      "bytes": 1876
+    },
+    {
+      "path": "service-contract-check.json",
+      "sha256": "f7b25f26e0c7cbd4a08b213e820cbab4ebf806e15b57cc55ca64c745f58563f4",
+      "bytes": 611
+    },
+    {
+      "path": "target-readback.json",
+      "sha256": "a607ed6e50b767be88f01e39118107e8424285e16cfd62efe8cf39c98b15431c",
+      "bytes": 2375
+    },
+    {
+      "path": "target-restart-readback.json",
+      "sha256": "a607ed6e50b767be88f01e39118107e8424285e16cfd62efe8cf39c98b15431c",
+      "bytes": 2375
+    },
+    {
+      "path": "target-services.json",
+      "sha256": "7354d92628b084689fdb90075fc9726e2b92455d0bbd281b4bb78a1e6f722053",
+      "bytes": 1901
+    }
+  ]
+}

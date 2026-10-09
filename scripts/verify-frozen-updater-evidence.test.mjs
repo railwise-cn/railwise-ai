@@ -6,13 +6,38 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { RELEASE_REPOSITORY } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF, validateUpdaterEvidenceRun, verifyUpdaterEvidenceArchive, verifyUpdaterEvidenceSource } from './verify-frozen-updater-evidence.mjs'
+import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
+
+// Synthetic contract fixtures only; these are never package acceptance records.
+function serviceIdentity(sourceHead, { version = '0.5.3', layout = 'asar-unpacked', asarSha256 = 'e'.repeat(64) } = {}) {
+  const compatibility = layout === 'source-compatibility'
+  const dependencyRoot = compatibility ? 'node_modules' : `app.${layout === 'asar' ? 'asar' : 'asar.unpacked'}/kun/node_modules`
+  return {
+    schemaVersion: 1, packageVersion: version, packageSourceHead: version === '0.5.2' ? null : sourceHead, asarSha256, layout,
+    serviceSourceHead: compatibility || version === '0.5.3' ? sourceHead : null,
+    serviceTreeSha256: 'a'.repeat(64),
+    modules: ['engineering-service', 'survey-service'].map(name => ({ path: `dist/engineering/${name}.js`, sha256: 'b'.repeat(64) })),
+    dependencies: ['better-sqlite3', 'better-sqlite3-native', 'jszip', 'pdfkit', 'zod'].map(name => ({ name,
+      path: `${dependencyRoot}/${name === 'better-sqlite3-native' ? 'better-sqlite3/build/Release/better_sqlite3.node' : `${name}/package.json`}`, sha256: 'c'.repeat(64),
+      ...(name === 'better-sqlite3-native' ? {} : { treeSha256: 'd'.repeat(64) }) })),
+  }
+}
+
+function serviceEvidence(sourceHead) {
+  const target = serviceIdentity(sourceHead)
+  return { baseVersion: '0.5.2', targetVersion: '0.5.3', targetAsarSha256: target.asarSha256, installedAsarSha256: target.asarSha256,
+    targetServiceIdentity: target,
+    dataSeed: { serviceSource: 'source-bound-compatibility-service', serviceIdentity: serviceIdentity(sourceHead, { version: '0.5.2', layout: 'source-compatibility', asarSha256: 'f'.repeat(64) }) },
+    dataReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) },
+    dataRestartReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) } }
+}
 
 function fixture(t) {
   const sourceHead = 'a'.repeat(40)
   const run = { repository: RELEASE_REPOSITORY, workflowPath: UPDATER_WORKFLOW, sourceHead, runId: 4321, runAttempt: 2,
     artifact: { id: 91, name: 'frozen-updater-arm64-4321', digest: `sha256:${'b'.repeat(64)}` } }
   const nativeBytes = Buffer.from('{"status":"passed","startedAt":"new-run"}\n')
-  const machine = { arch: 'arm64', nativeReportSha256: reportSha256(nativeBytes), provenance: { repository: run.repository, workflowPath: run.workflowPath,
+  const machine = { ...serviceEvidence(sourceHead), arch: 'arm64', nativeReportSha256: reportSha256(nativeBytes), provenance: { repository: run.repository, workflowPath: run.workflowPath,
     workflowRef: UPDATER_WORKFLOW_REF, workflowSha: sourceHead, sourceHead, runId: run.runId, runAttempt: run.runAttempt } }
   const machineBytes = Buffer.from(JSON.stringify(machine) + '\n')
   const root = `repos/${RELEASE_REPOSITORY}`
@@ -60,6 +85,18 @@ test('updater report provenance binds the exact freeze, run and retained native 
   assert.equal(Object.hasOwn(f.actual, 'workflow_ref'), false)
   assert.equal(Object.hasOwn(f.artifact.workflow_run, 'run_attempt'), false)
   verifyUpdaterEvidenceArchive({ ...f, archive: f.archive() })
+})
+
+test('retained archive accepts the runner service inspection and both historical readbacks', t => {
+  const f = fixture(t)
+  const reports = {
+    'target-services.json': { mode: 'inspect', serviceSource: 'target-package', serviceIdentity: f.machine.targetServiceIdentity },
+    'seed-data.json': f.machine.dataSeed,
+    'verify-data.json': f.machine.dataReadback,
+    'verify-restart-data.json': f.machine.dataRestartReadback,
+  }
+  for (const [name, report] of Object.entries(reports)) writeFileSync(join(f.temporary, name), JSON.stringify(report) + '\n')
+  verifyUpdaterEvidenceArchive({ ...f, archive: f.archive(Object.keys(reports)) })
 })
 
 test('wrong or incomplete native updater workflow and artifacts cannot authorize release', async t => {
@@ -120,4 +157,79 @@ test('successful workflow jobs can span multiple API pages', t => {
     total_count: 2, jobs: [{ name: 'unrelated', conclusion: 'success' }],
   }
   verifyUpdaterEvidenceSource(f.run, f.api)
+})
+
+test('both real native architectures use their exact report architecture in the artifact name', t => {
+  for (const arch of ['arm64', 'x64']) {
+    const f = fixture(t); f.machine.arch = arch; f.run.artifact.name = `frozen-updater-${arch}-${f.run.runId}`
+    assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), f.run)
+    f.run.artifact.name = `frozen-updater-${arch === 'arm64' ? 'x64' : 'arm64'}-${f.run.runId}`
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /artifact name mismatch/)
+  }
+  for (const arch of [undefined, 'ARM64', 'x86', 'unsupported']) {
+    const f = fixture(t); f.machine.arch = arch; f.run.artifact.name = `frozen-updater-${arch}-${f.run.runId}`
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /supported native macOS architecture/)
+  }
+})
+
+test('packaged service contracts support both layouts and explicitly labeled baseline compatibility', () => {
+  const sourceHead = 'a'.repeat(40)
+  for (const layout of ['asar-unpacked', 'asar']) {
+    const machine = { ...serviceEvidence(sourceHead), arch: 'arm64' }
+    machine.targetServiceIdentity = serviceIdentity(sourceHead, { layout })
+    for (const key of ['dataReadback', 'dataRestartReadback']) machine[key].serviceIdentity = structuredClone(machine.targetServiceIdentity)
+    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead }), machine)
+    machine.dataSeed = { serviceSource: 'baseline-package', serviceIdentity: serviceIdentity(sourceHead, { version: '0.5.2', layout }) }
+    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead }), machine)
+    machine.dataSeed.serviceIdentity.packageSourceHead = 'd'.repeat(40)
+    machine.dataSeed.serviceIdentity.serviceSourceHead = 'd'.repeat(40)
+    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead }), machine)
+  }
+})
+
+test('source fallback, unbound or changed services and unsafe dependency identities are rejected', async t => {
+  const changes = {
+    targetFallback: f => { f.machine.dataReadback.serviceSource = 'source-bound-compatibility-service' },
+    mislabeledTarget: f => { f.machine.dataRestartReadback.serviceSource = 'baseline-package' },
+    missingFrozenIdentity: f => { delete f.machine.targetServiceIdentity },
+    missingReadbackIdentity: f => { delete f.machine.dataReadback.serviceIdentity },
+    missingRestartIdentity: f => { delete f.machine.dataRestartReadback.serviceIdentity },
+    wrongFrozenVersion: f => { f.machine.targetServiceIdentity.packageVersion = '0.5.2' },
+    wrongFrozenSource: f => { f.machine.targetServiceIdentity.packageSourceHead = 'd'.repeat(40) },
+    wrongServiceSource: f => { f.machine.targetServiceIdentity.serviceSourceHead = 'd'.repeat(40) },
+    wrongFrozenAsar: f => { f.machine.targetServiceIdentity.asarSha256 = 'd'.repeat(64) },
+    wrongInstalledAsar: f => { f.machine.installedAsarSha256 = 'd'.repeat(64) },
+    sourceLayout: f => { f.machine.targetServiceIdentity.layout = 'source-compatibility' },
+    changedRestartModule: f => { f.machine.dataRestartReadback.serviceIdentity.modules[0].sha256 = 'd'.repeat(64) },
+    changedRestartDependency: f => { f.machine.dataRestartReadback.serviceIdentity.dependencies[0].sha256 = 'd'.repeat(64) },
+    changedRestartServiceTree: f => { f.machine.dataRestartReadback.serviceIdentity.serviceTreeSha256 = 'b'.repeat(64) },
+    changedRestartDependencyTree: f => { f.machine.dataRestartReadback.serviceIdentity.dependencies[0].treeSha256 = 'b'.repeat(64) },
+    missingServiceTree: f => { delete f.machine.targetServiceIdentity.serviceTreeSha256 },
+    missingDependencyTree: f => { delete f.machine.targetServiceIdentity.dependencies[0].treeSha256 },
+    missingModule: f => { f.machine.targetServiceIdentity.modules.pop() },
+    wrongModulePath: f => { f.machine.targetServiceIdentity.modules[0].path = 'src/engineering/engineering-service.ts' },
+    wrongModuleHash: f => { f.machine.targetServiceIdentity.modules[0].sha256 = 'invalid' },
+    missingNativeDependency: f => { f.machine.targetServiceIdentity.dependencies = f.machine.targetServiceIdentity.dependencies.filter(item => item.name !== 'better-sqlite3-native') },
+    duplicateDependency: f => { f.machine.targetServiceIdentity.dependencies.push(f.machine.targetServiceIdentity.dependencies[0]) },
+    wrongDependencyHash: f => { f.machine.targetServiceIdentity.dependencies[0].sha256 = 'D'.repeat(64) },
+    dependencyOutsidePackage: f => { f.machine.targetServiceIdentity.dependencies[0].path = 'node_modules/better-sqlite3/lib/index.js' },
+    dependencyWrongPackage: f => { f.machine.targetServiceIdentity.dependencies[0].path = 'app.asar/kun/node_modules/another-package/index.js' },
+    dependencyNotNative: f => { f.machine.targetServiceIdentity.dependencies[1].path = 'app.asar.unpacked/node_modules/better-sqlite3/index.js' },
+    wrongSeedVersion: f => { f.machine.dataSeed.serviceIdentity.packageVersion = '0.5.3' },
+    wrongSeedSource: f => { f.machine.dataSeed.serviceIdentity.serviceSourceHead = 'd'.repeat(40) },
+    unboundSeedSource: f => { f.machine.dataSeed.serviceIdentity.serviceSourceHead = null },
+    mislabeledSeed: f => { f.machine.dataSeed.serviceSource = 'baseline-package' },
+    seedMissingAsar: f => { delete f.machine.dataSeed.serviceIdentity.asarSha256 },
+    unboundSeedPackageSource: f => { delete f.machine.dataSeed.serviceIdentity.packageSourceHead },
+  }
+  for (const path of ['/host/node_modules/better-sqlite3/index.js', 'app.asar/../node_modules/better-sqlite3/index.js',
+    'app.asar//node_modules/better-sqlite3/index.js', 'app.asar/./node_modules/better-sqlite3/index.js',
+    'app.asar\\node_modules\\better-sqlite3\\index.js', 'https://host/node_modules/better-sqlite3/index.js',
+    'app.asar/node_modules/better-sqlite3/index.js\n']) {
+    changes[`unsafePath:${JSON.stringify(path)}`] = f => { f.machine.targetServiceIdentity.dependencies[0].path = path }
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
+    const f = fixture(st); change(f)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /updater-service/)
+  })
 })

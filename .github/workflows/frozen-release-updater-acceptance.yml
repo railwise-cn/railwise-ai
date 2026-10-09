@@ -32,6 +32,18 @@ jobs:
           cache: npm
       - name: Install verification tools without application startup
         run: npm ci --ignore-scripts
+      - name: Record actual native updater architecture
+        id: native-identity
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs'
+          if (!['arm64', 'x64'].includes(process.arch)) throw new Error('Unsupported native updater architecture')
+          appendFileSync(process.env.GITHUB_OUTPUT, `arch=${process.arch}\n`)
+          NODE
+      - name: Build source-bound baseline compatibility services
+        run: |
+          npm --prefix kun ci --ignore-scripts
+          npm --prefix kun run build
       - name: Test frozen updater boundaries
         run: node --test scripts/frozen-release-updater-acceptance.test.mjs
       - name: Record immutable build reference without shell interpolation
@@ -58,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frozen-updater-arm64-${{ github.run_id }}
+          name: frozen-updater-${{ steps.native-identity.outputs.arch }}-${{ github.run_id }}
           retention-days: 7
           if-no-files-found: warn
           path: |
@@ -67,3 +79,5 @@ jobs:
             ${{ runner.temp }}/frozen-updater-evidence/*.redacted.log
             ${{ runner.temp }}/frozen-updater-evidence/seed-data.json
             ${{ runner.temp }}/frozen-updater-evidence/verify-data.json
+            ${{ runner.temp }}/frozen-updater-evidence/verify-restart-data.json
+            ${{ runner.temp }}/frozen-updater-evidence/target-services.json

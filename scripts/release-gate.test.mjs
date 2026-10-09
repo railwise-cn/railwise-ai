@@ -74,7 +74,16 @@ function releaseFixture(t, packageVersion = '0.5.3') {
   // These synthetic unit reports mirror the existing runner schema. They are
   // temporary fixtures only and must never be copied into release evidence.
   const identity = version => ({ version, bundleId: PUBLIC_IDENTITY.bundleId, signature: 'verified', stapledNotarization: 'verified', gatekeeper: 'accepted', designatedRequirement: 'designated => synthetic-unit-fixture' })
-  const data = mode => ({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: 'd'.repeat(64) })
+  const serviceIdentity = seed => ({ schemaVersion: 1, packageVersion: seed ? '0.5.2' : '0.5.3', packageSourceHead: seed ? null : reviewedSourceHead,
+    serviceSourceHead: reviewedSourceHead, asarSha256: (seed ? 'f' : 'e').repeat(64), layout: seed ? 'source-compatibility' : 'asar-unpacked',
+    serviceTreeSha256: 'a'.repeat(64),
+    modules: ['engineering-service', 'survey-service'].map(name => ({ path: `dist/engineering/${name}.js`, sha256: 'b'.repeat(64) })),
+    dependencies: ['better-sqlite3', 'better-sqlite3-native', 'jszip', 'pdfkit', 'zod'].map(name => ({ name,
+      path: `${seed ? 'node_modules' : 'app.asar.unpacked/kun/node_modules'}/${name === 'better-sqlite3-native' ? 'better-sqlite3/build/Release/better_sqlite3.node' : `${name}/package.json`}`, sha256: 'c'.repeat(64),
+      ...(name === 'better-sqlite3-native' ? {} : { treeSha256: 'd'.repeat(64) }) })),
+  })
+  const data = mode => ({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: 'd'.repeat(64),
+    serviceSource: mode === 'seed' ? 'source-bound-compatibility-service' : 'target-package', serviceIdentity: serviceIdentity(mode === 'seed') })
   const machineReport = {
     schemaVersion: 1, status: 'passed', baseVersion: '0.5.2', targetVersion: '0.5.3', platform: 'darwin', arch: 'arm64',
     productionTouched: false, systemTrustModified: false, officialFeedsModified: false, publicReleasePerformed: false,
@@ -84,6 +93,7 @@ function releaseFixture(t, packageVersion = '0.5.3') {
     baselineAsset: { tag: 'v0.5.2', name: 'WorkWise-0.5.2-mac-Apple-Silicon.dmg', size: 301766076, sha256: '09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0', assetId: 612608487 },
     baselineIdentity: identity('0.5.2'), targetIdentity: identity('0.5.3'), installedIdentity: identity('0.5.3'),
     targetZipSha256: 'a'.repeat(64), frozenManifestSha256: 'a'.repeat(64), targetAsarSha256: 'e'.repeat(64), installedAsarSha256: 'e'.repeat(64),
+    targetServiceIdentity: serviceIdentity(false),
     strictNonceProbe: { strictProbeRequired: true, nonceSha256: 'f'.repeat(64) }, separateSentinelPreserved: true,
     dataSeed: data('seed'), dataReadback: data('verify'), dataRestartReadback: data('verify'), configReferences: { status: 'byte-preserved' },
     feedRequests: { manifest: 2, zip: 1, bytesServed: 100 },
@@ -445,6 +455,37 @@ test('runtime, build, config and non-QA documentation changes require fresh pack
       f.verify(f.tagRelease(), /changes after the reviewed package must be limited to docs\/qa evidence/)
     })
   }
+})
+
+test('public release rejects source-tree target readback and incomplete packaged service identities', async t => {
+  const changes = {
+    targetSourceFallback: f => { f.machineReport.dataReadback.serviceSource = 'source-bound-compatibility-service' },
+    targetMislabeledBaseline: f => { f.machineReport.dataRestartReadback.serviceSource = 'baseline-package' },
+    missingFrozenServiceIdentity: f => { delete f.machineReport.targetServiceIdentity },
+    missingReadbackServiceIdentity: f => { delete f.machineReport.dataReadback.serviceIdentity },
+    missingRestartServiceIdentity: f => { delete f.machineReport.dataRestartReadback.serviceIdentity },
+    differentFrozenServiceVersion: f => { f.machineReport.targetServiceIdentity.packageVersion = '0.5.2' },
+    differentFrozenPackageSource: f => { f.machineReport.targetServiceIdentity.packageSourceHead = 'b'.repeat(40) },
+    differentFrozenServiceSource: f => { f.machineReport.targetServiceIdentity.serviceSourceHead = 'b'.repeat(40) },
+    differentFrozenServiceAsar: f => { f.machineReport.targetServiceIdentity.asarSha256 = 'b'.repeat(64) },
+    missingFrozenServiceModule: f => { f.machineReport.targetServiceIdentity.modules.pop() },
+    changedRestartServiceModule: f => { f.machineReport.dataRestartReadback.serviceIdentity.modules[0].sha256 = 'c'.repeat(64) },
+    changedRestartDependency: f => { f.machineReport.dataRestartReadback.serviceIdentity.dependencies[0].sha256 = 'b'.repeat(64) },
+    changedRestartServiceTree: f => { f.machineReport.dataRestartReadback.serviceIdentity.serviceTreeSha256 = 'b'.repeat(64) },
+    changedRestartDependencyTree: f => { f.machineReport.dataRestartReadback.serviceIdentity.dependencies[0].treeSha256 = 'b'.repeat(64) },
+    missingServiceTree: f => { delete f.machineReport.targetServiceIdentity.serviceTreeSha256 },
+    missingDependencyTree: f => { delete f.machineReport.targetServiceIdentity.dependencies[0].treeSha256 },
+    dependencyPathEscapesPackage: f => { f.machineReport.targetServiceIdentity.dependencies[0].path = 'app.asar.unpacked/../node_modules/better-sqlite3/index.js' },
+    dependencyHashMissing: f => { delete f.machineReport.targetServiceIdentity.dependencies[0].sha256 },
+    missingNativeDependency: f => { f.machineReport.targetServiceIdentity.dependencies = f.machineReport.targetServiceIdentity.dependencies.filter(item => item.name !== 'better-sqlite3-native') },
+    changedSeedCompatibilitySource: f => { f.machineReport.dataSeed.serviceIdentity.serviceSourceHead = 'b'.repeat(40) },
+    unknownSeedService: f => { f.machineReport.dataSeed.serviceSource = 'target-package' },
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
+    const f = releaseFixture(st)
+    change(f); f.recordEvidence()
+    f.verify(f.tagRelease(), /updater-service/)
+  })
 })
 
 test('reverting an unreviewed runtime edit does not bypass the release gate', t => {

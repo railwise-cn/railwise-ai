@@ -17,6 +17,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { PUBLIC_IDENTITY, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence } from './verify-frozen-updater-evidence.mjs'
+import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 
 const ROOT = process.cwd()
 
@@ -170,6 +171,7 @@ function requireFrozenUpdaterEvidence(evidence, reviewedBuild, packageIdentity, 
     sha256(data?.sourceSha256, `${key} original source`)
     equal(data.sourceSha256, machine.dataSeed.sourceSha256, `${key} original source continuity`)
   }
+  validateUpdaterServiceEvidence(machine, { sourceHead: reviewedBuild.sourceHead, version })
   equal(machine.configReferences?.status, 'byte-preserved', 'configuration reference preservation')
   if (!Number.isSafeInteger(machine.feedRequests?.manifest) || machine.feedRequests.manifest < 1
     || !Number.isSafeInteger(machine.feedRequests?.zip) || machine.feedRequests.zip < 1

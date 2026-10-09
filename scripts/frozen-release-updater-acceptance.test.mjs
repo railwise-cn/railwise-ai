@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { parse, stringify } from 'yaml'
 import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './frozen-release-updater-feed.mjs'
-import { assertHistoricalRowsPreserved, assertRetainedFiles, snapshotFiles } from './frozen-release-updater-data.mjs'
+import { assertHistoricalRowsPreserved, assertRetainedFiles, fixtureServiceIdentity, persistedJsonValue, prepareCompatibilityService, resolveFixtureService, SERVICE_MODULES, snapshotFiles, validateFixtureExecution } from './frozen-release-updater-data.mjs'
 import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
 
@@ -32,6 +32,100 @@ function request(url, options = {}) {
     call.once('error', reject); call.end()
   })
 }
+
+function serviceLayout(app, layout, modules = SERVICE_MODULES) {
+  const root = join(app, 'Contents/Resources', layout === 'asar-unpacked' ? 'app.asar.unpacked/kun' : 'app.asar/kun')
+  mkdirSync(root, { recursive: true })
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }))
+  for (const path of modules) { mkdirSync(join(root, path, '..'), { recursive: true }); writeFileSync(join(root, path), 'export const unitFixtureOnly = true\n') }
+  return root
+}
+
+test('target readback uses the complete actual unpacked bundle and supports complete legacy ASAR layout', t => {
+  const app = join(temporary(t), 'Unit fixture.app')
+  const compatibilityRoot = serviceLayout(join(temporary(t), 'Checkout fixture.app'), 'asar')
+  const legacy = serviceLayout(app, 'asar')
+  assert.equal(resolveFixtureService({ app, mode: 'verify', compatibilityRoot }).root, legacy)
+  const unpacked = serviceLayout(app, 'asar-unpacked')
+  for (const mode of ['verify', 'inspect']) assert.deepEqual(resolveFixtureService({ app, mode, compatibilityRoot }), {
+    root: unpacked, layout: 'asar-unpacked', present: [true, true], serviceSource: 'target-package'
+  })
+  assert.equal(resolveFixtureService({ app, mode: 'seed', compatibilityRoot }).serviceSource, 'baseline-package')
+})
+
+test('target missing services and partial/mixed layouts never fall back to a complete checkout', t => {
+  const compatibilityRoot = serviceLayout(join(temporary(t), 'Checkout fixture.app'), 'asar')
+  const app = join(temporary(t), 'Unit fixture.app')
+  for (const mode of ['verify', 'inspect']) assert.throws(() => resolveFixtureService({ app, mode, compatibilityRoot }), /fallback is forbidden/)
+  assert.equal(resolveFixtureService({ app, mode: 'seed', compatibilityRoot }).serviceSource, 'source-bound-compatibility-service')
+  serviceLayout(app, 'asar-unpacked', [SERVICE_MODULES[0]])
+  serviceLayout(app, 'asar', [SERVICE_MODULES[1]])
+  for (const mode of ['seed', 'verify', 'inspect']) assert.throws(() => resolveFixtureService({ app, mode, compatibilityRoot }), /Incomplete packaged/)
+  serviceLayout(app, 'asar')
+  assert.throws(() => resolveFixtureService({ app, mode: 'verify', compatibilityRoot }), /Incomplete packaged/)
+  assert.throws(() => resolveFixtureService({ app, mode: 'invalid', compatibilityRoot }), /mode/)
+})
+
+test('baseline compatibility cannot run without explicitly built services', t => {
+  const app = join(temporary(t), 'Unit fixture.app')
+  assert.throws(() => resolveFixtureService({ app, mode: 'seed' }), /must be built/)
+  assert.throws(() => prepareCompatibilityService(app, temporary(t), join(temporary(t), 'staging')), /must be built/)
+})
+
+test('JSON snapshot equality ignores only non-persisted undefined properties while preserving changed values', () => {
+  const baseline = { x: 50, metadata: { parser: 'cosa' } }
+  assert.deepEqual(persistedJsonValue({ ...baseline, optional: undefined, metadata: { parser: 'cosa', converterId: undefined } }), baseline)
+  for (const changed of [{ ...baseline, x: 51 }, { ...baseline, optional: null }, { ...baseline, metadata: { parser: 'different' } }]) {
+    assert.notDeepEqual(persistedJsonValue(changed), baseline)
+  }
+})
+
+test('fixture execution binds the real selected executable, target version and frozen source', t => {
+  const root = temporary(t); const app = join(root, 'Unit fixture.app'); const executable = join(app, 'Contents/MacOS/RailWise AI')
+  mkdirSync(join(app, 'Contents/MacOS'), { recursive: true }); writeFileSync(executable, 'unit fixture executable')
+  const head = 'a'.repeat(40); const metadata = { version: '0.5.3', buildProvenance: { sourceHead: head } }
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, metadata, 'verify', head))
+  const other = join(root, 'Other executable'); writeFileSync(other, 'unit fixture executable')
+  assert.throws(() => validateFixtureExecution(app, other, metadata, 'verify', head), /selected packaged/)
+  assert.throws(() => validateFixtureExecution(app, executable, { ...metadata, version: '0.5.2' }, 'verify', head), /version/)
+  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', 'b'.repeat(40)), /source/)
+  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', undefined), /frozen source/)
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: '0.5.2' }, 'seed', head))
+})
+
+test('service identity fails closed when a dependency is missing or resolves outside the bundle', t => {
+  const app = join(temporary(t), 'Unit fixture.app'); const root = serviceLayout(app, 'asar-unpacked')
+  const selection = resolveFixtureService({ app, mode: 'verify' })
+  const options = { app, selection, metadata: { version: '0.5.3', buildProvenance: { sourceHead: 'a'.repeat(40) } }, sourceHead: 'a'.repeat(40) }
+  assert.throws(() => fixtureServiceIdentity(options), /outside its selected package|Cannot find module/)
+  const external = temporary(t); mkdirSync(join(external, 'lib'), { recursive: true })
+  writeFileSync(join(external, 'package.json'), JSON.stringify({ main: 'lib/index.js' })); writeFileSync(join(external, 'lib/index.js'), 'module.exports = {}')
+  mkdirSync(join(root, 'node_modules')); symlinkSync(external, join(root, 'node_modules/better-sqlite3'))
+  assert.throws(() => fixtureServiceIdentity(options), /outside its selected package/)
+})
+
+test('package identity covers transitive service files and both ESM and CJS dependency files', t => {
+  const app = join(realpathSync(temporary(t)), 'Unit fixture.app'); const root = serviceLayout(app, 'asar-unpacked')
+  for (const name of ['better-sqlite3', 'jszip', 'pdfkit', 'zod']) {
+    const packageRoot = join(root, 'node_modules', name); mkdirSync(join(packageRoot, 'lib'), { recursive: true })
+    writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name, main: 'lib/index.cjs' }))
+    writeFileSync(join(packageRoot, 'lib/index.cjs'), 'module.exports = {}')
+    writeFileSync(join(packageRoot, 'lib/index.js'), 'export const fixture = true')
+  }
+  const native = join(root, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node')
+  mkdirSync(join(native, '..'), { recursive: true }); writeFileSync(native, 'unit-only fake native bytes; not executable')
+  const options = { app, selection: resolveFixtureService({ app, mode: 'verify' }), metadata: { version: '0.5.3', buildProvenance: { sourceHead: 'a'.repeat(40) } }, sourceHead: 'a'.repeat(40), diskRead: () => Buffer.from('unit-only fake archive bytes') }
+  const before = fixtureServiceIdentity(options)
+  const zod = before.dependencies.find(item => item.name === 'zod')
+  assert.match(zod.path, /zod\/package\.json$/)
+  writeFileSync(join(root, 'node_modules/zod/lib/index.js'), 'export const fixture = false')
+  writeFileSync(join(root, 'dist/engineering/transitive-helper.js'), 'export const helper = true')
+  const after = fixtureServiceIdentity(options)
+  assert.deepEqual(after.modules, before.modules)
+  assert.notEqual(after.serviceTreeSha256, before.serviceTreeSha256)
+  assert.equal(after.dependencies.find(item => item.name === 'zod').sha256, zod.sha256)
+  assert.notEqual(after.dependencies.find(item => item.name === 'zod').treeSha256, zod.treeSha256)
+})
 
 test('historical public updater runs only in its trusted fresh hosted macOS workflow', () => {
   const env = hostedEnvironment()
@@ -231,6 +325,19 @@ test('workflow is read-only, fresh hosted and preserves only redacted acceptance
   const text = readFileSync(workflowPath, 'utf8'); const workflow = parse(text)
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   assert.equal(workflow.jobs['native-macos']['runs-on'], 'macos-15')
+  const steps = workflow.jobs['native-macos'].steps
+  const nativeIdentity = steps.find(step => step.id === 'native-identity')
+  assert.match(nativeIdentity.run, /process\.arch/)
+  assert.match(nativeIdentity.run, /\['arm64', 'x64'\]/)
+  assert.match(nativeIdentity.run, /GITHUB_OUTPUT/)
+  const retained = steps.find(step => step.uses === 'actions/upload-artifact@v4')
+  assert.equal(retained.with.name, 'frozen-updater-${{ steps.native-identity.outputs.arch }}-${{ github.run_id }}')
+  assert.match(retained.with.path, /verify-restart-data\.json/)
+  assert.match(retained.with.path, /target-services\.json/)
+  const compatibilityBuild = steps.findIndex(step => step.name === 'Build source-bound baseline compatibility services')
+  assert.match(steps[compatibilityBuild].run, /npm --prefix kun ci --ignore-scripts/)
+  assert.match(steps[compatibilityBuild].run, /npm --prefix kun run build/)
+  assert.ok(compatibilityBuild < steps.findIndex(step => step.name?.startsWith('Run default-trust')))
   assert.equal(workflow.jobs['native-macos'].steps.find(step => step.env?.REVIEWED_BUILD_JSON)?.env.REVIEWED_BUILD_JSON, '${{ inputs.reviewed_build }}')
   assert.doesNotMatch(text, /secrets\.|publish-r2|deploy-website|gh release|--candidate-root|--candidate-source-head/)
   const script = readFileSync(new URL('./run-frozen-release-updater-acceptance.mjs', import.meta.url), 'utf8')
