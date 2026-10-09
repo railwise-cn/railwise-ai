@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "scope": "Independent AI source review only; not final package acceptance or publication approval",
+  "status": "source-review-passed-package-acceptance-pending",
+  "reviewedHead": "a19b84c3a67f33fd5ce74d96dd2323f57449b9a1",
+  "files": [
+    {
+      "originalPath": "/private/tmp/railwise-053-tools/current-source-review-20261009.md",
+      "archivedPath": "docs/qa/release-gates/v0.5.3-ai-review/pre-freeze-source-review-20261009.md",
+      "bytes": 8078,
+      "sha256": "58293da75d0e39b73fd55adafdb57f8aa75ef6ec30fc283aa07b67d7ebf1cfb8"
+    },
+    {
+      "originalPath": "/private/tmp/railwise-053-tools/current-source-review-files-20261009.json",
+      "archivedPath": "docs/qa/release-gates/v0.5.3-ai-review/pre-freeze-source-review-files-20261009.json",
+      "bytes": 1929,
+      "sha256": "413f8815b2b493ab2be2ad3414f45a525bb35b0aff08cea529616e97ff452e38"
+    },
+    {
+      "originalPath": "/private/tmp/railwise-053-tools/current-source-review-plist-probe-20261009.json",
+      "archivedPath": "docs/qa/release-gates/v0.5.3-ai-review/pre-freeze-source-review-plist-probe-20261009.json",
+      "bytes": 1089,
+      "sha256": "4bc84505bb64ee3a4ea77c2bd0d8be0ebbfd6973d42c1cb584ad75ce59972afd"
+    },
+    {
+      "originalPath": "/private/tmp/railwise-053-tools/current-source-review-static-inventory-20261009.json",
+      "archivedPath": "docs/qa/release-gates/v0.5.3-ai-review/pre-freeze-source-review-static-inventory-20261009.json",
+      "bytes": 929020,
+      "sha256": "66b2bd17d3b926a62429e7ce35403fcc1ef08c46c424feab1c249b0b4c9fb71d"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "AI independent source review; not installed-package acceptance",
+  "reviewedAtUtc": "2026-10-09T00:17:45.913635+00:00",
+  "cwd": "/Users/wangjiawei/Documents/WorkWise",
+  "head": "a19b84c3a67f33fd5ce74d96dd2323f57449b9a1",
+  "base": "1aae1717926de575220cb01e2289613f3c34c639",
+  "diffSha256": "85d5070d31e2e7226a3b513c79bc9a45295b4ba53e8a254cbe960cd96a1e040c",
+  "files": {
+    "docs/qa/release-gates/v0.5.3/README.md": "6a1a12c3ca30be237bffd3783707f9aa34120e572282311149c0cb857914551a",
+    "docs/qa/release-gates/v0.5.3/normal-profile-protection-selftest.json": "1a20e1fa785d64b97ea3501b7dce92db0b955e0ee425351b891bcdf7d7f5a2cb",
+    "docs/qa/release-gates/v0.5.3/normal-profile-protection.md": "c93bbf3c6d7b1e7dc8bdc315c66288ab05bf9c0e080a6ea33cc31cf76a2e6dd4",
+    "docs/qa/release-gates/v0.5.3/normal-profile-protection.mjs": "994be48b6edb18e9ee0ed1f4b855a779bf3de26b47a11a20aa1dd6e0e2f9fb74",
+    "docs/qa/release-gates/v0.5.3/release-execution-order-20261008.md": "fec443dd4b7e2c6d3e8c606fd77580dfec67c87729d19df863df17dce4e9f6ae",
+    "src/renderer/src/components/engineering/EngineeringSkillsPanel.dom.test.ts": "9160676140bc53ad3a6142bc4353c054a9e4bfda4402327f3080d2911cbda13e",
+    "src/renderer/src/components/engineering/EngineeringSkillsPanel.tsx": "8c2d5e032679dd94fc9b0a205be007a6b2e7eae6a511a92339abf1cdaf721897",
+    "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts": "9042f89a11acc59d943b5c7abd8097b0b78756424cc0428ebcb25c527c501af4",
+    "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx": "66e7ba4f234415ce306dd099ec6da1b05f8c05491a1c6d63abd28b82824832f8",
+    "src/renderer/src/locales/en/common.json": "a34cfc42c953b333fe6af79ba1e613c4a4b2f7cc958a31198ac64dd9eda23186",
+    "src/renderer/src/locales/zh/common.json": "e0b659c81a898038c90277004e2060171ba76cd8fa6b7847165ca0b68e58013a"
+  },
+  "sourceBlockingFindings": []
+}
