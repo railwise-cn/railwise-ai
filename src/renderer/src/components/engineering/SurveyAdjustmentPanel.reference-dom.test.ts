@@ -12,6 +12,7 @@ let savedNetwork: typeof planeNetwork | null
 let earlierNetworks: typeof planeNetwork[]
 let importedBodies: Record<string, unknown>[]
 let validationAddsRevision: boolean
+let importedNetworkType: string | undefined
 
 const planeNetwork = {
   id: 'network-reference-check', revision: 2, networkType: 'plane-control',
@@ -39,7 +40,7 @@ function response(body: unknown): { ok: true; status: 200; body: string } {
   return { ok: true, status: 200, body: JSON.stringify(body) }
 }
 
-async function render(project: { id: string; revision: number; coordinateSystem?: string; verticalDatum?: string; heightDatum?: string; taskContext?: { coordinateSystem?: string; verticalDatum?: string } } = { id: 'project-reference', revision: 1 }, compact = true): Promise<void> {
+async function render(project: { id: string; workspace?: string; revision: number; coordinateSystem?: string; verticalDatum?: string; heightDatum?: string; taskContext?: { coordinateSystem?: string; verticalDatum?: string } } = { id: 'project-reference', revision: 1 }, compact = true): Promise<void> {
   await act(async () => root.render(createElement(SurveyAdjustmentPanel, { project, runtimeReady: true, compact, preferredSection: 'network' })))
   await settle()
   await settle()
@@ -72,11 +73,14 @@ async function changeInput(input: HTMLInputElement | HTMLTextAreaElement, value:
 }
 
 async function chooseFile(): Promise<void> {
+  const expectedCount = importedBodies.length + 1
   const picker = container.querySelector<HTMLInputElement>('input[type="file"]')!
   Object.defineProperty(picker, 'files', { configurable: true, value: [new File(['instrument survey bytes'], 'survey.gsi')] })
-  await act(async () => picker.dispatchEvent(new Event('change', { bubbles: true })))
-  for (let attempt = 0; attempt < 10 && !importedBodies.length; attempt += 1) await settle()
-  expect(importedBodies).toHaveLength(1)
+  await act(async () => {
+    picker.dispatchEvent(new Event('change', { bubbles: true }))
+    await vi.waitFor(() => expect(importedBodies).toHaveLength(expectedCount))
+  })
+  await settle()
 }
 
 async function chooseFiles(files: File[]): Promise<void> {
@@ -118,12 +122,15 @@ beforeEach(async () => {
   earlierNetworks = []
   importedBodies = []
   validationAddsRevision = false
+  importedNetworkType = undefined
   Object.defineProperty(window, 'workwise', {
     configurable: true,
     value: {
       runtimeRequest: vi.fn(async (path: string, method: string, body?: string) => {
         if (path === '/v1/engineering/survey/networks?projectId=project-reference' && method === 'GET') return response({ networks: savedNetwork ? [savedNetwork, ...earlierNetworks] : earlierNetworks })
         if (path === '/v1/engineering/adjustments?projectId=project-reference' && method === 'GET') return response({ adjustments: [] })
+        if (/^\/v1\/engineering\/survey\/networks\?projectId=/.test(path) && method === 'GET') return response({ networks: [] })
+        if (/^\/v1\/engineering\/adjustments\?projectId=/.test(path) && method === 'GET') return response({ adjustments: [] })
         if (path === '/v1/engineering/survey/tabular/probe' && method === 'POST') {
           const input = JSON.parse(body!) as { name: string }
           const xlsx = input.name.endsWith('.xlsx')
@@ -140,7 +147,7 @@ beforeEach(async () => {
           if (savedNetwork) earlierNetworks.unshift(savedNetwork)
           savedNetwork = {
             ...structuredClone(planeNetwork), id: `network-import-${importedBodies.length}`,
-            networkType: mapping ? request.networkType as string : planeNetwork.networkType,
+            networkType: mapping ? request.networkType as string : importedNetworkType ?? planeNetwork.networkType,
             coordinateSystem: mapping?.coordinateSystem ?? planeNetwork.coordinateSystem,
             verticalDatum: mapping?.verticalDatum ?? planeNetwork.verticalDatum,
             ...references,
@@ -372,6 +379,75 @@ describe('Survey professional reference declaration', () => {
     await chooseFile()
     expect(importedBodies[0]).toMatchObject({ projectId: 'project-reference', expectedRevision: 3, name: 'survey.gsi', referenceDeclaration: { coordinateSystem: '工程独立坐标系', verticalDatum: '1985 国家高程基准' } })
     expect(importedBodies[0]!.dataBase64).toBe(btoa('instrument survey bytes'))
+  })
+
+  it('retains explicit GSI references through a project revision refresh and known-point reimport of the same source', async () => {
+    savedNetwork = null
+    importedNetworkType = 'leveling'
+    await render({ id: 'project-reference', revision: 1 })
+    await changeInput(coordinateInput(), 'SYNTHETIC-LOCAL-GRID')
+    await changeInput(heightInput(), 'SYNTHETIC-BENCHMARK')
+    await chooseFile()
+    const firstNetwork = structuredClone(savedNetwork)
+    expect(importedBodies[0]!.referenceDeclaration).toEqual({ coordinateSystem: 'SYNTHETIC-LOCAL-GRID', verticalDatum: 'SYNTHETIC-BENCHMARK' })
+
+    // Import updates the project revision but does not persist these source
+    // declarations as project defaults. A refresh must retain the user's draft.
+    await render({ id: 'project-reference', revision: 2 })
+    expect(coordinateInput().value).toBe('SYNTHETIC-LOCAL-GRID')
+    expect(heightInput().value).toBe('SYNTHETIC-BENCHMARK')
+    await changeInput(container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${i18n.t('surveyKnownPointsInput')}"]`)!, 'BM,100.000')
+    await chooseFile()
+
+    expect(importedBodies[1]).toMatchObject({
+      expectedRevision: 2, name: 'survey.gsi', dataBase64: importedBodies[0]!.dataBase64,
+      knownPoints: [{ id: 'BM', height: 100 }],
+      referenceDeclaration: { coordinateSystem: 'SYNTHETIC-LOCAL-GRID', verticalDatum: 'SYNTHETIC-BENCHMARK' }
+    })
+    expect(savedNetwork).toMatchObject({ verticalDatum: 'SYNTHETIC-BENCHMARK' })
+    expect(earlierNetworks).toContainEqual(firstNetwork)
+  })
+
+  it('updates an explicitly changed project reference without clearing the other reference draft', async () => {
+    await render({ id: 'project-reference', revision: 1, coordinateSystem: 'OLD-GRID' })
+    await changeInput(heightInput(), 'SYNTHETIC-BENCHMARK')
+    await render({ id: 'project-reference', revision: 2, coordinateSystem: 'NEW-GRID' })
+    expect(coordinateInput().value).toBe('NEW-GRID')
+    expect(heightInput().value).toBe('SYNTHETIC-BENCHMARK')
+
+    await changeInput(coordinateInput(), 'LOCAL-DRAFT-GRID')
+    await render({ id: 'project-reference', revision: 3, coordinateSystem: 'NEW-GRID', verticalDatum: 'NEW-BENCHMARK' })
+    expect(coordinateInput().value).toBe('LOCAL-DRAFT-GRID')
+    expect(heightInput().value).toBe('NEW-BENCHMARK')
+  })
+
+  it.each(['project', 'workspace'])('resets reference drafts when the %s scope changes', async (scope) => {
+    await render({ id: 'project-reference', workspace: '/workspace-one', revision: 1 })
+    await changeInput(coordinateInput(), 'SYNTHETIC-LOCAL-GRID')
+    await changeInput(heightInput(), 'SYNTHETIC-BENCHMARK')
+    await render({
+      id: scope === 'project' ? 'project-next' : 'project-reference',
+      workspace: scope === 'workspace' ? '/workspace-two' : '/workspace-one',
+      revision: 1, coordinateSystem: 'NEXT-GRID'
+    })
+    expect(coordinateInput().value).toBe('NEXT-GRID')
+    expect(heightInput().value).toBe('')
+  })
+
+  it('allows an explicit new reference for a new import without rewriting the earlier network', async () => {
+    savedNetwork = null
+    importedNetworkType = 'leveling'
+    await render()
+    await changeInput(heightInput(), 'FIRST-BENCHMARK')
+    await chooseFile()
+    const firstNetwork = structuredClone(savedNetwork)
+    await render({ id: 'project-reference', revision: 2 })
+    await changeInput(heightInput(), 'SECOND-BENCHMARK')
+    await chooseFile()
+    expect(importedBodies[1]!.referenceDeclaration).toEqual({ verticalDatum: 'SECOND-BENCHMARK' })
+    expect(savedNetwork).toMatchObject({ verticalDatum: 'SECOND-BENCHMARK' })
+    expect(earlierNetworks).toContainEqual(firstNetwork)
+    expect(earlierNetworks[0]).toMatchObject({ verticalDatum: 'FIRST-BENCHMARK' })
   })
 
   it('does not send blank reference fields or turn typed values into a declaration on the old network', async () => {
