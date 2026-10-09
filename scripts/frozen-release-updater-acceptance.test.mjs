@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,7 +51,10 @@ test('target readback uses the complete actual unpacked bundle and supports comp
   for (const mode of ['verify', 'inspect']) assert.deepEqual(resolveFixtureService({ app, mode, compatibilityRoot }), {
     root: unpacked, layout: 'asar-unpacked', present: [true, true], serviceSource: 'target-package'
   })
-  assert.equal(resolveFixtureService({ app, mode: 'seed', compatibilityRoot }).serviceSource, 'baseline-package')
+  assert.deepEqual(resolveFixtureService({ app, mode: 'seed', compatibilityRoot }), {
+    root: compatibilityRoot, layout: 'source-compatibility', serviceSource: 'source-bound-compatibility-service'
+  })
+  assert.throws(() => resolveFixtureService({ app, mode: 'seed' }), /must be built/)
 })
 
 test('target missing services and partial/mixed layouts never fall back to a complete checkout', t => {
@@ -70,6 +74,35 @@ test('baseline compatibility cannot run without explicitly built services', t =>
   const app = join(temporary(t), 'Unit fixture.app')
   assert.throws(() => resolveFixtureService({ app, mode: 'seed' }), /must be built/)
   assert.throws(() => prepareCompatibilityService(app, temporary(t), join(temporary(t), 'staging')), /must be built/)
+})
+
+test('baseline compatibility stages frozen services with the baseline SQLite package', t => {
+  const root = realpathSync(temporary(t)); const app = join(root, 'Baseline.app'); const resources = join(app, 'Contents/Resources')
+  const baselineAsar = join(resources, 'app.asar'); const baselineSqlite = join(baselineAsar, 'node_modules/better-sqlite3')
+  const checkout = join(root, 'Checkout'); const checkoutSqlite = join(checkout, 'node_modules/better-sqlite3')
+  const destination = join(root, 'staged-compatibility')
+  mkdirSync(join(baselineSqlite, 'lib'), { recursive: true }); mkdirSync(join(baselineSqlite, 'build/Release'), { recursive: true })
+  writeFileSync(join(baselineAsar, 'package.json'), JSON.stringify({ name: 'baseline', type: 'commonjs' }))
+  writeFileSync(join(baselineSqlite, 'package.json'), JSON.stringify({ name: 'better-sqlite3', main: 'lib/index.js' }))
+  writeFileSync(join(baselineSqlite, 'lib/index.js'), "module.exports = class Database { prepare(sql) { if (sql !== 'SELECT 1 AS value') throw new Error('unexpected query'); return { get: () => ({ value: 1 }) } } close() {} }\n")
+  const nativeBytes = Buffer.from('baseline SQLite ABI fixture bytes')
+  writeFileSync(join(baselineSqlite, 'build/Release/better_sqlite3.node'), nativeBytes)
+  mkdirSync(join(checkout, 'dist/engineering'), { recursive: true }); mkdirSync(join(checkoutSqlite, 'lib'), { recursive: true }); mkdirSync(join(checkoutSqlite, 'build/Release'), { recursive: true })
+  writeFileSync(join(checkout, 'package.json'), JSON.stringify({ name: 'checkout', type: 'module' }))
+  writeFileSync(join(checkout, 'dist/engineering/engineering-service.js'), 'export const service = "frozen"\n')
+  writeFileSync(join(checkout, 'dist/engineering/survey-service.js'), 'export const service = "frozen"\n')
+  writeFileSync(join(checkoutSqlite, 'package.json'), JSON.stringify({ name: 'better-sqlite3', main: 'lib/index.js' }))
+  writeFileSync(join(checkoutSqlite, 'lib/index.js'), 'throw new Error("checkout SQLite must not be used")\n')
+  writeFileSync(join(checkoutSqlite, 'build/Release/better_sqlite3.node'), 'checkout ABI must not be copied')
+
+  prepareCompatibilityService(app, checkout, destination)
+  assert.equal(readFileSync(join(destination, 'dist/engineering/survey-service.js'), 'utf8'), 'export const service = "frozen"\n')
+  assert.deepEqual(readFileSync(join(destination, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node')), nativeBytes)
+  const stagedRequire = createRequire(join(destination, 'package.json'))
+  assert.equal(stagedRequire.resolve('better-sqlite3'), join(destination, 'node_modules/better-sqlite3/lib/index.js'))
+  const database = new (stagedRequire('better-sqlite3'))(':memory:')
+  assert.equal(database.prepare('SELECT 1 AS value').get().value, 1)
+  database.close()
 })
 
 test('JSON snapshot equality ignores only non-persisted undefined properties while preserving changed values', () => {
