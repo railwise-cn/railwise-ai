@@ -1,0 +1,40 @@
+{
+  "scope": "source regression only; not native updater or package acceptance",
+  "checks": [
+    {
+      "name": "focused-check.raw.log",
+      "status": "passed",
+      "pass": 36,
+      "sha256": "f5b8012158e49d892bc7cdc0ed8f700f87a6ae914c92587669387a57a3ccc95a",
+      "bytes": 3827
+    },
+    {
+      "name": "release-related-check.raw.log",
+      "status": "passed",
+      "pass": 431,
+      "sha256": "3f677d859223a19e8512ed94f7cea698570b76ba49316e374e9442f2348e2f32",
+      "bytes": 23307
+    },
+    {
+      "name": "release-delivery-check.raw.log",
+      "status": "passed",
+      "pass": 21,
+      "sha256": "628c4e94a63d1e3fd80d149d2a502d37aafa0f4c9b8b0f4677f36f2097fc1728",
+      "bytes": 220
+    },
+    {
+      "name": "eslint-check.raw.log",
+      "status": "passed",
+      "pass": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "name": "diff-check.raw.log",
+      "status": "passed",
+      "pass": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ]
+}

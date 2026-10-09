@@ -1,0 +1,171 @@
+{
+  "kind": "independent final pure-source readback; not installed-package acceptance",
+  "sourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "sourceHashes": {
+    "src/renderer/src/components/engineering/engineering-professional-text.ts": "5d1cca0c78afd017f8eeabefc00fa60ab7de8ac339a200ae229af977fb4bf17e",
+    "src/renderer/src/components/engineering/engineering-professional-text.test.ts": "75ac21ab88a82a67e4d936d3352bae1c6c29e6f2f1fe0f29dcce3db6126031c4"
+  },
+  "assertions": {
+    "datumProseUnchanged": true,
+    "scalarProseUnchanged": true,
+    "EnglishRecordsUnchanged": true,
+    "pointNamesAndFilenamesUnchanged": true,
+    "professionalStatesNoRawFields": true,
+    "repeatedFilterStable": true,
+    "userOriginalPreserved": true
+  },
+  "results": [
+    {
+      "id": "natural-datum",
+      "input": "The coordinate system is unknown\nThe vertical datum is known\nThe datum is unknown (survey declaration pending).\n平面坐标系为 unknown，不能计算。\n高程基准是 known。",
+      "lang": "en-US",
+      "once": "The coordinate system is unknown\nThe vertical datum is known\nThe datum is unknown (survey declaration pending).\n平面坐标系为 unknown，不能计算。\n高程基准是 known。",
+      "twice": "The coordinate system is unknown\nThe vertical datum is known\nThe datum is unknown (survey declaration pending).\n平面坐标系为 unknown，不能计算。\n高程基准是 known。",
+      "idempotent": true
+    },
+    {
+      "id": "natural-datum",
+      "input": "The coordinate system is unknown\nThe vertical datum is known\nThe datum is unknown (survey declaration pending).\n平面坐标系为 unknown，不能计算。\n高程基准是 known。",
+      "lang": "zh-CN",
+      "once": "The coordinate system is unknown\nThe vertical datum is known\nThe datum is unknown (survey declaration pending).\n平面坐标系为 unknown，不能计算。\n高程基准是 known。",
+      "twice": "The coordinate system is unknown\nThe vertical datum is known\nThe datum is unknown (survey declaration pending).\n平面坐标系为 unknown，不能计算。\n高程基准是 known。",
+      "idempotent": true
+    },
+    {
+      "id": "natural-scalar",
+      "input": "The true closure check must use the original observations.\nA false alarm does not establish point movement.\nThe null hypothesis concerns point stability; the datum remains undefined.",
+      "lang": "en-US",
+      "once": "The true closure check must use the original observations.\nA false alarm does not establish point movement.\nThe null hypothesis concerns point stability; the datum remains undefined.",
+      "twice": "The true closure check must use the original observations.\nA false alarm does not establish point movement.\nThe null hypothesis concerns point stability; the datum remains undefined.",
+      "idempotent": true
+    },
+    {
+      "id": "natural-scalar",
+      "input": "The true closure check must use the original observations.\nA false alarm does not establish point movement.\nThe null hypothesis concerns point stability; the datum remains undefined.",
+      "lang": "zh-CN",
+      "once": "The true closure check must use the original observations.\nA false alarm does not establish point movement.\nThe null hypothesis concerns point stability; the datum remains undefined.",
+      "twice": "The true closure check must use the original observations.\nA false alarm does not establish point movement.\nThe null hypothesis concerns point stability; the datum remains undefined.",
+      "idempotent": true
+    },
+    {
+      "id": "natural-record",
+      "input": "Compare the dataset with the other datasets and the network records.\nThe adjustment record and adjustment records remain available for review.\nStation A and station B are separate setups; STATION C is the original label.",
+      "lang": "en-US",
+      "once": "Compare the dataset with the other datasets and the network records.\nThe adjustment record and adjustment records remain available for review.\nStation A and station B are separate setups; STATION C is the original label.",
+      "twice": "Compare the dataset with the other datasets and the network records.\nThe adjustment record and adjustment records remain available for review.\nStation A and station B are separate setups; STATION C is the original label.",
+      "idempotent": true
+    },
+    {
+      "id": "natural-record",
+      "input": "Compare the dataset with the other datasets and the network records.\nThe adjustment record and adjustment records remain available for review.\nStation A and station B are separate setups; STATION C is the original label.",
+      "lang": "zh-CN",
+      "once": "Compare the dataset with the other datasets and the network records.\nThe 平差 record and 平差 records remain available for review.\nStation A and station B are separate setups; STATION C is the original label.",
+      "twice": "Compare the dataset with the other datasets and the network records.\nThe 平差 record and 平差 records remain available for review.\nStation A and station B are separate setups; STATION C is the original label.",
+      "idempotent": true
+    },
+    {
+      "id": "point-identities",
+      "input": "| Point | X (m) |\n| --- | --- |\n| known | 50.250 |\n| unknown | -1.250 |\n| station | 15.200 |\n| true | 12.25 |\n| false | 1.1 |\n| null | 100.250 |\n| undefined | -1.25 |\n| known-point | 50 |\n| unknown-point | 60 |\n\nSource files: known.csv / unknown.in2 / station.in1.",
+      "lang": "en-US",
+      "once": "| Point | X (m) |\n| --- | --- |\n| known | 50.250 |\n| unknown | -1.250 |\n| station | 15.200 |\n| true | 12.25 |\n| false | 1.1 |\n| null | 100.250 |\n| undefined | -1.25 |\n| known-point | 50 |\n| unknown-point | 60 |\n\nSource files: known.csv / unknown.in2 / station.in1.",
+      "twice": "| Point | X (m) |\n| --- | --- |\n| known | 50.250 |\n| unknown | -1.250 |\n| station | 15.200 |\n| true | 12.25 |\n| false | 1.1 |\n| null | 100.250 |\n| undefined | -1.25 |\n| known-point | 50 |\n| unknown-point | 60 |\n\nSource files: known.csv / unknown.in2 / station.in1.",
+      "idempotent": true
+    },
+    {
+      "id": "point-identities",
+      "input": "| Point | X (m) |\n| --- | --- |\n| known | 50.250 |\n| unknown | -1.250 |\n| station | 15.200 |\n| true | 12.25 |\n| false | 1.1 |\n| null | 100.250 |\n| undefined | -1.25 |\n| known-point | 50 |\n| unknown-point | 60 |\n\nSource files: known.csv / unknown.in2 / station.in1.",
+      "lang": "zh-CN",
+      "once": "| Point | X (m) |\n| --- | --- |\n| known | 50.250 |\n| unknown | -1.250 |\n| station | 15.200 |\n| true | 12.25 |\n| false | 1.1 |\n| null | 100.250 |\n| undefined | -1.25 |\n| known-point | 50 |\n| unknown-point | 60 |\n\nSource files: known.csv / unknown.in2 / station.in1.",
+      "twice": "| Point | X (m) |\n| --- | --- |\n| known | 50.250 |\n| unknown | -1.250 |\n| station | 15.200 |\n| true | 12.25 |\n| false | 1.1 |\n| null | 100.250 |\n| undefined | -1.25 |\n| known-point | 50 |\n| unknown-point | 60 |\n\nSource files: known.csv / unknown.in2 / station.in1.",
+      "idempotent": true
+    },
+    {
+      "id": "explicit-field-states",
+      "input": "| Field | Value |\n| --- | --- |\n| precision.passed | false |\n| standardConformity | not-evaluated |\n| readOnly | true |\n| varianceFactorEstimated | false |\n| statisticalSummary | null |\n| callerDeclarationsAuthenticated | false |",
+      "lang": "en-US",
+      "once": "| Field | Value |\n| --- | --- |\n| Precision check passed | No |\n| Standards conformity | Not evaluated |\n| Variance factor estimation | Not estimated |\n| Statistical summary | No statistical test summary is available |\n| Declaration verification | Not independently verified |",
+      "twice": "| Field | Value |\n| --- | --- |\n| Precision check passed | No |\n| Standards conformity | Not evaluated |\n| Variance factor estimation | Not estimated |\n| Statistical summary | No statistical test summary is available |\n| Declaration verification | Not independently verified |",
+      "idempotent": true
+    },
+    {
+      "id": "explicit-field-states",
+      "input": "| Field | Value |\n| --- | --- |\n| precision.passed | false |\n| standardConformity | not-evaluated |\n| readOnly | true |\n| varianceFactorEstimated | false |\n| statisticalSummary | null |\n| callerDeclarationsAuthenticated | false |",
+      "lang": "zh-CN",
+      "once": "| Field | Value |\n| --- | --- |\n| 精度检查是否通过 | 否 |\n| 规范符合性 | 尚未评估 |\n| 单位权方差因子是否估计 | 未估计 |\n| 统计摘要 | 未提供统计检验摘要 |\n| 声明核实 | 未经独立核实 |",
+      "twice": "| Field | Value |\n| --- | --- |\n| 精度检查是否通过 | 否 |\n| 规范符合性 | 尚未评估 |\n| 单位权方差因子是否估计 | 未估计 |\n| 统计摘要 | 未提供统计检验摘要 |\n| 声明核实 | 未经独立核实 |",
+      "idempotent": true
+    },
+    {
+      "id": "explicit-point-fields",
+      "input": "| Field | Value |\n| --- | --- |\n| pointClass | known |\n| recordType | unknown-point |\n| rawFields.recordType | station |\n| known | false |\n\nP1 pointClass=known; P2 recordType=unknown-point; P3 pointClass=station.",
+      "lang": "en-US",
+      "once": "| Field | Value |\n| --- | --- |\n| Point class | Known point |\n| Record type | Unknown point |\n| Record type | Station |\n| Known control point | No |\n\nP1 Point class: Known point; P2 Record type: Unknown point; P3 Point class: Station.",
+      "twice": "| Field | Value |\n| --- | --- |\n| Point class | Known point |\n| Record type | Unknown point |\n| Record type | Station |\n| Known control point | No |\n\nP1 Point class: Known point; P2 Record type: Unknown point; P3 Point class: Station.",
+      "idempotent": true
+    },
+    {
+      "id": "explicit-point-fields",
+      "input": "| Field | Value |\n| --- | --- |\n| pointClass | known |\n| recordType | unknown-point |\n| rawFields.recordType | station |\n| known | false |\n\nP1 pointClass=known; P2 recordType=unknown-point; P3 pointClass=station.",
+      "lang": "zh-CN",
+      "once": "| Field | Value |\n| --- | --- |\n| 点位类别 | 已知点 |\n| 记录类型 | 未知点 |\n| 记录类型 | 测站 |\n| 是否已知点 | 否 |\n\nP1 点位类别：已知点; P2 记录类型：未知点; P3 点位类别：测站.",
+      "twice": "| Field | Value |\n| --- | --- |\n| 点位类别 | 已知点 |\n| 记录类型 | 未知点 |\n| 记录类型 | 测站 |\n| 是否已知点 | 否 |\n\nP1 点位类别：已知点; P2 记录类型：未知点; P3 点位类别：测站.",
+      "idempotent": true
+    },
+    {
+      "id": "numbers-and-failure",
+      "input": "S1 residual −2.37×10⁻¹⁰ rad; covariance 7.8255e-15 m²; X = 49.99999999284098 m; sourceRow=5; COSA.in2:5.\nS1 residual 12 mm exceeds 3 mm; precision.passed=false; contextHash=sha256-private; readOnly=true.",
+      "lang": "en-US",
+      "once": "S1 residual −2.37×10⁻¹⁰ rad; covariance 7.8255e-15 m²; X = 49.99999999284098 m; Source record line=5; COSA.in2:5.\nS1 residual 12 mm exceeds 3 mm; Precision check failed.",
+      "twice": "S1 residual −2.37×10⁻¹⁰ rad; covariance 7.8255e-15 m²; X = 49.99999999284098 m; Source record line=5; COSA.in2:5.\nS1 residual 12 mm exceeds 3 mm; Precision check failed.",
+      "idempotent": true
+    },
+    {
+      "id": "numbers-and-failure",
+      "input": "S1 residual −2.37×10⁻¹⁰ rad; covariance 7.8255e-15 m²; X = 49.99999999284098 m; sourceRow=5; COSA.in2:5.\nS1 residual 12 mm exceeds 3 mm; precision.passed=false; contextHash=sha256-private; readOnly=true.",
+      "lang": "zh-CN",
+      "once": "S1 residual −2.37×10⁻¹⁰ rad; covariance 7.8255e-15 m²; X = 49.99999999284098 m; 原始记录行=5; COSA.in2:5.\nS1 residual 12 mm exceeds 3 mm; 精度检查未通过.",
+      "twice": "S1 residual −2.37×10⁻¹⁰ rad; covariance 7.8255e-15 m²; X = 49.99999999284098 m; 原始记录行=5; COSA.in2:5.\nS1 residual 12 mm exceeds 3 mm; 精度检查未通过.",
+      "idempotent": true
+    },
+    {
+      "id": "legacy-role",
+      "input": "P1 是 unknown 点；A 为 known-point；基准为 unknown，不能计算。",
+      "lang": "en-US",
+      "once": "P1 是Unknown point；A 为Known point；基准为 unknown，不能计算。",
+      "twice": "P1 是Unknown point；A 为Known point；基准为 unknown，不能计算。",
+      "idempotent": true
+    },
+    {
+      "id": "legacy-role",
+      "input": "P1 是 unknown 点；A 为 known-point；基准为 unknown，不能计算。",
+      "lang": "zh-CN",
+      "once": "P1 是未知点；A 为已知点；基准为 unknown，不能计算。",
+      "twice": "P1 是未知点；A 为已知点；基准为 unknown，不能计算。",
+      "idempotent": true
+    },
+    {
+      "id": "actual-full-raw",
+      "lang": "en-US",
+      "once": "**Checks before a plane control network adjustment** (any-station/direction–distance network) — professional practice, stated in brief\n\n1. **Source and version control** — Build a clean source inventory of the original observation records (e.g. IN2 direction–distance sets). If more than one file of the same type exists, stop and confirm which version is authoritative — never pick one arbitrarily. Record the actual software and working method stated in the engineering report.\n\n2. **Completeness and parseability** — Each setup needs complete face-left/face-right rounds, zero-set observations, and no missing station readings. Angles and distances must parse cleanly in their recorded format and units. Missing or illegible records stay listed as evidence gaps — they are not filled in.\n\n3. **Raw observation screening** — Before any adjustment, screen face-left/face-right discrepancies and zeroing differences, and cross-check station-level observations against the companion data. These are pre-checks; note that the full reduction chain (setup data → network observations) is not a fully validated capability here, so don't present it as done.\n\n4. **Independent closure checks on the original route** — Compute angular/azimuth and coordinate/length closures from the original observations against explicit project limits. This is the true pre-adjustment check. Numbers historically labelled \"closure\" in legacy outputs are after-adjustment fitted residual norms and must never substitute for it.\n\n5. **Network geometry and rank** — Verify connectivity and redundancy: independent observations versus unknowns, with no rank deficiency and no illegal input. Such networks must fail and be corrected at the data level, not forced through.\n\n6. **Datum and point roles** — Confirm the declared coordinate system and projection, and keep each point's role as recorded: constraint/fixed points, points to be determined, and any unverified points remain unverified. A declared datum is not independently verified.\n\n7. **Weighting and precision basis** — Confirm the recorded weighting model (absolute vs. relative) and whether direction and distance variance components are estimated. The scale basis determines how any precision result may be interpreted afterwards.\n\n8. **Limits, standard, and sign-off basis** — Project tolerances, standard and version, and personnel/sign-off basis must be supplied. Limits are never invented, and numerical agreement with a historical output is not standards acceptance.\n\n9. **Gross-error handling as hypotheses only** — Suspected outliers may be flagged with source-linked evidence, but observations are never deleted, weights changed, or initial values reset without explicit confirmation.\n\nNo data has been modified and no calculation started — this is consultation only. In the current project, no observation files or adjustment records are registered yet, so the practical first step, when work begins, is to add the authoritative source files together with the project's limit and sign-off basis.",
+      "twice": "**Checks before a plane control network adjustment** (any-station/direction–distance network) — professional practice, stated in brief\n\n1. **Source and version control** — Build a clean source inventory of the original observation records (e.g. IN2 direction–distance sets). If more than one file of the same type exists, stop and confirm which version is authoritative — never pick one arbitrarily. Record the actual software and working method stated in the engineering report.\n\n2. **Completeness and parseability** — Each setup needs complete face-left/face-right rounds, zero-set observations, and no missing station readings. Angles and distances must parse cleanly in their recorded format and units. Missing or illegible records stay listed as evidence gaps — they are not filled in.\n\n3. **Raw observation screening** — Before any adjustment, screen face-left/face-right discrepancies and zeroing differences, and cross-check station-level observations against the companion data. These are pre-checks; note that the full reduction chain (setup data → network observations) is not a fully validated capability here, so don't present it as done.\n\n4. **Independent closure checks on the original route** — Compute angular/azimuth and coordinate/length closures from the original observations against explicit project limits. This is the true pre-adjustment check. Numbers historically labelled \"closure\" in legacy outputs are after-adjustment fitted residual norms and must never substitute for it.\n\n5. **Network geometry and rank** — Verify connectivity and redundancy: independent observations versus unknowns, with no rank deficiency and no illegal input. Such networks must fail and be corrected at the data level, not forced through.\n\n6. **Datum and point roles** — Confirm the declared coordinate system and projection, and keep each point's role as recorded: constraint/fixed points, points to be determined, and any unverified points remain unverified. A declared datum is not independently verified.\n\n7. **Weighting and precision basis** — Confirm the recorded weighting model (absolute vs. relative) and whether direction and distance variance components are estimated. The scale basis determines how any precision result may be interpreted afterwards.\n\n8. **Limits, standard, and sign-off basis** — Project tolerances, standard and version, and personnel/sign-off basis must be supplied. Limits are never invented, and numerical agreement with a historical output is not standards acceptance.\n\n9. **Gross-error handling as hypotheses only** — Suspected outliers may be flagged with source-linked evidence, but observations are never deleted, weights changed, or initial values reset without explicit confirmation.\n\nNo data has been modified and no calculation started — this is consultation only. In the current project, no observation files or adjustment records are registered yet, so the practical first step, when work begins, is to add the authoritative source files together with the project's limit and sign-off basis.",
+      "retained": [
+        {
+          "text": "true pre-adjustment check",
+          "retained": true
+        },
+        {
+          "text": "adjustment records",
+          "retained": true
+        },
+        {
+          "text": "station readings",
+          "retained": true
+        },
+        {
+          "text": "station-level",
+          "retained": true
+        }
+      ]
+    }
+  ]
+}

@@ -200,10 +200,75 @@ function professionalWeightingFields(line: string, language: string, fieldValueT
   return `${row[1]}${label(field)} ${row[3]}${value(row[4].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, ''), field)} ${row[5]}`
 }
 
+/** Boolean/null spellings are also ordinary survey prose (true closure,
+ * false alarm, null hypothesis). Translate only a recorded scalar value in
+ * a recognized field/value row, never every occurrence in an answer. */
+function professionalFieldStateValues(line: string, language: string, fieldValueTable: boolean): string {
+  if (!fieldValueTable) return line
+  const row = line.match(/^(\s*\|\s*)([^|]+)(\|\s*)([^|]*)(\|.*)$/)
+  if (!row) return line
+  const field = row[2].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, '')
+  if (/^readOnly$/i.test(field)) return ''
+  if (!/^(?:sourceEligibility(?:\.eligible|\.status)?|sourceAdmission(?:\.status)?|standardConformity|humanSignatureVerification|callerDeclarationsAuthenticated|varianceFactorEstimated|statisticalSummary|precision\.passed)$/i.test(field)) return line
+  const scalar = row[4].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, '').toLowerCase()
+  const states: Record<string, [string, string]> = {
+    true: ['是', 'Yes'], false: ['否', 'No'], null: ['未提供', 'Not provided'],
+    undefined: ['未提供', 'Not provided'], 'not-evaluated': ['尚未评估', 'Not evaluated']
+  }
+  const state = states[scalar]
+  const english = language.toLowerCase().startsWith('en')
+  if (field === 'varianceFactorEstimated' && /^(true|false)$/.test(scalar)) {
+    const value = scalar === 'true' ? ['为估计值', 'Estimated'] : ['未估计', 'Not estimated']
+    return `${row[1]}${row[2]}${row[3]}${value[english ? 1 : 0]} ${row[5]}`
+  }
+  if (field === 'statisticalSummary' && /^(null|undefined)$/.test(scalar)) {
+    return `${row[1]}${row[2]}${row[3]}${english ? 'No statistical test summary is available' : '未提供统计检验摘要'} ${row[5]}`
+  }
+  if (field === 'callerDeclarationsAuthenticated' && scalar === 'false') {
+    return `${row[1]}${english ? 'Declaration verification' : '声明核实'} ${row[3]}${english ? 'Not independently verified' : '未经独立核实'} ${row[5]}`
+  }
+  return state ? `${row[1]}${row[2]}${row[3]}${state[language.toLowerCase().startsWith('en') ? 1 : 0]} ${row[5]}` : line
+}
+
+/** Point-role enums belong to explicit recorded fields, not words in survey
+ * prose, point names or source filenames that happen to share their spelling. */
+function professionalPointRoleFields(line: string, language: string, fieldValueTable: boolean): string {
+  const english = language.toLowerCase().startsWith('en')
+  const label = (chinese: string, translated: string): string => english ? translated : chinese
+  const role = (value: string): string => {
+    switch (value.toLowerCase()) {
+      case 'known': case 'known-point': return label('已知点', 'Known point')
+      case 'unknown': case 'unknown-point': return label('未知点', 'Unknown point')
+      default: return label('测站', 'Station')
+    }
+  }
+  const fieldLabel = (field: string): string => field.toLowerCase() === 'pointclass' ? label('点位类别', 'Point class') : label('记录类型', 'Record type')
+  const row = line.match(/^(\s*\|\s*)([^|]+)(\|\s*)([^|]*)(\|.*)$/)
+  const field = row?.[2].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, '')
+  if (fieldValueTable && row && field) {
+    const value = row[4].trim().replace(/^(?:\*\*|__)|(?:\*\*|__)$/g, '')
+    if (/^(pointClass|(?:rawFields\.)?recordType)$/.test(field)) {
+      const parsed = value.match(/^(known-point|unknown-point|known|unknown|station)(?=$|\s|[（(])/i)
+      if (parsed) return `${row[1]}${fieldLabel(field)} ${row[3]}${role(parsed[1])}${value.slice(parsed[0].length)} ${row[5]}`
+    }
+    if (field === 'known') {
+      const parsed = value.match(/^(true|false)(?=$|\s|[（(])/i)
+      if (parsed) return `${row[1]}${label('是否已知点', 'Known control point')} ${row[3]}${parsed[1].toLowerCase() === 'true' ? label('是', 'Yes') : label('否', 'No')}${value.slice(parsed[0].length)} ${row[5]}`
+    }
+  }
+  return line
+    .replace(/\b(pointClass|(?:rawFields\.)?recordType)\s*[:=]\s*(known-point|unknown-point|known|unknown|station)(?!\.[a-z0-9])(?=$|\s|[.,;，。；（(])/gi,
+      (_, field: string, value: string) => `${fieldLabel(field)}${english ? ': ' : '：'}${role(value)}`)
+    // A legacy Chinese answer can explicitly declare a point role in prose.
+    // Do not infer this role from an unresolved coordinate or datum statement.
+    .replace(/(是|为)\s*(?:(known-point|unknown-point)|(known|unknown)\s*点)(?=$|[\s，。；;（(])/gi,
+      (_, verb: string, enumValue: string | undefined, value: string | undefined) => `${verb}${role(enumValue ?? value!)}`)
+}
+
 function stripInternalFragments(line: string, language: string, fieldValueTable = false): string {
   const english = language.toLowerCase().startsWith('en')
   const label = (chinese: string, translated: string): string => english ? translated : chinese
-  return professionalWeightingFields(line.replace(/`([^`]+)`/g, '$1'), language, fieldValueTable)
+  return professionalWeightingFields(professionalPointRoleFields(professionalFieldStateValues(line.replace(/`([^`]+)`/g, '$1'), language, fieldValueTable), language, fieldValueTable), language, fieldValueTable)
     .replace(/`([^`]+)`/g, '$1')
     .replace(/(?:^|(?<=。))选择器中[^。]*(?:原样传入|核验来源|定位到该点精度记录作答|点位精度即对应 point-precision)[。]?/g, '')
     .replace(/原因：该引用缺少\s*statistics\s*类型证据的必需字段[^。]*。/g, '所选资料的定位信息不完整，未能完成核查。')
@@ -244,12 +309,6 @@ function stripInternalFragments(line: string, language: string, fieldValueTable 
     .replace(/\bsourceAdmission(?:\.status)?\s*(?:[:=：]|为)?\s*/gi, label('资料可用性：', 'Source availability: '))
     .replace(/\bqualityStatus\s*[:=：]?\s*validated\b/gi, label('资料质量已校核', 'Data quality checked'))
     .replace(/\bstatus\s+open\b/gi, label('仍待处理', 'Review still required'))
-    .replace(/\bknown\s*\|\s*false\b/gi, label('是否已知点 | 否', 'Known control point | No'))
-    .replace(/\bknown\s*\|\s*true\b/gi, label('是否已知点 | 是', 'Known control point | Yes'))
-    .replace(/\bknown-point\b/gi, label('已知点', 'Known point'))
-    .replace(/\bunknown-point\b/gi, label('未知点', 'Unknown point'))
-    .replace(/\bknown(?=\s*(?:[|（(]|点|$))/gi, label('已知点', 'Known point'))
-    .replace(/\bunknown(?=\s*(?:[|（(]|点|$))/gi, label('未知点', 'Unknown point'))
     .replace(/(\|\s*)id(\s*\|)/gi, label('$1点号$2', '$1Point$2'))
     .replace(/\b(?:typedEvidence|typed)\s*(?:证据)?/gi, label('所选资料', 'selected record'))
     .replace(/类型化证据/g, '所选资料')
@@ -370,9 +429,6 @@ function stripInternalFragments(line: string, language: string, fieldValueTable 
     .replace(/\bsurvey_finding_[a-z0-9-]+\b(?:…|\.\.\.)?/gi, '')
     .replace(/\bstatus\s+仍为\s+open\b/gi, '该提示仍待处理')
     .replace(/\b(?:走|采用)\s*(?:策略|strategy)\b/gi, '按当前资料检查规则')
-    .replace(/\bknown-point\b/gi, label('已知点', 'Known point'))
-    .replace(/\bunknown-point\b/gi, label('未知点', 'Unknown point'))
-    .replace(/\bstation\b/gi, label('测站', 'Station'))
     .replace(/`([^`]+)`/g, '$1')
     // Remove the metadata portion while retaining the professional statement
     // around it, e.g. "源文件：COSA.in2（sha256=…）" stays useful to a surveyor.
@@ -497,7 +553,7 @@ function cleanResidualProfessionalFragments(line: string, language: string): str
     .replace(/\bmetric\s*[:=：]\s*([^,，)）]+)/gi, '$1')
     .replace(/\bnetwork\s*\/\s*(?:未知点资料|unknown[- ]point data)\s*(?:\/\s*)?/gi, '')
     .replace(/\bidentity\s+(?:id\s*[=:：]\s*)?["“']?[A-Za-z0-9_-]+["”']?/gi, '')
-    .replace(/\b(?:network|adjustment)\s+(?:revision|record|修订)\s*[，,、；;：:]*/gi, '')
+    .replace(/\b(?:network|adjustment)\s+(?:revision\b|修订)\s*(?:[:=：]\s*)?\d+\s*[，,、；;：:]*/gi, '')
     .replace(/\b(?:direction)（方向）/gi, label('方向', 'Direction'))
     .replace(/\b(?:quality flag|质量标记)\s*[:：]?\s*\[\s*["“']?([^\]"”']+)["”']?\s*\]/gi, `${label('质量标记：', 'Quality flag: ')}$1`)
     .replace(/(?:source|来源|源)\s*[。.]$/gi, '。')
@@ -544,9 +600,9 @@ function cleanResidualProfessionalFragments(line: string, language: string): str
     // rendered "other findings".
     .replace(/(?<!other )\b(?:findings?)\b/gi, label('其他问题', 'other findings'))
     .replace(/\b(?:strategy|策略)\b/g, '')
-    .replace(/\b(?:unknown(?!\s+point)|known(?!\s+point)|adjustment|plane-control|validated|verified|completed|valid|warning|open)\b/gi, match => {
+    .replace(/\b(?:adjustment|plane-control|validated|verified|completed|valid|warning|open)\b/gi, match => {
       const translations: Record<string, [string, string]> = {
-        unknown: ['未知', 'unknown'], known: ['已知', 'known'], adjustment: ['平差', 'adjustment'],
+        adjustment: ['平差', 'adjustment'],
         'plane-control': ['平面控制网', 'plane control network'], validated: ['已校核', 'validated'],
         verified: ['已核验', 'verified'], completed: ['已完成', 'completed'], valid: ['有效', 'valid'],
         warning: ['警告', 'warning'], open: ['仍待处理', 'open']
@@ -677,13 +733,6 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
       // values or a blocking conclusion. Remove the residual token only.
       .replace(new RegExp(internalPhrase.source, 'gi'), '')
       .replace(/\b(?:execution|processing)\s+(?:completed|started|failed)\b/gi, '')
-      .replace(/\b(?:true|false|null|undefined|not-evaluated)\b/gi, (value) => {
-        const states: Record<string, [string, string]> = {
-          true: ['是', 'Yes'], false: ['否', 'No'], null: ['未提供', 'Not provided'],
-          undefined: ['未提供', 'Not provided'], 'not-evaluated': ['尚未评估', 'Not evaluated']
-        }
-        return states[value.toLowerCase()][language.toLowerCase().startsWith('en') ? 1 : 0]
-      })
       .replace(/\s{2,}/g, ' ')
       .trim()
     // Older model answers can use generic implementation vocabulary without

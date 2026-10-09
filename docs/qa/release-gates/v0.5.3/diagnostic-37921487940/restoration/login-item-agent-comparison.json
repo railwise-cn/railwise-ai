@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-09T14:22:53.305Z",
+  "method": "CUA native Login Items AX and screenshot readback; agent comparison",
+  "before": {
+    "railwiseOpenAtLogin": false,
+    "railwiseBackgroundActivity": "on"
+  },
+  "after": {
+    "railwiseOpenAtLogin": false,
+    "railwiseBackgroundActivity": "on"
+  },
+  "comparison": "same protected RailWise item states",
+  "wholeOtherApplicationList": "private only",
+  "source": "Observed login list has Code Awake and SendRight only; RailWise background-switch value on in both retained AX."
+}

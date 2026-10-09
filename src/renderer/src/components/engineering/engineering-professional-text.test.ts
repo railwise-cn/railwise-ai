@@ -5,6 +5,99 @@ import historicalSyntheticAnswers from './fixtures/historical-survey-synthetic-a
 
 describe('engineeringProfessionalText', () => {
   beforeEach(async () => { await appI18n.changeLanguage('zh-CN') })
+  it('preserves the professional English sentences observed in the packaged AI reply', () => {
+    const answer = [
+      'This is the true pre-adjustment check.',
+      'In the current project, no observation files or adjustment records are registered yet.',
+      'Each setup needs complete face-left/face-right rounds and no missing station readings.',
+      'Cross-check station-level observations in an any-station network.'
+    ].join('\n')
+    expect(engineeringProfessionalAnswerText(answer, 'en-US')).toBe(answer)
+  })
+  it.each(['zh-CN', 'en-US'])('preserves natural true, false, null and undefined survey terminology in %s', language => {
+    const answer = [
+      'The true closure check must use the original observations.',
+      'A false alarm does not establish that the control point moved.',
+      'The null hypothesis concerns point stability; the datum remains undefined.'
+    ].join('\n')
+    expect(engineeringProfessionalAnswerText(answer, language)).toBe(answer)
+  })
+  it('retains dataset names, singular and plural records, and station capitalization in prose', () => {
+    const answer = [
+      'Compare the dataset with the other datasets and the network records.',
+      'The adjustment record and adjustment records remain available for review.',
+      'Station A and station B are separate setups; STATION C is the original label.'
+    ].join('\n')
+    expect(engineeringProfessionalAnswerText(answer, 'en-US')).toBe(answer)
+  })
+  it.each(['zh-CN', 'en-US'])('keeps scalar status translation confined to recognized field/value rows in %s', language => {
+    const answer = engineeringProfessionalAnswerText([
+      '| Field | Value |', '| --- | --- |',
+      '| precision.passed | false |',
+      '| standardConformity | not-evaluated |',
+      '| Observation note | true closure check |',
+      '| Point name | null |'
+    ].join('\n'), language)
+    expect(answer).toContain(language.startsWith('en') ? '| Precision check passed | No |' : '| 精度检查是否通过 | 否 |')
+    expect(answer).toContain(language.startsWith('en') ? '| Standards conformity | Not evaluated |' : '| 规范符合性 | 尚未评估 |')
+    expect(answer).toContain('| Observation note | true closure check |')
+    expect(answer).toContain('| Point name | null |')
+    expect(answer).not.toMatch(/precision\.passed|standardConformity|not-evaluated/)
+  })
+  it('still hides internal fields while preserving quantities and failed precision semantics', () => {
+    const answer = engineeringProfessionalAnswerText('S1 residual 0.4 mm; varianceFactor=1.14e-8; precision.passed=false; pointClass=station; contextHash=sha256-private; readOnly=true.', 'en-US')
+    for (const retained of ['S1 residual 0.4 mm', 'Variance factor=1.14e-8', 'Precision check failed', 'Station']) expect(answer).toContain(retained)
+    expect(answer).not.toMatch(/contextHash|sha256-private|readOnly|precision\.passed|pointClass/)
+  })
+  it.each(['zh-CN', 'en-US'])('preserves unresolved datum prose without inferring point roles in %s', language => {
+    const answer = [
+      'The coordinate system is unknown',
+      'The vertical datum is known',
+      'The datum is unknown (survey declaration pending).',
+      'The station readings are complete.',
+      '平面坐标系为 unknown，不能计算。',
+      '高程基准是 known。'
+    ].join('\n')
+    expect(engineeringProfessionalAnswerText(answer, language)).toBe(answer)
+  })
+  it.each(['zh-CN', 'en-US'])('preserves enum-like point names and original source filenames in %s', language => {
+    const answer = [
+      '| Point | X (m) |', '| --- | --- |',
+      '| known | 10 |', '| unknown | 20 |', '| station | 30 |',
+      '', 'Source files: known.csv / unknown.in2 / station.in1.',
+      'Original note: "station readings are complete; the datum is unknown".'
+    ].join('\n')
+    expect(engineeringProfessionalAnswerText(answer, language)).toBe(answer)
+    expect(engineeringProfessionalUserText(answer)).toBe(answer)
+  })
+  it.each(['zh-CN', 'en-US'])('translates recorded point classes without altering point identities in %s', language => {
+    const answer = engineeringProfessionalAnswerText([
+      '| Field | Value |', '| --- | --- |',
+      '| pointClass | unknown |', '| recordType | station |',
+      '| rawFields.recordType | known-point |', '| known | false |',
+      '', 'P1 pointClass=known; P2 recordType=unknown-point; P3 pointClass=station.'
+    ].join('\n'), language)
+    expect(answer).toContain(language.startsWith('en') ? '| Point class | Unknown point |' : '| 点位类别 | 未知点 |')
+    expect(answer).toContain(language.startsWith('en') ? '| Record type | Station |' : '| 记录类型 | 测站 |')
+    expect(answer).toContain(language.startsWith('en') ? '| Record type | Known point |' : '| 记录类型 | 已知点 |')
+    expect(answer).toContain(language.startsWith('en') ? '| Known control point | No |' : '| 是否已知点 | 否 |')
+    expect(answer).toContain(language.startsWith('en') ? 'P1 Point class: Known point' : 'P1 点位类别：已知点')
+    expect(answer).not.toMatch(/pointClass|recordType|rawFields|\|\s*false\s*\|/)
+  })
+  it.each(['zh-CN', 'en-US'])('preserves statistical limitations and removes whole internal-only rows in %s', language => {
+    const answer = engineeringProfessionalAnswerText([
+      '| Field | Value |', '| --- | --- |',
+      '| varianceFactorEstimated | false |', '| statisticalSummary | null |',
+      '| readOnly | true |', '| callerDeclarationsAuthenticated | false |',
+      '| Observation note | null hypothesis |'
+    ].join('\n'), language)
+    expect(answer).toContain(language.startsWith('en') ? '| Variance factor estimation | Not estimated |' : '| 单位权方差因子是否估计 | 未估计 |')
+    expect(answer).toContain(language.startsWith('en') ? 'No statistical test summary is available' : '未提供统计检验摘要')
+    expect(answer).toContain(language.startsWith('en') ? 'Not independently verified' : '未经独立核实')
+    expect(answer).toContain('| Observation note | null hypothesis |')
+    expect(answer).not.toMatch(/varianceFactorEstimated|statisticalSummary|readOnly|callerDeclarationsAuthenticated|\|\s*\|\s*(?:true|false)|\|\s*(?:false|null)\s*\|/)
+    expect(answer.split('\n').filter(line => line.startsWith('|'))).toHaveLength(6)
+  })
   it.each([
     ['zh-CN', '定权依据：按测段路长相对定权', '相对定权参考路长（m）：1', '方差尺度单位：m²', '单位权中误差单位：m', '方差尺度评定：未评定', '点位精度评定：未评定'],
     ['en-US', 'Weighting basis: Relative weights based on route length', 'Relative-weight reference route length (m): 1', 'Variance scale unit: m²', 'Unit weight standard deviation unit: m', 'Variance scale assessment: Not evaluated', 'Point precision assessment: Not evaluated']

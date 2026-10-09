@@ -1,0 +1,18 @@
+{
+  "status": "private-source-files-macos-signature-and-package-readback-passed",
+  "runId": 37921487940,
+  "runAttempt": 1,
+  "sourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "files": 8,
+  "verifiedFiles": "/private/tmp/railwise-053-tools/new-freeze-37921487940/verified-release-files",
+  "combinedReceipt": "/private/tmp/railwise-053-tools/new-freeze-37921487940/reviewed-build-combined.json",
+  "updaterDispatchInput": "/private/tmp/railwise-053-tools/new-freeze-37921487940/frozen-updater-dispatch.json",
+  "signatureLog": "/private/tmp/railwise-053-tools/new-freeze-37921487940/local-mac-artifacts-signature.log",
+  "packageIdentityReadback": "/private/tmp/railwise-053-tools/new-freeze-37921487940/package-identity-readback.json",
+  "limitations": [
+    "Not installed or launched",
+    "UI/function/accessibility/updater acceptance pending",
+    "Windows signing not verified",
+    "No public release/feed/tag/website action performed"
+  ]
+}

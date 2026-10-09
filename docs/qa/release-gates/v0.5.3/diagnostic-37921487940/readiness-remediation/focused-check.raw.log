@@ -1,0 +1,44 @@
+✔ target readback uses the complete actual unpacked bundle and supports complete legacy ASAR layout (8.145458ms)
+✔ target missing services and partial/mixed layouts never fall back to a complete checkout (6.974208ms)
+✔ baseline compatibility cannot run without explicitly built services (1.241083ms)
+✔ baseline compatibility stages frozen services with the baseline SQLite package (10.876458ms)
+✔ JSON snapshot equality ignores only non-persisted undefined properties while preserving changed values (0.140667ms)
+✔ fixture execution binds the real selected executable, target version and frozen source (2.822375ms)
+✔ service identity fails closed when a dependency is missing or resolves outside the bundle (4.777ms)
+✔ package identity covers transitive service files and both ESM and CJS dependency files (14.012833ms)
+✔ historical public updater runs only in its trusted fresh hosted macOS workflow (0.357291ms)
+✔ hosted updater provenance identifies the exact main workflow execution and rejects malformed or mixed revisions (0.20675ms)
+✔ a current updater execution cannot accept an older build or another repository (0.091709ms)
+✔ existing public, legacy, runtime or updater profiles block acceptance without deleting them (7.902792ms)
+✔ the exact signed public package identity is preserved across the upgrade (0.236333ms)
+✔ reviewed build inputs require immutable artifact IDs/digests and the exact 0.5.3 file set (0.999209ms)
+✔ frozen feed rejects wrong versions, duplicate assets, hash/size changes and links (16.376583ms)
+✔ real temporary HTTP origin serves only random capability and exact frozen manifest/ZIP (14.182542ms)
+✔ range parsing accepts only single bounded safe-integer ranges (0.093292ms)
+✔ default-trust tunnel endpoints reject aliases, credentials and unexpected origins (0.099416ms)
+✔ tunnel readiness requires a unique endpoint, live process and registered connection after delayed setup (0.240209ms)
+✔ tunnel readiness terminates on process exit or changing endpoints and respects its deadline (0.131791ms)
+✔ frozen manifest readiness retries allowlisted DNS, connection and gateway startup failures then verifies exact bytes (2.618875ms)
+✔ all explicit transient network codes and gateway statuses remain bounded readiness retries (1.47425ms)
+✔ TLS errors outrank nested transient errors and unknown errors never enter readiness retry (0.4185ms)
+✔ redirects, alternate origins/paths, terminal HTTP and manifest identity mismatch fail without retry (0.650291ms)
+✔ manifest readiness bounds repeated transient failures, attempt count and a stalled response body (4.980291ms)
+✔ readiness checks cannot start for an exited tunnel or unbound manifest inputs (0.339917ms)
+✔ retained logs/report fields remove feed capabilities, temporary origins and tokens (0.445959ms)
+✔ native report fingerprint binds the final redacted retained bytes including their newline (1.439208ms)
+✔ native evidence retention rejects unreadable or linked reports before creating a substitute (1.483291ms)
+✔ native round trip requires the real six stages and strict nonce verification (0.132375ms)
+✔ native updater cleanup waits for owned applications after SIGTERM (1.728542ms)
+✔ native updater cleanup escalates stubborn owned applications to SIGKILL (1.077375ms)
+✔ native updater cleanup reports processes that survive forced termination (1.129542ms)
+✔ historical database rows and configuration bytes cannot be altered or dropped (1.940833ms)
+✔ pinned asset download validates body size and digest before trusting its bytes (3.004208ms)
+✔ workflow is read-only, fresh hosted and preserves only redacted acceptance evidence (2.098542ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 254.65375

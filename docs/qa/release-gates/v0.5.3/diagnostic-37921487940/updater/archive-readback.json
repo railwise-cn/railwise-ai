@@ -1,0 +1,29 @@
+{
+  "status": "failed-updater-evidence-byte-preserved",
+  "artifactId": 11620971963,
+  "digest": "sha256:63c516ce2f66ae135809ba36f3c90db3091ed16be5e57a7e100f80c1d36c5d79",
+  "members": [
+    {
+      "name": "frozen-updater.json",
+      "bytes": 17760,
+      "sha256": "a7b84acf976a9aaed85c6da99a45fabf6eac61dc1f2f7ed217a1ed3bdc506fdb"
+    },
+    {
+      "name": "seed-data.json",
+      "bytes": 2313,
+      "sha256": "5b765a2529066c207fa10d31c13a292b1360701bb27f1dc1099f692568fd9411"
+    },
+    {
+      "name": "target-services.json",
+      "bytes": 1902,
+      "sha256": "b2e11d64f6d92b10185017b16fba492d369c4e1ca0a47c5bd7d539d7f2ccfaa1"
+    },
+    {
+      "name": "cloudflared.redacted.log",
+      "bytes": 2019,
+      "sha256": "f2ca02327fcf49bc2b1537182692668cc21c696aacf716b061a3fa9fac934c02"
+    }
+  ],
+  "nativeReportPresent": false,
+  "notAcceptance": true
+}

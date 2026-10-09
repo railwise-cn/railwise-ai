@@ -1,0 +1,28 @@
+{
+  "status": "failed-acceptance-reviewed",
+  "classification": "harness-readiness-race-with-external-non-readiness",
+  "productDefectProven": false,
+  "sourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "runId": 37939882485,
+  "runAttempt": 1,
+  "firstFailedStep": {
+    "name": "Run default-trust HTTPS download, Squirrel install and historical data readback",
+    "status": "completed",
+    "conclusion": "failure",
+    "number": 9,
+    "started_at": "2026-10-09T13:52:36Z",
+    "completed_at": "2026-10-09T13:54:30Z"
+  },
+  "nativeUpdaterStarted": false,
+  "seedPassed": true,
+  "nativeReportPresent": false,
+  "archive": {
+    "id": 11620971963,
+    "name": "frozen-updater-arm64-37939882485",
+    "digest": "sha256:63c516ce2f66ae135809ba36f3c90db3091ed16be5e57a7e100f80c1d36c5d79",
+    "size": 7174
+  },
+  "failure": "fetch failed Evidence retention: Required native updater report is missing.",
+  "reportSha256": "952346e3c21aa5bb287448341d186d0e4f355a94d64d8ae1c21b282e66595c99",
+  "notAcceptance": true
+}

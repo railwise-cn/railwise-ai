@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-09T14:26:54.633459+00:00",
+  "operation": "preserve blocked 0.5.3 installation and restore exact pre-acceptance application",
+  "restoredVersion": "0.5.2",
+  "restoredAsarSha256": "94a815ad4eb084b652a066838b2ade64ea5959059dd7c32c650c6a8e63ec3030",
+  "restoredOriginalIdentityVerified": true,
+  "blockedPackage": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-blocked-installed-37921487940-20261009/RailWise AI.app",
+  "blockedAsarSha256": "2134c273af4b7e86e6f0243b0178fd1ffedeb120f260bca7094b5726b7474af7",
+  "profileSessionRestored": true,
+  "normalAppLaunched": false,
+  "publicReleasePerformed": false,
+  "boundary": "Exact previously installed application restoration, not an independent pinned-asset compatibility acceptance."
+}

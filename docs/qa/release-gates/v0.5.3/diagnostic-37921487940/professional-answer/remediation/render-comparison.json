@@ -1,0 +1,17 @@
+{
+  "scope": "Actual synthetic model response rendered through original frozen-source and patched-source filters; not installed-package acceptance",
+  "freezeSource": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "rawSha256": "d0b9167f7ae9543b8675b15ee4fb5f85daf52d5cdb62b0d91553839cda2fd407",
+  "preFixSha256": "3fb8066aa3b3855963cc612e04bb3586c20fdcc879419867ef97843b8693de03",
+  "patchedSha256": "f0daf267898bdad3ed4ce4bdf713590f9b31a1f879a0a8eed0d669827bae9c3b",
+  "before": {
+    "booleanWordCorrupted": true,
+    "recordPluralCorrupted": true,
+    "stationCaseCorrupted": true
+  },
+  "after": {
+    "originalTrueClausePreserved": true,
+    "originalRecordClausePreserved": true,
+    "stationCasePreserved": true
+  }
+}

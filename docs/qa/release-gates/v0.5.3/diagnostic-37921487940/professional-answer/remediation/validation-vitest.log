@@ -1,0 +1,11 @@
+
+ RUN  v4.1.7 /Users/wangjiawei/Documents/WorkWise
+
+(node:9953) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  3 passed (3)
+      Tests  169 passed (169)
+   Start at  22:37:10
+   Duration  1.63s (transform 552ms, setup 0ms, import 892ms, tests 915ms, environment 197ms)
+

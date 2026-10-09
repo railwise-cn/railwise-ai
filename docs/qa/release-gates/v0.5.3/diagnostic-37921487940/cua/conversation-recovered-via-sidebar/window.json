@@ -1,0 +1,165 @@
+{
+  "capturedAt" : "2026-10-09T14:13:38Z",
+  "coordinateSystem" : "CoreGraphics global display coordinates",
+  "displays" : [
+    {
+      "bounds" : {
+        "height" : 1080,
+        "width" : 1920,
+        "x" : 0,
+        "y" : 0
+      },
+      "id" : 3,
+      "isMain" : true,
+      "modeSize" : {
+        "height" : 1080,
+        "width" : 1920
+      },
+      "pixelSize" : {
+        "height" : 2160,
+        "width" : 3840
+      },
+      "scaleX" : 2,
+      "scaleY" : 2
+    }
+  ],
+  "operation" : "observe-window",
+  "schemaVersion" : 1,
+  "screenCapturePermissionGranted" : true,
+  "targetPID" : 64797,
+  "windows" : [
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 500,
+        "width" : 500,
+        "x" : 0,
+        "y" : 580
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22126,
+      "layer" : 0,
+      "onScreen" : false,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "",
+      "titleAvailable" : true
+    },
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 30,
+        "width" : 1920,
+        "x" : 0,
+        "y" : 0
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22119,
+      "layer" : 0,
+      "onScreen" : false,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "",
+      "titleAvailable" : true
+    },
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 30,
+        "width" : 1920,
+        "x" : 0,
+        "y" : 0
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22118,
+      "layer" : 0,
+      "onScreen" : false,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "",
+      "titleAvailable" : true
+    },
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 20,
+        "width" : 66,
+        "x" : 326,
+        "y" : 62
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22167,
+      "layer" : 0,
+      "onScreen" : true,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "Window",
+      "titleAvailable" : true
+    },
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 840,
+        "width" : 1280,
+        "x" : 320,
+        "y" : 56
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22123,
+      "layer" : 0,
+      "onScreen" : true,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "RailWise AI",
+      "titleAvailable" : true
+    },
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 30,
+        "width" : 1920,
+        "x" : 0,
+        "y" : 0
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22121,
+      "layer" : 0,
+      "onScreen" : false,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "",
+      "titleAvailable" : true
+    },
+    {
+      "alpha" : 1,
+      "bounds" : {
+        "height" : 30,
+        "width" : 1920,
+        "x" : 0,
+        "y" : 0
+      },
+      "displayIDs" : [
+        3
+      ],
+      "id" : 22120,
+      "layer" : 0,
+      "onScreen" : false,
+      "ownerName" : "RailWise AI",
+      "ownerPID" : 64797,
+      "title" : "",
+      "titleAvailable" : true
+    }
+  ]
+}
