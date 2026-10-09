@@ -108,6 +108,30 @@ afterEach(async () => {
 })
 
 describe('Engineering AI session recovery states', () => {
+  it.each([
+    ['en', 'deformation', false, 'analysis', 'engineeringTabAnalysis'],
+    ['zh', 'deformation', false, 'analysis', 'engineeringTabAnalysis'],
+    ['en', 'control-network', false, 'survey', 'engineeringTabSurvey'],
+    ['en', 'control-network', true, 'analysis', 'engineeringTabAnalysis']
+  ] as const)('opens the correct calculation page for %s %s (monitoring data: %s)', async (locale, taskType, hasDataset, tab, label) => {
+    await i18n.changeLanguage(locale)
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
+    const onOpenTab = vi.fn()
+    await act(async () => root.render(createElement(EngineeringAiCommandCenter, {
+      workspaceRoot, runtimeReady: true, project: { ...project, taskType },
+      dataset: hasDataset ? { sourceFileName: 'monitoring.csv', observationCount: 3, status: 'validated', findings: [] } : null,
+      analysis: null, onCreateProject: () => undefined, onImportData: () => undefined,
+      onSurveyFiles: () => undefined, onOpenTab, onRefresh
+    })))
+    await settle()
+    const shortcut = container.querySelector<HTMLButtonElement>(`button[aria-label="${i18n.t(label)}"]`)
+    expect(shortcut).not.toBeNull()
+    const priorRequests = runtimeRequest.mock.calls.length
+    await act(async () => shortcut!.click())
+    expect(onOpenTab).toHaveBeenCalledExactlyOnceWith(tab)
+    expect(runtimeRequest).toHaveBeenCalledTimes(priorRequests)
+  })
+
   it('passes only professional user and assistant messages to the timeline', async () => {
     runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
     useChatStore.setState({ blocks: [

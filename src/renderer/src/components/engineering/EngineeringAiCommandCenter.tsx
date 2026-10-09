@@ -106,7 +106,7 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null)
   const [approvedSteps, setApprovedSteps] = useState<string[]>([])
   const projectId = project?.id ?? ''
-  const computationTab = dataset || project?.taskType === 'deformation-monitoring' ? 'analysis' : 'survey'
+  const computationTab = dataset || project?.taskType === 'deformation' ? 'analysis' : 'survey'
   const computationLabel = computationTab === 'analysis' ? 'engineeringTabAnalysis' : 'engineeringTabSurvey'
   const selectedEvidence = useEngineeringConversationDrafts(state => state.drafts[JSON.stringify([workspaceRoot, projectId])]?.evidenceContext)
   const reasoningEffort = useEngineeringConversationDrafts(state => state.drafts[JSON.stringify([workspaceRoot, projectId])]?.reasoningEffort ?? 'max')

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "reviewType": "AI source regression review; final installed-package acceptance not performed",
+  "version": "0.5.3",
+  "reviewedFiles": [
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "b0aae1dde4d04edd249a85dd10029a195812b1fc9ffca3c59988a1fe7d2a1725"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "bd11c78e226cf4f7ce8e1304d0c53c06648bb930f6f1163e64526685d2b0f12c"
+    },
+    {
+      "path": "src/renderer/src/locales/en/common.json",
+      "sha256": "418bad96cddd647f6a7a31662c9b16668d23ebb92c325b6983117970c4ca5d2e"
+    },
+    {
+      "path": "src/renderer/src/locales/zh/common.json",
+      "sha256": "5f897cecdc82aba67857c9f308062dca7aa85a4a901d1a04810b6e0f0d183756"
+    }
+  ],
+  "problem": "Monitoring analysis preserves source units without conversion; UI previously labelled current value with project unit and omitted change/rate units.",
+  "verification": {
+    "regressionBeforeFix": {
+      "failed": 2,
+      "example": {
+        "expected": [
+          "6 mm",
+          "4 mm",
+          "2 mm/d"
+        ],
+        "observed": [
+          "6 m",
+          "4",
+          "2"
+        ]
+      }
+    },
+    "workspaceDom": {
+      "passed": 74
+    },
+    "applicationTests": {
+      "passed": 3240,
+      "skipped": 2
+    },
+    "lint": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "strictOpenSpec": {
+      "passed": 12
+    },
+    "brandBoundary": "passed",
+    "independentRuntimeUnitsTimeReports": {
+      "passed": 22
+    },
+    "independentReview": "passed; legacy status presentation finding resolved"
+  },
+  "packageAcceptance": "pending-new-freeze"
+}
