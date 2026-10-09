@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent AI source review, not final packaged acceptance",
+  "reviewedAt": "2026-10-09T01:04:43.609367+00:00",
+  "targetVersion": "0.5.3",
+  "installedVersion": null,
+  "packageAcceptanceExecuted": false,
+  "publicReleaseApprovedByThisReview": false,
+  "sourceHead": "e5f212b19e6eb18867afa840da17e5ec1cacab5b",
+  "workingTreeDiffSha256": "72dc50c96c68bea7b71e95ba3f4b75205ade26ac1ef3ef8a5385487c5105db9b",
+  "reviewedFiles": [
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "b0aae1dde4d04edd249a85dd10029a195812b1fc9ffca3c59988a1fe7d2a1725",
+      "bytes": 130821,
+      "matchesReviewedBoundary": true
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "bd11c78e226cf4f7ce8e1304d0c53c06648bb930f6f1163e64526685d2b0f12c",
+      "bytes": 80999,
+      "matchesReviewedBoundary": true
+    },
+    {
+      "path": "src/renderer/src/locales/en/common.json",
+      "sha256": "418bad96cddd647f6a7a31662c9b16668d23ebb92c325b6983117970c4ca5d2e",
+      "bytes": 290127,
+      "matchesReviewedBoundary": true
+    },
+    {
+      "path": "src/renderer/src/locales/zh/common.json",
+      "sha256": "5f897cecdc82aba67857c9f308062dca7aa85a4a901d1a04810b6e0f0d183756",
+      "bytes": 274577,
+      "matchesReviewedBoundary": true
+    }
+  ],
+  "result": "no remaining blocking finding in reviewed four-file diff",
+  "findings": [],
+  "resolvedFindings": [
+    {
+      "id": "monitoring-legacy-unit-threshold-presentation",
+      "severity": "P1",
+      "status": "resolved-in-final-reviewed-diff",
+      "trigger": "Stored legacy analysis has thresholdStatus normal but lacks unit/unitStatus",
+      "priorBehavior": "Unit not recorded was displayed alongside a normal badge and normal count",
+      "verifiedResolution": "Row badge/color and summary use monitoringThresholdStatus: only nonempty unit plus aligned state may present stored threshold; other states become unresolved. Old stored result remains unchanged and recorded status is described as historical, requiring review.",
+      "resolutionEvidence": "final-dom-tests.json: bilingual regression includes unresolved non-green badge, historical status explanation, and original analysis still normal"
+    }
+  ],
+  "reviewedSemantics": [
+    "Values use recorded result.unit, not current project.unit; no conversion or relabeling is performed",
+    "Finite current/cumulative/rate values include source units; rate uses sourceUnit/d; missing nonfinite values remain dash",
+    "Missing or whitespace-only legacy unit explicitly shows Unit not recorded rather than a project-unit inference",
+    "source-differs/conflict explanations are professional and localized; threshold unresolved summary covers missing limit, unit or period issues",
+    "Threshold state, row color and count use the same compatibility guard; source-differs/conflict and unknown unit states cannot appear as current evaluated normal",
+    "No new runtime mutation, calculation action, approval permission, storage migration or schema persistence is introduced"
+  ],
+  "tests": [
+    {
+      "report": "/private/tmp/railwise-053-tools/monitoring-unit-20261009/final-dom-tests.json",
+      "sha256": "6fcd431df71387d57c07a47ddf44136036c42b8313077d94116a407a4e98ceb2",
+      "total": 74,
+      "passed": 74,
+      "failed": 0,
+      "pending": 0
+    },
+    {
+      "report": "/private/tmp/railwise-053-tools/monitoring-unit-20261009/runtime-unit-time-report-tests.json",
+      "sha256": "bb81107b750ebc19c50593ec156c44a63d94f40d5e22d7f10b3c8d1c92f16e0a",
+      "total": 22,
+      "passed": 22,
+      "failed": 0,
+      "pending": 0
+    }
+  ],
+  "gitDiffCheckPassed": true,
+  "fileHashesStableAcrossFinalIndependentDomRun": true,
+  "limits": [
+    "No installed package was launched or operated",
+    "No CUA screenshots, native exports, updater round-trip, signature or notarization acceptance was performed",
+    "Visual unit text readability, screen-reader behavior and theme/window matrix still require final package CUA",
+    "Root owns full checks, PR, strict CI and new private freeze; this source review cannot close package or public-release gates",
+    "AI review does not certify vendor interoperability, regulatory conformity, field datum stability, professional signatures or human approval"
+  ]
+}

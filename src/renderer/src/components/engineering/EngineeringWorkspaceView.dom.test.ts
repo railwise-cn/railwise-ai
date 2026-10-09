@@ -81,6 +81,35 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('Survey delivery without a monitoring dataset', () => {
+  it.each(['en', 'zh'])('preserves source units and unavailable legacy units in monitoring results in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    datasets = [{ id: 'data', sourceFileName: 'source.csv', sourceFileHash: 'a'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 6, columnCount: 4, observationCount: 6, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    analyses = [{ id: 'analysis', datasetId: 'data', algorithmVersion: 'workwise-engineering-2', inputHash: 'b'.repeat(64), results: [
+      { monitoringItem: 'settlement', point: 'source-mm', currentValue: 6, cumulativeChange: 4, changeRate: 2, unit: 'mm', unitStatus: 'source-differs', trend: 'rising', anomaly: false, thresholdStatus: 'unresolved' },
+      { monitoringItem: 'settlement', point: 'aligned-m', currentValue: 0.006, cumulativeChange: 0.004, changeRate: 0.002, unit: 'm', unitStatus: 'aligned', trend: 'rising', anomaly: false, thresholdStatus: 'normal' },
+      { monitoringItem: 'settlement', point: 'mixed-periods', currentValue: 10, unit: 'm', unitStatus: 'conflict', trend: 'unknown', anomaly: false, thresholdStatus: 'unresolved' },
+      { monitoringItem: 'settlement', point: 'legacy', currentValue: 3, cumulativeChange: 2, changeRate: 1, trend: 'rising', anomaly: false, thresholdStatus: 'normal' }
+    ] }]
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryResults')).click())
+    const rows = [...container.querySelectorAll('tbody tr')]
+    const cells = (point: string) => [...rows.find(row => row.querySelector('td')?.textContent?.includes(point))!.querySelectorAll('td')].map(cell => cell.textContent?.trim())
+    expect(cells('source-mm').slice(1, 4)).toEqual(['6 mm', '4 mm', '2 mm/d'])
+    expect(cells('source-mm')[5]).toContain(i18n.t('engineeringMonitoringSourceUnitDiffers', { sourceUnit: 'mm', projectUnit: 'm' }))
+    expect(cells('aligned-m').slice(1, 4)).toEqual(['0.006 m', '0.004 m', '0.002 m/d'])
+    expect(cells('mixed-periods').slice(1, 4)).toEqual(['10 m', '—', '—'])
+    expect(cells('mixed-periods')[5]).toContain(i18n.t('engineeringMonitoringUnitConflict'))
+    const unrecorded = i18n.t('engineeringMonitoringUnitUnrecorded')
+    expect(cells('legacy').slice(1, 4)).toEqual([`3 ${unrecorded}`, `2 ${unrecorded}`, `1 ${unrecorded}`])
+    const legacyRow = rows.find(row => row.querySelector('td')?.textContent?.includes('legacy'))!
+    expect(legacyRow.querySelector('td:last-child > span')?.textContent).toBe(i18n.t('engineeringStatusUnresolved'))
+    expect(cells('legacy')[5]).toContain(i18n.t('engineeringMonitoringLegacyThreshold', { status: i18n.t('engineeringStatusNormal') }))
+    expect(legacyRow.querySelector('td:last-child > span')?.className).not.toContain('green')
+    expect(analyses).toEqual([expect.objectContaining({ results: expect.arrayContaining([expect.objectContaining({ point: 'legacy', thresholdStatus: 'normal' })]) })])
+    expect(container.textContent).toContain(i18n.t('engineeringThresholdUnresolvedReason'))
+    expect(request.mock.calls.every(([, method]) => method === undefined || method === 'GET')).toBe(true)
+  })
+
   it.each(['en', 'zh'])('keeps an empty deformation task in the monitoring workflow in %s', async (locale) => {
     await i18n.changeLanguage(locale)
     const monitoringProject = { ...project, taskType: 'deformation', monitoringType: 'deformation', unit: 'mm' }
