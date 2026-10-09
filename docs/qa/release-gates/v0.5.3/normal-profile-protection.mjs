@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, readlink, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, readlink, realpath, rename, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -39,16 +39,22 @@ async function assertNoSymlinks(path) {
   }
 }
 
-async function fingerprint(path) {
+async function assertRegularFileWithoutSymlinks(path) {
+  await assertNoSymlinks(path)
+  if (!(await lstat(path)).isFile()) fail(`Expected a regular file: ${path}`)
+}
+
+async function fingerprint(path, allowSymlinks = true) {
   if (!await exists(path)) return { present: false }
   const entries = []
   async function visit(current, name) {
     const s = await lstat(current)
     if (s.isSymbolicLink()) {
+      if (!allowSymlinks) fail(`Symlink in installation source is not supported: ${current}`)
       // Existing user roots can contain intentional toolchain links (for
       // example python -> python3.12). Record the link itself and never
-      // follow its target; installation assets and direct target paths still
-      // go through assertNoSymlinks before they are accepted.
+      // follow its target. Installation identity uses the strict mode instead;
+      // direct file readers separately reject links before reading bytes.
       entries.push({ path: name, mode: s.mode & 0o7777, uid: s.uid, gid: s.gid, type: 'symlink', target: await readlink(current) })
       return
     }
@@ -113,18 +119,30 @@ async function assertStopped(ctx) {
 async function installedIdentity(ctx) {
   if (!ctx.installedApp) fail('--installed-app must point to the frozen installed package.')
   await assertNoSymlinks(ctx.installedApp)
+  if (!(await lstat(ctx.installedApp)).isDirectory()) fail('Expected an installed application directory.')
   const info = join(ctx.installedApp, 'Contents/Info.plist')
+  await assertRegularFileWithoutSymlinks(info)
   const version = ctx.testing ? '0.5.3' : command('/usr/bin/plutil', ['-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', info]).trim()
   const bundleId = ctx.testing ? DOMAIN : command('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', info]).trim()
   if (version !== '0.5.3' || bundleId !== DOMAIN) fail('Expected the normal public-identity 0.5.3 bundle.')
   const asar = join(ctx.installedApp, 'Contents/Resources/app.asar')
-  return { version, bundleId, asar: await fingerprint(asar), packManifestHash: digest(await readFile(join(ctx.packSource, 'package.json'))), packContents: await fingerprint(ctx.packSource) }
+  await assertRegularFileWithoutSymlinks(asar)
+  await assertNoSymlinks(ctx.packSource)
+  if (!(await lstat(ctx.packSource)).isDirectory()) fail('Expected a bundled pack directory.')
+  const packContents = await fingerprint(ctx.packSource, false)
+  const manifestPath = join(ctx.packSource, 'package.json')
+  await assertRegularFileWithoutSymlinks(manifestPath)
+  return { version, bundleId, asar: await fingerprint(asar, false), packManifestHash: digest(await readFile(manifestPath)), packContents }
 }
 
 async function inventory(ctx) {
   const identity = await installedIdentity(ctx)
-  const manifest = JSON.parse(await readFile(join(ctx.packSource, 'package.json'), 'utf8'))
-  const audit = manifest.skillAudit ? JSON.parse(await readFile(join(ctx.packSource, safeRelative(manifest.skillAudit)), 'utf8')) : null
+  const manifestPath = join(ctx.packSource, 'package.json')
+  await assertRegularFileWithoutSymlinks(manifestPath)
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const auditPath = manifest.skillAudit ? join(ctx.packSource, safeRelative(manifest.skillAudit)) : null
+  if (auditPath) await assertRegularFileWithoutSymlinks(auditPath)
+  const audit = auditPath ? JSON.parse(await readFile(auditPath, 'utf8')) : null
   const assets = new Map()
   for (const asset of manifest.agentAssets ?? []) {
     if (asset.kind === 'skill' && audit && !audit.skills.some(s => s.id === asset.name && s.packaged === true && s.status === 'available')) continue
@@ -306,8 +324,10 @@ async function freshSettings(ctx, journal, reuseDeepseek) {
     claw: { enabled: false, channels: [], tasks: [], im: { enabled: false } }, schedule: { enabled: false, tasks: [] } }
   if (reuseDeepseek) {
     const profileEntry = journal.entries.find(e => e.path === ctx.userData)
+    const settingsPath = join(journal.session, 'snapshot', profileEntry.id, 'workwise-settings.json')
+    await assertRegularFileWithoutSymlinks(settingsPath)
     let original
-    try { original = JSON.parse(await readFile(join(journal.session, 'snapshot', profileEntry.id, 'workwise-settings.json'), 'utf8')) }
+    try { original = JSON.parse(await readFile(settingsPath, 'utf8')) }
     catch { fail('The original private settings file is unavailable or invalid; its contents are omitted.') }
     const selected = original.provider?.providers?.find(p => p.id === 'deepseek')
     const baseUrl = selected?.baseUrl || original.provider?.baseUrl
@@ -488,10 +508,13 @@ async function selfTest() {
   ctx.fakeDefaults = { panel: { width: 900 }, retained: true }
   const originalDefaults = structuredClone(ctx.fakeDefaults)
   await mkdir(ctx.packSource, { recursive: true })
+  await writeFile(join(ctx.installedApp, 'Contents/Info.plist'), 'synthetic identity checked without launching an app')
   await writeFile(join(ctx.installedApp, 'Contents/Resources/app.asar'), 'synthetic-package')
   const assetFile = join(ctx.packSource, 'assets/example.md')
   await mkdir(dirname(assetFile), { recursive: true }); await writeFile(assetFile, 'new pack example')
-  await privateJson(join(ctx.packSource, 'package.json'), { name: PACK, version: '1.2.34', agentAssets: [{ kind: 'agent', name: 'example', dir: 'assets/example.md', target: 'example.md' }] })
+  const packManifest = { name: PACK, version: '1.2.34', skillAudit: 'audit.json', agentAssets: [{ kind: 'agent', name: 'example', dir: 'assets/example.md', target: 'example.md' }] }
+  await privateJson(join(ctx.packSource, 'package.json'), packManifest)
+  await privateJson(join(ctx.packSource, 'audit.json'), { skills: [] })
   for (const path of ctx.rootPaths.slice(0, 3)) { await mkdir(path, { recursive: true }); await writeFile(join(path, 'original.txt'), `original ${basename(path)}`) }
   await privateJson(join(ctx.userData, 'workwise-settings.json'), { provider: { apiKey: 'synthetic-not-a-real-secret', baseUrl: 'https://api.deepseek.com', providers: [] } })
   await mkdir(join(ctx.codex, 'agents'), { recursive: true })
@@ -503,9 +526,39 @@ async function selfTest() {
   const unrelated = join(ctx.codex, 'agents/unrelated.md'); await writeFile(unrelated, 'unrelated unchanged')
   const login = join(temp, 'login-before.txt'); await writeFile(login, 'synthetic CUA login state')
   const session = join(ctx.guardRoot, 'synthetic-session')
-  const before = await inventory(ctx)
   const checks = []
+  // Every installation source must be real, including paths read before its
+  // recursive identity hash. The target bytes stay unchanged in these tests.
+  for (const [path, check] of [
+    [join(ctx.installedApp, 'Contents/Info.plist'), 'installation-info-link-rejected'],
+    [join(ctx.installedApp, 'Contents/Resources/app.asar'), 'installation-asar-link-rejected'],
+    [ctx.packSource, 'installation-pack-root-link-rejected'],
+    [join(ctx.packSource, 'package.json'), 'installation-manifest-link-rejected'],
+    [join(ctx.packSource, 'audit.json'), 'installation-audit-link-rejected'],
+    [assetFile, 'installation-asset-link-rejected']
+  ]) {
+    const held = join(temp, `source-held-${randomUUID()}`)
+    await rename(path, held)
+    await symlink(held, path)
+    try { await assert.rejects(inventory(ctx), /Symlink/); checks.push(check) }
+    finally { await unlink(path); await rename(held, path) }
+  }
+  const external = join(temp, 'external-user-target.txt')
+  await writeFile(external, 'external original bytes')
+  const userLinks = [[join(ctx.workwise, 'external-tool'), external], [join(ctx.workwise, 'broken-tool'), join(temp, 'missing-target')],
+    [join(ctx.workwise, 'self-cycle'), '.'], [join(ctx.workwise, 'relative-root'), '../.workwise'], [join(obsolete, 'external-tool'), external]]
+  for (const [path, target] of userLinks) await symlink(target, path)
+  const linkedRootBefore = await fingerprint(ctx.workwise)
+  await writeFile(external, 'external bytes changed independently')
+  assert.deepEqual(await fingerprint(ctx.workwise), linkedRootBefore, 'User fingerprint followed a link target.')
+  const before = await inventory(ctx)
   await snapshot(ctx, session, { loginOpenAtLogin: false, loginBeforeEvidence: login })
+  const snapshotJournal = JSON.parse(await readFile(join(session, 'journal.json'), 'utf8'))
+  for (const [path, target] of userLinks) {
+    const entry = snapshotJournal.entries.find(e => e.before.present && (e.path === path || inside(e.path, path)))
+    const backupLink = join(session, 'snapshot', entry.id, relative(entry.path, path))
+    assert.ok((await lstat(backupLink)).isSymbolicLink()); assert.equal(await readlink(backupLink), target)
+  }
   await assert.rejects(snapshot(ctx, join(ctx.guardRoot, 'conflicting-session'), { loginOpenAtLogin: false, loginBeforeEvidence: login }), /unresolved/); checks.push('concurrent-session-conflict')
   await writeFile(packFile, 'external change before activation')
   await assert.rejects(activate(ctx, session), /Original changed/); checks.push('changed-original-blocks-activation')
@@ -530,12 +583,32 @@ async function selfTest() {
   await restore(ctx, session)
   for (const entry of before.entries.filter(e => e.kind !== 'preferences')) assert.deepEqual(await fingerprint(entry.path), entry.before)
   assert.deepEqual(ctx.fakeDefaults, originalDefaults); assert.equal(await readFile(unrelated, 'utf8'), 'unrelated unchanged')
+  for (const [path, target] of userLinks) { assert.ok((await lstat(path)).isSymbolicLink()); assert.equal(await readlink(path), target) }
+  assert.equal(await readFile(external, 'utf8'), 'external bytes changed independently')
   checks.push('full-reversible-cycle', 'absence-restored', 'legacy-metadata-and-obsolete-union-restored', 'unrelated-codex-file-preserved', 'fresh-settings-and-migration-targets', 'interrupted-pack-archive-and-partial-copy-recovery')
   ctx.fault = 'verify-terminal'
   await assert.rejects(verify(ctx, session, login), /Synthetic interruption/)
   delete ctx.fault
   await verify(ctx, session, login); assert.equal(await exists(join(ctx.guardRoot, '.active-session.json')), false)
-  checks.push('final-login-evidence-required')
+  checks.push('final-login-evidence-required', 'nested-user-links-restored-without-following-external-broken-or-cyclic-targets')
+  // Preserving a user link does not authorize following it for credential
+  // reuse. Block this before activation; keep ordinary settings reuse above.
+  const settingsPath = join(ctx.userData, 'workwise-settings.json')
+  const heldSettings = join(temp, 'held-original-settings.json')
+  const externalSettings = join(temp, 'external-settings.json')
+  const externalSettingsBytes = JSON.stringify({ provider: { apiKey: 'synthetic-external-not-a-real-secret', baseUrl: 'https://api.deepseek.com', providers: [] } })
+  await writeFile(externalSettings, externalSettingsBytes)
+  await rename(settingsPath, heldSettings); await symlink(externalSettings, settingsPath)
+  const linkedSettingsSession = join(ctx.guardRoot, 'linked-settings-session')
+  try {
+    await snapshot(ctx, linkedSettingsSession, { loginOpenAtLogin: false, loginBeforeEvidence: login })
+    await assert.rejects(activate(ctx, linkedSettingsSession, { reuseDeepseek: true }), /Symlink/)
+    assert.equal(JSON.parse(await readFile(join(linkedSettingsSession, 'journal.json'), 'utf8')).status, 'snapshotted')
+    assert.ok((await lstat(settingsPath)).isSymbolicLink())
+    assert.equal(await readFile(externalSettings, 'utf8'), externalSettingsBytes)
+    await abortSnapshot(ctx, linkedSettingsSession)
+    checks.push('linked-settings-credential-reuse-rejected-before-activation')
+  } finally { await unlink(settingsPath); await rename(heldSettings, settingsPath) }
   const abortedSession = join(ctx.guardRoot, 'abort-snapshot-session')
   await snapshot(ctx, abortedSession, { loginOpenAtLogin: false, loginBeforeEvidence: login })
   const abortJournal = JSON.parse(await readFile(join(abortedSession, 'journal.json'), 'utf8'))
@@ -572,7 +645,6 @@ async function selfTest() {
   await recoverLock(ctx, session)
   assert.equal(await exists(operationLock), false)
   checks.push('dead-lock-recovery-and-live-owner-rejection')
-  const { symlink } = await import('node:fs/promises')
   await symlink(join(temp, 'outside'), join(ctx.codex, 'agents/escape.md'))
   await assert.rejects(assertNoSymlinks(join(ctx.codex, 'agents/escape.md')), /Symlink/)
   checks.push('symlink-escape-rejected')
