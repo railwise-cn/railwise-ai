@@ -296,10 +296,15 @@ export function SurveyAdjustmentPanel({ project, runtimeReady, refreshToken = 0,
   const [knownPointsText, setKnownPointsText] = useState('')
   const [coordinateSystem, setCoordinateSystem] = useState(declaredProjectCoordinate)
   const [verticalDatum, setVerticalDatum] = useState(declaredProjectHeight)
+  // Ordinary revisions (including imports) must not erase source declarations
+  // being completed for a reimport. Sync only the reference that actually changed,
+  // and reset both fields when the task scope changes.
   useEffect(() => {
     setCoordinateSystem(declaredProjectCoordinate)
+  }, [project.id, project.workspace, declaredProjectCoordinate])
+  useEffect(() => {
     setVerticalDatum(declaredProjectHeight)
-  }, [project.id, project.workspace, project.revision, declaredProjectCoordinate, declaredProjectHeight])
+  }, [project.id, project.workspace, declaredProjectHeight])
   const [networks, setNetworks] = useState<Network[]>([])
   const [network, setNetwork] = useState<Network | null>(null)
   const [adjustment, setAdjustment] = useState<Adjustment | null>(null)

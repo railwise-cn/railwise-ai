@@ -620,6 +620,10 @@ export function createNavigationActions(
       const forkRegistry = hydrateThreadForkRegistry(sidebarThreads, readThreadForkRegistry())
       saveThreadForkRegistry(forkRegistry)
       const enrichedThreads = enrichThreadsWithForkInfo(sidebarThreads, forkRegistry)
+      const writeWorkspaceRoots = await readWriteWorkspaceRoots()
+      // Read the current selection after all asynchronous reads. A thread can
+      // be created and selected while an older refresh is awaiting settings.
+      // Preserve that selection before applying this listing's snapshot.
       // Preserve the active WorkWise Runtime thread when it is not in the listing yet.
       // A brand-new thread can be absent from `listThreads` until the first
       // message is written. Without this, the optimistic thread would be wiped
@@ -660,7 +664,6 @@ export function createNavigationActions(
       ) {
         displayThreads = [preservedSddActiveThread, ...displayThreads]
       }
-      const writeWorkspaceRoots = await readWriteWorkspaceRoots()
       const writeRegistry = hydrateWriteThreadRegistry(
         displayThreads,
         writeWorkspaceRoots,
