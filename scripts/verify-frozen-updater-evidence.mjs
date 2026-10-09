@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { githubApi, RELEASE_REPOSITORY } from './verify-reviewed-release-artifacts.mjs'
+import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 
 export const UPDATER_WORKFLOW = '.github/workflows/frozen-release-updater-acceptance.yml'
 export const UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/${UPDATER_WORKFLOW}@refs/heads/main`
@@ -21,6 +22,7 @@ export function reportSha256(bytes) { return createHash('sha256').update(bytes).
 
 export function validateUpdaterEvidenceRun(run, machine, sourceHead) {
   if (!run || typeof run !== 'object') fail('updaterRoundTrip.workflowRun is required')
+  if (!['arm64', 'x64'].includes(machine?.arch)) fail('machine report must identify a supported native macOS architecture')
   equal(run.repository, RELEASE_REPOSITORY, 'repository')
   equal(run.workflowPath, UPDATER_WORKFLOW, 'workflow path')
   equal(run.sourceHead, sourceHead, 'exact frozen workflow source')
@@ -33,6 +35,7 @@ export function validateUpdaterEvidenceRun(run, machine, sourceHead) {
     runId: run.runId, runAttempt: run.runAttempt }
   if (!isDeepStrictEqual(machine.provenance, provenance)) fail('machine report workflow provenance mismatch')
   if (!/^[a-f0-9]{64}$/.test(machine.nativeReportSha256 ?? '')) fail('native report SHA256 is required')
+  validateUpdaterServiceEvidence(machine, { sourceHead })
   return run
 }
 
@@ -96,7 +99,7 @@ export function verifyUpdaterEvidenceArchive({ archive, run, machineBytes, nativ
     const path = join(root, 'evidence.zip')
     writeFileSync(path, archive, { mode: 0o600, flag: 'wx' })
     const entries = execFileSync('unzip', ['-Z1', path], { encoding: 'utf8', maxBuffer: MAX_ARCHIVE, timeout: 30_000 }).trim().split(/\r?\n/)
-    if (new Set(entries).size !== entries.length || entries.some(name => !/^(?:frozen-updater\.json|native-updater\.json|seed-data\.json|verify-data\.json|[a-z-]+\.redacted\.log)$/.test(name))
+    if (new Set(entries).size !== entries.length || entries.some(name => !/^(?:frozen-updater\.json|native-updater\.json|target-services\.json|seed-data\.json|verify-data\.json|verify-restart-data\.json|[a-z-]+\.redacted\.log)$/.test(name))
       || !entries.includes('frozen-updater.json') || !entries.includes('native-updater.json')) fail('unexpected updater artifact entries')
     for (const [name, committed] of [['frozen-updater.json', machineBytes], ['native-updater.json', nativeBytes]]) {
       const downloaded = execFileSync('unzip', ['-p', path, name], { maxBuffer: MAX_ARCHIVE, timeout: 30_000 })

@@ -13,6 +13,7 @@ import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, validateReviewed
 import { hashFile, startFrozenReleaseFeed } from './frozen-release-updater-feed.mjs'
 import { assertRetainedFiles, snapshotFiles } from './frozen-release-updater-data.mjs'
 import { boundedCommand } from './updater-acceptance-process.mjs'
+import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptRoot = dirname(fileURLToPath(import.meta.url))
@@ -155,6 +156,8 @@ export async function downloadPinned(url, destination, pin) {
 function cleanChildEnvironment(root) {
   const env = { ...process.env, TMPDIR: join(root, 'native-temp') }
   for (const name of Object.keys(env)) if (/SECRET|TOKEN|PASSWORD|PRIVATE_KEY|API_KEY|P12_BASE64|^(?:CSC_|APPLE_|MAC_CODESIGN_|R2_|S3_|WORKWISE_WEBSITE_|WORKWISE_CANDIDATE|WORKWISE_UPDATE_)|^(?:RELEASE_CHANNEL|WORKWISE_PUBLIC_BASE_URL)$/i.test(name)) delete env[name]
+  // Package/service resolution must not inherit external module roots or hooks.
+  delete env.NODE_PATH; delete env.NODE_OPTIONS
   return env
 }
 
@@ -220,9 +223,9 @@ function installBaseline(dmg, root, run) {
   } finally { run('/usr/bin/hdiutil', ['detach', mount]) }
 }
 
-function fixture(app, mode, root, paths, env, run) {
-  const report = join(root, `${mode}-data.json`)
-  run(join(app, 'Contents/MacOS/RailWise AI'), [join(scriptRoot, 'frozen-release-updater-data.mjs'), `--mode=${mode}`, `--app=${app}`, `--data-dir=${paths.data}`, `--workspace=${paths.workspace}`, `--snapshot=${join(root, 'data-baseline.json')}`, `--report=${report}`], { env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, timeoutMs: 5 * 60_000 })
+function fixture(app, mode, root, paths, env, run, sourceHead, reportName = `${mode}-data.json`) {
+  const report = join(root, reportName)
+  run(join(app, 'Contents/MacOS/RailWise AI'), [join(scriptRoot, 'frozen-release-updater-data.mjs'), `--mode=${mode}`, `--app=${app}`, `--source-head=${sourceHead}`, `--data-dir=${paths.data}`, `--workspace=${paths.workspace}`, `--snapshot=${join(root, 'data-baseline.json')}`, `--report=${report}`], { env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, timeoutMs: 5 * 60_000 })
   return JSON.parse(readFileSync(report, 'utf8'))
 }
 
@@ -339,6 +342,11 @@ export async function main() {
     equal(report.targetIdentity.designatedRequirement, report.baselineIdentity.designatedRequirement, 'Baseline/target signing requirement')
     report.targetZipSha256 = await hashFile(targetZip)
     report.targetAsarSha256 = await hashFile(join(target, 'Contents/Resources/app.asar'))
+    // Bind unpacked modules/dependencies as well as the ASAR to the exact
+    // signature-verified frozen target before the updater installs it.
+    const targetServices = fixture(target, 'inspect', root, paths, env, run, build.sourceHead, 'target-services.json')
+    equal(targetServices.serviceSource, 'target-package', 'Frozen target service source')
+    report.targetServiceIdentity = targetServices.serviceIdentity
     const cloudPin = CLOUDFLARED_PINS[process.arch]; const cloudArchive = join(root, cloudPin.name)
     await downloadPinned(`https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_PINS.version}/${cloudPin.name}`, cloudArchive, cloudPin)
     const cloudEntries = run('/usr/bin/tar', ['-tzf', cloudArchive]).stdout.trim().split(/\r?\n/)
@@ -347,7 +355,7 @@ export async function main() {
     report.cloudflared = { version: CLOUDFLARED_PINS.version, ...cloudPin }
     mkdirSync(join(root, 'native-temp'))
     assertFreshProfile(home); ownsProfile = true
-    report.dataSeed = fixture(baseline, 'seed', root, paths, env, run)
+    report.dataSeed = fixture(baseline, 'seed', root, paths, env, run, build.sourceHead)
     seedConfiguration(paths)
     const beforeRefs = snapshotFiles(paths.workwise)
     const beforeSentinel = readFileSync(join(paths.profile, 'frozen-release-sentinel.json'))
@@ -372,8 +380,9 @@ export async function main() {
     report.installedAsarSha256 = await hashFile(join(installed, 'Contents/Resources/app.asar'))
     equal(report.installedAsarSha256, report.targetAsarSha256, 'Installed/exact frozen ZIP ASAR')
     equal(readFileSync(join(paths.profile, 'frozen-release-sentinel.json')).toString(), beforeSentinel.toString(), 'Independent user-data sentinel')
-    report.dataReadback = fixture(installed, 'verify', root, paths, env, run)
-    report.dataRestartReadback = fixture(installed, 'verify', root, paths, env, run)
+    report.dataReadback = fixture(installed, 'verify', root, paths, env, run, build.sourceHead)
+    report.dataRestartReadback = fixture(installed, 'verify', root, paths, env, run, build.sourceHead, 'verify-restart-data.json')
+    validateUpdaterServiceEvidence(report, { sourceHead: build.sourceHead, version: TARGET_VERSION })
     assertRetainedFiles(beforeRefs, snapshotFiles(paths.workwise))
     report.configReferences = { status: 'byte-preserved', kinds: ['disabled MCP', 'plugin manifest reference', 'Skill text', 'inert credential reference'], scope: 'Stored bytes only; updater acceptance exits before configuration activation. No real credential, plugin activation or complete catalog migration is certified.' }
     report.separateSentinelPreserved = true; report.feedRequests = feed.requests; report.frozenManifestSha256 = feed.manifestSha256
@@ -383,7 +392,7 @@ export async function main() {
     report.status = 'failed'; report.failure = sanitizeRetainedText(error.message, secrets)
     progress({ operation: 'acceptance', status: 'failed' })
   } finally {
-    for (const name of ['native-updater.json', 'native-updater.log', 'harness.log', 'cloudflared.log', 'seed-data.json', 'verify-data.json']) {
+    for (const name of ['native-updater.json', 'native-updater.log', 'harness.log', 'cloudflared.log', 'seed-data.json', 'verify-data.json', 'verify-restart-data.json', 'target-services.json']) {
       try {
         const path = join(root, name)
         if (name !== 'native-updater.json' && !existsSync(path)) continue
