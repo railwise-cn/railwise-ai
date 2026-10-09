@@ -392,6 +392,21 @@ test('default manifest attempts cover the complete timeout at the configured ret
   assert.equal(f.events.at(-1).attempt, 120)
 })
 
+test('manifest readiness waits through delayed public DNS before accepting exact HTTPS bytes', async () => {
+  let calls = 0
+  const f = readinessFixture(async () => {
+    calls += 1
+    if (calls <= 125) throw readinessNetworkError('ENOTFOUND')
+    return readinessResponse()
+  })
+  const result = await waitForFrozenManifest(f.options, { ...f.timing, timeoutMs: 300_000, retryMs: 1_000, maxAttempts: undefined })
+  assert.equal(result.attempts, 126)
+  assert.equal(result.elapsedMs, 125_000)
+  assert.equal(calls, 126)
+  assert.equal(f.events.at(-1).category, 'identity-verified')
+  assert.equal(f.events.at(-1).elapsedMs, 125_000)
+})
+
 test('readiness checks cannot start for an exited tunnel or unbound manifest inputs', async () => {
   let calls = 0; const f = readinessFixture(async () => { calls += 1; return readinessResponse() }, { isRunning: () => false })
   await assert.rejects(waitForFrozenManifest(f.options, f.timing), /tunnel-stopped/); assert.equal(calls, 0)

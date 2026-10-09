@@ -18,6 +18,7 @@ import { validateUpdaterServiceEvidence } from './frozen-release-updater-service
 const require = createRequire(import.meta.url)
 const scriptRoot = dirname(fileURLToPath(import.meta.url))
 const BASE_VERSION = '0.5.2'; const TARGET_VERSION = '0.5.3'
+const FROZEN_MANIFEST_READINESS_TIMEOUT_MS = 5 * 60_000
 const FROZEN_UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`
 const UPDATE_URL = 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
 export const BASELINE_PINS = Object.freeze({
@@ -247,7 +248,8 @@ async function requestFrozenManifest(url, expected, fetchImpl, timeoutMs) {
 }
 
 export async function waitForFrozenManifest({ origin, prefix, manifestSize, manifestSha256, isRunning, progress = () => {} }, {
-  fetchImpl = fetch, timeoutMs = 120_000, requestTimeoutMs = 10_000, retryMs = 1_000, maxAttempts = Math.max(1, Math.ceil(timeoutMs / retryMs)),
+  // Quick Tunnel connection registration can precede public DNS/HTTPS reachability.
+  fetchImpl = fetch, timeoutMs = FROZEN_MANIFEST_READINESS_TIMEOUT_MS, requestTimeoutMs = 10_000, retryMs = 1_000, maxAttempts = Math.max(1, Math.ceil(timeoutMs / retryMs)),
   sleep = delay, now = () => performance.now()
 } = {}) {
   const url = validateTunnelUrl(origin) + prefix + 'latest-mac.yml'
