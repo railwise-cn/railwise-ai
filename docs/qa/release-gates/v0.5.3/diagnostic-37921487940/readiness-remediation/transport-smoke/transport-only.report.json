@@ -1,0 +1,726 @@
+{
+  "schemaVersion": 1,
+  "status": "transport-only-failed",
+  "scope": "transport-only current-source regression; not native updater, installed package, UI, migration or release acceptance",
+  "frozenSourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "frozenRunId": 37921487940,
+  "frozenRunAttempt": 1,
+  "reviewedSource": [
+    {
+      "path": "scripts/run-frozen-release-updater-acceptance.mjs",
+      "sha256": "afe5eb6ae539491e7cdf336529d074448a83d073f13aa49d637bb2d4ccf1abd1"
+    },
+    {
+      "path": "scripts/frozen-release-updater-acceptance.test.mjs",
+      "sha256": "e92bb5397fd8825989e99768ef4433b57da34af2cbf06e9d229b39775eee315b"
+    }
+  ],
+  "defaultTlsVerification": true,
+  "followRedirects": false,
+  "appLaunched": false,
+  "nativeUpdaterLaunched": false,
+  "normalProfileAccessed": false,
+  "publicFeedsModified": false,
+  "persistentRemoteUpload": false,
+  "events": [
+    {
+      "operation": "tunnel-connection-readiness",
+      "status": "waiting",
+      "category": "endpoint-pending",
+      "attempt": 1,
+      "elapsedMs": 0
+    },
+    {
+      "operation": "tunnel-connection-readiness",
+      "status": "waiting",
+      "category": "connection-pending",
+      "attempt": 15,
+      "elapsedMs": 7028
+    },
+    {
+      "operation": "tunnel-connection-readiness",
+      "status": "completed",
+      "category": "connected",
+      "attempt": 16,
+      "elapsedMs": 7531
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 1,
+      "elapsedMs": 296,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 2,
+      "elapsedMs": 1305,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 3,
+      "elapsedMs": 2312,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 4,
+      "elapsedMs": 3320,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 5,
+      "elapsedMs": 4327,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 6,
+      "elapsedMs": 5335,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 7,
+      "elapsedMs": 6344,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 8,
+      "elapsedMs": 7349,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 9,
+      "elapsedMs": 8357,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 10,
+      "elapsedMs": 9367,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 11,
+      "elapsedMs": 10376,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 12,
+      "elapsedMs": 11383,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 13,
+      "elapsedMs": 12389,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 14,
+      "elapsedMs": 13394,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 15,
+      "elapsedMs": 14401,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 16,
+      "elapsedMs": 15406,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 17,
+      "elapsedMs": 16412,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 18,
+      "elapsedMs": 17418,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 19,
+      "elapsedMs": 18425,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 20,
+      "elapsedMs": 19433,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 21,
+      "elapsedMs": 20441,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 22,
+      "elapsedMs": 21447,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 23,
+      "elapsedMs": 22457,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 24,
+      "elapsedMs": 23463,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 25,
+      "elapsedMs": 24469,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 26,
+      "elapsedMs": 25475,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 27,
+      "elapsedMs": 26481,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 28,
+      "elapsedMs": 27487,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 29,
+      "elapsedMs": 28493,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 30,
+      "elapsedMs": 29498,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 31,
+      "elapsedMs": 30505,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 32,
+      "elapsedMs": 31511,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 33,
+      "elapsedMs": 32520,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 34,
+      "elapsedMs": 33526,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 35,
+      "elapsedMs": 34531,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 36,
+      "elapsedMs": 35537,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 37,
+      "elapsedMs": 36542,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 38,
+      "elapsedMs": 37550,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 39,
+      "elapsedMs": 38557,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 40,
+      "elapsedMs": 39562,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 41,
+      "elapsedMs": 40568,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 42,
+      "elapsedMs": 41575,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 43,
+      "elapsedMs": 42581,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 44,
+      "elapsedMs": 43587,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 45,
+      "elapsedMs": 44594,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 46,
+      "elapsedMs": 45602,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 47,
+      "elapsedMs": 46609,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 48,
+      "elapsedMs": 47615,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 49,
+      "elapsedMs": 48623,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 50,
+      "elapsedMs": 49630,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 51,
+      "elapsedMs": 50639,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 52,
+      "elapsedMs": 51648,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 53,
+      "elapsedMs": 52654,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 54,
+      "elapsedMs": 53660,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 55,
+      "elapsedMs": 54668,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 56,
+      "elapsedMs": 55675,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 57,
+      "elapsedMs": 56681,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 58,
+      "elapsedMs": 57688,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 59,
+      "elapsedMs": 58694,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 60,
+      "elapsedMs": 59700,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ]
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "failed",
+      "category": "deadline",
+      "attempt": 60,
+      "elapsedMs": 60703
+    }
+  ],
+  "ownedProcessPid": 9103,
+  "connection": {
+    "attempts": 16,
+    "elapsedMs": 7532
+  },
+  "failure": "Frozen updater readiness failed (manifest-deadline).",
+  "elapsedMs": 68636,
+  "cleanup": {
+    "ownedProcessStopped": true,
+    "ownedFeedClosed": true
+  }
+}

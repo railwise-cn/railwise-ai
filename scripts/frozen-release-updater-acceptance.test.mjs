@@ -9,7 +9,7 @@ import { test } from 'node:test'
 import { parse, stringify } from 'yaml'
 import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './frozen-release-updater-feed.mjs'
 import { assertHistoricalRowsPreserved, assertRetainedFiles, fixtureServiceIdentity, persistedJsonValue, prepareCompatibilityService, resolveFixtureService, SERVICE_MODULES, snapshotFiles, validateFixtureExecution } from './frozen-release-updater-data.mjs'
-import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance } from './run-frozen-release-updater-acceptance.mjs'
+import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
 
 function temporary(t) { const root = mkdtempSync(join(tmpdir(), 'railwise-frozen-updater-test-')); t.after(() => rmSync(root, { recursive: true, force: true })); return root }
@@ -254,6 +254,142 @@ test('range parsing accepts only single bounded safe-integer ranges', () => {
 test('default-trust tunnel endpoints reject aliases, credentials and unexpected origins', () => {
   assert.equal(validateTunnelUrl('https://ephemeral-words.trycloudflare.com'), 'https://ephemeral-words.trycloudflare.com')
   for (const url of ['http://ephemeral-words.trycloudflare.com', 'https://ephemeral-words.trycloudflare.com.evil.test', 'https://user@ephemeral-words.trycloudflare.com', 'https://ephemeral-words.trycloudflare.com:8443', 'https://ephemeral-words.trycloudflare.com/path', 'https://ephemeral-words.trycloudflare.com?secret=1']) assert.throws(() => validateTunnelUrl(url))
+})
+
+const readinessOrigin = 'https://unit-readiness.trycloudflare.com'
+const readinessPrefix = `/private-${'f'.repeat(64)}/`
+const readinessBytes = Buffer.from('version: 0.5.3\nunit-test-only: manifest readiness, not updater acceptance\n')
+const readinessUrl = readinessOrigin + readinessPrefix + 'latest-mac.yml'
+function readinessFixture(fetchImpl, patches = {}) {
+  let clock = 0; const events = []; const sleeps = []
+  return { events, sleeps, options: { origin: readinessOrigin, prefix: readinessPrefix, manifestSize: readinessBytes.length,
+    manifestSha256: createHash('sha256').update(readinessBytes).digest('hex'), isRunning: () => true, progress: event => events.push(event), ...patches },
+  timing: { fetchImpl, now: () => clock, sleep: async ms => { sleeps.push(ms); clock += ms }, timeoutMs: 20, retryMs: 2, requestTimeoutMs: 10, maxAttempts: 10 }, advance: ms => { clock += ms } }
+}
+function readinessResponse({ bytes = readinessBytes, status = 200, url = readinessUrl, redirected = false, length = bytes.length } = {}) {
+  const response = new Response(bytes, { status, headers: { 'content-length': String(length) } })
+  Object.defineProperties(response, { url: { value: url }, redirected: { value: redirected } })
+  return response
+}
+function readinessNetworkError(code) {
+  return new TypeError(`fetch failed at ${readinessUrl}`, { cause: Object.assign(new Error('private connection details'), { code }) })
+}
+
+test('tunnel readiness requires a unique endpoint, live process and registered connection after delayed setup', async () => {
+  let clock = 0; let reads = 0; const events = []
+  const result = await waitForTunnelConnection({ readLog: () => {
+    reads += 1
+    return reads === 1 ? 'INF Requesting quick Tunnel' : reads === 2 ? `INF Created ${readinessOrigin}`
+      : `INF Created ${readinessOrigin}\n2026-10-09T00:00:00Z INF Registered tunnel connection connIndex=0 protocol=quic`
+  }, isRunning: () => true, progress: event => events.push(event) }, { now: () => clock, sleep: async ms => { clock += ms }, timeoutMs: 10, pollMs: 2 })
+  assert.equal(result.origin, readinessOrigin); assert.equal(result.attempts, 3); assert.equal(result.elapsedMs, 4)
+  assert.deepEqual(events.map(event => event.category), ['endpoint-pending', 'connection-pending', 'connected'])
+  assert.doesNotMatch(JSON.stringify(events), /trycloudflare|private-|https/)
+})
+
+test('tunnel readiness terminates on process exit or changing endpoints and respects its deadline', async () => {
+  const log = `INF Created ${readinessOrigin}\nINF Registered tunnel connection connIndex=0`
+  await assert.rejects(waitForTunnelConnection({ readLog: () => log, isRunning: () => false }), /tunnel-stopped/)
+  await assert.rejects(waitForTunnelConnection({ readLog: () => `${log}\nhttps://changed-origin.trycloudflare.com`, isRunning: () => true }), /tunnel-origin-changed/)
+  let clock = 0; const events = []
+  await assert.rejects(waitForTunnelConnection({ readLog: () => `INF Created ${readinessOrigin}`, isRunning: () => true, progress: event => events.push(event) },
+    { now: () => clock, sleep: async ms => { clock += ms }, timeoutMs: 5, pollMs: 2 }), /tunnel-deadline/)
+  assert.equal(clock, 5); assert.equal(events.at(-1).category, 'deadline')
+})
+
+test('frozen manifest readiness retries allowlisted DNS, connection and gateway startup failures then verifies exact bytes', async () => {
+  const queue = [readinessNetworkError('ENOTFOUND'), readinessNetworkError('ECONNREFUSED'), readinessNetworkError('ECONNRESET'), readinessResponse({ status: 502 }), readinessResponse({ status: 530 }), readinessResponse()]
+  const calls = []
+  const f = readinessFixture(async (url, options) => {
+    calls.push({ url, options }); const next = queue.shift()
+    if (next instanceof Error) throw next
+    return next
+  })
+  const result = await waitForFrozenManifest(f.options, f.timing)
+  assert.equal(result.attempts, 6); assert.equal(result.elapsedMs, 10)
+  assert.deepEqual(f.events.map(event => event.category), ['dns-transient', 'connection-transient', 'connection-transient', 'gateway-transient', 'gateway-transient', 'identity-verified'])
+  for (const call of calls) {
+    assert.equal(call.url, readinessUrl)
+    assert.equal(call.options.redirect, 'manual'); assert.equal(call.options.credentials, 'omit')
+    assert.equal(call.options.cache, 'no-store'); assert.ok(call.options.signal instanceof AbortSignal)
+    assert.deepEqual(call.options.headers, { 'Accept-Encoding': 'identity' })
+    assert.deepEqual(Object.keys(call.options).sort(), ['cache', 'credentials', 'headers', 'redirect', 'signal'])
+  }
+  assert.doesNotMatch(JSON.stringify(f.events), /trycloudflare|private-|private connection|fetch failed/)
+})
+
+test('all explicit transient network codes and gateway statuses remain bounded readiness retries', async () => {
+  for (const failure of ['EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ENETUNREACH', 'EHOSTUNREACH', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET', 502, 503, 504, 530]) {
+    let calls = 0
+    const f = readinessFixture(async () => { calls += 1; if (calls > 1) return readinessResponse(); if (typeof failure === 'string') throw readinessNetworkError(failure); return readinessResponse({ status: failure }) })
+    assert.equal((await waitForFrozenManifest(f.options, f.timing)).attempts, 2, String(failure))
+    assert.equal(f.events[0].retryable, true)
+  }
+})
+
+test('TLS errors outrank nested transient errors and unknown errors never enter readiness retry', async () => {
+  const errors = [readinessNetworkError('CERT_HAS_EXPIRED'), readinessNetworkError('ERR_TLS_CERT_ALTNAME_INVALID'), readinessNetworkError('UNABLE_TO_VERIFY_LEAF_SIGNATURE'),
+    new TypeError('fetch failed', { cause: new AggregateError([Object.assign(new Error('retryable'), { code: 'EAI_AGAIN' }), Object.assign(new Error('invalid certificate'), { code: 'SELF_SIGNED_CERT_IN_CHAIN' })]) }),
+    readinessNetworkError('EACCES'), new TypeError(`unknown failure at ${readinessUrl}`)]
+  for (const [index, error] of errors.entries()) {
+    let calls = 0; const f = readinessFixture(async () => { calls += 1; throw error })
+    await assert.rejects(waitForFrozenManifest(f.options, f.timing), index < 4 ? /tls-verification/ : /network-terminal/)
+    assert.equal(calls, 1); assert.deepEqual(f.sleeps, [])
+    assert.doesNotMatch(JSON.stringify(f.events), /trycloudflare|private-|invalid certificate|unknown failure/)
+  }
+  const manyCauses = new AggregateError([...Array.from({ length: 33 }, () => Object.assign(new Error('temporary'), { code: 'EAI_AGAIN' })), readinessNetworkError('CERT_HAS_EXPIRED')])
+  const truncated = readinessFixture(async () => { throw manyCauses })
+  await assert.rejects(waitForFrozenManifest(truncated.options, truncated.timing), /network-terminal/)
+  assert.deepEqual(truncated.sleeps, [])
+})
+
+test('redirects, alternate origins/paths, terminal HTTP and manifest identity mismatch fail without retry', async () => {
+  const responses = [readinessResponse({ status: 302 }), readinessResponse({ redirected: true }),
+    readinessResponse({ url: 'https://different.trycloudflare.com' + readinessPrefix + 'latest-mac.yml' }),
+    readinessResponse({ url: readinessOrigin + readinessPrefix + 'other.yml' }), readinessResponse({ status: 404 }), readinessResponse({ status: 429 }),
+    readinessResponse({ bytes: Buffer.alloc(readinessBytes.length, 1) }), readinessResponse({ length: readinessBytes.length + 1 }),
+    readinessResponse({ bytes: readinessBytes.subarray(1), length: readinessBytes.length }),
+    readinessResponse({ bytes: Buffer.concat([readinessBytes, Buffer.from('x')]), length: readinessBytes.length })]
+  for (const response of responses) {
+    let calls = 0; const f = readinessFixture(async () => { calls += 1; return response })
+    await assert.rejects(waitForFrozenManifest(f.options, f.timing), /manifest-(?:redirect|origin-changed|http-status|identity)/)
+    assert.equal(calls, 1); assert.deepEqual(f.sleeps, [])
+  }
+  const encoded = readinessResponse(); encoded.headers.set('content-encoding', 'gzip')
+  const f = readinessFixture(async () => encoded)
+  await assert.rejects(waitForFrozenManifest(f.options, f.timing), /manifest-identity/); assert.deepEqual(f.sleeps, [])
+  const chunked = readinessResponse(); chunked.headers.delete('content-length')
+  const accepted = readinessFixture(async () => chunked)
+  assert.equal((await waitForFrozenManifest(accepted.options, accepted.timing)).attempts, 1)
+})
+
+test('manifest readiness bounds repeated transient failures, attempt count and a stalled response body', async () => {
+  let calls = 0; const f = readinessFixture(async () => { calls += 1; throw readinessNetworkError('EAI_AGAIN') })
+  await assert.rejects(waitForFrozenManifest(f.options, { ...f.timing, timeoutMs: 5 }), /manifest-deadline/)
+  assert.equal(calls, 3); assert.equal(f.sleeps.at(-1), 1); assert.equal(f.events.at(-1).category, 'deadline')
+  const limited = readinessFixture(async () => { throw readinessNetworkError('EAI_AGAIN') })
+  await assert.rejects(waitForFrozenManifest(limited.options, { ...limited.timing, maxAttempts: 2 }), /manifest-deadline/)
+  assert.equal(limited.events.filter(event => event.retryable).length, 2)
+  const stalled = readinessFixture(async () => {
+    const response = new Response(new ReadableStream({ start() {}, cancel() { return new Promise(() => {}) } }), { headers: { 'content-length': String(readinessBytes.length) } })
+    Object.defineProperty(response, 'url', { value: readinessUrl }); return response
+  })
+  await assert.rejects(waitForFrozenManifest(stalled.options, { ...stalled.timing, maxAttempts: 1, requestTimeoutMs: 2 }), /manifest-deadline/)
+  assert.equal(stalled.events[0].category, 'request-timeout')
+  const stalledHeaders = readinessFixture(async () => new Promise(() => {}))
+  await assert.rejects(waitForFrozenManifest(stalledHeaders.options, { ...stalledHeaders.timing, maxAttempts: 1, requestTimeoutMs: 2 }), /manifest-deadline/)
+  assert.equal(stalledHeaders.events[0].category, 'request-timeout')
+})
+
+test('readiness checks cannot start for an exited tunnel or unbound manifest inputs', async () => {
+  let calls = 0; const f = readinessFixture(async () => { calls += 1; return readinessResponse() }, { isRunning: () => false })
+  await assert.rejects(waitForFrozenManifest(f.options, f.timing), /tunnel-stopped/); assert.equal(calls, 0)
+  let running = true
+  const exited = readinessFixture(async () => { running = false; return readinessResponse() }, { isRunning: () => running })
+  await assert.rejects(waitForFrozenManifest(exited.options, exited.timing), /tunnel-stopped/)
+  for (const patch of [{ prefix: '/public/' }, { manifestSize: 0 }, { manifestSha256: 'wrong' }]) {
+    await assert.rejects(waitForFrozenManifest({ ...f.options, ...patch }, f.timing), /manifest-input/)
+  }
 })
 
 test('retained logs/report fields remove feed capabilities, temporary origins and tokens', () => {

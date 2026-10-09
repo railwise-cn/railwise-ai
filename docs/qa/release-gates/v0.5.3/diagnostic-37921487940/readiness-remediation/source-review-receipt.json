@@ -1,0 +1,17 @@
+{
+  "scope": "source regression and independent AI review only; not updater or packaged acceptance",
+  "baseSourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "branch": "codex/frozen-updater-readiness-053",
+  "sources": [
+    {
+      "path": "scripts/run-frozen-release-updater-acceptance.mjs",
+      "sha256": "afe5eb6ae539491e7cdf336529d074448a83d073f13aa49d637bb2d4ccf1abd1"
+    },
+    {
+      "path": "scripts/frozen-release-updater-acceptance.test.mjs",
+      "sha256": "e92bb5397fd8825989e99768ef4433b57da34af2cbf06e9d229b39775eee315b"
+    }
+  ],
+  "diffSha256": "0eb405e81ccef2dcf2a2cd74acb9e84912e8ad2fde1f72dbf4939c8d050e446e",
+  "independentReviewSha256": "4f8323632a0298210145915e152799d7f31d9e60fd300e5010354e92ab19a495"
+}

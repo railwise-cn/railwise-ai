@@ -1,0 +1,80 @@
+{
+  "observedAt": "2026-10-09T14:17:32.064553+00:00",
+  "package": {
+    "version": "0.5.3",
+    "runId": 37921487940,
+    "runAttempt": 1,
+    "sourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+    "asarSha256": "2134c273af4b7e86e6f0243b0178fd1ffedeb120f260bca7094b5726b7474af7",
+    "pid": 64797,
+    "profileProtectionSession": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-final-normal-37921487940-20261009"
+  },
+  "nonMutatingDiagnostic": true,
+  "unprovenDefect": true,
+  "listeners": "COMMAND     PID       USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nRailWise  64797 wangjiawei   57u  IPv4 0x8da55ac35e6a0a27      0t0  TCP 127.0.0.1:8788 (LISTEN)\nRailWise  64975 wangjiawei   57u  IPv4 0x456ed7eaa7a588f1      0t0  TCP 127.0.0.1:8899 (LISTEN)\n",
+  "processes": "64797     1 /Applications/Ra 20:43 S   \n64975 64797 /Applications/Ra 20:34 S   \n",
+  "runtimeHealth": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ok",
+      "service": "kun",
+      "mode": "serve",
+      "protocolVersion": 1
+    }
+  },
+  "primaryProcess8788Health": {
+    "httpStatus": 404,
+    "body": {
+      "ok": false,
+      "message": "Not found."
+    }
+  },
+  "threadList": {
+    "httpStatus": 200,
+    "body": {
+      "threads": [
+        {
+          "id": "thr_mwg66yoe",
+          "domain": "engineering",
+          "projectId": "project_440db098-a100-4da0-b0ee-976cec8d4dd9",
+          "workspace": "/Users/wangjiawei/.workwise/default_workspace",
+          "status": "idle",
+          "archived": null,
+          "createdAt": "2026-10-09T14:04:50.726Z",
+          "updatedAt": "2026-10-09T14:04:50.726Z"
+        }
+      ]
+    }
+  },
+  "settingsPresenceOnly": {
+    "revision": 0,
+    "officialProviderKeyPresent": true,
+    "providerCount": 1,
+    "workspaceRoot": "/Users/wangjiawei/.workwise/default_workspace",
+    "runtimeDataDir": "/Users/wangjiawei/.workwise/runtime"
+  },
+  "captureContradiction": {
+    "capture": "cua/captures/new-task-preparing-en-dark-1280x840",
+    "axPreparing": true,
+    "screenshotVisualPlaceholder": "Ask the agent…",
+    "conclusion": "Sequential AX and image capture are inconsistent. The screenshot does not prove a stuck Preparing state. Fresh task input behavior must be re-observed before declaring a package defect."
+  },
+  "unitRegressionRun": {
+    "command": "npm test -- --run src/renderer/src/store/chat-store-navigation-actions.test.ts src/renderer/src/store/chat-store-thread-actions.test.ts src/renderer/src/components/engineering/EngineeringComposer.dom.test.ts",
+    "exitCode": 0,
+    "filesPassed": 3,
+    "testsPassed": 29,
+    "duration": "789 ms",
+    "startedLocal": "22:16:09",
+    "scope": "Frozen-source model regressions only; does not substitute for installed application acceptance."
+  },
+  "parentFollowupObservation": {
+    "reportedAt": "2026-10-09T14:18:01.500016+00:00",
+    "source": "Root-agent live CUA report; screenshots/AX preserved by root separately",
+    "secondFreshTaskInitialAx": "Preparing",
+    "afterComposerClickAndSyntheticPublicQuestionPaste": "Ask the agent; Send enabled",
+    "sendResult": "User message visibly sent; Processing survey data; Stop control visible",
+    "classification": "Transient initial binding or observation mismatch; persistent stuck defect not reproduced",
+    "modelReply": "Pending at root report time; no AI answer acceptance implied"
+  }
+}

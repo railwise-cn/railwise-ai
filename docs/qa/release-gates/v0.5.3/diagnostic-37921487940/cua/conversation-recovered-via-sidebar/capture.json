@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "type": "Observed CUA original-image evidence; not an automatic acceptance conclusion",
+  "capturedAt": "2026-10-09T14:13:38.596Z",
+  "id": "conversation-recovered-via-sidebar",
+  "locale": "en",
+  "theme": "dark",
+  "page": "state",
+  "packageIdentity": {
+    "status": "actual-dmg-installed-identity-signature-notarization-asar-passed",
+    "at": "2026-10-09T13:54:04.130750+00:00",
+    "runId": 37921487940,
+    "runAttempt": 1,
+    "version": "0.5.3",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "appPath": "/Applications/RailWise AI.app",
+    "sourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+    "artifactFile": "/private/tmp/railwise-053-tools/new-freeze-37921487940/verified-release-files/WorkWise-0.5.3-mac-arm64.dmg",
+    "artifactSha256": "0a33b5f6a8655b677762304dc9052b5cfbd8028249376323da0289579be0d852",
+    "asarSha256": "2134c273af4b7e86e6f0243b0178fd1ffedeb120f260bca7094b5726b7474af7",
+    "signature": "verified",
+    "stapledNotarization": "verified",
+    "gatekeeperRaw": "/Applications/RailWise AI.app: accepted\nsource=Notarized Developer ID\noverride=security disabled",
+    "gatekeeperEnforcementLocallyVerified": false,
+    "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U\nExecutable=/Applications/RailWise AI.app/Contents/MacOS/RailWise AI",
+    "architecture": "/Applications/RailWise AI.app/Contents/MacOS/RailWise AI: Mach-O 64-bit executable arm64",
+    "heldOriginal": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-baseline-before-37921487940-20261009/held-original/RailWise AI.app",
+    "started": true,
+    "profileChanged": true,
+    "pid": 64797,
+    "processStartedAt": "Fri Oct  9 21:56:49 2026",
+    "capturedAt": "2026-10-09T13:57:28.356925+00:00",
+    "profileProtectionSession": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-final-normal-37921487940-20261009",
+    "observedProfilePaths": {
+      "settings": "/Users/wangjiawei/Library/Application Support/RailWise AI/workwise-settings.json",
+      "workspaceRoot": "/Users/wangjiawei/.workwise/default_workspace",
+      "runtimeDataDir": "/Users/wangjiawei/.workwise/runtime",
+      "writeWorkspaceRoot": "/Users/wangjiawei/.workwise/write_workspace"
+    },
+    "lifecycleClarification": "Original installation identity reported profileChanged:false at installation. inventory/snapshot/activate subsequently isolated normal profile before PID 64797 launch; original capture is preserved.",
+    "lifecycleRecordedAt": "2026-10-09T14:12:22.063Z"
+  },
+  "windowId": 22123,
+  "requestedWindowLogicalSize": null,
+  "actualWindowLogicalSize": {
+    "width": 1280,
+    "height": 840
+  },
+  "actualScreenshotPixelSize": {
+    "width": 2560,
+    "height": 1680
+  },
+  "screenshotFormat": "jpeg",
+  "screenshotMimeType": "image/jpeg",
+  "requestedSizeMatches": null,
+  "observationCapturedAt": "2026-10-09T14:13:38Z",
+  "screenshot": "screenshot.jpg",
+  "ax": "ax.txt",
+  "windowObservation": "window.json",
+  "sha256": {
+    "screenshot": "c213c13996758ea3883f1f4ea6d4dc084b1ca5e44a78fa05c77a32f022906e0a",
+    "ax": "2d9baad2f137ec0aaf9e7294301d1bb52da0781e74f84b312629e00159f612eb",
+    "windowObservation": "4ae2bb1c74ded8dd012ed534744530eb3412daea76b8abac0b9e1ba1b20b1d91"
+  },
+  "status": "observed-not-reviewed",
+  "findings": [
+    "Close details then Continue conversation changed Preparing to Ask the agent; first-task automatic binding still under diagnosis."
+  ]
+}

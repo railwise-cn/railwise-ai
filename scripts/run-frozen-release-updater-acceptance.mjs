@@ -141,6 +141,141 @@ export function validateTunnelUrl(value) {
   return url.origin
 }
 
+const TRANSIENT_READINESS_CODES = new Map([
+  ['EAI_AGAIN', 'dns-transient'], ['ENOTFOUND', 'dns-transient'],
+  ['ECONNREFUSED', 'connection-transient'], ['ECONNRESET', 'connection-transient'],
+  ['ENETUNREACH', 'connection-transient'], ['EHOSTUNREACH', 'connection-transient'],
+  ['ETIMEDOUT', 'connection-timeout'], ['UND_ERR_CONNECT_TIMEOUT', 'connection-timeout'],
+  ['UND_ERR_HEADERS_TIMEOUT', 'connection-timeout'], ['UND_ERR_BODY_TIMEOUT', 'connection-timeout'],
+  ['UND_ERR_SOCKET', 'connection-transient']
+])
+const TRANSIENT_READINESS_STATUSES = new Set([502, 503, 504, 530])
+
+function readinessFailure(category, details = {}) {
+  return Object.assign(new Error(`Frozen updater readiness failed (${category}).`), { readinessCategory: category, ...details })
+}
+
+// Only bounded, known codes are retained. Messages can contain the capability
+// URL, and a TLS failure must never be retried behind a transient nested cause.
+function classifyReadinessError(error) {
+  if (error?.readinessCategory) return { category: error.readinessCategory, retryable: error.retryable === true,
+    ...(error.httpStatus ? { httpStatus: error.httpStatus } : {}) }
+  const codes = new Set(); const seen = new Set(); let truncated = false
+  const visit = value => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return
+    if (seen.size >= 32) { truncated = true; return }
+    seen.add(value)
+    if (typeof value.code === 'string') codes.add(value.code)
+    visit(value.cause)
+    if (Array.isArray(value.errors)) for (const nested of value.errors) visit(nested)
+  }
+  visit(error)
+  if ([...codes].some(code => /^(?:ERR_TLS_|ERR_SSL_|CERT_|DEPTH_ZERO_SELF_SIGNED_CERT$|SELF_SIGNED_CERT_IN_CHAIN$|UNABLE_TO_(?:GET_ISSUER_CERT|GET_ISSUER_CERT_LOCALLY|VERIFY_LEAF_SIGNATURE)$)/.test(code))) {
+    return { category: 'tls-verification', retryable: false }
+  }
+  if (!truncated && codes.size && [...codes].every(code => TRANSIENT_READINESS_CODES.has(code))) {
+    return { category: TRANSIENT_READINESS_CODES.get([...codes][0]), retryable: true, networkCodes: [...codes].sort() }
+  }
+  return { category: 'network-terminal', retryable: false }
+}
+
+export async function waitForTunnelConnection({ readLog, isRunning, progress = () => {} }, {
+  timeoutMs = 90_000, pollMs = 500, sleep = delay, now = () => performance.now()
+} = {}) {
+  const started = now(); const deadline = started + timeoutMs
+  let attempt = 0; let previousCategory
+  while (now() < deadline) {
+    attempt += 1
+    if (!isRunning()) throw readinessFailure('tunnel-stopped')
+    const log = readLog()
+    const urls = [...new Set(log.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/g) ?? [])]
+    if (urls.length > 1) throw readinessFailure('tunnel-origin-changed')
+    const origin = urls.length === 1 ? validateTunnelUrl(urls[0]) : undefined
+    const connected = /(?:^|\n)[^\n]*\bINF Registered tunnel connection\b/.test(log)
+    const category = !origin ? 'endpoint-pending' : connected ? 'connected' : 'connection-pending'
+    if (category !== previousCategory) progress({ operation: 'tunnel-connection-readiness', status: connected && origin ? 'completed' : 'waiting', category, attempt, elapsedMs: Math.max(0, Math.round(now() - started)) })
+    previousCategory = category
+    if (connected && origin) {
+      if (!isRunning()) throw readinessFailure('tunnel-stopped')
+      return { origin, attempts: attempt, elapsedMs: Math.max(0, Math.round(now() - started)) }
+    }
+    await sleep(Math.min(pollMs, Math.max(0, deadline - now())))
+  }
+  progress({ operation: 'tunnel-connection-readiness', status: 'failed', category: 'deadline', attempt, elapsedMs: Math.max(0, Math.round(now() - started)) })
+  throw readinessFailure('tunnel-deadline')
+}
+
+async function requestFrozenManifest(url, expected, fetchImpl, timeoutMs) {
+  const controller = new AbortController()
+  let reader; let timer
+  const request = (async () => {
+    const response = await fetchImpl(url, { redirect: 'manual', credentials: 'omit', cache: 'no-store', headers: { 'Accept-Encoding': 'identity' }, signal: controller.signal })
+    if (response.redirected || response.status >= 300 && response.status < 400) throw readinessFailure('manifest-redirect')
+    if (response.url !== url) throw readinessFailure('manifest-origin-changed')
+    if (TRANSIENT_READINESS_STATUSES.has(response.status)) {
+      await response.body?.cancel().catch(() => {})
+      throw readinessFailure('gateway-transient', { retryable: true, httpStatus: response.status })
+    }
+    if (response.status !== 200) throw readinessFailure('manifest-http-status', { httpStatus: response.status })
+    const contentLength = response.headers.get('content-length'); const encoding = response.headers.get('content-encoding')
+    if (contentLength !== null && contentLength !== String(expected.size) || encoding !== null && encoding !== 'identity' || !response.body) throw readinessFailure('manifest-identity')
+    reader = response.body.getReader()
+    let size = 0; const hash = createHash('sha256')
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      size += chunk.value.byteLength
+      if (size > expected.size) throw readinessFailure('manifest-identity')
+      hash.update(chunk.value)
+    }
+    if (size !== expected.size || hash.digest('hex') !== expected.sha256) throw readinessFailure('manifest-identity')
+  })()
+  const timedOut = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(readinessFailure('request-timeout', { retryable: true }))
+      controller.abort()
+    }, timeoutMs)
+  })
+  try { await Promise.race([request, timedOut]) }
+  finally {
+    clearTimeout(timer)
+    controller.abort()
+    // Cancellation cannot extend the attempt deadline if a stalled source
+    // fails to settle its cancellation promise.
+    if (reader) reader.cancel().catch(() => {})
+  }
+}
+
+export async function waitForFrozenManifest({ origin, prefix, manifestSize, manifestSha256, isRunning, progress = () => {} }, {
+  fetchImpl = fetch, timeoutMs = 120_000, requestTimeoutMs = 10_000, retryMs = 1_000, maxAttempts = 60,
+  sleep = delay, now = () => performance.now()
+} = {}) {
+  const url = validateTunnelUrl(origin) + prefix + 'latest-mac.yml'
+  if (!/^\/private-[a-f0-9]{64}\/$/.test(prefix) || !Number.isSafeInteger(manifestSize) || manifestSize < 1 || manifestSize > 1024 * 1024
+    || !/^[a-f0-9]{64}$/.test(manifestSha256)) throw readinessFailure('manifest-input')
+  const started = now(); const deadline = started + timeoutMs
+  let attempt = 0
+  while (now() < deadline && attempt < maxAttempts) {
+    if (!isRunning()) throw readinessFailure('tunnel-stopped')
+    attempt += 1
+    try {
+      await requestFrozenManifest(url, { size: manifestSize, sha256: manifestSha256 }, fetchImpl, Math.min(requestTimeoutMs, Math.max(1, deadline - now())))
+      if (now() >= deadline) throw readinessFailure('manifest-deadline')
+      if (!isRunning()) throw readinessFailure('tunnel-stopped')
+      const result = { attempts: attempt, elapsedMs: Math.max(0, Math.round(now() - started)), manifestSha256 }
+      progress({ operation: 'frozen-manifest-readiness', status: 'completed', category: 'identity-verified', attempt, elapsedMs: result.elapsedMs })
+      return result
+    } catch (error) {
+      const failure = classifyReadinessError(error)
+      progress({ operation: 'frozen-manifest-readiness', status: failure.retryable ? 'retrying' : 'failed', attempt, elapsedMs: Math.max(0, Math.round(now() - started)), ...failure })
+      if (!failure.retryable) throw readinessFailure(failure.category)
+      await sleep(Math.min(retryMs, Math.max(0, deadline - now())))
+    }
+  }
+  progress({ operation: 'frozen-manifest-readiness', status: 'failed', category: 'deadline', attempt, elapsedMs: Math.max(0, Math.round(now() - started)) })
+  throw readinessFailure('manifest-deadline')
+}
+
 export async function downloadPinned(url, destination, pin) {
   const response = await fetch(url, { signal: AbortSignal.timeout(10 * 60_000) })
   if (!response.ok || !response.body) throw new Error(`Pinned asset download failed (${response.status}).`)
@@ -176,20 +311,13 @@ function startCapturedProcess(command, args, { env, logPath, timeoutMs }) {
   return { child, completed, stop: () => { try { process.kill(-child.pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error } } }
 }
 
-async function startTunnel(executable, origin, root, env) {
+async function startTunnel(executable, origin, root, env, progress) {
   const logPath = join(root, 'cloudflared.log')
   const processRun = startCapturedProcess(executable, ['tunnel', '--url', origin, '--no-autoupdate', '--loglevel', 'info'], { env, logPath, timeoutMs: 30 * 60_000 })
-  const deadline = Date.now() + 90_000
+  const isRunning = () => processRun.child.exitCode === null && processRun.child.signalCode === null
   try {
-    while (Date.now() < deadline) {
-      const log = readFileSync(logPath, 'utf8')
-      const urls = [...new Set(log.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/g) ?? [])]
-      if (urls.length === 1) return { ...processRun, url: validateTunnelUrl(urls[0]) }
-      if (urls.length > 1) throw new Error('Tunnel yielded ambiguous endpoints.')
-      if (processRun.child.exitCode !== null) throw new Error('Temporary tunnel stopped before readiness.')
-      await delay(500)
-    }
-    throw new Error('Temporary tunnel readiness timed out.')
+    const ready = await waitForTunnelConnection({ readLog: () => readFileSync(logPath, 'utf8'), isRunning, progress })
+    return { ...processRun, url: ready.origin, isRunning, connectionReadiness: { attempts: ready.attempts, elapsedMs: ready.elapsedMs } }
   } catch (error) { processRun.stop(); await processRun.completed.catch(() => {}); throw error }
 }
 
@@ -361,11 +489,12 @@ export async function main() {
     const beforeSentinel = readFileSync(join(paths.profile, 'frozen-release-sentinel.json'))
     feed = await startFrozenReleaseFeed({ zipPath: targetZip, manifestPath: join(verified, 'latest-mac.yml'), version: TARGET_VERSION, arch: process.arch })
     secrets.push(feed.prefix)
-    tunnel = await startTunnel(join(root, 'cloudflared'), feed.origin, root, env)
+    tunnel = await startTunnel(join(root, 'cloudflared'), feed.origin, root, env, progress)
     secrets.push(tunnel.url)
+    report.tunnelConnectionReadiness = tunnel.connectionReadiness
     const feedUrl = tunnel.url + feed.prefix
-    const check = await fetch(feedUrl + 'latest-mac.yml', { signal: AbortSignal.timeout(30_000) })
-    if (!check.ok || createHash('sha256').update(Buffer.from(await check.arrayBuffer())).digest('hex') !== feed.manifestSha256) throw new Error('Temporary default-CA HTTPS feed did not return the frozen manifest.')
+    report.frozenManifestReadiness = await waitForFrozenManifest({ origin: tunnel.url, prefix: feed.prefix,
+      manifestSize: lstatSync(join(verified, 'latest-mac.yml')).size, manifestSha256: feed.manifestSha256, isRunning: tunnel.isRunning, progress })
     const beforeNativeRequests = { ...feed.requests }
     harness = startCapturedProcess(process.execPath, [join(scriptRoot, 'run-native-updater-acceptance.mjs'), `--installer=${baselineDmg}`, `--feed-url=${feedUrl}`, `--base-version=${BASE_VERSION}`, `--target-version=${TARGET_VERSION}`, '--channel=frontier', `--expected-arch=${process.arch}`, `--report=${join(root, 'native-updater.json')}`], { env, logPath: join(root, 'harness.log'), timeoutMs: 25 * 60_000 })
     report.strictNonceProbe = await observeStrictProbe(paths.profile, harness)

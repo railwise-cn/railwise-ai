@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-10-09T14:46:45.228043+00:00",
+  "scope": "source checks only; not replacement packaged application acceptance",
+  "npmTest": {
+    "passedFiles": 357,
+    "skippedFiles": 2,
+    "passedTests": 3271,
+    "skippedTests": 2,
+    "failedTests": 0,
+    "exitCode": 0
+  },
+  "fullTypecheck": {
+    "exitCode": 0
+  },
+  "fullLint": {
+    "exitCode": 0
+  },
+  "independentAiSourceReviews": "both passed; actual installation and updater remain required",
+  "sourceFiles": {
+    "scripts/run-frozen-release-updater-acceptance.mjs": "afe5eb6ae539491e7cdf336529d074448a83d073f13aa49d637bb2d4ccf1abd1",
+    "scripts/frozen-release-updater-acceptance.test.mjs": "e92bb5397fd8825989e99768ef4433b57da34af2cbf06e9d229b39775eee315b",
+    "src/renderer/src/components/engineering/engineering-professional-text.ts": "5d1cca0c78afd017f8eeabefc00fa60ab7de8ac339a200ae229af977fb4bf17e",
+    "src/renderer/src/components/engineering/engineering-professional-text.test.ts": "75ac21ab88a82a67e4d936d3352bae1c6c29e6f2f1fe0f29dcce3db6126031c4"
+  }
+}

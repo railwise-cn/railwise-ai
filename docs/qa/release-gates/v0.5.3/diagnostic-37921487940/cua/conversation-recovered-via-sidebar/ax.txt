@@ -1,0 +1,37 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container Open AI
+					5 container
+						6 标题 Open AI, Value: 2
+							7 文本 Open AI
+						8 按钮 Close details
+					9 container Survey AI session
+						10 container
+							11 标题 Survey AI session, Value: 2
+								12 文本 Survey AI session
+							13 文本 New Survey job
+							14 按钮 Import and preflight
+							15 按钮 Survey adjustment
+							16 按钮 Refresh task data
+						17 标题 Survey AI, Value: 2
+							18 文本 Survey AI
+						19 文本 Describe your goal or add files. We will check the inputs and guide you through calculation and delivery.
+						20 container
+							21 文本输入区 (settable) Ask the agent…
+							22 按钮 More actions
+							23 按钮 (disabled) Send
+	24 关闭按钮
+	25 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	26 最小化按钮
+27 menu bar
+	28 RailWise AI
+	29 File
+	30 Edit
+	31 View
+	32 Window
+	33 Help
+
+The focused UI element is 8 按钮 Close details

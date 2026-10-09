@@ -1,0 +1,22 @@
+{
+  "status": "actual-dmg-installed-identity-signature-notarization-asar-passed",
+  "at": "2026-10-09T13:54:04.130750+00:00",
+  "runId": 37921487940,
+  "runAttempt": 1,
+  "version": "0.5.3",
+  "bundleId": "com.wangjiawei508.workgpt",
+  "appPath": "/Applications/RailWise AI.app",
+  "sourceHead": "6bcfe0db516eafbecfed546e7077088975cda804",
+  "artifactFile": "/private/tmp/railwise-053-tools/new-freeze-37921487940/verified-release-files/WorkWise-0.5.3-mac-arm64.dmg",
+  "artifactSha256": "0a33b5f6a8655b677762304dc9052b5cfbd8028249376323da0289579be0d852",
+  "asarSha256": "2134c273af4b7e86e6f0243b0178fd1ffedeb120f260bca7094b5726b7474af7",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperRaw": "/Applications/RailWise AI.app: accepted\nsource=Notarized Developer ID\noverride=security disabled",
+  "gatekeeperEnforcementLocallyVerified": false,
+  "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U\nExecutable=/Applications/RailWise AI.app/Contents/MacOS/RailWise AI",
+  "architecture": "/Applications/RailWise AI.app/Contents/MacOS/RailWise AI: Mach-O 64-bit executable arm64",
+  "heldOriginal": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-baseline-before-37921487940-20261009/held-original/RailWise AI.app",
+  "started": false,
+  "profileChanged": false
+}

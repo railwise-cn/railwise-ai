@@ -1,0 +1,20 @@
+{
+  "id": 11620971963,
+  "node_id": "MDg6QXJ0aWZhY3QxMTYyMDk3MTk2Mw==",
+  "name": "frozen-updater-arm64-37939882485",
+  "size_in_bytes": 7174,
+  "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/11620971963",
+  "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/11620971963/zip",
+  "expired": false,
+  "digest": "sha256:63c516ce2f66ae135809ba36f3c90db3091ed16be5e57a7e100f80c1d36c5d79",
+  "created_at": "2026-10-09T13:54:31Z",
+  "updated_at": "2026-10-09T13:54:31Z",
+  "expires_at": "2026-10-16T13:54:30Z",
+  "workflow_run": {
+    "id": 37939882485,
+    "repository_id": 1268259206,
+    "head_repository_id": 1268259206,
+    "head_branch": "main",
+    "head_sha": "6bcfe0db516eafbecfed546e7077088975cda804"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-10-09T14:40:14.513625+00:00",
+  "scope": "source validation; not rebuilt package acceptance",
+  "tests": {
+    "suites": 3,
+    "passed": 169,
+    "failed": 0
+  },
+  "typecheckWeb": "passed",
+  "targetedEslint": "passed",
+  "gitDiffCheck": "passed",
+  "installedPackageRun": "37921487940",
+  "normalProfileTouchedByThisDiagnosticAfterRestoration": false,
+  "sourceSha256": {
+    "src/renderer/src/components/engineering/engineering-professional-text.ts": "5d1cca0c78afd017f8eeabefc00fa60ab7de8ac339a200ae229af977fb4bf17e",
+    "src/renderer/src/components/engineering/engineering-professional-text.test.ts": "75ac21ab88a82a67e4d936d3352bae1c6c29e6f2f1fe0f29dcce3db6126031c4"
+  }
+}

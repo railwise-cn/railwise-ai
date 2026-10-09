@@ -1,0 +1,10 @@
+{
+  "scope": "official pinned transport binary only; not app or updater acceptance",
+  "officialVersion": "2026.10.0",
+  "archiveSize": 19809074,
+  "archiveSha256": "a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70",
+  "binarySha256": "72edfd3eea463aef4d5cb89e2e209cecb048cc756c2b01915de2e0ad7cb39830",
+  "tarEntries": [
+    "cloudflared"
+  ]
+}

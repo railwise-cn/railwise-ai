@@ -1,0 +1,21 @@
+**Checks before a plane control network adjustment** (any-station/direction–distance network) — professional practice, stated in brief:
+
+1. **Source and version control** — Build a clean source inventory of the original observation records (e.g., IN2 direction–distance sets). If more than one file of the same type exists, stop and confirm which version is authoritative — never pick one arbitrarily. Record the actual software and working method stated in the engineering report.
+
+2. **Completeness and parseability** — Each setup needs complete face-left/face-right rounds, zero-set observations, and no missing station readings. Angles and distances must parse cleanly in their recorded format and units. Missing or illegible records stay listed as evidence gaps — they are not filled in.
+
+3. **Raw observation screening** — Before any adjustment, screen face-left/face-right discrepancies and zeroing differences, and cross-check station-level observations against the companion data. These are pre-checks; note that the full reduction chain (setup data → network observations) is not a fully validated capability here, so don't present it as done.
+
+4. **Independent closure checks on the original route** — Compute angular/azimuth and coordinate/length closures from the original observations against explicit project limits. This is the true pre-adjustment check. Numbers historically labelled "closure" in legacy outputs are after-adjustment fitted residual norms and must never substitute for it.
+
+5. **Network geometry and rank** — Verify connectivity and redundancy: independent observations versus unknowns, with no rank deficiency and no illegal input. Such networks must fail and be corrected at the data level, not forced through.
+
+6. **Datum and point roles** — Confirm the declared coordinate system and projection, and keep each point's role as recorded: constraint/fixed points, points to be determined, and any unverified points remain unverified. A declared datum is not independently verified.
+
+7. **Weighting and precision basis** — Confirm the recorded weighting model (absolute vs. relative) and whether direction and distance variance components are estimated. The scale basis determines how any precision result may be interpreted afterwards.
+
+8. **Limits, standard, and sign-off basis** — Project tolerances, standard and version, and personnel/sign-off basis must be supplied. Limits are never invented, and numerical agreement with a historical output is not standards acceptance.
+
+9. **Gross-error handling as hypotheses only** — Suspected outliers may be flagged with source-linked evidence, but observations are never deleted, weights changed, or initial values reset without explicit confirmation.
+
+No data has been modified and no calculation started — this is consultation only. In the current project, no observation files or adjustment records are registered yet, so the practical first step, when work begins, is to add the authoritative source files together with the project's limit and sign-off basis.
