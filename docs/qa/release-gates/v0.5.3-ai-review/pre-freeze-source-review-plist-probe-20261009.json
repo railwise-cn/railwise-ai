@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "review": "independent synthetic source review only; no real preferences read/export/import",
+  "platform": "macOS same-host plutil XML1 conversion",
+  "records": [
+    {
+      "input": "xml1-forward.plist",
+      "sha256": "2b2c6299c1bed53c69feb267eac1df009929e5c92dc52a081277d09288e24506",
+      "parsedValuesPreserved": true
+    },
+    {
+      "input": "xml1-reverse.plist",
+      "sha256": "2b2c6299c1bed53c69feb267eac1df009929e5c92dc52a081277d09288e24506",
+      "parsedValuesPreserved": true
+    },
+    {
+      "input": "binary1-forward.plist",
+      "sha256": "2b2c6299c1bed53c69feb267eac1df009929e5c92dc52a081277d09288e24506",
+      "parsedValuesPreserved": true
+    },
+    {
+      "input": "binary1-reverse.plist",
+      "sha256": "2b2c6299c1bed53c69feb267eac1df009929e5c92dc52a081277d09288e24506",
+      "parsedValuesPreserved": true
+    }
+  ],
+  "allFourEqual": true,
+  "commonSha256": "2b2c6299c1bed53c69feb267eac1df009929e5c92dc52a081277d09288e24506",
+  "fixtureDirectory": "/private/tmp/railwise-053-tools/railwise-review-plist-20261009-y74hm_5c"
+}

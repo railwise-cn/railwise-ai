@@ -1,14 +1,18 @@
 # Final public-identity 0.5.3 acceptance preparation
 
-This directory currently contains preparation tools and plans. It is not a
-passing package acceptance report or publication manifest. The previous
-private freeze run `37749218440`, sourced from
-`d3f9158a6fd26cd40e4f0bd3dd4d92e4686d1f51`, was canceled after the independent
-numerical review identified incorrect scale-unit labeling for relative
-leveling weights. Product remediation is awaiting its source PR and a new
-freeze. No replacement source SHA, run, final package or acceptance result is
-recorded here. Do not consume the canceled run's artifacts for final acceptance
-or publication.
+This directory contains preparation tools and plans. It is not a passing
+package acceptance report or publication manifest. On 2026-10-09, freeze run
+`37861714441`, sourced from `1aae1717926de575220cb01e2289613f3c34c639`, was
+canceled after independent source review found that an archived review-draft
+question still exposed its internal record identifier. PR #49 is being revised
+to fix that question, capability presentation and profile-protection link
+boundaries before another protected-main freeze. No new final package or
+passing installed-package acceptance is recorded here.
+
+Earlier runs `37749218440`, `37767883793` and `37860746475` are historical
+only. Their packages, screenshots and updater reports cannot authorize the
+next package or publication. Required final screenshots, functional checks,
+AI review and native updater evidence must all identify the new frozen bytes.
 
 ## Preparation and evidence index
 

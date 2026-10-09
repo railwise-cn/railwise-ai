@@ -1,11 +1,18 @@
 {
   "schema": "railwise.profile-protection.selftest.v1",
-  "observedDate": "2026-10-08",
+  "observedDate": "2026-10-09",
+  "observedAtUtc": "2026-10-09T00:10:55.911111+00:00",
   "status": "passed",
-  "testedScriptSha256": "2b65d8390f0d6641b43b28d64834b0146105d5e9e62ac128203e252ba40f5a6c",
+  "testedScriptSha256": "994be48b6edb18e9ee0ed1f4b855a779bf3de26b47a11a20aa1dd6e0e2f9fb74",
   "command": "node docs/qa/release-gates/v0.5.3/normal-profile-protection.mjs self-test",
-  "scope": "Temporary synthetic directories only; no live profile activation, application launch, or product acceptance.",
+  "scope": "Temporary synthetic directories only; no live profile activation or product acceptance.",
   "checks": [
+    "installation-info-link-rejected",
+    "installation-asar-link-rejected",
+    "installation-pack-root-link-rejected",
+    "installation-manifest-link-rejected",
+    "installation-audit-link-rejected",
+    "installation-asset-link-rejected",
     "concurrent-session-conflict",
     "changed-original-blocks-activation",
     "full-reversible-cycle",
@@ -15,6 +22,8 @@
     "fresh-settings-and-migration-targets",
     "interrupted-pack-archive-and-partial-copy-recovery",
     "final-login-evidence-required",
+    "nested-user-links-restored-without-following-external-broken-or-cyclic-targets",
+    "linked-settings-credential-reuse-rejected-before-activation",
     "interrupted-unactivated-snapshot-can-be-aborted",
     "verify-and-abort-terminal-journal-retry",
     "snapshot-journal-and-reservation-crash-recovery",
@@ -22,14 +31,44 @@
     "dead-lock-recovery-and-live-owner-rejection",
     "symlink-escape-rejected"
   ],
+  "privateSyntheticSession": "/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/railwise-profile-guard-selftest-2GzwWa/home/Library/Application Support/RailWise Acceptance/synthetic-session",
   "additionalChecks": [
     "node --check passed",
-    "git diff --check passed",
-    "real installed 0.5.2 bundle refused by exact-version inventory guard"
+    "git diff --check passed"
   ],
+  "xmlPlistConversionProbe": {
+    "scope": "Four temporary synthetic plist inputs, real /usr/bin/plutil XML1 conversion only; not a live defaults export/import or installed-package acceptance",
+    "inputFormats": [
+      "xml1",
+      "binary1"
+    ],
+    "equivalentDictionaryInsertionOrders": 2,
+    "includedValues": [
+      "nested dictionary",
+      "Unicode string",
+      "opaque data bytes",
+      "date",
+      "noninteger real"
+    ],
+    "allFourSha256Equal": "ef981369a173de83534b0d67a7fc47fbcfde2c9087f2b61091c790b3c82a1ab5",
+    "parsedValuesPreserved": true,
+    "platform": "macOS on this machine; not universal cross-platform canonicalization"
+  },
+  "priorSelfTest": {
+    "observedDate": "2026-10-08",
+    "testedScriptSha256": "2b65d8390f0d6641b43b28d64834b0146105d5e9e62ac128203e252ba40f5a6c",
+    "checksPassed": 15,
+    "additionalChecks": [
+      "node --check passed",
+      "git diff --check passed",
+      "real installed 0.5.2 bundle refused by exact-version inventory guard"
+    ],
+    "scope": "Temporary synthetic directories only; no live profile activation, application launch, or product acceptance."
+  },
   "unexecuted": [
-    "Final frozen 0.5.3 installed-package inventory",
+    "Final frozen 0.5.3 installed-package inventory with this revised tool",
     "Real snapshot/activate/restore/verify cycle",
+    "Real preferences defaults export/import/verify round trip",
     "Final-package functional and visual acceptance"
   ]
 }
