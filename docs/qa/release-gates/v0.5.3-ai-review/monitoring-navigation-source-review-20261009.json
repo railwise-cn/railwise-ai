@@ -1,0 +1,75 @@
+{
+  "reviewType": "Independent AI source/DOM review; not installed package acceptance",
+  "conclusion": "no-blocking-findings",
+  "baseHead": "0969e589931aa95088247d9322a27b0ae44b74ff",
+  "branch": "codex/monitoring-navigation-053",
+  "diffSha256": "e0e8dc4f04123d74ead074f0805c2ccbb9fb49355de9f35962a61ca2e2690fa7",
+  "files": [
+    {
+      "path": "docs/qa/release-gates/v0.5.3/README.md",
+      "size": 5277,
+      "sha256": "0419463ff3e60ab0e5a049b4d0237b55aff198fc9555298fc7128f496b781763"
+    },
+    {
+      "path": "docs/qa/release-gates/v0.5.3/release-execution-order-20261008.md",
+      "size": 12088,
+      "sha256": "71529b9d6ba7d93f2613a63e41d93878ff65b1176f2ed3cdad9ccafdfcf1ab52"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts",
+      "size": 56826,
+      "sha256": "e620d67c0b42390205f304f4e52202814cc3ddbc5b8eaa9e855a8f5f6ea8660d"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringAiCommandCenter.tsx",
+      "size": 43666,
+      "sha256": "a542a17c4acee285a59a8b589df26fc7f9e40fcf85e54ba4848c2e3688f0da24"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "size": 77819,
+      "sha256": "ca72a499ad6eed31782dbba999ca1df82bfeb43bcf5b48afabf057e506e414f0"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "size": 129307,
+      "sha256": "7a67d400982c50ddfb453b15a21bf2b2db40dd13993911284350213104e18fad"
+    }
+  ],
+  "productionBehaviorChanges": 3,
+  "newParameterizedScenarios": 7,
+  "findings": [],
+  "checks": {
+    "canonicalTaskTypeDeformation": true,
+    "datasetOverridePreserved": true,
+    "controlNetworkNavigationPreserved": true,
+    "overviewUploadUsesWorkflow": true,
+    "legacyTabsPreserved": true,
+    "runtimePermissionsApprovalAndExecutionUnchanged": true,
+    "newNavigationNoMutationAssertions": true,
+    "sourceBindingUnchanged": true,
+    "gitDiffCheckPassed": true
+  },
+  "independentDomVerification": {
+    "command": "./node_modules/.bin/vitest run src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts src/renderer/src/components/engineering/EngineeringAiCommandCenter.dom.test.ts --reporter=verbose",
+    "exitCode": 0,
+    "testFiles": 2,
+    "passed": 140,
+    "failed": 0,
+    "rawLogPrivatePath": "/private/tmp/railwise-053-tools/monitoring-navigation-20261009/independent-dom-tests.log",
+    "rawLogSha256": "c6081434cb71d8f291d7994651bed5ed58e6bf3a83a046c393e2895d41eb60ee",
+    "rawLogNeedNotBeCommitted": true
+  },
+  "priorFailedBaseline": "4 failed/136 passed reported by implementer; not independently rerun by this reviewer",
+  "frozenRunReadOnlyApi": {
+    "runId": 37865282420,
+    "status": "completed",
+    "conclusion": "cancelled",
+    "headSha": "0969e589931aa95088247d9322a27b0ae44b74ff"
+  },
+  "repositoryGuiProfileModified": false,
+  "installedPackageInspected": false,
+  "runtimeRealModelOrUpdaterExecuted": false,
+  "remainingGate": "New protected-main freeze followed by full installed-package computer-use/functional/updater and independent package AI review",
+  "reviewBoundaries": "AI review is not real human approval, professional signature, vendor/SUC interoperability or production acceptance"
+}

@@ -9,6 +9,15 @@ to fix that question, capability presentation and profile-protection link
 boundaries before another protected-main freeze. No new final package or
 passing installed-package acceptance is recorded here.
 
+On 2026-10-09, PR #49 merged into protected main at
+`0969e589931aa95088247d9322a27b0ae44b74ff`. Freeze `37865282420` was started
+with the full stability gate, then canceled after independent preparation
+identified empty deformation tasks routing to survey adjustment. The project
+contract uses `deformation`; two renderer branches compared a nonexistent
+value, and the overview upload shortcut always selected survey sources.
+These navigation repairs need their own strict CI and protected-main merge
+before another freeze. This canceled run has no final package acceptance.
+
 Earlier runs `37749218440`, `37767883793` and `37860746475` are historical
 only. Their packages, screenshots and updater reports cannot authorize the
 next package or publication. Required final screenshots, functional checks,

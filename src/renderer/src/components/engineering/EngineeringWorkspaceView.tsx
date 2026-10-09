@@ -1111,7 +1111,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
     manifestValid: latestManifest?.validation.valid === true
   })
   const readinessLabel = t(`engineeringReadiness.${readiness}`, { defaultValue: readiness })
-  const monitoringWorkflow = Boolean(activeDataset) || overview?.project.taskType === 'deformation-monitoring'
+  const monitoringWorkflow = Boolean(activeDataset) || overview?.project.taskType === 'deformation'
   const surveyResultCurrent = Boolean(latestSurveyAdjustment && surveyAdjustmentIds.includes(latestSurveyAdjustment.run.id))
   const overviewSource = activeDataset?.sourceFileName ?? activeSurveyNetwork?.sourceFile?.name
   const renderDeliveryOutput = (output: Output): ReactElement => {
@@ -1225,7 +1225,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
                   if (!overviewSource) setAiOpen(true)
                   else setTab(activeAnalysis || surveyResultCurrent ? (monitoringWorkflow ? 'analysis' : 'precision') : monitoringWorkflow ? 'quality' : 'source')
                 }} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-white"><ChevronRight className="h-4 w-4" />{t(!overviewSource ? 'engineeringDescribeGoal' : activeAnalysis || surveyResultCurrent ? 'engineeringViewResults' : 'engineeringContinueProcessing')}</button>
-                {!overviewSource ? <button type="button" onClick={() => setTab('source')} className="ml-3 min-h-11 px-3 text-sm text-accent">{t('engineeringUploadFiles')}</button> : null}
+                {!overviewSource ? <button type="button" onClick={() => setTab(monitoringWorkflow ? 'data' : 'source')} className="ml-3 min-h-11 px-3 text-sm text-accent">{t('engineeringUploadFiles')}</button> : null}
               </div>
               {activeAnalysis || surveyResultCurrent || manifestOutputs.length ? <div className="mt-6"><h3 className="text-sm font-medium">{t('engineeringLatestResult')}</h3>{overview.manifests.length ? <p className="mt-2 text-[12px] text-ds-muted">{t('engineeringManifestCountShort', { count: overview.manifests.length })} · {t('engineeringReviewPendingShort')}</p> : null}<p className="mt-2 text-sm text-ds-muted">{activeAnalysis ? t('engineeringSummaryResults', { count: activeAnalysis.results.length }) : t('engineeringReviewSurveyAnalysis')}</p><button type="button" onClick={() => setTab('deliverables')} className="mt-2 min-h-11 text-sm text-accent">{t('engineeringExportDraft')}</button></div> : null}
             </section> : null}

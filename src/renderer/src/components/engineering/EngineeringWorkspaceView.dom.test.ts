@@ -81,6 +81,37 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('Survey delivery without a monitoring dataset', () => {
+  it.each(['en', 'zh'])('keeps an empty deformation task in the monitoring workflow in %s', async (locale) => {
+    await i18n.changeLanguage(locale)
+    const monitoringProject = { ...project, taskType: 'deformation', monitoringType: 'deformation', unit: 'mm' }
+    request.mockImplementation(async (path: string) => ({
+      ok: true, status: 200, body: JSON.stringify(path === '/v1/engineering/projects' ? { projects: [monitoringProject] }
+        : path.endsWith('/overview') ? emptyOverview(monitoringProject)
+          : path.includes('/survey/networks?') ? { networks: [] } : { adjustments: [] })
+    }))
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    expect(container.textContent).toContain(i18n.t('engineeringSelectOrImportDataset'))
+    expect(container.querySelector('[data-testid="survey-refresh-token"]')).toBeNull()
+    await act(async () => button(i18n.t('engineeringPrimaryResults')).click())
+    expect(container.textContent).toContain(i18n.t('engineeringNoMonitoringSelected'))
+    expect(container.querySelector('[data-testid="survey-refresh-token"]')).toBeNull()
+    await act(async () => button(i18n.t('engineeringPrimaryOverview')).click())
+    await act(async () => button(i18n.t('engineeringUploadFiles')).click())
+    expect(container.textContent).toContain(i18n.t('engineeringSelectOrImportDataset'))
+    expect(container.querySelector('[data-testid="survey-refresh-token"]')).toBeNull()
+    expect(request.mock.calls.every(([, method]) => method === undefined || method === 'GET')).toBe(true)
+  })
+
+  it('preserves survey navigation for an empty control-network task', async () => {
+    adjustments = []
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    expect(container.querySelector('[data-testid="survey-refresh-token"]')).not.toBeNull()
+    await act(async () => button(i18n.t('engineeringPrimaryResults')).click())
+    expect(container.querySelector('[data-testid="survey-refresh-token"]')).not.toBeNull()
+  })
+
   it('saves structured monitoring limits with the existing project keys and refuses an incomplete value', async () => {
     const limitsProject = { ...project, thresholds: { default: 8, settlement: 10, '隧道收敛': -2.5 } }
     request.mockImplementation(async (path: string, method?: string, requestBody?: string) => {
