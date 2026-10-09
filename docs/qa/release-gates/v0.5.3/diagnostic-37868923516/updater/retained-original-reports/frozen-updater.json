@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "status": "failed",
+  "baseVersion": "0.5.2",
+  "targetVersion": "0.5.3",
+  "platform": "darwin",
+  "arch": "arm64",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/frozen-release-updater-acceptance.yml",
+    "workflowRef": "railwise-cn/railwise-ai/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main",
+    "workflowSha": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+    "sourceHead": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+    "runId": 37882814359,
+    "runAttempt": 1
+  },
+  "productionTouched": false,
+  "systemTrustModified": false,
+  "officialFeedsModified": false,
+  "publicReleasePerformed": false,
+  "transport": "Temporary externally reachable Cloudflare Quick Tunnel with default CA TLS and a 256-bit bearer capability path; no persistent remote storage.",
+  "steps": [
+    {
+      "operation": "gh",
+      "status": "started",
+      "timeoutMs": 900000,
+      "at": "2026-10-09T04:14:08.837Z"
+    },
+    {
+      "operation": "gh",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:16:19.882Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:16:22.515Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:16:22.544Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:16:22.547Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:16:25.287Z"
+    },
+    {
+      "operation": "gh",
+      "status": "started",
+      "timeoutMs": 900000,
+      "at": "2026-10-09T04:16:25.293Z"
+    },
+    {
+      "operation": "gh",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:16:42.175Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:16:42.707Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:16:42.716Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:16:42.719Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:16:43.057Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:00.315Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:05.637Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:05.675Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:19.063Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:19.067Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:19.377Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:19.387Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:19.408Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:19.526Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:23.601Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:23.613Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:26.760Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:26.767Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:30.545Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:30.556Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:30.637Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:30.638Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:30.690Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:30.704Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:37.401Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:37.405Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:37.421Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:37.479Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:41.766Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:41.769Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:42.135Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:42.137Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:45.704Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:45.712Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:45.813Z"
+    },
+    {
+      "operation": "tar",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:48.155Z"
+    },
+    {
+      "operation": "tar",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:48.253Z"
+    },
+    {
+      "operation": "tar",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-10-09T04:17:48.254Z"
+    },
+    {
+      "operation": "tar",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-10-09T04:17:48.376Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "started",
+      "timeoutMs": 300000,
+      "at": "2026-10-09T04:17:48.378Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "failed",
+      "exitCode": 1,
+      "signal": null,
+      "at": "2026-10-09T04:17:49.639Z"
+    },
+    {
+      "operation": "acceptance",
+      "status": "failed",
+      "at": "2026-10-09T04:17:49.644Z"
+    },
+    {
+      "operation": "owned-resource-cleanup",
+      "status": "failed",
+      "at": "2026-10-09T04:17:52.777Z"
+    }
+  ],
+  "reviewedBuild": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "sourceHead": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+    "runId": 37868923516,
+    "runAttempt": 1,
+    "publicIdentity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI"
+    },
+    "artifacts": [
+      {
+        "name": "release-mac",
+        "id": 11595086567,
+        "digest": "sha256:95d94fa9cadc5ae729a42d723eeb4ffc85c4bfbb2e7f55dab9468c5449db5380"
+      },
+      {
+        "name": "release-win",
+        "id": 11593677488,
+        "digest": "sha256:7d11c76bfaaae689eb0e1b75d75ad0cecfddd82250edd1d879888f5f768fdd1c"
+      }
+    ],
+    "files": [
+      {
+        "name": "WorkWise-0.5.3-mac-arm64.dmg",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 301984303,
+        "sha256": "36df77e9226205fa4cfdcd629b5a8a709eeeb58ed78577bfc397c762cef16222"
+      },
+      {
+        "name": "WorkWise-0.5.3-mac-arm64.zip",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 308207077,
+        "sha256": "997d7e6db4befd7e8f69ba77f4df802df6c4578cb5acb45fad4dac2a4079fda6"
+      },
+      {
+        "name": "WorkWise-0.5.3-mac-x64.dmg",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 306896402,
+        "sha256": "7a69141a3e30d185fba68e020aadc608989c0eeb75b60adc17e0cfe6643a5cbc"
+      },
+      {
+        "name": "WorkWise-0.5.3-mac-x64.zip",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 313358296,
+        "sha256": "0533931dd703360db04207a3b1d9a628eab29c16736e1c62a8bdaa77513a92f0"
+      },
+      {
+        "name": "latest-mac.yml",
+        "platform": "darwin",
+        "artifact": "release-mac",
+        "size": 824,
+        "sha256": "9a7240ce6cfa793f7e8f36ff74ce59dfeef28f17fd4f750cac23adb392f8b7e5"
+      },
+      {
+        "name": "WorkWise-0.5.3-win-x64.exe",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 252575771,
+        "sha256": "7d53a2f1f88b4dca58b1bc7bea3d731288bc4f09ceaecc93ebc975a34dfc2e49"
+      },
+      {
+        "name": "WorkWise-0.5.3-win-x64.exe.blockmap",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 259116,
+        "sha256": "840ae9379f00955c2a72f41f24eac92ef8f1709008cd70adadba554dcd41d97a"
+      },
+      {
+        "name": "latest.yml",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 349,
+        "sha256": "c03e26f66777ea16c2732d2d655894d787857ac3d8575c76dd0256cd15ea2eb7"
+      }
+    ]
+  },
+  "baselineAsset": {
+    "tag": "v0.5.2",
+    "name": "WorkWise-0.5.2-mac-Apple-Silicon.dmg",
+    "size": 301766076,
+    "sha256": "09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0",
+    "assetId": 612608487
+  },
+  "baselineIdentity": {
+    "version": "0.5.2",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "signature": "verified",
+    "stapledNotarization": "verified",
+    "gatekeeper": "accepted",
+    "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U"
+  },
+  "targetIdentity": {
+    "version": "0.5.3",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "signature": "verified",
+    "stapledNotarization": "verified",
+    "gatekeeper": "accepted",
+    "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U"
+  },
+  "targetZipSha256": "997d7e6db4befd7e8f69ba77f4df802df6c4578cb5acb45fad4dac2a4079fda6",
+  "targetAsarSha256": "01f74eb38998a1978821bd82680e1b1a9cc9fe8d8accc83a807029f839171057",
+  "cloudflared": {
+    "version": "2026.10.0",
+    "name": "cloudflared-darwin-arm64.tgz",
+    "size": 19809074,
+    "sha256": "a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70"
+  },
+  "failure": "RailWise AI failed (exit 1): [updater-data] Cannot find module '/Users/runner/work/railwise-ai/railwise-ai/kun/dist/engineering/engineering-service.js' imported from /Users/runner/work/railwise-ai/railwise-ai/scripts/frozen-release-updater-data.mjs\n Evidence retention: Required native updater report is missing."
+}

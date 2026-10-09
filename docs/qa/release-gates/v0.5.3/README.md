@@ -23,9 +23,21 @@ only. Their packages, screenshots and updater reports cannot authorize the
 next package or publication. Required final screenshots, functional checks,
 AI review and native updater evidence must all identify the new frozen bytes.
 
+Freeze `37868923516` from source `68ab3cb39c76f44f22f0c22f3504ac82c232d023`
+produced an installed 0.5.3 diagnostic package, but product preflight found a
+new-task conversation race, loss of a height declaration during GSI reimport and
+professional semantic/wording defects in a complete AI answer. Real updater run
+`37882814359` also failed before retaining its required native report. These
+original failures and partial recovery observations are preserved in the
+[failed-freeze diagnostic archive](diagnostic-37868923516/README.md). The normal
+profile was restored and verified, and the original official 0.5.2 application
+was restored locally. This freeze is not accepted, and no result from it can
+pass a later package.
+
 ## Preparation and evidence index
 
 - [Release execution order and current freeze status](release-execution-order-20261008.md)
+- [Failed freeze 37868923516 diagnostic evidence](diagnostic-37868923516/README.md)
 - [Normal public-identity profile protection procedure](normal-profile-protection.md)
 - [Profile protection script](normal-profile-protection.mjs)
 - [Synthetic profile protection self-test record](normal-profile-protection-selftest.json)

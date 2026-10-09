@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-09T04:23:34.937403+00:00",
+  "purpose": "diagnostic product preflight, not final release acceptance",
+  "package": {
+    "status": "installed-identity-signature-and-frozen-asar-matched",
+    "installedAt": "2026-10-09T04:12:27.776038+00:00",
+    "runId": 37868923516,
+    "runAttempt": 1,
+    "sourceHead": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+    "installedApp": "/Applications/RailWise AI.app",
+    "version": "0.5.3",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "artifactSha256": "36df77e9226205fa4cfdcd629b5a8a709eeeb58ed78577bfc397c762cef16222",
+    "asarSha256": "01f74eb38998a1978821bd82680e1b1a9cc9fe8d8accc83a807029f839171057",
+    "originalInstalledPackagePreserved": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-original-installed-052-20261009/RailWise AI.app",
+    "computerUseAcceptance": "not-executed",
+    "updaterAcceptance": "not-executed",
+    "gatekeeperPolicyBoundary": "Assessment log retains local policy state; no system policy changed"
+  },
+  "observedMainPid": 30830,
+  "observedRuntimePid": 31038,
+  "nativeWindow": "000-native-window.json",
+  "originalFailure": {
+    "action": "New task",
+    "result": "AI drawer persists Preparing this project conversation; Send disabled",
+    "projectId": "project_c9beee30-ec45-4a62-8ec9-301c5253c1f7",
+    "threadId": "thr_x1qxr86d",
+    "creationTime": "2026-10-09T04:18:16.949Z",
+    "evidence": [
+      "001-new-task-preparing.ax.txt",
+      "001-new-task-preparing.png"
+    ]
+  },
+  "recovery": {
+    "action": "Continue conversation in sidebar",
+    "result": "Ask the agent input restored; draft typed; Escape closes; focus returned to Continue conversation",
+    "evidence": [
+      "002-explicit-continue-restored.ax.txt",
+      "002-explicit-continue-restored.png"
+    ]
+  },
+  "releaseAcceptance": "blocked by observed updater failure and product preflight investigation"
+}

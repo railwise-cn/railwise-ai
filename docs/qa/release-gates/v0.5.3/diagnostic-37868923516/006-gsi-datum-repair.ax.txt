@@ -1,0 +1,166 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 2
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 leica-gsi-cumulative-leveling Control network · m · 10/9
+								20 文本 leica-gsi-cumulative-leveling
+								21 文本 Control network
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/9
+							26 按钮 Continue conversation
+							27 按钮 New Survey job Control network · m · 10/9
+								28 文本 New Survey job
+								29 文本 Control network
+								30 文本  · 
+								31 文本 m
+								32 文本  · 
+								33 文本 10/9
+						34 container
+							35 切换按钮 Connect phone, Value: 0
+							36 按钮 Settings
+					37 container
+						38 按钮 Collapse sidebar
+						39 标题 RailWise Survey, Value: 1
+							40 文本 RailWise Survey
+						41 text Engineering Survey Processing Current Survey job
+						42 弹出式按钮 Current Survey job, Value: leica-gsi-cumulative-leveling
+							43 (selected) New Survey job
+						44 按钮 New task
+						45 container Work view
+							46 按钮 Overview
+							47 按钮 Process
+							48 按钮 Results
+							49 按钮 Deliver
+						50 文本 Work view
+						51 按钮 Open AI
+						52 按钮 Advanced
+					53 container
+						54 text Current source leica-gsi-cumulative-leveling.gsi Current status Ready to calculate Latest result —
+						55 开合三角标记 More metrics
+							56 文本 More metrics
+					57 container
+						58 container Import and preflight
+							59 按钮 Add files
+							60 container
+								61 文本 Source type
+								62 弹出式按钮 Source type, Value: Identify automatically
+									63 (selected) Identify automatically
+							64 按钮 Describe the task
+							65 文本 Survey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.
+						66 container Survey and adjustment console
+							67 标题 Data and calculation, Value: 3
+								68 文本 Data and calculation
+							69 文本 Upload your files and the app will identify the format, points, and observations before calculation.
+							70 按钮 Advanced details
+							71 container
+								72 文本 Network type
+								73 弹出式按钮 Description: Network type, Value: Leveling / height control
+									74 (selected) Leveling / height control
+								75 文本 Known control points for import (optional)
+								76 文本输入区 (settable) Description: Known control points for import (optional), Value: BM,100.000, Placeholder: BM-01,100.000
+								77 文本 One point per line: ID,height[,X,Y], in metres. Enter before choosing files. Explicit mappings are preserved with the import; conflicts block import and never replace source coordinates.
+							78 container Confirm references
+								79 文本 Confirm references
+								80 文本 Enter the coordinate and height references used by the survey data; unused references may be left blank. The file uploaded in this session can be used to complete the declaration.
+								81 container
+									82 文本 Coordinate system
+									83 文本栏 (settable) Description: Coordinate system, Placeholder: e.g. CGCS2000 or a project local grid
+								84 container
+									85 文本 Height datum
+									86 文本栏 (settable) Description: Height datum, Value: SYNTHETIC-BENCHMARK, Placeholder: e.g. national height datum or a project benchmark
+							87 文本 Recognized source
+							88 文本 leica-gsi-cumulative-leveling.gsi
+							89 文本 Leica GSI-8
+							90 文本 Source size
+							91 文本 4 points · 4 observations
+							92 container
+								93 text 0 stations
+							94 文本 Datum and units
+							95 文本 SYNTHETIC-BENCHMARK
+							96 文本 m
+							97 文本 Calculation readiness
+							98 文本 Ready to calculate
+							99 文本 Survey data passed the current calculation checks.
+							100 container Professional checks
+								101 标题 Professional checks, Value: 4
+									102 文本 Professional checks
+								103 文本 Confirm the network, observations, and points before calculation. Open details when needed.
+								104 文本 Validated
+								105 按钮 Network and datum Leveling / height control · 1 Known points
+									106 文本 Network and datum
+									107 文本 Leveling / height control · 1 Known points
+								108 按钮 Observations 4 observations
+									109 文本 Observations
+									110 文本 4 observations
+								111 按钮 Points and topology 4 points
+									112 文本 Points and topology
+									113 文本 4 points
+							114 container Needs attention
+								115 文本 Needs attention
+								116 内容列表
+									117 container
+										118 text Survey data recognized. Confirm the datum, control points, observation relationships, closure and precision before calculation. Calculation pauses when any check is incomplete. Next step:  Validate datum, control points, observation roles, topology, closure and precision; any failed condition blocks adjustment.
+							119 按钮 Check files
+							120 按钮 Start calculation
+							121 container Network, datum and control points
+								122 标题 Network, datum and control points, Value: 4
+									123 文本 Network, datum and control points
+								124 按钮 Ask Survey AI about Network, datum and control points
+								125 定义列表
+									126 container Network type
+										127 文本 Network type
+									128 文本 Leveling / height control
+									129 container Height datum
+										130 文本 Height datum
+									131 文本 SYNTHETIC-BENCHMARK
+								132 文本 Control network
+								133 图像 Survey network (Schematic layout)
+								134 文本 Schematic layout; edges use actual point IDs
+								135 文本 Known points
+								136 container Known points
+									137 表格
+										138 row
+											139 列标题
+												140 文本 Point ID
+											141 列标题
+												142 文本 H (m)
+											143 列标题
+												144 文本 Ask Survey AI
+										145 row
+											146 单元格
+												147 文本 BM
+											148 单元格
+												149 文本 100
+											150 单元格
+												151 按钮 Ask Survey AI about BM
+							152 文本 Source preflight completed for 1 file(s)
+	153 关闭按钮
+	154 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	155 最小化按钮
+156 menu bar
+	157 RailWise AI
+	158 File
+	159 Edit
+	160 View
+	161 Window
+	162 Help
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
