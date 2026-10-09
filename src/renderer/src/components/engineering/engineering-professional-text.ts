@@ -316,13 +316,11 @@ function stripInternalFragments(line: string, language: string, fieldValueTable 
     .replace(/\bstationCircleOrientation\s*[:=]\s*true\b/gi, label('采用测站度盘定向模型', 'Station-circle orientation model is used'))
     .replace(/\bstationCircleOrientation\s*[:=]\s*false\b/gi, label('未采用测站度盘定向模型', 'Station-circle orientation model is not used'))
     .replace(/\bstationCircleOrientation\b/gi, label('测站度盘定向', 'Station-circle orientation'))
-    // Keep this transform idempotent. Older answers may already contain the
-    // translated "Observation role" label; translating its nested "role:"
-    // again would expose "Observation Observation role" to the surveyor.
-    .replace(/(?<!Observation )\brole\s*[:=：]\s*/gi, label('观测作用：', 'Observation role: '))
-    .replace(/\b(?:Observation\s+role|Point\s+role)\s*:\s*(?:not\s+classified|unclassified)\b/gi, label('观测作用：待定点', 'Observation role: Unknown point'))
-    .replace(/\b((?:role|point\s+role)\s+(?:as|is)\s*["“]?)unknown(?=["”])/gi, (_, prefix: string) => `${prefix}${label('待定点', 'Unknown point')}`)
-    .replace(/观测作用：\s*(?:未分类|未知|unknown)(?=[。；;，,.:：\s]|$)/gi, label('观测作用：待定点', 'Observation role: Unknown point'))
+    // Only an explicit point-role assignment gives "unknown" its point-enum
+    // meaning. Unclassified observations and generic roles remain unchanged.
+    .replace(/\bpoint\s+role\s*[:=：]\s*["“']?unknown["”']?(?=[。；;，,.:：\s]|$)/gi, label('点位角色：待定点', 'Point role: Point to be determined'))
+    // Do not translate the role label nested in an already translated label.
+    .replace(/(?<!Observation )(?<!Point )\brole\s*[:=：]\s*/gi, label('观测作用：', 'Observation role: '))
     .replace(/\b(?:cosa-)?backsight-reset\b/gi, label('后视归零方向', 'Backsight zero direction'))
     .replace(/\bforesight\b/gi, label('前视方向', 'Foresight direction'))
     .replace(/\boutlier\s*[:=]\s*false\b/gi, label('未标记异常观测', 'No outlier flag'))
@@ -713,8 +711,6 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
     if (visible.at(-1) !== professionalCleaned) visible.push(professionalCleaned)
   }
   return visible.join('\n')
-    .replace(/观测作用：\s*(?:未分类|未知)(?=[。；;，,.:：\s]|$)/g, '观测作用：待定点')
-    .replace(/Observation role:\s*unknown point\b/gi, 'Observation role: Unknown point')
     .replace(/\bother\s+other\s+findings\b/gi, 'other findings')
     .replace(/其他其他问题/g, '其他问题')
     .replace(/\n{3,}/g, '\n\n')
