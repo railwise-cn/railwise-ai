@@ -1,0 +1,11 @@
+{
+  "status": "original-official-052-restored-locally",
+  "restoredAt": "2026-10-09T06:35:55.522167+00:00",
+  "installedApp": "/Applications/RailWise AI.app",
+  "version": "0.5.2",
+  "signature": "codesign-deep-strict-verified",
+  "asarSha256": "94a815ad4eb084b652a066838b2ade64ea5959059dd7c32c650c6a8e63ec3030",
+  "blocked053PreservedAt": "/Users/wangjiawei/Library/Application Support/RailWise Acceptance/053-blocked-installed-37868923516-20261009/RailWise AI.app",
+  "publicChannelsChanged": false,
+  "scope": "Local app restoration after blocked acceptance; no release approval or acceptance claim"
+}

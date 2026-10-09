@@ -1,0 +1,39 @@
+{
+  "status": "failed-real-updater-original-report-readback",
+  "sourceHead": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+  "frozenRunId": 37868923516,
+  "frozenRunAttempt": 1,
+  "updaterRunId": 37882814359,
+  "updaterRunAttempt": 1,
+  "artifact": {
+    "id": 11594984034,
+    "name": "frozen-updater-arm64-37882814359",
+    "size_in_bytes": 2561,
+    "digest": "sha256:79b0982d89a7a501e9f163633b3f999fa5054a19fbc557c0856ca3e1130a2ed8"
+  },
+  "machineReportSha256": "2f2805aef2d8f2df42e9857f6e8774c4e4b305979f572c67809a8f4bbc529b57",
+  "machineStatus": "failed",
+  "machineFailure": "RailWise AI failed (exit 1): [updater-data] Cannot find module '/Users/runner/work/railwise-ai/railwise-ai/kun/dist/engineering/engineering-service.js' imported from /Users/runner/work/railwise-ai/railwise-ai/scripts/frozen-release-updater-data.mjs\n Evidence retention: Required native updater report is missing.",
+  "runnerArchitecture": "arm64",
+  "dataServiceSource": {
+    "dataSeed": {
+      "status": null,
+      "serviceSource": null
+    },
+    "dataReadback": {
+      "status": null,
+      "serviceSource": null
+    },
+    "dataRestartReadback": {
+      "status": null,
+      "serviceSource": null
+    }
+  },
+  "nativeReportPresent": false,
+  "releaseAcceptancePassed": false,
+  "limitations": [
+    "Failure evidence preserved only; no updater success or professional data acceptance",
+    "No original machine/native bytes altered",
+    "Compatibility service seed does not certify baseline package Survey behavior"
+  ]
+}

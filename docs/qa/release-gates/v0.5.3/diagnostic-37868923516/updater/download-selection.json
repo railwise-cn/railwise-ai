@@ -1,0 +1,12 @@
+{
+  "status": "failed-run-evidence-only-not-acceptance",
+  "runId": 37882814359,
+  "runAttempt": 1,
+  "sourceHead": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+  "artifact": {
+    "id": 11594984034,
+    "name": "frozen-updater-arm64-37882814359",
+    "size_in_bytes": 2561,
+    "digest": "sha256:79b0982d89a7a501e9f163633b3f999fa5054a19fbc557c0856ca3e1130a2ed8"
+  }
+}

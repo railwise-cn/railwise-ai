@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "status": "restored-and-verified-bounded-observation",
+  "diagnosticFrozenSource": "68ab3cb39c76f44f22f0c22f3504ac82c232d023",
+  "diagnosticFreezeRunId": 37868923516,
+  "originalsVerifiedAt": "2026-10-09T04:50:17.229Z",
+  "finalVerifiedAt": "2026-10-09T04:54:21.238Z",
+  "profileJournalStatus": "restored",
+  "loginItemsObservation": {
+    "method": "Root computer-use capture, independently read back only the RailWise switch and Open at Login section",
+    "before": {
+      "railwiseOpenAtLoginPresent": false,
+      "railwiseBackgroundActivity": "on"
+    },
+    "after": {
+      "railwiseOpenAtLoginPresent": false,
+      "railwiseBackgroundActivity": "on"
+    },
+    "sameRailwiseScopedState": true,
+    "fullPersonalApplicationListArchived": false
+  },
+  "localApplicationRestoration": {
+    "status": "original-official-052-restored-locally",
+    "version": "0.5.2",
+    "signature": "codesign-deep-strict-verified",
+    "asarSha256": "94a815ad4eb084b652a066838b2ade64ea5959059dd7c32c650c6a8e63ec3030",
+    "originalPackageLaunchedDuringRestoration": false,
+    "blockedDiagnosticPackagePreservedPrivately": true,
+    "originalReport": "local-original-app-restore.json"
+  },
+  "limitations": [
+    "Only restoration status, verification timestamps and RailWise-scoped login/background observations are reported",
+    "No profile journal, settings, credentials, account configuration, private projects or personal application list is archived",
+    "Restoration does not constitute acceptance of the diagnostic package or authorize any release"
+  ]
+}
