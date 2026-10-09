@@ -80,7 +80,7 @@ records two substantive boundaries:
 
 The original answer and audit remain unchanged. The audit is retained as a raw
 `.txt` log so historical internal component names do not become authored product
-copy; its original `.md` source filename and exact digest are in the inventory.
+copy; its private source record and exact digest are bound in the inventory.
 Source remediation is tracked
 separately, and no CI result or repaired-source test closes this old package's
 acceptance. The conversation and reimport investigation is documented in the

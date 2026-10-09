@@ -191,8 +191,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9646,
-      "sha256": "7531225d607ce3a1bdd1e19b174f9c60adc2e3aef70e4c0dc499224418a92066",
+      "bytes": 9839,
+      "sha256": "68cc12dd23daccead289c1648d4e829c09fec12b8bb89558cdd59c86ab23e165",
       "origin": "archive-explanation-or-bounded-extract"
     },
     {
@@ -218,7 +218,7 @@
       "originalBytesEqual": true
     },
     {
-      "path": "professional-answer-audit-20261009.md",
+      "path": "professional-answer-audit-20261009.txt",
       "bytes": 3436,
       "sha256": "d42b84f3f8f72e143a2c0d51ca8bde1ac7a91e488fb0301a1b1419b05d49fcc2",
       "origin": "original-preserved",
