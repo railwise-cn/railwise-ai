@@ -3990,7 +3990,7 @@
   },
   "surveyProfessionalRole": {
     "known": "Known",
-    "unknown": "Unknown",
+    "unknown": "Point to be determined",
     "check": "Check",
     "station": "Station",
     "unverified": "Unverified"

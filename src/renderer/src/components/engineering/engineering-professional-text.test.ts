@@ -200,6 +200,46 @@ describe('engineeringProfessionalText', () => {
     expect(result).not.toContain('deepseek-v4-pro')
   })
 
+  it.each(['zh-CN', 'en-US'])('preserves an unclassified observation without inferring a point role in %s', (language) => {
+    const raw = language.startsWith('en')
+      ? 'Observation role: not classified. P1 has no blocking other findings.'
+      : '观测作用：未分类。P1 没有其他问题。'
+    const once = engineeringProfessionalAnswerText(raw, language)
+    const twice = engineeringProfessionalAnswerText(once, language)
+    expect(once).toContain(language.startsWith('en') ? 'Observation role: not classified' : '观测作用：未分类')
+    expect(twice).toBe(once)
+    expect(once).not.toMatch(/Observation Observation role|other other findings|待定点|Unknown point|Point to be determined/i)
+  })
+
+  it.each(['zh-CN', 'en-US'])('does not infer a point enum from a generic unknown role in %s', (language) => {
+    const raw = language.startsWith('en')
+      ? 'Observation role: unknown. The record leaves P1\'s role as "unknown".'
+      : '观测作用：未知。P1 的 role: unknown。'
+    const once = engineeringProfessionalAnswerText(raw, language)
+    expect(once).toContain(language.startsWith('en') ? 'Observation role: unknown' : '观测作用：未知')
+    expect(once).not.toMatch(/待定点|Unknown point|Point to be determined/i)
+    expect(engineeringProfessionalAnswerText(once, language)).toBe(once)
+  })
+
+  it.each(['zh-CN', 'en-US'])('translates an explicit unknown point-role enum idempotently in %s', (language) => {
+    const once = engineeringProfessionalAnswerText('P1 point role: unknown. H = 100.5998 m.', language)
+    expect(once).toContain(language.startsWith('en') ? 'Point role: Point to be determined' : '点位角色：待定点')
+    expect(once).toContain('100.5998 m')
+    expect(engineeringProfessionalAnswerText(once, language)).toBe(once)
+  })
+
+  it('distinguishes a relative-weight posterior result from an unavailable default residual significance screen', () => {
+    const answer = engineeringProfessionalAnswerText([
+      'Relative route-length weights were used. The point standard error is an a-posteriori, model-relative result.',
+      'The default standardised residual screen is not testable because no absolute prior precision is recorded.',
+      'A deleted-observation posterior t diagnostic is unavailable because the full model has only one degree of freedom.'
+    ].join('\n'), 'en-US')
+    expect(answer).toContain('posterior, model-relative')
+    expect(answer).toContain('not testable')
+    expect(answer).toContain('deleted-observation posterior t diagnostic')
+    expect(answer).toContain('only one degree of freedom')
+  })
+
   it('hides product storage and model-routing labels while retaining the survey conclusion', () => {
     const answer = engineeringProfessionalAnswerText([
       '附件由 Attachment Store 托管。',

@@ -316,7 +316,11 @@ function stripInternalFragments(line: string, language: string, fieldValueTable 
     .replace(/\bstationCircleOrientation\s*[:=]\s*true\b/gi, label('采用测站度盘定向模型', 'Station-circle orientation model is used'))
     .replace(/\bstationCircleOrientation\s*[:=]\s*false\b/gi, label('未采用测站度盘定向模型', 'Station-circle orientation model is not used'))
     .replace(/\bstationCircleOrientation\b/gi, label('测站度盘定向', 'Station-circle orientation'))
-    .replace(/\brole\s*[:=：]\s*/gi, label('观测作用：', 'Observation role: '))
+    // Only an explicit point-role assignment gives "unknown" its point-enum
+    // meaning. Unclassified observations and generic roles remain unchanged.
+    .replace(/\bpoint\s+role\s*[:=：]\s*["“']?unknown["”']?(?=[。；;，,.:：\s]|$)/gi, label('点位角色：待定点', 'Point role: Point to be determined'))
+    // Do not translate the role label nested in an already translated label.
+    .replace(/(?<!Observation )(?<!Point )\brole\s*[:=：]\s*/gi, label('观测作用：', 'Observation role: '))
     .replace(/\b(?:cosa-)?backsight-reset\b/gi, label('后视归零方向', 'Backsight zero direction'))
     .replace(/\bforesight\b/gi, label('前视方向', 'Foresight direction'))
     .replace(/\boutlier\s*[:=]\s*false\b/gi, label('未标记异常观测', 'No outlier flag'))
@@ -536,9 +540,11 @@ function cleanResidualProfessionalFragments(line: string, language: string): str
     .replace(/\b(?:runtime|Runtime)\b/gi, english ? 'current processing' : '本次处理')
     .replace(/\bestimated\b/gi, english ? 'estimated' : '为估计值')
     .replace(/点位补读被\s*(?:抑制|阻止)/g, '点位补读未完成')
-    .replace(/\b(?:findings?)\b/gi, label('其他问题', 'other findings'))
+    // Do not prepend the category twice when a previous cleanup pass already
+    // rendered "other findings".
+    .replace(/(?<!other )\b(?:findings?)\b/gi, label('其他问题', 'other findings'))
     .replace(/\b(?:strategy|策略)\b/g, '')
-    .replace(/\b(?:unknown|known|adjustment|plane-control|validated|verified|completed|valid|warning|open)\b/gi, match => {
+    .replace(/\b(?:unknown(?!\s+point)|known(?!\s+point)|adjustment|plane-control|validated|verified|completed|valid|warning|open)\b/gi, match => {
       const translations: Record<string, [string, string]> = {
         unknown: ['未知', 'unknown'], known: ['已知', 'known'], adjustment: ['平差', 'adjustment'],
         'plane-control': ['平面控制网', 'plane control network'], validated: ['已校核', 'validated'],
@@ -704,7 +710,11 @@ export function engineeringProfessionalText(text: string, language = appI18n.lan
     if (!professionalCleaned || /^(?:text|文本|assistant|助手)\s*[:：]?\s*$/i.test(professionalCleaned) || (codeLikeLine.test(professionalCleaned) && !professionalContent.test(professionalCleaned)) || /^[\s\d.,;:()[\]{}_\-，。；：、]+$/.test(professionalCleaned)) continue
     if (visible.at(-1) !== professionalCleaned) visible.push(professionalCleaned)
   }
-  return visible.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  return visible.join('\n')
+    .replace(/\bother\s+other\s+findings\b/gi, 'other findings')
+    .replace(/其他其他问题/g, '其他问题')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 /** Preserve the user's own words; hide only the legacy system-added selection. */
