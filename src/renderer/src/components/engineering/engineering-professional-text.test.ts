@@ -200,6 +200,31 @@ describe('engineeringProfessionalText', () => {
     expect(result).not.toContain('deepseek-v4-pro')
   })
 
+  it.each(['zh-CN', 'en-US'])('keeps point-role wording professional and idempotent in %s', (language) => {
+    const raw = language.startsWith('en')
+      ? 'Observation role: not classified. The record leaves P1\'s role as "unknown"; no blocking other findings.'
+      : '观测作用：未分类。P1 的 role: unknown；没有其他问题。'
+    const once = engineeringProfessionalAnswerText(raw, language)
+    const twice = engineeringProfessionalAnswerText(once, language)
+    const role = language.startsWith('en') ? 'Observation role: Unknown point' : '观测作用：待定点'
+    expect(once).toContain(role)
+    expect(twice).toBe(once)
+    expect(once).not.toMatch(/Observation Observation role|other other findings|未分类|unclassified|not classified/i)
+    expect(once).not.toContain(language.startsWith('en') ? 'Observation role: Unknown point point' : '待定点点')
+  })
+
+  it('distinguishes a relative-weight posterior result from an unavailable default residual significance screen', () => {
+    const answer = engineeringProfessionalAnswerText([
+      'Relative route-length weights were used. The point standard error is an a-posteriori, model-relative result.',
+      'The default standardised residual screen is not testable because no absolute prior precision is recorded.',
+      'A deleted-observation posterior t diagnostic is unavailable because the full model has only one degree of freedom.'
+    ].join('\n'), 'en-US')
+    expect(answer).toContain('posterior, model-relative')
+    expect(answer).toContain('not testable')
+    expect(answer).toContain('deleted-observation posterior t diagnostic')
+    expect(answer).toContain('only one degree of freedom')
+  })
+
   it('hides product storage and model-routing labels while retaining the survey conclusion', () => {
     const answer = engineeringProfessionalAnswerText([
       '附件由 Attachment Store 托管。',
