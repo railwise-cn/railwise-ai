@@ -247,7 +247,7 @@ async function requestFrozenManifest(url, expected, fetchImpl, timeoutMs) {
 }
 
 export async function waitForFrozenManifest({ origin, prefix, manifestSize, manifestSha256, isRunning, progress = () => {} }, {
-  fetchImpl = fetch, timeoutMs = 120_000, requestTimeoutMs = 10_000, retryMs = 1_000, maxAttempts = 60,
+  fetchImpl = fetch, timeoutMs = 120_000, requestTimeoutMs = 10_000, retryMs = 1_000, maxAttempts = Math.max(1, Math.ceil(timeoutMs / retryMs)),
   sleep = delay, now = () => performance.now()
 } = {}) {
   const url = validateTunnelUrl(origin) + prefix + 'latest-mac.yml'

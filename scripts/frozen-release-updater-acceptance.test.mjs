@@ -381,6 +381,17 @@ test('manifest readiness bounds repeated transient failures, attempt count and a
   assert.equal(stalledHeaders.events[0].category, 'request-timeout')
 })
 
+test('default manifest attempts cover the complete timeout at the configured retry interval', async () => {
+  let calls = 0
+  const f = readinessFixture(async () => { calls += 1; throw readinessNetworkError('ENOTFOUND') })
+  await assert.rejects(waitForFrozenManifest(f.options, { ...f.timing, timeoutMs: 120_000, retryMs: 1_000, maxAttempts: undefined }), /manifest-deadline/)
+  assert.equal(calls, 120)
+  assert.equal(f.sleeps.length, 120)
+  assert.ok(f.sleeps.every(ms => ms === 1_000))
+  assert.equal(f.events.at(-1).category, 'deadline')
+  assert.equal(f.events.at(-1).attempt, 120)
+})
+
 test('readiness checks cannot start for an exited tunnel or unbound manifest inputs', async () => {
   let calls = 0; const f = readinessFixture(async () => { calls += 1; return readinessResponse() }, { isRunning: () => false })
   await assert.rejects(waitForFrozenManifest(f.options, f.timing), /tunnel-stopped/); assert.equal(calls, 0)
