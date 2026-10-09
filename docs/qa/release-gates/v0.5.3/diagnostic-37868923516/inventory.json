@@ -15,7 +15,8 @@
     "explicitAllowList": true,
     "originalsCompared": true,
     "screenshotsVisuallyReviewed": true,
-    "pngDecodeVerified": true,
+    "imageDecodeVerified": true,
+    "originalScreenshotEncoding": "jpeg",
     "personalLoginListArchived": false,
     "profileOrCredentialFilesArchived": false,
     "originalZipContainsOnlyMachineReport": true
@@ -191,8 +192,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9839,
-      "sha256": "68cc12dd23daccead289c1648d4e829c09fec12b8bb89558cdd59c86ab23e165",
+      "bytes": 10073,
+      "sha256": "e53040010c5b807df0c79e5443bd132601ee8e6b5e4a411336ca892dd0fbf5d3",
       "origin": "archive-explanation-or-bounded-extract"
     },
     {

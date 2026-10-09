@@ -28,6 +28,9 @@ a licensed professional signature, or real human approval.
 - [Native window observation](000-native-window.json) records an observed
   1280 × 840 logical window. Original screenshots are 2560 × 1680 pixels.
   This is not coverage for 1280 × 800, 1440 × 900 or narrow windows.
+- The eight original screenshot names retain their `.png` extension, but the
+  captured bytes are JPEG-encoded. Image decoding and dimensions were checked
+  using the actual media format; neither the bytes nor the names were changed.
 - Screenshots, AX text, package metadata and updater originals retain their
   source bytes. [SHA256SUMS.txt](SHA256SUMS.txt) and
   [inventory.json](inventory.json) bind every archived file except the inventory
