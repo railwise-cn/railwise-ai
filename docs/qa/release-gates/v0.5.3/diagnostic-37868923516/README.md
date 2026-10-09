@@ -32,6 +32,10 @@ a licensed professional signature, or real human approval.
   source bytes. [SHA256SUMS.txt](SHA256SUMS.txt) and
   [inventory.json](inventory.json) bind every archived file except the inventory
   files themselves. No screenshot was resized, redacted or relabeled.
+- Original AX records contain trailing spaces in list markers and separators.
+  They are preserved deliberately: whitespace warnings in those original files
+  are not corrected by changing captured evidence. Authored Markdown/JSON and
+  archive metadata are checked separately for whitespace errors.
 - Only this explicit diagnostic allow-list was copied. Profile snapshots,
   settings, credentials, account configuration, real user projects and the
   personal system Login Items list are excluded. Host paths in original reports
