@@ -56,7 +56,7 @@ macOS-provided Chinese accessibility metadata.
 | 004 | [PNG](004-gsi-missing-bm-blocked.png) / [AX](004-gsi-missing-bm-blocked.ax.txt): the source network retained the declared synthetic height datum. Reference draft fields were already empty. Missing benchmark/topology conditions legitimately blocked calculation. |
 | 005 | [PNG](005-gsi-reimport-lost-datum.png) / [AX](005-gsi-reimport-lost-datum.ax.txt): after entering `BM,100.000` and reselecting the same original GSI file, the new network lost its height declaration and correctly blocked calculation. |
 | 006 | [PNG](006-gsi-datum-repair.png) / [AX](006-gsi-datum-repair.ax.txt): explicit reference repair focused Height datum, accepted the synthetic declaration and restored readiness. This capture precedes the actual calculation; subsequent diagnostic results are visible in 007. It does not prove the original reimport defect fixed. |
-| 007 | [PNG](007-gsi-ai-no-live-response.png) / [AX](007-gsi-ai-no-live-response.ax.txt): the application contains a **complete live AI answer** about P1 and a result table. The capture label `no-live-response` is retained for original-file identity and is **not an observed lack of response**. The answer has professional semantic and wording defects described below. |
+| 007 | [PNG](007-gsi-ai-no-live-response.png) / [AX](007-gsi-ai-no-live-response.ax.txt): the application contains a **complete live AI answer** and numerical results about P1. The capture label `no-live-response` is retained for original-file identity and is **not an observed lack of response**. The answer has professional semantic and wording defects described below. |
 
 The synthetic leveling calculation yielded P1 = 100.5998 m, a 0.4 mm observed
 loop closure and a 0.2 mm posterior point error. The record had four observations,
@@ -65,7 +65,7 @@ do not certify a tolerance pass, standards conformity or field accuracy.
 
 ## AI answer findings and source repairs
 
-The [independent AI professional-answer audit](professional-answer-audit-20261009.md)
+The [independent AI professional-answer audit](professional-answer-audit-20261009.txt)
 records two substantive boundaries:
 
 1. Point role `unknown` means a point to be determined, not an unclassified
@@ -78,7 +78,10 @@ records two substantive boundaries:
    assumptions and redundancy gates; with one degree of freedom it is unavailable
    in this sample.
 
-The original answer and audit remain unchanged. Source remediation is tracked
+The original answer and audit remain unchanged. The audit is retained as a raw
+`.txt` log so historical internal component names do not become authored product
+copy; its original `.md` source filename and exact digest are in the inventory.
+Source remediation is tracked
 separately, and no CI result or repaired-source test closes this old package's
 acceptance. The conversation and reimport investigation is documented in the
 [remediation report](../../v0.5.3-ai-review/survey-reimport-and-conversation-remediation-20261009.md).
