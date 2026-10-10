@@ -1114,6 +1114,18 @@ export const SurveyNetworkImportRequest = z.object({
 }).strict().refine((value) => Boolean(value.network || (value.name && value.dataBase64)), { message: 'network or name/dataBase64 is required' })
 export type SurveyNetworkImportRequest = z.infer<typeof SurveyNetworkImportRequest>
 
+/** A reviewed declaration for a new height network from authenticated saved bytes. */
+export const SurveyNetworkReimportRequest = z.object({
+  projectId: z.string().min(1), expectedRevision: z.number().int().positive(),
+  idempotencyKey: z.string().min(8).max(200),
+  sourceNetworkId: z.string().min(1), sourceNetworkRevision: z.number().int().positive(),
+  sourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  networkType: z.enum(['leveling', 'height-control']),
+  verticalDatum: z.string().trim().min(1).max(256),
+  knownPointId: z.string().min(1).max(200), knownPointHeight: z.number().finite()
+}).strict()
+export type SurveyNetworkReimportRequest = z.infer<typeof SurveyNetworkReimportRequest>
+
 export const SurveyNetworkValidateRequest = z.object({ expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().min(8).max(200) }).strict()
 export const AdjustmentRequestV1 = z.object({ networkId: z.string().min(1), expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().min(8).max(200), method: AdjustmentRunV1.shape.method.optional(), constraint: AdjustmentRunV1.shape.constraint.optional() }).strict()
 export const AdjustmentMutationRequestV1 = z.object({ expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().min(8).max(200), reason: z.string().max(500).optional() }).strict()

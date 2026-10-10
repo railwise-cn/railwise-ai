@@ -1,5 +1,6 @@
 /** Runtime-owned effects: a model or API client cannot downgrade approval risk. */
 export const engineeringPlanToolRisks = {
+  survey_network_reimport: 'write',
   survey_network_validate: 'write',
   survey_adjustment_read: 'read',
   survey_calculator: 'write',

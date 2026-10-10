@@ -3433,6 +3433,7 @@
     "append-only": "新增计算记录或候选文件，历史证据保留；不支持自动撤销。"
   },
   "engineeringPlanOutput": {
+    "prepared-network": "保留原件生成的新测量网",
     "network-validation": "网络校核修订",
     "dataset-validation": "数据集校核修订",
     "deterministic-analysis": "确定性分析记录",
@@ -3787,6 +3788,9 @@
   "engineeringFileActionFailed": "文件操作未完成，请重试。",
   "engineeringFixIssue": "处理问题",
   "engineeringPlanInput": "输入资料",
+  "engineeringPlanSourcePreparation": "待确认的起算点和基准",
+  "engineeringPlanSourceDeclaration": "{{network}} · 起算点 {{point}} = {{height}} m · 高程基准：{{datum}}",
+  "engineeringPlanSourcePreservation": "按上述声明将已核验原件重新导入为新测量网，保留原网络和成果；本步骤不执行计算。",
   "engineeringPlanCurrentInputs": "当前任务的已确认资料",
   "engineeringPlanSavedResult": "保存的计算结果",
   "engineeringPlanConfirmationHint": "确认后将按方案检查资料、计算并保存结果；原始资料保留。",

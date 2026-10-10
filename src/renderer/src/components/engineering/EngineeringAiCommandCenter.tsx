@@ -14,6 +14,7 @@ import { EngineeringComposer } from './EngineeringComposer'
 import { composerReasoningEffortRequestValue } from '../chat/FloatingComposerModelPicker'
 import { EngineeringProjectSuggestions } from './EngineeringProjectSuggestions'
 import { engineeringPlanTranscriptText } from './engineering-plan-transcript'
+import { surveyNetworkTypeLabel } from './engineering-task-types'
 import { engineeringProfessionalAnswerText, engineeringProfessionalStepText, engineeringProfessionalText, engineeringProfessionalUserText } from './engineering-professional-text'
 import { prepareEngineeringQuestion, useEngineeringConversationDrafts } from './engineering-conversation-drafts'
 import { evidenceCardNavigationTarget, planStepNavigationTarget, surveyNavigationTarget, type EngineeringEvidenceNavigationTarget, type EngineeringNavigationContext } from './engineering-evidence-navigation'
@@ -407,6 +408,14 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
     }} className="h-8 min-w-0 flex-1 rounded border border-ds-border bg-ds-card px-2 text-ds-ink"><option value="">{t('engineeringPlanLatest')}</option>{planHistory.map((plan, index) => <option key={plan.id} value={plan.id}>{t('engineeringPlanHistoryItem', { number: index + 1 })} · {engineeringProfessionalStepText(plan.goal, i18n.language).slice(0, 100)}</option>)}</select></label></details> : null}
     {scopedPlan ? <section className="max-h-[35%] shrink-0 overflow-y-auto border-t border-ds-border-muted" aria-label={t('engineeringTypedPlan')}>
       <button type="button" aria-expanded={showPlan} onClick={() => setExpandedPlanId(showPlan ? null : scopedPlanKey)} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-[12px]"><ClipboardList className="h-4 w-4 shrink-0 text-accent" /><span className="min-w-0 flex-1 truncate">{t('engineeringTypedPlan')}</span><span className="text-ds-muted">{phaseLabel(planStatus ?? scopedPlan.status, t)}</span><ChevronDown className={`h-4 w-4 ${showPlan ? 'rotate-180' : ''}`} /></button>
+      {scopedPlan.steps.filter(step => step.tool === 'survey_network_reimport').map(step => <div key={step.id} data-testid="engineering-plan-source-preparation" className="border-t border-ds-border-muted px-3 py-2.5 text-[11px]">
+        <p className="font-medium">{t('engineeringPlanSourcePreparation')}</p>
+        <p className="mt-1 break-words">{t('engineeringPlanSourceDeclaration', {
+          network: surveyNetworkTypeLabel(typeof step.parameters?.networkType === 'string' ? step.parameters.networkType : undefined, t),
+          point: step.parameters?.knownPointId, height: step.parameters?.knownPointHeight, datum: step.parameters?.verticalDatum
+        })}</p>
+        <p className="mt-1 text-ds-muted">{t('engineeringPlanSourcePreservation')}</p>
+      </div>)}
       {!showPlan ? <div className="border-t border-ds-border-muted px-3 py-2.5 text-[11px]">
         <p className="break-words font-medium text-ds-ink">{displayPlanGoal}</p>
         <p role="status" aria-live="polite" className="mt-1 text-ds-muted">{completedStepCount}/{scopedPlan.steps.length} · {phaseLabel(planStatus ?? scopedPlan.status, t)}</p>

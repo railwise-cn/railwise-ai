@@ -7,6 +7,8 @@ import type { CapabilityToolProvider } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import type { EngineeringAiOrchestrator } from '../../engineering/engineering-ai-orchestrator.js'
 import { surveyAiAdjustmentSemantics } from '../../engineering/survey-ai-adjustment-semantics.js'
+import { SurveyNetworkReimportRequest } from '../../contracts/survey.js'
+import { z } from 'zod'
 
 /**
  * Compatibility bridge for the reviewed RailWise tool IDs. The aliases call
@@ -26,9 +28,10 @@ export function buildRailwiseToolProviders(service: EngineeringService, survey?:
     unknownColumns: dataset.unknownColumns,
     findings: dataset.findings.map((finding) => ({ id: finding.id, code: finding.code, severity: finding.severity, status: finding.status, row: finding.row, message: finding.message, suggestion: finding.suggestion }))
   })
-  const make = (name: string, description: string, inputSchema: Record<string, unknown>, execute: (args: Record<string, unknown>) => Promise<{ output: unknown; isError?: boolean }>) => LocalToolHost.defineTool({ name, description, inputSchema, policy: 'auto', execute: async (args, context) => {
+  const make = (name: string, description: string, inputSchema: Record<string, unknown>, execute: (args: Record<string, unknown>) => Promise<{ output: unknown; isError?: boolean }>, approvedOnly = false) => LocalToolHost.defineTool({ name, description, inputSchema, policy: 'auto', ...(approvedOnly ? { shouldAdvertise: (context: { allowedToolNames?: readonly string[] }) => context.allowedToolNames?.includes(name) === true } : {}), execute: async (args, context) => {
     const gate = getPlanGate?.()
     const authorization = await gate?.authorizeToolCall(context.threadId, context.turnId, name, args)
+    if (approvedOnly && !authorization) throw new Error('source reimport requires an approved engineering plan')
     try {
       const result = await execute(authorization?.parameters ?? args)
       if (authorization) {
@@ -149,7 +152,8 @@ export function buildRailwiseToolProviders(service: EngineeringService, survey?:
   const validateSurveyNetwork = async (args: Record<string, unknown>) => {
     if (!survey || typeof args.networkId !== 'string') return { output: { error: 'survey validation is unavailable; networkId is required' }, isError: true }
     try {
-      return { output: { network: surveyNetworkSummary(survey.validateNetwork(args.networkId, { expectedRevision: Number(args.expectedRevision ?? 0), idempotencyKey: String(args.idempotencyKey ?? `railwise-validate-${args.networkId}`) })) } }
+      const network = survey.validateNetwork(args.networkId, { expectedRevision: Number(args.expectedRevision ?? 0), idempotencyKey: String(args.idempotencyKey ?? `railwise-validate-${args.networkId}`) })
+      return { output: { network: surveyNetworkSummary(network) }, ...(network.qualityStatus === 'blocked' ? { isError: true } : {}) }
     } catch (error) { return { output: { error: error instanceof Error ? error.message : String(error) }, isError: true } }
   }
   const readSurveyAdjustment = async (args: Record<string, unknown>) => {
@@ -180,7 +184,8 @@ export function buildRailwiseToolProviders(service: EngineeringService, survey?:
           ...created,
           rawSourceIntegrity: current?.rawSourceIntegrity,
           sourceEligibility: current?.sourceEligibility
-        })
+        }),
+        ...(created.run.status !== 'completed' || created.result.validation !== 'valid' ? { isError: true } : {})
       }
     } catch (error) { return { output: { error: error instanceof Error ? error.message : String(error) }, isError: true } }
   }
@@ -192,6 +197,10 @@ export function buildRailwiseToolProviders(service: EngineeringService, survey?:
   }
   const reportSchema = { type: 'object', properties: { projectId: { type: 'string' }, datasetId: { type: 'string' }, analysisId: { type: 'string' }, adjustmentIds: { type: 'array', items: { type: 'string' } }, deformationIds: { type: 'array', items: { type: 'string' } }, expectedRevision: { type: 'integer' } }, required: ['projectId'], anyOf: [{ required: ['datasetId'] }, { required: ['adjustmentIds'], properties: { adjustmentIds: { minItems: 1 } } }, { required: ['deformationIds'], properties: { deformationIds: { minItems: 1 } } }] }
   const tools = [
+    make('survey_network_reimport', 'Only after explicit plan approval, reimport the authenticated saved original source as a NEW leveling/height-control network with the user-declared height datum and one known starting-point height. Preserve the old network/results. No new observations, raw bytes, file paths or calculated values may be supplied. Bind later networkId/expectedRevision to this step network.id/network.revision.', z.toJSONSchema(SurveyNetworkReimportRequest.omit({ idempotencyKey: true })), async args => {
+      if (!survey) return { output: { error: 'survey source reimport is unavailable' }, isError: true }
+      return { output: { network: surveyNetworkSummary(await survey.reimportHeightNetwork(args)) } }
+    }, true),
     make('monitoring_csv', 'Normalize a managed monitoring dataset without sending raw rows to a model.', { type: 'object', properties: { projectId: { type: 'string' }, datasetId: { type: 'string' }, expectedRevision: { type: 'integer' } }, required: ['projectId', 'datasetId'] }, analysis),
     make('railwise.monitoring_csv', 'RailWise namespaced alias for monitoring_csv.', { type: 'object', properties: { projectId: { type: 'string' }, datasetId: { type: 'string' }, expectedRevision: { type: 'integer' } }, required: ['projectId', 'datasetId'] }, analysis),
     make('deformation_rate', 'Calculate deterministic monitoring change rates and trends.', { type: 'object', properties: { projectId: { type: 'string' }, datasetId: { type: 'string' }, expectedRevision: { type: 'integer' } }, required: ['projectId', 'datasetId'] }, analysis),

@@ -110,6 +110,22 @@ afterEach(async () => {
 })
 
 describe('Engineering AI session recovery states', () => {
+  it.each(['en', 'zh'])('shows approved source-preparation declarations with technical details collapsed: %s', async language => {
+    await i18n.changeLanguage(language)
+    const plan = { ...refreshedPlan, steps: [{ ...refreshedPlan.steps[0], tool: 'survey_network_reimport',
+      parameters: { projectId: project.id, expectedRevision: 1, sourceNetworkId: 'internal-source', sourceNetworkRevision: 2, sourceSha256: 'a'.repeat(64), networkType: 'leveling', verticalDatum: 'Synthetic fixed BM datum', knownPointId: 'BM', knownPointHeight: 100 },
+      expectedOutputs: ['prepared-network'] }] }
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan } : { cards: [] }))
+    await render({ expandPlan: false }); await settle()
+    const declaration = container.querySelector('[data-testid="engineering-plan-source-preparation"]')!
+    expect(declaration.textContent).toContain('BM = 100 m')
+    expect(declaration.textContent).toContain('Synthetic fixed BM datum')
+    expect(declaration.textContent).toContain(i18n.t('engineeringPlanSourcePreservation'))
+    expect(declaration.textContent).not.toContain('internal-source')
+    expect(declaration.textContent).not.toContain('a'.repeat(64))
+    expect(runtimeRequest.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+  })
+
   it.each([
     ['en', 'deformation', false, 'analysis', 'engineeringTabAnalysis'],
     ['zh', 'deformation', false, 'analysis', 'engineeringTabAnalysis'],
