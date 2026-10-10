@@ -1,0 +1,93 @@
+{
+  "purpose": "Actual installed-package failure diagnostic, not release acceptance",
+  "packageVersion": "0.5.3",
+  "freezeRunId": 38000521987,
+  "sourceCommit": "33466f5a26a0e43ed5a234eed234979ea459f4b5",
+  "installedAsarSha256": "b8d356ce60d6c869ca2ce6d6dad133427e2a594b6e6e904976bfcd042e8f3b54",
+  "captureTiming": "Folder0952 is a label; action-trace beforeClick09:50:34.960Z/afterClick09:50:35.050Z is authoritative. AX and JPEG were separate captures.",
+  "acceptancePassed": false,
+  "releaseReady": false,
+  "files": [
+    {
+      "file": "before-one-confirm.jpg",
+      "originalSource": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/before-one-confirm.jpg",
+      "bytes": 235688,
+      "sha256": "b126734eb726117c8943e3c09505e37141f670071e4ed0312fa659ffaf6f9095",
+      "mimeType": "image/jpeg",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "before-one-confirm.ax.txt",
+      "originalSource": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/before-one-confirm.ax.txt",
+      "bytes": 2312,
+      "sha256": "094f3d9daa34cd8507f25bd0afff1af584a1b32abd03d9d44122f77e1350df4b",
+      "mimeType": "text/plain",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "after-click-direct.jpg",
+      "originalSource": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/after-click-direct.jpg",
+      "bytes": 264266,
+      "sha256": "d595076844d4c6c4fbd9f2769a46cc59fad13406110bac49fa4b9be9eaf1ae0d",
+      "mimeType": "image/jpeg",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "after-click-direct.ax.txt",
+      "originalSource": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/after-click-direct.ax.txt",
+      "bytes": 2504,
+      "sha256": "79f4a109d9122ac63531c00ec44452955f4aad234a946be7392af9aa9c7f9262",
+      "mimeType": "text/plain",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "action-trace.json",
+      "originalSource": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/action-trace.json",
+      "bytes": 286,
+      "sha256": "f3d08d96d11e3e9dba8c73160707b4c9147aaad257a9346e7000bef7ba7100db",
+      "mimeType": "application/json",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "readback-report.json",
+      "originalSource": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/installed-failure-readback/readback-report.json",
+      "bytes": 1679,
+      "sha256": "5a19e8e8be69fea05e98b06ff2b5c87721367b7cef69d403e996fe33753f4f89",
+      "mimeType": "application/json",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "source-and-installed-receipts.json",
+      "originalSource": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/independent-source-review/source-and-installed-receipts.json",
+      "bytes": 2140,
+      "sha256": "d7e73a0914ab997c10be154e058e5fd3c8065c8868f79251921a58c8d99f6240",
+      "mimeType": "application/json",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "actual-path-isolated-reproduction.json",
+      "originalSource": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/packaged-root-cause/actual-path-isolated-reproduction.json",
+      "bytes": 3808,
+      "sha256": "4919e3887a905707f682e08688dacad40d552bdb758848a79dac5475e30c6d1b",
+      "mimeType": "application/json",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "package-and-real-failure-linkage.json",
+      "originalSource": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/packaged-root-cause/package-and-real-failure-linkage.json",
+      "bytes": 5050,
+      "sha256": "0e0567ae1582c96a32445f8c35b9e7ab49fc039393b8bc732f85d84da3592001",
+      "mimeType": "application/json",
+      "preservedOriginalBytes": true
+    },
+    {
+      "file": "root-independent-source-review.json",
+      "originalSource": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/root-independent-source-review.json",
+      "bytes": 1426,
+      "sha256": "2f4caf5d40f93a5acdd56772901d9c6f82c512beebb6259890a90c4cd0eaace6",
+      "mimeType": "application/json",
+      "preservedOriginalBytes": true,
+      "purpose": "independent AI source review, not package acceptance"
+    }
+  ]
+}

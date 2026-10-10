@@ -186,6 +186,38 @@ describe('app-ipc-schemas', () => {
     expect(payload.path).toBe('/v1/skills')
   })
 
+  it('allows Survey delivery decisions despite the overlapping flow-run detail path', () => {
+    for (const decision of ['approve', 'reject']) {
+      const payload = {
+        path: '/v1/flow-runs/decision',
+        method: 'POST',
+        body: JSON.stringify({ runId: 'flowrun_survey_1', nodeId: 'approval', decision })
+      }
+      expect(runtimeRequestPayloadSchema.parse(payload)).toEqual(payload)
+    }
+    expect(runtimeRequestPayloadSchema.parse({
+      path: '/v1/flow-runs/flowrun_survey_1',
+      method: 'GET'
+    }).path).toBe('/v1/flow-runs/flowrun_survey_1')
+  })
+
+  it('allows registered Flow POST actions despite the overlapping flow detail path', () => {
+    for (const action of ['validate', 'publish', 'run', 'test-node']) {
+      const path = `/v1/flows/${action}`
+      expect(runtimeRequestPayloadSchema.parse({ path, method: 'POST', body: '{}' }).path).toBe(path)
+    }
+  })
+
+  it('keeps unregistered Flow methods and paths rejected when route paths overlap', () => {
+    for (const payload of [
+      ...['PUT', 'PATCH', 'DELETE', 'OPTIONS'].map(method => ({ path: '/v1/flow-runs/decision', method })),
+      { path: '/v1/flow-runs/flowrun_survey_1', method: 'POST', body: '{}' },
+      { path: '/v1/flow-runs/flowrun_survey_1/decision', method: 'POST', body: '{}' },
+      { path: '/v1/flows/flow_survey_1', method: 'POST', body: '{}' },
+      { path: '/v1/flows/unregistered-action', method: 'POST', body: '{}' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(payload).success, JSON.stringify(payload)).toBe(false)
+  })
+
   it('accepts WorkWise Runtime attachment and memory endpoints', () => {
     expect(runtimeRequestPayloadSchema.parse({
       path: '/v1/attachments',

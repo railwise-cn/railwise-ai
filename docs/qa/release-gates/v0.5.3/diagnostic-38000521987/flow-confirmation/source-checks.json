@@ -1,0 +1,199 @@
+{
+  "sourceBase": "5496b214a296a454bf9c97fb0282259868f66ad9",
+  "sourceBranch": "codex/flow-decision-053",
+  "checks": [
+    {
+      "name": "regression-before-fix",
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "src/main/ipc/app-ipc-schemas.test.ts"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:51:14.047091+00:00",
+      "finishedAt": "2026-10-10T09:51:15.449008+00:00",
+      "exitCode": 1,
+      "sourceFixApplied": false,
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/regression-before-fix.json",
+        "sha256": "f888fbddce0162fefbe6ed0030284a37a34e13d3a7200a8bce6489dc824a7a96"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/regression-before-fix.log",
+        "bytes": 2027,
+        "sha256": "db88347877d6557389b26bb99ff5202067f4963bbaa4ac06a1fa657b5c8b1839"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    },
+    {
+      "name": "targeted-after-fix",
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "src/main/ipc/app-ipc-schemas.test.ts",
+        "src/main/ipc/app-ipc-survey-collaboration.test.ts",
+        "src/main/ipc/app-ipc-quality-workflow.test.ts",
+        "src/renderer/src/components/flow/FlowWorkspaceView.test.ts",
+        "src/renderer/src/components/flow/FlowWorkspaceView.dom.test.ts",
+        "src/renderer/src/components/engineering/SurveyCollaborationPanel.dom.test.ts"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:52:11.059169+00:00",
+      "finishedAt": "2026-10-10T09:52:12.933694+00:00",
+      "exitCode": 0,
+      "sourceFixApplied": true,
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/targeted-after-fix.json",
+        "sha256": "c62269b3350d4ab7520fe30d2085bfe43cc731bf2f63b29f0929d97dacbe3ae2"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/targeted-after-fix.log",
+        "bytes": 812,
+        "sha256": "51f298892aada83e6f167f9b7efab3d7886897b6de35d441c520115ddc96c12e"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    },
+    {
+      "name": "typecheck-after-fix",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:52:44.914912+00:00",
+      "finishedAt": "2026-10-10T09:52:58.217753+00:00",
+      "exitCode": 0,
+      "sourceFixApplied": true,
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/typecheck-after-fix.json",
+        "sha256": "8ff5f658c6fe8561811e695f0c5d7c6ba0cd949d0c8a070b534db05a8bf46238"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/typecheck-after-fix.log",
+        "bytes": 103,
+        "sha256": "da8093127cb81db5b129cb7058eb2e318ceccfda4c688bd4f064a70b0891447e"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    },
+    {
+      "name": "full-test-after-fix",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:53:05.700067+00:00",
+      "finishedAt": "2026-10-10T09:53:43.113974+00:00",
+      "exitCode": 0,
+      "sourceFixApplied": true,
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/full-test-after-fix.json",
+        "sha256": "1c8bc2376e2264d5028e81502f3857129b5f8c83e28d31800dbf8fd25913ab50"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/full-test-after-fix.log",
+        "bytes": 2870,
+        "sha256": "b55e759317f4123551b7100feec7251c6c0a1ce602171dfa3a9293d0f3fc78c3"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    },
+    {
+      "name": "schema-final",
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "src/main/ipc/app-ipc-schemas.test.ts"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:54:04.996137+00:00",
+      "finishedAt": "2026-10-10T09:54:06.123369+00:00",
+      "exitCode": 0,
+      "sourceFixApplied": true,
+      "sourceSha256": {
+        "src/main/ipc/app-ipc-schemas.ts": "6fe1e1f28b4a3be5d632bb96c1cc0f5728581fe61d9551934baa3bdda9bb1323",
+        "src/main/ipc/app-ipc-schemas.test.ts": "70e45228cf472b4113c6eda2eded439a76c2c79973aa2cb13d814f5eec1af6ae"
+      },
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/schema-final.json",
+        "sha256": "015591e249d2e0e19dea584f6847d9fa05fa7b85cfca8dd7414171def35bd6e9"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/schema-final.log",
+        "bytes": 333,
+        "sha256": "3002377e7a5b1ba8135e74d9ac93d6a9b09c12d8f4f7060e64b1d1065a1e80d1"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    },
+    {
+      "name": "lint-source",
+      "command": [
+        "npx",
+        "eslint",
+        "src/main/ipc/app-ipc-schemas.ts",
+        "src/main/ipc/app-ipc-schemas.test.ts"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:54:06.123739+00:00",
+      "finishedAt": "2026-10-10T09:54:07.392967+00:00",
+      "exitCode": 0,
+      "sourceFixApplied": true,
+      "sourceSha256": {
+        "src/main/ipc/app-ipc-schemas.ts": "6fe1e1f28b4a3be5d632bb96c1cc0f5728581fe61d9551934baa3bdda9bb1323",
+        "src/main/ipc/app-ipc-schemas.test.ts": "70e45228cf472b4113c6eda2eded439a76c2c79973aa2cb13d814f5eec1af6ae"
+      },
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/lint-source.json",
+        "sha256": "c6fced73cdb0c19c2f93e31dc3f730d5274c1c76e90cadd0fd7efe7e45e34093"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/lint-source.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    },
+    {
+      "name": "build-after-fix",
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+      "startedAt": "2026-10-10T09:54:07.393527+00:00",
+      "finishedAt": "2026-10-10T09:54:18.825270+00:00",
+      "exitCode": 0,
+      "sourceFixApplied": true,
+      "sourceSha256": {
+        "src/main/ipc/app-ipc-schemas.ts": "6fe1e1f28b4a3be5d632bb96c1cc0f5728581fe61d9551934baa3bdda9bb1323",
+        "src/main/ipc/app-ipc-schemas.test.ts": "70e45228cf472b4113c6eda2eded439a76c2c79973aa2cb13d814f5eec1af6ae"
+      },
+      "originalReport": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/build-after-fix.json",
+        "sha256": "063f9dc9269960bde6c1efc6f7aadef7a32deb0c0ebdde40d3e31b924319204e"
+      },
+      "originalLog": {
+        "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/local-checks/build-after-fix.log",
+        "bytes": 37333,
+        "sha256": "4752052b126d225ae383c21a1d71a9d64a30b7115d8726d787b910fcf85479b2"
+      },
+      "purpose": "source regression/check only, not installed-package acceptance"
+    }
+  ],
+  "acceptancePassed": false,
+  "releaseReady": false,
+  "sourceFiles": [
+    {
+      "path": "src/main/ipc/app-ipc-schemas.ts",
+      "sha256": "6fe1e1f28b4a3be5d632bb96c1cc0f5728581fe61d9551934baa3bdda9bb1323"
+    },
+    {
+      "path": "src/main/ipc/app-ipc-schemas.test.ts",
+      "sha256": "70e45228cf472b4113c6eda2eded439a76c2c79973aa2cb13d814f5eec1af6ae"
+    }
+  ]
+}

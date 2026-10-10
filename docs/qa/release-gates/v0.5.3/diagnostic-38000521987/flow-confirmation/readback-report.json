@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-10-10T09:46:23.040139+00:00",
+  "packageFreezeRunId": 38000521987,
+  "installedAsarSha256": "b8d356ce60d6c869ca2ce6d6dad133427e2a594b6e6e904976bfcd042e8f3b54",
+  "references": {
+    "draftId": "survey_draft_6c2d6acf-8528-4457-8cfa-28e1f49b29d3",
+    "runId": "flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d",
+    "projectId": "project_2f741e55-11a2-47b6-99a1-3de52fe3205f"
+  },
+  "observations": "GET both records succeeds; persisted check succeeded and approval waiting; no approval decision/backend error was persisted. UI failure captured separately by GUI owner. Cause still under independent review.",
+  "receipts": [
+    {
+      "path": "run-details.raw.json",
+      "request": {
+        "method": "GET",
+        "path": "/v1/flow-runs/flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d"
+      },
+      "httpStatus": 200,
+      "bytes": 2802,
+      "sha256": "426376d8530d72b552ca98dab34eaa8c9b0b83e7da31224ef62b313b89b8210d"
+    },
+    {
+      "path": "draft-detail.raw.json",
+      "request": {
+        "method": "GET",
+        "path": "/v1/engineering/projects/project_2f741e55-11a2-47b6-99a1-3de52fe3205f/collaboration-drafts/survey_draft_6c2d6acf-8528-4457-8cfa-28e1f49b29d3"
+      },
+      "httpStatus": 200,
+      "bytes": 1252,
+      "sha256": "c66b81fa6516c98c5314dc0ccda532ad5d3eff0e0948d7c91651cae820fcfe0e"
+    },
+    {
+      "path": "database-selection.readonly.json",
+      "bytes": 4004,
+      "sha256": "cea82d266ba9f7daf86461dc9382b0d4c15f56e0fe055989042cd1b7554381d0",
+      "note": "Read-only selection of actual produced records; serialization derivative, not database bytes"
+    }
+  ],
+  "readOnly": true,
+  "acceptancePassed": false
+}

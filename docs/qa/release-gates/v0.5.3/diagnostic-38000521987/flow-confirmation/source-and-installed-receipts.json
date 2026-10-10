@@ -1,0 +1,51 @@
+{
+  "inspectedAt": "2026-10-10T09:51:53.598Z",
+  "readOnly": true,
+  "installedAsar": {
+    "path": "/Applications/RailWise AI.app/Contents/Resources/app.asar",
+    "sha256": "b8d356ce60d6c869ca2ce6d6dad133427e2a594b6e6e904976bfcd042e8f3b54"
+  },
+  "installedMain": {
+    "path": "out/main/index.js",
+    "bytes": 2047844,
+    "sha256": "14503c50d6299c2121c290e216a9809bb974885a2f12fd847a05c6080118a29a"
+  },
+  "oldSource": "33466f5a26a0e43ed5a234eed234979ea459f4b5",
+  "currentSource": "5496b214a296a454bf9c97fb0282259868f66ad9",
+  "sources": [
+    {
+      "file": "src/main/ipc/app-ipc-schemas.ts",
+      "oldSourceSha256": "a127bc2c911ca25ae1d539af0a3250e78e319faf6a91d9320b5d1dc09cb5f276",
+      "currentSourceSha256": "a127bc2c911ca25ae1d539af0a3250e78e319faf6a91d9320b5d1dc09cb5f276",
+      "identicalBytes": true
+    },
+    {
+      "file": "src/shared/runtime-endpoints.ts",
+      "oldSourceSha256": "748ad98269d92332b3c3ff111383833d75feb57d7c3dd40cb421fc9b69404322",
+      "currentSourceSha256": "748ad98269d92332b3c3ff111383833d75feb57d7c3dd40cb421fc9b69404322",
+      "identicalBytes": true
+    },
+    {
+      "file": "src/renderer/src/components/flow/FlowWorkspaceView.tsx",
+      "oldSourceSha256": "cae376e4ca9b51db489be101c67a6c10ee35d462dd729b5227f4ef6d0aebc060",
+      "currentSourceSha256": "cae376e4ca9b51db489be101c67a6c10ee35d462dd729b5227f4ef6d0aebc060",
+      "identicalBytes": true
+    },
+    {
+      "file": "src/main/ipc/register-app-ipc-handlers.ts",
+      "oldSourceSha256": "3af798baff2dd3a9c5f4deb74327adb936ac6111abf41aff04142de441c82ec1",
+      "currentSourceSha256": "3af798baff2dd3a9c5f4deb74327adb936ac6111abf41aff04142de441c82ec1",
+      "identicalBytes": true
+    },
+    {
+      "file": "kun/src/server/routes/index.ts",
+      "oldSourceSha256": "82130dfa5faffb6ef450787296eb1d5e91b80fc4e42b091848b4f576a77f1b12",
+      "currentSourceSha256": "82130dfa5faffb6ef450787296eb1d5e91b80fc4e42b091848b4f576a77f1b12",
+      "identicalBytes": true
+    }
+  ],
+  "snippetReceipt": {
+    "file": "installed-main-snippets.json",
+    "sha256": "4f1b0f7acc5d172b42ca900c4d7238709a420f5dc3634492d603d099dece52ac"
+  }
+}
