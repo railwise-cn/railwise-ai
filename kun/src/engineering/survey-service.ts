@@ -2406,8 +2406,16 @@ export class SurveyService {
       }
       const angular = isAngularObservation(observation)
       const unit = normalizedUnitToken(observation.unit)
-      if (!angular && network.unit && unit !== network.unit.trim().toLowerCase() && !(network.unit === 'm' && ['meter', 'meters'].includes(unit))) {
-        findings.push(finding(network.id, 'unit_conflict', 'warning', `观测 ${observation.id} 的单位 ${observation.unit} 与网络单位 ${network.unit} 不一致`, '确认单位并在导入前统一，换算不会静默丢失', observation.sourceRow, this.nowIso))
+      if (!angular && network.unit && linearUnitScale(observation.unit) !== undefined && linearUnitScale(network.unit) !== undefined
+        && unit !== network.unit.trim().toLowerCase() && !(network.unit === 'm' && ['meter', 'meters'].includes(unit))) {
+        findings.push({
+          ...finding(network.id, 'unit_conflict', 'warning', `观测 ${observation.id} 的单位 ${observation.unit} 与网络单位 ${network.unit} 不一致`,
+            '核对原始单位声明；支持的长度单位在计算时规范换算为 m，原始值和单位保留，无需在导入前强制统一。', observation.sourceRow, this.nowIso),
+          localized: { en: {
+            message: `Observation ${observation.id} declares ${observation.unit}, while the network declares ${network.unit}.`,
+            suggestedAction: 'Verify the original unit declarations. Supported length units are normalized to m during calculation; original values and units are retained. They do not need to be forced to one unit before import.'
+          } }
+        })
       }
       if (['plane-control', 'traverse', 'triangulation', 'cpiii-free-station', 'cpiii-resection'].includes(network.networkType)) {
         for (const id of observationEndpointIds(observation)) {
