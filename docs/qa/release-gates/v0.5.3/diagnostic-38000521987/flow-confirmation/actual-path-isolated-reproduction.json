@@ -1,0 +1,135 @@
+{
+  "status": "installed-ipc-endpoint-shadow-reproduced-not-acceptance",
+  "at": "2026-10-10T09:54:43.726Z",
+  "installedAsarSha256": "b8d356ce60d6c869ca2ce6d6dad133427e2a594b6e6e904976bfcd042e8f3b54",
+  "packageVersion": "0.5.3",
+  "sourceHead": "33466f5a26a0e43ed5a234eed234979ea459f4b5",
+  "requestsConstructedInMemoryFromActualRun": true,
+  "runtimeRequestsSent": 0,
+  "schemaDeclarationCount": 262,
+  "originalImportedDependency": [
+    "import { z } from \"zod\";"
+  ],
+  "closureSha256": "baec24223f0e0cec7f7437d9d2a6ae0af71ffd814becc84dd684107329280579",
+  "results": [
+    {
+      "name": "real-run-detail-get",
+      "payload": {
+        "path": "/v1/flow-runs/flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d",
+        "method": "GET"
+      },
+      "matchingRules": [
+        {
+          "index": 63,
+          "allowedMethods": [
+            "GET"
+          ],
+          "methodAllowed": true,
+          "queryAllowed": true
+        }
+      ],
+      "predicateAllowed": true,
+      "schemaAccepted": true,
+      "issues": []
+    },
+    {
+      "name": "confirmation-approve-post",
+      "payload": {
+        "path": "/v1/flow-runs/decision",
+        "method": "POST",
+        "body": "{\"runId\":\"flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d\",\"nodeId\":\"approval\",\"decision\":\"approve\"}"
+      },
+      "matchingRules": [
+        {
+          "index": 63,
+          "allowedMethods": [
+            "GET"
+          ],
+          "methodAllowed": false,
+          "queryAllowed": true
+        },
+        {
+          "index": 67,
+          "allowedMethods": [
+            "POST"
+          ],
+          "methodAllowed": true,
+          "queryAllowed": true
+        }
+      ],
+      "predicateAllowed": false,
+      "schemaAccepted": false,
+      "issues": [
+        {
+          "code": "custom",
+          "path": [],
+          "message": "runtime request path is not allowed"
+        }
+      ],
+      "ipcError": "Invalid payload for runtime:request: runtime request path is not allowed"
+    },
+    {
+      "name": "confirmation-reject-post",
+      "payload": {
+        "path": "/v1/flow-runs/decision",
+        "method": "POST",
+        "body": "{\"runId\":\"flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d\",\"nodeId\":\"approval\",\"decision\":\"reject\"}"
+      },
+      "matchingRules": [
+        {
+          "index": 63,
+          "allowedMethods": [
+            "GET"
+          ],
+          "methodAllowed": false,
+          "queryAllowed": true
+        },
+        {
+          "index": 67,
+          "allowedMethods": [
+            "POST"
+          ],
+          "methodAllowed": true,
+          "queryAllowed": true
+        }
+      ],
+      "predicateAllowed": false,
+      "schemaAccepted": false,
+      "issues": [
+        {
+          "code": "custom",
+          "path": [],
+          "message": "runtime request path is not allowed"
+        }
+      ],
+      "ipcError": "Invalid payload for runtime:request: runtime request path is not allowed"
+    },
+    {
+      "name": "same-real-run-cancel-post-control",
+      "payload": {
+        "path": "/v1/flow-runs/flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d/cancel",
+        "method": "POST",
+        "body": "{}"
+      },
+      "matchingRules": [
+        {
+          "index": 64,
+          "allowedMethods": [
+            "POST"
+          ],
+          "methodAllowed": true,
+          "queryAllowed": true
+        }
+      ],
+      "predicateAllowed": true,
+      "schemaAccepted": true,
+      "issues": []
+    }
+  ],
+  "limitations": [
+    "Only extracted pure IPC/schema declarations executed in isolated VM",
+    "No Electron startup, preload invocation, IPC invocation or HTTP request performed",
+    "Candidate approval/rejection/cancel payloads were never sent",
+    "This is diagnostic reproduction, not fixed-package acceptance"
+  ]
+}

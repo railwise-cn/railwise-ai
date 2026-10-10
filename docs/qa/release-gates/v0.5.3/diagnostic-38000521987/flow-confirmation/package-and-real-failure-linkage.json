@@ -1,0 +1,111 @@
+{
+  "status": "actual-installed-diagnostic-evidence-linked-not-acceptance",
+  "observedAt": "2026-10-10T09:54:43.756Z",
+  "packageFreezeRunId": 38000521987,
+  "version": "0.5.3",
+  "sourceHead": "33466f5a26a0e43ed5a234eed234979ea459f4b5",
+  "installedAppPath": "/Applications/RailWise AI.app",
+  "installedAsarSha256": "b8d356ce60d6c869ca2ce6d6dad133427e2a594b6e6e904976bfcd042e8f3b54",
+  "bundleId": "com.wangjiawei508.workgpt",
+  "originalExtractedFiles": [
+    {
+      "path": "installed-package.original.json",
+      "asarMember": "package.json",
+      "bytes": 2494,
+      "sha256": "4d2f3a60fa44a4fcfecb03aa390110f2971e737a254d9adfd76ec7e7d7615e1b"
+    },
+    {
+      "path": "installed-main.original.js",
+      "asarMember": "out/main/index.js",
+      "bytes": 2047844,
+      "sha256": "14503c50d6299c2121c290e216a9809bb974885a2f12fd847a05c6080118a29a"
+    },
+    {
+      "path": "installed-preload.original.cjs",
+      "asarMember": "out/preload/index.cjs",
+      "bytes": 23469,
+      "sha256": "45552dfbe7421489a05a6623fc081994ba50507a2b6454bdce5a926e64de5117"
+    }
+  ],
+  "actualReferences": {
+    "runId": "flowrun_5b11f436-bc4c-4047-8517-de52ae341d4d",
+    "draftId": "survey_draft_6c2d6acf-8528-4457-8cfa-28e1f49b29d3",
+    "projectId": "project_2f741e55-11a2-47b6-99a1-3de52fe3205f",
+    "runStatus": "waiting_approval",
+    "approvalNodeStatus": "waiting_approval",
+    "checkNodeStatus": "succeeded"
+  },
+  "originalReadbackSha256": {
+    "runDetails": "426376d8530d72b552ca98dab34eaa8c9b0b83e7da31224ef62b313b89b8210d",
+    "draftDetail": "c66b81fa6516c98c5314dc0ccda532ad5d3eff0e0948d7c91651cae820fcfe0e"
+  },
+  "guiActionTrace": {
+    "packageASAR": "b8d356ce60d6c869ca2ce6d6dad133427e2a594b6e6e904976bfcd042e8f3b54",
+    "beforeClick": "2026-10-10T09:50:34.960Z",
+    "afterClick": "2026-10-10T09:50:35.050Z",
+    "action": "one normal AX click Confirm and export; no API workaround",
+    "screenshotSeparateFromAX": true
+  },
+  "evidence": [
+    {
+      "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/installed-failure-readback/run-details.raw.json",
+      "bytes": 2802,
+      "sha256": "426376d8530d72b552ca98dab34eaa8c9b0b83e7da31224ef62b313b89b8210d"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/installed-failure-readback/draft-detail.raw.json",
+      "bytes": 1252,
+      "sha256": "c66b81fa6516c98c5314dc0ccda532ad5d3eff0e0948d7c91651cae820fcfe0e"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-flow-decision-20261010/installed-failure-readback/readback-report.json",
+      "bytes": 1679,
+      "sha256": "5a19e8e8be69fea05e98b06ff2b5c87721367b7cef69d403e996fe33753f4f89"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/action-trace.json",
+      "bytes": 286,
+      "sha256": "f3d08d96d11e3e9dba8c73160707b4c9147aaad257a9346e7000bef7ba7100db"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/before-one-confirm.ax.txt",
+      "bytes": 2312,
+      "sha256": "094f3d9daa34cd8507f25bd0afff1af584a1b32abd03d9d44122f77e1350df4b"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/before-one-confirm.jpg",
+      "bytes": 235688,
+      "sha256": "b126734eb726117c8943e3c09505e37141f670071e4ed0312fa659ffaf6f9095"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/after-click-direct.ax.txt",
+      "bytes": 2504,
+      "sha256": "79f4a109d9122ac63531c00ec44452955f4aad234a946be7392af9aa9c7f9262"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38000521987/cua-evidence/survey-resume/E-quality/confirm-reobservation-20261010T0952/after-click-direct.jpg",
+      "bytes": 264266,
+      "sha256": "d595076844d4c6c4fbd9f2769a46cc59fad13406110bac49fa4b9be9eaf1ae0d"
+    }
+  ],
+  "unchangedSourceFiles": [
+    {
+      "path": "src/main/ipc/app-ipc-schemas.ts",
+      "sourceHead": "33466f5a26a0e43ed5a234eed234979ea459f4b5",
+      "sha256": "a127bc2c911ca25ae1d539af0a3250e78e319faf6a91d9320b5d1dc09cb5f276",
+      "currentBytesEqualFrozenSource": true
+    },
+    {
+      "path": "src/shared/runtime-endpoints.ts",
+      "sourceHead": "33466f5a26a0e43ed5a234eed234979ea459f4b5",
+      "sha256": "748ad98269d92332b3c3ff111383833d75feb57d7c3dd40cb421fc9b69404322",
+      "currentBytesEqualFrozenSource": true
+    }
+  ],
+  "limitations": [
+    "Original GUI and runtime readback were produced by root/GUI owner; this agent only read and hashed them",
+    "Directory label 0952 is not the click time; actual times come from action-trace.json",
+    "No source/profile/GUI/runtime state mutation",
+    "No fixed-package acceptance, release approval, vendor certification or human signature claim"
+  ]
+}

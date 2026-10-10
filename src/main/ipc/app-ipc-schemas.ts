@@ -383,8 +383,9 @@ function isAllowedRuntimeRequest(value: { path: string; method?: string }): bool
     const path = url.pathname
     const method = value.method ?? 'GET'
     for (const endpoint of ENDPOINTS) {
-      if (endpoint.match(path)) {
-        return endpoint.allowedMethods.includes(method) && hasAllowedQuery(url, endpoint)
+      // A literal action can share its path shape with another method's identifier route.
+      if (endpoint.match(path) && endpoint.allowedMethods.includes(method)) {
+        return hasAllowedQuery(url, endpoint)
       }
     }
     return false

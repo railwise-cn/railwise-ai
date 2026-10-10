@@ -1,0 +1,60 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 container
+									14 开合三角标记 Tools
+										15 文本 Tools
+									16 按钮 Write
+									17 按钮 Plugins
+									18 按钮 Scheduled tasks
+									19 按钮 Flow
+									20 按钮 Design
+							21 按钮 New Agent
+						22 文本 Flow 仍为 Preview。请在画布中配置、校验并测试流程。
+						23 container
+							24 切换按钮 Connect phone, Value: 0
+							25 按钮 Settings
+					26 标题 Review and export, Value: 1
+						27 文本 Review and export
+					28 container Review and export
+						29 container
+							30 标题 Review and export, Value: 2
+								31 文本 Review and export
+							32 text leica-gsi-cumulative-leveling — 草稿复核与导出 Check the selected results, review notes, and figures before exporting a review draft. Edited drafts are saved separately from source results. This confirmation is not a professional signature. Review records unavailable
+							33 内容列表
+								34 container
+									35 text 1 .  Check source and draft Complete
+								36 container
+									37 text 2 .  Confirm this delivery Confirmation required
+								38 container
+									39 text 3 .  Generate review files Waiting for previous step
+							40 文本 The draft could not be checked or exported. Confirm that its source is current and edits are saved, then retry. If the source changed, return to Delivery and prepare a new draft.
+							41 按钮 Confirm and export
+							42 按钮 Return for changes
+							43 按钮 Cancel
+							44 按钮 Return to Delivery
+						45 开合三角标记 Advanced details
+							46 文本 Advanced details
+	47 关闭按钮
+	48 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	49 最小化按钮
+50 menu bar
+	51 RailWise AI
+	52 File
+	53 Edit
+	54 View
+	55 Window
+	56 Help
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
