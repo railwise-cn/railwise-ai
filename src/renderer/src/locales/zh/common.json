@@ -3668,6 +3668,8 @@
   "advancedStaticPosterior": "加权残差平方和 {{sse}} · 自由度 {{df}} · 后验方差因子估计 {{posterior}}。后验值仅作诊断，未用于缩放先验协方差或修改权重。",
   "advancedStaticSteps": "逐条追加状态",
   "advancedStaticObservation": "追加观测",
+  "advancedStaticLinearizedValue": "高差线性化量",
+  "advancedStaticLinearizedValueMeaning": "此值为原始高差减去两点初始高程之差，用于估计高程改正数，不是原始观测高差。",
   "advancedStaticTotal": "总观测数",
   "advancedStaticResidual": "白化变换残差（无量纲）",
   "advancedStaticResidualNorm": "累计白化残差范数（无量纲）",

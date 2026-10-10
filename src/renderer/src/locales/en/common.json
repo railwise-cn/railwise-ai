@@ -3668,6 +3668,8 @@
   "advancedStaticPosterior": "Weighted residual sum of squares {{sse}} · Degrees of freedom {{df}} · Posterior variance factor estimate {{posterior}}. Diagnostic only; not used to scale prior covariance or alter weights.",
   "advancedStaticSteps": "Per-observation update state",
   "advancedStaticObservation": "Appended observation",
+  "advancedStaticLinearizedValue": "Linearized height difference",
+  "advancedStaticLinearizedValueMeaning": "This value is the original height difference minus the initial height difference between its points. It is used to estimate height corrections; it is not the original observed height difference.",
   "advancedStaticTotal": "Total observations",
   "advancedStaticResidual": "Whitened transformed residual (dimensionless)",
   "advancedStaticResidualNorm": "Accumulated whitened residual norm (dimensionless)",
