@@ -1,0 +1,425 @@
+{
+  "type": "Extracted structured records from actual packaged-runtime conversation; original messages.jsonl remains private",
+  "threadId": "thr_vc7m2xog",
+  "records": [
+    {
+      "id": "item_turn_bp28lo5g_user",
+      "turnId": "turn_bp28lo5g",
+      "threadId": "thr_vc7m2xog",
+      "role": "user",
+      "status": "completed",
+      "createdAt": "2026-10-10T08:17:30.331Z",
+      "finishedAt": "2026-10-10T08:17:30.331Z",
+      "kind": "user_message",
+      "text": "Explain P, its source evidence, and anything requiring review.\n\nSelected Survey evidence (reference only, not execution approval): {\"projectId\":\"project_c5faa7e6-1f32-42bf-b8c3-72d59f292f2d\",\"projectRevision\":2,\"networkId\":\"network_f9cde1ed-c719-4539-8d9c-6950124990eb\",\"networkRevision\":2,\"sourceSha256\":\"e074bd174b7a36814d4b4d934bfb1d426821df5cd0656de7e2f40372e549e951\",\"parserId\":\"workwise-survey-source\",\"parserVersion\":\"1\",\"parserSourceHash\":\"ca3baaff34304760d4f666274e1bc76bb36120ef97794382ff1103771689fbb5\",\"adjustmentId\":\"adjustment_05fb1440-b34f-472b-afed-fa8a85769376\",\"algorithmVersion\":\"workwise-survey-adjustment-9\",\"section\":\"result\",\"typedEvidence\":{\"schemaVersion\":1,\"projectId\":\"project_c5faa7e6-1f32-42bf-b8c3-72d59f292f2d\",\"projectRevision\":2,\"selector\":{\"path\":[\"points\",1],\"identity\":{\"id\":\"P\"}},\"kind\":\"professional-review\",\"networkId\":\"network_f9cde1ed-c719-4539-8d9c-6950124990eb\",\"networkRevision\":2,\"sourceSha256\":\"e074bd174b7a36814d4b4d934bfb1d426821df5cd0656de7e2f40372e549e951\",\"adjustmentId\":\"adjustment_05fb1440-b34f-472b-afed-fa8a85769376\",\"resultId\":\"adjustment_result_05708d3a-8aaa-4591-90cd-f4633f820986\",\"inputHash\":\"2e43ce29915a9e5c5ae22bcd36f41f848fbd00b3f5cab90bd36fdeb4336fc660\",\"resultHash\":\"52fd4f4012ad044cf89bace74a8f04f10607c07421e6e18ce7514357785408fc\",\"projectionHash\":\"365576e23143153ad190f7c8b905e75f5b206d04c982cce486a6c04acef0bca9\",\"projectionVersion\":\"survey-professional-review-1\"},\"metric\":\"professional-point\",\"pointId\":\"P\"}\nRead this exact typedEvidence using survey_read_evidence before answering. Do not substitute another record or execute a calculation. If unavailable or stale, report that limitation.",
+      "displayText": "Explain P, its source evidence, and anything requiring review."
+    },
+    {
+      "id": "item_call_00_H5mzFflYVTByuHnel4PG2138",
+      "turnId": "turn_bp28lo5g",
+      "threadId": "thr_vc7m2xog",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-10-10T08:17:37.331Z",
+      "finishedAt": "2026-10-10T08:17:37.331Z",
+      "kind": "tool_result",
+      "toolName": "survey_read_evidence",
+      "callId": "call_00_H5mzFflYVTByuHnel4PG2138",
+      "toolKind": "tool_call",
+      "output": {
+        "status": "resolved",
+        "reference": {
+          "schemaVersion": 1,
+          "projectId": "project_c5faa7e6-1f32-42bf-b8c3-72d59f292f2d",
+          "projectRevision": 2,
+          "selector": {
+            "path": [
+              "points",
+              1
+            ],
+            "identity": {
+              "id": "P"
+            }
+          },
+          "kind": "professional-review",
+          "networkId": "network_f9cde1ed-c719-4539-8d9c-6950124990eb",
+          "networkRevision": 2,
+          "sourceSha256": "e074bd174b7a36814d4b4d934bfb1d426821df5cd0656de7e2f40372e549e951",
+          "adjustmentId": "adjustment_05fb1440-b34f-472b-afed-fa8a85769376",
+          "resultId": "adjustment_result_05708d3a-8aaa-4591-90cd-f4633f820986",
+          "inputHash": "2e43ce29915a9e5c5ae22bcd36f41f848fbd00b3f5cab90bd36fdeb4336fc660",
+          "resultHash": "52fd4f4012ad044cf89bace74a8f04f10607c07421e6e18ce7514357785408fc",
+          "projectionHash": "365576e23143153ad190f7c8b905e75f5b206d04c982cce486a6c04acef0bca9",
+          "projectionVersion": "survey-professional-review-1"
+        },
+        "boundaries": {
+          "readOnly": true,
+          "newComputationStarted": false,
+          "approvalCapability": "none",
+          "callerDeclarationsAuthenticated": false,
+          "standardConformity": "not-evaluated",
+          "humanSignatureVerification": "not-evaluated",
+          "interpretation": "Explain the selected stored evidence and its original limits. Caller declarations and trial outputs are not professional acceptance or authenticated field facts."
+        },
+        "provenance": {
+          "record": {
+            "projectId": "project_c5faa7e6-1f32-42bf-b8c3-72d59f292f2d",
+            "networkId": "network_f9cde1ed-c719-4539-8d9c-6950124990eb",
+            "algorithmVersion": "workwise-survey-adjustment-9",
+            "inputHash": "2e43ce29915a9e5c5ae22bcd36f41f848fbd00b3f5cab90bd36fdeb4336fc660",
+            "resultHash": "52fd4f4012ad044cf89bace74a8f04f10607c07421e6e18ce7514357785408fc",
+            "runId": "adjustment_05fb1440-b34f-472b-afed-fa8a85769376",
+            "resultId": "adjustment_result_05708d3a-8aaa-4591-90cd-f4633f820986",
+            "projectionVersion": "survey-professional-review-1",
+            "projectionHash": "365576e23143153ad190f7c8b905e75f5b206d04c982cce486a6c04acef0bca9",
+            "reviewStatus": "unsigned",
+            "standardsConformity": "not-evaluated"
+          }
+        },
+        "value": {
+          "id": "P",
+          "role": "unknown",
+          "height": 10.9998,
+          "correctionHeight": -0.0002000000000000002,
+          "standardError": 0.00040000000000000034,
+          "precisionBasis": "a-posteriori",
+          "unit": "m"
+        }
+      },
+      "isError": false
+    },
+    {
+      "id": "item_call_01_XNUQ9Ngn0oNV8J876ILD9239",
+      "turnId": "turn_bp28lo5g",
+      "threadId": "thr_vc7m2xog",
+      "role": "tool",
+      "status": "completed",
+      "createdAt": "2026-10-10T08:17:37.367Z",
+      "finishedAt": "2026-10-10T08:17:37.367Z",
+      "kind": "tool_result",
+      "toolName": "survey_read_context",
+      "callId": "call_01_XNUQ9Ngn0oNV8J876ILD9239",
+      "toolKind": "tool_call",
+      "output": {
+        "context": {
+          "schemaVersion": 1,
+          "projectId": "project_c5faa7e6-1f32-42bf-b8c3-72d59f292f2d",
+          "projectRevision": 2,
+          "generatedAt": "2026-10-10T08:17:37.364Z",
+          "project": {
+            "name": "relative-m",
+            "taskType": "control-network",
+            "monitoringType": "control-network",
+            "unit": "m",
+            "reportPeriod": {},
+            "thresholds": {}
+          },
+          "datasets": [],
+          "analyses": [],
+          "runs": [],
+          "surveyNetworks": [
+            {
+              "id": "network_f9cde1ed-c719-4539-8d9c-6950124990eb",
+              "networkType": "leveling",
+              "coordinateSystem": "SYNTHETIC-LOCAL-GRID; numerical acceptance only",
+              "verticalDatum": "SYNTHETIC-FIXED-BM=10m; not a field benchmark",
+              "pointCount": 2,
+              "observationCount": 2,
+              "qualityStatus": "validated",
+              "revision": 2,
+              "inputAttachmentHash": "e074bd174b7a36814d4b4d934bfb1d426821df5cd0656de7e2f40372e549e951"
+            }
+          ],
+          "surveyAdjustments": [
+            {
+              "id": "adjustment_05fb1440-b34f-472b-afed-fa8a85769376",
+              "networkId": "network_f9cde1ed-c719-4539-8d9c-6950124990eb",
+              "status": "completed",
+              "revision": 1,
+              "strategyId": "leveling",
+              "algorithmVersion": "workwise-survey-adjustment-9",
+              "inputHash": "2e43ce29915a9e5c5ae22bcd36f41f848fbd00b3f5cab90bd36fdeb4336fc660",
+              "validation": "valid",
+              "observationCount": 2,
+              "unknownCount": 1,
+              "degreesOfFreedom": 1,
+              "sourceAdmission": {
+                "status": "current-admissible",
+                "rawSourceIntegrity": {
+                  "status": "verified",
+                  "ledgerEntryCount": 2,
+                  "errors": []
+                },
+                "sourceEligibility": {
+                  "eligible": true,
+                  "findings": []
+                }
+              }
+            }
+          ],
+          "citations": [],
+          "watchDrafts": [],
+          "contextHash": "sha256-a56548034796cb134b6a18e0babb31620b4361e6978c09f4015215a1d65f83d9"
+        },
+        "selectedPoint": {
+          "id": "P",
+          "pointClass": "unknown",
+          "height": 11,
+          "known": false,
+          "sourceLocator": "WorkWise JSON:network.unknownPoints[0]"
+        },
+        "evidence": [],
+        "selectedNetwork": {
+          "id": "network_f9cde1ed-c719-4539-8d9c-6950124990eb",
+          "networkType": "leveling",
+          "revision": 2,
+          "source": {
+            "sha256": "e074bd174b7a36814d4b4d934bfb1d426821df5cd0656de7e2f40372e549e951",
+            "parserId": "workwise-survey-source",
+            "parserVersion": "1",
+            "parserSourceHash": "ca3baaff34304760d4f666274e1bc76bb36120ef97794382ff1103771689fbb5"
+          },
+          "observationCount": 2,
+          "observations": [
+            {
+              "id": "out",
+              "type": "height-difference",
+              "from": "BM",
+              "to": "P",
+              "value": 1,
+              "unit": "m",
+              "routeLength": 1,
+              "sourceLocator": "WorkWise JSON:network.observations[0]",
+              "sourceRecordId": "workwise-json-observation-1"
+            },
+            {
+              "id": "back",
+              "type": "height-difference",
+              "from": "P",
+              "to": "BM",
+              "value": -0.999,
+              "unit": "m",
+              "routeLength": 4,
+              "sourceLocator": "WorkWise JSON:network.observations[1]",
+              "sourceRecordId": "workwise-json-observation-2"
+            }
+          ],
+          "pointCount": 2,
+          "points": [
+            {
+              "id": "BM",
+              "pointClass": "known",
+              "height": 10,
+              "known": true,
+              "sourceLocator": "WorkWise JSON:network.knownPoints[0]"
+            },
+            {
+              "id": "P",
+              "pointClass": "unknown",
+              "height": 11,
+              "known": false,
+              "sourceLocator": "WorkWise JSON:network.unknownPoints[0]"
+            }
+          ]
+        },
+        "adjustments": [
+          {
+            "runId": "adjustment_05fb1440-b34f-472b-afed-fa8a85769376",
+            "networkId": "network_f9cde1ed-c719-4539-8d9c-6950124990eb",
+            "inputHash": "2e43ce29915a9e5c5ae22bcd36f41f848fbd00b3f5cab90bd36fdeb4336fc660",
+            "sourceAdmission": {
+              "status": "current-admissible",
+              "rawSourceIntegrity": {
+                "status": "verified",
+                "ledgerEntryCount": 2,
+                "errors": []
+              },
+              "sourceEligibility": {
+                "eligible": true,
+                "findings": []
+              }
+            },
+            "validation": "valid",
+            "algorithmVersion": "workwise-survey-adjustment-9",
+            "closure": {
+              "heightDifference": 0.0010000000000000009
+            },
+            "closureUnits": {
+              "heightDifference": "m"
+            },
+            "weightingBasis": "relative-route-length",
+            "unitWeightStdDevUnit": "m",
+            "varianceFactorUnit": "m2",
+            "unitWeightStdDev": 0.00044721359549995833,
+            "varianceFactor": 2.0000000000000036e-7,
+            "precision": {
+              "maxPointStdDev": 0.00040000000000000034,
+              "relativePrecision": null,
+              "passed": true,
+              "assessmentStatus": "available"
+            },
+            "relativeWeightReferenceLengthMetres": 1,
+            "relativeWeightDefaultLengthObservationIds": [],
+            "weightingSemantics": {
+              "status": "recorded",
+              "method": "P=L0/L; L0=1 metre; missing lengths are an explicit all-observation equal-weight assumption",
+              "scaleStatus": "estimated-posterior",
+              "unitWeightStdDev": 0.00044721359549995833,
+              "varianceFactor": 2.0000000000000036e-7,
+              "precisionStatus": "available",
+              "meaning": "Relative route-length weights supply no absolute prior precision. The estimated unit-weight standard error is for a 1-metre reference route, not per kilometre. The variance scale is in square metres and must not be compared with dimensionless 1. Without redundancy, retained nominal scale numbers are not assessed precision. Residuals are in metres, not sigma multiples."
+            },
+            "independentClosureCheck": {
+              "status": "not-evaluated",
+              "reason": "closure-tolerance-not-configured",
+              "sourceBinding": "bound",
+              "computationStage": "before-adjustment",
+              "meaning": "Independent checks from original route observations and declared reference controls. A missing check is not zero or a pass. These do not follow from fitted residuals.",
+              "routeCount": 1,
+              "routesReturned": 1,
+              "routesTruncated": false,
+              "routes": [
+                {
+                  "id": "leveling-cycle:out",
+                  "kind": "loop",
+                  "from": "P",
+                  "to": "P",
+                  "members": [
+                    {
+                      "observationId": "back",
+                      "direction": 1,
+                      "from": "P",
+                      "to": "BM",
+                      "heightDifferenceMetres": -0.999,
+                      "routeLengthMetres": 4,
+                      "sourceRecordId": "workwise-json-observation-2"
+                    },
+                    {
+                      "observationId": "out",
+                      "direction": 1,
+                      "from": "BM",
+                      "to": "P",
+                      "heightDifferenceMetres": 1,
+                      "routeLengthMetres": 1,
+                      "sourceRecordId": "workwise-json-observation-1"
+                    }
+                  ],
+                  "sumObservedMetres": 0.0010000000000000009,
+                  "knownHeightDifferenceMetres": 0,
+                  "misclosureMetres": 0.0010000000000000009,
+                  "totalLengthMetres": 5,
+                  "status": "not-evaluated",
+                  "reason": "closure-tolerance-not-configured",
+                  "memberCount": 2,
+                  "membersTruncated": false
+                }
+              ]
+            },
+            "fittedResidualSummary": {
+              "status": "descriptive-only",
+              "computationStage": "after-adjustment",
+              "method": "euclidean-norm-of-fitted-observation-residuals-grouped-by-unit",
+              "meaning": "Describes how well the adjusted model fits observations. Never a pre-adjustment route closure, independent field check, significance test or standards decision.",
+              "residualNorms": [
+                {
+                  "unit": "m",
+                  "value": 0.0008246211251235328,
+                  "count": 2
+                }
+              ],
+              "observationsWithoutRecordedUnit": 0
+            },
+            "legacyClosureSemantics": {
+              "authoritativeForProfessionalClosureChecks": false,
+              "meaning": "The retained closure container mixes historical meanings. Use independentClosureCheck for route checks and fittedResidualSummary for fitted norms. Do not infer a professional pass from these historical values.",
+              "entries": [
+                {
+                  "key": "heightDifference",
+                  "meaning": "legacy-value-use-professional-checks-for-verified-meaning"
+                }
+              ]
+            },
+            "linearUnit": "m",
+            "angularUnit": "rad",
+            "varianceFactorEstimated": true,
+            "statisticalSummary": {
+              "schemaVersion": 1,
+              "scope": "descriptive-screening",
+              "numericalStatus": "not-evaluated",
+              "availableCount": 0,
+              "unavailableCount": 2,
+              "flaggedCount": 0,
+              "varianceBasis": "estimated-posterior",
+              "varianceLog10RatioToUnit": null,
+              "standardDeviationLog10RatioToUnit": null,
+              "significance": "not-evaluated",
+              "standardsConformity": "not-evaluated"
+            },
+            "degreesOfFreedom": 1,
+            "qualityFindings": [],
+            "residuals": [
+              {
+                "observationId": "out",
+                "correction": -0.0002000000000000002,
+                "residual": -0.0002000000000000002,
+                "unit": "m",
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "weight-normalized-residual",
+                  "scaleBasis": "relative-weight",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "not-testable",
+                  "reason": "missing-absolute-precision"
+                },
+                "outlier": false,
+                "sourceRecordId": "workwise-json-observation-1"
+              },
+              {
+                "observationId": "back",
+                "correction": -0.0008000000000000007,
+                "residual": -0.0008000000000000007,
+                "unit": "m",
+                "standardizedResidualUnit": "sigma",
+                "residualStatistic": {
+                  "schemaVersion": 1,
+                  "method": "weight-normalized-residual",
+                  "scaleBasis": "relative-weight",
+                  "scope": "descriptive-screening",
+                  "significance": "not-evaluated",
+                  "status": "not-testable",
+                  "reason": "missing-absolute-precision"
+                },
+                "outlier": false,
+                "sourceRecordId": "workwise-json-observation-2"
+              }
+            ],
+            "selectedAdjustedPoint": {
+              "id": "P",
+              "height": 10.9998,
+              "correctionHeight": -0.0002000000000000002,
+              "standardError": 0.00040000000000000034,
+              "covariance": [
+                0.8
+              ]
+            },
+            "residualCount": 2
+          }
+        ]
+      },
+      "isError": false
+    },
+    {
+      "id": "item_text_qp6je4nq",
+      "turnId": "turn_bp28lo5g",
+      "threadId": "thr_vc7m2xog",
+      "role": "assistant",
+      "status": "completed",
+      "createdAt": "2026-10-10T08:18:12.796Z",
+      "kind": "assistant_text",
+      "text": "# Point P — adjusted result and source evidence\n\n**What P is.** P is an **unknown point (a point to be determined)** in this project's leveling network (\"relative-m\"), listed in the unknown-points set of the imported source document with an approximate input height of 11.000 m. Its network companion, BM, is a known (fixed) point at 10.000 m. P's height is therefore *determined by the adjustment*, not given as control.\n\n## Recorded result\n\n| Quantity | Value |\n|---|---|\n| Adjusted height of P | **10.9998 m** |\n| Correction applied to the approximate height | **−0.2 mm** |\n| Standard error of the adjusted height | **0.4 mm** (posterior, model-relative) |\n\nThe correction is a change to the approximate starting coordinate — not a movement and not an epoch-to-epoch comparison. All units are metres.\n\n## Source evidence\n\nThe result rests on the project's imported leveling source: two height-difference observations, recorded in the network's observation list.\n\n- **BM → P:** +1.000 m over a 1 m route\n- **P → BM:** −0.999 m over a 4 m route\n\nThe adjustment used both observations for one unknown point, leaving **one redundant observation (1 degree of freedom)**; the run is recorded as valid. Weights are **relative route lengths** (1 m reference length) with the scale estimated posterior. When it was run, the imported source passed the application's admissibility screening (records intact, eligible for adjustment).\n\n**Closure vs. fit — these are different things:**\n- As an original loop (P → BM → P), the observations **misclose by +1.0 mm over 5 m of route**. This is an *observed* route closure — but the independent closure check was **not evaluated, because no closure tolerance is configured**. The retained legacy closure value (the same +1.0 mm) is not authoritative for professional closure checks.\n- **After adjustment**, the fitted residuals are −0.2 mm (forward) and −0.8 mm (return), with a combined fitted residual norm of **0.82 mm**. That figure describes only how well the model fits the observations — it is not an independent field check.\n\n**Scale units caution:** the estimated unit-weight standard error is ≈0.45 mm for the 1 m reference route; the corresponding variance scale is ≈2×10⁻⁷ m² — a *squared* quantity in square metres. It must not be compared with a dimensionless factor of 1, and it is not a per-kilometre value.\n\n## What is recorded, and what is missing\n\n- **Precision assessment:** available; maximum point standard deviation recorded as 0.4 mm; no relative-precision value was recorded. The numerical flag is a software check, not a standards decision.\n- **Independent closure check:** not completed (no tolerance configured). A missing check is *neither zero nor a pass*.\n- **Residual significance screening:** **not testable** — only relative weights are recorded, with no absolute precision basis, so the residuals cannot be judged statistically. \"Not testable\" is not a pass.\n- **Statistical summary:** descriptive screening not evaluated (no testable entries); standards conformity: **not evaluated**.\n- **Review status:** the professional-review record is an **unsigned draft**; no engineer acceptance is recorded. Re-reading the stored record (as here) is not fresh verification.\n\n## Requires review / next actions\n\n1. **Configure a closure tolerance** for the applicable standard so the loop closure can actually be evaluated — and don't substitute the legacy closure value for that check.\n2. **Record an absolute precision model** if statistical outlier screening is required; relative weights alone cannot support it.\n3. **Treat the 0.4 mm standard error as model-relative and provisional** — it is posterior, relative-weight based, and rests on a single degree of freedom (minimal redundancy). It is not absolute accuracy.\n4. **Datum caveat:** the framework is synthetic (a fixed benchmark at 10 m on a local grid, for numerical acceptance only). The declared datum is not independently verified — real field use would need verified benchmark provenance.\n5. **Human professional review and sign-off** are still required before any delivery; no standard is cited in the record.\n\n**Bottom line:** P is a to-be-determined height point adjusted to 10.9998 m (correction −0.2 mm) from two short leveling legs, with a 0.4 mm posterior model-relative standard error. The numbers are internally consistent and the run is recorded as valid, but the independent closure check, the statistical significance screen, and the standards review are all incomplete — this value should not be treated as professionally accepted or fit for delivery as-is."
+    }
+  ]
+}
+
