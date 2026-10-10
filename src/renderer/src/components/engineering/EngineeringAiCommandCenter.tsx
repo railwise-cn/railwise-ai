@@ -121,9 +121,14 @@ export function EngineeringAiCommandCenter({ workspaceRoot, runtimeReady, projec
   // reasoning traces, model badges and internal UI blocks.
   const professionalUserMeta = (meta: Extract<typeof blocks[number], { kind: 'user' }>['meta']): Extract<typeof blocks[number], { kind: 'user' }>['meta'] => {
     if (!meta) return undefined
+    // Runtime-generated execution prompts have a separate professional goal.
+    // Keep it so the user bubble does not fall back to the stored protocol.
+    const displayText = typeof meta.displayText === 'string' && meta.displayText.trim()
+      ? engineeringProfessionalUserText(meta.displayText)
+      : undefined
     const attachmentIds = meta.attachmentIds
     const attachments = meta.attachments
-    return attachmentIds?.length || attachments?.length ? { attachmentIds, attachments } : undefined
+    return displayText || attachmentIds?.length || attachments?.length ? { displayText, attachmentIds, attachments } : undefined
   }
   const timelineBlocks = engineeringThreadActive
     ? blocks.filter((block) => block.kind === 'user' || block.kind === 'assistant').map(block => block.kind === 'assistant'

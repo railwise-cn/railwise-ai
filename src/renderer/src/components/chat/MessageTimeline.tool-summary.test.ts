@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import i18n from '../../i18n'
 import type { ChatBlock, NormalizedThread, ToolBlock } from '../../agent/types'
 import { useChatStore } from '../../store/chat-store'
 import { MessageTimeline, summarizeToolBlock } from './MessageTimeline'
@@ -193,6 +194,24 @@ describe('MessageTimeline WorkWise Runtime runtime metadata smoke', () => {
 
     expect(html).toContain('请解释观测 后视归零方向 的结果。')
     expect(html).not.toContain('cosa-in2-6-backsight-reset')
+  })
+
+  it('renders the execution goal without exposing or offering to edit its stored protocol', () => {
+    const block: ChatBlock = {
+      kind: 'user', id: 'approved-execution',
+      text: 'Execute the allowlisted plan. Plan: {"tool":"control_network","networkId":"internal-network"}',
+      meta: {
+        displayText: '核查当前水准网并生成复核报告。',
+        attachmentIds: ['source-file'],
+        attachments: [{ id: 'source-file', name: 'survey.gsi', mimeType: 'text/plain' }]
+      }
+    }
+    const html = renderToStaticMarkup(createElement(MessageBubble, { block, professionalSurface: true, language: 'zh-CN' }))
+    expect(html).toContain(block.meta!.displayText!)
+    expect(html).toContain('survey.gsi')
+    expect(html).not.toContain('control_network')
+    expect(html).not.toContain('internal-network')
+    expect(html).not.toContain(`aria-label="${i18n.t('rewindEditMessage')}"`)
   })
 
   it('renders user image attachments as thumbnails instead of attachment chips', () => {

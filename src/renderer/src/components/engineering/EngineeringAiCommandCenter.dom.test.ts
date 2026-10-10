@@ -13,12 +13,14 @@ vi.mock('./EngineeringProjectSuggestions', () => ({ EngineeringProjectSuggestion
 
 vi.mock('../chat/MessageTimeline', () => ({ MessageTimeline: ({ runtimeError, blocks, professionalSurface }: { runtimeError?: string | null; blocks: Array<{ kind: string; text: string; meta?: unknown; uiBlocks?: unknown[] }>; professionalSurface?: boolean }) => {
   const assistant = blocks.find(block => block.kind === 'assistant')
+  const user = blocks.find(block => block.kind === 'user')
   return createElement('div', {
     'data-testid': 'message-timeline',
     'data-block-kinds': blocks.map(block => block.kind).join(','),
     'data-professional-surface': String(professionalSurface === true),
     'data-assistant-meta': assistant?.meta === undefined ? 'none' : 'present',
-    'data-user-text': blocks.find(block => block.kind === 'user')?.text,
+    'data-user-text': user?.text,
+    'data-user-meta': JSON.stringify(user?.meta),
     'data-assistant-ui-block-count': String(assistant?.uiBlocks?.length ?? 0)
   }, runtimeError)
 } }))
@@ -157,6 +159,28 @@ describe('Engineering AI session recovery states', () => {
     await render({ expandPlan: false })
     expect(container.querySelector('[data-testid="message-timeline"]')?.getAttribute('data-user-text')).toBe(question)
     expect(useChatStore.getState().blocks[0]).toMatchObject({ text: question })
+  })
+
+  it.each([false, true])('keeps the professional execution goal with attachments present: %s', async withAttachments => {
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
+    const protocol = 'Execute this approved plan.\nPlan: {"tool":"control_network","networkId":"internal-network"}'
+    const goal = '核查当前水准网并生成复核报告。'
+    const attachments = withAttachments ? [{ id: 'source-file', name: 'survey.gsi', mimeType: 'text/plain' }] : undefined
+    const attachmentIds = withAttachments ? ['source-file'] : undefined
+    const originalMeta = { displayText: goal, attachments, attachmentIds, activeSkillIds: ['internal-skill'], injectedMemoryIds: ['internal-memory'] }
+    useChatStore.setState({ blocks: [{ kind: 'user', id: 'execution', text: protocol, meta: originalMeta }] as never })
+    await render({ expandPlan: false })
+    const meta = JSON.parse(container.querySelector('[data-testid="message-timeline"]')!.getAttribute('data-user-meta')!)
+    expect(meta).toEqual({ displayText: goal, ...(withAttachments ? { attachments, attachmentIds } : {}) })
+    expect(useChatStore.getState().blocks[0]).toMatchObject({ text: protocol, meta: originalMeta })
+  })
+
+  it('removes generated evidence routing from displayText while keeping its question', async () => {
+    runtimeRequest.mockImplementation(async path => response(200, path.startsWith('/v1/engineering/ai/plans?') ? { plan: null } : { cards: [] }))
+    const question = '请复核 S1 的点位精度。'
+    useChatStore.setState({ blocks: [{ kind: 'user', id: 'execution', text: 'Internal execution protocol', meta: { displayText: `${question}\n\nSelected Survey evidence (reference IDs only, not execution approval): {"projectId":"internal-project"}` } }] as never })
+    await render({ expandPlan: false })
+    expect(JSON.parse(container.querySelector('[data-testid="message-timeline"]')!.getAttribute('data-user-meta')!)).toEqual({ displayText: question })
   })
 
   it('keeps the execution protocol collapsed by default and reveals it on demand', async () => {
