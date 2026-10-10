@@ -1148,7 +1148,7 @@ describe('simplified continuous task flow', () => {
     await vi.waitFor(() => expect(request.mock.calls.some(([path]) => path.endsWith('/validate'))).toBe(true))
     const validation = request.mock.calls.find(([path]) => path.endsWith('/validate'))!
     expect(JSON.parse(validation[2]!).expectedRevision).toBe(4)
-    expect(datasets[0].revision).toBe(5)
+    expect((datasets[0] as { revision: number }).revision).toBe(5)
     expect(container.textContent).not.toContain('dataset revision conflict')
   })
 
