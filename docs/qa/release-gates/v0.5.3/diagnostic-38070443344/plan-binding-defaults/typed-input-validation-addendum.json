@@ -1,0 +1,52 @@
+{
+  "reviewLabel": "AI pure compiler reproduction typed-input addendum",
+  "schemaInstalledModule": "/Applications/RailWise AI.app/Contents/Resources/app.asar.unpacked/kun/dist/contracts/engineering-ai.js",
+  "schemaBytesEqualFrozen": true,
+  "schemaSha256": "54eead393dbbf502b6fe496c89fd0f195714abfcb976c0e3da1e2287c77bf580",
+  "checks": [
+    {
+      "variant": "canonicalExplicitEmptyParameters",
+      "stepId": "step-1",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalExplicitEmptyParameters",
+      "stepId": "step-2",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalExplicitEmptyParameters",
+      "stepId": "step-3",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalExplicitEmptyParameters",
+      "stepId": "step-4",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalOmittedParameters",
+      "stepId": "step-1",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalOmittedParameters",
+      "stepId": "step-2",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalOmittedParameters",
+      "stepId": "step-3",
+      "validTypedInput": true
+    },
+    {
+      "variant": "canonicalOmittedParameters",
+      "stepId": "step-4",
+      "validTypedInput": true
+    }
+  ],
+  "allCanonicalTypedInputsValid": true,
+  "sourceEditPerformed": false,
+  "businessExecutionPerformed": false,
+  "releaseReady": false
+}

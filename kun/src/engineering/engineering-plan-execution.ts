@@ -47,7 +47,13 @@ export function compilePlanSteps(steps: Step[], context: Context): Step[] {
     if (!def) throw new Error(`tool is not allowlisted: ${step.tool}`)
     const parameters: Parameters = { ...step.parameters }
     const bindings = [...step.parameterBindings ?? []]
+    const hasBinding = (parameter: string): boolean => bindings.some(binding => binding.parameter === parameter)
+    const setDefault = (parameter: keyof Parameters, value: Parameters[keyof Parameters]): void => {
+      if (!Object.prototype.hasOwnProperty.call(parameters, parameter) && !hasBinding(parameter)) parameters[parameter] = value
+    }
     const bind = (parameter: string, source: Step | undefined, output: NonNullable<Step['parameterBindings']>[number]['output'], asArray = false): boolean => {
+      // Preserve caller bindings for validation, including invalid or duplicate ones.
+      if (hasBinding(parameter)) return true
       if (!source) return false
       bindings.push({ parameter, stepId: source.id, output, ...(asArray ? { asArray: true } : {}) }); return true
     }
@@ -56,26 +62,26 @@ export function compilePlanSteps(steps: Step[], context: Context): Step[] {
     if (step.parameters === undefined) {
       const tool = planToolName(step.tool)
       if (tool.startsWith('survey_') || definition(tool)?.outputs.includes('adjustment-run')) {
-        if (net) parameters.networkId = net.id
+        if (net) setDefault('networkId', net.id)
         if (tool === 'survey_adjustment_read') bind('adjustmentId', priorAdjustment, 'run.id')
         if (tool !== 'survey_adjustment_read') {
-          if (!bind('expectedRevision', prior('survey_network_validate'), 'network.revision') && net) parameters.expectedRevision = net.revision
+          if (!bind('expectedRevision', prior('survey_network_validate'), 'network.revision') && net) setDefault('expectedRevision', net.revision)
         }
       } else if (tool === 'monitoring_data_first_check' || tool === 'deformation_rate') {
-        if (dataset) parameters.datasetId = dataset.id
-        if (tool === 'deformation_rate') parameters.projectId = context.projectId
-        if (!bind('expectedRevision', prior('monitoring_data_first_check'), 'dataset.revision') && dataset) parameters.expectedRevision = dataset.revision
+        if (dataset) setDefault('datasetId', dataset.id)
+        if (tool === 'deformation_rate') setDefault('projectId', context.projectId)
+        if (!bind('expectedRevision', prior('monitoring_data_first_check'), 'dataset.revision') && dataset) setDefault('expectedRevision', dataset.revision)
       } else if (tool === 'chart_generator') {
         bind('analysisId', prior('deformation_rate'), 'analysis.id')
-        parameters.chartType = 'trend'
+        setDefault('chartType', 'trend')
       } else if (tool === 'report_export' || tool === 'excel_export') {
-        parameters.projectId = context.projectId
+        setDefault('projectId', context.projectId)
         if (priorAdjustment) {
-          parameters.expectedRevision = context.projectRevision
+          setDefault('expectedRevision', context.projectRevision)
           bind('adjustmentIds', priorAdjustment, 'run.id', true)
         } else if (dataset) {
-          parameters.datasetId = dataset.id
-          if (!bind('expectedRevision', prior('monitoring_data_first_check'), 'dataset.revision')) parameters.expectedRevision = dataset.revision
+          setDefault('datasetId', dataset.id)
+          if (!bind('expectedRevision', prior('monitoring_data_first_check'), 'dataset.revision')) setDefault('expectedRevision', dataset.revision)
           bind('analysisId', prior('deformation_rate'), 'analysis.id')
         }
       }

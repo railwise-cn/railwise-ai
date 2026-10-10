@@ -10,8 +10,8 @@ import { EngineeringAiOrchestrator } from './engineering-ai-orchestrator.js'
 import { importWorkwiseSurveyNetwork } from './survey-test-helpers.js'
 import { buildRailwiseToolProviders } from '../adapters/tool/railwise-tool-provider.js'
 import { LocalToolHost } from '../adapters/tool/local-tool-host.js'
-import type { EngineeringRunPlanV1 } from '../contracts/engineering-ai.js'
-import { resolvedStepParameters } from './engineering-plan-execution.js'
+import { EngineeringPlanStepV1, type EngineeringRunPlanV1 } from '../contracts/engineering-ai.js'
+import { compilePlanSteps, planParameterDiagnostics, resolvedStepParameters } from './engineering-plan-execution.js'
 import type { StartTurnRequest } from '../contracts/turns.js'
 
 describe('Reviewed Survey plan execution', () => {
@@ -162,6 +162,68 @@ describe('Reviewed Survey plan execution', () => {
     }
     expect(repository.stepEvidence(plan.id, 'step-1')!.parameters.expectedRevision).toBe(repository.stepEvidence(plan.id, 'step-0')!.handles['dataset.revision'])
     expect(repository.stepEvidence(plan.id, 'step-3')!.parameters.analysisId).toBe(repository.stepEvidence(plan.id, 'step-1')!.handles['analysis.id'])
+  })
+
+  it('preserves a legal reimport-bound network chain when optional parameters are omitted', () => {
+    const snapshot = new EngineeringContextService(engineering, undefined, survey).snapshot(projectId)
+    const context = { ...snapshot, surveyNetworks: snapshot.surveyNetworks.map(item => ({ ...item, networkType: 'plane-control', inputAttachmentHash: 'a'.repeat(64) })) }
+    const step = (id: string, tool: string, dependsOn: string[], extra = {}) => EngineeringPlanStepV1.parse({ id, title: id, tool, risk: 'write', dependsOn, inputHash: 'draft', approval: 'pending', ...extra })
+    const steps = [
+      step('reimport', 'survey_network_reimport', [], { parameters: { projectId, expectedRevision: context.projectRevision, sourceNetworkId: networkId, sourceNetworkRevision: 1, sourceSha256: 'a'.repeat(64), networkType: 'leveling', verticalDatum: 'synthetic', knownPointId: 'BM', knownPointHeight: 100 } }),
+      step('validate', 'survey_network_validate', ['reimport'], { parameterBindings: [{ parameter: 'networkId', stepId: 'reimport', output: 'network.id' }, { parameter: 'expectedRevision', stepId: 'reimport', output: 'network.revision' }] }),
+      step('calculate', 'survey_calculator', ['validate'], { parameterBindings: [{ parameter: 'networkId', stepId: 'reimport', output: 'network.id' }, { parameter: 'expectedRevision', stepId: 'validate', output: 'network.revision' }] }),
+      step('report', 'report_export', ['calculate'], { parameterBindings: [{ parameter: 'adjustmentIds', stepId: 'calculate', output: 'run.id', asArray: true }] })
+    ]
+    const original = structuredClone(steps)
+    const compiled = compilePlanSteps(steps, context)
+    expect(planParameterDiagnostics(compiled, context)).toEqual([])
+    expect(compiled[1]?.parameters).toEqual({})
+    expect(compiled[2]?.parameters).toEqual({})
+    expect(compiled.map(item => item.parameterBindings)).toEqual(steps.map(item => item.parameterBindings ?? []))
+    const emptyParameters = steps.map(item => ['validate', 'calculate'].includes(item.id) ? { ...item, parameters: {} } : item)
+    expect(compilePlanSteps(emptyParameters, context)).toEqual(compiled)
+    const handles: Record<string, Record<string, unknown>> = { reimport: { 'network.id': 'new-network', 'network.revision': 3 }, validate: { 'network.id': 'new-network', 'network.revision': 4 }, calculate: { 'run.id': 'new-run' } }
+    expect(resolvedStepParameters(compiled[1]!, id => handles[id] ?? null)).toEqual({ networkId: 'new-network', expectedRevision: 3 })
+    expect(resolvedStepParameters(compiled[2]!, id => handles[id] ?? null)).toMatchObject({ networkId: 'new-network', expectedRevision: 4 })
+    expect(resolvedStepParameters(compiled[3]!, id => handles[id] ?? null)).toEqual({ projectId, expectedRevision: context.projectRevision, adjustmentIds: ['new-run'] })
+    expect(steps).toEqual(original)
+  })
+
+  it('keeps explicitly selected monitoring predecessors instead of duplicating inferred bindings', async () => {
+    const dataset = await engineering.importDataset({ projectId, expectedRevision: 1, idempotencyKey: 'bound-monitoring-data', name: 'measurements.csv', dataBase64: Buffer.from('point,time,value\nA,2026-01-01,1\nA,2026-01-02,1.1').toString('base64') })
+    const context = new EngineeringContextService(engineering, undefined, survey).snapshot(projectId)
+    const step = (id: string, tool: string, dependsOn: string[], extra = {}) => EngineeringPlanStepV1.parse({ id, title: id, tool: `railwise.${tool}`, risk: 'write', dependsOn, inputHash: 'draft', approval: 'pending', ...extra })
+    const datasetBindings = [{ parameter: 'datasetId', stepId: 'check-first', output: 'dataset.id' }, { parameter: 'expectedRevision', stepId: 'check-first', output: 'dataset.revision' }]
+    const steps = [
+      step('check-first', 'monitoring_data_first_check', [], { parameters: { datasetId: dataset.id, expectedRevision: dataset.revision } }),
+      step('check-latest', 'monitoring_data_first_check', ['check-first'], { parameters: { datasetId: dataset.id, expectedRevision: dataset.revision } }),
+      step('analyse', 'deformation_rate', ['check-first', 'check-latest'], { parameterBindings: datasetBindings }),
+      step('chart', 'chart_generator', ['analyse'], { parameterBindings: [{ parameter: 'analysisId', stepId: 'analyse', output: 'analysis.id' }] }),
+      step('report', 'report_export', ['analyse'], { parameterBindings: [...datasetBindings, { parameter: 'analysisId', stepId: 'analyse', output: 'analysis.id' }] })
+    ]
+    const compiled = compilePlanSteps(steps, context)
+    expect(planParameterDiagnostics(compiled, context)).toEqual([])
+    expect(compiled.map(item => item.parameterBindings)).toEqual(steps.map(item => item.parameterBindings ?? []))
+    expect(compiled[2]?.parameters).toEqual({ projectId })
+    expect(compiled[3]?.parameters).toEqual({ chartType: 'trend' })
+    expect(compiled[4]?.parameters).toEqual({ projectId })
+    expect(resolvedStepParameters(compiled[4]!, id => id === 'check-first' ? { 'dataset.id': 'selected-dataset', 'dataset.revision': 7 } : { 'analysis.id': 'selected-analysis' })).toEqual({ projectId, datasetId: 'selected-dataset', expectedRevision: 7, analysisId: 'selected-analysis' })
+  })
+
+  it('retains conflicting literals, duplicate caller bindings and invalid sources for review diagnostics', () => {
+    const context = new EngineeringContextService(engineering, undefined, survey).snapshot(projectId)
+    const source = EngineeringPlanStepV1.parse({ id: 'source', title: 'source', tool: 'survey_network_validate', risk: 'write', dependsOn: [], inputHash: 'draft', approval: 'pending' })
+    const binding = { parameter: 'expectedRevision', stepId: 'source', output: 'network.revision' as const }
+    const target = EngineeringPlanStepV1.parse({ ...source, id: 'target', dependsOn: ['source'], parameterBindings: [binding] })
+    for (const candidate of [
+      { ...target, parameters: { networkId, expectedRevision: 1 } },
+      { ...target, parameterBindings: [binding, binding] },
+      { ...target, parameterBindings: [{ ...binding, stepId: 'missing' }] }
+    ]) {
+      const compiled = compilePlanSteps([source, candidate], context)
+      expect(compiled[1]?.parameterBindings).toEqual(candidate.parameterBindings)
+      expect(planParameterDiagnostics(compiled, context)).toContainEqual({ stepId: 'target', code: 'invalid-binding', fields: ['expectedRevision'] })
+    }
   })
 
   it('preserves incomplete or legacy plans without allowing approval or execution', async () => {
