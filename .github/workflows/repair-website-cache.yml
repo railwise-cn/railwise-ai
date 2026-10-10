@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Inspect server configuration or apply the scoped cache rule.'
+        description: 'Inspect server configuration, inspect canonical product routes, or apply the scoped cache rule.'
         required: true
         type: choice
         options:
           - inspect
+          - canonical-inspect
           - apply
         default: inspect
       confirmation:
@@ -30,7 +31,7 @@ env:
 jobs:
   repair:
     name: ${{ inputs.mode }} WorkWise update metadata cache
-    if: ${{ inputs.mode == 'inspect' || inputs.confirmation == 'REPAIR-WORKWISE-METADATA-CACHE' }}
+    if: ${{ inputs.mode == 'inspect' || inputs.mode == 'canonical-inspect' || inputs.confirmation == 'REPAIR-WORKWISE-METADATA-CACHE' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.mode == 'apply' && 'production-release' || 'release-inspection' }}
