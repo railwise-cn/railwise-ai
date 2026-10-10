@@ -3433,6 +3433,7 @@
     "append-only": "Adds computation or candidate files; earlier evidence is retained. No automatic undo."
   },
   "engineeringPlanOutput": {
+    "prepared-network": "New network from the preserved source",
     "network-validation": "Network validation revision",
     "dataset-validation": "Dataset validation revision",
     "deterministic-analysis": "Deterministic analysis record",
@@ -3787,6 +3788,9 @@
   "engineeringFileActionFailed": "The file action did not complete. Please retry.",
   "engineeringFixIssue": "Resolve issue",
   "engineeringPlanInput": "Inputs",
+  "engineeringPlanSourcePreparation": "Starting point and reference to confirm",
+  "engineeringPlanSourceDeclaration": "{{network}} · Starting point {{point}} = {{height}} m · Height reference: {{datum}}",
+  "engineeringPlanSourcePreservation": "Reimport the verified original file as a new network using these declarations. Keep the original network and results; this step does not calculate.",
   "engineeringPlanCurrentInputs": "Confirmed inputs for this task",
   "engineeringPlanSavedResult": "Saved calculation result",
   "engineeringPlanConfirmationHint": "Confirm to check inputs, calculate and save the results described in this plan. Original files are retained.",

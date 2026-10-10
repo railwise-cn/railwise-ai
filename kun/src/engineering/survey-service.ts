@@ -17,6 +17,7 @@ import {
   DeformationComparisonRequestV1,
   DeformationComparisonV1,
   SurveyNetworkImportRequest,
+  SurveyNetworkReimportRequest,
   SurveyNetworkV1,
   SurveyNetworkValidateRequest,
   SurveyObservationV1,
@@ -2930,11 +2931,35 @@ export class SurveyService {
     this.importAudit.finish(attempt, reason)
   }
 
+  /** Keep the original network/results; explicit approved declarations create a new import. */
+  async reimportHeightNetwork(input: unknown): Promise<SurveyNetworkV1> {
+    const req = SurveyNetworkReimportRequest.parse(input)
+    const source = this.getNetwork(req.sourceNetworkId)
+    if (!source || source.projectId !== req.projectId) throw new Error('source network does not belong to the selected project')
+    if (source.revision !== req.sourceNetworkRevision || source.sourceFile?.sha256 !== req.sourceSha256) throw new Error('source network reference is stale')
+    if (this.getRawSourceIntegrity(source.id).status !== 'verified' || !this.getSourceEligibility(source.id).eligible) throw new Error('source is not currently admitted for reimport')
+    if (!source.observations.length || source.observations.some(item => item.type !== 'height-difference')) throw new Error('height reimport requires original height-difference observations')
+    if (![...source.knownPoints, ...source.unknownPoints].some(point => point.id === req.knownPointId)) throw new Error('declared starting point is absent from the original source')
+    const bytes = readFileSync(this.rawSourceOriginalPath(req.sourceSha256))
+    if (createHash('sha256').update(bytes).digest('hex') !== req.sourceSha256) throw new Error('preserved source bytes do not match the approved source')
+    const assertCurrentSource = () => {
+      const current = this.getNetwork(source.id)
+      if (current?.revision !== req.sourceNetworkRevision || current.sourceFile?.sha256 !== req.sourceSha256 || this.getRawSourceIntegrity(source.id).status !== 'verified' || !this.getSourceEligibility(source.id).eligible) throw new Error('source changed during reimport; refresh and request a new plan')
+    }
+    return this.importNetworkWithGuard({ projectId: req.projectId, expectedRevision: req.expectedRevision, idempotencyKey: req.idempotencyKey,
+      name: source.sourceFile!.name, dataBase64: bytes.toString('base64'), networkType: req.networkType,
+      knownPoints: [{ id: req.knownPointId, height: req.knownPointHeight }], referenceDeclaration: { verticalDatum: req.verticalDatum } }, assertCurrentSource)
+  }
+
   async importNetwork(input: unknown): Promise<SurveyNetworkV1> {
+    return this.importNetworkWithGuard(input)
+  }
+
+  private async importNetworkWithGuard(input: unknown, assertCurrentSource?: () => void): Promise<SurveyNetworkV1> {
     const attempt = this.importAudit.begin(input)
     let network: SurveyNetworkV1
     try {
-      network = await this.importNetworkTracked(input, attempt)
+      network = await this.importNetworkTracked(input, attempt, assertCurrentSource)
     } catch (error) {
       // A failed audit write leaves explicit incomplete evidence. Never claim
       // success, or fabricate a terminal receipt after persistence failed.
@@ -2950,7 +2975,7 @@ export class SurveyService {
     return await probeSurveyTabular(request.name, Buffer.from(request.dataBase64, 'base64'), request.delimiter)
   }
 
-  private async importNetworkTracked(input: unknown, attempt: SurveyImportAttempt): Promise<SurveyNetworkV1> {
+  private async importNetworkTracked(input: unknown, attempt: SurveyImportAttempt, assertCurrentSource?: () => void): Promise<SurveyNetworkV1> {
     const req = SurveyNetworkImportRequest.parse(input)
     attempt.stage = 'preparation'
     const prepared = prepareImportRequest(req)
@@ -3035,6 +3060,10 @@ export class SurveyService {
     const initialAdmission = persistedRawOriginal ? this.createSourceAdmissionRecord(parsed, parsed.createdAt) : null
     attempt.stage = 'commit'
     const committed = this.db.transaction(() => {
+      // Approved reimports bind the current source as well as the parsed bytes.
+      // Check under the writer lock before any network/ledger/idempotency insert.
+      // An async parser must not leave a durable new network after source drift.
+      assertCurrentSource?.()
       // Parsing and preserving the content-addressed source can happen before
       // this lock.  The durable state must not: another service may have
       // committed the same key while this request was parsing.

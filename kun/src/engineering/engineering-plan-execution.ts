@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { EngineeringContextSnapshotV1, EngineeringPlanStepV1, EngineeringRunPlanV1, EngineeringPlanParameterIssueV1 } from '../contracts/engineering-ai.js'
 import { EngineeringPlanParametersV1 } from '../contracts/engineering-ai.js'
 import { engineeringPlanToolRisk, surveyAdjustmentToolNetworks } from './engineering-plan-tools.js'
-import { AdjustmentRequestV1 } from '../contracts/survey.js'
+import { AdjustmentRequestV1, SurveyNetworkReimportRequest } from '../contracts/survey.js'
 
 type Step = EngineeringPlanStepV1
 type Context = EngineeringContextSnapshotV1
@@ -12,6 +12,7 @@ const revision = z.number().int().positive()
 const network = z.object({ networkId: id, expectedRevision: revision, method: AdjustmentRequestV1.shape.method }).strict()
 const report = z.object({ projectId: id, expectedRevision: revision, datasetId: id.optional(), analysisId: id.optional(), adjustmentIds: z.array(id).min(1).max(200).optional(), deformationIds: z.array(id).min(1).max(200).optional() }).strict().refine(value => Boolean(value.datasetId || value.adjustmentIds?.length || value.deformationIds?.length), 'select delivery inputs')
 const definitions: Record<string, { schema: z.ZodType; outputs: string[]; reversibility: NonNullable<Step['reversibility']> }> = {
+  survey_network_reimport: { schema: SurveyNetworkReimportRequest.omit({ idempotencyKey: true }), outputs: ['prepared-network'], reversibility: 'append-only' },
   survey_network_validate: { schema: z.object({ networkId: id, expectedRevision: revision }).strict(), outputs: ['network-validation'], reversibility: 'revisioned-write' },
   survey_adjustment_read: { schema: z.object({ networkId: id, adjustmentId: id.optional() }).strict(), outputs: ['existing-adjustment-evidence'], reversibility: 'read-only' },
   monitoring_data_first_check: { schema: z.object({ datasetId: id, expectedRevision: revision }).strict(), outputs: ['dataset-validation'], reversibility: 'revisioned-write' },
@@ -89,7 +90,7 @@ const sampleOutputs: Record<NonNullable<Step['parameterBindings']>[number]['outp
   'network.id': 'network-output', 'network.revision': 1, 'dataset.id': 'dataset-output', 'dataset.revision': 1, 'analysis.id': 'analysis-output', 'run.id': 'run-output'
 }
 const outputTools: Record<string, string[]> = {
-  'network.id': ['survey_network_validate'], 'network.revision': ['survey_network_validate'],
+  'network.id': ['survey_network_validate', 'survey_network_reimport'], 'network.revision': ['survey_network_validate', 'survey_network_reimport'],
   'dataset.id': ['monitoring_data_first_check'], 'dataset.revision': ['monitoring_data_first_check'],
   'analysis.id': ['deformation_rate'], 'run.id': ['survey_calculator', 'control_network', 'cpiii_adjustment', 'coord_transform', 'distance_calculator', 'angle_convert', 'survey_adjustment_read', 'report_export', 'excel_export']
 }
@@ -111,17 +112,22 @@ export function planParameterDiagnostics(steps: Step[], context?: Context): Engi
     const parsed = def.schema.safeParse(args)
     if (!parsed.success) issues.push({ stepId: step.id, code: 'invalid-parameters', fields: [...new Set(parsed.error.issues.flatMap(issue => issue.code === 'unrecognized_keys' ? issue.keys : issue.path.length ? [String(issue.path[0])] : ['inputs']))].slice(0, 200) })
     if (context) {
-      const networkId = (source: Step, visited = new Set<string>()): unknown => {
+      const selectedNetwork = (source: Step, visited = new Set<string>()): { id: string; networkType: string } | undefined => {
         if (visited.has(source.id)) return undefined
         visited.add(source.id)
-        if (source.parameters?.networkId !== undefined) return source.parameters.networkId
+        if (source.parameters?.networkId !== undefined) return context.surveyNetworks.find(item => item.id === source.parameters!.networkId)
         const binding = source.parameterBindings?.find(item => item.parameter === 'networkId' && item.output === 'network.id' && !item.asArray)
-        const parent = binding && steps.find(item => item.id === binding.stepId && planToolName(item.tool) === 'survey_network_validate')
-        return parent ? networkId(parent, visited) : undefined
+        const parent = binding && steps.find(item => item.id === binding.stepId)
+        if (parent && planToolName(parent.tool) === 'survey_network_reimport' && typeof parent.parameters?.networkType === 'string' && typeof parent.parameters.sourceNetworkId === 'string') return { id: parent.parameters.sourceNetworkId, networkType: parent.parameters.networkType }
+        return parent && planToolName(parent.tool) === 'survey_network_validate' ? selectedNetwork(parent, visited) : undefined
       }
       const allowed = surveyAdjustmentToolNetworks[planToolName(step.tool)]
-      const selected = allowed && context.surveyNetworks.find(item => item.id === networkId(step))
+      const selected = allowed && selectedNetwork(step)
       if (allowed && (!selected || !allowed.includes(selected.networkType))) issues.push({ stepId: step.id, code: 'invalid-parameters', fields: ['networkId'] })
+      if (planToolName(step.tool) === 'survey_network_reimport') {
+        const source = context.surveyNetworks.find(item => item.id === step.parameters?.sourceNetworkId)
+        if (!source || source.revision !== step.parameters.sourceNetworkRevision || source.inputAttachmentHash !== step.parameters.sourceSha256 || step.parameters.projectId !== context.projectId || step.parameters.expectedRevision !== context.projectRevision) issues.push({ stepId: step.id, code: 'invalid-parameters', fields: ['sourceNetworkId'] })
+      }
     }
   }
   return issues
@@ -133,6 +139,7 @@ export function planParameterIssues(steps: Step[], context?: Context): string[] 
 
 export function assertPlanParameterScope(parameters: Record<string, unknown>, context: Context): void {
   if (parameters.projectId !== undefined && parameters.projectId !== context.projectId) throw new Error('plan parameters refer to another project')
+  if (parameters.sourceNetworkId !== undefined && !context.surveyNetworks.some(item => item.id === parameters.sourceNetworkId && item.revision === parameters.sourceNetworkRevision && item.inputAttachmentHash === parameters.sourceSha256)) throw new Error('plan source reference is stale or outside the current project')
   for (const [key, records] of [['networkId', context.surveyNetworks], ['datasetId', context.datasets], ['analysisId', context.analyses]] as const) {
     if (parameters[key] !== undefined && !records.some(item => item.id === parameters[key])) throw new Error(`plan ${key} is not in the current project context`)
   }
