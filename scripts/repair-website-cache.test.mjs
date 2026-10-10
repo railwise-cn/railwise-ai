@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parse } from 'yaml'
@@ -46,4 +47,12 @@ test('canonical inspection is available only as a read-only dedicated workflow m
   assert.match(String(repair.if), /inputs\.mode == 'canonical-inspect'/)
   assert.match(String(repair.environment?.name), /release-inspection/)
   assert.equal(String(repair.steps.find(step => String(step.run || '').includes('repair-website-cache.mjs'))?.run).includes('apply'), false)
+})
+
+test('embedded remote script is valid bash after template extraction', () => {
+  const source = readFileSync(new URL('./repair-website-cache.mjs', import.meta.url), 'utf8')
+  const match = source.match(/const REMOTE_SCRIPT = String\.raw`([\s\S]*?)`\n/)
+  assert.ok(match, 'REMOTE_SCRIPT template must be present')
+  const result = spawnSync('bash', ['-n'], { input: match[1], encoding: 'utf8' })
+  assert.equal(result.status, 0, `${result.stderr || result.stdout}`)
 })

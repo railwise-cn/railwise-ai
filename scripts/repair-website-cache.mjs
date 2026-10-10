@@ -519,19 +519,19 @@ def safe(path):
 pattern = re.compile(r'\b(?:require|require_once|include|include_once)\s*(?:\(\s*)?([^;\n]+?)(?:\s*\))?\s*;')
 for match in pattern.finditer(text):
     expression = match.group(1).strip()
-    joined = re.fullmatch(r'__DIR__\s*\.\s*([\'\"])([^\'\"]+)\1', expression)
-    literal = re.fullmatch(r'([\'\"])([^\'\"]+)\1', expression)
+    joined = re.fullmatch(r"__DIR__\s*\.\s*([\x27\"])([^\x27\"]+)\1", expression)
+    literal = re.fullmatch(r"([\x27\"])([^\x27\"]+)\1", expression)
     if joined: path = safe(str(base / joined.group(2).lstrip('/')))
     elif literal and literal.group(2).startswith('/'): path = safe(literal.group(2))
     else: path = None
     status = 'resolved' if path and (path == approved or path.startswith(approved.rstrip('/') + '/')) else ('blocked' if path else 'unknown')
     add(expression, path, status)
-for match in re.finditer(r'__DIR__\s*\.\s*([\'\"])([^\'\"]+\.(?:php|json))\1', text):
+for match in re.finditer(r"__DIR__\s*\.\s*([\x27\"])([^\x27\"]+\.(?:php|json))\1", text):
     path = safe(str(base / match.group(2).lstrip('/')))
     status = 'resolved' if path and (path == approved or path.startswith(approved.rstrip('/') + '/')) else ('blocked' if path else 'unknown')
     add('__DIR__ . ' + match.group(1) + match.group(2) + match.group(1), path, status)
 markers = []
-for match in re.finditer(r'(?:version|softwareVersion|releaseVersion|releaseCommit)\s*[\'\"]?\s*(?:=>|:|=)\s*[\'\"]([^\'\"]+)[\'\"]', text, re.I): markers.append(match.group(1)[:128])
+for match in re.finditer(r"(?:version|softwareVersion|releaseVersion|releaseCommit)\s*[\x27\"]?\s*(?:=>|:|=)\s*[\x27\"]([^\x27\"]+)[\x27\"]", text, re.I): markers.append(match.group(1)[:128])
 print(json.dumps({'staticOnly': True, 'status': 'passed', 'references': refs, 'versionMarkers': sorted(set(markers))}, separators=(',', ':')))
 PY
 )"
