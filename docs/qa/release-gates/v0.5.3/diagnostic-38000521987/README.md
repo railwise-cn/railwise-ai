@@ -57,6 +57,19 @@ The corrected source requires its own strict CI, a new private freeze, and real
 acceptance of that final package. Results from this failed package are not
 inherited as passes by the replacement package.
 
+## Related Source-Unit Warning Clarification
+
+The `relative-mm` input retains its original values (`1000 mm` and `-999 mm`),
+and the numerical kernel converts them to metres for calculation. Its result
+and native exports agree with the metre input. The source/network unit
+difference is an appropriate nonblocking warning, but its old suggested action
+asked users to unify units before import. The corresponding AI response said
+not to rely on automatic conversion without explaining the recorded conversion.
+This is a wording clarification, not another numerical failure or a new release
+gate. Supported-unit warnings now explain conversion during calculation and
+preservation of original values and units in both languages. Unsupported units
+retain the existing blocking findings and are never described as convertible.
+
 ## Evidence Boundaries
 
 The personal Login Items list, normal profile, and reused credential are private

@@ -18,23 +18,23 @@ afterEach(async () => {
   }
 })
 
-async function fixture(options: { absolute?: boolean; mixed?: boolean; noRedundancy?: boolean; mm?: boolean; partialRoute?: boolean; noRouteLengths?: boolean } = {}) {
+async function fixture(options: { absolute?: boolean; mixed?: boolean; noRedundancy?: boolean; mm?: boolean; partialRoute?: boolean; noRouteLengths?: boolean; observationUnit?: string; networkUnit?: string } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'survey-weighting-'))
   const service = new SurveyService({ rootDir: root })
   allocated.push({ root, service })
   const scale = options.mm ? 1000 : 1
   const observations = [
-    { id: 'out', type: 'height-difference', from: 'BM', to: 'P', value: scale, unit: options.mm ? 'mm' : 'm',
+    { id: 'out', type: 'height-difference', from: 'BM', to: 'P', value: scale, unit: options.observationUnit ?? (options.mm ? 'mm' : 'm'),
       ...(!options.noRouteLengths ? { routeLength: 1 } : {}),
       ...(options.absolute || options.mixed ? { sigma: .002 * scale, sigmaUnit: options.mm ? 'mm' : 'm' } : {}) },
-    ...(!options.noRedundancy ? [{ id: 'back', type: 'height-difference', from: 'P', to: 'BM', value: -.999 * scale, unit: options.mm ? 'mm' : 'm',
+    ...(!options.noRedundancy ? [{ id: 'back', type: 'height-difference', from: 'P', to: 'BM', value: -.999 * scale, unit: options.observationUnit ?? (options.mm ? 'mm' : 'm'),
       ...(!options.noRouteLengths && !options.partialRoute ? { routeLength: 4 } : {}),
       ...(options.absolute ? { sigma: .004 * scale, sigmaUnit: options.mm ? 'mm' : 'm' } : {}) }] : [])
   ]
   const network = await importWorkwiseSurveyNetwork(service, { projectId: 'weighting', expectedRevision: 0,
     idempotencyKey: 'weighting-import', networkType: 'leveling', network: {
       knownPoints: [{ id: 'BM', known: true, height: 10 }], unknownPoints: [{ id: 'P', known: false, height: 11 }],
-      observations, instrumentParameters: {}
+      observations, instrumentParameters: {}, ...(options.networkUnit ? { unit: options.networkUnit } : {})
     } })
   const checked = service.validateNetwork(network.id, { expectedRevision: network.revision, idempotencyKey: 'weighting-check' })
   const output = service.createAdjustment({ networkId: network.id, expectedRevision: checked.revision, idempotencyKey: 'weighting-adjust' })
@@ -43,7 +43,7 @@ async function fixture(options: { absolute?: boolean; mixed?: boolean; noRedunda
 
 describe('versioned professional weighting units', () => {
   it.each([false, true])('retains the independent relative-route solution and one-metre reference scale (millimetres=%s)', async mm => {
-    const { service, output } = await fixture({ mm })
+    const { service, network, output } = await fixture({ mm })
     expect(output.run).toMatchObject({ status: 'completed', algorithmVersion: 'workwise-survey-adjustment-9' })
     expect(output.result).toMatchObject({ weightingBasis: 'relative-route-length', relativeWeightReferenceLengthMetres: 1,
       unitWeightStdDevUnit: 'm', varianceFactorUnit: 'm2', varianceFactorEstimated: true })
@@ -61,7 +61,35 @@ describe('versioned professional weighting units', () => {
       expect(row.standardizedResidual).toBeUndefined()
       expect(row.residualStatistic).toMatchObject({ status: 'not-testable', reason: 'missing-absolute-precision', scaleBasis: 'relative-weight' })
     })
+    if (mm) {
+      expect(network.observations.map(({ id, value, unit }) => ({ id, value, unit }))).toEqual([
+        { id: 'out', value: 1000, unit: 'mm' }, { id: 'back', value: -999, unit: 'mm' }
+      ])
+      expect(service.getNetwork(network.id)!.observations).toEqual(network.observations)
+      const warnings = network.findings.filter(item => item.code === 'unit_conflict')
+      expect(warnings).toHaveLength(2)
+      warnings.forEach(item => {
+        expect(item.severity).toBe('warning')
+        expect(item.suggestion).toContain('计算时规范换算为 m')
+        expect(item.suggestion).toContain('原始值和单位保留')
+        expect(item.localized?.en.suggestedAction).toContain('normalized to m during calculation')
+        expect(item.localized?.en.suggestedAction).toContain('original values and units are retained')
+      })
+      expect(output.result.observations.map(item => item.unit)).toEqual(['m', 'm'])
+    }
     expect(service.getAdjustmentForNewUse(output.run.id)?.result).toEqual(output.result)
+  })
+
+  it.each(['observation', 'network'] as const)('blocks an unsupported %s unit without claiming it can be normalized', async scope => {
+    const { network, output } = await fixture(scope === 'observation'
+      ? { observationUnit: 'unknown-unit' } : { mm: true, networkUnit: 'unknown-unit' })
+    expect(network.qualityStatus).toBe('blocked')
+    expect(output.run.status).toBe('needs_attention')
+    expect(output.result.validation).toBe('invalid')
+    expect(output.result.points).toEqual([])
+    const unitFindings = network.findings.filter(item => item.code === 'unit_conflict')
+    expect(unitFindings).toContainEqual(expect.objectContaining({ severity: 'blocking' }))
+    expect(unitFindings.some(item => item.severity === 'warning')).toBe(false)
   })
 
   it('records an explicit equal-weight convention when every route length is absent', async () => {
