@@ -272,6 +272,34 @@ describe('EngineeringService', () => {
     service.close()
   })
 
+  it('resolves obsolete project-basis warnings without removing import findings and reopens recurring warnings', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-monitoring-basis-'))
+    const service = new EngineeringService({ rootDir: root })
+    const project = service.createProject({ name: 'basis correction', workspace: root, unit: 'm', thresholds: {}, expectedRevision: 0, idempotencyKey: 'basis-project' })
+    try {
+      const imported = await service.importDataset({ projectId: project.id, expectedRevision: project.revision, idempotencyKey: 'basis-import', name: 'monitor.csv', dataBase64: Buffer.from('point,time,value,unit\nP1,2026-01-01,1,mm\nP1,2026-01-02,2,mm\nP2,2026-01-01,invalid,mm').toString('base64') })
+      const first = service.validateDataset({ datasetId: imported.id, expectedRevision: imported.revision, idempotencyKey: 'basis-first-check' })
+      const originalWarnings = first.findings.filter(f => f.code === 'unit_conflict' || f.code === 'missing_threshold')
+      expect(originalWarnings).toHaveLength(3)
+      expect(originalWarnings.every(f => f.status === 'open')).toBe(true)
+      const accepted = service.acceptWarningFinding({ datasetId: first.id, findingId: originalWarnings[0].id, expectedRevision: first.revision, idempotencyKey: 'basis-accept-warning' })
+      const unchanged = service.validateDataset({ datasetId: first.id, expectedRevision: accepted.revision, idempotencyKey: 'basis-unchanged-check' })
+      expect(unchanged.findings.find(f => f.id === originalWarnings[0].id)?.status).toBe('accepted')
+      const saved = service.updateProject(project.id, { expectedRevision: project.revision, unit: 'mm', thresholds: { default: 10 }, idempotencyKey: 'basis-save' })
+      const corrected = service.validateDataset({ datasetId: first.id, expectedRevision: unchanged.revision, idempotencyKey: 'basis-corrected-check' })
+      expect(corrected.findings).toHaveLength(first.findings.length)
+      expect(corrected.findings.filter(f => originalWarnings.some(old => old.id === f.id))).toHaveLength(3)
+      expect(corrected.findings.filter(f => originalWarnings.some(old => old.id === f.id)).every(f => f.status === 'resolved')).toBe(true)
+      expect(corrected.findings.find(f => f.code === 'invalid_number')).toMatchObject({ severity: 'blocking', status: 'open' })
+      expect(corrected.observations).toEqual(first.observations)
+      expect(corrected.sourceFileHash).toBe(first.sourceFileHash)
+      service.updateProject(project.id, { expectedRevision: saved.revision, unit: 'm', thresholds: {}, idempotencyKey: 'basis-recur' })
+      const recurred = service.validateDataset({ datasetId: corrected.id, expectedRevision: corrected.revision, idempotencyKey: 'basis-recurring-check' })
+      expect(recurred.findings.filter(f => f.code === 'unit_conflict' || f.code === 'missing_threshold')).toHaveLength(3)
+      expect(recurred.findings.filter(f => f.code === 'unit_conflict' || f.code === 'missing_threshold').every(f => f.status === 'open')).toBe(true)
+    } finally { service.close() }
+  })
+
   it('imports each XLSX worksheet with its own header and preserves worksheet provenance', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-engineering-'))
     const service = new EngineeringService({ rootDir: root })

@@ -1120,6 +1120,38 @@ describe('Survey delivery without a monitoring dataset', () => {
 })
 
 describe('simplified continuous task flow', () => {
+  it('rechecks a repeated import at its current dataset revision and binds the import key to project basis', async () => {
+    adjustments = []
+    const dataset = { id: 'replayed-data', sourceFileName: 'monitor.csv', sourceFileHash: 'c'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2,
+      columnCount: 4, observationCount: 2, timeRange: {}, status: 'validated', revision: 4, findings: [], updatedAt: project.updatedAt }
+    datasets = [dataset]
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (method !== 'POST') return original(path, method, payload)
+      const input = JSON.parse(payload ?? '{}')
+      if (path === '/v1/engineering/datasets/import') {
+        expect(input.idempotencyKey).toContain(`-${project.revision}-`)
+        return { ok: true, status: 200, body: JSON.stringify({ dataset: { ...dataset, revision: 1, status: 'imported' } }) }
+      }
+      if (path.endsWith('/validate')) {
+        expect(input.expectedRevision).toBe(4)
+        datasets = [{ ...dataset, revision: 5 }]
+        return { ok: true, status: 200, body: JSON.stringify({ dataset: datasets[0] }) }
+      }
+      throw new Error(`Unexpected mutation: ${path}`)
+    })
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    const input = container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('engineeringUnifiedImport')}"]`)!
+    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['point,time,value,unit\nP1,2026-01-01,1,mm'], 'monitor.csv', { type: 'text/csv' })] })
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30)) })
+    await vi.waitFor(() => expect(request.mock.calls.some(([path]) => path.endsWith('/validate'))).toBe(true))
+    const validation = request.mock.calls.find(([path]) => path.endsWith('/validate'))!
+    expect(JSON.parse(validation[2]!).expectedRevision).toBe(4)
+    expect((datasets[0] as { revision: number }).revision).toBe(5)
+    expect(container.textContent).not.toContain('dataset revision conflict')
+  })
+
   it('automatically checks an imported CSV, acknowledges warnings once, and reaches results', async () => {
     adjustments = []
     let dataset = {

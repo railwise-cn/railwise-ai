@@ -1617,12 +1617,21 @@ function normalizeRows(rows: Row[], mapping: FieldMappingV1, project: RailwisePr
   return { observations, findings, unknownColumns, columnCount: columns.filter((key) => !key.startsWith('__')).length, timeRange: { ...(start ? { start } : {}), ...(end ? { end } : {}) } }
 }
 function mergeFindings(existing: QualityFindingV1[], generated: QualityFindingV1[]): QualityFindingV1[] {
+  const keyFor = (item: QualityFindingV1): string => `${item.code}|${item.row ?? 0}|${item.message}`
+  const projectBasisFinding = (item: QualityFindingV1): boolean => item.code === 'unit_conflict' || item.code === 'missing_threshold'
+  const currentKeys = new Set(generated.map(keyFor))
   const byKey = new Map<string, QualityFindingV1>()
-  for (const item of [...existing, ...generated]) {
-    const key = `${item.code}|${item.row ?? 0}|${item.message}`
+  for (const item of existing) {
+    // Preserve the finding history and raw import blockers. A corrected
+    // project basis resolves only the warnings that no longer apply.
+    byKey.set(keyFor(item), projectBasisFinding(item) && !currentKeys.has(keyFor(item)) ? { ...item, status: 'resolved' } : item)
+  }
+  for (const item of generated) {
+    const key = keyFor(item)
     const previous = byKey.get(key)
-    // Keep a user resolution/acceptance if a re-check produces the same finding.
-    byKey.set(key, previous && previous.status !== 'open' ? previous : item)
+    // Keep acceptance for an unchanged finding; a recurring basis warning
+    // must reopen instead of inheriting its earlier automatic resolution.
+    byKey.set(key, previous && previous.status !== 'open' && !(projectBasisFinding(previous) && previous.status === 'resolved') ? previous : item)
   }
   return [...byKey.values()]
 }

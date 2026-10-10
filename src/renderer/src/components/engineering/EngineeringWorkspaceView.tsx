@@ -555,7 +555,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
     setNotice(null)
   }, [workspaceRoot])
 
-  const loadOverview = useCallback(async (projectId: string, preserveDraft = false): Promise<void> => {
+  const loadOverview = useCallback(async (projectId: string, preserveDraft = false): Promise<Overview | undefined> => {
     if (!runtimeReady || !projectId || requestScope.current.workspaceRoot !== workspaceRoot || !requestScope.current.runtimeReady || requestScope.current.projectId !== projectId) return
     const token = ++overviewRequest.current
     try {
@@ -565,6 +565,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       if (!preserveDraft) setProjectDraft(projectToDraft(next.project))
       setSelectedDatasetId((current) => next.datasets.some((dataset) => dataset.id === current) ? current : next.datasets[0]?.id ?? '')
       setSelectedAnalysisId((current) => next.analyses.some((analysis) => analysis.id === current) ? current : next.analyses.find((analysis) => analysis.algorithmVersion === ENGINEERING_ANALYSIS_ALGORITHM_VERSION)?.id ?? '')
+      return next
     } catch (error) {
       if (token !== overviewRequest.current) return
       setNotice({ tone: 'error', message: engineeringUserError(error, locale) })
@@ -830,15 +831,18 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       if (operationScope !== requestScope.current) return false
       const result = await runtimeRequest<{ dataset: Dataset }>('/v1/engineering/datasets/import', 'POST', {
         projectId: overview.project.id, name: file.name, dataBase64,
-        expectedRevision: overview.project.revision, idempotencyKey: `engineering-import-${overview.project.id}-${file.name}-${file.size}-${file.lastModified}`
+        expectedRevision: overview.project.revision, idempotencyKey: `engineering-import-${overview.project.id}-${overview.project.revision}-${file.name}-${file.size}-${file.lastModified}`
       })
       if (operationScope !== requestScope.current) return false
       setSelectedDatasetId(result.dataset.id)
       // Preserve the imported record even when preflight fails; retry is safe.
       setTab('quality')
-      await loadOverview(overview.project.id)
+      const refreshed = await loadOverview(overview.project.id)
       if (operationScope !== requestScope.current) return false
-      const checked = await runtimeRequest<{ dataset: Dataset }>(`/v1/engineering/datasets/${result.dataset.id}/validate`, 'POST', { expectedRevision: result.dataset.revision, idempotencyKey: `engineering-validate-${result.dataset.id}-${result.dataset.revision}` })
+      // An idempotent import may return its original revision even after
+      // later checks. Validate the current record from the refreshed overview.
+      const imported = refreshed?.datasets.find(dataset => dataset.id === result.dataset.id) ?? result.dataset
+      const checked = await runtimeRequest<{ dataset: Dataset }>(`/v1/engineering/datasets/${imported.id}/validate`, 'POST', { expectedRevision: imported.revision, idempotencyKey: `engineering-validate-${imported.id}-${imported.revision}` })
       if (operationScope !== requestScope.current) return false
       replaceDataset(checked.dataset)
       setNotice({ tone: checked.dataset.findings.some(finding => finding.severity === 'blocking' && finding.status === 'open') ? 'warning' : 'success', message: t('engineeringNoticeDatasetImported', { name: file.name, count: result.dataset.observationCount }) })
