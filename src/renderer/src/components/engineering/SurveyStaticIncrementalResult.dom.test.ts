@@ -38,6 +38,21 @@ function baseMismatchResult() {
 }
 
 describe('static incremental result presentation', () => {
+  it.each(['en', 'zh'])('distinguishes source height-difference linearization from declared observations in %s', async language => {
+    await i18n.changeLanguage(language)
+    const result = calculatedResult()
+    await act(async () => root.render(createElement(SurveyStaticIncrementalResult, { result, sourceBound: true })))
+    const table = host.querySelector(`[aria-label="${i18n.t('advancedStaticObservation')}"]`)!
+    expect(table.querySelectorAll('thead th')[1].textContent).toBe(i18n.t('advancedStaticLinearizedValue'))
+    expect(host.textContent).toContain(i18n.t('advancedStaticLinearizedValueMeaning'))
+    const values = [...table.querySelectorAll('tbody tr')].map(row => row.querySelectorAll('td')[0].textContent)
+    await act(async () => root.render(createElement(SurveyStaticIncrementalResult, { result })))
+    const declaredTable = host.querySelector(`[aria-label="${i18n.t('advancedStaticObservation')}"]`)!
+    expect(declaredTable.querySelectorAll('thead th')[1].textContent).toBe(i18n.t('surveyObservationValue'))
+    expect(host.textContent).not.toContain(i18n.t('advancedStaticLinearizedValueMeaning'))
+    expect([...declaredTable.querySelectorAll('tbody tr')].map(row => row.querySelectorAll('td')[0].textContent)).toEqual(values)
+  })
+
   it.each(['en', 'zh'])('keeps professional metrics and hides algorithm diagnostics in %s', async language => {
     await i18n.changeLanguage(language)
     const result = calculatedResult()

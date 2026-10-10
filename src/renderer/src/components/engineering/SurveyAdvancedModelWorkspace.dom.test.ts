@@ -147,6 +147,9 @@ describe('source-bound professional desktop workflow', () => {
     } else if (kind === 'static-incremental') {
       expect(declaration.base.observations.map((row: { sourceAnchor: string }) => row.sourceAnchor)).toEqual(f.source.model.observations.map(row => row.sourceAnchor))
       expect(declaration.append.observations[0].value).toBeCloseTo(.0005, 12)
+      const table = host.querySelector(`[aria-label="${commonText('advancedStaticObservation')}"]`)!
+      expect(table.querySelectorAll('thead th')[1].textContent).toBe(commonText('advancedStaticLinearizedValue'))
+      expect(host.textContent).toContain(commonText('advancedStaticLinearizedValueMeaning'))
     } else {
       expect(declaration.observations.map((row: { sourceAnchor: string }) => row.sourceAnchor)).toEqual(f.source.model.observations.map(row => row.sourceAnchor))
       if (kind === 'huber') expect(declaration.initialParameters).toEqual(f.source.model.formalCorrections)
@@ -157,6 +160,7 @@ describe('source-bound professional desktop workflow', () => {
     expect(exported.sourceModel).toEqual(f.source.binding); expect(exported.declarationJson).toBe(request.declarationJson)
     await click(commonButton('advancedHistory')); await vi.waitFor(() => expect(restoreButton()).toBeDefined())
     await click(restoreButton()); await loaded()
+    if (kind === 'static-incremental') expect(host.textContent).toContain(commonText('advancedStaticLinearizedValueMeaning'))
     expect(JSON.stringify(f.service.getAdjustment(f.adjustment.run.id))).toBe(formalBefore)
     expect(host.textContent).not.toMatch(/fixedModelHash|sourceAdmissionHash|adapterVersion|schemaVersion|idempotencyKey/)
     expect(host.textContent).not.toContain(f.source.binding.runId)

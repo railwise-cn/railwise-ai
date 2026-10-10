@@ -10,7 +10,7 @@ const failureKeys: Record<string, string> = {
   'base-rank-or-conditioning': 'advancedStaticBaseRank', 'updated-rank-or-conditioning': 'advancedStaticUpdatedRank',
   'numeric-range-or-resolution': 'advancedNumerical', 'incremental-batch-disagreement': 'advancedStaticDisagreement'
 }
-export function SurveyStaticIncrementalResult({ result }: { result: SurveyStaticIncrementalOutputV1 }): ReactElement {
+export function SurveyStaticIncrementalResult({ result, sourceBound = false }: { result: SurveyStaticIncrementalOutputV1; sourceBound?: boolean }): ReactElement {
   const { t, i18n } = useTranslation('common')
   if (result.outcome === 'invalid-input') return <p role="alert">{t('advancedInvalidInput')}</p>
   const { request } = result
@@ -38,8 +38,9 @@ export function SurveyStaticIncrementalResult({ result }: { result: SurveyStatic
       </table></div>)}
       <p className="leading-5">{t('advancedStaticPosterior', { sse: number(result.updatedFit.weightedResidualSumSquares), df: result.updatedFit.degreesOfFreedom, posterior: number(result.updatedFit.posteriorVarianceFactorEstimate) })}</p>
       <h5 className="font-medium">{t('advancedStaticObservation')}</h5>
+      {sourceBound ? <p className="leading-5 text-ds-muted">{t('advancedStaticLinearizedValueMeaning')}</p> : null}
       <div className={scroll} role="region" tabIndex={0} aria-label={t('advancedStaticObservation')}><table className="w-full text-[11px]">
-        <thead><tr>{['surveyObservationId', 'surveyObservationValue', 'advancedHuberResidual'].map(key => <th className={cell} scope="col" key={key}>{t(key)}</th>)}</tr></thead>
+        <thead><tr>{['surveyObservationId', sourceBound ? 'advancedStaticLinearizedValue' : 'surveyObservationValue', 'advancedHuberResidual'].map(key => <th className={cell} scope="col" key={key}>{t(key)}</th>)}</tr></thead>
         <tbody>{request.append.observations.map((observation, index) => {
           const residualIndex = request.base.observations.length + index
           return <tr key={observation.id}>
