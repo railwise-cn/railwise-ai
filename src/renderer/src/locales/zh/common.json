@@ -582,6 +582,7 @@
   "engineeringFindingInfo": "提示",
   "engineeringFindingRow": "第 {{row}} 行",
   "engineeringFindingAccepted": "已接受",
+  "engineeringFindingResolved": "已解决 · 保留历史",
   "engineeringFindingAcceptWarning": "接受警告",
   "engineeringFindingFixSource": "修正源数据\n后重新导入",
   "engineeringNoQualityFindings": "未发现质量问题。",
