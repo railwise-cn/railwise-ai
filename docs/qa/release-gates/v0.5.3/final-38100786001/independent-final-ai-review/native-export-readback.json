@@ -1,0 +1,593 @@
+{
+  "reviewType": "Independent AI review read-only native-export corroboration",
+  "version": "0.5.3",
+  "freezeRunId": 38100786001,
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "status": "passed-for-native-content-and-pdf-render-scope",
+  "checkCount": 73,
+  "failureCount": 0,
+  "checks": [
+    {
+      "name": "xlsx ten sections",
+      "actual": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "name": "known controls remain three",
+      "actual": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "name": "S1 x m vs fresh math",
+      "actual": 49.99999999284098,
+      "expected": 49.99999999284102,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "S1 y m vs fresh math",
+      "actual": 49.999999963710295,
+      "expected": 49.999999963710216,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "S1 posterior standard error mm",
+      "actual": 0.00013592152495710963,
+      "expected": 0.00013592155366010008,
+      "passed": true,
+      "absoluteTolerance": 1e-08
+    },
+    {
+      "name": "A no solved correction/stddev",
+      "actual": [
+        "不可用",
+        "不可用",
+        "不可用",
+        "不可用"
+      ],
+      "expected": [
+        "不可用",
+        "不可用",
+        "不可用",
+        "不可用"
+      ],
+      "passed": true
+    },
+    {
+      "name": "B no solved correction/stddev",
+      "actual": [
+        "不可用",
+        "不可用",
+        "不可用",
+        "不可用"
+      ],
+      "expected": [
+        "不可用",
+        "不可用",
+        "不可用",
+        "不可用"
+      ],
+      "passed": true
+    },
+    {
+      "name": "C no solved correction/stddev",
+      "actual": [
+        "不可用",
+        "不可用",
+        "不可用",
+        "不可用"
+      ],
+      "expected": [
+        "不可用",
+        "不可用",
+        "不可用",
+        "不可用"
+      ],
+      "passed": true
+    },
+    {
+      "name": "xlsx observations",
+      "actual": 5,
+      "expected": 5,
+      "passed": true
+    },
+    {
+      "name": "xlsx points",
+      "actual": 4,
+      "expected": 4,
+      "passed": true
+    },
+    {
+      "name": "xlsx dof",
+      "actual": 2,
+      "expected": 2,
+      "passed": true
+    },
+    {
+      "name": "xlsx unitweight scale",
+      "actual": 0.00010671165867325277,
+      "expected": 0.00010671168120790065,
+      "passed": true,
+      "absoluteTolerance": 1e-07
+    },
+    {
+      "name": "xlsx variance factor",
+      "actual": 1.1387378096796804e-08,
+      "expected": 1.1387382906216616e-08,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "xlsx posterior variance basis",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "xlsx observations five",
+      "actual": 5,
+      "expected": 5,
+      "passed": true
+    },
+    {
+      "name": "obs1 canonical observed",
+      "actual": 0,
+      "expected": 0.0,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "obs1 adjusted modulo circle",
+      "actual": 8.881784197001252e-16,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "obs1 residual unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "obs1 residual conversion",
+      "actual": -4.895780494523131e-05,
+      "expected": -4.895798814518096e-05,
+      "passed": true,
+      "absoluteTolerance": 1e-07
+    },
+    {
+      "name": "obs1 correction equals residual",
+      "actual": -4.895780494523131e-05,
+      "expected": -4.895780494523131e-05,
+      "passed": true
+    },
+    {
+      "name": "obs1 original row location",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "passed": true
+    },
+    {
+      "name": "obs2 canonical observed",
+      "actual": 4.71238898038469,
+      "expected": 4.71238898038469,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "obs2 adjusted modulo circle",
+      "actual": 0.0,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "obs2 residual unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "obs2 residual conversion",
+      "actual": 4.066159522522697e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true,
+      "absoluteTolerance": 1e-07
+    },
+    {
+      "name": "obs2 correction equals residual",
+      "actual": 4.066159522522697e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true
+    },
+    {
+      "name": "obs2 original row location",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "passed": true
+    },
+    {
+      "name": "obs3 canonical observed",
+      "actual": 100,
+      "expected": 100.0,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "obs3 adjusted modulo circle",
+      "actual": 4.263256414560601e-14,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "obs3 residual unit",
+      "actual": "mm",
+      "expected": "mm",
+      "passed": true
+    },
+    {
+      "name": "obs3 residual conversion",
+      "actual": 7.159016490732029e-06,
+      "expected": 7.158973858167883e-06,
+      "passed": true,
+      "absoluteTolerance": 1e-07
+    },
+    {
+      "name": "obs3 correction equals residual",
+      "actual": 7.159016490732029e-06,
+      "expected": 7.159016490732029e-06,
+      "passed": true
+    },
+    {
+      "name": "obs3 original row location",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "passed": true
+    },
+    {
+      "name": "obs4 canonical observed",
+      "actual": 5.497787143782138,
+      "expected": 5.497787143782138,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "obs4 adjusted modulo circle",
+      "actual": 0.0,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "obs4 residual unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "obs4 residual conversion",
+      "actual": 8.296209720004341e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true,
+      "absoluteTolerance": 1e-07
+    },
+    {
+      "name": "obs4 correction equals residual",
+      "actual": 8.296209720004341e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true
+    },
+    {
+      "name": "obs4 original row location",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "passed": true
+    },
+    {
+      "name": "obs5 canonical observed",
+      "actual": 100,
+      "expected": 100.0,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "obs5 adjusted modulo circle",
+      "actual": -2.842170943040401e-14,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-09
+    },
+    {
+      "name": "obs5 residual unit",
+      "actual": "mm",
+      "expected": "mm",
+      "passed": true
+    },
+    {
+      "name": "obs5 residual conversion",
+      "actual": -0.00013708027779557597,
+      "expected": -0.00013708024937386654,
+      "passed": true,
+      "absoluteTolerance": 1e-07
+    },
+    {
+      "name": "obs5 correction equals residual",
+      "actual": -0.00013708027779557597,
+      "expected": -0.00013708027779557597,
+      "passed": true
+    },
+    {
+      "name": "obs5 original row location",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "passed": true
+    },
+    {
+      "name": "外业检核 not falsely passed",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "独立闭合检核 not falsely passed",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "精度限差 not falsely passed",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "规范符合性 not falsely passed",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "xlsx stored error cells absent",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "docx ten structured tables",
+      "actual": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "name": "docx preserves 待审查草稿",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx preserves 未签认",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx preserves 未评估/不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx preserves golden-plane-control-e2e.in2",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx preserves 显示舍入",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx signature roles",
+      "actual": [
+        "编制",
+        "复核",
+        "批准"
+      ],
+      "expected": [
+        "编制",
+        "复核",
+        "批准"
+      ],
+      "passed": true
+    },
+    {
+      "name": "docx signature fields blank",
+      "actual": true,
+      "expected": true,
+      "passed": true,
+      "method": "OOXML signature name/date/signature cells are empty strings; prior underscore-only expectation was overstrict. No product mutation."
+    },
+    {
+      "name": "pdf five pages",
+      "actual": 5,
+      "expected": 5,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 待审查草稿",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 未签认",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 点位成果与精度",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 观测值、改正数与残差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves XY 标准误差椭圆",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 质量检查与复核状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 签认栏（空白 / 未签认）",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves CGCS2000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf text preserves 1.1387e-8",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf page1 no text outside page",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "pdf page2 no text outside page",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "pdf page3 no text outside page",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "pdf page4 no text outside page",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "pdf page5 no text outside page",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    }
+  ],
+  "files": [
+    {
+      "path": "native-exports/in2/professional.xlsx",
+      "size": 47728,
+      "sha256": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e"
+    },
+    {
+      "path": "native-exports/in2/report.docx",
+      "size": 37011,
+      "sha256": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12"
+    },
+    {
+      "path": "native-exports/in2/independent-docx-fonts.conf",
+      "size": 896,
+      "sha256": "f8e40e3bdae4bbca05ecd820510feff49c2c5ad94ef99338ee50d8e69d6b23be"
+    },
+    {
+      "path": "native-exports/in2/report.pdf",
+      "size": 61145,
+      "sha256": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff"
+    }
+  ],
+  "pdfPages": [
+    {
+      "page": 1,
+      "widthPt": 841.8900146484375,
+      "heightPt": 595.280029296875,
+      "minFontPt": 8.0,
+      "outsidePageSpans": [],
+      "renderReviewed": "All 5 PDF PNGs visually inspected; tables and labels remain inside page bounds."
+    },
+    {
+      "page": 2,
+      "widthPt": 841.8900146484375,
+      "heightPt": 595.280029296875,
+      "minFontPt": 8.0,
+      "outsidePageSpans": [],
+      "renderReviewed": "All 5 PDF PNGs visually inspected; tables and labels remain inside page bounds."
+    },
+    {
+      "page": 3,
+      "widthPt": 841.8900146484375,
+      "heightPt": 595.280029296875,
+      "minFontPt": 8.0,
+      "outsidePageSpans": [],
+      "renderReviewed": "All 5 PDF PNGs visually inspected; tables and labels remain inside page bounds."
+    },
+    {
+      "page": 4,
+      "widthPt": 841.8900146484375,
+      "heightPt": 595.280029296875,
+      "minFontPt": 8.0,
+      "outsidePageSpans": [],
+      "renderReviewed": "All 5 PDF PNGs visually inspected; tables and labels remain inside page bounds."
+    },
+    {
+      "page": 5,
+      "widthPt": 841.8900146484375,
+      "heightPt": 595.280029296875,
+      "minFontPt": 8.0,
+      "outsidePageSpans": [],
+      "renderReviewed": "All 5 PDF PNGs visually inspected; tables and labels remain inside page bounds."
+    }
+  ],
+  "xlsxFormulaCount": 0,
+  "limitations": [
+    "Original DOCX native bytes were not modified; renderedreader does not certify MicrosoftWord interoperability.",
+    "XLSX structuredvalues/styles were read, not opened visually in nativeExcel; no printing/live-recalculation pass claim.",
+    "PDF is untagged and no PDF/UA certification.",
+    "Synthetic only; no geodetic/field/vendor/SUC/professional certification."
+  ],
+  "docxRenderObservation": {
+    "renderer": "bundled render_docx.py/LibreOffice",
+    "pages": 4,
+    "images": "native-exports/in2/independent-docx-render-font-readback/page-1.png through page-4.png",
+    "finding": "Temporary per-process systemCJK readerfallback renders originalDOCX Chinese correctly on all4pages; complete values/labels/blanksignatures remain. Defaultbundled3page missing-Chinese output retained. Decimalnumbers wrap and finalsignoffpage sparse.",
+    "blocksRelease": false,
+    "scopeReason": "User relaxed cosmetic/runtime-dependent export presentation conditions; no native numeric content loss observed.",
+    "independentlyVisualReviewedPages": [
+      1,
+      2,
+      3,
+      4
+    ]
+  }
+}

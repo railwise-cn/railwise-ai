@@ -1,0 +1,1960 @@
+[
+  {
+    "name": "01_成果说明与签认状态",
+    "rows": 17,
+    "columns": 2,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "项目",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "内容",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "成果标题",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "golden-plane-control-e2e 测量平差专业成果册",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A3",
+        "value": "项目名称",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B3",
+        "value": "golden-plane-control-e2e",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A4",
+        "value": "生成时间",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B4",
+        "value": "2026-10-11T10:49:02.656Z",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A5",
+        "value": "签认状态",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B5",
+        "value": "未签认",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A6",
+        "value": "说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B6",
+        "value": "本成果采用测量平差计算值。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A7",
+        "value": "说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B7",
+        "value": "“未评估/不可用”表示当前资料或检核条件不足，不代表通过、合格或安全。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A8",
+        "value": "说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B8",
+        "value": "本稿未完成专业复核、审核、批准和签名；签认栏保留空白。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A9",
+        "value": "说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B9",
+        "value": "显示舍入：m 为 6 位小数，mm 改正/残差为 4 位，观测/平差值为 10 位；存储数值保留原精度。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A10",
+        "value": "资料与版本绑定说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B10",
+        "value": "各项成果对应所列原始资料；完整来源与版本记录另行保存。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A11",
+        "value": "基准与已知控制点说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B11",
+        "value": "坐标系：CGCS2000；投影：不可用；高程基准：不可用；单位：m / rad；状态：已声明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A12",
+        "value": "闭合与附合检核说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B12",
+        "value": "闭合线路：不可用或未评估。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A13",
+        "value": "网形与测段索引说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B13",
+        "value": "本表以观测为边、起讫点为节点，保留闭合/附合线路中的有向成员关系；“未纳入独立闭合”不代表观测无效。数值来自本次平差成果。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A14",
+        "value": "平差统计与检查状态说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B14",
+        "value": "定权依据：绝对先验观测精度模型（包含声明精度或模型默认精度）；单位权中误差及方差尺度为无量纲。此说明不代表先验精度已独立标定。 残差范数仅作描述性统计，不等同闭合差；1.3726709029343796e-7 m（2 条），3.1115291770707554e-10 rad（3 条）",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A15",
+        "value": "点位成果与精度说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B15",
+        "value": "最弱点：S1，点位中误差 1.3592152495710963e-7 m。最弱边：未评估（点间协方差不可用）。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A16",
+        "value": "观测值、改正数与残差说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B16",
+        "value": "观测值与平差值保持 m / rad；线性改正数和残差以 mm 显示，角度以角秒显示。",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A17",
+        "value": "XY 标准误差椭圆说明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B17",
+        "value": "解算 XY 平面；轴向由 +X 转向 +Y，模 π；单位马氏半径，非置信百分比。缺唯一轴向时为不可用；GNSS XY 不等同当地东/北。",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'01_成果说明与签认状态'!$A$1:$B$17",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:B17"
+  },
+  {
+    "name": "02_资料与版本绑定",
+    "rows": 2,
+    "columns": 4,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "资料编号",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "源文件",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "绑定状态",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "原件完整性",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "资料 1 · golden-plane-control-e2e.in2",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "golden-plane-control-e2e.in2",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C2",
+        "value": "已绑定",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D2",
+        "value": "已校验",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'02_资料与版本绑定'!$A$1:$D$2",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:D2"
+  },
+  {
+    "name": "03_基准与已知控制点",
+    "rows": 4,
+    "columns": 5,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "点号",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "类型",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "X (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "Y (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "高程 (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "A",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "已知点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C2",
+        "value": 50,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D2",
+        "value": 150,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A3",
+        "value": "B",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B3",
+        "value": "已知点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C3",
+        "value": 150,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D3",
+        "value": 50,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A4",
+        "value": "C",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B4",
+        "value": "已知点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C4",
+        "value": 120.710678,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D4",
+        "value": 120.710678,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'03_基准与已知控制点'!$A$1:$E$4",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:E4"
+  },
+  {
+    "name": "04_闭合与附合检核",
+    "rows": 1,
+    "columns": 12,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "线路",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "类型",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "起点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "终点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "观测高差和 (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F1",
+        "value": "已知高差 (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G1",
+        "value": "线路长度 (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H1",
+        "value": "测站数",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I1",
+        "value": "闭合差 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J1",
+        "value": "限差 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K1",
+        "value": "限差依据",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "L1",
+        "value": "状态",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'04_闭合与附合检核'!$A$1:$L$1",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:L1"
+  },
+  {
+    "name": "05_网形与测段索引",
+    "rows": 6,
+    "columns": 10,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "观测号",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "类型",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "起点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "终点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "测段长度 (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F1",
+        "value": "观测值 (m / rad)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G1",
+        "value": "平差值 (m / rad)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H1",
+        "value": "单位",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I1",
+        "value": "闭合/附合路径",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J1",
+        "value": "原始定位",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "观测 1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "方向",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C2",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D2",
+        "value": "A",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F2",
+        "value": 0,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "G2",
+        "value": -2.3735413634540237e-10,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "H2",
+        "value": "rad",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I2",
+        "value": "未纳入独立闭合",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J2",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:6",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A3",
+        "value": "观测 2",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B3",
+        "value": "方向",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C3",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D3",
+        "value": "B",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F3",
+        "value": 4.71238898038469,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "G3",
+        "value": 4.712388980581823,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "H3",
+        "value": "rad",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I3",
+        "value": "未纳入独立闭合",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J3",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:7",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A4",
+        "value": "观测 3",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B4",
+        "value": "距离",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C4",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D4",
+        "value": "B",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F4",
+        "value": 100,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "G4",
+        "value": 100.00000000715902,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "H4",
+        "value": "m",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I4",
+        "value": "未纳入独立闭合",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J4",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:8",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A5",
+        "value": "观测 4",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B5",
+        "value": "方向",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C5",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D5",
+        "value": "C",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E5",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F5",
+        "value": 5.497787143782138,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "G5",
+        "value": 5.497787143822359,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "H5",
+        "value": "rad",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I5",
+        "value": "未纳入独立闭合",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J5",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:9",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A6",
+        "value": "观测 5",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B6",
+        "value": "距离",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C6",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D6",
+        "value": "C",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E6",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F6",
+        "value": 100,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "G6",
+        "value": 99.99999986291972,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "H6",
+        "value": "m",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I6",
+        "value": "未纳入独立闭合",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J6",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:10",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'05_网形与测段索引'!$A$1:$J$6",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:J6"
+  },
+  {
+    "name": "06_平差统计与检查状态",
+    "rows": 2,
+    "columns": 8,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "网型",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "观测数",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "点数",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "自由度",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "单位权中误差 (无量纲)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F1",
+        "value": "方差因子 (无量纲)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G1",
+        "value": "方差依据",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H1",
+        "value": "计算状态",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "平面控制网",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": 5,
+        "type": "n",
+        "numberFormat": "0"
+      },
+      {
+        "address": "C2",
+        "value": 4,
+        "type": "n",
+        "numberFormat": "0"
+      },
+      {
+        "address": "D2",
+        "value": 2,
+        "type": "n",
+        "numberFormat": "0"
+      },
+      {
+        "address": "E2",
+        "value": 0.00010671165867325277,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "F2",
+        "value": 1.1387378096796804e-08,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "G2",
+        "value": "后验",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H2",
+        "value": "计算有效",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'06_平差统计与检查状态'!$A$1:$H$2",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:H2"
+  },
+  {
+    "name": "07_点位成果与精度",
+    "rows": 5,
+    "columns": 10,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "点号",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "类型",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "X (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "Y (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "高程 (m)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F1",
+        "value": "X 改正数 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G1",
+        "value": "Y 改正数 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H1",
+        "value": "高程改正数 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I1",
+        "value": "点位中误差 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J1",
+        "value": "精度依据",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "A",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "已知点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C2",
+        "value": 50,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D2",
+        "value": 150,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I2",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J2",
+        "value": "未记录",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A3",
+        "value": "B",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B3",
+        "value": "已知点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C3",
+        "value": 150,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D3",
+        "value": 50,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I3",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J3",
+        "value": "未记录",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A4",
+        "value": "C",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B4",
+        "value": "已知点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C4",
+        "value": 120.710678,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D4",
+        "value": 120.710678,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I4",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J4",
+        "value": "未记录",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A5",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B5",
+        "value": "测站",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C5",
+        "value": 49.99999999284098,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "D5",
+        "value": 49.999999963710295,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E5",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F5",
+        "value": -1.9446147803137137e-05,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "G5",
+        "value": 0.000195930319080162,
+        "type": "n",
+        "numberFormat": "0.0000"
+      },
+      {
+        "address": "H5",
+        "value": "不可用",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I5",
+        "value": 0.00013592152495710963,
+        "type": "n",
+        "numberFormat": "0.0000"
+      },
+      {
+        "address": "J5",
+        "value": "后验",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'07_点位成果与精度'!$A$1:$J$5",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:J5"
+  },
+  {
+    "name": "08_观测值、改正数与残差",
+    "rows": 6,
+    "columns": 11,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "观测号",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "类型",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "起讫点",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "观测值",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "平差值",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "F1",
+        "value": "值单位",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G1",
+        "value": "改正数",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "H1",
+        "value": "残差",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "I1",
+        "value": "改正/残差单位",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J1",
+        "value": "残差筛查",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K1",
+        "value": "原始定位",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "观测 1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "方向",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C2",
+        "value": "S1 → A",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D2",
+        "value": 0,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "E2",
+        "value": -2.3735413634540237e-10,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "F2",
+        "value": "rad",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G2",
+        "value": -4.895780494523131e-05,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "H2",
+        "value": -4.895780494523131e-05,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "I2",
+        "value": "角秒",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J2",
+        "value": "未见候选",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K2",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:6",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A3",
+        "value": "观测 2",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B3",
+        "value": "方向",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C3",
+        "value": "S1 → B",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D3",
+        "value": 4.71238898038469,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "E3",
+        "value": 4.712388980581823,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "F3",
+        "value": "rad",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G3",
+        "value": 4.066159522522697e-05,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "H3",
+        "value": 4.066159522522697e-05,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "I3",
+        "value": "角秒",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J3",
+        "value": "未见候选",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K3",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:7",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A4",
+        "value": "观测 3",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B4",
+        "value": "距离",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C4",
+        "value": "S1 → B",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D4",
+        "value": 100,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "E4",
+        "value": 100.00000000715902,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "F4",
+        "value": "m",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G4",
+        "value": 7.159016490732029e-06,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "H4",
+        "value": 7.159016490732029e-06,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "I4",
+        "value": "mm",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J4",
+        "value": "未见候选",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K4",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:8",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A5",
+        "value": "观测 4",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B5",
+        "value": "方向",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C5",
+        "value": "S1 → C",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D5",
+        "value": 5.497787143782138,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "E5",
+        "value": 5.497787143822359,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "F5",
+        "value": "rad",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G5",
+        "value": 8.296209720004341e-06,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "H5",
+        "value": 8.296209720004341e-06,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "I5",
+        "value": "角秒",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J5",
+        "value": "未见候选",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K5",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:9",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A6",
+        "value": "观测 5",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B6",
+        "value": "距离",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C6",
+        "value": "S1 → C",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D6",
+        "value": 100,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "E6",
+        "value": 99.99999986291972,
+        "type": "n",
+        "numberFormat": "0.0000000000"
+      },
+      {
+        "address": "F6",
+        "value": "m",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "G6",
+        "value": -0.00013708027779557597,
+        "type": "n",
+        "numberFormat": "0.0000"
+      },
+      {
+        "address": "H6",
+        "value": -0.00013708027779557597,
+        "type": "n",
+        "numberFormat": "0.0000"
+      },
+      {
+        "address": "I6",
+        "value": "mm",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "J6",
+        "value": "未见候选",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "K6",
+        "value": "golden-plane-control-e2e.in2 · COSA.in2:10",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'08_观测值、改正数与残差'!$A$1:$K$6",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:K6"
+  },
+  {
+    "name": "09_XY 标准误差椭圆",
+    "rows": 2,
+    "columns": 5,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "点号",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "长半轴 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "短半轴 (mm)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "D1",
+        "value": "轴向 (rad)",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "E1",
+        "value": "方差依据",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "S1",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": 0.0001284808010949112,
+        "type": "n",
+        "numberFormat": "0.0000"
+      },
+      {
+        "address": "C2",
+        "value": 4.435475957184348e-05,
+        "type": "n",
+        "numberFormat": "0.0000E+00"
+      },
+      {
+        "address": "D2",
+        "value": 2.2584737816163187,
+        "type": "n",
+        "numberFormat": "0.000000"
+      },
+      {
+        "address": "E2",
+        "value": "后验",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'09_XY 标准误差椭圆'!$A$1:$E$2",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:E2"
+  },
+  {
+    "name": "10_质量检查与复核状态",
+    "rows": 9,
+    "columns": 3,
+    "cells": [
+      {
+        "address": "A1",
+        "value": "检查项",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B1",
+        "value": "状态",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C1",
+        "value": "依据/缺项原因",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A2",
+        "value": "来源绑定",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B2",
+        "value": "通过",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C2",
+        "value": "无",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A3",
+        "value": "原始记录覆盖",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B3",
+        "value": "通过",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C3",
+        "value": "无",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A4",
+        "value": "基准声明",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B4",
+        "value": "通过",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C4",
+        "value": "无",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A5",
+        "value": "外业检核",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B5",
+        "value": "未评估",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C5",
+        "value": "测站原始读数未评估",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A6",
+        "value": "独立闭合检核",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B6",
+        "value": "未评估",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C6",
+        "value": "平面网独立闭合未评估",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A7",
+        "value": "精度限差",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B7",
+        "value": "未评估",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C7",
+        "value": "未配置精度限差",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A8",
+        "value": "数值结果",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B8",
+        "value": "通过",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C8",
+        "value": "无",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "A9",
+        "value": "规范符合性",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "B9",
+        "value": "未评估",
+        "type": "s",
+        "numberFormat": "General"
+      },
+      {
+        "address": "C9",
+        "value": "适用规范和符合性未评估",
+        "type": "s",
+        "numberFormat": "General"
+      }
+    ],
+    "freezePanes": "A2",
+    "printTitles": "$1:$1",
+    "printArea": "'10_质量检查与复核状态'!$A$1:$C$9",
+    "orientation": "landscape",
+    "fitToWidth": 1,
+    "footer": "待审查草稿 &P / &N",
+    "autoFilter": "A1:C9"
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "recordType": "user-authorized-acceptance-scope-reduction",
+  "status": "completed-reduced-core-with-disclosed-findings",
+  "version": "0.5.3",
+  "freezeRunId": 38100786001,
+  "freezeRunAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "authorizationBasis": "Latest direct user direction, relayed by the root coordinator in this same chat, explicitly asks to relax exhaustive conditions and publish today. This is a scope record, not a new consent request or invented quotation/timestamp.",
+  "activeScope": [
+    "exact frozen package/source/signature/notarization identity",
+    "actual installed-package Survey core import/reference/preflight/calculation/results/draft/native delivery observations",
+    "current exported-file/numerical/semantic readback",
+    "normal same-package core result/export recovery and acceptance-profile restoration as actually evidenced",
+    "real pinned official0.5.2 to same frozen0.5.3 native updater round trip",
+    "separate senior-engineer-mode AI review of current-package actual evidence",
+    "normal evidence PR/strict CI/immutable tag/same-frozen-byte public delivery/canonical website final readback"
+  ],
+  "notRequiredAsExpandedCountGate": [
+    "old exhaustive49scenario execution index",
+    "old exhaustive48locale-theme-window-page matrix",
+    "full10weighting batch",
+    "all6advanced and4sourcebound batches",
+    "fullE quality/sample/linkage negative matrix",
+    "expandedD model/failure/recovery matrix"
+  ],
+  "untestedCoverageDisposition": "Not executed/not reviewed under this reduced scope; never converted to passed and never asserted as broad package certification.",
+  "priorDiagnosticEvidence": "Prior-package failures and limitations stay in their original historical records. Source fixes are recorded; current release scope may only claim current-package actual evidence.",
+  "invariants": [
+    "no source/CI/old-package substitute for actual current package evidence",
+    "same installed/frozen/updater ASAR",
+    "original immutable updaterJSON byte preservation",
+    "single-maintainer normal PR plus required strict CI",
+    "no admin bypass/protection changes/tag movement",
+    "AI review is not real human approval/vendorSUCinterop/professionalsignature/regulatoryconformity"
+  ],
+  "deferredExplicitlyNotPassed": [
+    "expanded49case",
+    "expanded48view",
+    "full10weights",
+    "fulladvanced-sourcebound-E-expandedD",
+    "Flash-plan",
+    "GSI-positive"
+  ],
+  "GSIExtraObservation": "Actual automatic/default Plane initial blocking and reference reimport still blocked; retained in current-package evidence, not passed.",
+  "acceptanceFinalEvidence": "independent-final-ai-review/review.json",
+  "profileRestoration": "actual-restored-and-verified-public-summary"
+}

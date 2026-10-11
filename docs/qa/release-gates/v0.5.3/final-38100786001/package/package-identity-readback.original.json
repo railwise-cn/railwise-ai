@@ -1,0 +1,180 @@
+{
+  "status": "actual-package-identity-and-asar-readback-passed",
+  "runId": 38100786001,
+  "runAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "outputs": [
+    {
+      "architecture": "arm64",
+      "appPath": "/private/tmp/railwise-053-tools/new-freeze-38100786001/package-readback/arm64/RailWise AI.app",
+      "appAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+      "infoPlist": {
+        "CFBundleName": "RailWise AI",
+        "DTXcode": "1640",
+        "DTSDKName": "macosx15.5",
+        "NSHumanReadableCopyright": "Copyright © 2026 WorkWise Contributors",
+        "DTSDKBuild": "24F74",
+        "CFBundleVersion": "0.5.3",
+        "ElectronAsarIntegrity": {
+          "Resources/app.asar": {
+            "hash": "cf6eaea7ad07f5ec76085d3bbd7e94f559184a7e1cac00eb0079595a65a21c99",
+            "algorithm": "SHA256"
+          }
+        },
+        "NSCameraUsageDescription": "This app needs access to the camera",
+        "NSMainNibFile": "MainMenu",
+        "CFBundlePackageType": "APPL",
+        "CFBundleIconFile": "icon.icns",
+        "CFBundleShortVersionString": "0.5.3",
+        "NSBluetoothPeripheralUsageDescription": "This app needs access to Bluetooth",
+        "NSHighResolutionCapable": true,
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone",
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "127.0.0.1": {
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+              "NSTemporaryExceptionRequiresForwardSecrecy": false,
+              "NSIncludesSubdomains": false,
+              "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+              "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+            },
+            "localhost": {
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+              "NSTemporaryExceptionRequiresForwardSecrecy": false,
+              "NSIncludesSubdomains": false,
+              "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+              "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+            }
+          },
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        },
+        "CFBundleInfoDictionaryVersion": "6.0",
+        "CFBundleExecutable": "RailWise AI",
+        "DTCompiler": "com.apple.compilers.llvm.clang.1_0",
+        "NSPrefersDisplaySafeAreaCompatibilityMode": false,
+        "NSPrincipalClass": "AtomApplication",
+        "CFBundleIdentifier": "com.wangjiawei508.workgpt",
+        "LSApplicationCategoryType": "public.app-category.developer-tools",
+        "DTXcodeBuild": "16F6",
+        "LSMinimumSystemVersion": "12.0",
+        "CFBundleDisplayName": "RailWise AI",
+        "LSEnvironment": {
+          "MallocNanoZone": "0"
+        },
+        "NSQuitAlwaysKeepsWindows": false,
+        "NSAudioCaptureUsageDescription": "This app needs access to audio capture",
+        "NSRequiresAquaSystemAppearance": false,
+        "NSBluetoothAlwaysUsageDescription": "This app needs access to Bluetooth",
+        "NSSupportsAutomaticGraphicsSwitching": true
+      },
+      "packagedMetadata": {
+        "name": "workwise",
+        "productName": "RailWise AI",
+        "version": "0.5.3",
+        "buildProvenance": {
+          "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f"
+        },
+        "updateChannel": "stable",
+        "buildHints": {
+          "macSigningEnabled": true,
+          "notarizationEnabled": true
+        }
+      },
+      "updater": {
+        "provider": "generic",
+        "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/",
+        "updaterCacheDirName": "workwise-updater"
+      }
+    },
+    {
+      "architecture": "x64",
+      "appPath": "/private/tmp/railwise-053-tools/new-freeze-38100786001/package-readback/x64/RailWise AI.app",
+      "appAsarSha256": "c333f2672f5e4906eb35f3b45979159f80797415bfa2901131c051c8e8d5c0b7",
+      "infoPlist": {
+        "CFBundleName": "RailWise AI",
+        "DTXcode": "1640",
+        "DTSDKName": "macosx15.5",
+        "NSHumanReadableCopyright": "Copyright © 2026 WorkWise Contributors",
+        "DTSDKBuild": "24F74",
+        "CFBundleVersion": "0.5.3",
+        "ElectronAsarIntegrity": {
+          "Resources/app.asar": {
+            "hash": "305eface25884cd58f104b783a385dc0132fe12ae7374c21380f68ee673896f6",
+            "algorithm": "SHA256"
+          }
+        },
+        "NSCameraUsageDescription": "This app needs access to the camera",
+        "NSMainNibFile": "MainMenu",
+        "CFBundlePackageType": "APPL",
+        "CFBundleIconFile": "icon.icns",
+        "CFBundleShortVersionString": "0.5.3",
+        "NSBluetoothPeripheralUsageDescription": "This app needs access to Bluetooth",
+        "NSHighResolutionCapable": true,
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone",
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "127.0.0.1": {
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+              "NSTemporaryExceptionRequiresForwardSecrecy": false,
+              "NSIncludesSubdomains": false,
+              "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+              "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+            },
+            "localhost": {
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+              "NSTemporaryExceptionRequiresForwardSecrecy": false,
+              "NSIncludesSubdomains": false,
+              "NSTemporaryExceptionMinimumTLSVersion": "1.0",
+              "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false
+            }
+          },
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        },
+        "CFBundleInfoDictionaryVersion": "6.0",
+        "CFBundleExecutable": "RailWise AI",
+        "DTCompiler": "com.apple.compilers.llvm.clang.1_0",
+        "NSPrefersDisplaySafeAreaCompatibilityMode": false,
+        "NSPrincipalClass": "AtomApplication",
+        "CFBundleIdentifier": "com.wangjiawei508.workgpt",
+        "LSApplicationCategoryType": "public.app-category.developer-tools",
+        "DTXcodeBuild": "16F6",
+        "LSMinimumSystemVersion": "12.0",
+        "CFBundleDisplayName": "RailWise AI",
+        "LSEnvironment": {
+          "MallocNanoZone": "0"
+        },
+        "NSQuitAlwaysKeepsWindows": false,
+        "NSAudioCaptureUsageDescription": "This app needs access to audio capture",
+        "NSRequiresAquaSystemAppearance": false,
+        "NSBluetoothAlwaysUsageDescription": "This app needs access to Bluetooth",
+        "NSSupportsAutomaticGraphicsSwitching": true
+      },
+      "packagedMetadata": {
+        "name": "workwise",
+        "productName": "RailWise AI",
+        "version": "0.5.3",
+        "buildProvenance": {
+          "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f"
+        },
+        "updateChannel": "stable",
+        "buildHints": {
+          "macSigningEnabled": true,
+          "notarizationEnabled": true
+        }
+      },
+      "updater": {
+        "provider": "generic",
+        "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/",
+        "updaterCacheDirName": "workwise-updater"
+      }
+    }
+  ],
+  "limitations": [
+    "Not launched or installed",
+    "UI/function/accessibility and updater acceptance pending",
+    "No Windows signature verification claim",
+    "No public operation performed"
+  ]
+}

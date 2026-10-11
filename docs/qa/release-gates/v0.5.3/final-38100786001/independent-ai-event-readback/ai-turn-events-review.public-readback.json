@@ -1,0 +1,521 @@
+{
+  "schemaVersion": 1,
+  "observedAtUtc": "2026-10-11T11:08:43.510029+00:00",
+  "reviewKind": "AI read-only raw runtime log inspection",
+  "scope": "Original installed-package first attempt and one explicit retry, no business writes or app/API calls",
+  "packageVersion": "0.5.3",
+  "freezeRun": 38100786001,
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "threadIndex": [
+    {
+      "id": "thr_oup3vt1u",
+      "title": "Survey AI · New Survey job",
+      "model": "deepseek-flash",
+      "status": "idle",
+      "message_count": 3,
+      "metadata_path": "[acceptance-home]/.workwise/runtime/threads/thr_oup3vt1u/metadata.jsonl",
+      "messages_path": "[acceptance-home]/.workwise/runtime/threads/thr_oup3vt1u/messages.jsonl",
+      "events_path": "[acceptance-home]/.workwise/runtime/threads/thr_oup3vt1u/events.jsonl",
+      "updated_at": "2026-10-11T11:02:48.497Z"
+    }
+  ],
+  "threadIndexModelCaveat": "Thread index model is deepseek-flash, but actual per-turn model is independently observed in pipeline and usage events; do not substitute thread default for routed model",
+  "turns": [
+    {
+      "turnId": "turn_d3fgo7h6",
+      "eventCount": 6502,
+      "firstEvent": {
+        "seq": 2,
+        "timestamp": "2026-10-11T10:56:58.019Z",
+        "kind": "turn_started"
+      },
+      "lastEvent": {
+        "seq": 6504,
+        "timestamp": "2026-10-11T10:58:06.557Z",
+        "kind": "turn_aborted",
+        "stage": null
+      },
+      "routedModels": [
+        "deepseek-v4-pro"
+      ],
+      "pipelineStages": [
+        {
+          "seq": 4,
+          "timestamp": "2026-10-11T10:56:58.034Z",
+          "kind": "pipeline_stage",
+          "stage": "setup"
+        },
+        {
+          "seq": 5,
+          "timestamp": "2026-10-11T10:56:58.039Z",
+          "kind": "pipeline_stage",
+          "stage": "pre_start"
+        },
+        {
+          "seq": 6,
+          "timestamp": "2026-10-11T10:56:58.044Z",
+          "kind": "pipeline_stage",
+          "stage": "post_start"
+        },
+        {
+          "seq": 7,
+          "timestamp": "2026-10-11T10:56:58.051Z",
+          "kind": "pipeline_stage",
+          "stage": "input_received",
+          "details": {
+            "stepIndex": 0
+          }
+        },
+        {
+          "seq": 8,
+          "timestamp": "2026-10-11T10:56:58.055Z",
+          "kind": "pipeline_stage",
+          "stage": "input_cached"
+        },
+        {
+          "seq": 9,
+          "timestamp": "2026-10-11T10:56:58.060Z",
+          "kind": "pipeline_stage",
+          "stage": "input_routed",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "reasoningEffort": "max"
+          }
+        },
+        {
+          "seq": 10,
+          "timestamp": "2026-10-11T10:56:58.209Z",
+          "kind": "pipeline_stage",
+          "stage": "input_compressed",
+          "details": {
+            "historyItems": 1
+          }
+        },
+        {
+          "seq": 11,
+          "timestamp": "2026-10-11T10:56:58.213Z",
+          "kind": "pipeline_stage",
+          "stage": "input_remembered",
+          "details": {
+            "memoryCount": 0,
+            "contextInstructionCount": 4
+          }
+        },
+        {
+          "seq": 12,
+          "timestamp": "2026-10-11T10:56:58.217Z",
+          "kind": "pipeline_stage",
+          "stage": "pre_send",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "historyItems": 1,
+            "toolCount": 7
+          }
+        },
+        {
+          "seq": 13,
+          "timestamp": "2026-10-11T10:56:58.220Z",
+          "kind": "pipeline_stage",
+          "stage": "post_send",
+          "details": {
+            "model": "deepseek-v4-pro"
+          }
+        },
+        {
+          "seq": 717,
+          "timestamp": "2026-10-11T10:57:07.277Z",
+          "kind": "pipeline_stage",
+          "stage": "response_received",
+          "details": {
+            "stopReason": "tool_calls",
+            "toolCallCount": 3
+          }
+        },
+        {
+          "seq": 725,
+          "timestamp": "2026-10-11T10:57:07.426Z",
+          "kind": "pipeline_stage",
+          "stage": "input_received",
+          "details": {
+            "stepIndex": 1
+          }
+        },
+        {
+          "seq": 726,
+          "timestamp": "2026-10-11T10:57:07.433Z",
+          "kind": "pipeline_stage",
+          "stage": "input_cached"
+        },
+        {
+          "seq": 728,
+          "timestamp": "2026-10-11T10:57:07.441Z",
+          "kind": "pipeline_stage",
+          "stage": "input_routed",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "reasoningEffort": "max"
+          }
+        },
+        {
+          "seq": 729,
+          "timestamp": "2026-10-11T10:57:07.487Z",
+          "kind": "pipeline_stage",
+          "stage": "input_compressed",
+          "details": {
+            "historyItems": 8
+          }
+        },
+        {
+          "seq": 730,
+          "timestamp": "2026-10-11T10:57:07.490Z",
+          "kind": "pipeline_stage",
+          "stage": "input_remembered",
+          "details": {
+            "memoryCount": 0,
+            "contextInstructionCount": 4
+          }
+        },
+        {
+          "seq": 731,
+          "timestamp": "2026-10-11T10:57:07.495Z",
+          "kind": "pipeline_stage",
+          "stage": "pre_send",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "historyItems": 8,
+            "toolCount": 7
+          }
+        },
+        {
+          "seq": 732,
+          "timestamp": "2026-10-11T10:57:07.499Z",
+          "kind": "pipeline_stage",
+          "stage": "post_send",
+          "details": {
+            "model": "deepseek-v4-pro"
+          }
+        }
+      ],
+      "terminalEvents": [],
+      "assistantTextItems": [],
+      "toolCalls": [
+        {
+          "id": "item_tool_turn_d3fgo7h6_call_00_yeBLrh4ynXdoFDRBisCe3566",
+          "toolName": "survey_read_context",
+          "status": "completed",
+          "createdAt": "2026-10-11T10:57:07.208Z",
+          "finishedAt": "2026-10-11T10:57:07.313Z"
+        },
+        {
+          "id": "item_tool_turn_d3fgo7h6_call_01_G40qFQPXGIo8N4rwgBJ71726",
+          "toolName": "survey_read_context",
+          "status": "completed",
+          "createdAt": "2026-10-11T10:57:07.232Z",
+          "finishedAt": "2026-10-11T10:57:07.354Z"
+        },
+        {
+          "id": "item_tool_turn_d3fgo7h6_call_02_EjyU9eaEZBzxhWq4RLJc3344",
+          "toolName": "survey_read_context",
+          "status": "completed",
+          "createdAt": "2026-10-11T10:57:07.252Z",
+          "finishedAt": "2026-10-11T10:57:07.394Z"
+        }
+      ],
+      "allToolNames": [
+        "survey_read_context"
+      ],
+      "conclusion": "no recorded terminal event or assistant text; interrupted/incomplete response preserved, do not infer a terminal failure code"
+    },
+    {
+      "turnId": "turn_fl8um8f7",
+      "eventCount": 7279,
+      "firstEvent": {
+        "seq": 6505,
+        "timestamp": "2026-10-11T11:01:30.212Z",
+        "kind": "turn_started"
+      },
+      "lastEvent": {
+        "seq": 13784,
+        "timestamp": "2026-10-11T11:02:48.501Z",
+        "kind": "turn_completed",
+        "stage": null
+      },
+      "routedModels": [
+        "deepseek-v4-pro"
+      ],
+      "pipelineStages": [
+        {
+          "seq": 6507,
+          "timestamp": "2026-10-11T11:01:30.228Z",
+          "kind": "pipeline_stage",
+          "stage": "setup"
+        },
+        {
+          "seq": 6508,
+          "timestamp": "2026-10-11T11:01:30.233Z",
+          "kind": "pipeline_stage",
+          "stage": "pre_start"
+        },
+        {
+          "seq": 6509,
+          "timestamp": "2026-10-11T11:01:30.261Z",
+          "kind": "pipeline_stage",
+          "stage": "post_start"
+        },
+        {
+          "seq": 6510,
+          "timestamp": "2026-10-11T11:01:30.267Z",
+          "kind": "pipeline_stage",
+          "stage": "input_received",
+          "details": {
+            "stepIndex": 0
+          }
+        },
+        {
+          "seq": 6511,
+          "timestamp": "2026-10-11T11:01:30.272Z",
+          "kind": "pipeline_stage",
+          "stage": "input_cached"
+        },
+        {
+          "seq": 6512,
+          "timestamp": "2026-10-11T11:01:30.277Z",
+          "kind": "pipeline_stage",
+          "stage": "input_routed",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "reasoningEffort": "max"
+          }
+        },
+        {
+          "seq": 6513,
+          "timestamp": "2026-10-11T11:01:30.382Z",
+          "kind": "pipeline_stage",
+          "stage": "input_compressed",
+          "details": {
+            "historyItems": 9
+          }
+        },
+        {
+          "seq": 6514,
+          "timestamp": "2026-10-11T11:01:30.387Z",
+          "kind": "pipeline_stage",
+          "stage": "input_remembered",
+          "details": {
+            "memoryCount": 0,
+            "contextInstructionCount": 3
+          }
+        },
+        {
+          "seq": 6515,
+          "timestamp": "2026-10-11T11:01:30.392Z",
+          "kind": "pipeline_stage",
+          "stage": "pre_send",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "historyItems": 9,
+            "toolCount": 7
+          }
+        },
+        {
+          "seq": 6516,
+          "timestamp": "2026-10-11T11:01:30.396Z",
+          "kind": "pipeline_stage",
+          "stage": "post_send",
+          "details": {
+            "model": "deepseek-v4-pro"
+          }
+        },
+        {
+          "seq": 11525,
+          "timestamp": "2026-10-11T11:02:24.824Z",
+          "kind": "pipeline_stage",
+          "stage": "response_received",
+          "details": {
+            "stopReason": "tool_calls",
+            "toolCallCount": 3
+          }
+        },
+        {
+          "seq": 11533,
+          "timestamp": "2026-10-11T11:02:24.973Z",
+          "kind": "pipeline_stage",
+          "stage": "input_received",
+          "details": {
+            "stepIndex": 1
+          }
+        },
+        {
+          "seq": 11534,
+          "timestamp": "2026-10-11T11:02:24.982Z",
+          "kind": "pipeline_stage",
+          "stage": "input_cached"
+        },
+        {
+          "seq": 11536,
+          "timestamp": "2026-10-11T11:02:24.993Z",
+          "kind": "pipeline_stage",
+          "stage": "input_routed",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "reasoningEffort": "max"
+          }
+        },
+        {
+          "seq": 11537,
+          "timestamp": "2026-10-11T11:02:25.032Z",
+          "kind": "pipeline_stage",
+          "stage": "input_compressed",
+          "details": {
+            "historyItems": 16
+          }
+        },
+        {
+          "seq": 11538,
+          "timestamp": "2026-10-11T11:02:25.035Z",
+          "kind": "pipeline_stage",
+          "stage": "input_remembered",
+          "details": {
+            "memoryCount": 0,
+            "contextInstructionCount": 3
+          }
+        },
+        {
+          "seq": 11539,
+          "timestamp": "2026-10-11T11:02:25.041Z",
+          "kind": "pipeline_stage",
+          "stage": "pre_send",
+          "details": {
+            "model": "deepseek-v4-pro",
+            "historyItems": 16,
+            "toolCount": 7
+          }
+        },
+        {
+          "seq": 11540,
+          "timestamp": "2026-10-11T11:02:25.045Z",
+          "kind": "pipeline_stage",
+          "stage": "post_send",
+          "details": {
+            "model": "deepseek-v4-pro"
+          }
+        },
+        {
+          "seq": 13781,
+          "timestamp": "2026-10-11T11:02:48.463Z",
+          "kind": "pipeline_stage",
+          "stage": "response_received",
+          "details": {
+            "stopReason": "stop",
+            "toolCallCount": 0
+          }
+        }
+      ],
+      "terminalEvents": [
+        {
+          "seq": 13784,
+          "timestamp": "2026-10-11T11:02:48.501Z",
+          "threadId": "thr_oup3vt1u",
+          "turnId": "turn_fl8um8f7",
+          "kind": "turn_completed",
+          "reason": "completed"
+        }
+      ],
+      "assistantTextItems": [
+        {
+          "id": "item_text_ntu99o6u",
+          "status": "completed",
+          "createdAt": "2026-10-11T11:02:48.481Z",
+          "finishedAt": null,
+          "characters": 2536,
+          "sha256": "2e4473cdcf16aa9c13b8c080e0efa6420dffbbeda7c898174b49b0820fa2f879"
+        }
+      ],
+      "toolCalls": [
+        {
+          "id": "item_tool_turn_fl8um8f7_call_00_jWsgSWzNblqr2h2TanAM3224",
+          "toolName": "survey_read_context",
+          "status": "completed",
+          "createdAt": "2026-10-11T11:02:24.761Z",
+          "finishedAt": "2026-10-11T11:02:24.863Z"
+        },
+        {
+          "id": "item_tool_turn_fl8um8f7_call_01_0qL4zMDnTGdZQbvgMqbT6566",
+          "toolName": "survey_read_context",
+          "status": "completed",
+          "createdAt": "2026-10-11T11:02:24.785Z",
+          "finishedAt": "2026-10-11T11:02:24.903Z"
+        },
+        {
+          "id": "item_tool_turn_fl8um8f7_call_02_VHcHkaFY2fVdo8zZWAO93446",
+          "toolName": "survey_read_context",
+          "status": "completed",
+          "createdAt": "2026-10-11T11:02:24.802Z",
+          "finishedAt": "2026-10-11T11:02:24.940Z"
+        }
+      ],
+      "allToolNames": [
+        "survey_read_context"
+      ],
+      "conclusion": "completed with actual assistant text and terminal event"
+    }
+  ],
+  "rawFiles": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/independent-ai-event-readback/raw/messages.original.jsonl",
+      "sourcePath": "[acceptance-home]/.workwise/runtime/threads/thr_oup3vt1u/messages.jsonl",
+      "bytes": 129524,
+      "sha256": "5c3d8aedb99ecdd2cfae45cba4e1d174b0f38812076d5c6a745677de15ef1113"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/independent-ai-event-readback/raw/events.original.jsonl",
+      "sourcePath": "[acceptance-home]/.workwise/runtime/threads/thr_oup3vt1u/events.jsonl",
+      "bytes": 5284161,
+      "sha256": "f518f78ac66f03be8c970df1c1ad141375930c49baa83fbb15b4a5f417d6c3d6"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/independent-ai-event-readback/raw/metadata.original.jsonl",
+      "sourcePath": "[acceptance-home]/.workwise/runtime/threads/thr_oup3vt1u/metadata.jsonl",
+      "bytes": 41372,
+      "sha256": "3116f5853be2d1091deafd3ac813594abeb1d1edca7e89b4d0d6ce4a1d0574a6"
+    }
+  ],
+  "usageRows": [
+    {
+      "thread_id": "thr_oup3vt1u",
+      "seq": 716,
+      "timestamp": "2026-10-11T10:57:07.272Z",
+      "turn_id": "turn_d3fgo7h6",
+      "model": "deepseek-v4-pro",
+      "usage_json": "{\"promptTokens\":26836,\"completionTokens\":818,\"totalTokens\":27654,\"cachedTokens\":1024,\"cacheHitTokens\":1024,\"cacheMissTokens\":25812,\"cacheHitRate\":0.03815769861380235,\"turns\":1,\"costUsd\":0.011943592,\"costCny\":0.0823696,\"cacheSavingsUsd\":0.000441728,\"cacheSavingsCny\":0.0030464,\"tokenEconomySavingsTokens\":0,\"tokenEconomySavingsUsd\":0,\"tokenEconomySavingsCny\":0}"
+    },
+    {
+      "thread_id": "thr_oup3vt1u",
+      "seq": 11524,
+      "timestamp": "2026-10-11T11:02:24.819Z",
+      "turn_id": "turn_fl8um8f7",
+      "model": "deepseek-v4-pro",
+      "usage_json": "{\"promptTokens\":63825,\"completionTokens\":5993,\"totalTokens\":69818,\"cachedTokens\":2304,\"cacheHitTokens\":2304,\"cacheMissTokens\":61521,\"cacheHitRate\":0.03609870740305523,\"turns\":2,\"costUsd\":0.031983897,\"costCny\":0.2205786,\"cacheSavingsUsd\":0.000993888,\"cacheSavingsCny\":0.0068544,\"tokenEconomySavingsTokens\":0,\"tokenEconomySavingsUsd\":0,\"tokenEconomySavingsCny\":0}"
+    },
+    {
+      "thread_id": "thr_oup3vt1u",
+      "seq": 13780,
+      "timestamp": "2026-10-11T11:02:48.387Z",
+      "turn_id": "turn_fl8um8f7",
+      "model": "deepseek-v4-pro",
+      "usage_json": "{\"promptTokens\":119720,\"completionTokens\":8261,\"totalTokens\":127981,\"cachedTokens\":39168,\"cacheHitTokens\":39168,\"cacheMissTokens\":80552,\"cacheHitRate\":0.3271633812228533,\"turns\":3,\"costUsd\":0.042369173999999996,\"costCny\":0.2922012,\"cacheSavingsUsd\":0.016896096,\"cacheSavingsCny\":0.1165248,\"tokenEconomySavingsTokens\":0,\"tokenEconomySavingsUsd\":0,\"tokenEconomySavingsCny\":0}"
+    }
+  ],
+  "finding": "Initial user request was interrupted before final response and remains incomplete. Explicit retry has 3 completed survey_read_context calls and completed assistant text from deepseek-v4-pro. Only read tools appear in these turns; independent numerical/export before-after comparison belongs to separate root evidence.",
+  "guiAcceptance": false,
+  "wholeCasePassed": false,
+  "releaseReady": false,
+  "publicationProvenance": {
+    "kind": "public-safe-personal-path-derivative",
+    "originalFile": "independent-ai-event-readback/ai-turn-events-review.json",
+    "originalSha256": "bf9fe8a79fa51b1f42ff361c864e4ef6d5c2748887de0d28125c4bf7b18900ae",
+    "originalBytes": 16701,
+    "transformation": "Personal home path prefix replaced with [acceptance-home] only; numerical values, IDs, checks, event summary fields and statuses unchanged. Raw runtime events/messages/metadata remain private and are not committed.",
+    "byteExactOriginal": false
+  }
+}

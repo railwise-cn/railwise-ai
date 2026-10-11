@@ -1,0 +1,533 @@
+{
+  "schemaVersion": 1,
+  "reviewType": "Independent senior-engineer-mode AI review",
+  "reviewedAt": "2026-10-11T11:20:23.020463+00:00",
+  "reviewStatus": "passed",
+  "verdict": "The exact installed 0.5.3 package is acceptable for the user-authorized reduced review scope. Actual Survey calculation, native DOCX/PDF/XLSX delivery, normal restart restoration, Quality to Deliver navigation and real updater evidence were reviewed. Actual Pro/max recovery response and unchanged numerical records/export bytes are corroborated. Two AI advisory explanation defects are retained for follow-up; deterministic numerical results and native exports remain correct. No additional exhaustive coverage gate is imposed.",
+  "version": "0.5.3",
+  "freezeRunId": 38100786001,
+  "freezeRunAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "installedAppPath": "/Applications/RailWise AI.app",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "arm64DmgSha256": "6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e",
+  "reviewPerspective": [
+    "engineering survey mathematics and reporting semantics",
+    "software package identity and persistence",
+    "product interaction/readability/accessibility evidence"
+  ],
+  "functionalChecklist": [
+    {
+      "id": "identity",
+      "status": "reviewed-passed",
+      "evidence": [
+        "local-install/installed-identity.json",
+        "package-identity-readback.json"
+      ],
+      "observation": "Independent installed plist version and ASAR hash readback agree exactly with freeze receipt and updater target bytes."
+    },
+    {
+      "id": "signature-notarization",
+      "status": "reviewed-passed-with-environment-limitation",
+      "evidence": [
+        "independent-final-ai-review/installed-codesign.log",
+        "independent-final-ai-review/installed-stapler.log"
+      ],
+      "observation": "Fresh strict/deep codesign verification and stapled ticket validation return exit 0. System Gatekeeper assessments are disabled; no enforcement-on-machine claim."
+    },
+    {
+      "id": "native-updater",
+      "status": "reviewed-passed-with-scope-limitation",
+      "evidence": [
+        "updater-readback-38111109910/immutable-updater-readback-result.json",
+        "updater-readback-38111109910/retained-original-reports/native-updater.json"
+      ],
+      "observation": "Real 0.5.2→0.5.3 native updater downloaded, installed and relaunched frozen same-ASAR target without opening website; synthetic stored data continuity checked. Not arbitrary-schema or live credential/plugin certification."
+    },
+    {
+      "id": "in2-reference-negative-import",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/README.md",
+        "cua-evidence/in2/cua-observed-state.txt"
+      ],
+      "observation": "Actual Add files import and reference declaration/re-import observed. Operator record preserves initial missing-reference block; final preflight ready state is archived."
+    },
+    {
+      "id": "in2-calculation",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/calculation-result.ax.txt",
+        "cua-evidence/in2/calculation-result.jpg",
+        "independent-final-ai-review/independent-in2-derivation.json",
+        "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json"
+      ],
+      "observation": "Actual Start calculation completed with 5 observations, rank 3/3, dof 2 and S1=(50,50) m. Fresh independent derivation passes 8 GUI comparisons. Separate original stored-result/source-row review passes 129 checks with 0 failures."
+    },
+    {
+      "id": "result-semantics",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/calculation-result.ax.txt"
+      ],
+      "observation": "Pending professional review/signing; fixed known-point precision not evaluated; closure/precision conformity not evaluated; dimensionless unit-weight scale explicitly labeled."
+    },
+    {
+      "id": "deliver-draft",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/review-draft.ax.txt",
+        "cua-evidence/in2/review-draft.jpg"
+      ],
+      "observation": "Current Survey scope remained in Deliver and created three preview draft files. Draft confirmation explicitly does not constitute signoff; original result preservation stated."
+    },
+    {
+      "id": "native-export-readback",
+      "status": "reviewed-passed-with-presentation-limitations",
+      "evidence": [
+        "native-exports/in2/report.docx",
+        "native-exports/in2/report.pdf",
+        "native-exports/in2/professional.xlsx",
+        "cua-evidence/in2/native-export-complete.ax.txt",
+        "cua-evidence/in2/native-export-complete.jpg",
+        "cua-evidence/in2/docx-save-panel.ax.txt",
+        "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json",
+        "cua-evidence/in2/independent-numerical-readback/query-proof.json",
+        "independent-final-ai-review/native-export-readback.json",
+        "native-exports/in2/independent-native-readback/independent-native-semantics-review.json",
+        "native-exports/in2/independent-docx-render-font-readback/page-1.png"
+      ],
+      "observation": "Actual native saves produced DOCX (37,011 bytes), PDF (61,145 bytes) and XLSX (47,728 bytes). Independent 73 content/semantic checks and separate 614 native semantic checks pass with 0 failures. All 5 PDF and 4 reader-font-fallback DOCX pages visually inspected; Chinese and numerical content preserved. Long DOCX decimal cells wrap and final signoff page is sparse. Native Excel display/printing/live recalculation not claimed."
+    },
+    {
+      "id": "normal-restart-result-recovery",
+      "status": "reviewed-passed-with-scope-limitation",
+      "evidence": [
+        "cua-evidence/in2/survey-restored-after-restart.ax.txt",
+        "cua-evidence/in2/survey-restored-after-restart.jpg",
+        "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json"
+      ],
+      "observation": "Normal quit/restart restored the same named IN2 Survey job and three draft files. GUI correctly states Previous draft restored. Files have not been reverified. Subsequent read-only comparison confirms exact original network and completed-adjustment data_json bytes plus all three original export hashes unchanged. No arbitrary-profile/history recovery claim."
+    },
+    {
+      "id": "visual-accessibility-observed-views",
+      "status": "reviewed-passed-with-coverage-limitation",
+      "evidence": [
+        "cua-evidence/in2/calculation-result.jpg",
+        "cua-evidence/in2/calculation-result.ax.txt",
+        "cua-evidence/in2/review-draft.jpg",
+        "cua-evidence/in2/review-draft.ax.txt",
+        "cua-evidence/website/survey-zh-light.ax.txt",
+        "cua-evidence/website/survey-zh-light.jpg",
+        "cua-evidence/website/deliver-zh-light.ax.txt",
+        "cua-evidence/website/deliver-zh-light.jpg",
+        "cua-evidence/website/settings-zh-light.ax.txt",
+        "cua-evidence/website/settings-zh-light.jpg"
+      ],
+      "observation": "English dark Result/Deliver and Chinese light Survey/Deliver/Settings actual screenshots are readable with opaque work surfaces, clear primary actions and textual statuses. AX exposes relevant controls and tables. Settings screenshot contains no visible credentials. No complete locale/theme/size/keyboard/screen-reader matrix claim; screenshot pixel dimensions are not assumed to be logical window bounds."
+    },
+    {
+      "id": "quality-to-deliver-regression",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/quality-source-context.ax.txt",
+        "cua-evidence/in2/quality-to-deliver-regression.ax.txt",
+        "cua-evidence/in2/quality-to-deliver-regression.jpg"
+      ],
+      "observation": "Neutral genericQuality page offers dataset quality checks, then Deliver retains exact displayed IN2 current source and three Survey draftfiles. Former monitor-route switch not observed on current package."
+    },
+    {
+      "id": "ai-core-answer",
+      "status": "reviewed-functional-response-with-disclosed-follow-up",
+      "evidence": [
+        "cua-evidence/ai-core/first-request-restored.ax.txt",
+        "cua-evidence/ai-core/recovery-answer.ax.txt",
+        "cua-evidence/ai-core/recovery-answer.jpg",
+        "independent-ai-event-readback/ai-turn-events-review.json",
+        "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json"
+      ],
+      "observation": "Original request was interrupted before final response and remains incomplete. Explicit recovery turn turn_fl8um8f7 routed deepseek-v4-pro/max, completed three survey_read_context calls and a 2,536-character response at 11:02:48.501Z. Thread-index Flash default does not override actual per-turn Pro evidence. S1/A values, rows, units and fixed-control/posterior distinction correct. Residual-sign definition and prior-conservativeness wording findings remain; no all-narrative-pass claim. Exact two numerical records and three native export files unchanged over the observed interval."
+    }
+  ],
+  "findings": [
+    {
+      "id": "R1",
+      "severity": "disclosure",
+      "blocksRelease": false,
+      "title": "Synthetic reference declaration is not geodetic authentication",
+      "detail": "CGCS2000 /1985 National Height Datum were entered to exercise declared-reference workflow on a synthetic local plane-control fixture. Tiny posterior standard errors reflect near-exact synthetic input and are not a field accuracy or datum stability finding."
+    },
+    {
+      "id": "R2",
+      "severity": "environment-limitation",
+      "blocksRelease": false,
+      "title": "Gatekeeper enforcement locally disabled",
+      "detail": "Signature and notarization verified independently; current system policy prevents claiming enforcement under normal enabled Gatekeeper. No user system policy change requested."
+    },
+    {
+      "id": "R3",
+      "severity": "presentation",
+      "blocksRelease": false,
+      "title": "DOCX typography can improve",
+      "detail": "Original DOCX bytes render Chinese and tables completely in a read-only CJK font-fallback reader over 4 pages. Initial bundled missing-Chinese rendering is preserved as a reader diagnostic. Long decimal cells wrap within narrow columns and the final signoff page is sparse. No content loss observed; Microsoft Word layout interoperability is not certified."
+    },
+    {
+      "id": "R4",
+      "severity": "accessibility-limitation",
+      "blocksRelease": false,
+      "title": "PDF export is untagged",
+      "detail": "Native PDF metadata is Tagged:no. Current readable rendered pages are not PDF/UA or screen-reader certification."
+    },
+    {
+      "id": "R5",
+      "severity": "P2-advisory-correctness",
+      "blocksRelease": false,
+      "disposition": "Retained for follow-up under explicit user-relaxed release scope; no all-professional-text-pass claim.",
+      "title": "AI explanation reverses residual sign definition",
+      "evidence": "cua-evidence/ai-core/recovery-answer.ax.txt",
+      "detail": "At AX line 80 the answer defines residual as observed minus model, while its table and deterministic records use adjusted/model minus observed. For B distance, 100.00000000715902 m minus observed 100 m gives +7.1590165e-9 m. Numerical coordinates, residual values and native exports remain correct, but the explanatory sign sentence is wrong. Advisory text needs professional checking against deterministic tables."
+    },
+    {
+      "id": "R6",
+      "severity": "P2-advisory-evidence",
+      "blocksRelease": false,
+      "disposition": "Retained for follow-up under explicit user-relaxed release scope.",
+      "title": "AI overstates prior conservativeness from tiny synthetic residuals",
+      "evidence": "cua-evidence/ai-core/recovery-answer.ax.txt",
+      "detail": "At AX line 145 the answer treats tiny m0 as proving the declared prior conservative. Near-exact rounded synthetic geometry does not establish instrument or calibrated-prior conservativeness. The answer also states that prior calibration and significance are not evaluated; the justified statement concerns internal fit scale only."
+    },
+    {
+      "id": "R7",
+      "severity": "scope-deferred",
+      "blocksRelease": false,
+      "title": "GSI extra path remains unaccepted",
+      "disposition": "Deferred under the user-authorized reduced core release scope; do not claim GSI pass.",
+      "evidence": "cua-evidence/gsi/initial-wrong-network-blocked.ax.txt",
+      "detail": "Preserved actual initial screenshot/AX shows recognized Leica GSI-8, default Plane network, 0 known points and 15 preflight blockers. Root operator reports later selecting leveling and confirming datum/reimport still retained the old Plane network. This additional path is explicitly unaccepted/deferred, without a GSI numerical/export pass claim."
+    }
+  ],
+  "releaseBlockingProductFindings": [],
+  "scope": "Review applies only to actual current-package evidence in the revised core release scope. The former 49-case, 48-view matrix, full weighting/advanced/source-bound/E/expanded-D batches are deferred, not passed. This report completes the independent AI review; root owns profile restoration, evidence PR, public delivery and final website/download verification. GSI extra attempt was blocked by the prepared session's default Plane network and missing BM/reference fixture; it is preserved as unpassed evidence and is not represented as GSI pass.",
+  "notCertification": [
+    "Not a real human approval",
+    "Not licensed professional signoff",
+    "Not vendor/SUC interoperability evidence",
+    "Not regulatory or production field conformity certification"
+  ],
+  "reviewedEvidence": [
+    {
+      "path": "package-identity-readback.json",
+      "size": 7471,
+      "sha256": "41c3cd648277627013e51f00bedc0e059171dd43d0a56e8f779ebe7d06d8d98c"
+    },
+    {
+      "path": "local-install/installed-identity.json",
+      "size": 2292,
+      "sha256": "ed093679a5857923f70090fa245656e440aefbcd4d4713db291f9e038d134f23"
+    },
+    {
+      "path": "reviewed-build-combined.json",
+      "size": 2495,
+      "sha256": "e5d1308f8cecc692c9a03a2501552d29a8947ebfe132eb25d8f932c22d741441"
+    },
+    {
+      "path": "two-hour-stability-readback.json",
+      "size": 339,
+      "sha256": "0c7769f07b31e41001786d4d649fd988117b5d0fd3ed5059e6689cf6764e274e"
+    },
+    {
+      "path": "private-readback-result.json",
+      "size": 960,
+      "sha256": "2b2af8734291f76215ecc336fabe7dfa4920277eddd5c3aff9fb1246c2f886ab"
+    },
+    {
+      "path": "updater-readback-38111109910/immutable-updater-readback-result.json",
+      "size": 1843,
+      "sha256": "d4a99a110ec04d6e725458e3ba6bf12bcdc2336dafa8602f0fd6cf83c657272d"
+    },
+    {
+      "path": "updater-readback-38111109910/retained-original-reports/native-updater.json",
+      "size": 995,
+      "sha256": "9745c174e6ae6d0cb932da6d28670d36e6e99c0009b681e92d79fadefda1be66"
+    },
+    {
+      "path": "updater-readback-38111109910/retained-original-reports/verify-restart-data.json",
+      "size": 2428,
+      "sha256": "00415e2f583e3776cc5cbc9cc08c064c19643b73f535a9ec7d336cf23392a0ce"
+    },
+    {
+      "path": "cua-evidence/in2/README.md",
+      "size": 1202,
+      "sha256": "f14bb3d7f1a3fd71693372dc8e4a9b9131408453fb945b7b4682d7bcce88f538"
+    },
+    {
+      "path": "cua-evidence/in2/cua-observed-state.txt",
+      "size": 639,
+      "sha256": "59b93d262e44df360ac0db8b814ecc7f4277c505cfd3fb0e312f06289e6a21ce"
+    },
+    {
+      "path": "cua-evidence/in2/calculation-result.ax.txt",
+      "size": 15410,
+      "sha256": "cf307591170cc614f3b9f410f0dec7dda761e2ead34fbdcaee4e77501f73a039"
+    },
+    {
+      "path": "cua-evidence/in2/calculation-result.jpg",
+      "size": 293319,
+      "sha256": "d59493db50f7c9ce54a36e4c26896945eba82053d0718c2c29304ef5e3717c7b",
+      "reviewSnapshot": "screenshots/calculation-result.jpg",
+      "pixelDimensions": [
+        2560,
+        1680
+      ]
+    },
+    {
+      "path": "cua-evidence/in2/review-draft.ax.txt",
+      "size": 4309,
+      "sha256": "7302a9566469a54bd16e5f4fad986a5c0500e4d6bae24bbebddae6d10db9d606"
+    },
+    {
+      "path": "cua-evidence/in2/review-draft.jpg",
+      "size": 327943,
+      "sha256": "899905b2ec94b3c90252cc187dfd4378930e171cf0e2f8b05fe3e4edca80a2f5",
+      "reviewSnapshot": "screenshots/review-draft.jpg",
+      "pixelDimensions": [
+        2560,
+        1680
+      ]
+    },
+    {
+      "path": "independent-final-ai-review/independent-in2-derivation.json",
+      "size": 4231,
+      "sha256": "1783eecb29202fcc27b8c77ad4c3106b46789589e8dae040701b4554db2b07a9"
+    },
+    {
+      "path": "independent-final-ai-review/installed-codesign.log",
+      "exitCode": 0,
+      "sha256": "db6cee174af0a89034a2680eb3887436111f6e555b9e4d15223814f8e5c6c972"
+    },
+    {
+      "path": "independent-final-ai-review/installed-stapler.log",
+      "exitCode": 0,
+      "sha256": "1fd5bf3e5656c907830cc3a91c8b301f2851a43e8752fb484380e650f4c8b649"
+    },
+    {
+      "path": "native-exports/in2/report.docx",
+      "size": 37011,
+      "sha256": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12"
+    },
+    {
+      "path": "native-exports/in2/report.pdf",
+      "size": 61145,
+      "sha256": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff"
+    },
+    {
+      "path": "native-exports/in2/professional.xlsx",
+      "size": 47728,
+      "sha256": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e"
+    },
+    {
+      "path": "cua-evidence/in2/native-export-complete.ax.txt",
+      "size": 4156,
+      "sha256": "54bb3afb0b42b86caeef60cc3f8994b1aef43fa45a2ca37e695538e7da383589"
+    },
+    {
+      "path": "cua-evidence/in2/native-export-complete.jpg",
+      "size": 239474,
+      "sha256": "ac4960600441ed75391ca76136c3f83c7ed44455513fee6d8e0b51bd640c957c",
+      "reviewSnapshot": "screenshots/native-export-complete.jpg"
+    },
+    {
+      "path": "cua-evidence/in2/docx-save-panel.ax.txt",
+      "size": 1053,
+      "sha256": "3f32e54c50b82a017d675c8df968a878611838f7b1352a72bdc800f9b0122112"
+    },
+    {
+      "path": "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json",
+      "size": 32804,
+      "sha256": "b70ed881d769cf0694aca87e001302b9a68f14244e0179f0f02d62fd690f0003"
+    },
+    {
+      "path": "cua-evidence/in2/independent-numerical-readback/query-proof.json",
+      "size": 7004,
+      "sha256": "5ec34cf5f06c4f8f3343ee53c847fd126cfc990d2d3912c27fcb70e05c85b93d"
+    },
+    {
+      "path": "independent-final-ai-review/native-export-readback.json",
+      "size": 15140,
+      "sha256": "e4d3a7cc6ace8e93314665bf82c99d2d6869a1bf6f906ce855ffea339169c2a5",
+      "methodNote": "Final corrected reader-only DOCX CJK observation included; original native file hashes unchanged."
+    },
+    {
+      "path": "cua-evidence/in2/survey-restored-after-restart.ax.txt",
+      "size": 4077,
+      "sha256": "0d189e05f9d266ba001f1824aa4d752bda8b22340a9792d4403f347a8c7d04b9"
+    },
+    {
+      "path": "cua-evidence/in2/survey-restored-after-restart.jpg",
+      "size": 304673,
+      "sha256": "516e1bf845358a968c9b83ff33148cc782147beb404ae369fc06f97f4dd452ea",
+      "reviewSnapshot": "screenshots/survey-restored-after-restart.jpg"
+    },
+    {
+      "path": "cua-evidence/in2/quality-source-context.ax.txt",
+      "size": 3525,
+      "sha256": "cd7dfb818233171962892c6cebd0e24f7135c2dd1698e77a1326c9701777fec7"
+    },
+    {
+      "path": "cua-evidence/in2/quality-source-context.jpg",
+      "size": 289469,
+      "sha256": "e9d45c31cb8cbd153fd6d19114815c94e3bdc8fac595063c5badb1ab2c5c2fc1",
+      "reviewSnapshot": "screenshots/quality-source-context.jpg"
+    },
+    {
+      "path": "cua-evidence/in2/quality-to-deliver-regression.ax.txt",
+      "size": 4244,
+      "sha256": "5f1c42898b9eeaeca7f5adda5122c8b797a6763cb9b05119b0660d69112e5495"
+    },
+    {
+      "path": "cua-evidence/in2/quality-to-deliver-regression.jpg",
+      "size": 315304,
+      "sha256": "a0d5dfc90b909f039e8f47c71ccee40a77a2d902587943f98107b443f9ef1b5b",
+      "reviewSnapshot": "screenshots/quality-to-deliver-regression.jpg"
+    },
+    {
+      "path": "cua-evidence/ai-core/first-request-restored.ax.txt",
+      "size": 1338,
+      "sha256": "023c432965088b5bc6e9c5362330f874a2bf4ae5cf37344547912cd40d440e09"
+    },
+    {
+      "path": "cua-evidence/ai-core/first-request-restored.jpg",
+      "size": 300452,
+      "sha256": "5da26526974e112127cb791f599156a84b898ca2ee71a6172eadf2e777c3e030",
+      "reviewSnapshot": "screenshots/first-request-restored.jpg"
+    },
+    {
+      "path": "cua-evidence/ai-core/recovery-answer.ax.txt",
+      "size": 10658,
+      "sha256": "d3b7fd426f2d9562f9e40d106b897b435ff18df1fe0a1fd343e06208a180dcad"
+    },
+    {
+      "path": "cua-evidence/ai-core/recovery-answer.jpg",
+      "size": 444428,
+      "sha256": "92940a21beeb12077558dac165c4bec760f07ef0fec59046ccc1a658eb9bea88",
+      "reviewSnapshot": "screenshots/recovery-answer.jpg"
+    },
+    {
+      "path": "native-exports/in2/independent-native-readback/independent-native-semantics-review.json",
+      "size": 98519,
+      "sha256": "52486a5e09175f1c1211188ca44a85dada7eca4fae5c5cc748f90709df0e5c78"
+    },
+    {
+      "path": "native-exports/in2/independent-docx-render-font-readback/page-1.png",
+      "size": 300085,
+      "sha256": "35e3387f85f6e3c6750cd84fdc198f42fe5f668e4bffdc64d39168516f807f65",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "native-exports/in2/independent-docx-render-font-readback/page-2.png",
+      "size": 325407,
+      "sha256": "794928656e67309e39fcad629d5578f9de4e2f86e3b1d8c1afb4c279e87d82f2",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "native-exports/in2/independent-docx-render-font-readback/page-3.png",
+      "size": 236191,
+      "sha256": "ef70a7bac1f724dcb3580b5e9c17ec51c25892fc58e24ac08614a89840ff07eb",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "native-exports/in2/independent-docx-render-font-readback/page-4.png",
+      "size": 46420,
+      "sha256": "05c4377cc9224f3b2fad0b43df77156e411f9acd1f7f3ad6fef3c765fffe349c",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "independent-ai-event-readback/ai-turn-events-review.json",
+      "size": 16701,
+      "sha256": "bf9fe8a79fa51b1f42ff361c864e4ef6d5c2748887de0d28125c4bf7b18900ae"
+    },
+    {
+      "path": "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json",
+      "size": 2572,
+      "sha256": "4721db2363f5830b4fbf964afd17b59d5901c7a94d990ef526ed67250300add1"
+    },
+    {
+      "path": "cua-evidence/website/survey-zh-light.ax.txt",
+      "size": 14437,
+      "sha256": "f361d24332af9fa7de0c42e9fd7120d23287d17076e40270321ca8ae4cd637d2"
+    },
+    {
+      "path": "cua-evidence/website/survey-zh-light.jpg",
+      "size": 271394,
+      "sha256": "ec0eb934be6995bb8249a479a7f8bb173a743ccc26f457588ec4d7829103fc3e",
+      "reviewSnapshot": "screenshots/survey-zh-light.jpg",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "cua-evidence/website/deliver-zh-light.ax.txt",
+      "size": 4039,
+      "sha256": "ed6ca2caec17c936192025f78202ef00775d31c1f0328f18de4f6aea98fdfef2"
+    },
+    {
+      "path": "cua-evidence/website/deliver-zh-light.jpg",
+      "size": 289092,
+      "sha256": "04db10af2ee26dce5ae5fb78daf3c548e9b0a8addaa540e47e0001c38a796a89",
+      "reviewSnapshot": "screenshots/deliver-zh-light.jpg",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "cua-evidence/website/settings-zh-light.ax.txt",
+      "size": 6112,
+      "sha256": "b924a8af622dda6602f4246ebb17bb11507a4598e8a8f7cd28cb0ce44f44e671"
+    },
+    {
+      "path": "cua-evidence/website/settings-zh-light.jpg",
+      "size": 263242,
+      "sha256": "42d1841d761124cfa12fcf0630bafe0c52b1e473dae867e60e17b187c42ad809",
+      "reviewSnapshot": "screenshots/settings-zh-light.jpg",
+      "independentlyVisuallyInspected": true
+    },
+    {
+      "path": "cua-evidence/gsi/initial-wrong-network-blocked.ax.txt",
+      "size": 9917,
+      "sha256": "8a7ceee3fc51c9f2dd4fb06ac2930ac159190c77070da3d6d2c8d1ee1002daa3"
+    },
+    {
+      "path": "cua-evidence/gsi/initial-wrong-network-blocked.jpg",
+      "size": 406987,
+      "sha256": "91560fd73386efd168392f23c2a4dc368c9ae508c9e5abbc3ccdae96a29a0166",
+      "reviewSnapshot": "screenshots/gsi-initial-wrong-network-blocked.jpg",
+      "independentlyVisuallyInspected": true
+    }
+  ],
+  "releaseGateStatus": "passed",
+  "disposition": "Completed independent package review within the user-authorized reduced scope, with disclosed follow-up findings.",
+  "methods": [
+    "Read-only review of frozen and installed package identity, independent strict codesign and stapler validation.",
+    "Independent CSV/Decimal angle parsing and analytical weighted Gauss-Newton derivation from the original synthetic IN2 fixture; no product parser or solver imported.",
+    "Visual review of actual current-package CUA screenshots and accessibility text, including English dark and Chinese light core surfaces.",
+    "Read-only OOXML/PDF/XLSX content and numeric checks plus visual inspection of all five native PDF pages and four original DOCX pages rendered with reader-only CJK font fallback.",
+    "Review of native updater original reports, same-package restart evidence, per-turn raw runtime model events and exact before/after two-record plus three-file byte hashes.",
+    "No business records, installed app, profile, source code, execution index or GUI were mutated by this reviewer."
+  ],
+  "aiResponseObservation": {
+    "originalTurn": "turn_d3fgo7h6",
+    "originalDisposition": "interrupted/incomplete; no final assistant response inherited",
+    "completedRecoveryTurn": "turn_fl8um8f7",
+    "actualModel": "deepseek-v4-pro",
+    "actualReasoningEffort": "max",
+    "completedAtUtc": "2026-10-11T11:02:48.501Z",
+    "responseCharacters": 2536,
+    "responseSha256": "2e4473cdcf16aa9c13b8c080e0efa6420dffbbeda7c898174b49b0820fa2f879",
+    "nonmutationScope": "Exactly two numerical data_json records and three native export files in the observed comparison interval."
+  },
+  "gsiExtraAttempt": {
+    "status": "deferred-unpassed",
+    "evidence": [
+      "cua-evidence/gsi/initial-wrong-network-blocked.ax.txt",
+      "cua-evidence/gsi/initial-wrong-network-blocked.jpg"
+    ],
+    "observation": "Independent review of preserved screenshot/AX shows automatic identification recognized Leica GSI-8, but the initial session network remained Plane with 0 known points and 15 preflight blockers. Root operator reports that later selecting leveling and confirming datum/reimport still retained the old Plane network. GSI calculation/export has no pass claim; extra-path configuration coverage is deferred.",
+    "evidenceBasis": "Initial blocked state independently inspected from preserved screenshot/AX; subsequent selection/reimport outcome is attributed to root operator report."
+  }
+}

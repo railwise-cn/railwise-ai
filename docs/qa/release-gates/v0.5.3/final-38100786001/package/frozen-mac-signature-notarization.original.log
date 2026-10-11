@@ -1,0 +1,146 @@
+正在检查“Protective Master Boot Record (MBR : 0)”的校验和…
+Protective Master Boot Record (MBR :：已验证CRC32 $05B5771E
+正在检查“GPT Header (Primary GPT Header : 1)”的校验和…
+ GPT Header (Primary GPT Header : 1)：已验证CRC32 $49070710
+正在检查“GPT Partition Data (Primary GPT Table : 2)”的校验和…
+GPT Partition Data (Primary GPT Tabl：已验证CRC32 $2AA9A226
+正在检查“ (Apple_Free : 3)”的校验和…
+                    (Apple_Free : 3)：已验证CRC32 $00000000
+正在检查“disk image (Apple_HFS : 4)”的校验和…
+          disk image (Apple_HFS : 4)：已验证CRC32 $F3AFA62F
+正在检查“ (Apple_Free : 5)”的校验和…
+                    (Apple_Free : 5)：已验证CRC32 $00000000
+正在检查“GPT Partition Data (Backup GPT Table : 6)”的校验和…
+GPT Partition Data (Backup GPT Table：已验证CRC32 $2AA9A226
+正在检查“GPT Header (Backup GPT Header : 7)”的校验和…
+  GPT Header (Backup GPT Header : 7)：已验证CRC32 $E5E4431D
+已验证CRC32 $4F2017CC
+hdiutil: WARNING: 'hdiutil attach -readonly -nobrowse -mountpoint ...' is deprecated. Please use 'diskutil image attach --readOnly --mountOptions nobrowse --mountPoint ...' instead.
+/dev/disk11         	GUID_partition_scheme          	
+/dev/disk11s1       	Apple_HFS                      	/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app: valid on disk
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app: satisfies its Designated Requirement
+[mac-notarize] Verified Electron/V8 entitlements on 5 macOS runtime executable(s).
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app: accepted
+source=Notarized Developer ID
+override=security disabled
+Processing: /var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-h9YSdx/RailWise AI.app
+The validate action worked!
+Verified signed and notarized macOS app: WorkWise-0.5.3-mac-arm64.dmg
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app: valid on disk
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app: satisfies its Designated Requirement
+[mac-notarize] Verified Electron/V8 entitlements on 5 macOS runtime executable(s).
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app: accepted
+source=Notarized Developer ID
+override=security disabled
+Processing: /var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-KU5bXE/RailWise AI.app
+The validate action worked!
+Verified signed and notarized macOS app: WorkWise-0.5.3-mac-arm64.zip
+正在检查“Protective Master Boot Record (MBR : 0)”的校验和…
+Protective Master Boot Record (MBR :：已验证CRC32 $C740B686
+正在检查“GPT Header (Primary GPT Header : 1)”的校验和…
+ GPT Header (Primary GPT Header : 1)：已验证CRC32 $FD7054B4
+正在检查“GPT Partition Data (Primary GPT Table : 2)”的校验和…
+GPT Partition Data (Primary GPT Tabl：已验证CRC32 $E19D7FC0
+正在检查“ (Apple_Free : 3)”的校验和…
+                    (Apple_Free : 3)：已验证CRC32 $00000000
+正在检查“disk image (Apple_HFS : 4)”的校验和…
+          disk image (Apple_HFS : 4)：已验证CRC32 $29F6F866
+正在检查“GPT Partition Data (Backup GPT Table : 5)”的校验和…
+GPT Partition Data (Backup GPT Table：已验证CRC32 $E19D7FC0
+正在检查“GPT Header (Backup GPT Header : 6)”的校验和…
+  GPT Header (Backup GPT Header : 6)：已验证CRC32 $121A2833
+已验证CRC32 $5EF0C6FC
+hdiutil: WARNING: 'hdiutil attach -readonly -nobrowse -mountpoint ...' is deprecated. Please use 'diskutil image attach --readOnly --mountOptions nobrowse --mountPoint ...' instead.
+/dev/disk11         	GUID_partition_scheme          	
+/dev/disk11s1       	Apple_HFS                      	/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app: valid on disk
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app: satisfies its Designated Requirement
+[mac-notarize] Verified Electron/V8 entitlements on 5 macOS runtime executable(s).
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app: accepted
+source=Notarized Developer ID
+override=security disabled
+Processing: /var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-dmg-verify-4jj3xs/RailWise AI.app
+The validate action worked!
+Verified signed and notarized macOS app: WorkWise-0.5.3-mac-x64.dmg
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/private/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app: valid on disk
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app: satisfies its Designated Requirement
+[mac-notarize] Verified Electron/V8 entitlements on 5 macOS runtime executable(s).
+/var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app: accepted
+source=Notarized Developer ID
+override=security disabled
+Processing: /var/folders/t8/1bkjpgdx5zbd2ynlyzpqd7zw0000gn/T/workwise-zip-verify-GSBiQb/RailWise AI.app
+The validate action worked!
+Verified signed and notarized macOS app: WorkWise-0.5.3-mac-x64.zip

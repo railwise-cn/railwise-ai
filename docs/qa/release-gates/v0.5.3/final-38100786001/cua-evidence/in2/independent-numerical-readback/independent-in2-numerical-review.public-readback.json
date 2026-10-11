@@ -1,0 +1,1040 @@
+{
+  "schemaVersion": 1,
+  "reviewLabel": "Independent AI numerical and raw-record corroboration of root-operated installed GUI calculation",
+  "observedAtUtc": "2026-10-11T10:51:58.804993+00:00",
+  "freezeRunId": 38100786001,
+  "freezeAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "packageVersion": "0.5.3",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "target": {
+    "id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+    "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+    "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+    "updated_at": "2026-10-11T10:46:11.300Z"
+  },
+  "networkRevision": 3,
+  "resultId": "adjustment_result_947aa496-b66d-4a84-9005-d3be049e7129",
+  "checkCount": 129,
+  "failureCount": 0,
+  "status": "passed-for-numerical-and-source-record-scope",
+  "checks": [
+    {
+      "name": "freeze run",
+      "actual": 38100786001,
+      "expected": 38100786001,
+      "passed": true
+    },
+    {
+      "name": "freeze attempt",
+      "actual": 1,
+      "expected": 1,
+      "passed": true
+    },
+    {
+      "name": "freeze head",
+      "actual": "3256f4842503e002f094952934b82f2d1d445a0f",
+      "expected": "3256f4842503e002f094952934b82f2d1d445a0f",
+      "passed": true
+    },
+    {
+      "name": "installed bundle version",
+      "actual": "0.5.3",
+      "expected": "0.5.3",
+      "passed": true
+    },
+    {
+      "name": "installed bundle id",
+      "actual": "com.wangjiawei508.workgpt",
+      "expected": "com.wangjiawei508.workgpt",
+      "passed": true
+    },
+    {
+      "name": "current installed ASAR equals exact target",
+      "actual": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+      "expected": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+      "passed": true
+    },
+    {
+      "name": "installed receipt ASAR equals current",
+      "actual": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+      "expected": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+      "passed": true
+    },
+    {
+      "name": "prepared source hash",
+      "actual": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "expected": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "passed": true
+    },
+    {
+      "name": "prepared source matches independent oracle hash",
+      "actual": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "expected": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "passed": true
+    },
+    {
+      "name": "prepared source matches oracle byte size",
+      "actual": 141,
+      "expected": 141,
+      "passed": true
+    },
+    {
+      "name": "unique completed source target",
+      "actual": 1,
+      "expected": 1,
+      "passed": true
+    },
+    {
+      "name": "network source hash matches oracle",
+      "actual": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "expected": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "passed": true
+    },
+    {
+      "name": "network source byte size matches oracle",
+      "actual": 141,
+      "expected": 141,
+      "passed": true
+    },
+    {
+      "name": "network source original preserved",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "network type",
+      "actual": "plane-control",
+      "expected": "plane-control",
+      "passed": true
+    },
+    {
+      "name": "network canonical linear unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "network quality status",
+      "actual": "validated",
+      "expected": "validated",
+      "passed": true
+    },
+    {
+      "name": "calculation completed",
+      "actual": "completed",
+      "expected": "completed",
+      "passed": true
+    },
+    {
+      "name": "result bound exact calculation input hash",
+      "actual": "1ba3d798095b9447f94530c22a920cd6d1eb14462f87dbb934682438be8e7b0a",
+      "expected": "1ba3d798095b9447f94530c22a920cd6d1eb14462f87dbb934682438be8e7b0a",
+      "passed": true
+    },
+    {
+      "name": "result bound exact network",
+      "actual": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+      "expected": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+      "passed": true
+    },
+    {
+      "name": "result bound exact run",
+      "actual": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+      "expected": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+      "passed": true
+    },
+    {
+      "name": "observation count",
+      "actual": 5,
+      "expected": 5,
+      "passed": true
+    },
+    {
+      "name": "unknown parameter count",
+      "actual": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "name": "degrees of freedom",
+      "actual": 2,
+      "expected": 2,
+      "passed": true
+    },
+    {
+      "name": "rank",
+      "actual": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "name": "absolute prior weighting",
+      "actual": "absolute-prior",
+      "expected": "absolute-prior",
+      "passed": true
+    },
+    {
+      "name": "variance factor dimensionless",
+      "actual": "dimensionless",
+      "expected": "dimensionless",
+      "passed": true
+    },
+    {
+      "name": "unit weight standard deviation dimensionless",
+      "actual": "dimensionless",
+      "expected": "dimensionless",
+      "passed": true
+    },
+    {
+      "name": "variance factor versus independent oracle",
+      "actual": 1.1387378096796804e-08,
+      "expected": 1.1387383580835469e-08,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "unit weight stddev squared equals factor",
+      "actual": 1.1387378096796804e-08,
+      "expected": 1.1387378096796804e-08,
+      "passed": true,
+      "absoluteTolerance": 1e-20
+    },
+    {
+      "name": "standards conformity remains not evaluated",
+      "actual": "not-evaluated",
+      "expected": "not-evaluated",
+      "passed": true
+    },
+    {
+      "name": "statistical significance remains not evaluated",
+      "actual": "not-evaluated",
+      "expected": "not-evaluated",
+      "passed": true
+    },
+    {
+      "name": "S1 final x metres",
+      "actual": 49.99999999284098,
+      "expected": 49.999999992841026,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "S1 actual initial-to-final x correction metres",
+      "actual": -1.9446147803137137e-08,
+      "expected": -1.9446147803137137e-08,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "S1 final y metres",
+      "actual": 49.999999963710295,
+      "expected": 49.9999999637103,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "S1 actual initial-to-final y correction metres",
+      "actual": 1.95930319080162e-07,
+      "expected": 1.95930319080162e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "S1 final orientation radians",
+      "actual": 1.5707963269606606,
+      "expected": 1.5707963269606608,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "S1 posterior point stddev metres",
+      "actual": 1.3592152495710963e-07,
+      "expected": 1.359215576862765e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "A declared fixed coordinate metres",
+      "actual": [
+        50,
+        150
+      ],
+      "expected": [
+        50.0,
+        150.0
+      ],
+      "passed": true
+    },
+    {
+      "name": "A fixed result remains unchanged",
+      "actual": [
+        50,
+        150
+      ],
+      "expected": [
+        50.0,
+        150.0
+      ],
+      "passed": true
+    },
+    {
+      "name": "A has no solved posterior precision claim",
+      "actual": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "name": "B declared fixed coordinate metres",
+      "actual": [
+        150,
+        50
+      ],
+      "expected": [
+        150.0,
+        50.0
+      ],
+      "passed": true
+    },
+    {
+      "name": "B fixed result remains unchanged",
+      "actual": [
+        150,
+        50
+      ],
+      "expected": [
+        150.0,
+        50.0
+      ],
+      "passed": true
+    },
+    {
+      "name": "B has no solved posterior precision claim",
+      "actual": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "name": "C declared fixed coordinate metres",
+      "actual": [
+        120.710678,
+        120.710678
+      ],
+      "expected": [
+        120.710678,
+        120.710678
+      ],
+      "passed": true
+    },
+    {
+      "name": "C fixed result remains unchanged",
+      "actual": [
+        120.710678,
+        120.710678
+      ],
+      "expected": [
+        120.710678,
+        120.710678
+      ],
+      "passed": true
+    },
+    {
+      "name": "C has no solved posterior precision claim",
+      "actual": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "name": "prior covariance 0,0 versus oracle",
+      "actual": 6.872084438073081e-07,
+      "expected": 6.87208443807279e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 0,1 versus oracle",
+      "actual": -6.262705982801717e-07,
+      "expected": -6.262705982801548e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 0,2 versus oracle",
+      "actual": 7.474163269919943e-09,
+      "expected": 7.474163269919877e-09,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 1,0 versus oracle",
+      "actual": -6.262705982801717e-07,
+      "expected": -6.262705982801548e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 1,1 versus oracle",
+      "actual": 9.351721243643048e-07,
+      "expected": 9.351721243643203e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 1,2 versus oracle",
+      "actual": -8.88516487243097e-09,
+      "expected": -8.885164872431056e-09,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 2,0 versus oracle",
+      "actual": 7.474163269919945e-09,
+      "expected": 7.474163269919877e-09,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 2,1 versus oracle",
+      "actual": -8.88516487243097e-09,
+      "expected": -8.885164872431054e-09,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "prior covariance 2,2 versus oracle",
+      "actual": 1.0092521025674865e-10,
+      "expected": 1.0092521025675041e-10,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "posterior XY covariance oracle 0",
+      "actual": 7.825502380945158e-15,
+      "expected": 7.825506149622503e-15,
+      "passed": true,
+      "absoluteTolerance": 1e-18
+    },
+    {
+      "name": "posterior XY covariance factor relation 0",
+      "actual": 7.825502380945158e-15,
+      "expected": 7.825502380945158e-15,
+      "passed": true,
+      "absoluteTolerance": 1e-25
+    },
+    {
+      "name": "posterior XY covariance oracle 1",
+      "actual": -7.131580093523458e-15,
+      "expected": -7.13158352801544e-15,
+      "passed": true,
+      "absoluteTolerance": 1e-18
+    },
+    {
+      "name": "posterior XY covariance factor relation 1",
+      "actual": -7.131580093523458e-15,
+      "expected": -7.131580093523458e-15,
+      "passed": true,
+      "absoluteTolerance": 1e-25
+    },
+    {
+      "name": "posterior XY covariance oracle 2",
+      "actual": -7.131580093523458e-15,
+      "expected": -7.13158352801544e-15,
+      "passed": true,
+      "absoluteTolerance": 1e-18
+    },
+    {
+      "name": "posterior XY covariance factor relation 2",
+      "actual": -7.131580093523458e-15,
+      "expected": -7.131580093523458e-15,
+      "passed": true,
+      "absoluteTolerance": 1e-25
+    },
+    {
+      "name": "posterior XY covariance oracle 3",
+      "actual": 1.064915856572102e-14,
+      "expected": 1.0649163694241285e-14,
+      "passed": true,
+      "absoluteTolerance": 1e-18
+    },
+    {
+      "name": "posterior XY covariance factor relation 3",
+      "actual": 1.064915856572102e-14,
+      "expected": 1.064915856572102e-14,
+      "passed": true,
+      "absoluteTolerance": 1e-25
+    },
+    {
+      "name": "ellipse posterior basis",
+      "actual": "a-posteriori",
+      "expected": "a-posteriori",
+      "passed": true
+    },
+    {
+      "name": "ellipse plane",
+      "actual": "solution-xy",
+      "expected": "solution-xy",
+      "passed": true
+    },
+    {
+      "name": "ellipse axes unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "ellipse major",
+      "actual": 1.284808010949112e-07,
+      "expected": 1.2848083203239175e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "ellipse minor",
+      "actual": 4.435475957184348e-08,
+      "expected": 4.435477025223018e-08,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "ellipse orientation modulo pi",
+      "actual": 1.9984014443252818e-14,
+      "expected": 0.0,
+      "passed": true,
+      "absoluteTolerance": 1e-06
+    },
+    {
+      "name": "source row 6 observed canonical value",
+      "actual": 0,
+      "expected": 0.0,
+      "passed": true
+    },
+    {
+      "name": "source row 6 declared prior sigma",
+      "actual": 4.84813681109536e-06,
+      "expected": 4.84813681109536e-06,
+      "passed": true
+    },
+    {
+      "name": "source row 6 unit preserved",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 6 sigma unit preserved",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 6 result unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 6 adjusted-minus-observed residual",
+      "actual": -2.3735413634540237e-10,
+      "expected": -2.3735413634540237e-10,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 6 correction equals residual",
+      "actual": -2.3735413634540237e-10,
+      "expected": -2.3735413634540237e-10,
+      "passed": true
+    },
+    {
+      "name": "source row 6 standardized screening ratio magnitude",
+      "actual": 4.895780494523131e-05,
+      "expected": 4.895780494523131e-05,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 6 source row reference preserved",
+      "actual": "cosa-in2-record-6",
+      "expected": "cosa-in2-record-6",
+      "passed": true
+    },
+    {
+      "name": "source row 7 observed canonical value",
+      "actual": 4.71238898038469,
+      "expected": 4.71238898038469,
+      "passed": true
+    },
+    {
+      "name": "source row 7 declared prior sigma",
+      "actual": 4.84813681109536e-06,
+      "expected": 4.84813681109536e-06,
+      "passed": true
+    },
+    {
+      "name": "source row 7 unit preserved",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 7 sigma unit preserved",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 7 result unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 7 adjusted-minus-observed residual",
+      "actual": 1.971329766092822e-10,
+      "expected": 1.971329766092822e-10,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 7 correction equals residual",
+      "actual": 1.971329766092822e-10,
+      "expected": 1.971329766092822e-10,
+      "passed": true
+    },
+    {
+      "name": "source row 7 standardized screening ratio magnitude",
+      "actual": 4.066159522522697e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 7 source row reference preserved",
+      "actual": "cosa-in2-record-7",
+      "expected": "cosa-in2-record-7",
+      "passed": true
+    },
+    {
+      "name": "source row 8 observed canonical value",
+      "actual": 100,
+      "expected": 100.0,
+      "passed": true
+    },
+    {
+      "name": "source row 8 declared prior sigma",
+      "actual": 0.001004987562112089,
+      "expected": 0.001004987562112089,
+      "passed": true
+    },
+    {
+      "name": "source row 8 unit preserved",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "source row 8 sigma unit preserved",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "source row 8 result unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "source row 8 adjusted-minus-observed residual",
+      "actual": 7.159016490732029e-09,
+      "expected": 7.158973858167883e-09,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "source row 8 correction equals residual",
+      "actual": 7.159016490732029e-09,
+      "expected": 7.159016490732029e-09,
+      "passed": true
+    },
+    {
+      "name": "source row 8 standardized screening ratio magnitude",
+      "actual": 7.123487653604974e-06,
+      "expected": 7.123487653604974e-06,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 8 source row reference preserved",
+      "actual": "cosa-in2-record-8",
+      "expected": "cosa-in2-record-8",
+      "passed": true
+    },
+    {
+      "name": "source row 9 observed canonical value",
+      "actual": 5.497787143782138,
+      "expected": 5.497787143782138,
+      "passed": true
+    },
+    {
+      "name": "source row 9 declared prior sigma",
+      "actual": 4.84813681109536e-06,
+      "expected": 4.84813681109536e-06,
+      "passed": true
+    },
+    {
+      "name": "source row 9 unit preserved",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 9 sigma unit preserved",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 9 result unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "source row 9 adjusted-minus-observed residual",
+      "actual": 4.022115973612017e-11,
+      "expected": 4.022115973612017e-11,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 9 correction equals residual",
+      "actual": 4.022115973612017e-11,
+      "expected": 4.022115973612017e-11,
+      "passed": true
+    },
+    {
+      "name": "source row 9 standardized screening ratio magnitude",
+      "actual": 8.296209720004341e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 9 source row reference preserved",
+      "actual": "cosa-in2-record-9",
+      "expected": "cosa-in2-record-9",
+      "passed": true
+    },
+    {
+      "name": "source row 10 observed canonical value",
+      "actual": 100,
+      "expected": 100.0,
+      "passed": true
+    },
+    {
+      "name": "source row 10 declared prior sigma",
+      "actual": 0.001004987562112089,
+      "expected": 0.001004987562112089,
+      "passed": true
+    },
+    {
+      "name": "source row 10 unit preserved",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "source row 10 sigma unit preserved",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "source row 10 result unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "source row 10 adjusted-minus-observed residual",
+      "actual": -1.3708027779557597e-07,
+      "expected": -1.370803204281401e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "source row 10 correction equals residual",
+      "actual": -1.3708027779557597e-07,
+      "expected": -1.3708027779557597e-07,
+      "passed": true
+    },
+    {
+      "name": "source row 10 standardized screening ratio magnitude",
+      "actual": 0.00013639997445091467,
+      "expected": 0.00013639997445091467,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "source row 10 source row reference preserved",
+      "actual": "cosa-in2-record-10",
+      "expected": "cosa-in2-record-10",
+      "passed": true
+    },
+    {
+      "name": "actual residual SSE / df equals actual variance factor",
+      "actual": 1.1387378096797525e-08,
+      "expected": 1.1387378096796804e-08,
+      "passed": true,
+      "absoluteTolerance": 1e-18
+    },
+    {
+      "name": "linear residual descriptive norm",
+      "actual": 1.3726709029343796e-07,
+      "expected": 1.3726713064453376e-07,
+      "passed": true,
+      "absoluteTolerance": 1e-10
+    },
+    {
+      "name": "angular residual descriptive norm",
+      "actual": 3.111529177070756e-10,
+      "expected": 3.111529177070756e-10,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "original source anchor row 1",
+      "actual": "1.000,1,1",
+      "expected": "1.000,1,1",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 2",
+      "actual": "A,50.000000,150.000000",
+      "expected": "A,50.000000,150.000000",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 3",
+      "actual": "B,150.000000,50.000000",
+      "expected": "B,150.000000,50.000000",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 4",
+      "actual": "C,120.710678,120.710678",
+      "expected": "C,120.710678,120.710678",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 5",
+      "actual": "S1",
+      "expected": "S1",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 6",
+      "actual": "A,L,0",
+      "expected": "A,L,0",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 7",
+      "actual": "B,L,270.00000",
+      "expected": "B,L,270.00000",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 8",
+      "actual": "B,S,100.000",
+      "expected": "B,S,100.000",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 9",
+      "actual": "C,L,315.00000",
+      "expected": "C,L,315.00000",
+      "passed": true
+    },
+    {
+      "name": "original source anchor row 10",
+      "actual": "C,S,100.000",
+      "expected": "C,S,100.000",
+      "passed": true
+    },
+    {
+      "name": "source anchor count",
+      "actual": 10,
+      "expected": 10,
+      "passed": true
+    }
+  ],
+  "originalByteInventory": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/source.original.in2",
+      "bytes": 141,
+      "sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+      "sourcePath": "/private/tmp/railwise-053-tools/pre-freeze-20261009/prepared-inputs/golden-plane-control-e2e.in2"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/oracle.original.json",
+      "bytes": 8932,
+      "sha256": "199e1e7f971c0b0a5fe84ba7f093c601b1e3ac067f3942386d7ef870eb690a34",
+      "sourcePath": "[acceptance-home]/Documents/WorkWise/docs/qa/release-gates/v0.5.3/independent-numerical-expectations-20261008.json",
+      "scope": "Existing frozen independent NumPy oracle, no product solver imported"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/installed-identity.original.json",
+      "bytes": 2292,
+      "sha256": "ed093679a5857923f70090fa245656e440aefbcd4d4713db291f9e038d134f23",
+      "sourcePath": "/private/tmp/railwise-053-tools/new-freeze-38100786001/local-install/installed-identity.json"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/installed-Info.original.plist",
+      "bytes": 3858,
+      "sha256": "794daaf4ead0f61b41734334ffdff193bd505a3d8be4dfcc565d430e69513582",
+      "sourcePath": "/Applications/RailWise AI.app/Contents/Info.plist"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/current-process.original.txt",
+      "bytes": 138,
+      "sha256": "82528b3912e29620cdfe370ec06be76d149143f6c4ffb9f0c3110becf33ba6bb",
+      "scope": "Exact installed executable PID/PPID/comm only; no arguments/environment",
+      "observedAtUtc": "2026-10-11T10:51:58.801361+00:00"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/network-1.record.original.json",
+      "bytes": 19303,
+      "sha256": "6041a4673da95f3a29f9bec0853ff29ce94cf4d644e9ca0bcf849cb58eccd646",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_networks",
+      "selectedColumns": {
+        "id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+        "revision": 3,
+        "updated_at": "2026-10-11T10:29:41.082Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/adjustment-1.record.original.json",
+      "bytes": 7450,
+      "sha256": "f747073f4caf71c8cb3c6be765dd299220a13ba91ceaf6d868c27384cd6ea727",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_adjustments",
+      "selectedColumns": {
+        "id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+        "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+        "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "updated_at": "2026-10-11T10:46:11.300Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/source-admission-1.record.original.json",
+      "bytes": 506,
+      "sha256": "cc2c58bf938858ab98fe56684811953470389884e3495e0ff14885ef4e9c0cd2",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_source_admissions",
+      "selectedColumns": {
+        "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+        "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+        "source_file_hash": "2e20572306e07d9294bcb20b561bbf59f91fba29924c1d6e9173d1a17039b16b",
+        "solver_input_hash": "1ba3d798095b9447f94530c22a920cd6d1eb14462f87dbb934682438be8e7b0a",
+        "recorded_at": "2026-10-11T10:28:02.947Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/raw-source-ledger-1.record.original.json",
+      "bytes": 512,
+      "sha256": "cb612d50e62e3270d10201fb07746353592aecc5a4d97e573e283d12426c92f1",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_raw_source_ledger",
+      "selectedColumns": {
+        "id": "raw_source_d88e125d-ab68-4f2f-844d-448344eb9dc6",
+        "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "sequence": 1,
+        "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+        "recorded_at": "2026-10-11T10:28:02.947Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/raw-source-ledger-2.record.original.json",
+      "bytes": 576,
+      "sha256": "06eb3e7b9a45358a3271155490dc2f70322cc7daf61a2ae28a9c471bd733ff8d",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_raw_source_ledger",
+      "selectedColumns": {
+        "id": "raw_source_fecd851c-4da5-4fff-9edd-e4b5800872e2",
+        "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "sequence": 2,
+        "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+        "recorded_at": "2026-10-11T10:28:02.967Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/raw-source-ledger-3.record.original.json",
+      "bytes": 576,
+      "sha256": "a34e66152862cb0d412f042387b26f371efe55e15e96cbe742eefec78b64cee3",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_raw_source_ledger",
+      "selectedColumns": {
+        "id": "raw_source_70b4c107-55cf-42e6-ab12-c56600f0ea37",
+        "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "sequence": 3,
+        "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+        "recorded_at": "2026-10-11T10:29:41.081Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/adjustment-evidence-1.record.original.json",
+      "bytes": 653,
+      "sha256": "cb7713e55e252b8eedff5610ed6bae936d3ddbecfbd2619150b020cdde4a5325",
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "table": "survey_adjustment_evidence",
+      "selectedColumns": {
+        "adjustment_id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+        "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+        "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+        "input_hash": "1ba3d798095b9447f94530c22a920cd6d1eb14462f87dbb934682438be8e7b0a",
+        "source_admission_hash": "9b9b34a29b5bfc5ff75f7ab022489a8b05f3d1be49a37e02c6121bbca1d6007a",
+        "calculation_hash": "78b890959782c5e2a510c7a7f8f845ede05d6a394299e232d11a0b9920308cc4",
+        "output_hash": "3e9894d25c356328488b657acc97a36f151d113c35c0eba3d566a5a8079bbced",
+        "recorded_at": "2026-10-11T10:46:11.300Z"
+      },
+      "byteScope": "Exact SQLite TEXT encoded as UTF-8; no JSON reserialization"
+    }
+  ],
+  "queryProof": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/query-proof.json",
+  "professionalSemantics": {
+    "station": "S1 initial coordinates are an initializer; final coordinates and corrections are separate. Oracle initializer differs slightly from actual product initializer, so correction uses actual stored initial.",
+    "controls": "A/B/C are declared fixed synthetic datum points, not independently verified control and not posterior solved points.",
+    "covariance": "Stored result covariance is prior. Error ellipse XY covariance and point standard error are posterior scaled by variance factor.",
+    "precision": "Near-noiseless synthetic fixture precision is not an instrument performance or field quality claim.",
+    "closure": "Residual norms are descriptive post-adjustment quantities; no independent closure limit, significance or standards conformity is inferred.",
+    "reference": "CGCS2000 is a GUI user declaration applied to this synthetic source. This review does not certify reference correctness; height is unused for plane control."
+  },
+  "wholeCasePassed": false,
+  "releaseReady": false,
+  "limitations": [
+    "Read-only corroboration does not substitute for original GUI AX/JPEG, native export, restoration or complete package acceptance.",
+    "This is AI review of a synthetic example, not vendor/SUC certification, field professional signoff or human release approval.",
+    "No GUI/API approval/business data/DB/profile/source/public operation performed.",
+    "No task record or approval state is invented; only actual completed survey_adjustments producer is read."
+  ],
+  "publicationProvenance": {
+    "kind": "public-safe-personal-path-derivative",
+    "originalFile": "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json",
+    "originalSha256": "b70ed881d769cf0694aca87e001302b9a68f14244e0179f0f02d62fd690f0003",
+    "originalBytes": 32804,
+    "transformation": "Personal home path prefix replaced with [acceptance-home] only; numerical values, IDs, checks, event summary fields and statuses unchanged. Raw runtime events/messages/metadata remain private and are not committed.",
+    "byteExactOriginal": false
+  }
+}

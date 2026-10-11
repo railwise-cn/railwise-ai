@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "purpose": "frozen-public-release",
+  "repository": "railwise-cn/railwise-ai",
+  "workflowPath": ".github/workflows/release.yml",
+  "runId": 38100786001,
+  "runAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+  "workflowSha": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "candidateOnly": true,
+  "preparePublicArtifacts": true,
+  "publishRelease": false,
+  "artifact": "release-mac",
+  "version": "0.5.3",
+  "identities": {
+    "darwin-arm64": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "version": "0.5.3",
+      "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+      "updateUrl": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/"
+    },
+    "darwin-x64": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "version": "0.5.3",
+      "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+      "updateUrl": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/"
+    }
+  },
+  "files": [
+    {
+      "name": "WorkWise-0.5.3-mac-arm64.dmg",
+      "platform": "darwin-arm64",
+      "artifact": "release-mac",
+      "size": 301352326,
+      "sha256": "6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e"
+    },
+    {
+      "name": "WorkWise-0.5.3-mac-arm64.zip",
+      "platform": "darwin-arm64",
+      "artifact": "release-mac",
+      "size": 307560343,
+      "sha256": "5b40f45654733acbe1511fcdccde101a1350e98a24306981c393cf063f4b774f"
+    },
+    {
+      "name": "WorkWise-0.5.3-mac-x64.dmg",
+      "platform": "darwin-x64",
+      "artifact": "release-mac",
+      "size": 306907651,
+      "sha256": "59613948518d9622d21063bff98aba2d78714d797f773b353bea313995975560"
+    },
+    {
+      "name": "WorkWise-0.5.3-mac-x64.zip",
+      "platform": "darwin-x64",
+      "artifact": "release-mac",
+      "size": 313377234,
+      "sha256": "f067a0dbfe1bc4b9aa464d2778aa832e2eb1e430c564c3eff55bb59932d8057a"
+    },
+    {
+      "name": "latest-mac.yml",
+      "platform": "darwin",
+      "artifact": "release-mac",
+      "size": 824,
+      "sha256": "01a3143a9fc0daa8258792a345f773d4bf2a02c2ed3c79ca9217aeae981c9311"
+    }
+  ]
+}

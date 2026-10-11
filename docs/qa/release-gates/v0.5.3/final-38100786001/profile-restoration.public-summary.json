@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "version": "0.5.3",
+  "freezeRunId": 38100786001,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "status": "restored-and-verified",
+  "operation": "existing normal-profile-protection restore then verify; exact session created for this final package",
+  "protectedEntries": 263,
+  "currentAssets": 100,
+  "originalsVerifiedAt": "2026-10-11T11:20:00.712Z",
+  "finalVerifiedAt": "2026-10-11T11:24:29.964Z",
+  "loginItemsComputerUse": {
+    "status": "matched-original-railwise-state",
+    "before": {
+      "railwiseOpenAtLoginPresent": false,
+      "railwiseBackgroundEnabled": true
+    },
+    "after": {
+      "railwiseOpenAtLoginPresent": false,
+      "railwiseBackgroundEnabled": true
+    },
+    "beforeScope": "Retained raw baseline from prior 38070443344 session, explicitly reused by current journal; not a fresh baseline for freeze38100786001",
+    "afterScope": "Fresh CUA system-settings AX and screenshot after this current session restoration",
+    "beforeAx": {
+      "bytes": 7829,
+      "sha256": "e6ed2d163da4e1ea3eb459d7f9de287068051a92386a5cd3d1f9b5b5f1e13b72",
+      "retention": "private local original; not committed"
+    },
+    "beforeScreenshot": {
+      "bytes": 174206,
+      "sha256": "e988246fa22ba6e3bf782f3406a048091ce075022a8da29badf0ae5afda4e430",
+      "retention": "private local original; not committed"
+    },
+    "afterAx": {
+      "bytes": 7921,
+      "sha256": "c19eee01cc89c655a2b03f7b1620d9c5e5ba7a8c43816b822d0ad3b14c97c7f0",
+      "retention": "private local original; not committed"
+    },
+    "afterScreenshot": {
+      "bytes": 172433,
+      "sha256": "febd7c2ac8d63b7b9f5dd57536507930dd4d480d3499be7df30f150e065816b2",
+      "retention": "private local original; not committed"
+    }
+  },
+  "privacy": "Personal app list, normal-profile data, credentials and journal paths stay private. Summary only; not an original machine report or product acceptance substitute."
+}
