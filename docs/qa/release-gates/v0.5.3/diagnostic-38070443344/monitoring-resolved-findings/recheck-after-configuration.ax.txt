@@ -1,0 +1,341 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 3
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 synthetic-monitoring Deformation monitoring · mm · 10/11
+								20 文本 synthetic-monitoring
+								21 文本 Deformation monitoring
+								22 文本  · 
+								23 文本 mm
+								24 文本  · 
+								25 文本 10/11
+							26 按钮 Continue conversation
+							27 按钮 leica-gsi-cumulative-leveling Control network · m · 10/11
+								28 文本 leica-gsi-cumulative-leveling
+								29 文本 Control network
+								30 文本  · 
+								31 文本 m
+								32 文本  · 
+								33 文本 10/11
+							34 按钮 golden-plane-control-e2e Control network · m · 10/11
+								35 文本 golden-plane-control-e2e
+								36 文本 Control network
+								37 文本  · 
+								38 文本 m
+								39 文本  · 
+								40 文本 10/11
+						41 container
+							42 切换按钮 Connect phone, Value: 0
+							43 按钮 Settings
+					44 container
+						45 按钮 Collapse sidebar
+						46 标题 RailWise Survey, Value: 1
+							47 文本 RailWise Survey
+						48 text Engineering Survey Processing Current Survey job
+						49 弹出式按钮 Current Survey job, Value: synthetic-monitoring
+							50 (selected) synthetic-monitoring
+						51 按钮 New task
+						52 container Work view
+							53 按钮 Overview
+							54 按钮 Process
+							55 按钮 Results
+							56 按钮 Deliver
+						57 文本 Work view
+						58 按钮 Open AI
+						59 按钮 Advanced
+					60 container
+						61 文本 Quality checks completed; findings were updated by severity.
+						62 按钮 Close notice
+					63 container
+						64 text Current source synthetic-monitoring.csv Current status Ready to calculate Latest result —
+						65 开合三角标记 More metrics
+							66 文本 More metrics
+					67 container
+						68 container Import and preflight
+							69 按钮 Add files
+							70 container
+								71 文本 Source type
+								72 弹出式按钮 Source type, Value: Monitoring data
+									73 (selected) Monitoring data
+							74 按钮 Describe the task
+							75 文本 Survey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.
+						76 开合三角标记 Imported files and field mapping
+							77 文本 Imported files and field mapping
+						78 开合三角标记 Advanced details
+							79 文本 Advanced details
+						80 标题 Quality checks and issue handling, Value: 2
+							81 文本 Quality checks and issue handling
+						82 文本 Blocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.
+						83 按钮 Run checks again
+						84 开合三角标记 0 blockers · 0 warnings · Details
+							85 文本 0 blockers · 0 warnings · Details
+						86 表格
+							87 row
+								88 列标题
+									89 文本 Level
+								90 列标题
+									91 文本 Issue and suggestion
+								92 列标题
+									93 文本 Source row
+								94 列标题
+									95 文本 Disposition
+							96 row
+								97 单元格
+									98 文本 Warning
+								99 单元格
+									100 container
+										101 文本 Project thresholds are not configured.
+										102 按钮 Ask Survey AI about Project thresholds are not configured.
+									103 文本 Supply thresholds in project settings.
+								104 单元格
+									105 文本 Row 1
+								106 单元格
+									107 文本 Pending confirmation
+							108 row
+								109 单元格
+									110 文本 Warning
+								111 单元格
+									112 container
+										113 文本 Unit mm differs from project unit m.
+										114 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									115 文本 Unify units, then validate again.
+								116 单元格
+									117 文本 Row 2
+								118 单元格
+									119 文本 Pending confirmation
+							120 row
+								121 单元格
+									122 文本 Warning
+								123 单元格
+									124 container
+										125 文本 Unit mm differs from project unit m.
+										126 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									127 文本 Unify units, then validate again.
+								128 单元格
+									129 文本 Row 3
+								130 单元格
+									131 文本 Pending confirmation
+							132 row
+								133 单元格
+									134 文本 Warning
+								135 单元格
+									136 container
+										137 文本 Unit mm differs from project unit m.
+										138 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									139 文本 Unify units, then validate again.
+								140 单元格
+									141 文本 Row 4
+								142 单元格
+									143 文本 Pending confirmation
+							144 row
+								145 单元格
+									146 文本 Warning
+								147 单元格
+									148 container
+										149 文本 Unit mm differs from project unit m.
+										150 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									151 文本 Unify units, then validate again.
+								152 单元格
+									153 文本 Row 5
+								154 单元格
+									155 文本 Pending confirmation
+							156 row
+								157 单元格
+									158 文本 Warning
+								159 单元格
+									160 container
+										161 文本 Unit mm differs from project unit m.
+										162 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									163 文本 Unify units, then validate again.
+								164 单元格
+									165 文本 Row 6
+								166 单元格
+									167 文本 Pending confirmation
+							168 row
+								169 单元格
+									170 文本 Warning
+								171 单元格
+									172 container
+										173 文本 Unit mm differs from project unit m.
+										174 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									175 文本 Unify units, then validate again.
+								176 单元格
+									177 文本 Row 7
+								178 单元格
+									179 文本 Pending confirmation
+							180 row
+								181 单元格
+									182 文本 Warning
+								183 单元格
+									184 container
+										185 文本 Unit mm differs from project unit m.
+										186 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									187 文本 Unify units, then validate again.
+								188 单元格
+									189 文本 Row 8
+								190 单元格
+									191 文本 Pending confirmation
+							192 row
+								193 单元格
+									194 文本 Warning
+								195 单元格
+									196 container
+										197 文本 Unit mm differs from project unit m.
+										198 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									199 文本 Unify units, then validate again.
+								200 单元格
+									201 文本 Row 9
+								202 单元格
+									203 文本 Pending confirmation
+							204 row
+								205 单元格
+									206 文本 Warning
+								207 单元格
+									208 container
+										209 文本 Unit mm differs from project unit m.
+										210 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									211 文本 Unify units, then validate again.
+								212 单元格
+									213 文本 Row 10
+								214 单元格
+									215 文本 Pending confirmation
+							216 row
+								217 单元格
+									218 文本 Warning
+								219 单元格
+									220 container
+										221 文本 Unit mm differs from project unit m.
+										222 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									223 文本 Unify units, then validate again.
+								224 单元格
+									225 文本 Row 11
+								226 单元格
+									227 文本 Pending confirmation
+							228 row
+								229 单元格
+									230 文本 Warning
+								231 单元格
+									232 container
+										233 文本 Unit mm differs from project unit m.
+										234 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									235 文本 Unify units, then validate again.
+								236 单元格
+									237 文本 Row 12
+								238 单元格
+									239 文本 Pending confirmation
+							240 row
+								241 单元格
+									242 文本 Warning
+								243 单元格
+									244 container
+										245 文本 Unit mm differs from project unit m.
+										246 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									247 文本 Unify units, then validate again.
+								248 单元格
+									249 文本 Row 13
+								250 单元格
+									251 文本 Pending confirmation
+							252 row
+								253 单元格
+									254 文本 Warning
+								255 单元格
+									256 container
+										257 文本 Unit mm differs from project unit m.
+										258 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									259 文本 Unify units, then validate again.
+								260 单元格
+									261 文本 Row 14
+								262 单元格
+									263 文本 Pending confirmation
+							264 row
+								265 单元格
+									266 文本 Warning
+								267 单元格
+									268 container
+										269 文本 Unit mm differs from project unit m.
+										270 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									271 文本 Unify units, then validate again.
+								272 单元格
+									273 文本 Row 15
+								274 单元格
+									275 文本 Pending confirmation
+							276 row
+								277 单元格
+									278 文本 Warning
+								279 单元格
+									280 container
+										281 文本 Unit mm differs from project unit m.
+										282 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									283 文本 Unify units, then validate again.
+								284 单元格
+									285 文本 Row 16
+								286 单元格
+									287 文本 Pending confirmation
+							288 row
+								289 单元格
+									290 文本 Warning
+								291 单元格
+									292 container
+										293 文本 Unit mm differs from project unit m.
+										294 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									295 文本 Unify units, then validate again.
+								296 单元格
+									297 文本 Row 17
+								298 单元格
+									299 文本 Pending confirmation
+							300 row
+								301 单元格
+									302 文本 Warning
+								303 单元格
+									304 container
+										305 文本 Unit mm differs from project unit m.
+										306 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									307 文本 Unify units, then validate again.
+								308 单元格
+									309 文本 Row 18
+								310 单元格
+									311 文本 Pending confirmation
+							312 row
+								313 单元格
+									314 文本 Warning
+								315 单元格
+									316 container
+										317 文本 Unit mm differs from project unit m.
+										318 按钮 Ask Survey AI about Unit mm differs from project unit m.
+									319 文本 Unify units, then validate again.
+								320 单元格
+									321 文本 Row 19
+								322 单元格
+									323 文本 Pending confirmation
+						324 container
+							325 文本 Before calculating, confirm: synthetic-monitoring.csv · unit mm. Correct the basis if it differs from the original source.
+							326 按钮 Edit basis and units
+							327 按钮 Start calculation
+	328 关闭按钮
+	329 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	330 最小化按钮
+331 menu bar
+	332 RailWise AI
+	333 File
+	334 Edit
+	335 View
+	336 Window
+	337 Help
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html

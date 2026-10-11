@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-10T23:53:18.147443+00:00",
+  "label": "Independent AI actual installed C/CSV quality history triage",
+  "freezeRunId": 38070443344,
+  "runAttempt": 1,
+  "version": "0.5.3",
+  "sourceHead": "4517bc06082258ec1a657163f2cba7a20db288a6",
+  "installedAsarSha256": "fcea9d600f9e19deeea2e7aa2baf2a12e5a1ef9ad60385f97d2d13e64a13d9bb",
+  "projectId": "project_d34872d4-970a-49f0-9b68-2d7580be05d0",
+  "datasetId": "dataset_a67aea88-4028-437e-a2c7-05925fccb1dd",
+  "projectRevision": 3,
+  "datasetRevision": 3,
+  "datasetSourceSha256": "05040836acaf29f6b7a05195de278d9e536a941c4f97902376ff1d9bb97d41ed",
+  "findingStatuses": {
+    "resolved": 19
+  },
+  "findingCodes": {
+    "missing_threshold": 1,
+    "unit_conflict": 18
+  },
+  "checks": {
+    "currentProjectUnitAndThresholds": true,
+    "exact18Observations": true,
+    "datasetValidated": true,
+    "all19FindingsResolved": true,
+    "zeroOpenFindings": true,
+    "zeroAcceptedFindings": true,
+    "postGuiReadyAndZeroWarnings": true,
+    "postGui19MislabeledPending": true,
+    "preGui19Warnings": true
+  },
+  "checkCount": 9,
+  "triageChecksPassed": true,
+  "rawEvidence": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-C-triage/actual-project.record.raw.json",
+      "bytes": 497,
+      "sha256": "069d49923a3e71b1957cb2537bb1c91fb8c3ca27019115ba96ae99fbeae04145"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-C-triage/actual-dataset.record.raw.json",
+      "bytes": 14978,
+      "sha256": "312f7e67607a8d7152265b030f5f35b1172ab6f9a4bc454c05cefcb2408a01a7"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-C-triage/EngineeringWorkspaceView.tsx.frozen-source.txt",
+      "bytes": 131143,
+      "sha256": "0469869148be515309b31c80e052ef092db56f7502756c3f05f7ef1b097b7b85"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-C-triage/engineering-service.ts.frozen-source.txt",
+      "bytes": 164551,
+      "sha256": "5951c6d98fc906d3185fa272937ec0577e52f49f1d667f684c917dd37cf0c67c"
+    }
+  ],
+  "guiEvidence": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/source-import/opened.jpg",
+      "bytes": 354134,
+      "sha256": "4ac5b2a5032557b647d9cfc18e633eaedff625b6d17d25790f8af354e33fdce7"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/source-import/opened.ax.txt",
+      "bytes": 12219,
+      "sha256": "998d80e07a13454a6fb9420ee183212406a8432bed1296cadf2f1d733c9a5448"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/configuration-before-save.jpg",
+      "bytes": 325856,
+      "sha256": "8da77a20997c777e3c890cd6ca421fc658275640bca8f0fefd69e34bd0a95e8f"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/configuration-before-save.ax.txt",
+      "bytes": 3781,
+      "sha256": "140df83498ff38135ee88c67049c4274cadaff54bb91f431a6ce490f06b798ac"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/configuration-saved.jpg",
+      "bytes": 321643,
+      "sha256": "a634dad3c34dff32f8bf088b7fc90e317f576bbffc70faf8f20f55df00f9c79b"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/configuration-saved.ax.txt",
+      "bytes": 3843,
+      "sha256": "e80e95f4aa2eef8c0baa0e171bf631a9212c0429facd9f48c0e15f36fd9a4b6a"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/after-configuration.jpg",
+      "bytes": 343104,
+      "sha256": "a3890ff140017bf240f4acae28a5424c475cb430e4007ac39036176db1cbb255"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/after-configuration.ax.txt",
+      "bytes": 12022,
+      "sha256": "6ef6cfe68561744c49a49efc28b6832a786900b6fbfeb3d9d90f2d7ab3092780"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/recheck-after-configuration.jpg",
+      "bytes": 357192,
+      "sha256": "63d6498c234b1bf558deead6cafbd9e3800616677792fcc0490773a2e6bdb8bb"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/recheck-after-configuration.ax.txt",
+      "bytes": 12221,
+      "sha256": "fc3497a4ed7cdc1dc2b4249bf85c207f7f305f6c05f7900d95a827abbc1b2aa9"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/analysis-complete.jpg",
+      "bytes": 329606,
+      "sha256": "6b8f4f42f50a132c29af1c03c51778641d36972003c9290a4754bf8f8e2afc16"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/C/CSV/analysis-complete.ax.txt",
+      "bytes": 6581,
+      "sha256": "4ad1457d398d395907733e74d00d8e6ed6bf12fe1344a657484fbe81add6bf10"
+    }
+  ],
+  "installedRendererEvidence": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-C-triage/installed-renderer-1.js",
+      "bytes": 1767576,
+      "sha256": "0ef017342425c5bda71cc429dcc27c036866eee2c392cb3cf5c70fb19dc62da0"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-C-triage/installed-renderer-0.js",
+      "bytes": 1188582,
+      "sha256": "b9885ad21210a111f940c374fd039ef21769db8e0968fd30db8328bacae17d29"
+    }
+  ],
+  "diagnosis": {
+    "category": "proven-renderer-status-label-defect",
+    "activeBasisConditionsRemain": false,
+    "rootCause": "Backend mergeFindings correctly preserves historical warnings and marks obsolete project-unit/missing-threshold findings resolved. UI counts only open findings but maps every historical finding; disposition tests accepted then warning severity, so resolved warning rows fall through to Pending confirmation. No resolved status label or historical qualifier exists.",
+    "sourceLocations": [
+      "EngineeringWorkspaceView.tsx frozen line 667: open-only counts",
+      "EngineeringWorkspaceView.tsx frozen line 1268: maps all historical findings and warning severity fallback",
+      "engineering-service.ts frozen line 1619: mergeFindings preserves and resolves obsolete basis warnings"
+    ],
+    "requiredFix": "Render resolved disposition before severity actions, preserve original history/message/source selectors and distinguish resolved historical rows."
+  },
+  "installedAcceptancePassed": false,
+  "releaseAcceptancePassed": false,
+  "limitations": [
+    "Current package failure retained; no installed retest or release claim.",
+    "Read-only SQLite mode=ro/query_only/BEGIN/rollback, no GUI/API/profile/source mutation during triage.",
+    "AI review only, not professional certification."
+  ]
+}
