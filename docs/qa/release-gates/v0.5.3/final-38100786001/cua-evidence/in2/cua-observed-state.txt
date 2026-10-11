@@ -1,0 +1,15 @@
+Observed fresh AX state at 2026-10-11T10:30:04Z after real native chooser selection and reference re-import:
+Current source golden-plane-control-e2e.in2
+Current status Ready to calculate
+Recognized source golden-plane-control-e2e.in2
+Recognized type COSA IN2
+Source size 4 points · 5 observations
+Stations 1
+Datum and units CGCS2000 · Unconfirmed; m · rad
+Calculation readiness Ready to calculate
+Professional checks Validated
+Network and datum Plane control · 3 Known points
+Observations 5 observations
+Points and topology 4 points
+Validation passed. Ready to adjust.
+Start calculation remained available; no calculation was started.

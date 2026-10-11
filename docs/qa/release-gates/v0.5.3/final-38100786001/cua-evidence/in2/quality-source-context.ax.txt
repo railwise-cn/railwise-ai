@@ -1,0 +1,89 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: on
+							12 container Workspace tools
+								13 container
+									14 开合三角标记 Tools
+										15 文本 Tools
+									16 按钮 Write
+									17 按钮 Plugins
+									18 按钮 Scheduled tasks
+									19 按钮 Flow
+									20 按钮 Design
+							21 按钮 New task
+						22 container
+							23 text Tasks 1
+							24 切换按钮 Description: Refresh Survey projects, Value: 0
+							25 按钮 golden-plane-control-e2e Control network · m · 10/11
+								26 文本 golden-plane-control-e2e
+								27 文本 Control network
+								28 文本  · 
+								29 文本 m
+								30 文本  · 
+								31 文本 10/11
+							32 按钮 Continue conversation
+						33 container
+							34 切换按钮 Connect phone, Value: 0
+							35 按钮 Settings
+					36 container
+						37 按钮 Collapse sidebar
+						38 标题 RailWise Survey, Value: 1
+							39 文本 RailWise Survey
+						40 text Engineering Survey Processing Current Survey job
+						41 弹出式按钮 Current Survey job, Value: golden-plane-control-e2e
+							42 (selected) golden-plane-control-e2e
+						43 按钮 New task
+						44 container Work view
+							45 按钮 Overview
+							46 按钮 Process
+							47 按钮 Results
+							48 按钮 Deliver
+						49 文本 Work view
+						50 按钮 Open AI
+						51 按钮 Advanced
+					52 container
+						53 text Current source golden-plane-control-e2e.in2 Current status Results ready · pending review Latest result Candidate deliverable
+						54 开合三角标记 More metrics
+							55 文本 More metrics
+					56 container
+						57 container Import and preflight
+							58 按钮 Add files
+							59 container
+								60 文本 Source type
+								61 弹出式按钮 Source type, Value: Identify automatically
+									62 (selected) Identify automatically
+							63 按钮 Describe the task
+							64 文本 Survey files, CSV / XLSX and AI uploads share this entry. Preflight runs automatically; calculation requires confirmation. Excel defaults to monitoring data; choose Survey sources for survey spreadsheets.
+						65 开合三角标记 Imported files and field mapping
+							66 文本 Imported files and field mapping
+						67 开合三角标记 Advanced details
+							68 文本 Advanced details
+						69 标题 Quality checks and issue handling, Value: 2
+							70 文本 Quality checks and issue handling
+						71 文本 Blocking items must be fixed in the source and re-imported. Warnings can be accepted by a reviewer and are recorded in the final review list.
+						72 按钮 (disabled) Run checks again
+						73 标题 Select or import a dataset, Value: 3
+							74 文本 Select or import a dataset
+						75 文本 Checks cover missing values, duplicate points, invalid numbers, time order, unit conflicts, and missing thresholds.
+	76 关闭按钮
+	77 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	78 最小化按钮
+79 menu bar
+	80 RailWise AI
+	81 File
+	82 Edit
+	83 View
+	84 Window
+	85 Help
+
+The focused UI element is 51 按钮 Advanced

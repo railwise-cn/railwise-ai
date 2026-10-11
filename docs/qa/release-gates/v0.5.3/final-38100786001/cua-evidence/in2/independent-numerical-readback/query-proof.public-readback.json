@@ -1,0 +1,171 @@
+{
+  "readOnlyMode": "SQLite mode=ro; one explicit read transaction; rollback; no product parser/solver imported",
+  "queries": [
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT n.id,n.project_id,n.revision,n.updated_at FROM survey_networks n WHERE json_extract(n.data_json,'$.sourceFile.name')=? AND json_extract(n.data_json,'$.sourceFile.sha256')=? ORDER BY n.updated_at",
+      "parameters": [
+        "golden-plane-control-e2e.in2",
+        "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+      ],
+      "rowCount": 2,
+      "selectedColumns": [
+        {
+          "id": "network_27626061-d5f3-40cc-a0af-cf49f98d0615",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "revision": 2,
+          "updated_at": "2026-10-11T10:26:45.101Z"
+        },
+        {
+          "id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "revision": 3,
+          "updated_at": "2026-10-11T10:29:41.082Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.803572+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT a.id,a.project_id,a.network_id,a.updated_at FROM survey_adjustments a JOIN survey_networks n ON n.id=a.network_id WHERE json_extract(n.data_json,'$.sourceFile.name')=? AND json_extract(n.data_json,'$.sourceFile.sha256')=? AND json_extract(a.data_json,'$.run.status')='completed'",
+      "parameters": [
+        "golden-plane-control-e2e.in2",
+        "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0"
+      ],
+      "rowCount": 1,
+      "selectedColumns": [
+        {
+          "id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "updated_at": "2026-10-11T10:46:11.300Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.803634+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT * FROM survey_networks WHERE id=?",
+      "parameters": [
+        "network_7fd4f761-2610-4472-b0ec-67b5353adc70"
+      ],
+      "rowCount": 1,
+      "selectedColumns": [
+        {
+          "id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "revision": 3,
+          "updated_at": "2026-10-11T10:29:41.082Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.803656+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT * FROM survey_adjustments WHERE id=?",
+      "parameters": [
+        "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b"
+      ],
+      "rowCount": 1,
+      "selectedColumns": [
+        {
+          "id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "updated_at": "2026-10-11T10:46:11.300Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.803942+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT * FROM survey_projects WHERE project_id=?",
+      "parameters": [
+        "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e"
+      ],
+      "rowCount": 0,
+      "selectedColumns": [],
+      "observedAtUtc": "2026-10-11T10:51:58.804238+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT * FROM survey_source_admissions WHERE network_id=?",
+      "parameters": [
+        "network_7fd4f761-2610-4472-b0ec-67b5353adc70"
+      ],
+      "rowCount": 1,
+      "selectedColumns": [
+        {
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "source_file_hash": "2e20572306e07d9294bcb20b561bbf59f91fba29924c1d6e9173d1a17039b16b",
+          "solver_input_hash": "1ba3d798095b9447f94530c22a920cd6d1eb14462f87dbb934682438be8e7b0a",
+          "recorded_at": "2026-10-11T10:28:02.947Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.804251+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT * FROM survey_raw_source_ledger WHERE network_id=?",
+      "parameters": [
+        "network_7fd4f761-2610-4472-b0ec-67b5353adc70"
+      ],
+      "rowCount": 3,
+      "selectedColumns": [
+        {
+          "id": "raw_source_d88e125d-ab68-4f2f-844d-448344eb9dc6",
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "sequence": 1,
+          "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "recorded_at": "2026-10-11T10:28:02.947Z"
+        },
+        {
+          "id": "raw_source_fecd851c-4da5-4fff-9edd-e4b5800872e2",
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "sequence": 2,
+          "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "recorded_at": "2026-10-11T10:28:02.967Z"
+        },
+        {
+          "id": "raw_source_70b4c107-55cf-42e6-ab12-c56600f0ea37",
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "sequence": 3,
+          "source_sha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+          "recorded_at": "2026-10-11T10:29:41.081Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.804355+00:00"
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "sql": "SELECT * FROM survey_adjustment_evidence WHERE network_id=?",
+      "parameters": [
+        "network_7fd4f761-2610-4472-b0ec-67b5353adc70"
+      ],
+      "rowCount": 1,
+      "selectedColumns": [
+        {
+          "adjustment_id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+          "project_id": "project_9ad0bbae-a42d-4c1e-944e-cd3ad2a62f9e",
+          "network_id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+          "input_hash": "1ba3d798095b9447f94530c22a920cd6d1eb14462f87dbb934682438be8e7b0a",
+          "source_admission_hash": "9b9b34a29b5bfc5ff75f7ab022489a8b05f3d1be49a37e02c6121bbca1d6007a",
+          "calculation_hash": "78b890959782c5e2a510c7a7f8f845ede05d6a394299e232d11a0b9920308cc4",
+          "output_hash": "3e9894d25c356328488b657acc97a36f151d113c35c0eba3d566a5a8079bbced",
+          "recorded_at": "2026-10-11T10:46:11.300Z"
+        }
+      ],
+      "observedAtUtc": "2026-10-11T10:51:58.804587+00:00"
+    }
+  ],
+  "publicationProvenance": {
+    "kind": "public-safe-personal-path-derivative",
+    "originalFile": "cua-evidence/in2/independent-numerical-readback/query-proof.json",
+    "originalSha256": "5ec34cf5f06c4f8f3343ee53c847fd126cfc990d2d3912c27fcb70e05c85b93d",
+    "originalBytes": 7004,
+    "transformation": "Personal home path prefix replaced with [acceptance-home] only; numerical values, IDs, checks, event summary fields and statuses unchanged. Raw runtime events/messages/metadata remain private and are not committed.",
+    "byteExactOriginal": false
+  }
+}

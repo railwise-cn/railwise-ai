@@ -1,0 +1,208 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 收起侧边栏
+						7 container
+							8 container 编程 / 内业
+								9 按钮 编程
+								10 按钮 内业
+							11 切换 Description: 专注模式, Value: on
+							12 container 工作区工具
+								13 开合三角标记 工具
+									14 文本 工具
+							15 按钮 新建任务
+						16 container
+							17 text 任务 2
+							18 切换按钮 Description: 刷新工程测量项目, Value: 0
+							19 按钮 leica-gsi-cumulative-leveling 控制网 · m · 10/11
+								20 文本 leica-gsi-cumulative-leveling
+								21 文本 控制网
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/11
+							26 按钮 继续对话
+							27 按钮 golden-plane-control-e2e 控制网 · m · 10/11
+								28 文本 golden-plane-control-e2e
+								29 文本 控制网
+								30 文本  · 
+								31 文本 m
+								32 文本  · 
+								33 文本 10/11
+						34 container
+							35 切换按钮 连接手机, Value: 0
+							36 按钮 设置
+					37 container
+						38 按钮 收起侧边栏
+						39 标题 RailWise Survey, Value: 1
+							40 文本 RailWise Survey
+						41 text 工程测量内业 当前内业任务
+						42 弹出式按钮 当前内业任务, Value: leica-gsi-cumulative-leveling
+							43 (selected) 新建内业任务
+						44 按钮 新建任务
+						45 container 工作视图
+							46 按钮 概览
+							47 按钮 处理
+							48 按钮 结果
+							49 按钮 交付
+						50 文本 工作视图
+						51 按钮 打开 AI
+						52 按钮 高级
+					53 container
+						54 text 当前来源 leica-gsi-cumulative-leveling.gsi 当前状态 阻断 最近结果 — 请先声明坐标与高程基准，才能开始新的计算；历史结果仍可查看。
+						55 开合三角标记 更多指标
+							56 文本 更多指标
+					57 container
+						58 container 导入与预检
+							59 按钮 上传资料
+							60 container
+								61 文本 资料类型
+								62 弹出式按钮 资料类型, Value: 自动识别
+									63 (selected) 自动识别
+							64 按钮 描述任务
+							65 文本 测量源文件、CSV / XLSX 和 AI 上传均在这里处理。系统自动预检，不会自动计算。Excel 默认按监测数据读取；测量表格可在资料类型中切换。
+						66 container 测量与平差控制台
+							67 标题 资料与计算, Value: 3
+								68 文本 资料与计算
+							69 文本 上传资料后，系统会识别格式、点位和观测数量，并在通过预检后开始计算。
+							70 按钮 高级详情
+							71 container
+								72 文本 网络类型
+								73 弹出式按钮 Description: 网络类型, Value: 平面控制网
+									74 (selected) 平面控制网
+								75 文本 导入时使用的已知控制点（可选）
+								76 文本输入区 (settable) Description: 导入时使用的已知控制点（可选）, Placeholder: BM-01,100.000
+								77 文本 每行：点号,高程[,X,Y]，数值单位为米。请在选择文件前填写，输入将随原文件导入并保留映射证据；冲突数据会阻断，不自动替换原记录。
+							78 container 确认基准
+								79 文本 确认基准
+								80 文本 按测量资料填写实际使用的坐标与高程基准；未使用的基准可留空。本次上传的原文件可用于补充基准声明。
+								81 container
+									82 文本 平面坐标系
+									83 文本栏 (settable) Description: 平面坐标系, Placeholder: 如：CGCS2000 或工程独立坐标系
+								84 container
+									85 文本 高程基准
+									86 文本栏 (settable) Description: 高程基准, Placeholder: 如：1985 国家高程基准或项目高程基准
+							87 文本 资料识别
+							88 文本 leica-gsi-cumulative-leveling.gsi
+							89 文本 Leica GSI-8
+							90 文本 资料规模
+							91 文本 4 点 · 4 观测
+							92 container
+								93 text 0 站
+							94 文本 基准与单位
+							95 文本 待确认 · 待确认
+							96 container
+								97 text m  · rad
+							98 文本 是否可计算
+							99 文本 待复核
+							100 文本 还有 15 项阻断问题，暂不能计算。请先完成下方修复。
+							101 container 专业检查
+								102 标题 专业检查, Value: 4
+									103 文本 专业检查
+								104 文本 先确认网形、观测和点位，再开始计算。详细记录按需展开。
+								105 文本 15 个阻断项
+								106 按钮 网形与基准 平面控制网 · 0 已知点
+									107 文本 网形与基准
+									108 文本 平面控制网 · 0 已知点
+								109 按钮 观测表 4 观测
+									110 文本 观测表
+									111 文本 4 观测
+								112 按钮 点位与网形 4 点
+									113 文本 点位与网形
+									114 文本 4 点
+							115 container 需要处理
+								116 文本 需要处理
+								117 内容列表
+									118 container
+										119 text 平面观测 gsi-block-1-line-3-dh 的点 BM 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										120 按钮 处理问题
+									121 container
+										122 text 平面观测 gsi-block-1-line-3-dh 的点 gsi-block-1:Z01 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										123 按钮 处理问题
+									124 container
+										125 text 平面观测 gsi-block-1-line-4-dh 的点 gsi-block-1:Z01 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										126 按钮 处理问题
+									127 container
+										128 text 平面观测 gsi-block-1-line-4-dh 的点 P1 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										129 按钮 处理问题
+									130 container
+										131 text 平面观测 gsi-block-1-line-5-dh 的点 P1 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										132 按钮 处理问题
+									133 container
+										134 text 平面观测 gsi-block-1-line-5-dh 的点 gsi-block-1:Z02 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										135 按钮 处理问题
+									136 container
+										137 text 平面观测 gsi-block-1-line-6-dh 的点 gsi-block-1:Z02 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										138 按钮 处理问题
+									139 container
+										140 text 平面观测 gsi-block-1-line-6-dh 的点 BM 缺少平面坐标 下一步： 补充 X/Y 初始坐标后重新导入
+										141 按钮 处理问题
+									142 container
+										143 text 平面控制网至少需要两条距离、绝对方向或测站角观测 下一步： 补充能够独立确定未知坐标的平面观测
+										144 按钮 处理问题
+									145 container
+										146 text 平面控制网不支持直接使用 height-difference 下一步： 先完成观测预处理，再导入水平距离、绝对方向或测站角
+										147 按钮 处理问题
+									148 container
+										149 text 平面控制网缺少已知坐标约束 下一步： 至少提供一个已知平面控制点，或使用明确的自由网约束
+										150 按钮 补充已知控制点
+									151 container
+										152 text 网络没有已知约束点 下一步： 提供已知点或明确自由网约束
+										153 按钮 补充已知控制点
+									154 container
+										155 text 存在与已知点不连通的网段 下一步： 检查点号、观测方向和缺失边
+										156 按钮 处理问题
+									157 container
+										158 text 平面坐标基准尚未声明。 下一步： 填写基准后点击修复，使用本次上传的原文件重新导入。
+										159 按钮 确认基准并重新导入
+									160 container
+										161 text 高程基准尚未声明。 下一步： 填写基准后点击修复，使用本次上传的原文件重新导入。
+										162 按钮 确认基准并重新导入
+									163 container
+										164 text 资料已识别。开始计算前，请确认坐标基准、控制点、观测关系、闭合差和精度条件；任一条件未满足时，系统会暂停计算。 下一步： 继续完成基准、控制点、观测角色、拓扑、闭合与精度校验；任一条件不满足都会阻断平差。
+							165 按钮 检查资料
+							166 按钮 (disabled) 开始计算
+							167 container 网形、基准与已知点
+								168 标题 网形、基准与已知点, Value: 4
+									169 文本 网形、基准与已知点
+								170 按钮 询问 网形、基准与已知点 的测量 AI
+								171 定义列表
+									172 container 网络类型
+										173 文本 网络类型
+									174 文本 平面控制网
+									175 container 平面坐标系
+										176 文本 平面坐标系
+									177 文本 待确认
+								178 文本 控制网
+								179 图像 测量网络关系图（示意布局）
+								180 文本 示意布局，连线仍按真实点号
+								181 文本 已知点
+								182 container 已知点
+									183 表格
+										184 row
+											185 列标题
+												186 文本 点号
+											187 列标题
+												188 文本 X (m)
+											189 列标题
+												190 文本 Y (m)
+											191 列标题
+												192 文本 询问测量 AI
+									193 文本 尚无已知控制点，请确认基准约束。
+							194 文本 1 个文件已完成来源预检
+	195 关闭按钮
+	196 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	197 最小化按钮
+198 menu bar
+	199 RailWise AI
+	200 文件
+	201 编辑
+	202 显示
+	203 窗口
+	204 帮助
+
+The focused UI element is 59 按钮 上传资料

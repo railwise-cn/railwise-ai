@@ -1,0 +1,3830 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent senior-engineer-mode AI numerical and native export readback",
+  "observedAtUtc": "2026-10-11T11:05:00.286824+00:00",
+  "packageVersion": "0.5.3",
+  "freezeRun": 38100786001,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "scope": "Actual GUI-produced IN2 result and DOCX/PDF/XLSX bytes only; not regulatory/vendor/SUC certification or professional signoff",
+  "rawRecordPaths": [
+    "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/network-1.record.original.json",
+    "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/adjustment-1.record.original.json"
+  ],
+  "nativeFiles": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/report.docx",
+      "sha256": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12",
+      "bytes": 37011
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/report.pdf",
+      "sha256": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff",
+      "bytes": 61145
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/professional.xlsx",
+      "sha256": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e",
+      "bytes": 47728
+    }
+  ],
+  "checkCount": 614,
+  "failureCount": 0,
+  "checks": [
+    {
+      "name": "report.docx unchanged SHA256",
+      "actual": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12",
+      "expected": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12",
+      "passed": true
+    },
+    {
+      "name": "report.docx unchanged bytes",
+      "actual": 37011,
+      "expected": 37011,
+      "passed": true
+    },
+    {
+      "name": "report.docx preserved copy bytes",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "report.pdf unchanged SHA256",
+      "actual": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff",
+      "expected": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff",
+      "passed": true
+    },
+    {
+      "name": "report.pdf unchanged bytes",
+      "actual": 61145,
+      "expected": 61145,
+      "passed": true
+    },
+    {
+      "name": "report.pdf preserved copy bytes",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "professional.xlsx unchanged SHA256",
+      "actual": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e",
+      "expected": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e",
+      "passed": true
+    },
+    {
+      "name": "professional.xlsx unchanged bytes",
+      "actual": 47728,
+      "expected": 47728,
+      "passed": true
+    },
+    {
+      "name": "professional.xlsx preserved copy bytes",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "ten DOCX sections",
+      "actual": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "name": "ten XLSX sheets",
+      "actual": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "name": "completed actual adjustment",
+      "actual": "valid",
+      "expected": "valid",
+      "passed": true
+    },
+    {
+      "name": "XLSX unsigned state",
+      "actual": "未签认",
+      "expected": "未签认",
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label 未签认",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label 本稿未完成专业复核、审核、批准和签名",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label 未评估/不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label CGCS2000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label m / rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label 残差范数仅作描述性统计，不等同闭合差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label 绝对先验观测精度模型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx explicit semantic label 非置信百分比",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "docx ordinary technical-token findings",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label 未签认",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label 本稿未完成专业复核、审核、批准和签名",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label 未评估/不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label CGCS2000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label m / rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label 残差范数仅作描述性统计，不等同闭合差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label 绝对先验观测精度模型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf explicit semantic label 非置信百分比",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "pdf ordinary technical-token findings",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label 未签认",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label 本稿未完成专业复核、审核、批准和签名",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label 未评估/不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label CGCS2000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label m / rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label 残差范数仅作描述性统计，不等同闭合差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label 绝对先验观测精度模型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx explicit semantic label 非置信百分比",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "xlsx ordinary technical-token findings",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 资料与版本绑定",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 资料编号",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 源文件",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 绑定状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 原件完整性",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 资料 1 · golden-plane-control-e2e.in2",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 golden-plane-control-e2e.in2",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 已绑定",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 资料与版本绑定 已校验",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 基准与已知控制点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 点号",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 类型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 X (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 Y (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 高程 (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 A",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 已知点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 50.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 150.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 B",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 已知点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 150.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 50.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 C",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 已知点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 120.710678",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 120.710678",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 基准与已知控制点 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 闭合与附合检核",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 线路",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 类型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 起点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 终点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 观测高差和 (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 已知高差 (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 线路长度 (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 测站数",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 闭合差 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 限差 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 限差依据",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 闭合与附合检核 状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 网形与测段索引",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测号",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 类型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 起点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 终点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 测段长度 (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测值 (m / rad)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 平差值 (m / rad)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 单位",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 闭合/附合路径",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 原始定位",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测 1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 方向",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 A",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 0.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 -2.3735e-10",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 未纳入独立闭合",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 golden-plane-control-e2e.in2 · COSA.in2:6",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测 2",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 方向",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 B",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 4.712389",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 4.712389",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 未纳入独立闭合",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 golden-plane-control-e2e.in2 · COSA.in2:7",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测 3",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 距离",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 B",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 100.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 100.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 m",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 未纳入独立闭合",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 golden-plane-control-e2e.in2 · COSA.in2:8",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测 4",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 方向",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 C",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 5.497787",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 5.497787",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 未纳入独立闭合",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 golden-plane-control-e2e.in2 · COSA.in2:9",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 观测 5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 距离",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 C",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 100.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 100.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 m",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 未纳入独立闭合",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 网形与测段索引 golden-plane-control-e2e.in2 · COSA.in2:10",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 平差统计与检查状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 网型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 观测数",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 点数",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 自由度",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 单位权中误差 (无量纲)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 方差因子 (无量纲)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 方差依据",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 计算状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 平面控制网",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 4",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 2",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 0.000107",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 1.1387e-8",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 后验",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 平差统计与检查状态 计算有效",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 点位成果与精度",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 点号",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 类型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 X (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 Y (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 高程 (m)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 X 改正数 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 Y 改正数 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 高程改正数 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 点位中误差 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 精度依据",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 A",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 已知点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 50.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 150.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 未记录",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 B",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 已知点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 150.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 50.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 未记录",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 C",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 已知点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 120.710678",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 120.710678",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 未记录",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 测站",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 50.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 50.000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 -1.9446e-5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 0.0002",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 不可用",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 0.0001",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 点位成果与精度 后验",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 观测值、改正数与残差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测号",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 类型",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 起讫点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测值",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 平差值",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 值单位",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 改正数",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 残差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 改正/残差单位",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 残差筛查",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 原始定位",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测 1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 方向",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 S1 → A",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 0.0000000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 -0.0000000002",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 -4.8958e-5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 -4.8958e-5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 角秒",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 未见候选",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 golden-plane-control-e2e.in2 · COSA.in2:6",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测 2",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 方向",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 S1 → B",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 4.7123889804",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 4.7123889806",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 4.0662e-5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 4.0662e-5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 角秒",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 未见候选",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 golden-plane-control-e2e.in2 · COSA.in2:7",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测 3",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 距离",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 S1 → B",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 100.0000000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 100.0000000072",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 m",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 7.1590e-6",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 7.1590e-6",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 mm",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 未见候选",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 golden-plane-control-e2e.in2 · COSA.in2:8",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测 4",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 方向",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 S1 → C",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 5.4977871438",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 5.4977871438",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 rad",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 8.2962e-6",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 8.2962e-6",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 角秒",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 未见候选",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 golden-plane-control-e2e.in2 · COSA.in2:9",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 观测 5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 距离",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 S1 → C",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 100.0000000000",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 99.9999998629",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 m",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 -0.0001",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 -0.0001",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 mm",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 未见候选",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 观测值、改正数与残差 golden-plane-control-e2e.in2 · COSA.in2:10",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header XY 标准误差椭圆",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 点号",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 长半轴 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 短半轴 (mm)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 轴向 (rad)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 方差依据",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 S1",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 0.0001",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 4.4355e-5",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 2.258474",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell XY 标准误差椭圆 后验",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 质量检查与复核状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 检查项",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 依据/缺项原因",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 来源绑定",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 通过",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 无",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 原始记录覆盖",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 通过",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 无",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 基准声明",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 通过",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 无",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 外业检核",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 测站原始读数未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 独立闭合检核",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 平面网独立闭合未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 精度限差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 未配置精度限差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 数值结果",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 通过",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 无",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 规范符合性",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 质量检查与复核状态 适用规范和符合性未评估",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX repeating header 签认栏",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 角色",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 姓名",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 日期",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 签名",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 编制",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 复核",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "PDF preserves DOCX cell 签认栏 批准",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 01_成果说明与签认状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 01_成果说明与签认状态",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 01_成果说明与签认状态",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 01_成果说明与签认状态",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 02_资料与版本绑定",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 02_资料与版本绑定",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 02_资料与版本绑定",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 02_资料与版本绑定",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 03_基准与已知控制点",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 03_基准与已知控制点",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 03_基准与已知控制点",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 03_基准与已知控制点",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 04_闭合与附合检核",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 04_闭合与附合检核",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 04_闭合与附合检核",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 04_闭合与附合检核",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 05_网形与测段索引",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 05_网形与测段索引",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 05_网形与测段索引",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 05_网形与测段索引",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 06_平差统计与检查状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 06_平差统计与检查状态",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 06_平差统计与检查状态",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 06_平差统计与检查状态",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 07_点位成果与精度",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 07_点位成果与精度",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 07_点位成果与精度",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 07_点位成果与精度",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 08_观测值、改正数与残差",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 08_观测值、改正数与残差",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 08_观测值、改正数与残差",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 08_观测值、改正数与残差",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 09_XY 标准误差椭圆",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 09_XY 标准误差椭圆",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 09_XY 标准误差椭圆",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 09_XY 标准误差椭圆",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "XLSX draft footer 10_质量检查与复核状态",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "XLSX repeat header 10_质量检查与复核状态",
+      "actual": "$1:$1",
+      "expected": "$1:$1",
+      "passed": true
+    },
+    {
+      "name": "XLSX freeze pane 10_质量检查与复核状态",
+      "actual": "A2",
+      "expected": "A2",
+      "passed": true
+    },
+    {
+      "name": "XLSX error cells 10_质量检查与复核状态",
+      "actual": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "name": "DOCX point count",
+      "actual": 4,
+      "expected": 4,
+      "passed": true
+    },
+    {
+      "name": "DOCX point A identifier",
+      "actual": "A",
+      "expected": "A",
+      "passed": true
+    },
+    {
+      "name": "xlsx point A identifier",
+      "actual": "A",
+      "expected": "A",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C2 full numeric value",
+      "actual": 50,
+      "expected": 50,
+      "passed": true,
+      "absoluteTolerance": 5e-13
+    },
+    {
+      "name": "DOCX A x m",
+      "actual": 50.0,
+      "expected": 50,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "xlsx 07 D2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 D2 full numeric value",
+      "actual": 150,
+      "expected": 150,
+      "passed": true,
+      "absoluteTolerance": 1.5e-12
+    },
+    {
+      "name": "DOCX A y m",
+      "actual": 150.0,
+      "expected": 150,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "DOCX no height A 4",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height A E",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX no height A 7",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height A H",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed A correctionX unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed A correctionX unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed A correctionY unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed A correctionY unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed A standardError unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed A standardError unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "point A precision basis DOCX",
+      "actual": "未记录",
+      "expected": "未记录",
+      "passed": true
+    },
+    {
+      "name": "point A precision basis XLSX",
+      "actual": "未记录",
+      "expected": "未记录",
+      "passed": true
+    },
+    {
+      "name": "DOCX point B identifier",
+      "actual": "B",
+      "expected": "B",
+      "passed": true
+    },
+    {
+      "name": "xlsx point B identifier",
+      "actual": "B",
+      "expected": "B",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C3 full numeric value",
+      "actual": 150,
+      "expected": 150,
+      "passed": true,
+      "absoluteTolerance": 1.5e-12
+    },
+    {
+      "name": "DOCX B x m",
+      "actual": 150.0,
+      "expected": 150,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "xlsx 07 D3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 D3 full numeric value",
+      "actual": 50,
+      "expected": 50,
+      "passed": true,
+      "absoluteTolerance": 5e-13
+    },
+    {
+      "name": "DOCX B y m",
+      "actual": 50.0,
+      "expected": 50,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "DOCX no height B 4",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height B E",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX no height B 7",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height B H",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed B correctionX unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed B correctionX unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed B correctionY unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed B correctionY unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed B standardError unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed B standardError unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "point B precision basis DOCX",
+      "actual": "未记录",
+      "expected": "未记录",
+      "passed": true
+    },
+    {
+      "name": "point B precision basis XLSX",
+      "actual": "未记录",
+      "expected": "未记录",
+      "passed": true
+    },
+    {
+      "name": "DOCX point C identifier",
+      "actual": "C",
+      "expected": "C",
+      "passed": true
+    },
+    {
+      "name": "xlsx point C identifier",
+      "actual": "C",
+      "expected": "C",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C4 full numeric value",
+      "actual": 120.710678,
+      "expected": 120.710678,
+      "passed": true,
+      "absoluteTolerance": 1.20710678e-12
+    },
+    {
+      "name": "DOCX C x m",
+      "actual": 120.710678,
+      "expected": 120.710678,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "xlsx 07 D4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 D4 full numeric value",
+      "actual": 120.710678,
+      "expected": 120.710678,
+      "passed": true,
+      "absoluteTolerance": 1.20710678e-12
+    },
+    {
+      "name": "DOCX C y m",
+      "actual": 120.710678,
+      "expected": 120.710678,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "DOCX no height C 4",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height C E",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX no height C 7",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height C H",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed C correctionX unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed C correctionX unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed C correctionY unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed C correctionY unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX fixed C standardError unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX fixed C standardError unavailable",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "point C precision basis DOCX",
+      "actual": "未记录",
+      "expected": "未记录",
+      "passed": true
+    },
+    {
+      "name": "point C precision basis XLSX",
+      "actual": "未记录",
+      "expected": "未记录",
+      "passed": true
+    },
+    {
+      "name": "DOCX point S1 identifier",
+      "actual": "S1",
+      "expected": "S1",
+      "passed": true
+    },
+    {
+      "name": "xlsx point S1 identifier",
+      "actual": "S1",
+      "expected": "S1",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 C5 full numeric value",
+      "actual": 49.99999999284098,
+      "expected": 49.99999999284098,
+      "passed": true,
+      "absoluteTolerance": 4.999999999284098e-13
+    },
+    {
+      "name": "DOCX S1 x m",
+      "actual": 50.0,
+      "expected": 49.99999999284098,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "xlsx 07 D5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 D5 full numeric value",
+      "actual": 49.999999963710295,
+      "expected": 49.999999963710295,
+      "passed": true,
+      "absoluteTolerance": 4.99999999637103e-13
+    },
+    {
+      "name": "DOCX S1 y m",
+      "actual": 50.0,
+      "expected": 49.999999963710295,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "DOCX no height S1 4",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height S1 E",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "DOCX no height S1 7",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "XLSX no height S1 H",
+      "actual": "不可用",
+      "expected": "不可用",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 F5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 F5 full numeric value",
+      "actual": -1.9446147803137137e-05,
+      "expected": -1.9446147803137137e-05,
+      "passed": true,
+      "absoluteTolerance": 1.9446147803137138e-19
+    },
+    {
+      "name": "DOCX S1 correctionX mm",
+      "actual": -1.9446e-05,
+      "expected": -1.9446147803137137e-05,
+      "passed": true,
+      "absoluteTolerance": 9.7249446e-10
+    },
+    {
+      "name": "xlsx 07 G5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 G5 full numeric value",
+      "actual": 0.000195930319080162,
+      "expected": 0.000195930319080162,
+      "passed": true,
+      "absoluteTolerance": 1.95930319080162e-18
+    },
+    {
+      "name": "DOCX S1 correctionY mm",
+      "actual": 0.0002,
+      "expected": 0.000195930319080162,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-05
+    },
+    {
+      "name": "xlsx 07 I5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 07 I5 full numeric value",
+      "actual": 0.00013592152495710963,
+      "expected": 0.00013592152495710963,
+      "passed": true,
+      "absoluteTolerance": 1.3592152495710963e-18
+    },
+    {
+      "name": "DOCX S1 standardError mm",
+      "actual": 0.0001,
+      "expected": 0.00013592152495710963,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-05
+    },
+    {
+      "name": "point S1 precision basis DOCX",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "point S1 precision basis XLSX",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation count",
+      "actual": 5,
+      "expected": 5,
+      "passed": true
+    },
+    {
+      "name": "observation 1 raw/result ID",
+      "actual": "cosa-in2-6-backsight-reset",
+      "expected": "cosa-in2-6-backsight-reset",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D2 full numeric value",
+      "actual": 0,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-23
+    },
+    {
+      "name": "xlsx 08 E2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 E2 full numeric value",
+      "actual": -2.3735413634540237e-10,
+      "expected": -2.3735413634540237e-10,
+      "passed": true,
+      "absoluteTolerance": 1e-23
+    },
+    {
+      "name": "xlsx 08 G2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 G2 full numeric value",
+      "actual": -4.895780494523131e-05,
+      "expected": -4.895780494523131e-05,
+      "passed": true,
+      "absoluteTolerance": 4.895780494523131e-19
+    },
+    {
+      "name": "xlsx 08 H2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 H2 full numeric value",
+      "actual": -4.895780494523131e-05,
+      "expected": -4.895780494523131e-05,
+      "passed": true,
+      "absoluteTolerance": 4.895780494523131e-19
+    },
+    {
+      "name": "DOCX observation 1 numeric column 3",
+      "actual": 0.0,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 1 numeric column 4",
+      "actual": -2e-10,
+      "expected": -2.3735413634540237e-10,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 1 numeric column 6",
+      "actual": -4.8958e-05,
+      "expected": -4.895780494523131e-05,
+      "passed": true,
+      "absoluteTolerance": 2.44838958e-09
+    },
+    {
+      "name": "DOCX observation 1 numeric column 7",
+      "actual": -4.8958e-05,
+      "expected": -4.895780494523131e-05,
+      "passed": true,
+      "absoluteTolerance": 2.44838958e-09
+    },
+    {
+      "name": "DOCX observation 1 canonical unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 1 canonical unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 1 display unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 1 display unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 1 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 1 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F2 full numeric value",
+      "actual": 0,
+      "expected": 0,
+      "passed": true,
+      "absoluteTolerance": 1e-23
+    },
+    {
+      "name": "xlsx 05 G2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 G2 full numeric value",
+      "actual": -2.3735413634540237e-10,
+      "expected": -2.3735413634540237e-10,
+      "passed": true,
+      "absoluteTolerance": 1e-23
+    },
+    {
+      "name": "XLSX index 1 anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:6",
+      "passed": true
+    },
+    {
+      "name": "XLSX index 1 closure membership",
+      "actual": "未纳入独立闭合",
+      "expected": "未纳入独立闭合",
+      "passed": true
+    },
+    {
+      "name": "observation 2 raw/result ID",
+      "actual": "cosa-in2-7-direction",
+      "expected": "cosa-in2-7-direction",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D3 full numeric value",
+      "actual": 4.71238898038469,
+      "expected": 4.71238898038469,
+      "passed": true,
+      "absoluteTolerance": 4.7123889803846895e-14
+    },
+    {
+      "name": "xlsx 08 E3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 E3 full numeric value",
+      "actual": 4.712388980581823,
+      "expected": 4.712388980581823,
+      "passed": true,
+      "absoluteTolerance": 4.712388980581823e-14
+    },
+    {
+      "name": "xlsx 08 G3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 G3 full numeric value",
+      "actual": 4.066159522522697e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true,
+      "absoluteTolerance": 4.066159522522697e-19
+    },
+    {
+      "name": "xlsx 08 H3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 H3 full numeric value",
+      "actual": 4.066159522522697e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true,
+      "absoluteTolerance": 4.066159522522697e-19
+    },
+    {
+      "name": "DOCX observation 2 numeric column 3",
+      "actual": 4.7123889804,
+      "expected": 4.71238898038469,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 2 numeric column 4",
+      "actual": 4.7123889806,
+      "expected": 4.712388980581823,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 2 numeric column 6",
+      "actual": 4.0662e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true,
+      "absoluteTolerance": 2.0335066199999998e-09
+    },
+    {
+      "name": "DOCX observation 2 numeric column 7",
+      "actual": 4.0662e-05,
+      "expected": 4.066159522522697e-05,
+      "passed": true,
+      "absoluteTolerance": 2.0335066199999998e-09
+    },
+    {
+      "name": "DOCX observation 2 canonical unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 2 canonical unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 2 display unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 2 display unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 2 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 2 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F3 full numeric value",
+      "actual": 4.71238898038469,
+      "expected": 4.71238898038469,
+      "passed": true,
+      "absoluteTolerance": 4.7123889803846895e-14
+    },
+    {
+      "name": "xlsx 05 G3 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 G3 full numeric value",
+      "actual": 4.712388980581823,
+      "expected": 4.712388980581823,
+      "passed": true,
+      "absoluteTolerance": 4.712388980581823e-14
+    },
+    {
+      "name": "XLSX index 2 anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:7",
+      "passed": true
+    },
+    {
+      "name": "XLSX index 2 closure membership",
+      "actual": "未纳入独立闭合",
+      "expected": "未纳入独立闭合",
+      "passed": true
+    },
+    {
+      "name": "observation 3 raw/result ID",
+      "actual": "cosa-in2-8-distance",
+      "expected": "cosa-in2-8-distance",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D4 full numeric value",
+      "actual": 100,
+      "expected": 100,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "xlsx 08 E4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 E4 full numeric value",
+      "actual": 100.00000000715902,
+      "expected": 100.00000000715902,
+      "passed": true,
+      "absoluteTolerance": 1.00000000007159e-12
+    },
+    {
+      "name": "xlsx 08 G4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 G4 full numeric value",
+      "actual": 7.159016490732029e-06,
+      "expected": 7.159016490732029e-06,
+      "passed": true,
+      "absoluteTolerance": 7.159016490732028e-20
+    },
+    {
+      "name": "xlsx 08 H4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 H4 full numeric value",
+      "actual": 7.159016490732029e-06,
+      "expected": 7.159016490732029e-06,
+      "passed": true,
+      "absoluteTolerance": 7.159016490732028e-20
+    },
+    {
+      "name": "DOCX observation 3 numeric column 3",
+      "actual": 100.0,
+      "expected": 100,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 3 numeric column 4",
+      "actual": 100.0000000072,
+      "expected": 100.00000000715902,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 3 numeric column 6",
+      "actual": 7.159e-06,
+      "expected": 7.159016490732029e-06,
+      "passed": true,
+      "absoluteTolerance": 3.5802159e-10
+    },
+    {
+      "name": "DOCX observation 3 numeric column 7",
+      "actual": 7.159e-06,
+      "expected": 7.159016490732029e-06,
+      "passed": true,
+      "absoluteTolerance": 3.5802159e-10
+    },
+    {
+      "name": "DOCX observation 3 canonical unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 3 canonical unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 3 display unit",
+      "actual": "mm",
+      "expected": "mm",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 3 display unit",
+      "actual": "mm",
+      "expected": "mm",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 3 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 3 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F4 full numeric value",
+      "actual": 100,
+      "expected": 100,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "xlsx 05 G4 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 G4 full numeric value",
+      "actual": 100.00000000715902,
+      "expected": 100.00000000715902,
+      "passed": true,
+      "absoluteTolerance": 1.00000000007159e-12
+    },
+    {
+      "name": "XLSX index 3 anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:8",
+      "passed": true
+    },
+    {
+      "name": "XLSX index 3 closure membership",
+      "actual": "未纳入独立闭合",
+      "expected": "未纳入独立闭合",
+      "passed": true
+    },
+    {
+      "name": "observation 4 raw/result ID",
+      "actual": "cosa-in2-9-direction",
+      "expected": "cosa-in2-9-direction",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D5 full numeric value",
+      "actual": 5.497787143782138,
+      "expected": 5.497787143782138,
+      "passed": true,
+      "absoluteTolerance": 5.497787143782138e-14
+    },
+    {
+      "name": "xlsx 08 E5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 E5 full numeric value",
+      "actual": 5.497787143822359,
+      "expected": 5.497787143822359,
+      "passed": true,
+      "absoluteTolerance": 5.4977871438223594e-14
+    },
+    {
+      "name": "xlsx 08 G5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 G5 full numeric value",
+      "actual": 8.296209720004341e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true,
+      "absoluteTolerance": 8.296209720004341e-20
+    },
+    {
+      "name": "xlsx 08 H5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 H5 full numeric value",
+      "actual": 8.296209720004341e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true,
+      "absoluteTolerance": 8.296209720004341e-20
+    },
+    {
+      "name": "DOCX observation 4 numeric column 3",
+      "actual": 5.4977871438,
+      "expected": 5.497787143782138,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 4 numeric column 4",
+      "actual": 5.4977871438,
+      "expected": 5.497787143822359,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 4 numeric column 6",
+      "actual": 8.2962e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true,
+      "absoluteTolerance": 4.14892962e-10
+    },
+    {
+      "name": "DOCX observation 4 numeric column 7",
+      "actual": 8.2962e-06,
+      "expected": 8.296209720004341e-06,
+      "passed": true,
+      "absoluteTolerance": 4.14892962e-10
+    },
+    {
+      "name": "DOCX observation 4 canonical unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 4 canonical unit",
+      "actual": "rad",
+      "expected": "rad",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 4 display unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 4 display unit",
+      "actual": "角秒",
+      "expected": "角秒",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 4 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 4 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F5 full numeric value",
+      "actual": 5.497787143782138,
+      "expected": 5.497787143782138,
+      "passed": true,
+      "absoluteTolerance": 5.497787143782138e-14
+    },
+    {
+      "name": "xlsx 05 G5 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 G5 full numeric value",
+      "actual": 5.497787143822359,
+      "expected": 5.497787143822359,
+      "passed": true,
+      "absoluteTolerance": 5.4977871438223594e-14
+    },
+    {
+      "name": "XLSX index 4 anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:9",
+      "passed": true
+    },
+    {
+      "name": "XLSX index 4 closure membership",
+      "actual": "未纳入独立闭合",
+      "expected": "未纳入独立闭合",
+      "passed": true
+    },
+    {
+      "name": "observation 5 raw/result ID",
+      "actual": "cosa-in2-10-distance",
+      "expected": "cosa-in2-10-distance",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D6 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 D6 full numeric value",
+      "actual": 100,
+      "expected": 100,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "xlsx 08 E6 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 E6 full numeric value",
+      "actual": 99.99999986291972,
+      "expected": 99.99999986291972,
+      "passed": true,
+      "absoluteTolerance": 9.999999986291973e-13
+    },
+    {
+      "name": "xlsx 08 G6 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 G6 full numeric value",
+      "actual": -0.00013708027779557597,
+      "expected": -0.00013708027779557597,
+      "passed": true,
+      "absoluteTolerance": 1.3708027779557597e-18
+    },
+    {
+      "name": "xlsx 08 H6 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 08 H6 full numeric value",
+      "actual": -0.00013708027779557597,
+      "expected": -0.00013708027779557597,
+      "passed": true,
+      "absoluteTolerance": 1.3708027779557597e-18
+    },
+    {
+      "name": "DOCX observation 5 numeric column 3",
+      "actual": 100.0,
+      "expected": 100,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 5 numeric column 4",
+      "actual": 99.9999998629,
+      "expected": 99.99999986291972,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-11
+    },
+    {
+      "name": "DOCX observation 5 numeric column 6",
+      "actual": -0.0001,
+      "expected": -0.00013708027779557597,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-05
+    },
+    {
+      "name": "DOCX observation 5 numeric column 7",
+      "actual": -0.0001,
+      "expected": -0.00013708027779557597,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-05
+    },
+    {
+      "name": "DOCX observation 5 canonical unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 5 canonical unit",
+      "actual": "m",
+      "expected": "m",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 5 display unit",
+      "actual": "mm",
+      "expected": "mm",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 5 display unit",
+      "actual": "mm",
+      "expected": "mm",
+      "passed": true
+    },
+    {
+      "name": "DOCX observation 5 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "passed": true
+    },
+    {
+      "name": "XLSX observation 5 original source anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F6 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 F6 full numeric value",
+      "actual": 100,
+      "expected": 100,
+      "passed": true,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "xlsx 05 G6 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 05 G6 full numeric value",
+      "actual": 99.99999986291972,
+      "expected": 99.99999986291972,
+      "passed": true,
+      "absoluteTolerance": 9.999999986291973e-13
+    },
+    {
+      "name": "XLSX index 5 anchor",
+      "actual": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "expected": "golden-plane-control-e2e.in2 · COSA.in2:10",
+      "passed": true
+    },
+    {
+      "name": "XLSX index 5 closure membership",
+      "actual": "未纳入独立闭合",
+      "expected": "未纳入独立闭合",
+      "passed": true
+    },
+    {
+      "name": "xlsx 06 B2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 06 B2 full numeric value",
+      "actual": 5,
+      "expected": 5,
+      "passed": true,
+      "absoluteTolerance": 5e-14
+    },
+    {
+      "name": "xlsx 06 C2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 06 C2 full numeric value",
+      "actual": 4,
+      "expected": 4,
+      "passed": true,
+      "absoluteTolerance": 4e-14
+    },
+    {
+      "name": "xlsx 06 D2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 06 D2 full numeric value",
+      "actual": 2,
+      "expected": 2,
+      "passed": true,
+      "absoluteTolerance": 2e-14
+    },
+    {
+      "name": "xlsx 06 E2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 06 E2 full numeric value",
+      "actual": 0.00010671165867325277,
+      "expected": 0.00010671165867325277,
+      "passed": true,
+      "absoluteTolerance": 1.0671165867325276e-18
+    },
+    {
+      "name": "xlsx 06 F2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 06 F2 full numeric value",
+      "actual": 1.1387378096796804e-08,
+      "expected": 1.1387378096796804e-08,
+      "passed": true,
+      "absoluteTolerance": 1.1387378096796804e-22
+    },
+    {
+      "name": "DOCX stats 1",
+      "actual": 5.0,
+      "expected": 5,
+      "passed": true,
+      "absoluteTolerance": 0.5001
+    },
+    {
+      "name": "DOCX stats 2",
+      "actual": 4.0,
+      "expected": 4,
+      "passed": true,
+      "absoluteTolerance": 0.5001
+    },
+    {
+      "name": "DOCX stats 3",
+      "actual": 2.0,
+      "expected": 2,
+      "passed": true,
+      "absoluteTolerance": 0.5001
+    },
+    {
+      "name": "DOCX stats 4",
+      "actual": 0.000107,
+      "expected": 0.00010671165867325277,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "DOCX stats 5",
+      "actual": 1.1387e-08,
+      "expected": 1.1387378096796804e-08,
+      "passed": true,
+      "absoluteTolerance": 5.6946387e-13
+    },
+    {
+      "name": "DOCX variance basis",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "XLSX variance basis",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "xlsx 09 B2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 09 B2 full numeric value",
+      "actual": 0.0001284808010949112,
+      "expected": 0.0001284808010949112,
+      "passed": true,
+      "absoluteTolerance": 1.284808010949112e-18
+    },
+    {
+      "name": "xlsx 09 C2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 09 C2 full numeric value",
+      "actual": 4.435475957184348e-05,
+      "expected": 4.435475957184348e-05,
+      "passed": true,
+      "absoluteTolerance": 4.435475957184348e-19
+    },
+    {
+      "name": "xlsx 09 D2 numeric type",
+      "actual": "n",
+      "expected": "n",
+      "passed": true
+    },
+    {
+      "name": "xlsx 09 D2 full numeric value",
+      "actual": 2.2584737816163187,
+      "expected": 2.2584737816163187,
+      "passed": true,
+      "absoluteTolerance": 2.2584737816163188e-14
+    },
+    {
+      "name": "DOCX ellipse semiMajor",
+      "actual": 0.0001,
+      "expected": 0.0001284808010949112,
+      "passed": true,
+      "absoluteTolerance": 5.0010000000000004e-05
+    },
+    {
+      "name": "DOCX ellipse semiMinor",
+      "actual": 4.4355e-05,
+      "expected": 4.435475957184348e-05,
+      "passed": true,
+      "absoluteTolerance": 2.2181935499999997e-09
+    },
+    {
+      "name": "DOCX ellipse orientationRad",
+      "actual": 2.258474,
+      "expected": 2.2584737816163187,
+      "passed": true,
+      "absoluteTolerance": 5.001e-07
+    },
+    {
+      "name": "DOCX ellipse basis",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "XLSX ellipse basis",
+      "actual": "后验",
+      "expected": "后验",
+      "passed": true
+    },
+    {
+      "name": "DOCX unassessed 外业检核",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "XLSX unassessed 外业检核",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "DOCX unassessed 独立闭合检核",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "XLSX unassessed 独立闭合检核",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "DOCX unassessed 精度限差",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "XLSX unassessed 精度限差",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "DOCX unassessed 规范符合性",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "XLSX unassessed 规范符合性",
+      "actual": "未评估",
+      "expected": "未评估",
+      "passed": true
+    },
+    {
+      "name": "DOCX blank professional signoff cells",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "DOCX no fabricated closure records",
+      "actual": 1,
+      "expected": 1,
+      "passed": true
+    }
+  ],
+  "findings": [],
+  "visualReview": {
+    "nativePdf": {
+      "pageCount": 5,
+      "allPagesVisuallyInspected": true,
+      "finding": "Chinese, numeric tables, source row anchors, draft labels and blank signoff readable; long file anchors wrap with complete text, repeated headers retained"
+    },
+    "docxReader": {
+      "pageCount": 4,
+      "allPagesVisuallyInspected": true,
+      "renderDirectory": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/independent-docx-render-font-readback",
+      "finding": "All 4 pages readable with temporary per-process system CJK fallback. No original file modified. Initial bundled default-fontconfig missing-Chinese rendering retained separately as reader diagnostic; not observed in OOXML or native PDF."
+    },
+    "xlsx": "Typed numeric cells, formats, repeated print headers, freeze panes and draft footer read back; native spreadsheet app visual opening not performed by this reviewer"
+  },
+  "limitations": [
+    "IN2 fixture is synthetic and unusually internally consistent; tiny posterior SE is not independently calibrated field accuracy.",
+    "Fixed controls do not receive solved posterior precision; unassessed closure/field/limits/standards are retained.",
+    "No inference of licensed interoperability or human professional acceptance."
+  ],
+  "acceptedWithinReadbackScope": true,
+  "wholeCasePassed": false,
+  "releaseReady": false
+}

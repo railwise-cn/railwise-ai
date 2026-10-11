@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "actual-reduced-core-public-safe-scope",
+  "observedAtUtc": "2026-10-11T11:28:13.491383+00:00",
+  "scope": "copy-ready docs/qa subtree only",
+  "byteExactImmutableReports": [
+    "updater/frozen-updater.json",
+    "updater/native-updater.json"
+  ],
+  "byteExactFinalReviewSha256": "f706311bfdef005fe777d9e6b4d934f4958c88deab788568be99b509c723cc4e",
+  "privateExcluded": [
+    "all staging/_private",
+    "personal Login Items AX/JPEG",
+    "normal-profile snapshots/journal/data",
+    "credentials and references",
+    "DB/WAL/SHM",
+    "raw runtime events/messages/metadata JSONL",
+    "settings and general-after-restart AX containing personal paths",
+    "fontconfig caches"
+  ],
+  "publicSafeDerivatives": "Four analysis reports replace personal home path prefixes only, label original hash, preserve all numeric/check/status fields; installed identity is an explicitly selected-field derivative. Exact immutable updater JSON remains unchanged.",
+  "checks": {
+    "scannedTextFiles": 82,
+    "personalHomePathMatches": 0,
+    "credentialShapeMatches": 0,
+    "forbiddenArtifactMatches": 0
+  },
+  "screenshotScope": "Actual synthetic current-package screenshots read by independent AI review; original JPEG bytes retained. Settings screenshot itself contains no visible private paths/credentials; full settings AX stays private.",
+  "profileRestorationSummarySha256": "cc415428f5119072cd28436a51bd69b0ad8dd43a7de4d4c8e9616cffcc06e90e",
+  "notCertification": "AI review is not real human approval/licensed/vendor/SUC/regulatory/field certification.",
+  "repoModified": false,
+  "publicOperationPerformed": false
+}

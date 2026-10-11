@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "purpose": "frozen-public-release",
+  "repository": "railwise-cn/railwise-ai",
+  "workflowPath": ".github/workflows/release.yml",
+  "runId": 38100786001,
+  "runAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+  "workflowSha": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "candidateOnly": true,
+  "preparePublicArtifacts": true,
+  "publishRelease": false,
+  "artifact": "release-win",
+  "version": "0.5.3",
+  "identities": {
+    "win32-x64": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "version": "0.5.3",
+      "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+      "updateUrl": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/"
+    }
+  },
+  "files": [
+    {
+      "name": "WorkWise-0.5.3-win-x64.exe",
+      "platform": "win32-x64",
+      "artifact": "release-win",
+      "size": 252586774,
+      "sha256": "f90da0651a3e913193b1f3714044a464f9b2da89717153b2bc59c3d4f9362146"
+    },
+    {
+      "name": "WorkWise-0.5.3-win-x64.exe.blockmap",
+      "platform": "win32-x64",
+      "artifact": "release-win",
+      "size": 258484,
+      "sha256": "e8c6cb58a029e8bead8e5b871b23b87fe0627599078bba4380bf3b19b51569cd"
+    },
+    {
+      "name": "latest.yml",
+      "platform": "win32-x64",
+      "artifact": "release-win",
+      "size": 349,
+      "sha256": "f06d2695d1c8f1dc5ed874f2fae968aeacd88824dfe1752a185f0a6d6db84ec3"
+    }
+  ]
+}

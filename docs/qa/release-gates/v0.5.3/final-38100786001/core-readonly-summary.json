@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "read-only reduced core chain evidence summary",
+  "package": {
+    "version": "0.5.3",
+    "freezeRun": 38100786001,
+    "freezeAttempt": 1,
+    "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+    "installedApp": "/Applications/RailWise AI.app",
+    "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797"
+  },
+  "coreChains": [
+    {
+      "id": "installed-frozen-package-native-updater",
+      "status": "passed-with-environment-and-scope-limitations",
+      "actualEvidence": [
+        "local-install/installed-identity.json",
+        "updater-readback-38111109910/immutable-updater-readback-result.json",
+        "updater-readback-38111109910/retained-original-reports/frozen-updater.json",
+        "updater-readback-38111109910/retained-original-reports/native-updater.json"
+      ],
+      "observed": "Actual signed/stapled-notarized arm64 DMG install binds freeze/source and installed ASAR. Immutable native updater workflow 38111109910 attempt 1 downloaded/installed/relaunched from official pinned 0.5.2 to same frozen 0.5.3 ASAR; retained report bytes rehashed and match their immutable receipts.",
+      "originalReportHashChecks": [
+        {
+          "file": "updater-readback-38111109910/retained-original-reports/frozen-updater.json",
+          "sha256": "3659558f8d3101b8e834f082e12b28ff3439a318d3a4b81ee7f84879fb0609d5",
+          "expected": "3659558f8d3101b8e834f082e12b28ff3439a318d3a4b81ee7f84879fb0609d5",
+          "matches": true
+        },
+        {
+          "file": "updater-readback-38111109910/retained-original-reports/native-updater.json",
+          "sha256": "9745c174e6ae6d0cb932da6d28670d36e6e99c0009b681e92d79fadefda1be66",
+          "expected": "9745c174e6ae6d0cb932da6d28670d36e6e99c0009b681e92d79fadefda1be66",
+          "matches": true
+        }
+      ],
+      "disclosures": [
+        "System Gatekeeper assessments disabled; no local enforcement-on-machine claim.",
+        "Updater continuity scope is synthetic stored data/config; no live credentials/plugins, arbitrary legacy schema or vendor migration certification."
+      ]
+    },
+    {
+      "id": "in2-reference-declare-calculate",
+      "status": "passed-with-disclosures",
+      "actualEvidence": [
+        "cua-evidence/in2/calculation-result.ax.txt",
+        "cua-evidence/in2/calculation-result.jpg",
+        "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json"
+      ],
+      "observed": "Real native chooser import initially blocked on undeclared coordinate reference; GUI declared CGCS2000 and 1985 National Height Datum, re-imported, then calculated. 4 points, 5 observations, rank 3/3, degrees of freedom 2; S1 posterior coordinates approximately (49.99999999284098,49.999999963710295) m.",
+      "disclosure": "The IN2 fixture is synthetic; closure, field checks, precision limits and standards conformity remain unassessed. Fixed controls have no posterior precision."
+    },
+    {
+      "id": "native-draft-export-readback",
+      "status": "passed-with-presentation-limitations",
+      "actualEvidence": [
+        "native-exports/in2/report.docx",
+        "native-exports/in2/report.pdf",
+        "native-exports/in2/professional.xlsx",
+        "native-exports/in2/independent-native-readback/independent-native-semantics-review.json"
+      ],
+      "observed": "Actual GUI Save produced DOCX 37011 bytes, PDF 61145 bytes, XLSX 47728 bytes. Independent semantic comparison completed 614 checks with 0 failures. PDF five pages rendered and visually inspected. DOCX four pages rendered with temporary per-process CJK fallback and visually inspected; original bytes unchanged. XLSX typed cells and print metadata were read-only checked; native spreadsheet-app visual open/live recalculation was not performed.",
+      "disclosure": "Initial bundled LibreOffice default fontconfig render omitted CJK glyphs; a reader-only temporary font config restored glyph display. The initial failure is retained as environment diagnostic and is not classified as installed-product export failure."
+    },
+    {
+      "id": "normal-restart-result-recovery",
+      "status": "gui-restored-id-corroboration-recorded",
+      "actualEvidence": [
+        "cua-evidence/in2/survey-restored-after-restart.ax.txt",
+        "cua-evidence/in2/survey-restored-after-restart.jpg",
+        "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json"
+      ],
+      "observed": "After normal quit/restart, GUI restored the same named IN2 Survey job and draft-export state. Read-only after-retry comparison found the preserved completed network and adjustment data_json bytes unchanged, and all three native export SHA256 values unchanged.",
+      "disclosure": "This byte comparison covers the selected network, adjustment and three exports only; it does not certify broad profile-wide byte identity."
+    },
+    {
+      "id": "ai-read-only-consultation",
+      "status": "retry-completed-initial-incomplete",
+      "actualEvidence": [
+        "independent-ai-event-readback/ai-turn-events-review.json",
+        "independent-ai-event-readback/raw/messages.original.jsonl",
+        "independent-ai-event-readback/raw/events.original.jsonl",
+        "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json"
+      ],
+      "observed": "The explicit retry routed to deepseek-v4-pro with max reasoning, completed three survey_read_context calls and produced a completed assistant response. The first attempt was also routed to deepseek-v4-pro but ended without a terminal event or assistant response; it is preserved as incomplete rather than inferred failed.",
+      "disclosures": [
+        "The retry prose describes residual as observed minus model; stored result semantics are adjusted minus observed. Treat this as advisory wording defect, not numerical record mutation.",
+        "The retry prose characterizes the prior as conservative; this interpretation is not independently established for the synthetic fixture."
+      ]
+    }
+  ],
+  "explicitlyUnexecutedOrOutOfScope": [
+    "Exhaustive old 49-case/48-view matrix and 10 weighting cases are not reclassified as passed.",
+    "Native spreadsheet application visual opening and live recalculation.",
+    "Broad profile-wide nonmutation beyond compared records/files.",
+    "Regulatory/vendor/SUC interoperability certification, professional signature or human approval.",
+    "Public tag, GitHub Release, Stable feed, website and product-page operations."
+  ],
+  "releaseDisposition": "not-a-release-approval; root owns reduced-scope checklist. Minimal Flash/GSI execution and final normal-profile restore/verify remain root ongoing work; these are not claimed complete by this summary.",
+  "sourceReports": [
+    "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json",
+    "native-exports/in2/independent-native-readback/independent-native-semantics-review.json",
+    "independent-ai-event-readback/ai-turn-events-review.json",
+    "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json"
+  ],
+  "observedAtUtc": "2026-10-11T11:17:50.148564+00:00"
+}

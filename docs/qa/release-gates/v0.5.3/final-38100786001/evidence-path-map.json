@@ -1,0 +1,20 @@
+{
+  "kind": "original-review-source-to-committed-evidence-map",
+  "originalReviewSha256": "f706311bfdef005fe777d9e6b4d934f4958c88deab788568be99b509c723cc4e",
+  "privateOriginalPathReferencesRemainUnchanged": true,
+  "reviewEvidencePathsAreRelativeToPrivateFreezeRoot": true,
+  "stagedPrefix": "docs/qa/release-gates/v0.5.3/final-38100786001/",
+  "publicSafeDerivatives": {
+    "local-install/installed-identity.json": "package/installed-identity.public-readback.json",
+    "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json": "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.public-readback.json",
+    "cua-evidence/in2/independent-numerical-readback/query-proof.json": "cua-evidence/in2/independent-numerical-readback/query-proof.public-readback.json",
+    "independent-ai-event-readback/ai-turn-events-review.json": "independent-ai-event-readback/ai-turn-events-review.public-readback.json",
+    "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json": "independent-ai-event-readback/consultation-numerical-exports-nonmutation.public-readback.json"
+  },
+  "privateOnly": [
+    "cua-evidence/website/settings-zh-light.ax.txt",
+    "raw runtime events/messages/metadata",
+    "personal Login Items/profile snapshots"
+  ],
+  "originalCopies": "Most actual source paths exist unchanged under stagedPrefix; exact retained file hashes are in SHA256SUMS.txt. Top package/freeze/updater paths retain their existing descriptive original names. Earlier review-checkpoint is not final."
+}

@@ -1,0 +1,20 @@
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/Applications/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/Applications/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+/Applications/RailWise AI.app: valid on disk
+/Applications/RailWise AI.app: satisfies its Designated Requirement

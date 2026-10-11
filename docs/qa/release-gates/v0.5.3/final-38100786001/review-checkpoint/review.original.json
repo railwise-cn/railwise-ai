@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "reviewType": "Independent senior-engineer-mode AI review",
+  "reviewedAt": "2026-10-11T11:02:18.433421+00:00",
+  "reviewStatus": "in-progress",
+  "verdict": "No release-blocking product defect observed in current-package calculation, delivery and real updater evidence; current job normal restart and remaining reduced workflow observations are continuing.",
+  "version": "0.5.3",
+  "freezeRunId": 38100786001,
+  "freezeRunAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "installedAppPath": "/Applications/RailWise AI.app",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "arm64DmgSha256": "6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e",
+  "reviewPerspective": [
+    "engineering survey mathematics and reporting semantics",
+    "software package identity and persistence",
+    "product interaction/readability/accessibility evidence"
+  ],
+  "functionalChecklist": [
+    {
+      "id": "identity",
+      "status": "reviewed-passed",
+      "evidence": [
+        "local-install/installed-identity.json",
+        "package-identity-readback.json"
+      ],
+      "observation": "Independent installed plist version and ASAR hash readback agree exactly with freeze receipt and updater target bytes."
+    },
+    {
+      "id": "signature-notarization",
+      "status": "reviewed-passed-with-environment-limitation",
+      "evidence": [
+        "independent-final-ai-review/installed-codesign.log",
+        "independent-final-ai-review/installed-stapler.log"
+      ],
+      "observation": "Fresh strict/deep codesign verification and stapled ticket validation return exit 0. System Gatekeeper assessments are disabled; no enforcement-on-machine claim."
+    },
+    {
+      "id": "native-updater",
+      "status": "reviewed-passed-with-scope-limitation",
+      "evidence": [
+        "updater-readback-38111109910/immutable-updater-readback-result.json",
+        "updater-readback-38111109910/retained-original-reports/native-updater.json"
+      ],
+      "observation": "Real 0.5.2→0.5.3 native updater downloaded, installed and relaunched frozen same-ASAR target without opening website; synthetic stored data continuity checked. Not arbitrary-schema or live credential/plugin certification."
+    },
+    {
+      "id": "in2-reference-negative-import",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/README.md",
+        "cua-evidence/in2/cua-observed-state.txt"
+      ],
+      "observation": "Actual Add files import and reference declaration/re-import observed. Operator record preserves initial missing-reference block; final preflight ready state is archived."
+    },
+    {
+      "id": "in2-calculation",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/calculation-result.ax.txt",
+        "cua-evidence/in2/calculation-result.jpg",
+        "independent-final-ai-review/independent-in2-derivation.json",
+        "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json"
+      ],
+      "observation": "Real GUI result has 5 observations, rank3/3,dof2 and S1=(50,50)m. Fresh independent derivation agrees with 8 numerical checks against current GUI. Separate129 stored-result/source-row corroboration checks pass with0 failures, confirming current GUI producer rather than manufacturing a result."
+    },
+    {
+      "id": "result-semantics",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/calculation-result.ax.txt"
+      ],
+      "observation": "Pending professional review/signing; fixed known-point precision not evaluated; closure/precision conformity not evaluated; dimensionless unit-weight scale explicitly labeled."
+    },
+    {
+      "id": "deliver-draft",
+      "status": "reviewed-passed",
+      "evidence": [
+        "cua-evidence/in2/review-draft.ax.txt",
+        "cua-evidence/in2/review-draft.jpg"
+      ],
+      "observation": "Current Survey scope remained in Deliver and created three preview draft files. Draft confirmation explicitly does not constitute signoff; original result preservation stated."
+    },
+    {
+      "id": "native-export-readback",
+      "status": "reviewed-passed-with-rendering-limitations",
+      "evidence": [
+        "native-exports/in2/report.docx",
+        "native-exports/in2/report.pdf",
+        "native-exports/in2/professional.xlsx",
+        "cua-evidence/in2/native-export-complete.ax.txt",
+        "cua-evidence/in2/native-export-complete.jpg",
+        "cua-evidence/in2/docx-save-panel.ax.txt",
+        "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json",
+        "cua-evidence/in2/independent-numerical-readback/query-proof.json",
+        "independent-final-ai-review/native-export-readback.json"
+      ],
+      "observation": "Current GUI native saves yielded DOCX37011B,PDF61145B,XLSX47728B. Independent73 content/unit/source/semantics checks pass; all5 original PDF pages rendered and visually checked. DOCX OOXML preserves content; bundled LibreOffice render Chinese glyph fallback fails in this environment, so DOCX visual fidelity is limited. Native Excel printing/live recalculation not claimed."
+    },
+    {
+      "id": "normal-restart-result-recovery",
+      "status": "awaiting-current-package-evidence",
+      "evidence": [],
+      "observation": "Early CUA control recovery is not counted as recovery of newly calculated job/result/export identifiers."
+    },
+    {
+      "id": "visual-accessibility-observed-views",
+      "status": "reviewed-passed-with-coverage-limitation",
+      "evidence": [
+        "cua-evidence/in2/calculation-result.jpg",
+        "cua-evidence/in2/calculation-result.ax.txt",
+        "cua-evidence/in2/review-draft.jpg",
+        "cua-evidence/in2/review-draft.ax.txt"
+      ],
+      "observation": "Dark English Result/Deliver work surfaces opaque and readable, primary actions evident, statuses textual, controls/known-point table exposed in AX. Screenshots2560x1680 pixels; logical bounds not inferred. No claim of complete languages/themes/window-size/keyboard/screen-reader matrix."
+    }
+  ],
+  "findings": [
+    {
+      "id": "R1",
+      "severity": "disclosure",
+      "blocksRelease": false,
+      "title": "Synthetic reference declaration is not geodetic authentication",
+      "detail": "CGCS2000 /1985 National Height Datum were entered to exercise declared-reference workflow on a synthetic local plane-control fixture. Tiny posterior standard errors reflect near-exact synthetic input and are not a field accuracy or datum stability finding."
+    },
+    {
+      "id": "R2",
+      "severity": "environment-limitation",
+      "blocksRelease": false,
+      "title": "Gatekeeper enforcement locally disabled",
+      "detail": "Signature and notarization verified independently; current system policy prevents claiming enforcement under normal enabled Gatekeeper. No user system policy change requested."
+    },
+    {
+      "id": "R3",
+      "severity": "rendering-limitation",
+      "blocksRelease": false,
+      "title": "DOCX visual fidelity remains limited in bundled renderer",
+      "detail": "OOXML includes Chinese labels and correct10 tables with blank professional-signoff cells. Bundled LibreOffice render yields3 pages with blank/square Chinese glyphs and numeric wrapping; do not declare visually complete DOCX/Word interoperability. Native PDF5 pages readable and XLSX full numeric cells available. Record for next version/environment verification without delaying current reduced release."
+    },
+    {
+      "id": "R4",
+      "severity": "accessibility-limitation",
+      "blocksRelease": false,
+      "title": "PDF export is untagged",
+      "detail": "Native PDF metadata is Tagged:no. Current readable rendered pages are not PDF/UA or screen-reader certification."
+    }
+  ],
+  "releaseBlockingProductFindings": [],
+  "scope": "Latest explicit user direction relaxes exhaustive acceptance. This independent review does not re-impose49case/48matrix. Unevaluated broader workflows remain unevaluated rather than passed. Root maintainer retains release-scope decision and must represent evidence truthfully.",
+  "notCertification": [
+    "Not a real human approval",
+    "Not licensed professional signoff",
+    "Not vendor/SUC interoperability evidence",
+    "Not regulatory or production field conformity certification"
+  ],
+  "reviewedEvidence": [
+    {
+      "path": "package-identity-readback.json",
+      "size": 7471,
+      "sha256": "41c3cd648277627013e51f00bedc0e059171dd43d0a56e8f779ebe7d06d8d98c"
+    },
+    {
+      "path": "local-install/installed-identity.json",
+      "size": 2292,
+      "sha256": "ed093679a5857923f70090fa245656e440aefbcd4d4713db291f9e038d134f23"
+    },
+    {
+      "path": "reviewed-build-combined.json",
+      "size": 2495,
+      "sha256": "e5d1308f8cecc692c9a03a2501552d29a8947ebfe132eb25d8f932c22d741441"
+    },
+    {
+      "path": "two-hour-stability-readback.json",
+      "size": 339,
+      "sha256": "0c7769f07b31e41001786d4d649fd988117b5d0fd3ed5059e6689cf6764e274e"
+    },
+    {
+      "path": "private-readback-result.json",
+      "size": 960,
+      "sha256": "2b2af8734291f76215ecc336fabe7dfa4920277eddd5c3aff9fb1246c2f886ab"
+    },
+    {
+      "path": "updater-readback-38111109910/immutable-updater-readback-result.json",
+      "size": 1843,
+      "sha256": "d4a99a110ec04d6e725458e3ba6bf12bcdc2336dafa8602f0fd6cf83c657272d"
+    },
+    {
+      "path": "updater-readback-38111109910/retained-original-reports/native-updater.json",
+      "size": 995,
+      "sha256": "9745c174e6ae6d0cb932da6d28670d36e6e99c0009b681e92d79fadefda1be66"
+    },
+    {
+      "path": "updater-readback-38111109910/retained-original-reports/verify-restart-data.json",
+      "size": 2428,
+      "sha256": "00415e2f583e3776cc5cbc9cc08c064c19643b73f535a9ec7d336cf23392a0ce"
+    },
+    {
+      "path": "cua-evidence/in2/README.md",
+      "size": 1202,
+      "sha256": "f14bb3d7f1a3fd71693372dc8e4a9b9131408453fb945b7b4682d7bcce88f538"
+    },
+    {
+      "path": "cua-evidence/in2/cua-observed-state.txt",
+      "size": 639,
+      "sha256": "59b93d262e44df360ac0db8b814ecc7f4277c505cfd3fb0e312f06289e6a21ce"
+    },
+    {
+      "path": "cua-evidence/in2/calculation-result.ax.txt",
+      "size": 15410,
+      "sha256": "cf307591170cc614f3b9f410f0dec7dda761e2ead34fbdcaee4e77501f73a039"
+    },
+    {
+      "path": "cua-evidence/in2/calculation-result.jpg",
+      "size": 293319,
+      "sha256": "d59493db50f7c9ce54a36e4c26896945eba82053d0718c2c29304ef5e3717c7b",
+      "reviewSnapshot": "screenshots/calculation-result.jpg",
+      "pixelDimensions": [
+        2560,
+        1680
+      ]
+    },
+    {
+      "path": "cua-evidence/in2/review-draft.ax.txt",
+      "size": 4309,
+      "sha256": "7302a9566469a54bd16e5f4fad986a5c0500e4d6bae24bbebddae6d10db9d606"
+    },
+    {
+      "path": "cua-evidence/in2/review-draft.jpg",
+      "size": 327943,
+      "sha256": "899905b2ec94b3c90252cc187dfd4378930e171cf0e2f8b05fe3e4edca80a2f5",
+      "reviewSnapshot": "screenshots/review-draft.jpg",
+      "pixelDimensions": [
+        2560,
+        1680
+      ]
+    },
+    {
+      "path": "independent-final-ai-review/independent-in2-derivation.json",
+      "size": 4231,
+      "sha256": "1783eecb29202fcc27b8c77ad4c3106b46789589e8dae040701b4554db2b07a9"
+    },
+    {
+      "path": "independent-final-ai-review/installed-codesign.log",
+      "exitCode": 0,
+      "sha256": "db6cee174af0a89034a2680eb3887436111f6e555b9e4d15223814f8e5c6c972"
+    },
+    {
+      "path": "independent-final-ai-review/installed-stapler.log",
+      "exitCode": 0,
+      "sha256": "1fd5bf3e5656c907830cc3a91c8b301f2851a43e8752fb484380e650f4c8b649"
+    },
+    {
+      "path": "native-exports/in2/report.docx",
+      "size": 37011,
+      "sha256": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12"
+    },
+    {
+      "path": "native-exports/in2/report.pdf",
+      "size": 61145,
+      "sha256": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff"
+    },
+    {
+      "path": "native-exports/in2/professional.xlsx",
+      "size": 47728,
+      "sha256": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e"
+    },
+    {
+      "path": "cua-evidence/in2/native-export-complete.ax.txt",
+      "size": 4156,
+      "sha256": "54bb3afb0b42b86caeef60cc3f8994b1aef43fa45a2ca37e695538e7da383589"
+    },
+    {
+      "path": "cua-evidence/in2/native-export-complete.jpg",
+      "size": 239474,
+      "sha256": "ac4960600441ed75391ca76136c3f83c7ed44455513fee6d8e0b51bd640c957c",
+      "reviewSnapshot": "screenshots/native-export-complete.jpg"
+    },
+    {
+      "path": "cua-evidence/in2/docx-save-panel.ax.txt",
+      "size": 1053,
+      "sha256": "3f32e54c50b82a017d675c8df968a878611838f7b1352a72bdc800f9b0122112"
+    },
+    {
+      "path": "cua-evidence/in2/independent-numerical-readback/independent-in2-numerical-review.json",
+      "size": 32804,
+      "sha256": "b70ed881d769cf0694aca87e001302b9a68f14244e0179f0f02d62fd690f0003"
+    },
+    {
+      "path": "cua-evidence/in2/independent-numerical-readback/query-proof.json",
+      "size": 7004,
+      "sha256": "5ec34cf5f06c4f8f3343ee53c847fd126cfc990d2d3912c27fcb70e05c85b93d"
+    },
+    {
+      "path": "independent-final-ai-review/native-export-readback.json",
+      "size": 15089,
+      "sha256": "60315a42da827b905b17fb12f321e88f89e4bdb35fd051d8c85967def6776f46"
+    }
+  ]
+}

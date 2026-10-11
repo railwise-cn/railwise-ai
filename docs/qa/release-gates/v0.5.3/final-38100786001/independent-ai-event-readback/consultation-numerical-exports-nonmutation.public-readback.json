@@ -1,0 +1,58 @@
+{
+  "reviewKind": "AI read-only preserved pre-AI numerical snapshot versus actual post-retry records",
+  "scope": "Network and completed adjustment data_json exact-byte equality plus native files SHA; no unobserved broad profile nonmutation claim",
+  "checks": [
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "mode": "ro",
+      "table": "survey_networks",
+      "id": "network_7fd4f761-2610-4472-b0ec-67b5353adc70",
+      "beforeFile": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/network-1.record.original.json",
+      "beforeSha256": "6041a4673da95f3a29f9bec0853ff29ce94cf4d644e9ca0bcf849cb58eccd646",
+      "afterSha256": "6041a4673da95f3a29f9bec0853ff29ce94cf4d644e9ca0bcf849cb58eccd646",
+      "unchangedBytes": true,
+      "bytes": 19303
+    },
+    {
+      "database": "[acceptance-home]/.workwise/runtime/engineering/survey.sqlite3",
+      "mode": "ro",
+      "table": "survey_adjustments",
+      "id": "adjustment_df01813e-b1c5-4bbc-abaa-83ef6143c67b",
+      "beforeFile": "/private/tmp/railwise-053-tools/new-freeze-38100786001/cua-evidence/in2/independent-numerical-readback/raw/adjustment-1.record.original.json",
+      "beforeSha256": "f747073f4caf71c8cb3c6be765dd299220a13ba91ceaf6d868c27384cd6ea727",
+      "afterSha256": "f747073f4caf71c8cb3c6be765dd299220a13ba91ceaf6d868c27384cd6ea727",
+      "unchangedBytes": true,
+      "bytes": 7450
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/report.docx",
+      "beforeSha256": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12",
+      "afterSha256": "0879f49cc873278d1aebe6fac0ef744275e042c1f828e4ed18106927e8480d12",
+      "unchangedBytes": true,
+      "bytes": 37011
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/report.pdf",
+      "beforeSha256": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff",
+      "afterSha256": "1faf516ac8edbfbe2b5755e80af4dba2de115a96bee60167ec3fb08fe090d1ff",
+      "unchangedBytes": true,
+      "bytes": 61145
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38100786001/native-exports/in2/professional.xlsx",
+      "beforeSha256": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e",
+      "afterSha256": "1d7bf7013f6f80df2a733a272a208b6968e017b95f96d18e186cfbcebc02a13e",
+      "unchangedBytes": true,
+      "bytes": 47728
+    }
+  ],
+  "allComparedRecordsAndExportsUnchanged": true,
+  "publicationProvenance": {
+    "kind": "public-safe-personal-path-derivative",
+    "originalFile": "independent-ai-event-readback/consultation-numerical-exports-nonmutation.json",
+    "originalSha256": "4721db2363f5830b4fbf964afd17b59d5901c7a94d990ef526ed67250300add1",
+    "originalBytes": 2572,
+    "transformation": "Personal home path prefix replaced with [acceptance-home] only; numerical values, IDs, checks, event summary fields and statuses unchanged. Raw runtime events/messages/metadata remain private and are not committed.",
+    "byteExactOriginal": false
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "reviewType": "independent senior-engineer-mode AI review mathematical supporting evidence",
+  "at": "2026-10-11T10:52:03.871140+00:00",
+  "freezeRunId": 38100786001,
+  "version": "0.5.3",
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "sourceFileSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+  "method": "Fresh CSV/Decimal D.MMSS parse; analytical direction/distance derivatives; independent NumPy weighted Gauss-Newton with RSS distance sigma and one shared station orientation.",
+  "syntheticOnly": true,
+  "coordinateConvention": "X north, Y east; atan2(deltaY, deltaX), predicted circle reading azimuth minus station orientation.",
+  "weightModel": {
+    "directionSigmaArcsec": 1.0,
+    "distanceConstantMm": 1.0,
+    "distanceScalePpm": 1.0,
+    "combination": "RSS"
+  },
+  "station": {
+    "xM": 49.99999999284102,
+    "yM": 49.999999963710216,
+    "orientationRad": 1.5707963269606613
+  },
+  "observationCount": 5,
+  "unknownParameterCount": 3,
+  "rank": 3,
+  "degreesOfFreedom": 2,
+  "weightedSumSquares": 2.277476581243323e-08,
+  "varianceFactor": 1.1387382906216616e-08,
+  "unitWeightStdDev": 0.00010671168120790065,
+  "pointStandardErrorMm": 0.00013592155366010008,
+  "observations": [
+    {
+      "sourceRow": 6,
+      "target": "A",
+      "kind": "L",
+      "observed": 0.0,
+      "sigma": 4.84813681109536e-06,
+      "adjusted": 6.283185306942231,
+      "adjustedMinusObserved": -2.3735502452382207e-10,
+      "unit": "rad"
+    },
+    {
+      "sourceRow": 7,
+      "target": "B",
+      "kind": "L",
+      "observed": 4.71238898038469,
+      "sigma": 4.84813681109536e-06,
+      "adjusted": 4.712388980581823,
+      "adjustedMinusObserved": 1.971329766092822e-10,
+      "unit": "rad"
+    },
+    {
+      "sourceRow": 8,
+      "target": "B",
+      "kind": "S",
+      "observed": 100.0,
+      "sigma": 0.001004987562112089,
+      "adjusted": 100.00000000715897,
+      "adjustedMinusObserved": 7.158973858167883e-09,
+      "unit": "m"
+    },
+    {
+      "sourceRow": 9,
+      "target": "C",
+      "kind": "L",
+      "observed": 5.497787143782138,
+      "sigma": 4.84813681109536e-06,
+      "adjusted": 5.497787143822359,
+      "adjustedMinusObserved": 4.022115973612017e-11,
+      "unit": "rad"
+    },
+    {
+      "sourceRow": 10,
+      "target": "C",
+      "kind": "S",
+      "observed": 100.0,
+      "sigma": 0.001004987562112089,
+      "adjusted": 99.99999986291975,
+      "adjustedMinusObserved": -1.3708024937386654e-07,
+      "unit": "m"
+    }
+  ],
+  "aprioriCovariance": [
+    [
+      6.872084438073113e-07,
+      -6.262705982801739e-07,
+      7.474163269919974e-09
+    ],
+    [
+      -6.262705982801738e-07,
+      9.351721243643055e-07,
+      -8.885164872430984e-09
+    ],
+    [
+      7.474163269919976e-09,
+      -8.885164872430988e-09,
+      1.0092521025674893e-10
+    ]
+  ],
+  "posteriorCovariance": [
+    [
+      7.825505686019098e-15,
+      -7.131583105521705e-15,
+      8.51111590581588e-17
+    ],
+    [
+      -7.131583105521705e-15,
+      1.0649163063356371e-14,
+      -1.0117877458723692e-16
+    ],
+    [
+      8.511115905815882e-17,
+      -1.0117877458723697e-16,
+      1.1492740140840207e-18
+    ]
+  ],
+  "uiEvidence": "cua-evidence/in2/calculation-result.ax.txt",
+  "guiComparisons": {
+    "station50_50WithinDisplayedPrecision": true,
+    "observationCountFive": true,
+    "rankThreeOfThree": true,
+    "degreesOfFreedomTwo": true,
+    "displayedUnitWeightStdDev0_00010671": true,
+    "displayedPointStandardError1_36eMinus4Mm": true,
+    "displayedBdistanceResidual7_1590165eMinus9M": true,
+    "displayedCdistanceResidualMinus0_00000014M": true
+  },
+  "limitations": [
+    "Mathematical expectations are compared to this package GUI, not inherited package pass evidence.",
+    "CGCS2000 and height datum were synthetic declarations for software workflow and do not authenticate a real geodetic reference.",
+    "This geometry does not establish field observation quality, vendor/SUC interoperability, precision tolerance compliance or professional signoff.",
+    "Full native covariance/export comparison remains separate pending the actual files."
+  ]
+}

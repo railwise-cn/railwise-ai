@@ -1,0 +1,44 @@
+{
+  "status": "actual-dmg-installed-identity-signature-notarization-asar-passed",
+  "at": "2026-10-11T04:11:33.952824+00:00",
+  "runId": 38100786001,
+  "runAttempt": 1,
+  "version": "0.5.3",
+  "bundleId": "com.wangjiawei508.workgpt",
+  "appPath": "/Applications/RailWise AI.app",
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "artifactSha256": "6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e",
+  "asarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "appFingerprint": "b31942af9e7ea8999efb8244ba5ed6c0d862b19d1b9d9a08d4cbbceedd61449e",
+  "signature": "verified",
+  "stapledNotarization": "verified",
+  "gatekeeperRaw": "/Applications/RailWise AI.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n",
+  "localGatekeeperPolicyRaw": "assessments disabled\n",
+  "localGatekeeperPolicyExitCode": 1,
+  "localGatekeeperAssessmentsDisabled": true,
+  "gatekeeperEnforcementLocallyVerified": false,
+  "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U\nExecutable=/Applications/RailWise AI.app/Contents/MacOS/RailWise AI\n",
+  "architecture": "/Applications/RailWise AI.app/Contents/MacOS/RailWise AI: Mach-O 64-bit executable arm64\n",
+  "packagedMetadata": {
+    "name": "workwise",
+    "productName": "RailWise AI",
+    "version": "0.5.3",
+    "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+    "updateChannel": "stable",
+    "updater": {
+      "provider": "generic",
+      "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/",
+      "updaterCacheDirName": "workwise-updater"
+    }
+  },
+  "recordKind": "Public-safe derived identity, not immutable original receipt",
+  "originalRecordSha256": "ed093679a5857923f70090fa245656e440aefbcd4d4713db291f9e038d134f23",
+  "omittedPrivateFields": [
+    "heldOriginal",
+    "artifactFile",
+    "started",
+    "profileChanged",
+    "limitations"
+  ],
+  "scope": "Exact installed identity/signature/notarization readback only. No package UI/function acceptance inferred; Gatekeeper enforcement not verified."
+}

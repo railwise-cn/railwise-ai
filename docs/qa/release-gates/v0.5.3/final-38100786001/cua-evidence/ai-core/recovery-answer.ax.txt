@@ -1,0 +1,201 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container Open AI
+					5 container
+						6 标题 Open AI, Value: 2
+							7 文本 Open AI
+						8 按钮 Close details
+					9 container Survey AI session
+						10 container
+							11 标题 Survey AI session, Value: 2
+								12 文本 Survey AI session
+							13 文本 golden-plane-control-e2e
+							14 按钮 Import and preflight
+							15 按钮 Survey adjustment
+							16 按钮 Refresh task data
+						17 container
+							18 文本 请只读解释当前平面控制网的 S1 和已知点 A：分别给出坐标、单位、精度依据以及改正数含义，区分固定基准与后验精度，不修改数据、不重新计算。
+							19 按钮 Copy message
+							20 文本 上一次请求后我退出并重启了应用，界面没有显示回答。请重新只读解释当前 S1 与已知点 A 的坐标、单位、精度依据和改正数含义；区分固定基准与后验精度，不修改数据、不重新计算。
+							21 按钮 Copy message
+							22 按钮 Edit & resend
+							23 文本 已重新只读读取当前平面控制网的确定性记录（网类型：平面控制网；坐标系 CGCS2000；项目单位 m；源文件《COSA.in2》；平差有效，5 个观测、3 个未知数、自由度 2；原始文件完整性已核验）。以下解释未修改任何数据、未重新计算。另注：同一原始数据另有一份导入处于"被阻断"状态，与本说明无关，本说明仅针对当前已校验的平面控制网。
+							24 标题 一、已知点 A（固定基准）, Value: 2
+								25 文本 一、已知点 A（固定基准）
+							26 内容列表
+								27 container
+									28 AXListMarker • 
+									29 text 记录位置：《COSA.in2》第 2 行，点类型为 已知点 （固定基准）。
+								30 container
+									31 AXListMarker • 
+									32 文本 坐标：x = 50.000000 m，y = 150.000000 m（记录值即 50.000000 / 150.000000，单位 m；坐标轴序按记录为北—东）。
+								33 container
+									34 AXListMarker • 
+									35 text 精度依据： 无后验精度 。A 在平差中被固定，平差结果中其坐标为原样常量（x=50 m，y=150 m），没有坐标改正数、没有标准差或误差椭圆字段。
+								36 container
+									37 AXListMarker • 
+									38 text 改正数： 不存在 。固定基准点不参与改正。
+								39 container
+									40 AXListMarker • 
+									41 文本 专业说明：A 的坐标是源文件中声明的已知值，平差按"声明基准"采用；该声明基准本身未经独立验证。同网中的 B、C 同样是固定已知点。
+							42 标题 二、测站点 S1（待定点）, Value: 2
+								43 文本 二、测站点 S1（待定点）
+							44 内容列表
+								45 container
+									46 AXListMarker • 
+									47 text 记录位置：《COSA.in2》第 5 行，点类型为 测站点（待定点） ，非已知点。
+								48 container
+									49 AXListMarker • 
+									50 文本 近似坐标（导入初始化值，记录注明由极坐标刚性初始化得到，距离拟合 RMS 约 1.23×10⁻⁸ m）
+								51 container
+									52 AXListMarker • 
+									53 文本 x₀ = 50.00000001228713 m
+								54 container
+									55 AXListMarker • 
+									56 文本 y₀ = 49.999999767779975 m
+								57 container
+									58 AXListMarker • 
+									59 文本 平差后坐标（单位 m）
+								60 container
+									61 AXListMarker • 
+									62 文本 x = 49.99999999284098 m
+								63 container
+									64 AXListMarker • 
+									65 文本 y = 49.999999963710295 m
+								66 container
+									67 AXListMarker • 
+									68 文本 坐标改正数（对近似坐标的增量，单位 m）
+								69 container
+									70 AXListMarker • 
+									71 文本 δx = −1.9446×10⁻⁸ m（换算为 −1.94×10⁻⁵ mm，单位已×1000）
+								72 container
+									73 AXListMarker • 
+									74 文本 δy = +1.9593×10⁻⁷ m（换算为 +1.96×10⁻⁴ mm，单位已×1000）
+								75 container
+									76 AXListMarker • 
+									77 text 改正数含义：它们是平差为使模型与观测一致而对 近似坐标 施加的修正量，即"近似坐标 → 平差坐标"的增量； 不是两期之间的位移 ，也不是对已知基准的改动。核对：x₀ + δx = 49.99999999284098 m，y₀ + δy = 49.999999963710295 m，与平差坐标一致。
+							78 标题 三、观测改正数（残差）的含义, Value: 2
+								79 文本 三、观测改正数（残差）的含义
+							80 text 平差记录同时给出 5 个观测的改正数（残差 = 观测值 − 模型值），它们是 平差后的拟合残差 ，属于描述性拟合质量，不是测前路线闭合差
+							81 按钮 Copy table
+								82 图像
+							83 按钮 Download table
+								84 图像
+							85 按钮 View fullscreen
+								86 图像
+							87 表格
+								88 row
+									89 列标题
+										90 文本 观测
+									91 列标题
+										92 文本 残差
+									93 列标题
+										94 文本 单位
+								95 row
+									96 单元格
+										97 文本 S1→A 后视置零方向（0）
+									98 单元格
+										99 文本 −2.3735×10⁻¹⁰
+									100 单元格
+										101 文本 rad
+								102 row
+									103 单元格
+										104 文本 S1→B 方向（270°）
+									105 单元格
+										106 文本 +1.9713×10⁻¹⁰
+									107 单元格
+										108 文本 rad
+								109 row
+									110 单元格
+										111 文本 S1→B 距离（100 m）
+									112 单元格
+										113 文本 +7.1590×10⁻⁹（即 +7.16×10⁻⁶ mm）
+									114 单元格
+										115 文本 m
+								116 row
+									117 单元格
+										118 文本 S1→C 方向（315°）
+									119 单元格
+										120 文本 +4.0221×10⁻¹¹
+									121 单元格
+										122 文本 rad
+								123 row
+									124 单元格
+										125 文本 S1→C 距离（100 m）
+									126 单元格
+										127 文本 −1.3708×10⁻⁷（即 −1.37×10⁻⁴ mm）
+									128 单元格
+										129 文本 m
+							130 text 标准化残差按 声明先验精度 计算（单位 σ，无量纲），最大约 0.00014σ，均小于 3 倍阈值、无离群标记；但这只是描述性筛查， 不构成显著性检验 。
+							131 标题 四、精度依据：先验与后验, Value: 2
+								132 文本 四、精度依据：先验与后验
+							133 内容列表
+								134 container
+									135 AXListMarker • 
+									136 text 加权依据记录为 绝对先验精度模型 （按观测先验方差的逆加权）：方向先验 σ = 1″（= 4.848×10⁻⁶ rad），距离先验 σ = √(1 mm² + (1 ppm × 100 m)²) ≈ 1.005 mm（记录为 1.005×10⁻³ m）。
+								137 container
+									138 AXListMarker • 
+									139 text 因为是绝对先验模型，单位权标准差与方差因子是 无量纲比例 ，可与 1 比较
+								140 container
+									141 AXListMarker • 
+									142 文本 后验估计方差因子 = 1.139×10⁻⁸（无量纲，方差是平方量）
+								143 container
+									144 AXListMarker • 
+									145 文本 其平方根（标准差尺度比）= 1.067×10⁻⁴ ≪ 1，说明拟合残差远小于先验标称精度，即声明先验偏保守。这是描述性结果，先验值本身未独立校准，显著性未评估。
+								146 container
+									147 AXListMarker • 
+									148 text S1 的 点位精度为后验（posterior）基准
+								149 container
+									150 AXListMarker • 
+									151 文本 点位标准差 = 1.3592×10⁻⁷ m（即全网最大点位标准差；换算 1.36×10⁻⁴ mm，单位已×1000）
+								152 container
+									153 AXListMarker • 
+									154 文本 误差椭圆：长半轴 1.2848×10⁻⁷ m（1.28×10⁻⁴ mm）、短半轴 4.4355×10⁻⁸ m（4.44×10⁻⁵ mm），方位角 2.2585 rad，比例取单位马氏半径，协方差单位为 m²，方差基准为后验。
+							155 标题 五、固定基准与后验精度的区分, Value: 2
+								156 文本 五、固定基准与后验精度的区分
+							157 内容列表
+								158 container
+									159 AXListMarker • 
+									160 text 固定基准 ：A、B、C 为已知点，坐标是源文件声明的输入常量，平差中保持不动，因此 没有改正数、没有后验精度 ；"精度依据"仅是该声明本身。
+								161 container
+									162 AXListMarker • 
+									163 text 后验精度 ：只对 S1 这类待定点成立——坐标由观测推估，获得改正数与后验标准差/误差椭圆。后验精度反映模型对观测的 内部一致性 ，不代表对固定基准坐标真实性的验证。
+							164 标题 六、专业限制与证据缺口, Value: 2
+								165 文本 六、专业限制与证据缺口
+							166 内容列表
+								167 container
+									168 AXListMarker 1. 
+									169 text 独立闭合检查 未完成 （记录为"平面闭合未评估"），因此不能说闭合已通过；记录中保留的水平/角度数值（水平 1.373×10⁻⁷ m、角度 3.112×10⁻¹⁰ rad）是 平差后的拟合残差范数 ，不是测前路线闭合差，不能当作闭合合格依据。
+								170 container
+									171 AXListMarker 2. 
+									172 text 精度"通过"标志只是描述性可用标志； 显著性检验与规范符合性均未评估 。
+								173 container
+									174 AXListMarker 3. 
+									175 文本 先验标称精度为声明/模型默认值，未经独立校准。
+								176 container
+									177 AXListMarker 4. 
+									178 文本 已知点坐标作为声明基准被采用，未经独立验证。
+								179 container
+									180 AXListMarker 5. 
+									181 文本 存在一条开放的质量提示（格式检测警告）：仍需人工完成基准、控制点、观测角色、拓扑、闭合与精度的审核确认。
+							182 文本 Oct 11, 07:02 PM
+							183 按钮 Copy message
+						184 container
+							185 文本输入区 (settable) Ask the agent…
+							186 按钮 More actions
+							187 按钮 (disabled) Send
+	188 关闭按钮
+	189 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	190 最小化按钮
+191 menu bar
+	192 RailWise AI
+	193 File
+	194 Edit
+	195 View
+	196 Window
+	197 Help
+
+The focused UI element is 8 按钮 Close details

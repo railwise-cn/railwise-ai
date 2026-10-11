@@ -1,0 +1,20 @@
+{
+  "status": "freeze-required-jobs-success-not-package-acceptance",
+  "runId": 38100786001,
+  "runAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "artifacts": [
+    {
+      "id": 11691406889,
+      "name": "release-mac",
+      "size_in_bytes": 1219889791,
+      "digest": "sha256:55b57ac6e3d83e155038116604bf0d161c60053c8d6ea362d3ea6318df650d94"
+    },
+    {
+      "id": 11690995218,
+      "name": "release-win",
+      "size_in_bytes": 252370388,
+      "digest": "sha256:daa80973e2fba57b70047b4680ca87af56eba3a8f06ff7b4eb7d741c237eb09d"
+    }
+  ]
+}

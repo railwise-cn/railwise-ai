@@ -1,0 +1,32 @@
+{
+  "status": "real-immutable-updater-readback-passed-not-release-approval",
+  "workflowRun": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/frozen-release-updater-acceptance.yml",
+    "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+    "runId": 38111109910,
+    "runAttempt": 1,
+    "artifact": {
+      "id": 11691164360,
+      "name": "frozen-updater-arm64-38111109910",
+      "digest": "sha256:db28d0759e16153b5a3afc5f3531d556adb622414ffdbdff2469a85deb529df5"
+    }
+  },
+  "frozenRunId": 38100786001,
+  "frozenRunAttempt": 1,
+  "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+  "machineReportPath": "/private/tmp/railwise-053-tools/new-freeze-38100786001/updater-readback-38111109910/retained-original-reports/frozen-updater.json",
+  "nativeReportPath": "/private/tmp/railwise-053-tools/new-freeze-38100786001/updater-readback-38111109910/retained-original-reports/native-updater.json",
+  "machineReportSha256": "3659558f8d3101b8e834f082e12b28ff3439a318d3a4b81ee7f84879fb0609d5",
+  "nativeReportSha256": "9745c174e6ae6d0cb932da6d28670d36e6e99c0009b681e92d79fadefda1be66",
+  "targetAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "installedAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "uiAsarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797",
+  "limitations": [
+    "Original files are private and not yet committed release-tag evidence",
+    "CUA installed package and independent senior-engineer review require separate records",
+    "Stored config bytes only; no live credential/plugin activation or complete migration certification",
+    "No vendor/SUC interoperability or real human professional-signature claim",
+    "No public release/feed/tag/website action performed"
+  ]
+}
