@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "status": "actual-installed-release-captures",
+  "version": "0.5.3",
+  "packageIdentity": {
+    "runId": 38100786001,
+    "runAttempt": 1,
+    "sourceHead": "3256f4842503e002f094952934b82f2d1d445a0f",
+    "version": "0.5.3",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "artifactSha256": "6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e",
+    "asarSha256": "2e18a357464957c304a7a7aeb040071845a9b0ddfc190257518604c55b739797"
+  },
+  "release": {
+    "tag": "v0.5.3",
+    "tagCommit": "2eae92b01eddfff3148224c8976fe387db36fd7e",
+    "publicReleaseId": 409642747,
+    "publishedAt": "2026-10-11T12:25:53Z",
+    "freezeRun": 38100786001,
+    "publicationRun": 38136584807
+  },
+  "locale": "zh-CN",
+  "theme": "light",
+  "dataScope": "synthetic-public-acceptance",
+  "captureTimestampBasis": "JPEG/AX files are fresh same-package CUA captures provided by the GUI owner. capturedAt uses the preserved original JPEG saved-file timestamp recorded separately as filesystemObservedAt; it is not represented as the exact screenshot API call instant.",
+  "screenshots": [
+    {
+      "role": "survey",
+      "sha256": "ec0eb934be6995bb8249a479a7f8bb173a743ccc26f457588ec4d7829103fc3e",
+      "mime": "image/jpeg",
+      "bytes": 271394,
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "capturedAt": "2026-10-11T11:07:34.495400+00:00",
+      "captureTimestampBasis": "Original CUA JPEG file saved timestamp, preserved with the same original bytes; not represented as an exact screenshot API instant.",
+      "description": "RailWise Survey 结果页：中文浅色界面，显示已计算结果、平面控制网 A/B/C 与测站 S1，以及专业成果与复核入口。",
+      "file": "10-survey-053-zh-light.jpg"
+    },
+    {
+      "role": "delivery",
+      "sha256": "04db10af2ee26dce5ae5fb78daf3c548e9b0a8addaa540e47e0001c38a796a89",
+      "mime": "image/jpeg",
+      "bytes": 289092,
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "capturedAt": "2026-10-11T11:06:53.590221+00:00",
+      "captureTimestampBasis": "Original CUA JPEG file saved timestamp, preserved with the same original bytes; not represented as an exact screenshot API instant.",
+      "description": "RailWise Survey 交付页：中文浅色界面，显示专业审查稿入口与 DOCX、PDF、XLSX 文件卡片。",
+      "file": "11-survey-053-delivery.jpg"
+    },
+    {
+      "role": "settings",
+      "sha256": "42d1841d761124cfa12fcf0630bafe0c52b1e473dae867e60e17b187c42ad809",
+      "mime": "image/jpeg",
+      "bytes": 263242,
+      "pixelWidth": 2560,
+      "pixelHeight": 1680,
+      "capturedAt": "2026-10-11T11:06:26.472646+00:00",
+      "captureTimestampBasis": "Original CUA JPEG file saved timestamp, preserved with the same original bytes; not represented as an exact screenshot API instant.",
+      "description": "RailWise AI 设置页：简体中文浅色界面，显示基础设置、通知与本地偏好选项。",
+      "file": "12-survey-053-settings.jpg"
+    }
+  ]
+}
