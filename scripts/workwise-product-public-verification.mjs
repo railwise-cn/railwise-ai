@@ -1,7 +1,8 @@
 import { basename } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 
-const PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
+const PRODUCT_URL = 'https://www.railwise.cn/products/railwise-ai/'
+const LEGACY_URL = 'https://www.railwise.cn/products/workwise/'
 
 export const NGINX_VHOST_ROOTS_PYTHON = String.raw`import re,shlex,sys
 
@@ -65,7 +66,7 @@ for value,separator in directives(open(sys.argv[1],encoding='utf-8',errors='repl
                     # allow-list check so formatting changes in the active
                     # vhost cannot make a valid release undiscoverable.
                     normalized=root.rstrip('/')
-                    if re.fullmatch(r'/www/audit-releases/audit-[A-Za-z0-9._-]+/site',normalized):
+                    if re.fullmatch(r'/www/(?:audit-releases/audit-[A-Za-z0-9._-]+|releases/[A-Za-z0-9][A-Za-z0-9._-]*)/site',normalized):
                         roots.add(normalized)
             server=None
         if stack:
@@ -90,7 +91,7 @@ export async function verifyProductPublication(manifest, {
     try {
       // Check the normal user URL as well as a cache-busting request. A fresh
       // query response alone must not mask an outdated default download page.
-      for (const url of [PRODUCT_URL, `${PRODUCT_URL}?release=${encodeURIComponent(version)}&t=${Date.now()}`]) {
+      for (const url of [LEGACY_URL, PRODUCT_URL, `${PRODUCT_URL}?release=${encodeURIComponent(version)}&t=${Date.now()}`]) {
         const response = await fetcher(url, { cache: 'no-store', signal: AbortSignal.timeout(15_000) })
         if (!response.ok) throw new Error(`Product page returned HTTP ${response.status}.`)
         const html = await response.text()
