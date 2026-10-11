@@ -331,6 +331,104 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(container.textContent).toContain(i18n.t('engineeringRunDeterministicAnalysis'))
   })
 
+  it.each(['en', 'zh'])('preserves the selected Survey source and delivery inputs across generic quality navigation in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    datasets = [{ id: 'other-data', sourceFileName: 'other-monitor.csv', sourceFileHash: 'a'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2, columnCount: 3, observationCount: 2, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringTabSource')).click())
+    const sourceKey = `workwise.survey.source-kind.v1:${JSON.stringify(['/test', 'job'])}`
+    expect(window.localStorage.getItem(sourceKey)).toBe('survey')
+    await act(async () => button(i18n.t('engineeringTabQuality')).click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('survey.in2')
+    expect(window.localStorage.getItem(sourceKey)).toBe('survey')
+    await act(async () => button(i18n.t('engineeringPrimaryDelivery')).click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('survey.in2')
+    expect(button(i18n.t('engineeringGeneratePreview')).disabled).toBe(false)
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (path.endsWith('/reports/preview')) {
+        const input = JSON.parse(payload!)
+        expect(input.adjustmentIds).toEqual(['adjustment'])
+        expect(input.datasetId).toBeUndefined()
+        expect(input.analysisId).toBeUndefined()
+      }
+      return original(path, method, payload)
+    })
+    await act(async () => button(i18n.t('engineeringGeneratePreview')).click())
+    expect(request.mock.calls.filter(([, method]) => method === 'POST')).toHaveLength(1)
+  })
+
+  it.each(['en', 'zh'])('preserves a stage-only legacy Survey selection through quality, overview and delivery in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    datasets = [{ id: 'unselected-data', sourceFileName: 'unselected-monitor.csv', sourceFileHash: 'd'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2, columnCount: 3, observationCount: 2, timeRange: {}, status: 'validated', revision: 1, findings: [], updatedAt: project.updatedAt }]
+    const scope = JSON.stringify(['/test', 'job'])
+    const sourceKey = `workwise.survey.source-kind.v1:${scope}`
+    window.localStorage.setItem(`workwise.survey.stage.v1:${scope}`, 'precision')
+    expect(window.localStorage.getItem(sourceKey)).toBeNull()
+    await act(async () => root.render(createElement(EngineeringWorkspaceView, { workspaceRoot: '/test', runtimeReady: true })))
+    await settle()
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('survey.in2')
+    await act(async () => button(i18n.t('engineeringTabQuality')).click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('survey.in2')
+    expect(window.localStorage.getItem(sourceKey)).toBe('survey')
+    await act(async () => button(i18n.t('engineeringPrimaryOverview')).click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('survey.in2')
+    await act(async () => button(i18n.t('engineeringPrimaryDelivery')).click())
+    expect(button(i18n.t('engineeringGeneratePreview')).disabled).toBe(false)
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (path.endsWith('/reports/preview')) {
+        const input = JSON.parse(payload!)
+        expect(input.adjustmentIds).toEqual(['adjustment'])
+        expect(input.datasetId).toBeUndefined()
+        expect(input.analysisId).toBeUndefined()
+      }
+      return original(path, method, payload)
+    })
+    await act(async () => button(i18n.t('engineeringGeneratePreview')).click())
+    expect(request.mock.calls.filter(([, method]) => method === 'POST')).toHaveLength(1)
+  })
+
+  it.each(['en', 'zh'])('preserves monitoring selection and explicitly locates a finding from Survey mode in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    const sha = 'b'.repeat(64)
+    datasets = [{ id: 'selected-data', sourceFileName: 'selected-monitor.csv', sourceFileHash: sha, fieldMapping: {}, unknownColumns: [], rowCount: 25, columnCount: 3, observationCount: 25, timeRange: {}, status: 'validated', revision: 4, findings: [{ id: 'exact-finding', code: 'missing', severity: 'blocking', status: 'open', message: 'Missing original point', suggestion: 'Check original point', row: 25 }], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringTabData')).click())
+    await act(async () => button(i18n.t('engineeringTabQuality')).click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('selected-monitor.csv')
+    expect(container.textContent).toContain(i18n.t('engineeringIssueCounts', { blocking: 1, warnings: 0 }))
+    await act(async () => button(i18n.t('engineeringTabSource')).click())
+    navigationFixture.target = { kind: 'dataset', workspaceRoot: '/test', projectId: 'job', projectRevision: 2, datasetId: 'selected-data', datasetRevision: 4, sourceSha256: sha, findingId: 'exact-finding' }
+    request.mockClear()
+    await act(async () => button('Locate exact test evidence').click())
+    expect(document.activeElement?.getAttribute('data-evidence-key')).toBe(JSON.stringify(['finding', 'exact-finding']))
+    expect(window.localStorage.getItem(`workwise.survey.source-kind.v1:${JSON.stringify(['/test', 'job'])}`)).toBe('monitoring')
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('selected-monitor.csv')
+    expect(button(i18n.t('surveyStartCalculation')).disabled).toBe(true)
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('activates monitoring preflight when a CSV is explicitly imported from Survey mode', async () => {
+    const dataset = { id: 'new-data', sourceFileName: 'new-monitor.csv', sourceFileHash: 'c'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 2, columnCount: 4, observationCount: 2, timeRange: {}, status: 'validated', revision: 2, findings: [], updatedAt: project.updatedAt }
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (method !== 'POST') return original(path, method, payload)
+      if (path.endsWith('/datasets/import')) { datasets = [dataset]; return { ok: true, status: 200, body: JSON.stringify({ dataset }) } }
+      if (path.endsWith('/validate')) return { ok: true, status: 200, body: JSON.stringify({ dataset }) }
+      throw new Error(`Unexpected mutation: ${path}`)
+    })
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringTabSource')).click())
+    const input = container.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t('engineeringUnifiedImport')}"]`)!
+    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['point,time,value,unit\nP1,2026-01-01,1,mm'], 'new-monitor.csv', { type: 'text/csv' })] })
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 30)) })
+    await vi.waitFor(() => expect(request.mock.calls.some(([path]) => path.endsWith('/validate'))).toBe(true))
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('new-monitor.csv')
+    expect(window.localStorage.getItem(`workwise.survey.source-kind.v1:${JSON.stringify(['/test', 'job'])}`)).toBe('monitoring')
+    expect(button(i18n.t('surveyStartCalculation')).disabled).toBe(false)
+  })
+
   it.each(['zh', 'en'])('shows professional mapping labels and preserves original column headings in %s', async language => {
     await i18n.changeLanguage(language)
     const fieldMapping = { monitoringItem: '测量项目原始列', warningThreshold: '预警线（mm）', timestamp: '外业记录时间' }

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "scope": "Original installed synthetic navigation defect and actual UI recovery, not release acceptance",
+  "files": [
+    {
+      "path": "independent-installed-navigation-review.json",
+      "bytes": 25382,
+      "sha256": "eb304b9ba197aead90bdcbada5c0f0dff805b9b5e7ace6bb5de6a92a52a87d27"
+    },
+    {
+      "path": "quality-to-delivery.ax.txt",
+      "bytes": 9738,
+      "sha256": "4b803aa911406f601609adf2a2ed543cb505e061245b9d4b37569044a3a7393d"
+    },
+    {
+      "path": "quality-to-delivery.jpg",
+      "bytes": 353994,
+      "sha256": "253a3571d65fa433d22ca934108d84f781d1c5a9664d182d2cbfb2bda17ae4b2"
+    },
+    {
+      "path": "recovered-via-results.ax.txt",
+      "bytes": 5536,
+      "sha256": "0c738bfc7a528be284e3d4082c67f5a64db778482f40a022fec677ed635b355d"
+    },
+    {
+      "path": "recovered-via-results.jpg",
+      "bytes": 358434,
+      "sha256": "aaf82c544fe5bf34c4767d977c89c13d6835d37e1be9ade099d46fcb6975296a"
+    }
+  ]
+}

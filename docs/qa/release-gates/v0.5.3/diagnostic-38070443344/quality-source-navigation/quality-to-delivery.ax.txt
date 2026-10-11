@@ -1,0 +1,175 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 5
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 source-fixed-two-height Control network · m · 10/11
+								20 文本 source-fixed-two-height
+								21 文本 Control network
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/11
+							26 按钮 synthetic-monitoring Deformation monitoring · mm · 10/11
+								27 文本 synthetic-monitoring
+								28 文本 Deformation monitoring
+								29 文本  · 
+								30 文本 mm
+								31 文本  · 
+								32 文本 10/11
+							33 按钮 synthetic-monitoring Deformation monitoring · mm · 10/11
+								34 文本 synthetic-monitoring
+								35 文本 Deformation monitoring
+								36 文本  · 
+								37 文本 mm
+								38 文本  · 
+								39 文本 10/11
+							40 按钮 leica-gsi-cumulative-leveling Control network · m · 10/11
+								41 文本 leica-gsi-cumulative-leveling
+								42 文本 Control network
+								43 文本  · 
+								44 文本 m
+								45 文本  · 
+								46 文本 10/11
+							47 按钮 golden-plane-control-e2e Control network · m · 10/11
+								48 文本 golden-plane-control-e2e
+								49 文本 Control network
+								50 文本  · 
+								51 文本 m
+								52 文本  · 
+								53 文本 10/11
+							54 按钮 Continue conversation
+						55 container
+							56 切换按钮 Connect phone, Value: 0
+							57 按钮 Settings
+					58 container
+						59 按钮 Collapse sidebar
+						60 标题 RailWise Survey, Value: 1
+							61 文本 RailWise Survey
+						62 text Engineering Survey Processing Current Survey job
+						63 弹出式按钮 Current Survey job, Value: golden-plane-control-e2e
+							64 (selected) golden-plane-control-e2e
+						65 按钮 New task
+						66 container Work view
+							67 按钮 Overview
+							68 按钮 Process
+							69 按钮 Results
+							70 按钮 Deliver
+						71 文本 Work view
+						72 按钮 Open AI
+						73 按钮 Advanced
+					74 container
+						75 text Current source Not imported Current status Results ready · pending review Latest result Candidate deliverable
+						76 开合三角标记 More metrics
+							77 文本 More metrics
+					78 container
+						79 标题 Delivery, Value: 2
+							80 文本 Delivery
+						81 文本 Generate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.
+						82 按钮 (disabled) Generate review draft
+						83 container Report and figure drafts
+							84 标题 Report and figure drafts, Value: 3
+								85 文本 Report and figure drafts
+							86 文本 Create a separate draft from the selected result. Edit review notes or a results figure, then check the source and confirm this export. The original result is preserved; draft confirmation does not constitute professional signoff.
+							87 container
+								88 文本 Select draft
+								89 弹出式按钮 Select draft, Value: Draft 1 · Revision 2 · Most recently generated review draft · One of 5 files: report.docx · Oct 11, 2026
+									90 (selected) Draft 1 · Revision 2 · Most recently generated review draft · One of 5 files: report.docx · Oct 11, 2026
+							91 container
+								92 text Most recently generated review draft  ·  One of 5 files: report.docx · Oct 11, 2026
+							93 按钮 Edit review notes
+							94 按钮 Edit results figure
+							95 按钮 Review and export
+							96 文本 Separate review draft · No professional signoff. Changes to notes or figures require a new confirmation.
+						97 标题 Select delivery inputs, Value: 3
+							98 文本 Select delivery inputs
+						99 文本 Import monitoring data or complete a survey adjustment. Generate a review draft once data and result checks pass.
+						100 开合三角标记 Advanced: review, archive and provenance
+							101 文本 Advanced: review, archive and provenance
+						102 container
+							103 标题 Review-pending deliverables, Value: 2
+								104 文本 Review-pending deliverables
+							105 文本 Save a review draft after basic checks pass; previous versions remain available. These deliverables are not approved until professional review, approval and signing are complete.
+							106 按钮 (disabled) Generate review list
+							107 开合三角标记 Unit product populations and first-round sampling
+								108 文本 Unit product populations and first-round sampling
+							109 container Inspection evidence review
+								110 标题 Inspection evidence review, Value: 3
+									111 文本 Inspection evidence review
+								112 文本 Matches the supplied inspection records, supporting materials and unit scores. This does not verify field inspection authenticity, organizational responsibilities or signatures, and does not replace deliverable review or an independent numerical check.
+								113 文本 Select all 1–8 units from the same inspection selection record and their corresponding planar-control-point or height-control-section scores. Use a saved first-round record or a reinspection record from rounds 2–8; reinspection requires the immediately previous assessment and corrected materials with new score records. This review does not determine whether a sample or batch passes acceptance.
+								114 按钮 Saved plans
+								115 按钮 Saved assessments
+								116 按钮 New linkage plan
+								117 container
+									118 文本 Saved deliverable list
+									119 弹出式按钮 Saved deliverable list, Value: Choose
+										120 (selected) Choose
+									121 按钮 (disabled) Load retention plans for this deliverable
+									122 文本 Material retention plan
+									123 弹出式按钮 Material retention plan, Value: Choose
+										124 (selected) Choose
+									125 文本 Retention record of this plan
+									126 弹出式按钮 Retention record of this plan, Value: Choose
+										127 (selected) Choose
+									128 按钮 Load existing sampling runs
+									129 文本 Sampling or full-inspection record
+									130 弹出式按钮 Sampling or full-inspection record, Value: Choose
+										131 (selected) Choose
+									132 文本 Survey product type
+									133 弹出式按钮 Survey product type, Value: Planar control point · Tables 43/44
+										134 (selected) Planar control point · Tables 43/44
+									135 文本 Reason for associating these materials
+									136 文本输入区 (settable) Reason for associating these materials
+									137 复选框 Value: 0, I confirm that all selected units and their supporting materials are included. This confirms the associations only; material completeness, field inspection authenticity, inspection completion and professional approval still require review.
+									138 文本 I confirm that all selected units and their supporting materials are included. This confirms the associations only; material completeness, field inspection authenticity, inspection completion and professional approval still require review.
+									139 按钮 (disabled) Confirm evidence plan
+							140 text Review checklist Source inputs selected and saved ·  Condition not met Import monitoring data or complete a survey adjustment that passes data and calculation checks. Blocking items cleared ·  Condition not met No pending blocking items in the current dataset. Warnings confirmed ·  Condition not met No warnings require acceptance. Result calculation complete ·  Condition not met Complete monitoring analysis or a survey adjustment that passes data and result checks first. Reviewable deliverables generated ·  Condition met 3 deliverable file(s) saved with integrity records. Review-pending list Each list is an independent review record; historical versions remain read-only. This record is not approval. Review draft
+							141 文本 report.docx
+							142 文本 36.2 KB
+							143 文本 report.pdf
+							144 文本 60.1 KB
+							145 文本 professional.xlsx
+							146 文本 46.6 KB
+							147 开合三角标记 Advanced: review records
+								148 文本 Advanced: review records
+							149 按钮 Ask Survey AI about Review draft
+							150 text 3 outputs  ·  Draft  ·  10/11/2026, 07:24:52
+							151 按钮 Verify deliverable again
+							152 container Monitoring recomputation
+								153 按钮 Recompute monitoring results
+							154 开合三角标记 Deliverable integrity review
+								155 文本 Deliverable integrity review
+							156 文本 Review notes: 1
+							157 文本 Review status
+							158 文本 Review-list generation conditions are not met
+							159 文本 The review draft records deliverables, citations, and human disposition. Do not describe it as approved delivery before review, approval, and signing are complete.
+							160 文本 Latest review record
+							161 文本 Review draft
+	162 关闭按钮
+	163 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	164 最小化按钮
+165 menu bar
+	166 RailWise AI
+	167 File
+	168 Edit
+	169 View
+	170 Window
+	171 Help
+
+The focused UI element is 100 开合三角标记 Advanced: review, archive and provenance
