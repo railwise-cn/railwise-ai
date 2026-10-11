@@ -78,7 +78,7 @@ $pageJsonLd = [
     'softwareVersion' => $workwiseVersion,
     'datePublished' => $workwiseReleaseDate,
     'description' => $pageDesc,
-    'url' => 'https://www.railwise.cn/products/workwise/',
+    'url' => 'https://www.railwise.cn/products/railwise-ai/',
     'image' => $pageOgImage,
     'downloadUrl' => 'https://www.railwise.cn' . ($workwiseDownloads[0]['url'] ?? '/downloads/workwise/'),
     'codeRepository' => $workwiseRepoUrl,
@@ -94,7 +94,7 @@ $pageJsonLd = [
     'itemListElement' => [
       ['@type' => 'ListItem', 'position' => 1, 'name' => '首页', 'item' => 'https://www.railwise.cn/'],
       ['@type' => 'ListItem', 'position' => 2, 'name' => '产品矩阵', 'item' => 'https://www.railwise.cn/products'],
-      ['@type' => 'ListItem', 'position' => 3, 'name' => 'RailWise AI', 'item' => 'https://www.railwise.cn/products/workwise/'],
+      ['@type' => 'ListItem', 'position' => 3, 'name' => 'RailWise AI', 'item' => 'https://www.railwise.cn/products/railwise-ai/'],
     ],
   ],
 ];

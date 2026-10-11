@@ -314,3 +314,35 @@ ${operations}
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test('live canonical guard accepts its own deployed shim on a second run and rejects unknown PHP', () => {
+  const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')
+  const guard = source.match(/verify_live_targets\(\) \{[\s\S]*?\n\}/)?.[0]
+  assert.ok(guard)
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-repeat-deploy-'))
+  try {
+    writeFileSync(join(directory, 'legacy.php'), '$workwiseManifest = rw_workwise_manifest();')
+    writeFileSync(join(directory, 'include.php'), 'function rw_workwise_manifest()')
+    writeFileSync(join(directory, 'manifest.json'), '{"releaseChannel": "stable"}')
+    const shim = readFileSync(new URL('../website/products/railwise-ai/index.php', import.meta.url), 'utf8')
+    const invoke = () => execFileSync('bash', ['-s'], { encoding: 'utf8', env: { ...process.env, FIXTURE_ROOT: directory }, input: `
+set -euo pipefail
+page_path="$FIXTURE_ROOT/legacy.php"
+canonical_page_path="$FIXTURE_ROOT/canonical.php"
+include_path="$FIXTURE_ROOT/include.php"
+json_path="$FIXTURE_ROOT/manifest.json"
+container_run() { "$@"; }
+fail() { echo "$1" >&2; exit 65; }
+${guard}
+verify_live_targets
+` })
+    writeFileSync(join(directory, 'canonical.php'), '$workwiseManifest = rw_workwise_manifest();')
+    assert.doesNotThrow(invoke)
+    writeFileSync(join(directory, 'canonical.php'), shim)
+    assert.doesNotThrow(invoke)
+    writeFileSync(join(directory, 'canonical.php'), '<?php require "/unapproved/page.php";')
+    assert.throws(invoke, /live canonical product page marker was not recognized/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
