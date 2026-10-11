@@ -1,0 +1,166 @@
+{
+  "findings": [
+    {
+      "priority": "P2",
+      "title": "Activate monitoring when a dataset is explicitly selected from neutral Quality",
+      "file": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "line": 423,
+      "relatedLine": 1264,
+      "trigger": "Select Survey source, open generic Quality, expand imported files and click a monitoring dataset name/row.",
+      "actual": "Row and button only update selectedDatasetId. sourceMode remains survey, activeDataset remains null; aria-pressed is false, monitoring findings stay unavailable and Survey remains current source.",
+      "expected": "An explicit dataset selection activates monitoring and exposes that selected dataset and its quality findings, without any Runtime mutation.",
+      "evidence": "Private reviewer harness: baseline one pass; reviewed final HEAD one failure (aria-pressed expected true, actual false).",
+      "recommendation": "Use an explicit monitoring selection on both dataset row and named-button handlers; add a regression exercising Survey → generic Quality → dataset selection."
+    }
+  ],
+  "errors": [],
+  "reviewLabel": "Independent senior-engineer-mode AI source review",
+  "reviewer": "/root/artifact_audit_053",
+  "independence": "Reviewer did not implement the navigation or legacy-mode patch and made no production-source changes.",
+  "createdAtUtc": "2026-10-11T00:24:44.003851+00:00",
+  "head": "3c955f060d641e48c58f9828e4a58b084d6febe4",
+  "base": "69404b10e69f85fdd93031e2b1f8bbd4deb43b00",
+  "branch": "codex/survey-quality-navigation-053",
+  "assessment": "changes requested for reproduced P2; original navigation defect and retained history fix otherwise verified by source/tests",
+  "checks": [
+    {
+      "name": "exact reviewed HEAD",
+      "passed": true
+    },
+    {
+      "name": "workspace/project-scoped persistence unchanged",
+      "passed": true
+    },
+    {
+      "name": "legacy stage-only Survey inference persisted before route changes",
+      "passed": true
+    },
+    {
+      "name": "generic quality/overview/delivery preserve selected source",
+      "passed": true
+    },
+    {
+      "name": "explicit data/analysis and Survey tabs still select their respective modes",
+      "passed": true
+    },
+    {
+      "name": "exact dataset evidence selects monitoring only after current workspace/project/revision/hash validation",
+      "passed": true
+    },
+    {
+      "name": "evidence identity/focus source paths unchanged",
+      "passed": true
+    },
+    {
+      "name": "monitoring imports select monitoring and retain failed preflight records",
+      "passed": true
+    },
+    {
+      "name": "async import checks request scope before source state navigation",
+      "passed": true
+    },
+    {
+      "name": "setTab callback includes current sourceMode and stageScope",
+      "passed": true
+    },
+    {
+      "name": "request scope layout effects remain unchanged",
+      "passed": true
+    },
+    {
+      "name": "read tokens reject stale workspace/project/reconnect completions",
+      "passed": true
+    },
+    {
+      "name": "preview guards and admitted Survey inputs untouched",
+      "passed": true
+    },
+    {
+      "name": "PR70 resolved branch retained before severity/accepted fallback",
+      "passed": true
+    },
+    {
+      "name": "PR70 bilingual history labels retained byte-equal to base",
+      "passed": true
+    },
+    {
+      "name": "all six PR70 bilingual retained-history regression cases pass",
+      "passed": true
+    },
+    {
+      "name": "full DOM suite 88 passed zero failed",
+      "passed": true
+    },
+    {
+      "name": "typecheck exit zero",
+      "passed": true
+    },
+    {
+      "name": "focused eslint exit zero",
+      "passed": true
+    },
+    {
+      "name": "source-only diff check passes",
+      "passed": true
+    },
+    {
+      "name": "explicit dataset click from neutral quality after Survey activates monitoring",
+      "passed": false
+    }
+  ],
+  "counts": {
+    "checks": 21,
+    "pass": 20,
+    "fail": 1
+  },
+  "validation": {
+    "fullDom": {
+      "passed": 88,
+      "failed": 0,
+      "logSha256": "ad515bf88858890a385a734ee4de2e88c68b1e8c9314e483a9dcdfc536b4cc06"
+    },
+    "typecheck": "passed",
+    "focusedLint": "passed",
+    "sourceDiffCheck": "passed",
+    "entirePrDiffCheck": "Original AX evidence trailing whitespace reported; preserve these original bytes. This is not a production-code failure.",
+    "privateReproduction": {
+      "baseTestsPassed": 1,
+      "finalTestsFailed": 1,
+      "log": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/source-survey-quality-navigation-20261011/independent-review/explicit-selection-repro-adjudicated.log",
+      "logSha256": "c31dfe895201e8db6005ad787989bd7b2f279ab92ff33667241e7ec7098d6db3",
+      "harnessErrorsPreserved": [
+        "explicit-selection-repro.log",
+        "explicit-selection-repro-runtime.log",
+        "explicit-selection-repro-comparison.log"
+      ],
+      "adjudication": "Initial private-harness module/CSS/JSX configuration errors were repaired in private harness only; adjudicated run has no harness error."
+    }
+  },
+  "fileBindings": [
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "438f058c29125790726c75e8d8697c07e23b22c8b04819121bfed454a103bc9a",
+      "gitBlob": "2492a97a99226fc2689c14dccf3baeb2695188ec"
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "2de9df78aa40752b20daa044410ebff850fd9639872f8d908bb9df5745aca610",
+      "gitBlob": "15fbb07bcd8d5dbfd2f4d2de6c8c4be75c8ba2cc"
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/locales/en/common.json",
+      "sha256": "b335f58c39da0292c3453befc906af6de1d6b058a521a41cfaa23dacf3733b6b",
+      "gitBlob": "c710fd3750a77116020cf531abfb212f2962afb7"
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/locales/zh/common.json",
+      "sha256": "c638f9e9eb92553702d08bd927f993561af76566655acad18f1dfda2afd50085",
+      "gitBlob": "1d0de05b9fe306af6510192f02f20f256aa170e0"
+    }
+  ],
+  "limits": [
+    "Source and DOM verification does not constitute installed packaged UI acceptance.",
+    "Frozen installed package remains 0.5.3 at source 4517bc06082258ec1a657163f2cba7a20db288a6; no release action authorized by this review.",
+    "Simulated AI engineering review is not a professional signature, human approval or vendor interoperability certification."
+  ]
+}

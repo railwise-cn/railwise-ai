@@ -389,6 +389,24 @@ describe('Survey delivery without a monitoring dataset', () => {
     expect(request.mock.calls.filter(([, method]) => method === 'POST')).toHaveLength(1)
   })
 
+  it.each(['en', 'zh'].flatMap(locale => ['button', 'row'].map(target => [locale, target])))('selects an imported monitoring dataset from Survey quality via %s %s', async (locale, target) => {
+    await i18n.changeLanguage(locale)
+    datasets = [{ id: 'selected-data', sourceFileName: 'selected-monitor.csv', sourceFileHash: 'b'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 25, columnCount: 3, observationCount: 25, timeRange: {}, status: 'validated', revision: 4, findings: [{ id: 'exact-finding', code: 'missing', severity: 'blocking', status: 'open', message: 'Missing original point', suggestion: 'Check original point', row: 25 }], updatedAt: project.updatedAt }]
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringTabSource')).click())
+    await act(async () => button(i18n.t('engineeringTabQuality')).click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('survey.in2')
+    const details = [...container.querySelectorAll('details')].find(item => item.querySelector(':scope > summary')?.textContent === i18n.t('engineeringImportedFilesDetails'))!
+    await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')) })
+    request.mockClear()
+    await act(async () => target === 'button' ? button('selected-monitor.csv').click() : [...container.querySelectorAll<HTMLTableRowElement>('tr[data-evidence-key]')].find(row => row.getAttribute('data-evidence-key') === JSON.stringify(['dataset', 'selected-data']))!.click())
+    expect(container.querySelector('[data-testid="engineering-summary-strip"]')?.textContent).toContain('selected-monitor.csv')
+    expect(window.localStorage.getItem(`workwise.survey.source-kind.v1:${JSON.stringify(['/test', 'job'])}`)).toBe('monitoring')
+    expect([...container.querySelectorAll('tr[data-evidence-key]')].find(row => row.getAttribute('data-evidence-key') === JSON.stringify(['finding', 'exact-finding']))?.textContent).toContain('Missing original point')
+    expect(button(i18n.t('surveyStartCalculation')).disabled).toBe(true)
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it.each(['en', 'zh'])('preserves monitoring selection and explicitly locates a finding from Survey mode in %s', async locale => {
     await i18n.changeLanguage(locale)
     const sha = 'b'.repeat(64)

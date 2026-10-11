@@ -1,0 +1,31 @@
+{
+  "observedAt": "2026-10-11T00:28:05.945528+00:00",
+  "base": "69404b10e69f85fdd93031e2b1f8bbd4deb43b00",
+  "fix": "Explicit named dataset and row selections activate monitoring; neutral route changes preserve existing source. Bilingual four regressions plus final whole DOM92 pass.",
+  "verification": {
+    "typecheckExitCode": 0,
+    "focusedEslintExitCode": 0,
+    "fullDom": {
+      "passed": 92,
+      "failed": 0
+    }
+  },
+  "independentReview": {
+    "path": "docs/qa/release-gates/v0.5.3/diagnostic-38070443344/quality-source-navigation/independent-source-review-final.json",
+    "sha256": "6a242aaf673aab4d666fc1c798c5fd9ee2c89ca6b963bb3a32a5a43ffd3b8da8",
+    "checks": 31,
+    "remainingFindings": 0
+  },
+  "sourceFiles": [
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "809aa21cf0598e9ebf58ad4015b0b1e1f7e7679460c9cde76144525f668d3358"
+    },
+    {
+      "path": "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "94ef0fc997399d3e3b12b6744bee0fda639fc0ae350aa95e1cd47235ed9a9a51"
+    }
+  ],
+  "scope": "Source repair only; current installed package failures remain, fresh final freeze and package acceptance required",
+  "originalAxWhitespace": "Preserved byte-exact; source-only diff-check passes, raw AX whitespace is not edited."
+}
