@@ -1,0 +1,84 @@
+{
+  "reviewType": "AI independent initial review plus explicitly authorized legacy-edge implementation verification",
+  "recordedAt": "2026-10-11T00:18:33.158691+00:00",
+  "baseHead": "640e2ae2d97d0a151d0e076626086e561c48394d",
+  "sourceState": "uncommitted concrete source/test diff",
+  "diff": {
+    "path": "/private/tmp/railwise-053-tools/source-survey-quality-navigation-20261011/legacy-remediated-workingtree.patch",
+    "sha256": "489998c8ee552b55f8099b96c8d4e36990c16d0a5098ec5ab63889e69a1ea3f2",
+    "sizeBytes": 12581
+  },
+  "files": [
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "9736f8dc8dde7789d736506cd03cf95fb1dc71c27d4444d8cb4944a22c5a97d9",
+      "sizeBytes": 131488
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "c02364cf59d2d4c6ac580b45309141bf1f131d42520783d91e4bc64401eb2756",
+      "sizeBytes": 91192
+    }
+  ],
+  "initialIndependentReview": {
+    "path": "/private/tmp/railwise-053-tools/source-survey-quality-navigation-20261011/independent-review-initial-with-P2.json",
+    "sha256": "fb424e325c982d1d78c992391700dd8149b6cb0774a7916cc3d4b8fe9809abe2",
+    "finding": "P2 legacy stage-only source-mode context loss"
+  },
+  "findingDisposition": "Addressed in source: neutral navigation now persists the current effective survey/monitoring mode even when it came only from a saved stage; explicit source/data/analysis and dataset evidence/import still select their mode.",
+  "change": {
+    "line": "setTab mode fallback preserves effective sourceMode when survey or monitoring",
+    "dependency": "useCallback includes sourceMode and stageScope",
+    "tests": "Bilingual legacy saved precision with no source-kind key and unselected monitoring dataset; Quality→Overview→Deliver retains survey and exact preview payload excludes dataset/analysis."
+  },
+  "validation": {
+    "regressionBeforeFix": {
+      "exitCode": 1,
+      "failed": 2,
+      "skipped": 80,
+      "total": 82,
+      "session": 65654
+    },
+    "focusedAfterFix": {
+      "exitCode": 0,
+      "passed": 7,
+      "skipped": 75,
+      "total": 82,
+      "session": 67813
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "session": 70965
+    },
+    "focusedEslint": {
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    }
+  },
+  "originalValidationLogs": [
+    {
+      "path": "/private/tmp/railwise-053-tools/source-survey-quality-navigation-20261011/legacy-pre-fix-dom.log",
+      "sha256": "ac1362e3cdef9215b6bd7891ae690cfaf5471c136484f163a613203abf75d7a6",
+      "sizeBytes": 1798
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-survey-quality-navigation-20261011/legacy-fix-typecheck.log",
+      "sha256": "da8093127cb81db5b129cb7058eb2e318ceccfda4c688bd4f064a70b0891447e",
+      "sizeBytes": 103
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-survey-quality-navigation-20261011/legacy-fix-eslint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    }
+  ],
+  "independenceBoundary": "The initial finding was independently reviewed. The same reviewer then implemented the explicitly authorized P2 correction; this report is implementation verification for that correction and must not be treated as the required separate final independent source/package review.",
+  "limitations": [
+    "Current frozen installed package still has original E navigation defect and C resolved-label defect. No package update or retrospective acceptance.",
+    "Parent performs final commit/rebase onto merged PR70 and a separate agent reviews final source; no commit/push/rebase performed by this agent.",
+    "No CUA/profile/DB/API/recalc or runtime-data mutation during source repair.",
+    "No professional/vendor/regulatory/public release approval."
+  ]
+}

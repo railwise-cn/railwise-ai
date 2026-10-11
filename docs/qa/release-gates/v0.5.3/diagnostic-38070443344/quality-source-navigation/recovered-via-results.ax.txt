@@ -1,0 +1,139 @@
+Window: "RailWise AI", App: RailWise AI.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Applications/RailWise%20AI.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 开合三角标记 Tools
+									14 文本 Tools
+							15 按钮 New task
+						16 container
+							17 text Tasks 5
+							18 切换按钮 Description: Refresh Survey projects, Value: 0
+							19 按钮 source-fixed-two-height Control network · m · 10/11
+								20 文本 source-fixed-two-height
+								21 文本 Control network
+								22 文本  · 
+								23 文本 m
+								24 文本  · 
+								25 文本 10/11
+							26 按钮 synthetic-monitoring Deformation monitoring · mm · 10/11
+								27 文本 synthetic-monitoring
+								28 文本 Deformation monitoring
+								29 文本  · 
+								30 文本 mm
+								31 文本  · 
+								32 文本 10/11
+							33 按钮 synthetic-monitoring Deformation monitoring · mm · 10/11
+								34 文本 synthetic-monitoring
+								35 文本 Deformation monitoring
+								36 文本  · 
+								37 文本 mm
+								38 文本  · 
+								39 文本 10/11
+							40 按钮 leica-gsi-cumulative-leveling Control network · m · 10/11
+								41 文本 leica-gsi-cumulative-leveling
+								42 文本 Control network
+								43 文本  · 
+								44 文本 m
+								45 文本  · 
+								46 文本 10/11
+							47 按钮 golden-plane-control-e2e Control network · m · 10/11
+								48 文本 golden-plane-control-e2e
+								49 文本 Control network
+								50 文本  · 
+								51 文本 m
+								52 文本  · 
+								53 文本 10/11
+							54 按钮 Continue conversation
+						55 container
+							56 切换按钮 Connect phone, Value: 0
+							57 按钮 Settings
+					58 container
+						59 按钮 Collapse sidebar
+						60 标题 RailWise Survey, Value: 1
+							61 文本 RailWise Survey
+						62 text Engineering Survey Processing Current Survey job
+						63 弹出式按钮 Current Survey job, Value: golden-plane-control-e2e
+							64 (selected) golden-plane-control-e2e
+						65 按钮 New task
+						66 container Work view
+							67 按钮 Overview
+							68 按钮 Process
+							69 按钮 Results
+							70 按钮 Deliver
+						71 文本 Work view
+						72 按钮 Open AI
+						73 按钮 Advanced
+					74 container
+						75 text Current source golden-plane-control-e2e.in2 Current status Results ready · pending review Latest result Candidate deliverable
+						76 开合三角标记 More metrics
+							77 文本 More metrics
+					78 container
+						79 标题 Delivery, Value: 2
+							80 文本 Delivery
+						81 文本 Generate a review draft, then preview and export DOCX, PDF or XLSX. Professional review, approval and signing are still required.
+						82 按钮 Generate review draft
+						83 container Report and figure drafts
+							84 标题 Report and figure drafts, Value: 3
+								85 文本 Report and figure drafts
+							86 文本 Create a separate draft from the selected result. Edit review notes or a results figure, then check the source and confirm this export. The original result is preserved; draft confirmation does not constitute professional signoff.
+							87 container
+								88 文本 Select draft
+								89 弹出式按钮 Select draft, Value: Draft 1 · Revision 2 · Most recently generated review draft · One of 5 files: report.docx · Oct 11, 2026
+									90 (selected) Draft 1 · Revision 2 · Most recently generated review draft · One of 5 files: report.docx · Oct 11, 2026
+							91 container
+								92 text Most recently generated review draft  ·  One of 5 files: report.docx · Oct 11, 2026
+							93 按钮 Edit review notes
+							94 按钮 Edit results figure
+							95 按钮 Review and export
+							96 文本 Separate review draft · No professional signoff. Changes to notes or figures require a new confirmation.
+						97 文本 Review draft files
+						98 文本 Review draft created. Pending professional review.
+						99 text Review status :  Draft
+						100 文本 report.docx
+						101 container
+							102 text DOCX  ·  36.2 KB
+						103 按钮 Preview
+						104 按钮 Export DOCX
+						105 按钮 Ask Survey AI about report.docx
+						106 文本 report.pdf
+						107 container
+							108 text PDF  ·  60.1 KB
+						109 按钮 Preview
+						110 按钮 Export PDF
+						111 按钮 Ask Survey AI about report.pdf
+						112 文本 professional.xlsx
+						113 container
+							114 text XLSX  ·  46.6 KB
+						115 按钮 Preview
+						116 按钮 Export XLSX
+						117 按钮 Ask Survey AI about professional.xlsx
+						118 开合三角标记 Advanced: review records
+							119 文本 Advanced: review records
+						120 开合三角标记 Advanced details
+							121 文本 Advanced details
+						122 开合三角标记 Citations
+							123 文本 Citations
+						124 开合三角标记 Advanced: review, archive and provenance
+							125 文本 Advanced: review, archive and provenance
+	126 关闭按钮
+	127 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	128 最小化按钮
+129 menu bar
+	130 RailWise AI
+	131 File
+	132 Edit
+	133 View
+	134 Window
+	135 Help
+
+The focused UI element is 70 按钮 Deliver

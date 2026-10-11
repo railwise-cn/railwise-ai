@@ -1,0 +1,496 @@
+{
+  "reviewType": "Independent AI read-only navigation/context root-cause review",
+  "capturedAt": "2026-10-11T00:10:14.419979+00:00",
+  "packageVersion": "0.5.3",
+  "freezeRun": "38070443344",
+  "frozenSource": "4517bc06082258ec1a657163f2cba7a20db288a6",
+  "installedAsarSha256": "fcea9d600f9e19deeea2e7aa2baf2a12e5a1ef9ad60385f97d2d13e64a13d9bb",
+  "finding": {
+    "classification": "navigation/source-context presentation defect; not data loss",
+    "priority": "P2",
+    "trigger": "For an IN2-only control-network task with completed admitted result, select generic Advanced → Quality checks, then Deliver.",
+    "observedBefore": "Current source Not imported; draft and review-list generation disabled; input/result conditions not met while same three historical professional outputs remain visible.",
+    "observedRecovery": "One Results → Deliver navigation restores golden-plane-control-e2e.in2 source header and generation readiness without formal writes or recalculation (GUI owner reports).",
+    "rootCause": "setTab quality unconditionally persists sourceMode monitoring. activeSurveyNetwork becomes null; latestSurveyAdjustment and implicit selected survey adjustment disappear from delivery input selection. Deliver/review do not set a mode and preserve monitoring. Results for this control-network task selects precision, which sets survey mode and restores the current selected network/result.",
+    "sourceReferences": [
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 421,
+        "purpose": "quality tab switches monitoring mode"
+      },
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 678,
+        "purpose": "monitoring mode suppresses active survey network"
+      },
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 690,
+        "purpose": "latest adjustment depends on active network"
+      },
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 696,
+        "purpose": "delivery input selection uses admitted selected adjustment"
+      },
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 1159,
+        "purpose": "primary navigation maps Results to precision and Deliver to review"
+      },
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 1181,
+        "purpose": "source header depends only on active source"
+      },
+      {
+        "file": "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+        "line": 1324,
+        "purpose": "input/result checklist depends on currently selected delivery inputs"
+      }
+    ],
+    "suggestedResolution": "Keep a survey task source context when entering task-wide Quality checks, or explicitly route/label the quality screen as monitoring-only and avoid silently persisting an empty monitoring source selection into Deliver. Preserve strict admission gates and intentional explicit source-mode selection for mixed-input tasks."
+  },
+  "replayAffordanceClarification": "Monitoring recomputation is not caused by a source-mode fallback. EngineeringManifestVerification unconditionally mounts EngineeringMonitoringReplay for every manifest (line67); it remains visible both before and after recovery. No replay POST was performed by this reviewer and no monitoring replay pass is claimed.",
+  "recordFindings": "Exact project, network, stored result, admission, calculation evidence and manifest originals remain present and match previously captured bytes where available. Three professional output hashes and two internal evidence outputs remain unchanged.",
+  "checks": [
+    {
+      "name": "project unchanged exact bytes since independently reviewed IN2",
+      "actual": "476297d8f4bc4a8422c2403238c47a18d32a0c9a66c5eb1f3b3250acfefd758f",
+      "expected": "476297d8f4bc4a8422c2403238c47a18d32a0c9a66c5eb1f3b3250acfefd758f",
+      "passed": true
+    },
+    {
+      "name": "manifest unchanged exact bytes since independently reviewed IN2",
+      "actual": "6feb2cd080628a67f26c01d04c81b8a1f2dc9a74c2f617504300c4bb022b62fe",
+      "expected": "6feb2cd080628a67f26c01d04c81b8a1f2dc9a74c2f617504300c4bb022b62fe",
+      "passed": true
+    },
+    {
+      "name": "run-finalized unchanged exact bytes since independently reviewed IN2",
+      "actual": "61be3230cc84ee6df2f062b19e3be41ac27350eb04a574c55402fd58702474cc",
+      "expected": "61be3230cc84ee6df2f062b19e3be41ac27350eb04a574c55402fd58702474cc",
+      "passed": true
+    },
+    {
+      "name": "network unchanged exact bytes since independently reviewed IN2",
+      "actual": "53c56fe4f520d4cdd1a3cf7a3306fd486eafd41fa1fe22130cb16c7f2b8d63c4",
+      "expected": "53c56fe4f520d4cdd1a3cf7a3306fd486eafd41fa1fe22130cb16c7f2b8d63c4",
+      "passed": true
+    },
+    {
+      "name": "adjustment unchanged exact bytes since independently reviewed IN2",
+      "actual": "ce65ce6103ff14db1ba03508299c947a6e965e52baf0865d78491af95fbcc2dd",
+      "expected": "ce65ce6103ff14db1ba03508299c947a6e965e52baf0865d78491af95fbcc2dd",
+      "passed": true
+    },
+    {
+      "name": "source-admission unchanged exact bytes since independently reviewed IN2",
+      "actual": "b2f96ef128f4f076169e71a0578c404131ca41b6ab661d4dcdce34d3d720f665",
+      "expected": "b2f96ef128f4f076169e71a0578c404131ca41b6ab661d4dcdce34d3d720f665",
+      "passed": true
+    },
+    {
+      "name": "adjustment-evidence unchanged exact bytes since independently reviewed IN2",
+      "actual": "7ea1b2a734f0c1bf0287a289d557e4c346c5fd65b3e4e972e0d63c3e8f2a6d04",
+      "expected": "7ea1b2a734f0c1bf0287a289d557e4c346c5fd65b3e4e972e0d63c3e8f2a6d04",
+      "passed": true
+    },
+    {
+      "name": "project actual task remains control-network",
+      "actual": "control-network",
+      "expected": "control-network",
+      "passed": true
+    },
+    {
+      "name": "actual monitoring datasets absent by intended IN2-only input",
+      "actual": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "name": "actual IN2 network/adjustment counts",
+      "actual": [
+        1,
+        1
+      ],
+      "expected": [
+        1,
+        1
+      ],
+      "passed": true
+    },
+    {
+      "name": "actual IN2 network revision",
+      "actual": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "name": "actual adjustment complete",
+      "actual": "completed",
+      "expected": "completed",
+      "passed": true
+    },
+    {
+      "name": "actual stored adjustment validation",
+      "actual": "valid",
+      "expected": "valid",
+      "passed": true
+    },
+    {
+      "name": "exact result/network/run IDs",
+      "actual": [
+        "adjustment_result_291f18ea-be46-4a37-8693-2e1014105ed7",
+        "network_b22b0d66-4eed-4359-8977-7db8eacd5011",
+        "adjustment_dfdb23fb-c020-473f-a5b6-02de5938e2f3"
+      ],
+      "expected": [
+        "adjustment_result_291f18ea-be46-4a37-8693-2e1014105ed7",
+        "network_b22b0d66-4eed-4359-8977-7db8eacd5011",
+        "adjustment_dfdb23fb-c020-473f-a5b6-02de5938e2f3"
+      ],
+      "passed": true
+    },
+    {
+      "name": "source admission/evidence solver hash equal",
+      "actual": "975259b1b2db64824f0a20ba08b17ea242575784dc356036883d904f55fee9f6",
+      "expected": "975259b1b2db64824f0a20ba08b17ea242575784dc356036883d904f55fee9f6",
+      "passed": true
+    },
+    {
+      "name": "actual manifest still draft",
+      "actual": "draft",
+      "expected": "draft",
+      "passed": true
+    },
+    {
+      "name": "actual manifest raw outputs",
+      "actual": 5,
+      "expected": 5,
+      "passed": true
+    },
+    {
+      "name": "actual manifest professional outputs",
+      "actual": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "name": "actual engineering run count preserved",
+      "actual": 2,
+      "expected": 2,
+      "passed": true
+    },
+    {
+      "name": "actual immutable output report.docx hash",
+      "actual": "25ecfa7a9f0c505dd1130f3219c55e1cbf5936fb89ae0e6991bf886589c49a24",
+      "expected": "25ecfa7a9f0c505dd1130f3219c55e1cbf5936fb89ae0e6991bf886589c49a24",
+      "passed": true
+    },
+    {
+      "name": "actual immutable output report.pdf hash",
+      "actual": "d64054c5b0c55125ca86ebfacc0852f165c98d19965408df3f00696116fb55c3",
+      "expected": "d64054c5b0c55125ca86ebfacc0852f165c98d19965408df3f00696116fb55c3",
+      "passed": true
+    },
+    {
+      "name": "actual immutable output evidence.xlsx hash",
+      "actual": "f891e5f59acd3ae37ff58f4fae571be75f1116e73e6ee9a291164fbbe2b58283",
+      "expected": "f891e5f59acd3ae37ff58f4fae571be75f1116e73e6ee9a291164fbbe2b58283",
+      "passed": true
+    },
+    {
+      "name": "actual immutable output professional.xlsx hash",
+      "actual": "f18de7abccf582f33efbbedd619b18fcf4862aa4bfe893e60edac82372252d53",
+      "expected": "f18de7abccf582f33efbbedd619b18fcf4862aa4bfe893e60edac82372252d53",
+      "passed": true
+    },
+    {
+      "name": "actual immutable output professional-review.json hash",
+      "actual": "ca4064beccf332a5ae39110c5448c36c76d4438f0d0b49be41469a97e1b3b95c",
+      "expected": "ca4064beccf332a5ae39110c5448c36c76d4438f0d0b49be41469a97e1b3b95c",
+      "passed": true
+    },
+    {
+      "name": "installed compiled chunk integrity",
+      "actual": "b9885ad21210a111f940c374fd039ef21769db8e0968fd30db8328bacae17d29",
+      "expected": "b9885ad21210a111f940c374fd039ef21769db8e0968fd30db8328bacae17d29",
+      "passed": true
+    },
+    {
+      "name": "compiled quality route forces monitoring",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "compiled active survey hidden under monitoring",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "compiled latest adjustment follows active network",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "compiled source header displays current mode only",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "compiled old manifest outputs remain selectable",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "actual quality-to-delivery header no source",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "actual quality-to-delivery draft button disabled",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "actual recovered header retains exact IN2 filename",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "actual recovered draft generation enabled",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "actual old professional outputs remain before recovery",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "actual monitoring replay affordance independent of source mode",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    }
+  ],
+  "checkCount": 36,
+  "failureCount": 0,
+  "originalByteInventory": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/project.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/engineering.sqlite3::engineering_projects[project_a28d35a4-d6ec-420d-96b5-a07f8430b5a2].data_json TEXT UTF-8",
+      "sizeBytes": 393,
+      "sha256": "476297d8f4bc4a8422c2403238c47a18d32a0c9a66c5eb1f3b3250acfefd758f"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/project.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/engineering.sqlite3 derived metadata",
+      "sizeBytes": 119,
+      "sha256": "a6d271051728bd562e07cf1657c3404f7cb53ac60277bb3920deeb6a93c34125"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/manifest.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/engineering.sqlite3::engineering_manifests[manifest_e97898d9-cbde-481c-b667-704b99619c90].data_json TEXT UTF-8",
+      "sizeBytes": 20961,
+      "sha256": "6feb2cd080628a67f26c01d04c81b8a1f2dc9a74c2f617504300c4bb022b62fe"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/manifest.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/engineering.sqlite3 derived metadata",
+      "sizeBytes": 167,
+      "sha256": "20f36f7f9c1b9dd93b14e64a45d6324896c5d9e2baf28cf5570f7ed7edd349c8"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/run-finalized.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/engineering.sqlite3::engineering_runs[run_1c03ee95-0ac8-428b-86b1-ebbbe3482c6a].data_json TEXT UTF-8",
+      "sizeBytes": 423,
+      "sha256": "61be3230cc84ee6df2f062b19e3be41ac27350eb04a574c55402fd58702474cc"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/run-finalized.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/engineering.sqlite3 derived metadata",
+      "sizeBytes": 162,
+      "sha256": "6bdef3e8d65b8cd45ebc87f24af58716ae01605c8414261e30feab8760525c98"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/network.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3::survey_networks[network_b22b0d66-4eed-4359-8977-7db8eacd5011].data_json TEXT UTF-8",
+      "sizeBytes": 19387,
+      "sha256": "53c56fe4f520d4cdd1a3cf7a3306fd486eafd41fa1fe22130cb16c7f2b8d63c4"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/network.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3 derived metadata",
+      "sizeBytes": 183,
+      "sha256": "2f74dad30069e8412860dd237633a41331af9f05cde2687a6ee480aefae026ea"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/adjustment.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3::survey_adjustments[adjustment_dfdb23fb-c020-473f-a5b6-02de5938e2f3].data_json TEXT UTF-8",
+      "sizeBytes": 7450,
+      "sha256": "ce65ce6103ff14db1ba03508299c947a6e965e52baf0865d78491af95fbcc2dd"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/adjustment.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3 derived metadata",
+      "sizeBytes": 233,
+      "sha256": "78cd253868308d05f907ddf4a8dcc669998111ab2557015c5c27edbb37710bb9"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/source-admission.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3::survey_source_admissions[network_b22b0d66-4eed-4359-8977-7db8eacd5011].data_json TEXT UTF-8",
+      "sizeBytes": 506,
+      "sha256": "b2f96ef128f4f076169e71a0578c404131ca41b6ab661d4dcdce34d3d720f665"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/source-admission.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3 derived metadata",
+      "sizeBytes": 443,
+      "sha256": "9415e243f9fd593baa0eb2a4175cb3b42f7d162d584b3b2f892e4f3b0ef73b65"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/adjustment-evidence.data-json.original.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3::survey_adjustment_evidence[adjustment_dfdb23fb-c020-473f-a5b6-02de5938e2f3].data_json TEXT UTF-8",
+      "sizeBytes": 653,
+      "sha256": "7ea1b2a734f0c1bf0287a289d557e4c346c5fd65b3e4e972e0d63c3e8f2a6d04"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/adjustment-evidence.row-metadata.json",
+      "source": "/Users/wangjiawei/.workwise/runtime/engineering/survey.sqlite3 derived metadata",
+      "sizeBytes": 599,
+      "sha256": "889294a1c9e993f91f081d4608f47f1c371822ef7e49a6e8c5d84e5a4b8a57f5"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/EngineeringWorkspaceView.tsx.frozen.original",
+      "source": "4517bc06082258ec1a657163f2cba7a20db288a6:src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sizeBytes": 131143,
+      "sha256": "0469869148be515309b31c80e052ef092db56f7502756c3f05f7ef1b097b7b85"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/EngineeringManifestVerification.tsx.frozen.original",
+      "source": "4517bc06082258ec1a657163f2cba7a20db288a6:src/renderer/src/components/engineering/EngineeringManifestVerification.tsx",
+      "sizeBytes": 4889,
+      "sha256": "ae913ec0c983070203bbe3762929ae4f08cf5690441ceb070b6b8da21d71e0b8"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/EngineeringMonitoringReplay.tsx.frozen.original",
+      "source": "4517bc06082258ec1a657163f2cba7a20db288a6:src/renderer/src/components/engineering/EngineeringMonitoringReplay.tsx",
+      "sizeBytes": 4754,
+      "sha256": "564b0ce980a6f2a0fde69b4e8484b707bfdb44bff210f8b34ebf9455b937eede"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/survey-service.ts.frozen.original",
+      "source": "4517bc06082258ec1a657163f2cba7a20db288a6:kun/src/engineering/survey-service.ts",
+      "sizeBytes": 298273,
+      "sha256": "769db408aedca0677c14b2f06c73e79df9ebe9187df3fbd91e9d61fbae5a7ddb"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/EngineeringWorkspaceView-BGSqcN-k.installed.original.js",
+      "source": "/Applications/RailWise AI.app/Contents/Resources/app.asar::out/renderer/assets/EngineeringWorkspaceView-BGSqcN-k.js",
+      "sizeBytes": 1188582,
+      "sha256": "b9885ad21210a111f940c374fd039ef21769db8e0968fd30db8328bacae17d29"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/AX-IN2-reselected.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/IN2-reselected.ax.txt",
+      "sizeBytes": 16220,
+      "sha256": "a3e2198ccc4917fb142688898c1b013c201a2e10cf352e9bc54cab36ee74386d"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/AX-quality-advanced-opened.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/quality-advanced-opened.ax.txt",
+      "sizeBytes": 1068,
+      "sha256": "f7f5513e66ca2fc6e6c443219ee40b597a9d9ad63c9f36d0b5ff062ed043dfc8"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/AX-quality-checks-opened.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/quality-checks-opened.ax.txt",
+      "sizeBytes": 4322,
+      "sha256": "a0f39ab0cf120616a06e1dff148b4949a48b16cf20c20d10980f09d288514c3c"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/AX-quality-details-expanded.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/quality-details-expanded.ax.txt",
+      "sizeBytes": 5325,
+      "sha256": "4a1423694d56288c78c4c5cc93a4a57627f7b1c5b271e8fbfd727a3b5f2538b2"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-advanced-after-source-recovered.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/advanced-after-source-recovered.ax.txt",
+      "sizeBytes": 10382,
+      "sha256": "807ec60905a031963591b4345c99ba431e910e3e382a0b6e5541fb5133d5a70e"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-advanced-after-source-recovered.jpg",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/advanced-after-source-recovered.jpg",
+      "sizeBytes": 251684,
+      "sha256": "ad8443856c4c3d2f0a4c56cb8a2f7970208b33bf83f52a75f39e4dbdbe45fe65"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-advanced-expanded.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/advanced-expanded.ax.txt",
+      "sizeBytes": 9738,
+      "sha256": "4b803aa911406f601609adf2a2ed543cb505e061245b9d4b37569044a3a7393d"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-advanced-expanded.jpg",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/advanced-expanded.jpg",
+      "sizeBytes": 353994,
+      "sha256": "253a3571d65fa433d22ca934108d84f781d1c5a9664d182d2cbfb2bda17ae4b2"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-deliver-after-results.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/deliver-after-results.ax.txt",
+      "sizeBytes": 5536,
+      "sha256": "0c738bfc7a528be284e3d4082c67f5a64db778482f40a022fec677ed635b355d"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-deliver-after-results.jpg",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/deliver-after-results.jpg",
+      "sizeBytes": 358434,
+      "sha256": "aaf82c544fe5bf34c4767d977c89c13d6835d37e1be9ade099d46fcb6975296a"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-deliver-opened.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/deliver-opened.ax.txt",
+      "sizeBytes": 4800,
+      "sha256": "44537c5440991c35fe6351d003be077436fba8d57aeaeb891c4e928e19c19f58"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-deliver-opened.jpg",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/deliver-opened.jpg",
+      "sizeBytes": 347275,
+      "sha256": "e42cb656471728bf6d67958549e1ac3be1f2a418cb37d6d6590120f4eb99c6d1"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-results-navigation.ax.txt",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/results-navigation.ax.txt",
+      "sizeBytes": 16220,
+      "sha256": "ed4a7354d43ad93885037fd9b20bf6a7f8d97b5eaccef32b1dd415ea90257f60"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-E-navigation-triage/raw/GUI-results-navigation.jpg",
+      "source": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/cua-evidence/E/review-workflow/results-navigation.jpg",
+      "sizeBytes": 313577,
+      "sha256": "bf57c4e931115359e481f27f10bf21bddd4bc9437d1983e61a09512ba1e2211d"
+    }
+  ],
+  "boundaries": [
+    "No source/profile/index changes, DB writes, API calls, recalc, GUI control or repeated before/after runtime polling.",
+    "sourceEligibility is an ephemeral runtime read-model field, not stored in adjustment TEXT; persisted admission/calculation evidence and GUI restored readiness are recorded separately. No fresh runtime re-admission was invoked.",
+    "GUI sourceMode localStorage value was not read directly; its transition is inferred from exact installed compiled code plus actual route/recovery evidence.",
+    "No data-loss, numerical-regression or whole-case/package/release pass inferred. This is AI review, not professional signoff or public-release approval."
+  ]
+}

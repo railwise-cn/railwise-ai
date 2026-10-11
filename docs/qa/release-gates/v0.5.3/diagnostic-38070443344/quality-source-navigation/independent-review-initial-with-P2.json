@@ -1,0 +1,133 @@
+{
+  "reviewType": "Separate senior-engineer-mode AI source review",
+  "recordedAt": "2026-10-11T00:15:23.158077+00:00",
+  "baseHead": "640e2ae2d97d0a151d0e076626086e561c48394d",
+  "workingTreeStatus": " M src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts\n M src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx\n?? docs/qa/release-gates/v0.5.3/diagnostic-38070443344/quality-source-navigation/\n",
+  "scope": "Uncommitted concrete navigation patch review; exact working-tree diff bound; no implementation edits",
+  "reviewedDiff": {
+    "path": "/private/tmp/railwise-053-tools/source-survey-quality-navigation-20261011/independent-reviewed-workingtree.patch",
+    "sha256": "bd3f2807aae868038471a69ff77ee59dda29725dd751a952bbb9077ede1f66d8",
+    "sizeBytes": 9773
+  },
+  "findings": [
+    {
+      "id": "P2-legacy-stage-only-source-mode",
+      "severity": "P2",
+      "title": "Generic Quality loses inferred survey context when source-kind storage is absent",
+      "evidence": {
+        "savedTab": "precision",
+        "savedSourceMode": null,
+        "initialEffectiveSourceMode": "survey",
+        "genericQualityExplicitMode": null,
+        "postQualityEffectiveSourceMode": "auto",
+        "risk": "mixed task can activate first monitoring dataset after generic Quality navigation despite prior survey context"
+      },
+      "impact": "A legacy/remounted mixed task with saved precision stage but no source-kind key can switch from survey to auto when Quality is opened; activeDataset then becomes first monitoring dataset and delivery readiness/input payload may change.",
+      "recommendation": "Have generic Quality preserve the effective source mode (including inferred survey), or initialize/persist source-kind before the stage change; add a stage-only mixed-task regression test."
+    }
+  ],
+  "conclusion": "Patch correctly makes generic Quality mode-neutral for persisted monitoring/survey modes and explicitly selects monitoring for dataset evidence/import. One legacy storage edge remains as above; focused tests pass but do not cover it.",
+  "checks": [
+    {
+      "name": "working tree has concrete source changes",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "tracked source diff scope",
+      "actual": [
+        "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+        "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx"
+      ],
+      "expected": [
+        "src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+        "src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx"
+      ],
+      "passed": true
+    },
+    {
+      "name": "source contract selectedSourceMode?:",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "source contract ['data', 'analysis'].includes(next)",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "source contract setTab(target.findingId ? 'quality' : 'data', 'monitoring')",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "source contract setTab('quality', 'monitoring')",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "quality old automatic monitoring removed",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "explicit source mode typed union",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "test preserves the selected Survey source and delivery inputs across generic quality navigation",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "test preserves monitoring selection and explicitly locates a finding from Survey mode",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "test activates monitoring preflight when a CSV is explicitly imported from Survey mode",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "focused tests exit/results",
+      "actual": {
+        "exitCode": 0,
+        "passed": 5,
+        "skipped": 75,
+        "total": 80
+      },
+      "expected": {
+        "exitCode": 0,
+        "passed": 5,
+        "skipped": 75,
+        "total": 80
+      },
+      "passed": true
+    },
+    {
+      "name": "legacy stage-only source-mode gap is reproducible",
+      "actual": "auto",
+      "expected": "auto",
+      "passed": true
+    }
+  ],
+  "checkCount": 13,
+  "failureCount": 0,
+  "limitations": [
+    "Review is source-only and patch remains uninstalled; no package/CUA/release claim.",
+    "No runtime/API/DB writes or product solver runs.",
+    "AI review is not professional, vendor, regulatory or release approval."
+  ]
+}

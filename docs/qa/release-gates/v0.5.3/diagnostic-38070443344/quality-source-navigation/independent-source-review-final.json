@@ -1,0 +1,213 @@
+{
+  "findings": [],
+  "errors": [],
+  "reviewLabel": "Independent senior-engineer-mode AI source review",
+  "reviewer": "/root/artifact_audit_053",
+  "independence": "Reviewer did not implement the navigation or legacy-mode patch and made no production-source changes.",
+  "createdAtUtc": "2026-10-11T00:27:33.014945+00:00",
+  "head": "3c955f060d641e48c58f9828e4a58b084d6febe4",
+  "base": "69404b10e69f85fdd93031e2b1f8bbd4deb43b00",
+  "branch": "codex/survey-quality-navigation-053",
+  "assessment": "No remaining actionable source findings after independent review and reproduced explicit-selection repair.",
+  "checks": [
+    {
+      "name": "exact reviewed HEAD",
+      "passed": true
+    },
+    {
+      "name": "workspace/project-scoped persistence unchanged",
+      "passed": true
+    },
+    {
+      "name": "legacy stage-only Survey inference persisted before route changes",
+      "passed": true
+    },
+    {
+      "name": "generic quality/overview/delivery preserve selected source",
+      "passed": true
+    },
+    {
+      "name": "explicit data/analysis and Survey tabs still select their respective modes",
+      "passed": true
+    },
+    {
+      "name": "exact dataset evidence selects monitoring only after current workspace/project/revision/hash validation",
+      "passed": true
+    },
+    {
+      "name": "evidence identity/focus source paths unchanged",
+      "passed": true
+    },
+    {
+      "name": "monitoring imports select monitoring and retain failed preflight records",
+      "passed": true
+    },
+    {
+      "name": "async import checks request scope before source state navigation",
+      "passed": true
+    },
+    {
+      "name": "setTab callback includes current sourceMode and stageScope",
+      "passed": true
+    },
+    {
+      "name": "request scope layout effects remain unchanged",
+      "passed": true
+    },
+    {
+      "name": "read tokens reject stale workspace/project/reconnect completions",
+      "passed": true
+    },
+    {
+      "name": "preview guards and admitted Survey inputs untouched",
+      "passed": true
+    },
+    {
+      "name": "PR70 resolved branch retained before severity/accepted fallback",
+      "passed": true
+    },
+    {
+      "name": "PR70 bilingual history labels retained byte-equal to base",
+      "passed": true
+    },
+    {
+      "name": "all six PR70 bilingual retained-history regression cases pass",
+      "passed": true
+    },
+    {
+      "name": "full DOM suite 88 passed zero failed",
+      "passed": true
+    },
+    {
+      "name": "typecheck exit zero",
+      "passed": true
+    },
+    {
+      "name": "focused eslint exit zero",
+      "passed": true
+    },
+    {
+      "name": "source-only diff check passes",
+      "passed": true
+    },
+    {
+      "name": "explicit dataset click from neutral quality after Survey activates monitoring",
+      "passed": true
+    },
+    {
+      "name": "selection helper has stageScope dependency",
+      "passed": true
+    },
+    {
+      "name": "named button and row both use explicit monitoring selection",
+      "passed": true
+    },
+    {
+      "name": "selection helper retains current tab",
+      "passed": true
+    },
+    {
+      "name": "selection helper performs no Runtime request",
+      "passed": true
+    },
+    {
+      "name": "bilingual named-button and row path regressions pass",
+      "passed": true
+    },
+    {
+      "name": "private independent reproduction passes after repair",
+      "passed": true
+    },
+    {
+      "name": "full final DOM suite 92 passes",
+      "passed": true
+    },
+    {
+      "name": "final focused lint passes",
+      "passed": true
+    },
+    {
+      "name": "final typecheck passes",
+      "passed": true
+    },
+    {
+      "name": "working source diff-check passes",
+      "passed": true
+    }
+  ],
+  "counts": {
+    "checks": 31,
+    "pass": 31,
+    "fail": 0
+  },
+  "validation": {
+    "fullDom": {
+      "passed": 92,
+      "failed": 0,
+      "logSha256": "6d9623e36728eb17ae4ac30ada2cf31feb5b78f5ed452fa14217dc6f88ef63f1"
+    },
+    "typecheck": {
+      "passed": true,
+      "logSha256": "da8093127cb81db5b129cb7058eb2e318ceccfda4c688bd4f064a70b0891447e"
+    },
+    "focusedLint": {
+      "passed": true,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "sourceDiffCheck": "passed",
+    "entirePrDiffCheck": "Original AX evidence whitespace retained; source-only check used for code quality.",
+    "privateReproduction": {
+      "testsPassed": 2,
+      "testsFailed": 0,
+      "log": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/source-survey-quality-navigation-20261011/independent-review/explicit-selection-fixed.log",
+      "logSha256": "e2ee623e3104c5ed993e4e2d5872cbd65df1a9d4cecd75a94329ab11d7656990",
+      "originalFailurePreserved": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/source-survey-quality-navigation-20261011/independent-review/explicit-selection-repro-adjudicated.log"
+    }
+  },
+  "fileBindings": [
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.tsx",
+      "sha256": "809aa21cf0598e9ebf58ad4015b0b1e1f7e7679460c9cde76144525f668d3358",
+      "gitBlob": "cf3411f7faabdf2e8230f1b76a6691cd6cf22587",
+      "binding": "working-tree bytes reviewed"
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/components/engineering/EngineeringWorkspaceView.dom.test.ts",
+      "sha256": "94ef0fc997399d3e3b12b6744bee0fda639fc0ae350aa95e1cd47235ed9a9a51",
+      "gitBlob": "e75b967db34695ed02d417ed0e95f9827c895848",
+      "binding": "working-tree bytes reviewed"
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/locales/en/common.json",
+      "sha256": "b335f58c39da0292c3453befc906af6de1d6b058a521a41cfaa23dacf3733b6b",
+      "gitBlob": "c710fd3750a77116020cf531abfb212f2962afb7",
+      "binding": "working-tree bytes reviewed"
+    },
+    {
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/src/renderer/src/locales/zh/common.json",
+      "sha256": "c638f9e9eb92553702d08bd927f993561af76566655acad18f1dfda2afd50085",
+      "gitBlob": "1d0de05b9fe306af6510192f02f20f256aa170e0",
+      "binding": "working-tree bytes reviewed"
+    }
+  ],
+  "limits": [
+    "Source and DOM verification does not constitute installed packaged UI acceptance.",
+    "Frozen installed package remains 0.5.3 at source 4517bc06082258ec1a657163f2cba7a20db288a6; no release action authorized by this review.",
+    "Simulated AI engineering review is not a professional signature, human approval or vendor interoperability certification."
+  ],
+  "reviewedState": "HEAD 3c955f060d641e48c58f9828e4a58b084d6febe4 plus the exact working-tree patch bound below; later docs-only commits require source-hash equality.",
+  "resolvedFindings": [
+    {
+      "priority": "P2",
+      "title": "Explicit monitoring dataset selection from neutral Quality",
+      "initialReport": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/source-survey-quality-navigation-20261011/independent-review/independent-source-review-initial-P2.json",
+      "initialSha256": "f57102873fec0bfd53feeee898c8cb459fb2819d89ffaee647c2d2c7c53262f5",
+      "remediation": "Dedicated selectMonitoringDataset sets dataset id, current project/workspace source mode and persistent source-kind key. Both named button and row use it. Current route and evidence records remain unchanged.",
+      "validation": "Full suite 92 pass; reviewer private baseline and patched comparison 2 pass; four new bilingual row/button regressions pass."
+    }
+  ],
+  "workingPatch": {
+    "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/source-survey-quality-navigation-20261011/independent-review/reviewed-selection-fix.patch",
+    "sha256": "264370c40776fa525ff31f91293d676948a14ca30e4de7bb7c85ec587da78636"
+  }
+}
