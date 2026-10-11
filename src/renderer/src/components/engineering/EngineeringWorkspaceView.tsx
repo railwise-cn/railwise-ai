@@ -415,17 +415,19 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
   const [sourceModes, setSourceModes] = useState<Record<string, 'monitoring' | 'survey'>>({})
   const savedSourceMode = readBrowserStorageItem(`workwise.survey.source-kind.v1:${stageScope}`)
   const sourceMode = sourceModes[stageScope] ?? (savedSourceMode === 'survey' || savedSourceMode === 'monitoring' ? savedSourceMode : ['source', 'survey', 'precision'].includes(tab) ? 'survey' : 'auto')
-  const setTab = useCallback((next: TabId): void => {
+  const setTab = useCallback((next: TabId, selectedSourceMode?: 'monitoring' | 'survey'): void => {
     setNotice((current) => current && (current.tone === 'success' || current.tone === 'info') ? null : current)
     if (!ADVANCED_TABS.includes(next)) { setBackgroundTab(next); setAdvancedOpen(false) }
-    const mode = ['source', 'survey', 'precision'].includes(next) ? 'survey' : ['data', 'quality', 'analysis'].includes(next) ? 'monitoring' : null
+    // Generic quality navigation inspects the current task without selecting
+    // another source. Imports and exact dataset evidence select monitoring explicitly.
+    const mode = selectedSourceMode ?? (['source', 'survey', 'precision'].includes(next) ? 'survey' : ['data', 'analysis'].includes(next) ? 'monitoring' : null) ?? (sourceMode === 'survey' || sourceMode === 'monitoring' ? sourceMode : null)
     if (mode) {
       setSourceModes(current => ({ ...current, [stageScope]: mode }))
       writeBrowserStorageItem(`workwise.survey.source-kind.v1:${stageScope}`, mode)
     }
     setTabsByScope((current) => ({ ...current, [stageScope]: next }))
     writeBrowserStorageItem(`workwise.survey.stage.v1:${stageScope}`, next)
-  }, [stageScope])
+  }, [sourceMode, stageScope])
   const [pendingSurveyFiles, setPendingSurveyFiles] = useState<Record<string, File[]>>({})
   const surveyFileScope = JSON.stringify([workspaceRoot, selectedProjectId])
   const [projectDraft, setProjectDraft] = useState<ProjectDraft | null>(null)
@@ -458,7 +460,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
     setAiOpen(false)
     setEvidenceNavigation({ ...target })
     if (target.kind === 'survey') setTab(target.section === 'result' ? 'precision' : 'source')
-    else if (target.kind === 'dataset') { setSelectedDatasetId(target.datasetId); setTab(target.findingId ? 'quality' : 'data') }
+    else if (target.kind === 'dataset') { setSelectedDatasetId(target.datasetId); setTab(target.findingId ? 'quality' : 'data', 'monitoring') }
     else if (target.kind === 'analysis') { setSelectedDatasetId(target.datasetId); setSelectedAnalysisId(target.analysisId); setTab('analysis') }
     else setTab('review')
   }
@@ -836,7 +838,7 @@ export function EngineeringWorkspaceView({ workspaceRoot, runtimeReady, leftSide
       if (operationScope !== requestScope.current) return false
       setSelectedDatasetId(result.dataset.id)
       // Preserve the imported record even when preflight fails; retry is safe.
-      setTab('quality')
+      setTab('quality', 'monitoring')
       const refreshed = await loadOverview(overview.project.id)
       if (operationScope !== requestScope.current) return false
       // An idempotent import may return its original revision even after
