@@ -1,0 +1,111 @@
+{
+  "reviewLabel": "AI pure advertised-tool schema addendum",
+  "installedBytesEqualFrozen": true,
+  "sourceBytesEqualFreezeCommit": true,
+  "installedSha256": "c5238f0da4de979cf2461fc00b1610bedfd105f0ed1d3f48b8893ed1a2222605",
+  "sourceSha256": "36c0330e194b2617dff89046c14ebb4789d7bff5736321b75716a7644209ba18",
+  "branchCount": 16,
+  "checks": [
+    {
+      "tool": "survey_network_reimport",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: projectId, expectedRevision, sourceNetworkId, sourceNetworkRevision, sourceSha256, networkType, verticalDatum, knownPointId, knownPointHeight."
+    },
+    {
+      "tool": "survey_network_validate",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision."
+    },
+    {
+      "tool": "survey_adjustment_read",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId."
+    },
+    {
+      "tool": "survey_calculator",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision. Supported network types only: leveling, height-control. Select the matching tool; method is a solver method, not a network type."
+    },
+    {
+      "tool": "control_network",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision. Supported network types only: traverse, plane-control, triangulation, gnss. Select the matching tool; method is a solver method, not a network type."
+    },
+    {
+      "tool": "cpiii_adjustment",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision. Supported network types only: cpiii-free-station, cpiii-resection. Select the matching tool; method is a solver method, not a network type."
+    },
+    {
+      "tool": "coord_transform",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision. Supported network types only: coordinate-transform. Select the matching tool; method is a solver method, not a network type."
+    },
+    {
+      "tool": "distance_calculator",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision."
+    },
+    {
+      "tool": "angle_convert",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: networkId, expectedRevision."
+    },
+    {
+      "tool": "monitoring_data_first_check",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: datasetId, expectedRevision."
+    },
+    {
+      "tool": "deformation_rate",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: projectId, datasetId, expectedRevision."
+    },
+    {
+      "tool": "chart_generator",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: analysisId."
+    },
+    {
+      "tool": "report_export",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: projectId, expectedRevision. Also select datasetId or nonempty adjustmentIds. expectedRevision is the project revision for survey-only exports, or the dataset revision for monitoring exports. One call generates DOCX, PDF and XLSX; no per-format or manifest operation."
+    },
+    {
+      "tool": "excel_export",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: projectId, expectedRevision. Also select datasetId or nonempty adjustmentIds. expectedRevision is the project revision for survey-only exports, or the dataset revision for monitoring exports. One call generates DOCX, PDF and XLSX; no per-format or manifest operation."
+    },
+    {
+      "tool": "standard_query",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: source."
+    },
+    {
+      "tool": "tool_norm_cite",
+      "parametersOptionalInAdvertisedSchema": true,
+      "bindingsOptionalInAdvertisedSchema": true,
+      "parametersDescription": "Required after resolving predecessor bindings: source."
+    }
+  ],
+  "bindingOnlyStepsAllowedByAdvertisedSchema": true,
+  "description": "Propose a typed Survey execution plan ONLY for requested computation, analysis or deliverables. Use the per-tool parameter fields below, with exact IDs and revisions from survey_read_context. For existing height data needing a declared starting point/datum, survey_network_reimport creates a new source-bound network after approval; use only user-declared knownPointId/knownPointHeight/verticalDatum and bind successor networkId/expectedRevision to its network.id/network.revision. Required values can be literals or bindings. Steps get IDs step-1, step-2, etc.; bind expectedRevision to validation network.revision, or adjustmentIds to calculation run.id with asArray:true. report_export or excel_export produces all three draft files (DOCX, PDF, XLSX) in one step; neither accepts format or draft. The manifest is created separately in the human Review UI, not by an export step. Include only requested operations in dependency order. Runtime fixes risk, outputs and reversibility. If parameterIssues are returned, correct them and request a new draft in this turn; the previous draft remains blocked. No work executes until UI approval. Never request or return approval tokens.",
+  "businessExecuteInvoked": false,
+  "getOrchestratorInvoked": false,
+  "releaseReady": false
+}

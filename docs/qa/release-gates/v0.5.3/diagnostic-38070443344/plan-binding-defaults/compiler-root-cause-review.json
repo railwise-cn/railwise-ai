@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "reviewLabel": "Independent AI pure in-memory compiler root-cause reproduction",
+  "observedAt": "2026-10-10T23:40:33.174Z",
+  "status": "confirmed-compiler-binding-default-collision",
+  "freezeRunId": 38070443344,
+  "packageVersion": "0.5.3",
+  "sourceHead": "4517bc06082258ec1a657163f2cba7a20db288a6",
+  "installedModule": "/Applications/RailWise AI.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/engineering-plan-execution.js",
+  "frozenModule": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/package-readback/arm64/RailWise AI.app/Contents/Resources/app.asar.unpacked/kun/dist/engineering/engineering-plan-execution.js",
+  "installedModuleSha256": "1a60fe9df78054fea1ae58c39e7a99ceedb1dc78070faa18122ac2f1b572d26a",
+  "installedModuleBytes": 15749,
+  "sourceModuleSha256": "16c6ebd3d41af6948497565b1e5e3be490cec09d70f3982d7ec6200c20c3f55a",
+  "originals": [
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-D1-readback/compiler-root-cause/installed-engineering-plan-execution.original.js",
+      "bytes": 15749,
+      "sha256": "1a60fe9df78054fea1ae58c39e7a99ceedb1dc78070faa18122ac2f1b572d26a",
+      "scope": "Exact installed module bytes"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-D1-readback/compiler-root-cause/frozen-engineering-plan-execution.original.js",
+      "bytes": 15749,
+      "sha256": "1a60fe9df78054fea1ae58c39e7a99ceedb1dc78070faa18122ac2f1b572d26a",
+      "scope": "Exact frozen artifact extracted module bytes"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-D1-readback/compiler-root-cause/current-engineering-plan-execution.original.ts",
+      "bytes": 15772,
+      "sha256": "16c6ebd3d41af6948497565b1e5e3be490cec09d70f3982d7ec6200c20c3f55a",
+      "scope": "Exact current clean checkout source bytes"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-D1-readback/compiler-root-cause/freeze-commit-engineering-plan-execution.original.ts",
+      "bytes": 15772,
+      "sha256": "16c6ebd3d41af6948497565b1e5e3be490cec09d70f3982d7ec6200c20c3f55a",
+      "scope": "Exact frozen source Git object bytes"
+    }
+  ],
+  "checks": [
+    {
+      "name": "installed module exact frozen package module",
+      "passed": true
+    },
+    {
+      "name": "current source exact frozen source Git object",
+      "passed": true
+    },
+    {
+      "name": "canonical explicit empty parameters compiles without issues",
+      "passed": true
+    },
+    {
+      "name": "canonical omitted parameters reproduces actual five diagnostics",
+      "passed": true
+    },
+    {
+      "name": "canonical omitted parameters reproduces actual first normalized parameter/binding chain",
+      "passed": true
+    },
+    {
+      "name": "compiler adds conflicting old network literals despite explicit bindings",
+      "passed": true
+    },
+    {
+      "name": "compiler adds duplicate revision binding despite explicit revision binding",
+      "passed": true
+    }
+  ],
+  "checkCount": 7,
+  "failureCount": 0,
+  "actualPlanIds": [
+    "eplan_0539cefb-61e4-44cb-98dd-7faeaa952745",
+    "eplan_08620b9d-81b9-404e-aabb-b43106a0d922"
+  ],
+  "actualFirstPlanId": "eplan_08620b9d-81b9-404e-aabb-b43106a0d922",
+  "contextHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+  "minimalTrigger": "At least one context survey network plus dependent step.parameters omitted and an explicit predecessor networkId/expectedRevision binding. compilePlanSteps fills old context literals and adds a duplicate revision binding without considering existing bindings.",
+  "minimalCorrectionBoundary": "Explicit empty parameters objects preserve binding-only declarations and compile successfully in the same module/context. Optional omitted parameters receive conflicting defaults. A future source fix should respect explicit bindings and preserve rejection of genuinely ambiguous literal-plus-binding or duplicate bindings.",
+  "evidenceScope": "The exact installed frozen module was imported solely for compilePlanSteps and planParameterDiagnostics in memory. No Runtime service, model request, calculation, export, API write or database write was created.",
+  "modelArgumentLimitation": "Original model tool arguments are deliberately omitted by persistence. This reproduction proves a compiler defect for legal binding-only declarations and reproduces the exact normalized chain; it does not prove the unavailable original model argument bytes omitted parameters or assign all blame to the model.",
+  "sourceEditPerformed": false,
+  "businessExecutionPerformed": false,
+  "wholeCasePassed": false,
+  "releaseReady": false,
+  "compilationResults": {
+    "path": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-D1-readback/compiler-root-cause/pure-compilation-results.json",
+    "sha256": "d2cc83391703cd26ce7c920bd1b7d426d2128968f6414cf1bf22c546d62a0f2c"
+  }
+}

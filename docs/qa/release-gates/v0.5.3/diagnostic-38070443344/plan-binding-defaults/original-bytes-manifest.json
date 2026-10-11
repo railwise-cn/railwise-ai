@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "scope": "Installed-package diagnostic originals, not release acceptance",
+  "files": [
+    {
+      "path": "compiler-root-cause-review.json",
+      "bytes": 5063,
+      "sha256": "e6346e50c46b1c4f3f5ef7b84d379284df4bcf7f630d6ec6c546322a6bafaa52"
+    },
+    {
+      "path": "pure-compilation-results.json",
+      "bytes": 23536,
+      "sha256": "d2cc83391703cd26ce7c920bd1b7d426d2128968f6414cf1bf22c546d62a0f2c"
+    },
+    {
+      "path": "typed-input-validation-addendum.json",
+      "bytes": 1434,
+      "sha256": "c189d7c70c2970f774a064f1ace41cda511f9a5abf11bce0aa4dbc8fad51d5c0"
+    },
+    {
+      "path": "advertised-tool-schema-addendum.json",
+      "bytes": 6918,
+      "sha256": "0b4264e62b1acc73b8328e7db6fb6211bc6247d8435291defbd6ac6ba0a619ad"
+    }
+  ]
+}

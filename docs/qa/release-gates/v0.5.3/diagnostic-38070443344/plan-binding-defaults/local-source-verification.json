@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "reviewLabel": "Maintainer local source verification; not final-package acceptance",
+  "observedAt": "2026-10-10T23:49:58.260422+00:00",
+  "baseHead": "4517bc06082258ec1a657163f2cba7a20db288a6",
+  "branch": "codex/survey-plan-binding-defaults-053",
+  "beforeFix": {
+    "testsFailed": 3,
+    "testsPassed": 9
+  },
+  "afterFixTargeted": {
+    "filesPassed": 2,
+    "testsPassed": 23
+  },
+  "runtimeFull": {
+    "filesPassed": 221,
+    "filesSkipped": 2,
+    "testsPassed": 3207,
+    "testsSkipped": 22
+  },
+  "runtimeTypecheck": "passed",
+  "targetedEslint": "passed",
+  "appBuild": "passed",
+  "independentSourceReview": {
+    "path": "independent-source-review.json",
+    "sha256": "39ead9a2d656a90cb9f5faa992a51062b3c43a35013cd2b5c165c5ed88dab160",
+    "probesPassed": 30,
+    "findings": []
+  },
+  "logs": [
+    {
+      "path": "/private/tmp/railwise-053-tools/source-plan-binding-defaults-20261011/before-fix-regression.log",
+      "bytes": 5009,
+      "sha256": "cf0ec894b308780015f8267463a1b576bb00e66a36d7b5315c4edccf436076cf"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-plan-binding-defaults-20261011/after-fix-runtime.log",
+      "bytes": 454,
+      "sha256": "024a2251c865e31caab2c44d1fb78abc1bd9d2db882e05fa71b83312cc150c29"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-plan-binding-defaults-20261011/runtime-full-test.log",
+      "bytes": 335,
+      "sha256": "c3b83337ce54f0c024b2ca4bd89dd5516af474cf71ca915f24d9c4179d83b08a"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-plan-binding-defaults-20261011/runtime-typecheck.log",
+      "bytes": 56,
+      "sha256": "369fb1b91d4bc5be75374f253acfa1ccd86ab16e2a1c4ddce423943f6f1d18b6"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-plan-binding-defaults-20261011/targeted-eslint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/private/tmp/railwise-053-tools/source-plan-binding-defaults-20261011/app-build.log",
+      "bytes": 37333,
+      "sha256": "6afefafba871d6f488293e651357665cb40c6b28625bfe8a70e481b8cdf4eeb9"
+    }
+  ],
+  "sourceReady": true,
+  "packagePass": false,
+  "releaseReady": false
+}

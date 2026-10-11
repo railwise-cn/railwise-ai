@@ -1,0 +1,789 @@
+{
+  "canonicalExplicitEmptyParameters": {
+    "input": [
+      {
+        "id": "step-1",
+        "title": "重建为水准网（BM = 100.000 m；基准 SYNTHETIC-LOCAL-BENCHMARK）",
+        "tool": "survey_network_reimport",
+        "risk": "write",
+        "dependsOn": [],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2,
+          "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "sourceNetworkRevision": 2,
+          "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+          "networkType": "leveling",
+          "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+          "knownPointId": "BM",
+          "knownPointHeight": 100
+        },
+        "parameterBindings": [],
+        "expectedOutputs": [
+          "prepared-network"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "校验重建网（路线成员与独立闭合检查）",
+        "tool": "survey_network_validate",
+        "risk": "write",
+        "dependsOn": [
+          "step-1"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {},
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-1",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "network-validation"
+        ],
+        "reversibility": "revisioned-write",
+        "approval": "pending"
+      },
+      {
+        "id": "step-3",
+        "title": "确定性水准网平差",
+        "tool": "survey_calculator",
+        "risk": "write",
+        "dependsOn": [
+          "step-2"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {},
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "adjustment-run",
+          "deterministic-adjustment-evidence"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-4",
+        "title": "生成 DOCX/PDF/XLSX 待专业复核稿",
+        "tool": "report_export",
+        "risk": "export",
+        "dependsOn": [
+          "step-3"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "adjustmentIds",
+            "stepId": "step-3",
+            "output": "run.id",
+            "asArray": true
+          }
+        ],
+        "expectedOutputs": [
+          "candidate-docx",
+          "candidate-pdf",
+          "evidence-xlsx"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      }
+    ],
+    "compiled": [
+      {
+        "id": "step-1",
+        "title": "重建为水准网（BM = 100.000 m；基准 SYNTHETIC-LOCAL-BENCHMARK）",
+        "tool": "survey_network_reimport",
+        "risk": "write",
+        "dependsOn": [],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2,
+          "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "sourceNetworkRevision": 2,
+          "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+          "networkType": "leveling",
+          "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+          "knownPointId": "BM",
+          "knownPointHeight": 100
+        },
+        "parameterBindings": [],
+        "expectedOutputs": [
+          "prepared-network"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "校验重建网（路线成员与独立闭合检查）",
+        "tool": "survey_network_validate",
+        "risk": "write",
+        "dependsOn": [
+          "step-1"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {},
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-1",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "network-validation"
+        ],
+        "reversibility": "revisioned-write",
+        "approval": "pending"
+      },
+      {
+        "id": "step-3",
+        "title": "确定性水准网平差",
+        "tool": "survey_calculator",
+        "risk": "write",
+        "dependsOn": [
+          "step-2"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {},
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "adjustment-run",
+          "deterministic-adjustment-evidence"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-4",
+        "title": "生成 DOCX/PDF/XLSX 待专业复核稿",
+        "tool": "report_export",
+        "risk": "export",
+        "dependsOn": [
+          "step-3"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "adjustmentIds",
+            "stepId": "step-3",
+            "output": "run.id",
+            "asArray": true
+          }
+        ],
+        "expectedOutputs": [
+          "candidate-docx",
+          "candidate-pdf",
+          "evidence-xlsx"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      }
+    ],
+    "diagnostics": []
+  },
+  "canonicalOmittedParameters": {
+    "input": [
+      {
+        "id": "step-1",
+        "title": "重建为水准网（BM = 100.000 m；基准 SYNTHETIC-LOCAL-BENCHMARK）",
+        "tool": "survey_network_reimport",
+        "risk": "write",
+        "dependsOn": [],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2,
+          "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "sourceNetworkRevision": 2,
+          "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+          "networkType": "leveling",
+          "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+          "knownPointId": "BM",
+          "knownPointHeight": 100
+        },
+        "parameterBindings": [],
+        "expectedOutputs": [
+          "prepared-network"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "校验重建网（路线成员与独立闭合检查）",
+        "tool": "survey_network_validate",
+        "risk": "write",
+        "dependsOn": [
+          "step-1"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-1",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "network-validation"
+        ],
+        "reversibility": "revisioned-write",
+        "approval": "pending"
+      },
+      {
+        "id": "step-3",
+        "title": "确定性水准网平差",
+        "tool": "survey_calculator",
+        "risk": "write",
+        "dependsOn": [
+          "step-2"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "adjustment-run",
+          "deterministic-adjustment-evidence"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-4",
+        "title": "生成 DOCX/PDF/XLSX 待专业复核稿",
+        "tool": "report_export",
+        "risk": "export",
+        "dependsOn": [
+          "step-3"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "adjustmentIds",
+            "stepId": "step-3",
+            "output": "run.id",
+            "asArray": true
+          }
+        ],
+        "expectedOutputs": [
+          "candidate-docx",
+          "candidate-pdf",
+          "evidence-xlsx"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      }
+    ],
+    "compiled": [
+      {
+        "id": "step-1",
+        "title": "重建为水准网（BM = 100.000 m；基准 SYNTHETIC-LOCAL-BENCHMARK）",
+        "tool": "survey_network_reimport",
+        "risk": "write",
+        "dependsOn": [],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2,
+          "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "sourceNetworkRevision": 2,
+          "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+          "networkType": "leveling",
+          "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+          "knownPointId": "BM",
+          "knownPointHeight": 100
+        },
+        "parameterBindings": [],
+        "expectedOutputs": [
+          "prepared-network"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "校验重建网（路线成员与独立闭合检查）",
+        "tool": "survey_network_validate",
+        "risk": "write",
+        "dependsOn": [
+          "step-1"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-1",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "network-validation"
+        ],
+        "reversibility": "revisioned-write",
+        "approval": "pending",
+        "parameters": {
+          "networkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "expectedRevision": 2
+        }
+      },
+      {
+        "id": "step-3",
+        "title": "确定性水准网平差",
+        "tool": "survey_calculator",
+        "risk": "write",
+        "dependsOn": [
+          "step-2"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "adjustment-run",
+          "deterministic-adjustment-evidence"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending",
+        "parameters": {
+          "networkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405"
+        }
+      },
+      {
+        "id": "step-4",
+        "title": "生成 DOCX/PDF/XLSX 待专业复核稿",
+        "tool": "report_export",
+        "risk": "export",
+        "dependsOn": [
+          "step-3"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "adjustmentIds",
+            "stepId": "step-3",
+            "output": "run.id",
+            "asArray": true
+          }
+        ],
+        "expectedOutputs": [
+          "candidate-docx",
+          "candidate-pdf",
+          "evidence-xlsx"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      }
+    ],
+    "diagnostics": [
+      {
+        "stepId": "step-2",
+        "code": "invalid-binding",
+        "fields": [
+          "networkId"
+        ]
+      },
+      {
+        "stepId": "step-2",
+        "code": "invalid-binding",
+        "fields": [
+          "expectedRevision"
+        ]
+      },
+      {
+        "stepId": "step-3",
+        "code": "invalid-binding",
+        "fields": [
+          "networkId"
+        ]
+      },
+      {
+        "stepId": "step-3",
+        "code": "invalid-binding",
+        "fields": [
+          "expectedRevision"
+        ]
+      },
+      {
+        "stepId": "step-3",
+        "code": "invalid-parameters",
+        "fields": [
+          "networkId"
+        ]
+      }
+    ]
+  },
+  "actualPlanRecompiledForDisclosureOnly": {
+    "input": [
+      {
+        "id": "step-1",
+        "title": "重建为水准网（BM = 100.000 m；基准 SYNTHETIC-LOCAL-BENCHMARK）",
+        "tool": "survey_network_reimport",
+        "risk": "write",
+        "dependsOn": [],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2,
+          "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "sourceNetworkRevision": 2,
+          "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+          "networkType": "leveling",
+          "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+          "knownPointId": "BM",
+          "knownPointHeight": 100
+        },
+        "parameterBindings": [],
+        "expectedOutputs": [
+          "prepared-network"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "校验重建网（路线成员与独立闭合检查）",
+        "tool": "survey_network_validate",
+        "risk": "write",
+        "dependsOn": [
+          "step-1"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "networkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-1",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "network-validation"
+        ],
+        "reversibility": "revisioned-write",
+        "approval": "pending"
+      },
+      {
+        "id": "step-3",
+        "title": "确定性水准网平差",
+        "tool": "survey_calculator",
+        "risk": "write",
+        "dependsOn": [
+          "step-2"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "networkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405"
+        },
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "adjustment-run",
+          "deterministic-adjustment-evidence"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-4",
+        "title": "生成 DOCX/PDF/XLSX 待专业复核稿",
+        "tool": "report_export",
+        "risk": "export",
+        "dependsOn": [
+          "step-3"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "adjustmentIds",
+            "stepId": "step-3",
+            "output": "run.id",
+            "asArray": true
+          }
+        ],
+        "expectedOutputs": [
+          "candidate-docx",
+          "candidate-pdf",
+          "evidence-xlsx"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      }
+    ],
+    "compiled": [
+      {
+        "id": "step-1",
+        "title": "重建为水准网（BM = 100.000 m；基准 SYNTHETIC-LOCAL-BENCHMARK）",
+        "tool": "survey_network_reimport",
+        "risk": "write",
+        "dependsOn": [],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2,
+          "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "sourceNetworkRevision": 2,
+          "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+          "networkType": "leveling",
+          "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+          "knownPointId": "BM",
+          "knownPointHeight": 100
+        },
+        "parameterBindings": [],
+        "expectedOutputs": [
+          "prepared-network"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-2",
+        "title": "校验重建网（路线成员与独立闭合检查）",
+        "tool": "survey_network_validate",
+        "risk": "write",
+        "dependsOn": [
+          "step-1"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "networkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-1",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "network-validation"
+        ],
+        "reversibility": "revisioned-write",
+        "approval": "pending"
+      },
+      {
+        "id": "step-3",
+        "title": "确定性水准网平差",
+        "tool": "survey_calculator",
+        "risk": "write",
+        "dependsOn": [
+          "step-2"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "networkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405"
+        },
+        "parameterBindings": [
+          {
+            "parameter": "networkId",
+            "stepId": "step-1",
+            "output": "network.id"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          },
+          {
+            "parameter": "expectedRevision",
+            "stepId": "step-2",
+            "output": "network.revision"
+          }
+        ],
+        "expectedOutputs": [
+          "adjustment-run",
+          "deterministic-adjustment-evidence"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      },
+      {
+        "id": "step-4",
+        "title": "生成 DOCX/PDF/XLSX 待专业复核稿",
+        "tool": "report_export",
+        "risk": "export",
+        "dependsOn": [
+          "step-3"
+        ],
+        "inputHash": "sha256-ef6061799ff2aae1c4f6efd751805e5841903005e3c1c12cb3d5a5a526554fa9",
+        "parameters": {
+          "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+          "expectedRevision": 2
+        },
+        "parameterBindings": [
+          {
+            "parameter": "adjustmentIds",
+            "stepId": "step-3",
+            "output": "run.id",
+            "asArray": true
+          }
+        ],
+        "expectedOutputs": [
+          "candidate-docx",
+          "candidate-pdf",
+          "evidence-xlsx"
+        ],
+        "reversibility": "append-only",
+        "approval": "pending"
+      }
+    ],
+    "diagnostics": [
+      {
+        "stepId": "step-2",
+        "code": "invalid-binding",
+        "fields": [
+          "networkId"
+        ]
+      },
+      {
+        "stepId": "step-2",
+        "code": "invalid-binding",
+        "fields": [
+          "expectedRevision"
+        ]
+      },
+      {
+        "stepId": "step-3",
+        "code": "invalid-binding",
+        "fields": [
+          "networkId"
+        ]
+      },
+      {
+        "stepId": "step-3",
+        "code": "invalid-binding",
+        "fields": [
+          "expectedRevision"
+        ]
+      },
+      {
+        "stepId": "step-3",
+        "code": "invalid-parameters",
+        "fields": [
+          "networkId"
+        ]
+      }
+    ]
+  }
+}

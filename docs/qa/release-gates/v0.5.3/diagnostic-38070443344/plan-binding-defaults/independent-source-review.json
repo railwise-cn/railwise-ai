@@ -1,0 +1,380 @@
+{
+  "schemaVersion": 1,
+  "reviewLabel": "Independent senior-engineer-mode AI source review",
+  "observedAt": "2026-10-10T23:49:08.468Z",
+  "branch": "codex/survey-plan-binding-defaults-053",
+  "baseHead": "4517bc06082258ec1a657163f2cba7a20db288a6",
+  "reviewWorktree": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise",
+  "diffPath": "/private/tmp/railwise-053-tools/new-freeze-38070443344-retry1/independent-D1-readback/source-patch-independent-review-v2/reviewed-diff.original.patch",
+  "diffSha256": "fb7cfb9b7b0f62c535133024f304da18f43b332311ded57d299285152fec52bc",
+  "diffBytes": 12251,
+  "sourceHashes": [
+    {
+      "file": "kun/src/engineering/engineering-plan-execution.ts",
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/kun/src/engineering/engineering-plan-execution.ts",
+      "bytes": 16272,
+      "sha256": "e3aa5557e729cae7adc789dcd16d799f34b9adcd64543d8597916e1dfe2f244e"
+    },
+    {
+      "file": "kun/src/engineering/engineering-plan-execution.test.ts",
+      "path": "/Users/wangjiawei/.codex/worktrees/survey-professional-answer-053/WorkWise/kun/src/engineering/engineering-plan-execution.test.ts",
+      "bytes": 24785,
+      "sha256": "4ec35c24f9cb4f0d4a88f7fd584d85ffacc8b0d4cf220f6d4da1da6cac88e457"
+    }
+  ],
+  "status": "reviewed-no-actionable-defect-in-source-patch",
+  "checkCount": 30,
+  "failureCount": 0,
+  "checks": [
+    {
+      "name": "exact current D1 canonical canonicalExplicitEmptyParameters now valid",
+      "passed": true,
+      "detail": {
+        "steps": [
+          {
+            "id": "step-1",
+            "parameters": {
+              "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+              "expectedRevision": 2,
+              "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+              "sourceNetworkRevision": 2,
+              "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+              "networkType": "leveling",
+              "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+              "knownPointId": "BM",
+              "knownPointHeight": 100
+            },
+            "bindings": []
+          },
+          {
+            "id": "step-2",
+            "parameters": {},
+            "bindings": [
+              {
+                "parameter": "networkId",
+                "stepId": "step-1",
+                "output": "network.id"
+              },
+              {
+                "parameter": "expectedRevision",
+                "stepId": "step-1",
+                "output": "network.revision"
+              }
+            ]
+          },
+          {
+            "id": "step-3",
+            "parameters": {},
+            "bindings": [
+              {
+                "parameter": "networkId",
+                "stepId": "step-1",
+                "output": "network.id"
+              },
+              {
+                "parameter": "expectedRevision",
+                "stepId": "step-2",
+                "output": "network.revision"
+              }
+            ]
+          },
+          {
+            "id": "step-4",
+            "parameters": {
+              "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+              "expectedRevision": 2
+            },
+            "bindings": [
+              {
+                "parameter": "adjustmentIds",
+                "stepId": "step-3",
+                "output": "run.id",
+                "asArray": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "exact current D1 canonical canonicalOmittedParameters now valid",
+      "passed": true,
+      "detail": {
+        "steps": [
+          {
+            "id": "step-1",
+            "parameters": {
+              "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+              "expectedRevision": 2,
+              "sourceNetworkId": "network_8f6b5ad9-cf9c-4c8a-95b0-128769a32405",
+              "sourceNetworkRevision": 2,
+              "sourceSha256": "8bbddf9ac9f6ac2cf700f55e88508fa1fb586f304e7f1500da334c4eb16309ea",
+              "networkType": "leveling",
+              "verticalDatum": "SYNTHETIC-LOCAL-BENCHMARK",
+              "knownPointId": "BM",
+              "knownPointHeight": 100
+            },
+            "bindings": []
+          },
+          {
+            "id": "step-2",
+            "parameters": {},
+            "bindings": [
+              {
+                "parameter": "networkId",
+                "stepId": "step-1",
+                "output": "network.id"
+              },
+              {
+                "parameter": "expectedRevision",
+                "stepId": "step-1",
+                "output": "network.revision"
+              }
+            ]
+          },
+          {
+            "id": "step-3",
+            "parameters": {},
+            "bindings": [
+              {
+                "parameter": "networkId",
+                "stepId": "step-1",
+                "output": "network.id"
+              },
+              {
+                "parameter": "expectedRevision",
+                "stepId": "step-2",
+                "output": "network.revision"
+              }
+            ]
+          },
+          {
+            "id": "step-4",
+            "parameters": {
+              "projectId": "project_7f01f914-4903-4e53-9b33-6b7ec237a817",
+              "expectedRevision": 2
+            },
+            "bindings": [
+              {
+                "parameter": "adjustmentIds",
+                "stepId": "step-3",
+                "output": "run.id",
+                "asArray": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity survey_network_reimport",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity survey_network_validate",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity survey_adjustment_read",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity survey_calculator",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity control_network",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity cpiii_adjustment",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity coord_transform",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity distance_calculator",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity angle_convert",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity monitoring_data_first_check",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity deformation_rate",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity chart_generator",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity report_export",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity excel_export",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity standard_query",
+      "passed": true
+    },
+    {
+      "name": "legacy no-explicit-binding compiler parity tool_norm_cite",
+      "passed": true
+    },
+    {
+      "name": "multiple-or-no selected network retains blocking/default parity 0",
+      "passed": true
+    },
+    {
+      "name": "multiple-or-no selected network retains blocking/default parity 2",
+      "passed": true
+    },
+    {
+      "name": "malformed caller binding remains blocked: literal plus binding",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-binding",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: duplicate same caller binding",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-binding",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: missing source",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-binding",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: nonancestor source",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-binding",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: wrong source tool",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-parameters",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: scalar asArray",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-parameters",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: unknown effect parameter",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-parameters",
+            "fields": [
+              "deleteSource"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed caller binding remains blocked: wrong scalar output",
+      "passed": true,
+      "detail": {
+        "diagnostics": [
+          {
+            "stepId": "target",
+            "code": "invalid-parameters",
+            "fields": [
+              "expectedRevision"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "literal out-of-project network remains rejected by original scope guard",
+      "passed": true
+    },
+    {
+      "name": "explicit monitoring older predecessor retained with namespaced tools",
+      "passed": true
+    }
+  ],
+  "findings": [],
+  "testQuality": "New regressions reproduce the precise omitted-parameters versus explicit-bindings collision, verify exact predecessor handles and no input mutation, exercise namespaced monitoring with a caller-selected nonlatest predecessor, and preserve rejection of conflicting/duplicate/missing-source bindings. Existing execution tests cover actual legacy defaults.",
+  "validationScope": "Independent pure in-memory probes and full changed-source/test-file read. No Runtime services, model calls, HTTP, DB writes, source writes, updater or packaged business execution were performed by this reviewer.",
+  "packagePass": false,
+  "releaseReady": false,
+  "limitations": [
+    "The installed frozen package still contains the original defect and its D1 failure evidence remains intact. This code review cannot accept a future package, real updater, UI or provider-mediated end-to-end workflow.",
+    "The unavailable original model tool arguments remain unavailable. Canonical typed binding-only reproduction establishes compiler causality without assigning unsupported model-input blame.",
+    "First probe run had an overly strict reviewer assertion that disallowed a valid inferred expectedRevision for a separate unknown-effect binding. Its failure report was preserved in source-patch-independent-review. Corrected probe verifies caller bindings remain intact while allowing legitimate distinct inferred defaults; malformed unknown-effect binding remains blocked."
+  ]
+}
