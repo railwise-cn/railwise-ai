@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "scope": "Original installed synthetic failure and source-only remediation; not release acceptance",
+  "files": [
+    {
+      "path": "independent-installed-triage.json",
+      "bytes": 7012,
+      "sha256": "6338dce8e447889df7e07df189d47b8c200be5a38c154766780fd9583d98611a"
+    },
+    {
+      "path": "recheck-after-configuration.ax.txt",
+      "bytes": 12221,
+      "sha256": "fc3497a4ed7cdc1dc2b4249bf85c207f7f305f6c05f7900d95a827abbc1b2aa9"
+    },
+    {
+      "path": "recheck-after-configuration.jpg",
+      "bytes": 357192,
+      "sha256": "63d6498c234b1bf558deead6cafbd9e3800616677792fcc0490773a2e6bdb8bb"
+    },
+    {
+      "path": "source-remediation.json",
+      "bytes": 8074,
+      "sha256": "3c78c905a036fa3bd0ddee2c358b6c770305c2d329c4c24cc4a9d4c436c0b82e"
+    }
+  ]
+}

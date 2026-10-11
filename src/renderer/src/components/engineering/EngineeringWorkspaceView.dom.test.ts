@@ -1207,6 +1207,123 @@ describe('simplified continuous task flow', () => {
     expect(request.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
   })
 
+  it.each(['en', 'zh'])('shows all 19 resolved monitoring findings as retained history with ready calculation in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    adjustments = []
+    const findings = Array.from({ length: 19 }, (_, index) => ({
+      id: index === 0 ? 'threshold-missing' : `unit-observation-${index - 1}`,
+      code: index === 0 ? 'missing_threshold' : 'unit_conflict', severity: 'warning', status: 'resolved', row: index + 1,
+      message: index === 0 ? '项目未配置阈值' : '单位 mm 与项目单位 m 不一致',
+      suggestion: index === 0 ? '在项目设置中补充阈值' : '统一单位后重新校核'
+    }))
+    const dataset = { id: 'resolved-data', sourceFileName: 'synthetic-monitoring.csv', sourceFileHash: 'f'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 18, columnCount: 6, observationCount: 18, timeRange: {}, status: 'validated', revision: 3, findings, updatedAt: project.updatedAt }
+    datasets = [dataset]
+    const monitoringProject = { ...project, taskType: 'deformation', monitoringType: 'deformation', unit: 'mm', thresholds: { default: 10 }, revision: 3 }
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (path === '/v1/engineering/projects') return { ok: true, status: 200, body: JSON.stringify({ projects: [monitoringProject] }) }
+      if (path.endsWith('/overview')) return { ok: true, status: 200, body: JSON.stringify({ project: monitoringProject, datasets, analyses, runs, manifests }) }
+      return original(path, method, payload)
+    })
+    const originalFindings = structuredClone(findings)
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    expect(container.textContent).toContain(i18n.t('engineeringReadiness.adjustment-ready'))
+    expect(container.textContent).toContain(i18n.t('engineeringIssueCounts', { blocking: 0, warnings: 0 }))
+    expect(button(i18n.t('surveyStartCalculation')).disabled).toBe(false)
+    expect(container.textContent).not.toContain(i18n.t('engineeringPendingConfirmation'))
+    expect([...container.querySelectorAll('button')].some(item => item.textContent === i18n.t('engineeringReplaceSource'))).toBe(false)
+    const rows = [...container.querySelectorAll<HTMLTableRowElement>('tr[data-evidence-key]')].filter(row => JSON.parse(row.dataset.evidenceKey!)[0] === 'finding')
+    expect(rows).toHaveLength(19)
+    const disposition = locale === 'en' ? 'Resolved · retained history' : '已解决 · 保留历史'
+    for (const [index, finding] of findings.entries()) {
+      const row = rows[index]
+      expect(row.dataset.evidenceKey).toBe(JSON.stringify(['finding', finding.id]))
+      const cells = row.querySelectorAll('td')
+      const displayedMessage = locale === 'en' ? index === 0 ? 'Project thresholds are not configured.' : 'Unit mm differs from project unit m.' : finding.message
+      const displayedSuggestion = locale === 'en' ? index === 0 ? 'Supply thresholds in project settings.' : 'Unify units, then validate again.' : finding.suggestion
+      expect(cells[1].querySelector('p')?.textContent).toBe(displayedMessage)
+      expect(cells[1].querySelectorAll('p')[1].textContent).toBe(displayedSuggestion)
+      expect(cells[2].textContent).toBe(i18n.t('engineeringRowNumber', { row: finding.row }))
+      expect(cells[3].textContent).toBe(disposition)
+      expect(cells[3].querySelector('button')).toBeNull()
+      await act(async () => row.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('surveyAskEvidence', { label: displayedMessage })}"]`)!.click())
+      expect(useEngineeringConversationDrafts.getState().drafts[JSON.stringify(['/test', 'job'])]!.evidenceContext!.typedEvidence).toEqual({
+        schemaVersion: 1, projectId: 'job', projectRevision: 3, kind: 'monitoring-dataset', datasetId: dataset.id,
+        datasetRevision: 3, sourceFileHash: dataset.sourceFileHash, selector: { path: ['findings', index], identity: { id: finding.id } }
+      })
+    }
+    expect(findings).toEqual(originalFindings)
+    expect(request.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+  })
+
+  it.each(['en', 'zh'])('keeps real warnings and blockers actionable alongside accepted and resolved history in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    adjustments = []
+    const findings = [
+      { id: 'resolved-warning', code: 'unit_conflict', severity: 'warning', status: 'resolved', message: 'Previous unit conflict', suggestion: 'Check original units', row: 2 },
+      { id: 'resolved-blocker', code: 'missing_identifier', severity: 'blocking', status: 'resolved', message: 'Previous missing point', suggestion: 'Check original point', row: 3 },
+      { id: 'resolved-info', code: 'source_note', severity: 'info', status: 'resolved', message: 'Previous source note', suggestion: 'Read original note', row: 4 },
+      { id: 'accepted-warning', code: 'review', severity: 'warning', status: 'accepted', message: 'Accepted source warning', suggestion: 'Retain review note', row: 5 },
+      { id: 'open-warning', code: 'review', severity: 'warning', status: 'open', message: 'Current source warning', suggestion: 'Review source', row: 6 },
+      { id: 'open-blocker', code: 'missing_identifier', severity: 'blocking', status: 'open', message: 'Current missing point', suggestion: 'Fix source', row: 7 }
+    ]
+    datasets = [{ id: 'mixed-data', sourceFileName: 'mixed.csv', sourceFileHash: 'e'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 7, columnCount: 3, observationCount: 6, timeRange: {}, status: 'validated', revision: 3, findings, updatedAt: project.updatedAt }]
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    const rowFor = (id: string): HTMLTableRowElement => container.querySelector(`tr[data-evidence-key='${JSON.stringify(['finding', id])}']`)!
+    const disposition = locale === 'en' ? 'Resolved · retained history' : '已解决 · 保留历史'
+    for (const id of ['resolved-warning', 'resolved-blocker', 'resolved-info']) {
+      expect(rowFor(id).querySelector('td:last-child')?.textContent).toBe(disposition)
+      expect(rowFor(id).querySelector('td:last-child button')).toBeNull()
+    }
+    expect(rowFor('accepted-warning').querySelector('td:last-child')?.textContent).toBe(i18n.t('engineeringFindingAccepted'))
+    expect(rowFor('open-warning').querySelector('td:last-child')?.textContent).toBe(i18n.t('engineeringPendingConfirmation'))
+    expect(rowFor('open-blocker').querySelector('td:last-child button')?.textContent).toBe(i18n.t('engineeringReplaceSource'))
+    expect([...container.querySelectorAll('td:last-child')].filter(cell => cell.textContent === i18n.t('engineeringPendingConfirmation'))).toHaveLength(1)
+    expect([...container.querySelectorAll('button')].filter(item => item.textContent === i18n.t('engineeringReplaceSource'))).toHaveLength(1)
+    expect(container.textContent).toContain(i18n.t('engineeringIssueCounts', { blocking: 1, warnings: 1 }))
+    const confirmation = button(i18n.t('engineeringConfirmContinue', { count: 1 }))
+    expect(confirmation.disabled).toBe(true)
+    await act(async () => confirmation.click())
+    await act(async () => button(i18n.t('engineeringPrimaryResults')).click())
+    expect(button(i18n.t('engineeringRunAnalysis')).disabled).toBe(true)
+    expect(request.mock.calls.every(([, method]) => !method || method === 'GET')).toBe(true)
+  })
+
+  it.each(['en', 'zh'])('confirms only an open warning and retains resolved and accepted history in %s', async locale => {
+    await i18n.changeLanguage(locale)
+    adjustments = []
+    let dataset = { id: 'confirm-data', sourceFileName: 'confirm.csv', sourceFileHash: 'd'.repeat(64), fieldMapping: {}, unknownColumns: [], rowCount: 3, columnCount: 3, observationCount: 3, timeRange: {}, status: 'validated', revision: 3, findings: [
+      { id: 'resolved-warning', code: 'unit_conflict', severity: 'warning', status: 'resolved', message: 'Previous unit conflict', suggestion: 'Check original units' },
+      { id: 'accepted-warning', code: 'review', severity: 'warning', status: 'accepted', message: 'Accepted source warning', suggestion: 'Retain review note' },
+      { id: 'open-warning', code: 'review', severity: 'warning', status: 'open', message: 'Current source warning', suggestion: 'Review source' }
+    ], updatedAt: project.updatedAt }
+    datasets = [dataset]
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path: string, method?: string, payload?: string) => {
+      if (method !== 'POST') return original(path, method, payload)
+      expect(path).toBe('/v1/engineering/datasets/confirm-data/findings/open-warning/accept')
+      expect(JSON.parse(payload!).expectedRevision).toBe(3)
+      dataset = { ...dataset, revision: 4, findings: dataset.findings.map(finding => finding.id === 'open-warning' ? { ...finding, status: 'accepted' } : finding) }
+      datasets = [dataset]
+      return { ok: true, status: 200, body: JSON.stringify({ dataset }) }
+    })
+    await renderDelivery()
+    await act(async () => button(i18n.t('engineeringPrimaryProcess')).click())
+    expect(container.textContent).toContain(i18n.t('engineeringReadiness.needs-confirmation'))
+    const confirmation = button(i18n.t('engineeringConfirmContinue', { count: 1 }))
+    expect(confirmation.disabled).toBe(false)
+    await act(async () => confirmation.click())
+    expect(request.mock.calls.filter(([, method]) => method === 'POST')).toHaveLength(1)
+    expect(dataset.findings.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: 'resolved-warning', status: 'resolved' }, { id: 'accepted-warning', status: 'accepted' }, { id: 'open-warning', status: 'accepted' }
+    ])
+    expect(container.querySelector(`tr[data-evidence-key='${JSON.stringify(['finding', 'resolved-warning'])}'] td:last-child`)?.textContent).toBe(locale === 'en' ? 'Resolved · retained history' : '已解决 · 保留历史')
+    expect(container.textContent).not.toContain(i18n.t('engineeringPendingConfirmation'))
+    expect(button(i18n.t('surveyStartCalculation')).disabled).toBe(false)
+  })
+
   it('keeps the two legacy delivery routes on the same export and review page', async () => {
     await renderDelivery()
     for (const route of ['engineeringTabDeliverables', 'engineeringTabReview']) {

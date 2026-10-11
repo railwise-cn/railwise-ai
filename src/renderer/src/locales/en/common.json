@@ -582,6 +582,7 @@
   "engineeringFindingInfo": "Info",
   "engineeringFindingRow": "Row {{row}}",
   "engineeringFindingAccepted": "Accepted",
+  "engineeringFindingResolved": "Resolved · retained history",
   "engineeringFindingAcceptWarning": "Accept warning",
   "engineeringFindingFixSource": "Fix source data\nand re-import",
   "engineeringNoQualityFindings": "No quality issues found.",
