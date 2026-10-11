@@ -9,7 +9,7 @@ $pageTitle = 'RailWise AI · Survey 工程测量内业';
 $pageDesc = 'RailWise Survey 将原始测量资料处理为可审查、可追溯的成果：导入预检、建网平差、精度分析与待审查成果包。提供 macOS 与 Windows 客户端，成果仍需工程人员复核。';
 $pageKeywords = 'RailWise AI,RailWise Survey,工程测量,控制网平差,水准网,测量精度,工程成果,AI 内业工作台';
 $pageHeroVisualKey = 'product-workwise';
-$pageOgImage = 'https://www.railwise.cn/products/screenshots/workwise/07-survey-051-zh-light.jpg';
+$pageOgImage = 'https://www.railwise.cn/products/screenshots/workwise/10-survey-053-zh-light.jpg';
 $workwiseReleaseUrl = (string)$workwiseManifest['releaseUrl'];
 $workwiseRepoUrl = (string)$workwiseManifest['repositoryUrl'];
 $workwiseVersion = 'v' . (string)$workwiseManifest['version'];
@@ -27,9 +27,9 @@ $workwiseDownloads = array_map(static function (array $item): array {
   ];
 }, is_array($workwiseManifest['platforms'] ?? null) ? $workwiseManifest['platforms'] : []);
 $workwiseShots = [
-  ['src' => '/products/screenshots/workwise/07-survey-051-zh-light.jpg', 'title' => '工程测量内业 · 0.5.1 历史界面', 'desc' => '公开合成控制网示例：4 点、1 测站、5 观测，查看平差结果、残差与精度。'],
-  ['src' => '/products/screenshots/workwise/08-survey-051-delivery.jpg', 'title' => '成果中心 · 0.5.1 历史界面', 'desc' => '同一公开合成控制网的 DOCX、PDF、XLSX，保留原始依据和待审查状态。'],
-  ['src' => '/products/screenshots/workwise/09-survey-051-settings.jpg', 'title' => '设置与外观 · 0.5.1 历史界面', 'desc' => '按使用习惯选择语言和明暗主题；已有配置保持兼容。'],
+  ['src' => '/products/screenshots/workwise/10-survey-053-zh-light.jpg', 'title' => '工程测量内业 · 0.5.3 版本界面', 'desc' => 'RailWise Survey 结果页：中文浅色界面，显示已计算结果、平面控制网 A/B/C 与测站 S1，以及专业成果与复核入口。'],
+  ['src' => '/products/screenshots/workwise/11-survey-053-delivery.jpg', 'title' => '成果中心 · 0.5.3 版本界面', 'desc' => 'RailWise Survey 交付页：中文浅色界面，显示专业审查稿入口与 DOCX、PDF、XLSX 文件卡片。'],
+  ['src' => '/products/screenshots/workwise/12-survey-053-settings.jpg', 'title' => '设置与外观 · 0.5.3 版本界面', 'desc' => 'RailWise AI 设置页：简体中文浅色界面，显示基础设置、通知与本地偏好选项。'],
 ];
 $workwiseWriteShots = $workwiseShots;
 $workwiseCapabilities = [
@@ -78,7 +78,7 @@ $pageJsonLd = [
     'softwareVersion' => $workwiseVersion,
     'datePublished' => $workwiseReleaseDate,
     'description' => $pageDesc,
-    'url' => 'https://www.railwise.cn/products/workwise/',
+    'url' => 'https://www.railwise.cn/products/railwise-ai/',
     'image' => $pageOgImage,
     'downloadUrl' => 'https://www.railwise.cn' . ($workwiseDownloads[0]['url'] ?? '/downloads/workwise/'),
     'codeRepository' => $workwiseRepoUrl,
@@ -94,7 +94,7 @@ $pageJsonLd = [
     'itemListElement' => [
       ['@type' => 'ListItem', 'position' => 1, 'name' => '首页', 'item' => 'https://www.railwise.cn/'],
       ['@type' => 'ListItem', 'position' => 2, 'name' => '产品矩阵', 'item' => 'https://www.railwise.cn/products'],
-      ['@type' => 'ListItem', 'position' => 3, 'name' => 'RailWise AI', 'item' => 'https://www.railwise.cn/products/workwise/'],
+      ['@type' => 'ListItem', 'position' => 3, 'name' => 'RailWise AI', 'item' => 'https://www.railwise.cn/products/railwise-ai/'],
     ],
   ],
 ];
@@ -150,9 +150,9 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="pd-screenshot featured">
           <div class="pd-browser-bar">
             <span></span><span></span><span></span>
-            <div class="pd-url">RailWise Survey · 0.5.1 历史界面 · 公开合成数据</div>
+            <div class="pd-url">RailWise Survey · 0.5.3 版本界面 · 公开合成数据</div>
           </div>
-          <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/07-survey-051-zh-light.jpg')); ?>" alt="RailWise Survey 工程测量内业中文浅色界面，使用公开合成数据" fetchpriority="high" decoding="async">
+          <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/10-survey-053-zh-light.jpg')); ?>" alt="RailWise Survey 工程测量内业中文浅色界面，使用公开合成数据" fetchpriority="high" decoding="async">
         </div>
       </div>
     </div>
@@ -213,8 +213,8 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
     <div class="ww-advantage-layout">
       <div class="ww-advantage-visual">
-        <div class="ww-visual-tag">RailWise Survey · 0.5.1 历史界面 · 公开合成数据</div>
-        <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/07-survey-051-zh-light.jpg')); ?>" alt="RailWise Survey 工程测量内业中文浅色界面，使用公开合成数据" loading="lazy" decoding="async">
+        <div class="ww-visual-tag">RailWise Survey · 0.5.3 版本界面 · 公开合成数据</div>
+        <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/10-survey-053-zh-light.jpg')); ?>" alt="RailWise Survey 工程测量内业中文浅色界面，使用公开合成数据" loading="lazy" decoding="async">
         <div class="ww-visual-points">
           <span><i class="fas fa-layer-group"></i> 原始依据</span>
           <span><i class="fas fa-file-word"></i> DOCX</span>
@@ -393,9 +393,9 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="pd-screenshot featured">
           <div class="pd-browser-bar">
             <span></span><span></span><span></span>
-            <div class="pd-url">Survey · 0.5.1 历史界面 · 公开合成数据</div>
+            <div class="pd-url">Survey · 0.5.3 版本界面 · 公开合成数据</div>
           </div>
-          <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/08-survey-051-delivery.jpg')); ?>" alt="Survey 待审查成果预览与文件哈希" loading="lazy" decoding="async">
+          <img src="<?php echo htmlspecialchars(optimizeImage('/products/screenshots/workwise/11-survey-053-delivery.jpg')); ?>" alt="Survey 待审查成果预览与文件哈希" loading="lazy" decoding="async">
         </div>
         <div class="ww-export-flow">
           <span>平差计算</span>

@@ -114,6 +114,23 @@ test('normalizes a trailing slash and accepts release identifiers with dots', ()
   }
 })
 
+test('discovers the actual canonical website release root and rejects traversal or foreign hosts', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
+  const dumpPath = join(directory, 'nginx-dump.txt')
+  try {
+    writeFileSync(dumpPath, String.raw`http {
+  server { server_name www.railwise.cn; root /www/releases/20261003-084327-76c48d0/site/; }
+  server { server_name www.railwise.cn; root /www/releases/../site; }
+  server { server_name www.other.example; root /www/releases/other/site; }
+  server { server_name www.railwise.cn; root /www/releases/../../escaped/site; }
+}`)
+    const roots = execFileSync('python3', ['-c', NGINX_VHOST_ROOTS_PYTHON, dumpPath], { encoding: 'utf8' })
+    assert.deepEqual(roots.trim().split('\n'), ['/www/releases/20261003-084327-76c48d0/site'])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('keeps conflicting active host roots visible so deployment fails closed', () => {
   const directory = mkdtempSync(join(tmpdir(), 'workwise-nginx-roots-'))
   const dumpPath = join(directory, 'nginx-dump.txt')
@@ -140,6 +157,7 @@ test('retries a stale normal page and verifies both URLs, manifest and all insta
     return calls.length === 1 ? new Response('"softwareVersion":"v0.5.0"') : goodResponse(url)
   } })
   assert.equal(calls.filter((url) => url.endsWith('/products/workwise/')).length, 2)
+  assert.equal(calls.filter((url) => url.endsWith('/products/railwise-ai/')).length, 1)
   assert.equal(calls.filter((url) => url.includes('?release=')).length, 1)
   assert.equal(calls.filter((url) => url.includes('/releases/')).length, 3)
 })
@@ -151,6 +169,16 @@ test('persistent stale default URL fails even when cache-busting URL would be fr
     return String(url).endsWith('/products/workwise/') ? new Response('"softwareVersion":"v0.5.0"') : goodResponse(url)
   } }), /Observed page version v0.5.0/)
   assert.equal(attempts, 2)
+})
+
+test('a fresh legacy URL cannot mask stale canonical product content', async () => {
+  const calls = []
+  await assert.rejects(verifyProductPublication(manifest, { ...options, fetcher: async (url) => {
+    calls.push(String(url))
+    return String(url).endsWith('/products/railwise-ai/') ? new Response('"softwareVersion":"v0.5.1"') : goodResponse(url)
+  } }), /Observed page version v0.5.1/)
+  assert.equal(calls.filter((url) => url.endsWith('/products/workwise/')).length, 2)
+  assert.equal(calls.filter((url) => url.endsWith('/products/railwise-ai/')).length, 2)
 })
 
 test('correct page cannot mask an old public manifest or wrong installer hash', async () => {
@@ -171,4 +199,150 @@ test('missing download content and unsupported Range responses remain failures',
   await assert.rejects(verifyProductPublication(manifest, { ...options, fetcher: async (url) =>
     String(url).includes('/releases/') ? new Response('full file', { status: 200 }) : goodResponse(url)
   }), /Installer Range verification failed/)
+})
+
+test('published-page rollback restores distinct legacy and canonical bytes from a release-root backup', () => {
+  const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')
+  const script = source.match(/const ROLLBACK_SCRIPT = String.raw`([\s\S]*?)\n`/)?.[1]
+  assert.ok(script)
+  const operations = script.slice(script.indexOf('release_root="$1"')).replace('discover_web_container\n', '')
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-canonical-rollback-'))
+  const virtualRoot = '/www/releases/20261003-084327-76c48d0'
+  const site = join(directory, 'site')
+  const backup = join(directory, '.workwise-product-backups/run-1')
+  try {
+    mkdirSync(join(site, 'products/workwise'), { recursive: true })
+    mkdirSync(join(site, 'products/railwise-ai'), { recursive: true })
+    mkdirSync(join(site, 'includes'), { recursive: true })
+    mkdirSync(join(site, 'data'), { recursive: true })
+    mkdirSync(backup, { recursive: true })
+    const fixtures = [
+      ['product-page.php', 'products/workwise/index.php', 'original legacy'],
+      ['canonical-product-page.php', 'products/railwise-ai/index.php', 'original canonical'],
+      ['workwise_product.php', 'includes/workwise_product.php', 'original include'],
+      ['workwise-product.json', 'data/workwise-product.json', '{"version":"0.5.1"}']
+    ]
+    for (const [name, relative, bytes] of fixtures) {
+      writeFileSync(join(backup, name), bytes)
+      writeFileSync(join(site, relative), 'new publication bytes')
+    }
+    writeFileSync(join(backup, 'deployed-screenshots.txt'), '')
+    execFileSync('bash', ['-s', '--', '/opt/1panel/1panel/www/sites/www.railwise.cn/index/downloads/workwise', 'run-1'], {
+      encoding: 'utf8', env: { ...process.env, FIXTURE_ROOT: directory }, input: `
+set -euo pipefail
+site_root='${virtualRoot}/site'
+container_run() {
+  local arg
+  local args=()
+  for arg in "$@"; do
+    case "$arg" in
+      ${virtualRoot}/*) args+=("$FIXTURE_ROOT/\${arg#${virtualRoot}/}") ;;
+      *) args+=("$arg") ;;
+    esac
+  done
+  "\${args[@]}"
+}
+${operations}
+`
+    })
+    for (const [, relative, bytes] of fixtures) assert.equal(readFileSync(join(site, relative), 'utf8'), bytes)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('generic source validation remains compatible with historical content-only sources lacking a canonical entry', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-source-compatible-'))
+  try {
+    mkdirSync(join(directory, 'products/workwise'), { recursive: true })
+    mkdirSync(join(directory, 'includes'), { recursive: true })
+    mkdirSync(join(directory, 'data'), { recursive: true })
+    writeFileSync(join(directory, 'products/workwise/index.php'), '<?php echo "historical content source";')
+    writeFileSync(join(directory, 'includes/workwise_product.php'), '<?php echo "historical include";')
+    writeFileSync(join(directory, 'data/workwise-product.json'), JSON.stringify(manifest))
+    const output = execFileSync(process.execPath, [new URL('./deploy-workwise-product-page.mjs', import.meta.url).pathname, 'validate', '--source', directory, '--version', manifest.version], { encoding: 'utf8' })
+    assert.match(output, /Validated WorkWise website source/)
+    assert.throws(() => execFileSync(process.execPath, [new URL('./deploy-workwise-product-page.mjs', import.meta.url).pathname, 'deploy', '--source', directory, '--version', manifest.version, '--deploy-id', 'compatibility-fixture'], { encoding: 'utf8', stdio: 'pipe' }), /Missing website source file: products\/railwise-ai\/index.php/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('historical full-page backups restore their original targets while preserving untouched canonical content', () => {
+  const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')
+  const script = source.match(/const ROLLBACK_SCRIPT = String.raw`([\s\S]*?)\n`/)?.[1]
+  const operations = script.slice(script.indexOf('release_root="$1"')).replace('discover_web_container\n', '')
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-legacy-backup-'))
+  const virtualRoot = '/www/audit-releases/audit-historical'
+  const site = join(directory, 'site')
+  const backup = join(directory, '.workwise-product-backups/run-old')
+  try {
+    for (const path of ['products/workwise', 'products/railwise-ai', 'includes', 'data']) mkdirSync(join(site, path), { recursive: true })
+    mkdirSync(backup, { recursive: true })
+    const fixtures = [
+      ['product-page.php', 'products/workwise/index.php', 'original legacy'],
+      ['workwise_product.php', 'includes/workwise_product.php', 'original include'],
+      ['workwise-product.json', 'data/workwise-product.json', '{"version":"0.5.1"}']
+    ]
+    for (const [name, relative, bytes] of fixtures) {
+      writeFileSync(join(backup, name), bytes)
+      writeFileSync(join(site, relative), 'new publication bytes')
+    }
+    writeFileSync(join(site, 'products/railwise-ai/index.php'), 'canonical was untouched')
+    writeFileSync(join(backup, 'deployed-screenshots.txt'), '')
+    execFileSync('bash', ['-s', '--', '/opt/1panel/1panel/www/sites/www.railwise.cn/index/downloads/workwise', 'run-old'], {
+      encoding: 'utf8', env: { ...process.env, FIXTURE_ROOT: directory }, input: `
+set -euo pipefail
+site_root='${virtualRoot}/site'
+container_run() {
+  local arg
+  local args=()
+  for arg in "$@"; do
+    case "$arg" in
+      ${virtualRoot}/*) args+=("$FIXTURE_ROOT/\${arg#${virtualRoot}/}") ;;
+      *) args+=("$arg") ;;
+    esac
+  done
+  "\${args[@]}"
+}
+${operations}
+`
+    })
+    for (const [, relative, bytes] of fixtures) assert.equal(readFileSync(join(site, relative), 'utf8'), bytes)
+    assert.equal(readFileSync(join(site, 'products/railwise-ai/index.php'), 'utf8'), 'canonical was untouched')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('live canonical guard accepts its own deployed shim on a second run and rejects unknown PHP', () => {
+  const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')
+  const guard = source.match(/verify_live_targets\(\) \{[\s\S]*?\n\}/)?.[0]
+  assert.ok(guard)
+  const directory = mkdtempSync(join(tmpdir(), 'workwise-repeat-deploy-'))
+  try {
+    writeFileSync(join(directory, 'legacy.php'), '$workwiseManifest = rw_workwise_manifest();')
+    writeFileSync(join(directory, 'include.php'), 'function rw_workwise_manifest()')
+    writeFileSync(join(directory, 'manifest.json'), '{"releaseChannel": "stable"}')
+    const shim = readFileSync(new URL('../website/products/railwise-ai/index.php', import.meta.url), 'utf8')
+    const invoke = () => execFileSync('bash', ['-s'], { encoding: 'utf8', env: { ...process.env, FIXTURE_ROOT: directory }, input: `
+set -euo pipefail
+page_path="$FIXTURE_ROOT/legacy.php"
+canonical_page_path="$FIXTURE_ROOT/canonical.php"
+include_path="$FIXTURE_ROOT/include.php"
+json_path="$FIXTURE_ROOT/manifest.json"
+container_run() { "$@"; }
+fail() { echo "$1" >&2; exit 65; }
+${guard}
+verify_live_targets
+` })
+    writeFileSync(join(directory, 'canonical.php'), '$workwiseManifest = rw_workwise_manifest();')
+    assert.doesNotThrow(invoke)
+    writeFileSync(join(directory, 'canonical.php'), shim)
+    assert.doesNotThrow(invoke)
+    writeFileSync(join(directory, 'canonical.php'), '<?php require "/unapproved/page.php";')
+    assert.throws(invoke, /live canonical product page marker was not recognized/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

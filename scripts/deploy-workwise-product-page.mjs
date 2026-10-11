@@ -39,13 +39,14 @@ function normalizeToken(value, label) {
   return token
 }
 
-function sourceFiles(sourceDirectory) {
+function sourceFiles(sourceDirectory, includeCanonical = false) {
   const source = resolve(sourceDirectory)
   const files = [
     { source: resolve(source, 'products/workwise/index.php'), relative: 'products/workwise/index.php' },
     { source: resolve(source, 'includes/workwise_product.php'), relative: 'includes/workwise_product.php' },
     { source: resolve(source, 'data/workwise-product.json'), relative: 'data/workwise-product.json' }
   ]
+  if (includeCanonical) files.push({ source: resolve(source, 'products/railwise-ai/index.php'), relative: 'products/railwise-ai/index.php' })
   const screenshotDirectory = resolve(source, 'products/screenshots/workwise')
   if (existsSync(screenshotDirectory) && statSync(screenshotDirectory).isDirectory()) {
     for (const name of readdirSync(screenshotDirectory).sort()) {
@@ -60,8 +61,8 @@ function sourceFiles(sourceDirectory) {
   return files
 }
 
-function validateSource(sourceDirectory, version) {
-  const files = sourceFiles(sourceDirectory)
+function validateSource(sourceDirectory, version, includeCanonical = false) {
+  const files = sourceFiles(sourceDirectory, includeCanonical)
   for (const file of files) {
     if (!existsSync(file.source) || !statSync(file.source).isFile() || statSync(file.source).size === 0) {
       throw new Error(`Missing website source file: ${file.relative}`)
@@ -165,7 +166,7 @@ deploy_id="$2"
 case "$release_root" in /*/downloads/workwise) ;; *) exit 64 ;; esac
 stage="/tmp/workwise-product-deploy-$deploy_id/payload"
 case "$stage" in /tmp/workwise-product-deploy-*/payload) ;; *) exit 64 ;; esac
-install -d -m 700 "$stage/products/workwise" "$stage/products/screenshots/workwise" "$stage/includes" "$stage/data"
+install -d -m 700 "$stage/products/workwise" "$stage/products/railwise-ai" "$stage/products/screenshots/workwise" "$stage/includes" "$stage/data"
 printf '%s\n' "$stage"
 `
 
@@ -221,7 +222,9 @@ rm -f "$nginx_dump"
     if docker exec -u 0 "$web_container" test -f "$candidate_root/products/workwise/index.php" \
       && docker exec -u 0 "$web_container" test -f "$candidate_root/includes/workwise_product.php" \
       && docker exec -u 0 "$web_container" test -f "$candidate_root/data/workwise-product.json" \
-      && docker exec "$php_container" test -f "$candidate_root/products/workwise/index.php"; then
+      && docker exec -u 0 "$web_container" test -f "$candidate_root/products/railwise-ai/index.php" \
+      && docker exec "$php_container" test -f "$candidate_root/products/workwise/index.php" \
+      && docker exec "$php_container" test -f "$candidate_root/products/railwise-ai/index.php"; then
       site_root="$candidate_root"
       root_count=$((root_count + 1))
     fi
@@ -232,6 +235,7 @@ EOF_ROOTS
   printf 'Selected active www.railwise.cn document root: %s\n' "$site_root"
 
   page_path="$site_root/products/workwise/index.php"
+  canonical_page_path="$site_root/products/railwise-ai/index.php"
   include_path="$site_root/includes/workwise_product.php"
   json_path="$site_root/data/workwise-product.json"
 }
@@ -248,9 +252,14 @@ container_decode() {
 }
 verify_live_targets() {
   container_run test -f "$page_path" || fail 'missing live WorkWise product page'
+  container_run test -f "$canonical_page_path" || fail 'missing live RailWise AI product page'
   container_run test -f "$include_path" || fail 'missing live WorkWise product include'
   container_run test -f "$json_path" || fail 'missing live WorkWise product manifest'
   container_run grep -Fq '$workwiseManifest = rw_workwise_manifest();' "$page_path" || fail 'live product page marker was not recognized'
+  if ! container_run grep -Fq '$workwiseManifest = rw_workwise_manifest();' "$canonical_page_path" \
+    && ! container_run grep -Fq "require __DIR__ . '/../workwise/index.php';" "$canonical_page_path"; then
+    fail 'live canonical product page marker was not recognized'
+  fi
   container_run grep -Fq 'function rw_workwise_manifest()' "$include_path" || fail 'live product include marker was not recognized'
   container_run grep -Fq '"releaseChannel": "stable"' "$json_path" || fail 'live product manifest marker was not recognized'
 }
@@ -290,21 +299,24 @@ for index in range(1, len(parts), 2):
                 print('Website routing:', line.strip())
 PY
 backup="$(dirname "$site_root")/.workwise-product-backups/$deploy_id"
-case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
+case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*|/www/releases/*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
 
 test -s "$stage/products/workwise/index.php" || fail 'missing staged product page'
+test -s "$stage/products/railwise-ai/index.php" || fail 'missing staged canonical product page'
 test -s "$stage/includes/workwise_product.php" || fail 'missing staged product include'
 test -s "$stage/data/workwise-product.json" || fail 'missing staged product manifest'
 printf 'Validated staged and live WorkWise website paths.\n'
 printf 'Derived the unique WorkWise targets from the approved document root.\n'
 
 docker exec -i "$php_container" php -l < "$stage/products/workwise/index.php" >/dev/null || fail 'product page PHP lint failed'
+docker exec -i "$php_container" php -l < "$stage/products/railwise-ai/index.php" >/dev/null || fail 'canonical product page PHP lint failed'
 docker exec -i "$php_container" php -l < "$stage/includes/workwise_product.php" >/dev/null || fail 'product include PHP lint failed'
 docker exec -i "$php_container" php -r '$p=json_decode(stream_get_contents(STDIN), true); if (!is_array($p) || ($p["version"] ?? "") !== $argv[1]) { exit(65); }' -- "$version" < "$stage/data/workwise-product.json" || fail 'product manifest JSON/version validation failed'
 printf 'Validated PHP syntax, JSON and exact WorkWise version.\n'
 
 container_run install -d -m 700 "$backup" || fail 'could not create backup directory'
 container_run cp -p "$page_path" "$backup/product-page.php" || fail 'could not back up product page'
+container_run cp -p "$canonical_page_path" "$backup/canonical-product-page.php" || fail 'could not back up canonical product page'
 container_run cp -p "$include_path" "$backup/workwise_product.php" || fail 'could not back up product include'
 container_run cp -p "$json_path" "$backup/workwise-product.json" || fail 'could not back up product manifest'
 if container_run test -d "$site_root/products/screenshots/workwise"; then
@@ -342,32 +354,35 @@ stage_replacement() {
 stage_replacement "$include_path" "$stage/includes/workwise_product.php"
 stage_replacement "$json_path" "$stage/data/workwise-product.json"
 stage_replacement "$page_path" "$stage/products/workwise/index.php"
+stage_replacement "$canonical_page_path" "$stage/products/railwise-ai/index.php"
 printf 'Created server backup and next-version files.\n'
 
 committed=0
 rollback() {
   if [ "$committed" -eq 0 ]; then
     if container_run test -f "$backup/product-page.php"; then container_run cp -p "$backup/product-page.php" "$page_path"; fi
+    if container_run test -f "$backup/canonical-product-page.php"; then container_run cp -p "$backup/canonical-product-page.php" "$canonical_page_path"; fi
     if container_run test -f "$backup/workwise_product.php"; then container_run cp -p "$backup/workwise_product.php" "$include_path"; fi
     if container_run test -f "$backup/workwise-product.json"; then container_run cp -p "$backup/workwise-product.json" "$json_path"; fi
     if container_run test -d "$backup/screenshots"; then
       container_run install -d -m 755 "$site_root/products/screenshots/workwise"
     fi
     restore_screenshots
-    container_run rm -f "$page_path.workwise-next" "$include_path.workwise-next" "$json_path.workwise-next"
+    container_run rm -f "$page_path.workwise-next" "$canonical_page_path.workwise-next" "$include_path.workwise-next" "$json_path.workwise-next"
   fi
 }
 trap rollback EXIT HUP INT TERM
 container_run mv -f "$include_path.workwise-next" "$include_path"
 container_run mv -f "$json_path.workwise-next" "$json_path"
 container_run mv -f "$page_path.workwise-next" "$page_path"
+container_run mv -f "$canonical_page_path.workwise-next" "$canonical_page_path"
 container_run install -d -m 755 "$site_root/products/screenshots/workwise"
 for encoded in "$stage"/products/screenshots/workwise/*.json; do
   [ -f "$encoded" ] || continue
   image_name="$(basename "$encoded" .json)"
   container_decode "$encoded" "$site_root/products/screenshots/workwise/$image_name"
 done
-for relative in products/workwise/index.php includes/workwise_product.php data/workwise-product.json; do
+for relative in products/workwise/index.php products/railwise-ai/index.php includes/workwise_product.php data/workwise-product.json; do
   expected="$(sha256sum "$stage/$relative" | cut -d ' ' -f 1)"
   actual="$(container_run sha256sum "$site_root/$relative" | cut -d ' ' -f 1)"
   php_actual="$(docker exec "$php_container" sha256sum "$site_root/$relative" | cut -d ' ' -f 1)"
@@ -427,7 +442,9 @@ PY
     if docker exec -u 0 "$web_container" test -f "$candidate_root/products/workwise/index.php" \
       && docker exec -u 0 "$web_container" test -f "$candidate_root/includes/workwise_product.php" \
       && docker exec -u 0 "$web_container" test -f "$candidate_root/data/workwise-product.json" \
-      && docker exec "$php_container" test -f "$candidate_root/products/workwise/index.php"; then
+      && docker exec -u 0 "$web_container" test -f "$candidate_root/products/railwise-ai/index.php" \
+      && docker exec "$php_container" test -f "$candidate_root/products/workwise/index.php" \
+      && docker exec "$php_container" test -f "$candidate_root/products/railwise-ai/index.php"; then
       site_root="$candidate_root"; root_count=$((root_count + 1))
     fi
   done <<EOF_ROOTS
@@ -443,14 +460,18 @@ deploy_id="$2"
 case "$release_root" in /*/downloads/workwise) ;; *) exit 64 ;; esac
 discover_web_container
 page_path="$site_root/products/workwise/index.php"
+canonical_page_path="$site_root/products/railwise-ai/index.php"
 include_path="$site_root/includes/workwise_product.php"
 json_path="$site_root/data/workwise-product.json"
 backup="$(dirname "$site_root")/.workwise-product-backups/$deploy_id"
-case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
+case "$backup" in /www/audit-releases/audit-*/.workwise-product-backups/*|/www/releases/*/.workwise-product-backups/*) ;; *) exit 64 ;; esac
 container_run test -s "$backup/product-page.php"
 container_run test -s "$backup/workwise_product.php"
 container_run test -s "$backup/workwise-product.json"
 container_run cp -p "$backup/product-page.php" "$page_path"
+if container_run test -s "$backup/canonical-product-page.php"; then
+  container_run cp -p "$backup/canonical-product-page.php" "$canonical_page_path"
+fi
 container_run cp -p "$backup/workwise_product.php" "$include_path"
 container_run cp -p "$backup/workwise-product.json" "$json_path"
 if container_run test -d "$backup/screenshots"; then
@@ -484,7 +505,7 @@ function copyToStage(config, localPath, remotePath) {
 }
 
 function deploy(sourceDirectory, version, deployId) {
-  const validated = validateSource(sourceDirectory, version)
+  const validated = validateSource(sourceDirectory, version, true)
   const config = readSshConfig()
   const stage = runRemote(config, PREPARE_SCRIPT, [config.releaseRoot, deployId]).trim()
   if (stage !== `/tmp/workwise-product-deploy-${deployId}/payload`) {
@@ -520,7 +541,7 @@ function rollback(deployId) {
 }
 
 async function verifyPublic(sourceDirectory, version) {
-  const { manifest } = validateSource(sourceDirectory, version)
+  const { manifest } = validateSource(sourceDirectory, version, true)
   await verifyProductPublication(manifest)
 }
 
@@ -531,7 +552,7 @@ const mode = flags.get('mode') || 'full'
 if (!['full', 'content-only'].includes(mode)) throw new Error(`Invalid mode: ${mode}`)
 
 if (mode === 'content-only') {
-  validateSource(source, version)
+  validateSource(source, version, false)
   await runContentCommand({
     command, source, sourceSha: requireFlag(flags, 'source-sha'),
     deployId: flags.get('deploy-id'),
