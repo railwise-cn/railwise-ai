@@ -56,6 +56,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: Verify native Windows ASAR paths and offline runtime packaging
+        run: node --test scripts/verify-packaged-markdown-rendering.test.cjs scripts/dependency-artifact-policy.test.cjs scripts/verify-markdown-packaging-filesets.test.cjs
       - name: Run core Windows security tests
         run: >-
           npm test -- --run

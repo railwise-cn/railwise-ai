@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process')
 const { dirname, join } = require('node:path')
 const { verifyAudit: verifySpecialistSkillAudit } = require('./specialist-skill-audit.cjs')
+const { verifyMarkdownPackagingFileSets } = require('./verify-markdown-packaging-filesets.cjs')
 
 function normalizeArch(arch) {
   if (arch === 'x64' || arch === 'arm64') return arch
@@ -63,6 +64,8 @@ function rebuildManagedRuntimeSqlite(context) {
 
 async function beforePack(context) {
   verifySpecialistSkillAudit()
+  const markdownFiles = await verifyMarkdownPackagingFileSets()
+  console.log(`[before-pack] Offline Markdown root FileSets verified: ${markdownFiles.collected} files.`)
   rebuildManagedRuntimeSqlite(context)
 }
 

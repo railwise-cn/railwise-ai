@@ -80,6 +80,7 @@ function createCandidatePackagingRepo(): { repo: string; sourceHead: string } {
   mkdirSync(join(repo, 'src', 'asset', 'agent-packs', 'metro-monitoring-agent-pack'), { recursive: true })
   copyFileSync(join(process.cwd(), 'electron-builder.cjs'), join(repo, 'electron-builder.cjs'))
   copyFileSync(join(process.cwd(), 'scripts/dependency-artifact-policy.cjs'), join(repo, 'scripts/dependency-artifact-policy.cjs'))
+  copyFileSync(join(process.cwd(), 'scripts/runtime-package-packaging.cjs'), join(repo, 'scripts/runtime-package-packaging.cjs'))
   copyFileSync(join(process.cwd(), 'kun', 'package-lock.json'), join(repo, 'kun', 'package-lock.json'))
   copyFileSync(
     join(process.cwd(), 'scripts', 'candidate-source-provenance.cjs'),
@@ -190,7 +191,9 @@ describe('electron-builder WorkWise packaging', () => {
     expect(builderConfig.buildDependenciesFromSource).toBe(true)
     expect(builderConfig.npmRebuild).toBe(true)
     expect(builderConfig.asarUnpack).toEqual(expect.arrayContaining([
-      'src/asset/skills/**/*'
+      'src/asset/skills/**/*',
+      '**/node_modules/bindings/**/*',
+      '**/node_modules/file-uri-to-path/**/*'
     ]))
     expect(builderConfig.files).not.toEqual(expect.arrayContaining([
       'kun/dist/**/*',
@@ -199,10 +202,16 @@ describe('electron-builder WorkWise packaging', () => {
       'kun/node_modules/vitest/**/*',
       'kun/node_modules/better-sqlite3/**/*'
     ]))
-    expect(builderConfig.files).toEqual(expect.arrayContaining([
-      'node_modules/@modelcontextprotocol/sdk/**/*',
-      'node_modules/zod-to-json-schema/**/*'
-    ]))
+    for (const name of ['@modelcontextprotocol/sdk', 'zod-to-json-schema', 'bindings', 'file-uri-to-path', 'katex', 'mermaid', 'markdown-it-footnote']) {
+      expect(builderConfig.files).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          from: `node_modules/${name}`,
+          to: `node_modules/${name}`,
+          filter: expect.arrayContaining(['!**/*.map', '!**/*.d.ts', '!**/*.ts', '!**/README*', '!**/CHANGELOG*'])
+        })
+      ]))
+      expect(builderConfig.files).not.toContain(`node_modules/${name}/**/*`)
+    }
     expect(builderConfig.asarUnpack).not.toEqual(expect.arrayContaining([
       '**/kun/node_modules/**/*'
     ]))

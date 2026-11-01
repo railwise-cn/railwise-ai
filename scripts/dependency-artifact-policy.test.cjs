@@ -6,11 +6,28 @@ const { join } = require('node:path')
 const { minimatch } = require('minimatch')
 const asar = require('@electron/asar')
 const config = require('../electron-builder.cjs')
-const { verifyBundledDependencyArtifacts } = require('./dependency-artifact-policy.cjs')
+const { archiveDependencyArtifacts, verifyBundledDependencyArtifacts } = require('./dependency-artifact-policy.cjs')
 
 function excluded(path, filters) {
   return filters.some((filter) => typeof filter === 'string' && filter.startsWith('!') && minimatch(path, filter.slice(1), { dot: true }))
 }
+
+test('dependency archive scanning rejects Windows and POSIX developer paths equally', () => {
+  const entries = [
+    '/node_modules/lib0/.playwright-mcp/console.log',
+    '\\node_modules\\lib0\\.playwright-mcp\\console.log',
+    '\\node_modules\\lib0\\nested\\diagnostic.LOG',
+    '\\node_modules\\lib0\\test-results\\report.json',
+    '\\node_modules\\lib0\\dist\\index.js',
+    '\\out\\renderer\\assets\\console.log'
+  ]
+  assert.deepEqual(archiveDependencyArtifacts(entries), [
+    'app.asar/node_modules/lib0/.playwright-mcp/console.log',
+    'app.asar/node_modules/lib0/.playwright-mcp/console.log',
+    'app.asar/node_modules/lib0/nested/diagnostic.LOG',
+    'app.asar/node_modules/lib0/test-results/report.json'
+  ])
+})
 
 test('main and managed-runtime filters exclude browser artifacts and logs while retaining runtime modules', () => {
   const managed = config.extraResources.find((resource) => resource.from === 'kun/node_modules').filter
