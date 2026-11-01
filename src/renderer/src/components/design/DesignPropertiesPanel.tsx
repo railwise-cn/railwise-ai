@@ -37,6 +37,7 @@ export function DesignPropertiesPanel(): ReactElement {
 
   const isSingle = selectedElements.length === 1
   const first = selectedElements[0]
+  const hasLockedSelection = selectedElements.some((element) => element.locked)
 
   // 多选时取首个元素的值作为显示（混合值时不显示具体数字）
   const sharedX = allSame(selectedElements, 'x') ? first.x : null
@@ -56,6 +57,11 @@ export function DesignPropertiesPanel(): ReactElement {
             {t('designSelectedCount', { count: selectedElements.length })}
           </div>
         ) : null}
+        {hasLockedSelection ? (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800">
+            {t('designLockedSelectionNotice')}
+          </div>
+        ) : null}
 
         {/* 位置和尺寸 */}
         <Section title={t('designGeometry')}>
@@ -63,21 +69,25 @@ export function DesignPropertiesPanel(): ReactElement {
             <NumberField
               label="X"
               value={sharedX}
+              disabled={hasLockedSelection}
               onChange={(v) => updateSelectedElements({ x: v })}
             />
             <NumberField
               label="Y"
               value={sharedY}
+              disabled={hasLockedSelection}
               onChange={(v) => updateSelectedElements({ y: v })}
             />
             <NumberField
               label={t('designWidth')}
               value={sharedW}
+              disabled={hasLockedSelection}
               onChange={(v) => updateSelectedElements({ w: Math.max(1, v) })}
             />
             <NumberField
               label={t('designHeight')}
               value={sharedH}
+              disabled={hasLockedSelection}
               onChange={(v) => updateSelectedElements({ h: Math.max(1, v) })}
             />
           </div>
@@ -87,6 +97,7 @@ export function DesignPropertiesPanel(): ReactElement {
         <Section title={t('designFill')}>
           <ColorField
             value={sharedFill ?? undefined}
+            disabled={hasLockedSelection}
             onChange={(v) => updateSelectedElements({ fill: v })}
           />
         </Section>
@@ -99,6 +110,7 @@ export function DesignPropertiesPanel(): ReactElement {
             max={1}
             step={0.05}
             value={sharedOpacity ?? 1}
+            disabled={hasLockedSelection}
             onChange={(e) => updateSelectedElements({ opacity: Number(e.target.value) })}
             className="w-full"
           />
@@ -108,7 +120,7 @@ export function DesignPropertiesPanel(): ReactElement {
         </Section>
 
         {/* 单选时的类型特有属性 */}
-        {isSingle && first ? <TypeSpecificProps element={first} onUpdate={updateSelectedElements} /> : null}
+        {isSingle && first ? <TypeSpecificProps element={first} onUpdate={updateSelectedElements} disabled={first.locked === true} /> : null}
       </div>
     </div>
   )
@@ -117,10 +129,12 @@ export function DesignPropertiesPanel(): ReactElement {
 /** 单选时显示的类型特有属性（text 的文字内容/字号、path 的路径数据等） */
 function TypeSpecificProps({
   element,
-  onUpdate
+  onUpdate,
+  disabled = false
 }: {
   element: DesignElement
   onUpdate: (patch: Partial<DesignElement>) => void
+  disabled?: boolean
 }): ReactElement | null {
   const { t } = useTranslation('common')
 
@@ -133,16 +147,19 @@ function TypeSpecificProps({
           className="w-full resize-none rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 text-[12.5px] text-ds-ink outline-none focus:border-accent"
           rows={3}
           placeholder={t('designTextContent')}
+          readOnly={disabled}
         />
         <div className="mt-2 grid grid-cols-2 gap-2">
           <NumberField
             label={t('designFontSize')}
             value={element.fontSize ?? 24}
+            disabled={disabled}
             onChange={(v) => onUpdate({ fontSize: Math.max(1, v) })}
           />
           <SelectField
             label={t('designTextAlign')}
             value={element.textAlign ?? 'left'}
+            disabled={disabled}
             onChange={(v) => onUpdate({ textAlign: v as DesignElement['textAlign'] })}
             options={[
               { value: 'left', label: t('designAlignLeft') },
@@ -163,6 +180,7 @@ function TypeSpecificProps({
           onChange={(e) => onUpdate({ pathData: e.target.value })}
           className="w-full resize-none rounded-lg border border-ds-border bg-ds-card px-2.5 py-1.5 font-mono text-[11px] text-ds-ink outline-none focus:border-accent"
           rows={3}
+          readOnly={disabled}
         />
       </Section>
     )
@@ -175,11 +193,13 @@ function TypeSpecificProps({
           <ColorField
             label={t('designStrokeColor')}
             value={element.stroke}
+            disabled={disabled}
             onChange={(v) => onUpdate({ stroke: v })}
           />
           <NumberField
             label={t('designStrokeWidth')}
             value={element.strokeWidth ?? 0}
+            disabled={disabled}
             onChange={(v) => onUpdate({ strokeWidth: Math.max(0, v) })}
           />
         </div>
@@ -212,11 +232,13 @@ function Section({ title, children }: { title: string; children: ReactElement | 
 function NumberField({
   label,
   value,
-  onChange
+  onChange,
+  disabled
 }: {
   label: string
   value: number | null
   onChange: (v: number) => void
+  disabled?: boolean
 }): ReactElement {
   return (
     <div>
@@ -224,6 +246,7 @@ function NumberField({
       <input
         type="number"
         value={value ?? ''}
+        disabled={disabled}
         onChange={(e) => {
           const v = Number(e.target.value)
           if (Number.isFinite(v)) onChange(Math.round(v))
@@ -237,11 +260,13 @@ function NumberField({
 function ColorField({
   label,
   value,
-  onChange
+  onChange,
+  disabled
 }: {
   label?: string
   value: string | undefined
   onChange: (v: string) => void
+  disabled?: boolean
 }): ReactElement {
   return (
     <div>
@@ -250,12 +275,14 @@ function ColorField({
         <input
           type="color"
           value={formatSvgColor(value) ?? '#000000'}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value.replace('#', '').toUpperCase())}
           className="h-8 w-8 shrink-0 cursor-pointer rounded border border-ds-border bg-transparent"
         />
         <input
           type="text"
           value={value ?? ''}
+          disabled={disabled}
           onChange={(e) => {
             const val = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().slice(0, 6)
             onChange(val)
@@ -272,18 +299,21 @@ function SelectField({
   label,
   value,
   onChange,
-  options
+  options,
+  disabled
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   options: Array<{ value: string; label: string }>
+  disabled?: boolean
 }): ReactElement {
   return (
     <div>
       <label className="mb-0.5 block text-[10.5px] text-ds-faint">{label}</label>
       <select
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-ds-border bg-ds-card px-2 py-1 text-[12px] text-ds-ink outline-none focus:border-accent"
       >

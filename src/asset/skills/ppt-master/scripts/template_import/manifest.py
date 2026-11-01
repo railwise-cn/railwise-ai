@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Internal helper: extract lightweight template assets and style metadata from a PPTX file.
+"""Internal helper: extract template resources and style metadata from a PPTX file.
 
 This helper is intentionally limited in scope:
 - extract reusable media assets
@@ -10,8 +10,8 @@ This helper is intentionally limited in scope:
 It does NOT try to convert arbitrary PPTX shapes into SVG templates.
 
 Output contract (single source of truth):
-    <workspace>/manifest.json   — all factual metadata (theme, assets, slides, layouts, masters)
-    <workspace>/assets/         — extracted reusable image assets
+    <workspace>/analysis/manifest.json — factual metadata and resource inventory
+    <workspace>/images/                — reusable image assets
 
 This module is a pure library. The CLI entry point lives in
 ``pptx_template_import.py`` at the scripts root.
@@ -19,10 +19,9 @@ This module is a pure library. The CLI entry point lives in
 
 from __future__ import annotations
 
-import json
 import posixpath
 import re
-import shutil
+import sys
 import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -30,9 +29,15 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
 
+# Latin keywords match whole words ("qa" must not fire on "Qatar").
+from pptx_ooxml.analyzer import _has_keyword
 from pptx_to_svg.ooxml_loader import (
     blip_embed_relationship_ids,
     parse_ooxml_boolean,
+)
+from pptx_workspace import (
+    inventory_package_resources,
+    write_workspace_resources,
 )
 
 
@@ -177,11 +182,6 @@ def emu_to_pixels(value: int) -> int:
     return int(round(value / EMU_PER_INCH * 96))
 
 
-def sanitize_filename(value: str) -> str:
-    value = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
-    return value.strip("._") or "asset"
-
-
 def part_svg_filename(role: str, seq: int, part_path: str) -> str:
     stem = PurePosixPath(part_path).stem
     safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_") or role
@@ -202,7 +202,7 @@ def resolve_first_rel(
     return None
 
 
-def parse_xfrm_record(sp: ET.Element) -> dict[str, int] | None:
+def parse_xfrm_record(sp: ET.Element) -> dict[str, float] | None:
     xfrm = sp.find("p:spPr/a:xfrm", NS)
     if xfrm is None:
         return None
@@ -218,10 +218,10 @@ def parse_xfrm_record(sp: ET.Element) -> dict[str, int] | None:
     except ValueError:
         return None
     return {
-        "x": emu_to_pixels(x),
-        "y": emu_to_pixels(y),
-        "width": emu_to_pixels(w),
-        "height": emu_to_pixels(h),
+        "x": x / EMU_PER_INCH * 96,
+        "y": y / EMU_PER_INCH * 96,
+        "width": w / EMU_PER_INCH * 96,
+        "height": h / EMU_PER_INCH * 96,
     }
 
 
@@ -407,11 +407,11 @@ def count_slide_shapes(root: ET.Element | None) -> int:
 
 def classify_slide(index: int, total: int, texts: list[str], image_count: int, shape_count: int) -> str:
     joined = " ".join(texts).lower()
-    if any(keyword in joined for keyword in THANKS_KEYWORDS):
+    if _has_keyword(joined, THANKS_KEYWORDS):
         return "ending_candidate"
-    if any(keyword in joined for keyword in TOC_KEYWORDS):
+    if _has_keyword(joined, TOC_KEYWORDS):
         return "toc_candidate"
-    if any(keyword in joined for keyword in CHAPTER_KEYWORDS):
+    if _has_keyword(joined, CHAPTER_KEYWORDS):
         return "chapter_candidate"
     if index == 1 and image_count <= 3:
         return "cover_candidate"
@@ -560,27 +560,9 @@ def build_manifest(
                     layout_parent[layout_path] = master_path
                     layout_parts.append(layout_path)
 
-        asset_dir = output_dir / "assets"
-        if asset_dir.exists():
-            shutil.rmtree(asset_dir)
-        asset_dir.mkdir(parents=True, exist_ok=True)
-
-        copied_assets: dict[str, str] = {}
-        for info in zf.infolist():
-            if not info.filename.startswith("ppt/media/") or info.is_dir():
-                continue
-            original_name = PurePosixPath(info.filename).name
-            safe_name = sanitize_filename(original_name)
-            destination = asset_dir / safe_name
-            stem = destination.stem
-            suffix = destination.suffix
-            counter = 2
-            while destination.exists():
-                destination = asset_dir / f"{stem}_{counter}{suffix}"
-                counter += 1
-            with zf.open(info.filename) as src, open(destination, "wb") as dst:
-                shutil.copyfileobj(src, dst)
-            copied_assets[info.filename] = destination.name
+        resource_inventory = inventory_package_resources(zf)
+        write_workspace_resources(output_dir, resource_inventory)
+        copied_assets = resource_inventory.image_name_map()
 
         slide_records: list[SlideRecord] = []
         asset_usage: Counter[str] = Counter()
@@ -593,6 +575,13 @@ def build_manifest(
 
         for index, slide_path in enumerate(slide_parts, 1):
             slide_root = load_xml_from_zip(zf, slide_path)
+            if slide_root is not None and slide_root.get("show", "").strip().lower() in {"0", "false", "off"}:
+                print(
+                    f"Warning: source slide {index} ({slide_path}) is hidden from the slide show; "
+                    "template preview export does not preserve this slide-hidden state. "
+                    "The slide is retained; use Edit Native roundtrip to preserve its source visibility.",
+                    file=sys.stderr,
+                )
             slide_rels = parse_relationships(zf, slide_path)
 
             layout_path = None
@@ -788,12 +777,13 @@ def build_manifest(
             },
             "slideSize": slide_size,
             "theme": theme_summary,
-            "assets": {
-                "exportDir": "assets",
-                "commonAssets": common_assets,
-                "allAssets": sorted(copied_assets.values()),
-                "assetMap": copied_assets,
+            "images": {
+                "exportDir": "images",
+                "commonImages": common_assets,
+                "allImages": sorted(copied_assets.values()),
+                "imageMap": copied_assets,
             },
+            "resources": resource_inventory.manifest(),
             "pageTypeCandidates": dict(sorted(page_type_map.items())),
             "layouts": layouts_top,
             "masters": masters_top,

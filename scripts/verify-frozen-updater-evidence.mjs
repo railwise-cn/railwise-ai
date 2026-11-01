@@ -10,7 +10,7 @@ import { validateUpdaterServiceEvidence } from './frozen-release-updater-service
 
 export const UPDATER_WORKFLOW = '.github/workflows/frozen-release-updater-acceptance.yml'
 export const UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/${UPDATER_WORKFLOW}@refs/heads/main`
-const JOB = 'Official 0.5.2 to exact frozen 0.5.3 native updater'
+const JOB = 'Official 0.5.2 to exact frozen public package native updater'
 const RUN_STEP = 'Run default-trust HTTPS download, Squirrel install and historical data readback'
 const RETAIN_STEP = 'Retain durable updater evidence including failures'
 const MAX_ARCHIVE = 20 * 1024 * 1024
@@ -20,7 +20,7 @@ function equal(actual, expected, label) { if (actual !== expected) fail(`${label
 function positive(value, label) { if (!Number.isSafeInteger(value) || value < 1) fail(`${label} must be a positive safe integer`) }
 export function reportSha256(bytes) { return createHash('sha256').update(bytes).digest('hex') }
 
-export function validateUpdaterEvidenceRun(run, machine, sourceHead) {
+export function validateUpdaterEvidenceRun(run, machine, sourceHead, version) {
   if (!run || typeof run !== 'object') fail('updaterRoundTrip.workflowRun is required')
   if (!['arm64', 'x64'].includes(machine?.arch)) fail('machine report must identify a supported native macOS architecture')
   equal(run.repository, RELEASE_REPOSITORY, 'repository')
@@ -35,7 +35,7 @@ export function validateUpdaterEvidenceRun(run, machine, sourceHead) {
     runId: run.runId, runAttempt: run.runAttempt }
   if (!isDeepStrictEqual(machine.provenance, provenance)) fail('machine report workflow provenance mismatch')
   if (!/^[a-f0-9]{64}$/.test(machine.nativeReportSha256 ?? '')) fail('native report SHA256 is required')
-  validateUpdaterServiceEvidence(machine, { sourceHead })
+  validateUpdaterServiceEvidence(machine, { sourceHead, version })
   return run
 }
 

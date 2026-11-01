@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { parse, stringify } from 'yaml'
 import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './frozen-release-updater-feed.mjs'
 import { assertHistoricalRowsPreserved, assertRetainedFiles, fixtureServiceIdentity, persistedJsonValue, prepareCompatibilityService, resolveFixtureService, SERVICE_MODULES, snapshotFiles, validateFixtureExecution } from './frozen-release-updater-data.mjs'
 import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
+import { readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 function temporary(t) { const root = mkdtempSync(join(tmpdir(), 'railwise-frozen-updater-test-')); t.after(() => rmSync(root, { recursive: true, force: true })); return root }
 function hostedEnvironment() {
@@ -18,14 +21,14 @@ function hostedEnvironment() {
     GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`,
     GITHUB_REF: 'refs/heads/main', GITHUB_SHA: 'a'.repeat(40), GITHUB_WORKFLOW_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
 }
-function fixture(t) {
-  const root = temporary(t); const zipPath = join(root, 'WorkWise-0.5.3-mac-arm64.zip'); const manifestPath = join(root, 'latest-mac.yml')
+function fixture(t, version = '0.5.3') {
+  const root = temporary(t); const zipPath = join(root, `WorkWise-${version}-mac-arm64.zip`); const manifestPath = join(root, 'latest-mac.yml')
   const bytes = Buffer.from('test-only HTTP transport bytes, not a signed application or native updater test')
   writeFileSync(zipPath, bytes)
   const sha512 = createHash('sha512').update(bytes).digest('base64')
-  const manifest = { version: '0.5.3', files: [{ url: 'WorkWise-0.5.3-mac-arm64.zip', sha512, size: bytes.length }], path: 'WorkWise-0.5.3-mac-arm64.zip', sha512 }
+  const manifest = { version, files: [{ url: `WorkWise-${version}-mac-arm64.zip`, sha512, size: bytes.length }], path: `WorkWise-${version}-mac-arm64.zip`, sha512 }
   const save = () => writeFileSync(manifestPath, stringify(manifest))
-  save(); return { root, bytes, manifest, save, options: { zipPath, manifestPath, version: '0.5.3', arch: 'arm64' } }
+  save(); return { root, bytes, manifest, save, options: { zipPath, manifestPath, version, arch: 'arm64' } }
 }
 function request(url, options = {}) {
   return new Promise((resolveRequest, reject) => {
@@ -117,13 +120,21 @@ test('fixture execution binds the real selected executable, target version and f
   const root = temporary(t); const app = join(root, 'Unit fixture.app'); const executable = join(app, 'Contents/MacOS/RailWise AI')
   mkdirSync(join(app, 'Contents/MacOS'), { recursive: true }); writeFileSync(executable, 'unit fixture executable')
   const head = 'a'.repeat(40); const metadata = { version: '0.5.3', buildProvenance: { sourceHead: head } }
-  assert.doesNotThrow(() => validateFixtureExecution(app, executable, metadata, 'verify', head))
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, metadata, 'verify', head, '0.5.3'))
   const other = join(root, 'Other executable'); writeFileSync(other, 'unit fixture executable')
-  assert.throws(() => validateFixtureExecution(app, other, metadata, 'verify', head), /selected packaged/)
-  assert.throws(() => validateFixtureExecution(app, executable, { ...metadata, version: '0.5.2' }, 'verify', head), /version/)
-  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', 'b'.repeat(40)), /source/)
-  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', undefined), /frozen source/)
-  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: '0.5.2' }, 'seed', head))
+  assert.throws(() => validateFixtureExecution(app, other, metadata, 'verify', head, '0.5.3'), /selected packaged/)
+  assert.throws(() => validateFixtureExecution(app, executable, { ...metadata, version: '0.5.2' }, 'verify', head, '0.5.3'), /version/)
+  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', 'b'.repeat(40), '0.5.3'), /source/)
+  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', undefined, '0.5.3'), /frozen source/)
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: '0.5.2' }, 'seed', head, '0.5.3'))
+  const next = { ...metadata, version: '0.5.4' }
+  for (const mode of ['verify', 'inspect']) {
+    assert.doesNotThrow(() => validateFixtureExecution(app, executable, next, mode, head, '0.5.4'))
+    assert.throws(() => validateFixtureExecution(app, executable, metadata, mode, head, '0.5.4'), /version/)
+    assert.throws(() => validateFixtureExecution(app, executable, next, mode, head, '0.5.3'), /version/)
+  }
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: '0.5.2' }, 'seed', head, '0.5.4'))
+  assert.throws(() => validateFixtureExecution(app, executable, next, 'verify', head), /explicit stable/)
 })
 
 test('service identity fails closed when a dependency is missing or resolves outside the bundle', t => {
@@ -219,6 +230,69 @@ test('reviewed build inputs require immutable artifact IDs/digests and the exact
   for (const modify of [b => { b.artifacts[0].id = -1 }, b => { delete b.artifacts[0].digest }, b => { b.files[0].name = 'WorkWise-0.5.2-mac-arm64.dmg' }, b => { b.workflowPath = '.github/workflows/attacker.yml' }]) {
     const copy = structuredClone(build); modify(copy); assert.throws(() => validateReviewedBuild(copy, { version: '0.5.3', sourceHead: head }))
   }
+})
+
+test('0.5.4 reviewed bytes and native public identity bind to an independently expected version', () => {
+  const head = 'a'.repeat(40)
+  const build = { repository: RELEASE_REPOSITORY, workflowPath: '.github/workflows/release.yml', sourceHead: head, runId: 123, runAttempt: 1, publicIdentity: PUBLIC_IDENTITY,
+    artifacts: [{ name: 'release-mac', id: 321, digest: `sha256:${'b'.repeat(64)}` }, { name: 'release-win', id: 322, digest: `sha256:${'c'.repeat(64)}` }], files: expectedReleaseFiles('0.5.4').map(file => ({ ...file, size: 1, sha256: 'd'.repeat(64) })) }
+  assert.doesNotThrow(() => validateReviewedBuild(build, { version: '0.5.4', sourceHead: head }))
+  assert.throws(() => validateReviewedBuild(build, { version: '0.5.3', sourceHead: head }))
+  const info = { CFBundleIdentifier: PUBLIC_IDENTITY.bundleId, CFBundleExecutable: PUBLIC_IDENTITY.productName, CFBundleShortVersionString: '0.5.4' }
+  const metadata = { name: 'workwise', productName: 'RailWise AI', version: '0.5.4', buildHints: { macSigningEnabled: true, notarizationEnabled: true }, buildProvenance: { sourceHead: head }, updateChannel: 'stable' }
+  const updater = { provider: 'generic', url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', updaterCacheDirName: 'workwise-updater' }
+  assert.doesNotThrow(() => validatePublicBundle(info, metadata, updater, '0.5.4', head))
+  assert.throws(() => validatePublicBundle(info, metadata, updater, '0.5.3', head))
+  // A fully coherent input for a different version cannot select its own target.
+  const sourceVersion = readFrozenSourceVersion()
+  const otherVersion = sourceVersion === '0.5.4' ? '0.5.3' : '0.5.4'
+  build.files = expectedReleaseFiles(otherVersion).map(file => ({ ...file, size: 1, sha256: 'd'.repeat(64) }))
+  assert.throws(() => validateReviewedBuild(build, { version: sourceVersion, sourceHead: head }))
+})
+
+test('stable targets retain the pinned historical baseline and reject ambiguous versions', () => {
+  for (const version of ['0.5.3', '0.5.4', '0.6.0', '1.0.0']) assert.equal(validateFrozenTargetVersion(version), version)
+  for (const version of [undefined, null, 504, '', '0.5.2', '0.5.1', '0.0.0', '00.5.4', '0.05.4', '0.5.04', 'v0.5.4', '0.5.4-beta.1', '0.5.4+build', '0.5.4\n', '9007199254740992.0.0']) {
+    assert.throws(() => validateFrozenTargetVersion(version))
+  }
+  assert.equal(readFrozenSourceVersion(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version)
+})
+
+test('workflow input execution binds reviewed bytes to the checked-out source version and GitHub SHA', t => {
+  const workflow = parse(readFileSync(new URL('../.github/workflows/frozen-release-updater-acceptance.yml', import.meta.url), 'utf8'))
+  const step = workflow.jobs['native-macos'].steps.find(item => item.env?.REVIEWED_BUILD_JSON)
+  const code = /^node --input-type=module <<'NODE'\n([\s\S]+)\nNODE\s*$/.exec(step.run)?.[1]
+  assert.ok(code, 'execute the actual trusted workflow input step')
+  const version = readFrozenSourceVersion(); const sourceHead = 'a'.repeat(40)
+  const build = { repository: RELEASE_REPOSITORY, workflowPath: '.github/workflows/release.yml', sourceHead, runId: 123, runAttempt: 1, publicIdentity: PUBLIC_IDENTITY,
+    artifacts: [{ name: 'release-mac', id: 321, digest: `sha256:${'b'.repeat(64)}` }, { name: 'release-win', id: 322, digest: `sha256:${'c'.repeat(64)}` }], files: expectedReleaseFiles(version).map(file => ({ ...file, size: 1, sha256: 'd'.repeat(64) })) }
+  const run = (input, githubSha, directory) => execFileSync(process.execPath, ['--input-type=module'], { input: code,
+    cwd: fileURLToPath(new URL('../', import.meta.url)), env: { ...process.env, REVIEWED_BUILD_JSON: JSON.stringify(input), GITHUB_SHA: githubSha, RUNNER_TEMP: directory }, stdio: ['pipe', 'pipe', 'pipe'] })
+  const accepted = temporary(t)
+  run(build, sourceHead, accepted)
+  assert.deepEqual(JSON.parse(readFileSync(join(accepted, 'frozen-reviewed-build.json'), 'utf8')), build)
+  const rejectedSource = temporary(t)
+  assert.throws(() => run(build, 'b'.repeat(40), rejectedSource))
+  assert.equal(existsSync(join(rejectedSource, 'frozen-reviewed-build.json')), false)
+  const rejectedVersion = temporary(t)
+  const otherVersion = version === '0.5.4' ? '0.5.3' : '0.5.4'
+  build.files = expectedReleaseFiles(otherVersion).map(file => ({ ...file, size: 1, sha256: 'd'.repeat(64) }))
+  assert.throws(() => run(build, sourceHead, rejectedVersion))
+  assert.equal(existsSync(join(rejectedVersion, 'frozen-reviewed-build.json')), false)
+})
+
+test('0.5.4 frozen feed serves the exact target bytes and refuses a different manifest target', async t => {
+  const f = fixture(t, '0.5.4')
+  const feed = await startFrozenReleaseFeed(f.options); t.after(() => feed.close())
+  const url = feed.origin + feed.prefix
+  const manifest = await request(url + 'latest-mac.yml')
+  assert.equal(manifest.status, 200)
+  assert.deepEqual(parse(manifest.body.toString()), f.manifest)
+  assert.deepEqual((await request(url + 'WorkWise-0.5.4-mac-arm64.zip')).body, f.bytes)
+  assert.equal((await request(url + 'WorkWise-0.5.3-mac-arm64.zip')).status, 404)
+  f.manifest.version = '0.5.3'; f.save()
+  await assert.rejects(validateFrozenFeed(f.options), /manifest version/)
+  await assert.rejects(validateFrozenFeed({ ...f.options, version: '0.5.3' }), /filename/)
 })
 
 test('frozen feed rejects wrong versions, duplicate assets, hash/size changes and links', async t => {
@@ -458,8 +532,13 @@ test('native evidence retention rejects unreadable or linked reports before crea
 test('native round trip requires the real six stages and strict nonce verification', () => {
   const names = ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved']
   const report = { schemaVersion: 1, status: 'passed', platform: 'darwin', arch: 'arm64', baseVersion: '0.5.2', targetVersion: '0.5.3', browserOpened: false, userDataPreserved: true, stages: names.map(name => ({ name, detail: name === 'user_data_preserved' ? '0.5.2' : undefined })) }
-  assert.doesNotThrow(() => validateNativeReport(report, 'arm64'))
-  for (const patch of [{ status: 'failed' }, { baseVersion: '0.0.0' }, { browserOpened: true }, { userDataPreserved: false }, { stages: report.stages.slice(1) }, { stages: report.stages.map(s => s.name === 'user_data_preserved' ? { ...s, detail: 'legacy-state:0.5.2' } : s) }]) assert.throws(() => validateNativeReport({ ...report, ...patch }, 'arm64'))
+  assert.doesNotThrow(() => validateNativeReport(report, 'arm64', '0.5.3'))
+  for (const patch of [{ status: 'failed' }, { baseVersion: '0.0.0' }, { browserOpened: true }, { userDataPreserved: false }, { stages: report.stages.slice(1) }, { stages: report.stages.map(s => s.name === 'user_data_preserved' ? { ...s, detail: 'legacy-state:0.5.2' } : s) }]) assert.throws(() => validateNativeReport({ ...report, ...patch }, 'arm64', '0.5.3'))
+  const next = { ...report, targetVersion: '0.5.4' }
+  assert.doesNotThrow(() => validateNativeReport(next, 'arm64', '0.5.4'))
+  assert.throws(() => validateNativeReport(report, 'arm64', '0.5.4'), /target/)
+  assert.throws(() => validateNativeReport(next, 'arm64', '0.5.3'), /target/)
+  assert.throws(() => validateNativeReport(next, 'arm64'), /explicit stable/)
 })
 
 test('native updater cleanup waits for owned applications after SIGTERM', async t => {

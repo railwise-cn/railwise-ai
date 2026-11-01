@@ -20,6 +20,7 @@ import {
   HrWidget,
   ImageWidget,
   ListBulletWidget,
+  MathInlineWidget,
   TableWidget,
   TaskCheckboxWidget,
   closingFencePattern,
@@ -42,6 +43,7 @@ type BlockRange = {
 
 type MarkdownImageContext = {
   filePath?: string | null
+  workspaceRoot?: string
 }
 
 const CONCEAL_MARKS = new Set([
@@ -283,6 +285,29 @@ function collectMarkdownCodeBlockRangesFromState(
   const rangeTo = Math.max(rangeFrom, to)
 
   while (line.number <= state.doc.lines) {
+    const math = /^(?: {0,3})(\$\$|\\\[)(.*)$/.exec(line.text)
+    if (math) {
+      const closer = math[1] === '$$' ? '$$' : '\\]'
+      const openingBody = math[2]
+      const sameLine = openingBody.indexOf(closer)
+      let lastLine = line
+      let content = sameLine >= 0 ? openingBody.slice(0, sameLine) : openingBody
+      let found = sameLine >= 0 && !openingBody.slice(sameLine + closer.length).trim()
+      if (!found) {
+        for (let number = line.number + 1; number <= state.doc.lines; number += 1) {
+          const candidate = state.doc.line(number)
+          const close = candidate.text.indexOf(closer)
+          if (close >= 0 && !candidate.text.slice(close + closer.length).trim()) { lastLine = candidate; content += `\n${candidate.text.slice(0, close)}`; found = true; break }
+          content += `\n${candidate.text}`
+        }
+      }
+      if (found) {
+        if (lastLine.to >= rangeFrom && line.from <= rangeTo) blocks.push({ from: line.from, to: lastLine.to, block: { language: 'math', code: content.trim() } })
+        if (lastLine.number >= state.doc.lines) break
+        line = state.doc.line(lastLine.number + 1)
+        continue
+      }
+    }
     const fence = openingFence(line.text)
     if (!fence) {
       if (line.number >= state.doc.lines) break
@@ -403,7 +428,7 @@ type BlockPreviewState = {
 // Characters that can introduce or break a fenced code block or table row.
 // Edits whose surrounding lines contain none of these cannot change the block
 // structure, so the expensive whole-document scan can be skipped.
-const BLOCK_STRUCTURE_MARKERS = /[`~|]/
+const BLOCK_STRUCTURE_MARKERS = /[`~|$\\]/
 
 function scanBlockRanges(state: EditorState): { codeBlocks: CodeBlockRange[]; tables: TableEntry[] } {
   const noActiveLines = new Set<number>()
@@ -568,6 +593,21 @@ function buildMarkdownDecorations(view: EditorView): DecorationSet {
   }
 
   for (const { from, to } of view.visibleRanges) {
+    let line = view.state.doc.lineAt(from)
+    while (line.from <= to) {
+      if (!activeLines.has(line.number) && !isInsideBlockRanges(line.from, line.to, renderedBlocks)) {
+        for (const match of line.text.matchAll(/(?<![\\$])\$(?![\s$])([^\n$]*?\S)\$(?!\d)|\\\(([^\n]*?)\\\)/g)) {
+          const start = line.from + (match.index ?? 0)
+          const end = start + match[0].length
+          let node = syntaxTree(view.state).resolveInner(start, 1)
+          let code = false
+          for (;;) { if (/Code|URL|Link/.test(node.name)) { code = true; break }; if (!node.parent) break; node = node.parent }
+          if (!code) ranges.push({ from: start, to: end, deco: Decoration.replace({ widget: new MathInlineWidget(match[1] ?? match[2], start) }) })
+        }
+      }
+      if (line.number === view.state.doc.lines) break
+      line = view.state.doc.line(line.number + 1)
+    }
     syntaxTree(view.state).iterate({
       from,
       to,
@@ -612,7 +652,7 @@ function buildMarkdownDecorations(view: EditorView): DecorationSet {
               ranges.push({
                 from: node.from,
                 to: node.to,
-                deco: Decoration.replace({ widget: new ImageWidget(parsed.src, parsed.alt, node.from, parsed.localPath) })
+                deco: Decoration.replace({ widget: new ImageWidget(parsed.src, parsed.alt, node.from, parsed.localPath, imageContext.workspaceRoot) })
               })
               return false
             }
@@ -694,10 +734,10 @@ const markdownLivePreviewPlugin = ViewPlugin.fromClass(
   }
 )
 
-export function writeMarkdownLivePreviewExtensions(filePath?: string | null): Extension[] {
+export function writeMarkdownLivePreviewExtensions(filePath?: string | null, workspaceRoot?: string): Extension[] {
   return [
     EditorView.editorAttributes.of({ class: 'cm-write-live-preview' }),
-    markdownImageContextFacet.of({ filePath }),
+    markdownImageContextFacet.of({ filePath, workspaceRoot }),
     syntaxHighlighting(writeMarkdownHighlight),
     writeMarkdownLiveTheme,
     markdownBlockPreviewField,

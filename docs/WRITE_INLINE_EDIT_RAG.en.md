@@ -89,7 +89,7 @@ Explicit edit requests currently use the same `write:inline-completion` IPC, but
 
 ```json
 {
-  "model": "deepseek-v4-flash",
+  "model": "deepseek-flash",
   "messages": [
     {
       "role": "system",

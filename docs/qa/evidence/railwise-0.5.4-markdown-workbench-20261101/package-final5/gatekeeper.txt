@@ -1,0 +1,2 @@
+/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final5/Applications/RailWise AI Candidate 209a17ecc2ab.app: accepted
+override=security disabled

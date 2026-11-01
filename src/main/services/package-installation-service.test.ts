@@ -258,6 +258,18 @@ describe('PackageInstallationService', () => {
       expect.objectContaining({ reviewedPackage: expect.anything() })
     ]))
 
+    const compatibilityRefresh = {
+      ...expandedPermissions,
+      compatibility: { ...expandedPermissions.compatibility, workwise: '>=0.3.6' }
+    }
+    const compatibilityReview = marketplacePackageReviewSha256(compatibilityRefresh)
+    await expect(service.updatePermissions({
+      ...request,
+      package: compatibilityRefresh,
+      reviewSha256: compatibilityReview,
+      idempotencyKey: 'compatibility-metadata-refresh'
+    })).resolves.toMatchObject({ reviewSha256: compatibilityReview })
+
     const changedRuntime = {
       ...expandedPermissions,
       auth: { type: 'token' as const, provider: 'example', environmentVariables: ['EXAMPLE_TOKEN'] }

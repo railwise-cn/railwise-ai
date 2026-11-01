@@ -58,4 +58,47 @@ describe('Skill package security', () => {
       totalBytes: 2 * 1024 * 1024 + 10
     })
   })
+
+  it('skips unsafe non-entry references during trusted discovery without following them', async () => {
+    const dir = await root()
+    const outside = await root()
+    await writeFile(join(outside, 'secret'), 'do not read')
+    await writeFile(join(dir, 'SKILL.md'), '# Template')
+    await symlink(join(outside, 'secret'), join(dir, 'ETHOS.md'))
+    await writeFile(join(dir, 'examples.webp'), Buffer.alloc(17 * 1024 * 1024))
+
+    await expect(validateSkillPackage(dir, TRUSTED_SKILL_DISCOVERY_LIMITS)).rejects.toThrow(/links and junctions/)
+    await expect(validateSkillPackage(dir, TRUSTED_SKILL_DISCOVERY_LIMITS, {
+      skipUnsafeNonEntryFiles: true
+    })).resolves.toEqual({
+      files: 1,
+      totalBytes: 10
+    })
+  })
+
+  it('only follows an entry symlink when trusted discovery explicitly allows it', async () => {
+    const dir = await root()
+    const outside = await root()
+    await writeFile(join(outside, 'SKILL.md'), '# Outside')
+    await symlink(join(outside, 'SKILL.md'), join(dir, 'SKILL.md'))
+    await expect(validateSkillPackage(dir, TRUSTED_SKILL_DISCOVERY_LIMITS, {
+      skipUnsafeNonEntryFiles: true
+    })).rejects.toThrow(/links and junctions/)
+    await expect(validateSkillPackage(dir, TRUSTED_SKILL_DISCOVERY_LIMITS, {
+      skipUnsafeNonEntryFiles: true,
+      allowTrustedEntryLinks: true,
+      trustedEntryLinkRoots: [outside]
+    })).resolves.toEqual({ files: 1, totalBytes: 9 })
+    const aliasRoot = await root()
+    const alias = join(aliasRoot, 'trusted-alias')
+    await symlink(outside, alias)
+    await expect(validateSkillPackage(dir, TRUSTED_SKILL_DISCOVERY_LIMITS, {
+      allowTrustedEntryLinks: true,
+      trustedEntryLinkRoots: [alias]
+    })).resolves.toEqual({ files: 1, totalBytes: 9 })
+    await expect(validateSkillPackage(dir, TRUSTED_SKILL_DISCOVERY_LIMITS, {
+      allowTrustedEntryLinks: true,
+      trustedEntryLinkRoots: [aliasRoot]
+    })).rejects.toThrow(/escapes trusted roots/)
+  })
 })

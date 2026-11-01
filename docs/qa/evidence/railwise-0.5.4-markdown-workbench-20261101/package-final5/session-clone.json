@@ -1,0 +1,13 @@
+{
+  "sourceCandidateRoot": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3",
+  "targetCandidateRoot": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final5",
+  "stoppedSourceConfirmedBy": "parent CUA quit",
+  "clonedDirectories": [
+    "user-data",
+    "session-data",
+    "home"
+  ],
+  "workspacePathPolicy": "Retain final3 isolated fixture absolute path, explicitly authorized by parent; never production user workspace",
+  "sourceMutated": false,
+  "tabCountObservedByParent": 22
+}

@@ -4,23 +4,21 @@ import type { ModelClient, ModelRequest, ModelStreamChunk } from '../ports/model
 
 export const AUTO_MODEL_ROUTER_MODEL = 'deepseek-flash'
 export const AUTO_MODEL_FLASH = 'deepseek-flash'
-export const AUTO_MODEL_PRO = 'deepseek-v4-pro'
 export const AUTO_MODEL_ROUTER_TIMEOUT_MS = 4_000
 
 export type AutoModelRouteSource = 'flash-router' | 'heuristic'
 export type AutoRouteReasoningEffort = 'off' | 'high' | 'max'
 
 export type AutoModelRouteSelection = {
-  model: typeof AUTO_MODEL_FLASH | typeof AUTO_MODEL_PRO
+  model: typeof AUTO_MODEL_FLASH
   reasoningEffort?: AutoRouteReasoningEffort
   source: AutoModelRouteSource
 }
 
 export const AUTO_MODEL_ROUTER_SYSTEM_PROMPT = [
   'You are the DeepSeek TUI auto-routing classifier. Return only compact JSON:',
-  '{"model":"deepseek-flash|deepseek-v4-pro","thinking":"off|high|max"}.',
-  'Use deepseek-flash for trivial, conversational, status, or single-step work.',
-  'Use deepseek-v4-pro for coding, debugging, release work, multi-step tasks, high-risk decisions, tool-heavy work, ambiguous requests, or anything that benefits from deeper reasoning.',
+  '{"model":"deepseek-flash","thinking":"off|high|max"}.',
+  'Always use deepseek-flash, the official API id for DeepSeek V4.1 Flash. Choose thinking effort for the task without changing the model.',
   'Use thinking off only for trivial no-tool answers, high for ordinary reasoning, and max for agentic, coding, multi-file, release, architecture, debugging, security, tool-heavy, or uncertain work.'
 ].join(' ')
 
@@ -82,33 +80,14 @@ export async function resolveAutoModelRoute(input: {
   }
 }
 
-export function autoModelHeuristic(input: string, _currentModel = ''): typeof AUTO_MODEL_FLASH | typeof AUTO_MODEL_PRO {
-  const len = [...input].length
-  const lower = input.toLowerCase()
-  const complexKeywords = [
-    'refactor',
-    'architecture',
-    'design',
-    'debug',
-    'security',
-    'review',
-    'audit',
-    'migrate',
-    'optimize',
-    'rewrite',
-    'implement',
-    'analyze'
-  ]
-  if (complexKeywords.some((keyword) => lower.includes(keyword))) {
-    return AUTO_MODEL_PRO
-  }
-  if (len < 100) return AUTO_MODEL_FLASH
-  if (len > 500) return AUTO_MODEL_PRO
+export function autoModelHeuristic(_input: string, _currentModel = ''): typeof AUTO_MODEL_FLASH {
+  // The auto default is V4.1 Flash for every task. Explicit saved model ids
+  // bypass this router; task complexity only changes thinking effort.
   return AUTO_MODEL_FLASH
 }
 
 export function parseAutoRouteRecommendation(raw: string): {
-  model: typeof AUTO_MODEL_FLASH | typeof AUTO_MODEL_PRO
+  model: typeof AUTO_MODEL_FLASH
   reasoningEffort?: AutoRouteReasoningEffort
 } | null {
   const json = extractFirstJsonObject(raw)
@@ -199,12 +178,14 @@ function extractFirstJsonObject(raw: string): string | null {
   return start >= 0 && end >= start ? raw.slice(start, end + 1) : null
 }
 
-function normalizeAutoRouteModel(model: string): typeof AUTO_MODEL_FLASH | typeof AUTO_MODEL_PRO | null {
+function normalizeAutoRouteModel(model: string): typeof AUTO_MODEL_FLASH | null {
   switch (model.trim().toLowerCase()) {
     case 'deepseek-v4-pro':
     case 'v4-pro':
     case 'pro':
-      return AUTO_MODEL_PRO
+      // Accept an older classifier recommendation without letting it change
+      // today's default. This does not rewrite an explicit user selection.
+      return AUTO_MODEL_FLASH
     case 'deepseek-flash':
     case 'deepseek-v4-flash':
     case 'v4-flash':

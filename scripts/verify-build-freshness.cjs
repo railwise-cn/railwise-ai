@@ -6,6 +6,8 @@ const outputFiles = [
   'out/main/index.js',
   'out/preload/index.cjs',
   'out/renderer/index.html',
+  'out/markdown-rendering/mermaid.js',
+  'out/markdown-rendering/mermaid-build.json',
   'kun/dist/cli/serve-entry.js'
 ]
 const productionRoots = ['src', 'kun/src']
@@ -43,7 +45,7 @@ if (missingOutputs.length) {
 
 const inputs = []
 for (const path of productionRoots) collectFiles(join(root, path), inputs)
-for (const path of ['electron.vite.config.ts', 'electron-builder.cjs']) collectFiles(join(root, path), inputs)
+for (const path of ['electron.vite.config.ts', 'electron-builder.cjs', 'package.json', 'package-lock.json', 'scripts/build-markdown-rendering.cjs']) collectFiles(join(root, path), inputs)
 
 const newestInput = inputs.reduce((latest, path) => {
   const mtime = statSync(path).mtimeMs

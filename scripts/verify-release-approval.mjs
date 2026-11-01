@@ -191,7 +191,7 @@ function requireFrozenUpdaterEvidence(evidence, reviewedBuild, packageIdentity, 
   equal(native.stages.at(-1).detail, '0.5.2', 'strict historical nonce proof')
   if (native.failure) fail('native updater evidence retains a failure')
   equal(reportSha256(nativeBytes), machine.nativeReportSha256, 'retained native report digest')
-  const run = validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead)
+  const run = validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead, version)
   return { run, machineBytes, nativeBytes }
 }
 

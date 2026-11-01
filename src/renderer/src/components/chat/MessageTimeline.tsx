@@ -162,7 +162,10 @@ export function MessageTimeline({
   }, [busy, currentTurnUserId])
 
   return (
-    <div ref={containerRef} className="ds-no-drag flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+    <div
+      ref={containerRef}
+      className="ds-chat-timeline ds-no-drag flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+    >
       <div className="ds-message-timeline-content ds-chat-column-inset mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-8 pb-10 pt-8">
         {!hasContent || !activeThreadId ? (
           <MessageTimelineEmptyHero

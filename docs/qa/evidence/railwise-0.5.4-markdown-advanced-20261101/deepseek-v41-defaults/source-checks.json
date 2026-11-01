@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-11-01T10:31:46.182208+00:00",
+  "status": "passed",
+  "baseSignedSourceHead": "ab68c2b297f1bd8338278c23deb7b3d476f44982",
+  "checks": {
+    "runtimeFullTests": {
+      "command": "npm --prefix kun test -- --testTimeout=15000",
+      "passedFiles": 221,
+      "passedTests": 3209,
+      "skippedFiles": 2,
+      "skippedTests": 22
+    },
+    "desktopFullTests": {
+      "command": "npm test -- --testTimeout=15000",
+      "passedFiles": 389,
+      "passedTests": 3748,
+      "skippedFiles": 2,
+      "skippedTests": 2
+    },
+    "runtimeTypecheck": "passed",
+    "desktopTypecheck": "passed",
+    "productionBuild": "passed",
+    "changedEslint": "passed"
+  },
+  "earlierFailure": "First full Runtime run had 3 assertions expecting old automatic Pro routing. Updated only the automatic model expectations, retained reasoning/provider/explicit-choice assertions, and the complete rerun passed.",
+  "noProductionSettingsOrCredentialsModified": true,
+  "packageAcceptance": "New automatic routing is source-verified here; subsequent exact private signed-package evidence must bind the new source head.",
+  "logs": [
+    {
+      "path": "/private/tmp/railwise-deepseek-v41-runtime-tests-final.log",
+      "sha256": "987289c6a3fb547804d3ae87a354446770c2abf881ef2ae7b4bdfa812745cfae"
+    },
+    {
+      "path": "/private/tmp/railwise-deepseek-v41-desktop-tests-full.log",
+      "sha256": "5d1f3fb6ad3161e7d264b4a9eb3a2ed256c7a4ef060e383180f0ff2b2d324d64"
+    },
+    {
+      "path": "/private/tmp/railwise-deepseek-v41-types.log",
+      "sha256": "ba23a13d7dd5a995969e036d407416cdbf3afa84dcef7f61eaee38c6463558d5"
+    },
+    {
+      "path": "/private/tmp/railwise-deepseek-v41-build.log",
+      "sha256": "758ca0a8f2318b175170dcdcb1370cea8a14ae46b33f1dc5dc540f223af61c4f"
+    },
+    {
+      "path": "/private/tmp/railwise-deepseek-v41-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

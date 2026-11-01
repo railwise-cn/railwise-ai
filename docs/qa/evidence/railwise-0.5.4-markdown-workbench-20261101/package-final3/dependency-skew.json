@@ -1,0 +1,52 @@
+{
+  "exitCode": 1,
+  "entries": [
+    {
+      "path": [
+        "pdfjs-dist",
+        "@napi-rs/canvas"
+      ],
+      "version": "0.1.100",
+      "invalid": null
+    },
+    {
+      "path": [
+        "pptx-vanilla-viewer",
+        "ooxml-core",
+        "@napi-rs/canvas"
+      ],
+      "version": "0.1.100",
+      "invalid": "\"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/ooxml-core"
+    },
+    {
+      "path": [
+        "pptx-vanilla-viewer",
+        "ooxml-core",
+        "emf-converter",
+        "@napi-rs/canvas"
+      ],
+      "version": "0.1.100",
+      "invalid": "\"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/ooxml-core, \"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/emf-converter"
+    },
+    {
+      "path": [
+        "pptx-vanilla-viewer",
+        "ooxml-ui",
+        "emf-converter",
+        "@napi-rs/canvas"
+      ],
+      "version": "0.1.100",
+      "invalid": "\"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/ooxml-core, \"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/emf-converter, \"^1.0.9\" from node_modules/ooxml-ui/node_modules/emf-converter"
+    },
+    {
+      "path": [
+        "pptx-vanilla-viewer",
+        "ooxml-ui",
+        "ooxml-core",
+        "@napi-rs/canvas"
+      ],
+      "version": "0.1.100",
+      "invalid": "\"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/ooxml-core, \"^1.0.9\" from node_modules/pptx-vanilla-viewer/node_modules/emf-converter, \"^1.0.9\" from node_modules/ooxml-ui/node_modules/emf-converter, \"^1.0.9\" from node_modules/ooxml-ui/node_modules/ooxml-core"
+    }
+  ]
+}

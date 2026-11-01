@@ -1,0 +1,9 @@
+classDiagram
+ class Document {
+ +String title
+ +save()
+ }
+ class Revision {
+ +String fingerprint
+ }
+ Document "1" --> "many" Revision : history

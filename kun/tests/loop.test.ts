@@ -2818,7 +2818,7 @@ describe('AgentLoop', () => {
 
     await h.loop.runTurn(h.threadId, turnId)
 
-    expect(seenModels).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
+    expect(seenModels).toEqual(['deepseek-flash', 'deepseek-flash'])
   })
 
   it('keeps explicit turn reasoning effort when auto routing chooses the model', async () => {
@@ -2852,7 +2852,7 @@ describe('AgentLoop', () => {
 
     await h.loop.runTurn(h.threadId, turnId)
 
-    expect(seenModels).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
+    expect(seenModels).toEqual(['deepseek-flash', 'deepseek-flash'])
   })
 
   it('falls back to a concrete heuristic model when auto router fails', async () => {

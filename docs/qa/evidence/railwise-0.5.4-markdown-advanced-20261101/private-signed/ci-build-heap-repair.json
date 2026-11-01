@@ -1,0 +1,26 @@
+{
+  "failedRun": 41291059117,
+  "head": "4124ac8c745ab24ad04b7e4ce9850702e89f8ed3",
+  "failure": "Node22 macOS default ~2GiB V8 heap exhausted during electron-vite renderer bundling",
+  "failureBeforeSigning": true,
+  "fix": {
+    "path": ".github/workflows/private-updater-acceptance.yml",
+    "scope": "Prepare clean-source candidate identity step only",
+    "env": {
+      "NODE_OPTIONS": "--max-old-space-size=6144"
+    },
+    "runtimeSourceChanged": false,
+    "publicWorkflowJobsChanged": false
+  },
+  "runnerCapacity": {
+    "runner": "macos-15 standard Apple silicon hosted runner",
+    "documentedRamGiB": 7,
+    "heapLimitGiB": 6,
+    "source": "GitHub-hosted standard arm64 runner capacity; 6GiB heap leaves OS/process overhead and avoids default2GiBheap; actual next job validates capacity"
+  },
+  "validation": {
+    "privateGuardTestsPassed": 12,
+    "loopbackEscalationRequired": true,
+    "tlsValidationDisabled": false
+  }
+}

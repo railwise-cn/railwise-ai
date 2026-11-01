@@ -22,7 +22,7 @@ separate bundle identity or a local rebuild cannot substitute for the final
 public-identity package.
 
 Complete and record installed-package signature/notarization, computer-use UI
-inspection, the functional checklist, the official 0.5.2-to-frozen-0.5.3 native
+inspection, the functional checklist, the official 0.5.2-to-frozen-target native
 updater round trip, and the independent senior-engineer AI review. The updater
 reports must come from the trusted
 `frozen-release-updater-acceptance.yml` workflow on the same frozen main source.
@@ -95,7 +95,7 @@ published GitHub Release.
 
 The final publication job is protected by the GitHub environment
 `production-release`. This repository currently operates in **single-maintainer
-mode**, explicitly authorized for the 0.5.3 release: the environment has no
+mode**, as explicitly authorized in `AGENTS.md`: the environment has no
 required reviewer, and branch protection keeps CI, strict status checks, admin
 enforcement, and tag protection while requiring no human PR approval. The
 computer-use inspection, separate senior-engineer-mode AI review, immutable

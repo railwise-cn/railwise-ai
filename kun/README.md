@@ -64,7 +64,7 @@ Run from the `kun/` directory.
 | `--runtime-token` | Bearer token for `/v1/*` requests | empty |
 | `--api-key` | DeepSeek-compatible API key | empty |
 | `--base-url` | DeepSeek-compatible model API base URL | `https://api.deepseek.com` |
-| `--model` | Default model id | `deepseek-v4-pro` |
+| `--model` | Default model id | `deepseek-flash` |
 | `--approval-policy` | `on-request` \| `untrusted` \| `never` \| `auto` \| `suggest` | `auto` |
 | `--sandbox-mode` | `read-only` \| `workspace-write` \| `danger-full-access` \| `external-sandbox` | `workspace-write` |
 | `--insecure` | Disable bearer token check (local dev only) | off |
@@ -79,7 +79,7 @@ kun serve \
   --data-dir ~/.deepseekgui/kun \
   --runtime-token dev-token \
   --api-key "$DEEPSEEK_API_KEY" \
-  --model deepseek-v4-pro
+  --model deepseek-flash
 ```
 
 Kun can also run as a standalone agent without the GUI:
@@ -144,7 +144,7 @@ Shape:
     "runtimeToken": "",
     "apiKey": "",
     "baseUrl": "https://api.deepseek.com",
-    "model": "deepseek-v4-pro",
+    "model": "deepseek-flash",
     "approvalPolicy": "auto",
     "sandboxMode": "workspace-write",
     "storage": {
@@ -162,6 +162,18 @@ Shape:
   },
   "models": {
     "profiles": {
+      "deepseek-flash": {
+        "contextWindowTokens": 1000000,
+        "maxOutputTokens": 384000,
+        "contextCompaction": {
+          "softThreshold": 980000,
+          "hardThreshold": 990000
+        },
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "supportsToolCalling": true,
+        "messageParts": ["text", "image_url"]
+      },
       "deepseek-v4-pro": {
         "contextWindowTokens": 1000000,
         "maxOutputTokens": 384000,
@@ -250,8 +262,9 @@ default `{dataDir}/index.sqlite3` path.
 
 Model-specific context windows, capabilities, and compaction thresholds
 belong in `models.profiles`. Built-in profiles already cover
-`deepseek-v4-pro`, `deepseek-v4-flash`, and the compatibility aliases
-`deepseek-chat` / `deepseek-reasoner`; DeepSeek V4 defaults to a 1M
+`deepseek-flash` (the default, DeepSeek V4.1 Flash), explicit Pro and legacy
+Flash ids, and the compatibility aliases `deepseek-chat` / `deepseek-reasoner`;
+DeepSeek V4.1 Flash uses a 1M
 context window, reports a 384K maximum-output capability, and starts
 compaction around 980k input tokens. Use `https://api.deepseek.com` for
 normal Chat Completions and Responses traffic; the `/beta` base is
@@ -267,7 +280,7 @@ Feature flags are intentionally explicit:
 - `serve.tokenEconomy` / `tokenEconomyMode` compresses tool descriptions, tool results, and history context while preserving code, paths, commands, URLs, errors, and other high-value signals.
 - `contextCompaction` controls fallback long-thread compaction thresholds and summary behavior. Per-model thresholds live in `models.profiles`. Compaction preserves goals, constraints, decisions, touched files, tool outcomes, and unresolved next steps.
 - `serve.runtimeTuning.toolStorm` suppresses repeated identical tool calls within a turn so useless tool loops do not keep spending tokens.
-- `capabilities.web` exposes `web_fetch` and/or `web_search`. The built-in provider fetches HTTP(S) pages. GUI-managed official DeepSeek V4 Pro / Flash runtimes use the DeepSeek Responses API for server-side search; third-party runtimes still require their own search provider.
+- `capabilities.web` exposes `web_fetch` and/or `web_search`. The built-in provider fetches HTTP(S) pages. GUI-managed official DeepSeek V4.1 Flash and explicitly selected Pro runtimes use the DeepSeek Responses API for server-side search; third-party runtimes still require their own search provider.
 - `capabilities.skills` scans configured roots for `skill.json` manifests and, when `legacySkillMd` is true, older `SKILL.md` directories.
 - `capabilities.attachments` stores image bytes outside thread logs and allows turns to reference `attachmentIds`. Vision-capable models receive image parts; text-only models require the explicitly configured loopback vision-evidence analyzer and receive sanitized structured evidence. If that analyzer is unavailable or fails, the turn fails explicitly; it never falls back to Base64 text. The legacy `textFallback*` settings are retained only for backward-compatible attachment metadata/config loading.
 - `capabilities.memory` stores long-term records under the data dir, retrieves scoped matches before turns, and exposes `memory_create`, `memory_update`, and `memory_delete` tools.

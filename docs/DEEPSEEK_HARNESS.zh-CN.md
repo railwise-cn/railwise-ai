@@ -2,6 +2,8 @@
 
 本文只记录 WorkWise 0.4.0 至 0.4.2 实际接入并验证的内容。`DeepSeek Harness` 是上游项目名称；本文不把上游仓库的全部能力、最新变更或官方模型能力自动归入 WorkWise。
 
+当前默认与自动模式使用 DeepSeek V4.1 Flash（官方 API ID `deepseek-flash`），支持文本、图片和工具调用；明确保存的其他模型配置保持原样。以下 0.4.0–0.4.2 内容保留为当时实现和验证的历史记录。
+
 ## 0.4.0 使用的内容
 
 WorkWise Runtime 使用自己的 DeepSeek 兼容模型适配器、结构化附件合约和 Agent Loop：

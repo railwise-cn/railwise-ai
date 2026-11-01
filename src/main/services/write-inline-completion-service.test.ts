@@ -165,21 +165,120 @@ describe('requestWriteInlineCompletion', () => {
     })
   })
 
-  it('does not request the API when inline completion is disabled', async () => {
+  it.each([undefined, 'short', 'long', 'unknown'])(
+    'does not request the API for %s suggestions when automatic completion is disabled, even with edit signals',
+    async (mode) => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const request = {
+        ...createRequest(),
+        mode: mode as WriteInlineCompletionRequest['mode'],
+        editCandidate: {
+          kind: 'paragraph' as const,
+          from: 0, to: 7,
+          startLine: 1, startColumn: 1, endLine: 1, endColumn: 8,
+          original: 'A draft'
+        },
+        recentEdits: [{
+          source: 'user' as const, ageMs: 100, from: 0, to: 1,
+          deletedText: 'B', insertedText: 'A', beforeContext: '', afterContext: ' draft'
+        }]
+      }
+
+      const result = await requestWriteInlineCompletion(createSettings({ enabled: false }), request)
+
+      expect(result).toEqual({ ok: false, message: 'Inline completion is disabled.' })
+      expect(fetchMock).not.toHaveBeenCalled()
+      const debugEntries = listWriteInlineCompletionDebugEntries()
+      expect(debugEntries).toHaveLength(1)
+      expect(debugEntries[0]).toMatchObject({
+        ok: false,
+        errorMessage: 'Inline completion is disabled.',
+        completion: '',
+        responseChars: 0
+      })
+    }
+  )
+
+  it.each([undefined, 'unknown'])(
+    'keeps edit requests with %s scopes disabled rather than treating them as manual actions',
+    async (kind) => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const request: WriteInlineCompletionRequest = { ...createRequest(), mode: 'edit' }
+      if (kind) request.editCandidate = {
+        kind: kind as 'selection', from: 0, to: 1,
+        startLine: 1, startColumn: 1, endLine: 1, endColumn: 2,
+        original: 'A'
+      }
+
+      const result = await requestWriteInlineCompletion(createSettings({ enabled: false }), request)
+
+      expect(result).toEqual({ ok: false, message: 'Inline completion is disabled.' })
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    { action: 'selection rewrite', kind: 'selection', original: 'A draft', replacement: 'A clearer draft' },
+    { action: 'paragraph rewrite', kind: 'paragraph', original: 'A draft', replacement: 'A clearer draft' },
+    { action: 'document append', kind: 'selection', original: '', replacement: '\n\n## Summary\nA synthetic summary.' },
+    { action: 'document replace', kind: 'selection', original: '# Draft\n\nA draft', replacement: '# Reviewed\n\nA clearer draft' }
+  ] as const)('allows an explicit $action when automatic suggestions are disabled', async ({ kind, original, replacement }) => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: `<<<EDIT\n${replacement}\n>>>` } }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const request: WriteInlineCompletionRequest = {
+      ...createRequest(),
+      mode: 'edit',
+      prefix: '# Surrounding context\n\n',
+      policy: { ...createRequest().policy, instruction: 'The user explicitly requested an in-place text edit.' },
+      editCandidate: {
+        kind, from: 23, to: 23 + original.length,
+        startLine: 3, startColumn: 1, endLine: 3, endColumn: 1 + original.length,
+        original, selectedText: original
+      }
+    }
+
+    const result = await requestWriteInlineCompletion(createSettings({ enabled: false, retrievalEnabled: false }), request)
+
+    expect(result).toMatchObject({
+      ok: true, mode: 'edit', completion: replacement,
+      action: { kind: 'edit', replacement, from: 23, to: 23 + original.length, original, scopeKind: kind }
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer sk-test' })
+    const body = JSON.parse(String(init.body)) as { messages: Array<{ content: string }>; prompt?: string }
+    expect(body.prompt).toBeUndefined()
+    expect(body.messages[1].content).toContain('Trigger hint: edit')
+    expect(body.messages[1].content).toContain('<<<EDIT_SCOPE')
+    expect(body.messages[1].content).toContain(original)
+    expect(listWriteInlineCompletionDebugEntries()[0]).toMatchObject({ ok: true, mode: 'edit' })
+  })
+
+  it('still requires an API key for a manual edit when automatic suggestions are disabled', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
+    const settings = createSettings({ enabled: false })
+    settings.agents.kun.apiKey = ''
+    const request: WriteInlineCompletionRequest = {
+      ...createRequest(), mode: 'edit',
+      editCandidate: {
+        kind: 'selection', from: 0, to: 7,
+        startLine: 1, startColumn: 1, endLine: 1, endColumn: 8,
+        original: 'A draft'
+      }
+    }
 
-    const result = await requestWriteInlineCompletion(createSettings({ enabled: false }), createRequest())
+    const result = await requestWriteInlineCompletion(settings, request)
 
-    expect(result).toEqual({ ok: false, message: 'Inline completion is disabled.' })
+    expect(result).toEqual({ ok: false, message: 'Missing API key for inline completion.' })
     expect(fetchMock).not.toHaveBeenCalled()
-    const debugEntries = listWriteInlineCompletionDebugEntries()
-    expect(debugEntries).toHaveLength(1)
-    expect(debugEntries[0]).toMatchObject({
-      ok: false,
-      errorMessage: 'Inline completion is disabled.',
-      completion: '',
-      responseChars: 0
+    expect(listWriteInlineCompletionDebugEntries()[0]).toMatchObject({
+      ok: false, mode: 'edit', errorMessage: 'Missing API key for inline completion.'
     })
   })
 

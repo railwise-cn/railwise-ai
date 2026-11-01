@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any
 from xml.etree import ElementTree as ET
 from dataclasses import dataclass, field
 
+from pptx_ooxml.package import PackagePartRegistry
+
 if TYPE_CHECKING:
     from .theme_colors import ThemeColorSpec
     from .theme_fonts import ThemeFontSpec
@@ -69,6 +71,8 @@ class ConvertContext:
     claimed_shape_ids: set[int] = field(default_factory=set)
     referenced_shape_ids: set[int] = field(default_factory=set)
     slide_num: int = 1
+    # Public presentation roster size, used to fail closed on #slide-N links.
+    slide_count: int | None = None
     translate_x: float = 0.0
     translate_y: float = 0.0
     scale_x: float = 1.0
@@ -82,9 +86,15 @@ class ConvertContext:
     rel_entries: list[dict[str, str]] = field(default_factory=list)
     package_files: dict[str, bytes] = field(default_factory=dict)
     content_type_overrides: dict[str, str] = field(default_factory=dict)
+    package_parts: PackagePartRegistry = field(default_factory=PackagePartRegistry)
     rel_id_counter: int = 2  # rId1 reserved for slideLayout
     svg_dir: Path | None = None
+    # Explicit project boundary for deterministic resource resolution. Public
+    # conversion entry points require it; recursive child contexts retain it.
+    resource_root: Path | None = None
     inherited_styles: dict[str, str] = field(default_factory=dict)
+    # Shared ancestry for visibility overrides and native geometry carriers.
+    parent_by_id: dict[int, ET.Element] = field(default_factory=dict)
     # Effective SVG font sizes keyed by element identity. Shared resolution
     # keeps relative sizes and em tracking identical across checker/exporter.
     text_font_sizes: dict[int, float] = field(default_factory=dict)
@@ -127,6 +137,8 @@ class ConvertContext:
     # Canonical BCP-47 content language from spec_lock.md. ``None`` preserves
     # the legacy per-run script heuristic for older projects and lockless quick generation.
     primary_language: str | None = None
+    # Reuse media relationships when the same image fills multiple text runs.
+    text_image_fill_cache: dict[tuple[str, str], str] = field(default_factory=dict)
 
     def next_id(self) -> int:
         """Allocate the next shape ID."""
@@ -243,6 +255,7 @@ class ConvertContext:
             claimed_shape_ids=self.claimed_shape_ids,
             referenced_shape_ids=self.referenced_shape_ids,
             slide_num=self.slide_num,
+            slide_count=self.slide_count,
             translate_x=self.translate_x + dx,
             translate_y=self.translate_y + dy,
             scale_x=self.scale_x * sx,
@@ -256,9 +269,12 @@ class ConvertContext:
             rel_entries=self.rel_entries,
             package_files=self.package_files,
             content_type_overrides=self.content_type_overrides,
+            package_parts=self.package_parts,
             rel_id_counter=self.rel_id_counter,
             svg_dir=self.svg_dir,
+            resource_root=self.resource_root,
             inherited_styles=merged,
+            parent_by_id=self.parent_by_id,
             text_font_sizes=self.text_font_sizes,
             text_letter_spacings=self.text_letter_spacings,
             opacity_multiplier=self.opacity_multiplier * local_opacity,
@@ -277,6 +293,7 @@ class ConvertContext:
             theme_font_spec=self.theme_font_spec,
             theme_color_spec=self.theme_color_spec,
             primary_language=self.primary_language,
+            text_image_fill_cache=self.text_image_fill_cache,
         )
 
     def sync_from_child(self, child_ctx: ConvertContext) -> None:

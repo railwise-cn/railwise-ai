@@ -12,10 +12,11 @@ RailWise AI is a local-first desktop platform. Version 0.5.1 has Code and Survey
 - Direct mirror downloads: [Download and installation](https://www.railwise.cn/products/workwise/#download)
 - Documentation: [kb.railwise.cn/products/workwise](https://kb.railwise.cn/products/workwise/)
 - Public releases: [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases)
+- Latest stable version: [Download](https://github.com/railwise-cn/railwise-ai/releases/latest), or check for updates in the installed application.
 
-## Current release
+## 0.5.1 release background
 
-The current stable release is **[v0.5.1](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)**. It provides the four-stage Survey workspace, exact evidence questions and declared review records, with fixes for macOS startup, persisted tool-argument summaries and variance-scale explanations. Existing clients can check for updates in the application. Public releases have three user-facing installers:
+**[v0.5.1](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1)** introduced the four-stage Survey workspace, exact evidence questions and declared review records, with fixes for macOS startup, persisted tool-argument summaries and variance-scale explanations. Existing clients can check for updates in the application. Public releases have three user-facing installers:
 
 | Platform | Installer | Download |
 | --- | --- | --- |
@@ -58,7 +59,7 @@ The final candidate passed the full two-hour stability gate and all three client
 
 ## DeepSeek V4.1
 
-The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`; existing explicit model selections remain unchanged. Version 0.5.1 includes the automatic-routing and fallback fixes while preserving explicit saved model choices.
+The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`; automatic mode uses the same model for every task and adjusts thinking effort. Existing explicit model selections remain unchanged. Version 0.5.1 includes the automatic-routing and fallback fixes while preserving explicit saved model choices.
 
 On September 20, 2026, real official-service calls through the product adapter passed conversation, JSON output, declared function-name/argument return and synthetic-image recognition checks. The function check did not execute a tool. These checks do not replace acceptance of the complete packaged AI conversation, approval, tool and vision workflows.
 
@@ -83,12 +84,14 @@ Collaborate around local projects and source material: understand, modify, test,
 
 ### Write workbench
 
-Use a complete document workflow for Markdown and text work:
+Keep Markdown/MDX files in your local workspace and use a document workflow:
 
-- Edit, preview, and organize Markdown and text content.
-- Copy rich text and deliver through HTML, PDF, DOC, and DOCX paths.
-- Use Skills such as AI Word, humanized writing, and PPT Master to improve structure, expression, and review.
-- Keep a human review step for facts, images, tables, layout, and formal delivery.
+- Open multiple documents, pin tabs, reopen closed documents, and switch between rich text, source, split preview, and preview only.
+- Display math, footnotes, and Mermaid diagrams; use the block's **Edit source** action to change the Markdown with a live preview before applying it.
+- Search local titles, text, and paths; edit YAML properties and writing stages; inspect broken links, backlinks, document relations, snapshot differences, and local comments.
+- Select text for AI rewriting, shortening, expansion, or terminology changes, or draft from workspace sources. Review the proposed difference before accepting it. Manual AI actions remain available when automatic suggestions are off.
+- Preserve your draft when an external edit conflicts. Partially loaded large files are read-only to protect the original.
+- Export HTML, PDF, DOC, or DOCX. Math, footnotes, and diagrams use the same local rendering rules; complex Word equations may use an image fallback. DOCX templates let you customize document styles. Check facts, sources, pagination, and layout before delivery.
 - Attach PDF and Office tender sources directly in Write, then start the bundled Tender Master workflow without switching to Code.
 
 Read more: [Write and document export](https://kb.railwise.cn/products/workwise/write-export/).
@@ -107,9 +110,15 @@ The DeepSeek Harness integration describes the application's own Runtime adapter
 
 Create multi-page structured canvases with text, shapes, images, layers, groups, undo/redo,
 document-scoped Agent conversations, visible selection targets, and revision-safe canvas commands.
-PPTX import uses a readable-first full-slide reference that can be selected and annotated; source
-text, charts, and animations are not misrepresented as individually editable objects. Export the
-active design to PNG or SVG, insert it into Write, or deliver a validated PPTX through PPT Master.
+Export the active design to PNG or SVG, insert it into Write, or deliver a structurally checked PPTX.
+
+Import a PPTX to open the dedicated slide editor. **Edit**, **Reference**, and **Compare** modes let you
+edit supported text, shapes, images, tables, and charts and compare the result with the original.
+The original file remains immutable. Complex masters, SmartArt, and unsupported OOXML parts are
+retained with explicit protection boundaries. AI changes show the target slide, objects, and scope
+before confirmation and can be undone. A saved revision becomes active after package, page,
+relationship, and media checks. Reference previews report any degradation; verify complex
+animation, fonts, and layout in the intended PowerPoint or WPS environment.
 
 ### Flow Preview
 
@@ -119,7 +128,9 @@ Flow is visible by default and labeled Preview. Nodes that require an unconfigur
 
 ### Skills and MCP
 
-Skills are WorkWise reusable assets for high-frequency methods, writing rules, templates, and domain processes. The MCP and plugin market provides source, purpose, and installation-state context before additional tools are connected.
+Skills are reusable methods, writing rules, templates, and domain processes. Open **Plugins** in the sidebar and choose **Featured**; each detail page explains what the capability does, how to use it, and any setup needed. After installation, describe your task in the relevant workbench. The **Skills** tab provides local recommendations, search, and browsing by source.
+
+Bundled PPT Master uses a fixed 6.8.0 snapshot for creating and editing PowerPoint files from Markdown, reports, web pages, or an existing PPTX. Give the Write or Design assistant your source, audience, and slide count to begin. Core workflows, scripts, references, and lightweight templates are included; large asset libraries, user projects, generated exports, and backups are excluded.
 
 Read more: [Skills and templates](https://kb.railwise.cn/products/workwise/templates/).
 

@@ -57,7 +57,7 @@ kun/
 | `--runtime-token` | `/v1/*` 鉴权 token | empty |
 | `--api-key` | DeepSeek 兼容 API key | empty |
 | `--base-url` | DeepSeek 兼容模型 API 的基础 URL | `https://api.deepseek.com` |
-| `--model` | 默认模型 ID | `deepseek-v4-pro` |
+| `--model` | 默认模型 ID | `deepseek-flash` |
 | `--approval-policy` | `on-request` \| `untrusted` \| `never` \| `auto` \| `suggest` | `auto` |
 | `--sandbox-mode` | `read-only` \| `workspace-write` \| `danger-full-access` \| `external-sandbox` | `workspace-write` |
 | `--insecure` | 关闭 token 鉴权（仅本地开发） | off |
@@ -72,7 +72,7 @@ kun serve \
   --data-dir ~/.deepseekgui/kun \
   --runtime-token dev-token \
   --api-key "$DEEPSEEK_API_KEY" \
-  --model deepseek-v4-pro
+  --model deepseek-flash
 ```
 
 Kun 也可以在无 GUI 的情况下独立运行：
@@ -133,7 +133,7 @@ Kun 使用 JSON 配置文件管理运行时行为，避免重建后重配或硬�
     "runtimeToken": "",
     "apiKey": "",
     "baseUrl": "https://api.deepseek.com",
-    "model": "deepseek-v4-pro",
+    "model": "deepseek-flash",
     "approvalPolicy": "auto",
     "sandboxMode": "workspace-write",
     "storage": {
@@ -151,6 +151,18 @@ Kun 使用 JSON 配置文件管理运行时行为，避免重建后重配或硬�
   },
   "models": {
     "profiles": {
+      "deepseek-flash": {
+        "contextWindowTokens": 1000000,
+        "maxOutputTokens": 384000,
+        "contextCompaction": {
+          "softThreshold": 980000,
+          "hardThreshold": 990000
+        },
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "supportsToolCalling": true,
+        "messageParts": ["text", "image_url"]
+      },
       "deepseek-v4-pro": {
         "contextWindowTokens": 1000000,
         "maxOutputTokens": 384000,
@@ -232,7 +244,7 @@ Kun 使用 JSON 配置文件管理运行时行为，避免重建后重配或硬�
 
 Kun 默认使用混合存储：`threads/{threadId}/messages.jsonl` 与 `events.jsonl` 是会话的标准回放日志；`index.sqlite3` 仅保存可重建的线程元数据（列表与搜索加速）。将 `serve.storage.backend` 设置为 `"file"` 可以回退到旧版 JSON 索引，或设置 `serve.storage.sqlitePath` 覆盖默认的 `{dataDir}/index.sqlite3`。
 
-模型窗口、模型能力和模型级压缩阈值写在 `models.profiles`。内置配置已包含 `deepseek-v4-pro`、`deepseek-v4-flash` 以及兼容别名 `deepseek-chat` / `deepseek-reasoner`；DeepSeek V4 默认是 1M 上下文、384K 最大输出能力，并在约 980k input tokens 时开始压缩。普通 Chat Completions 与 Responses 请求使用 `https://api.deepseek.com`，`/beta` 只用于 FIM 和前缀续写。旧的 `contextCompaction.modelProfiles` 仍会读取以兼容已有配置，但新配置请使用 `models.profiles`。更完整的文件位置、字段格式和用户自定义方式见 `../docs/KUN_CONFIG.md`。
+模型窗口、模型能力和模型级压缩阈值写在 `models.profiles`。内置配置已包含默认的 `deepseek-flash`（DeepSeek V4.1 Flash），并保留显式 Pro、旧 Flash 及 `deepseek-chat` / `deepseek-reasoner` 兼容配置；DeepSeek V4.1 Flash 使用 1M 上下文、384K 最大输出能力，并在约 980k input tokens 时开始压缩。普通 Chat Completions 与 Responses 请求使用 `https://api.deepseek.com`，`/beta` 只用于 FIM 和前缀续写。旧的 `contextCompaction.modelProfiles` 仍会读取以兼容已有配置，但新配置请使用 `models.profiles`。更完整的文件位置、字段格式和用户自定义方式见 `../docs/KUN_CONFIG.md`。
 
 功能开关是显式设计：
 
@@ -241,7 +253,7 @@ Kun 默认使用混合存储：`threads/{threadId}/messages.jsonl` 与 `events.j
 - `serve.tokenEconomy` / `tokenEconomyMode` 会压缩工具描述、工具结果和历史上下文；保留代码、路径、命令、URL、错误信号等高价值信息，同时省掉重复、超长或二进制 payload。
 - `contextCompaction` 控制长会话压缩的兜底阈值和摘要方式；模型级阈值写在 `models.profiles`。压缩时保留目标、约束、决策、已触碰文件、工具结果和未解决事项。
 - `serve.runtimeTuning.toolStorm` 会抑制同一回合内重复的相同工具调用，阻止无意义 tool loop 继续烧 token。
-- `capabilities.web` 暴露 `web_fetch` 与/或 `web_search`。内置 provider 负责 HTTP(S) 抓取；GUI 管理的官方 DeepSeek V4 Pro / Flash Runtime 使用 DeepSeek Responses API 执行服务端搜索，第三方 Runtime 仍需自行配置搜索 provider。
+- `capabilities.web` 暴露 `web_fetch` 与/或 `web_search`。内置 provider 负责 HTTP(S) 抓取；GUI 管理的官方 DeepSeek V4.1 Flash 及显式选择 Pro 的 Runtime 使用 DeepSeek Responses API 执行服务端搜索，第三方 Runtime 仍需自行配置搜索 provider。
 - `capabilities.skills` 扫描 `roots` 下的 `skill.json`，并在 `legacySkillMd` 为 `true` 时兼容 `SKILL.md`。
 - `capabilities.attachments` 是 WorkWise 对 DeepSeek Harness 附件链的运行时实现：图片二进制从线程日志剥离，回合只引用 `attachmentIds`。视觉模型直接接收结构化图片部分；纯文本模型必须配置明确的本机回环视觉证据分析器，并只接收脱敏后的结构化证据。分析器不可用或失败时，本回合会明确失败，绝不会把图片退回为模型提示中的 Base64 文本。分析器自己的本机 HTTP 输入可以使用 `dataBase64`，这是本地传输格式，不是模型消息格式。旧版 `textFallback*` 设置仅为兼容读取旧配置/元数据保留。
 - `capabilities.memory` 在数据目录下持久化跨会话记忆，按作用域检索并注入上下文；也会公开 `memory_create`、`memory_update`、`memory_delete` 工具。

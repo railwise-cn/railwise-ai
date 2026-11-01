@@ -29,6 +29,10 @@ describe('plugin marketplace localization fallbacks', () => {
     expect(friendlyMarketplaceError('TypeError: fetch failed', missing)).toContain(
       'could not be reached'
     )
+    expect(friendlyMarketplaceError(
+      'OAuth client ID is missing and dynamic registration is unavailable.',
+      missing
+    )).toContain('OAuth client ID')
   })
 
   it('keeps installed CLIs visible when login or a health check needs attention', () => {
@@ -49,7 +53,14 @@ describe('plugin marketplace localization fallbacks', () => {
       'Unsafe Skill package: file exceeds 1 MiB: assets/reference.pptx.',
       missing
     )).toBe(
-      'Skipped Skill “artifact-template-team-alignment”: assets/reference.pptx exceeds the 1 MiB discovery limit. Other Skills are unaffected.'
+      'Skipped Skill “artifact-template-team-alignment”: assets/reference.pptx exceeds the 1 MiB discovery limit. Remove the large file or move it outside the Skill package. Other Skills are unaffected.'
+    )
+    expect(skillValidationWarning(
+      '/Users/wangjiawei/.codex/skills/gstack',
+      'Unsafe Skill package: links and junctions are not allowed: ETHOS.md.',
+      missing
+    )).toBe(
+      'Skipped Skill “gstack”: ETHOS.md is a symbolic link or junction, which is not allowed. Replace it with a regular file. Other Skills are unaffected.'
     )
   })
 })

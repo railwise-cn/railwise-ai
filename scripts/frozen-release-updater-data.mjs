@@ -4,6 +4,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, re
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 const sha = value => createHash('sha256').update(value).digest('hex')
 export const SERVICE_MODULES = ['dist/engineering/engineering-service.js', 'dist/engineering/survey-service.js']
@@ -38,9 +39,10 @@ export function resolveFixtureService({ app, mode, compatibilityRoot }) {
   throw new Error('Target package does not contain both Survey services; source fallback is forbidden.')
 }
 
-export function validateFixtureExecution(app, executable, metadata, mode, sourceHead) {
+export function validateFixtureExecution(app, executable, metadata, mode, sourceHead, targetVersion) {
+  validateFrozenTargetVersion(targetVersion)
   assert.equal(realpathSync(executable), realpathSync(join(app, 'Contents/MacOS/RailWise AI')), 'Fixture must execute the selected packaged application.')
-  assert.equal(metadata.version, mode === 'seed' ? '0.5.2' : '0.5.3', 'Fixture package version')
+  assert.equal(metadata.version, mode === 'seed' ? FROZEN_BASE_VERSION : targetVersion, 'Fixture package version')
   if (!/^[a-f0-9]{40}$/.test(sourceHead ?? '')) throw new Error('Exact frozen source is required for fixture provenance.')
   if (mode !== 'seed') assert.equal(metadata.buildProvenance?.sourceHead, sourceHead, 'Fixture target source')
 }
@@ -158,7 +160,7 @@ async function main() {
   if (!['seed', 'verify', 'inspect'].includes(mode)) throw new Error('Fixture mode must be seed, verify or inspect.')
   const sourceHead = argument('source-head')
   const metadata = JSON.parse(readFileSync(join(app, 'Contents/Resources/app.asar/package.json'), 'utf8'))
-  validateFixtureExecution(app, process.execPath, metadata, mode, sourceHead)
+  validateFixtureExecution(app, process.execPath, metadata, mode, sourceHead, readFrozenSourceVersion())
   const checkoutRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../kun')
   let selection = resolveFixtureService({ app, mode, compatibilityRoot: mode === 'seed' ? checkoutRoot : undefined })
   if (selection.layout === 'source-compatibility') {

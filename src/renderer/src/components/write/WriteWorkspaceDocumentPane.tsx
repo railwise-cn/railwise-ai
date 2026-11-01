@@ -14,6 +14,7 @@ import { WriteWorkspaceStart } from './WriteWorkspaceStart'
 import { WriteImagePreview } from './WriteImagePreview'
 
 type Props = {
+  startingTask?: boolean
   activeFilePath: string | null
   activeFileIsImage: boolean
   activeFileIsText: boolean
@@ -42,9 +43,9 @@ type Props = {
   recentEdits: WriteRecentEdit[]
   editorPaneRef: RefObject<HTMLDivElement | null>
   previewPaneRef: RefObject<HTMLDivElement | null>
-  onAskAssistant: () => void
-  onCreateDraft: () => void
-  onCreatePresentation: () => void
+  onAskAssistant: (prompt: string) => void
+  onCreateDraft: (brief?: string) => void
+  onCreatePresentation: (brief?: string) => void
   onPickWorkspace: () => void
   onRefreshWorkspace: () => void
   onContentChange: (content: string) => void
@@ -56,6 +57,7 @@ type Props = {
 }
 
 export function WriteWorkspaceDocumentPane({
+  startingTask,
   activeFilePath,
   activeFileIsImage,
   activeFileIsText,
@@ -101,6 +103,7 @@ export function WriteWorkspaceDocumentPane({
   if (!activeFilePath) {
     return (
       <WriteWorkspaceStart
+        busy={startingTask}
         workspaceName={workspaceName}
         workspacePathLabel={workspacePathLabel}
         onAskAssistant={onAskAssistant}
@@ -232,6 +235,8 @@ export function WriteWorkspaceDocumentPane({
               content={debouncedPreviewContent}
               isMarkdown={isMarkdown && renderSafety.markdownPreviewEnabled}
               filePath={activeFilePath}
+              workspaceRoot={workspaceRoot}
+              onOpenDocument={(path) => void import('../../write/write-workspace-store').then(({ useWriteWorkspaceStore }) => useWriteWorkspaceStore.getState().openFile(workspaceRoot, path))}
               previewErrorMessage={t('writePreviewErrorFallback')}
             />
           </div>

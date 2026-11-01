@@ -16,6 +16,8 @@ const {
 } = require('./verify-packaged-markitdown.cjs')
 const { verifyCandidateSourceTree } = require('./candidate-source-provenance.cjs')
 const { verifyMacRuntimeEntitlements } = require('./mac-notarize.cjs')._internals
+const { verifyBundledDependencyArtifacts } = require('./dependency-artifact-policy.cjs')
+const { verifyPackagedMarkdownRendering } = require('./verify-packaged-markdown-rendering.cjs')
 
 const MAC_ENTITLEMENTS_PATH = join(__dirname, '..', 'build', 'entitlements.mac.plist')
 
@@ -214,6 +216,10 @@ async function afterPack(context) {
   console.log(
     `[after-pack] ASAR integrity passed: ${integrity.files} files, ${integrity.compiledFiles} compiled files.`
   )
+  verifyBundledDependencyArtifacts(packedResourcesDir(context))
+  console.log('[after-pack] Dependency developer-artifact check passed.')
+  const markdownAssets = verifyPackagedMarkdownRendering(packedResourcesDir(context))
+  console.log(`[after-pack] Offline Markdown rendering assets verified: ${markdownAssets.assets} assets, ${markdownAssets.notices} notices.`)
   maybeAdhocSignMacApp(context)
 }
 

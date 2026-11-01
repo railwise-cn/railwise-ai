@@ -742,7 +742,14 @@ export async function requestWriteInlineCompletion(
   request: WriteInlineCompletionRequest
 ): Promise<WriteInlineCompletionResult> {
   const startedAt = Date.now()
-  if (settings.write.inlineCompletion.enabled === false) {
+  // The preference disables automatic suggestions. Explicit AI writing actions
+  // use edit mode with a known scope, including empty scopes for append actions.
+  // Background suggestions may also carry edit candidates/recent edits, so
+  // those signals alone must never bypass the automatic-suggestions switch.
+  const explicitEdit = request.mode === 'edit' && (
+    request.editCandidate?.kind === 'selection' || request.editCandidate?.kind === 'paragraph'
+  )
+  if (settings.write.inlineCompletion.enabled === false && !explicitEdit) {
     appendInlineCompletionPreflightFailure(startedAt, settings, request, 'Inline completion is disabled.')
     return { ok: false, message: 'Inline completion is disabled.' }
   }

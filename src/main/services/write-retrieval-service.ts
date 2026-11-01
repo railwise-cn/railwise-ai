@@ -1,49 +1,18 @@
-import { open as openFile, readdir, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises'
+import { basename, resolve } from 'node:path'
 import type { WriteInlineCompletionRequest } from '../../shared/write-inline-completion'
-import { isWriteTextFileExtension } from '../../shared/write-text-file'
-import { expandHomePath } from './workspace-service'
+import { expandHomePath } from './workspace-paths'
+import { invalidateWriteDocumentIndex, loadWriteDocumentIndex, type WriteDocumentIndex } from './write-document-index'
+import { resolveContainedPath } from './canonical-containment'
 
-const INDEX_CACHE_TTL_MS = 30_000
-const MAX_INDEX_BUILD_MS = 250
-const MAX_SCAN_ENTRIES = 8_000
-const MAX_INDEX_FILES = 160
-const MAX_FILE_BYTES = 600_000
-const MAX_INDEX_CHUNKS = 720
+const MAX_INDEX_CHUNKS = 20_000
+const MAX_INDEX_TOKENS = 2_000_000
 const MAX_CHUNK_CHARS = 900
-const MIN_CHUNK_CHARS = 48
+const MIN_CHUNK_CHARS = 1
 const MAX_TOKENS_PER_CHUNK = 1_200
 const MAX_QUERY_TERMS = 36
 const DEFAULT_MAX_SNIPPETS = 3
 const MAX_SNIPPET_CHARS = 520
-
-const SKIP_DIRS = new Set([
-  '.git',
-  '.hg',
-  '.svn',
-  'node_modules',
-  'dist',
-  'out',
-  'build',
-  '.next',
-  'coverage',
-  '.cache',
-  '.idea',
-  '.pnpm-store',
-  '.turbo',
-  '.venv',
-  '.vscode',
-  '.yarn',
-  '.yarn-cache',
-  '.parcel-cache',
-  'log',
-  'logs',
-  'target',
-  'temp',
-  'tmp',
-  'vendor',
-  'venv'
-])
 
 const STOP_WORDS = new Set([
   'the',
@@ -96,6 +65,9 @@ export type WriteRetrievalContext = {
   snippets: WriteRetrievalSnippet[]
   indexedFiles: number
   indexedChunks: number
+  skippedFiles: number
+  truncated: boolean
+  limits: { maxFiles: number; maxFileBytes: number; maxTotalBytes: number; maxChunks: number; maxTokens: number }
 }
 
 type IndexedChunk = {
@@ -119,6 +91,8 @@ type WorkspaceIndex = {
   chunks: IndexedChunk[]
   averageLength: number
   documentFrequency: Map<string, number>
+  source: WriteDocumentIndex
+  truncated: boolean
 }
 
 type QueryModel = {
@@ -128,19 +102,10 @@ type QueryModel = {
   phrases: string[]
 }
 
-const indexCache = new Map<string, WorkspaceIndex>()
-const inFlightIndexCache = new Map<string, Promise<WorkspaceIndex>>()
-
-function deadlineExceeded(deadline: number): boolean {
-  return Date.now() > deadline
-}
+let indexCache = new WeakMap<WriteDocumentIndex, Promise<WorkspaceIndex>>()
 
 function compactText(text = ''): string {
   return String(text || '').replace(/\r\n?/g, '\n').replace(/\s+/g, ' ').trim()
-}
-
-function normalizeRelativePath(value: string): string {
-  return value.replaceAll('\\', '/')
 }
 
 function clipTail(text = '', maxChars = 0): string {
@@ -193,11 +158,6 @@ function termFrequency(tokens: string[]): Map<string, number> {
   return map
 }
 
-function isWithinWorkspace(workspaceRoot: string, targetPath: string): boolean {
-  const rel = relative(workspaceRoot, targetPath)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
-}
-
 function resolveWorkspaceRoot(raw: string | undefined): string {
   const value = raw?.trim()
   if (!value) return ''
@@ -208,47 +168,6 @@ function resolveComparablePath(raw: string | undefined): string {
   const value = raw?.trim()
   if (!value) return ''
   return resolve(expandHomePath(value))
-}
-
-function isIndexedFile(path: string): boolean {
-  return isWriteTextFileExtension(extname(path).toLowerCase())
-}
-
-async function scanWorkspaceFiles(workspaceRoot: string, deadline: number): Promise<string[]> {
-  const files: string[] = []
-  const stack = [workspaceRoot]
-  let scanned = 0
-
-  while (
-    stack.length > 0 &&
-    scanned < MAX_SCAN_ENTRIES &&
-    files.length < MAX_INDEX_FILES &&
-    !deadlineExceeded(deadline)
-  ) {
-    const current = stack.pop()!
-    let entries
-    try {
-      entries = await readdir(current, { withFileTypes: true })
-    } catch {
-      continue
-    }
-
-    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
-    for (const entry of entries) {
-      if (deadlineExceeded(deadline)) break
-      scanned += 1
-      if (scanned >= MAX_SCAN_ENTRIES || files.length >= MAX_INDEX_FILES) break
-      if (entry.name === '.DS_Store') continue
-      const path = join(current, entry.name)
-      if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) stack.push(path)
-        continue
-      }
-      if (entry.isFile() && isIndexedFile(path)) files.push(path)
-    }
-  }
-
-  return files
 }
 
 function cleanHeading(text: string): string {
@@ -308,6 +227,17 @@ function chunkMarkdown(path: string, relativePath: string, content: string): Ind
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
+    // A single long paragraph must not hide its tail from retrieval. Each
+    // segment retains the real source line instead of inventing line offsets.
+    if (line.length > MAX_CHUNK_CHARS) {
+      if (buffer.length) flush()
+      for (let offset = 0; offset < line.length; offset += MAX_CHUNK_CHARS) {
+        const chunk = buildChunk(path, relativePath, currentTitle, [line.slice(offset, offset + MAX_CHUNK_CHARS)], index + 1)
+        if (chunk) chunks.push(chunk)
+      }
+      lineStart = index + 2
+      continue
+    }
     const heading = headingFromLine(line)
     if (heading) {
       if (buffer.length > 0) flush()
@@ -327,80 +257,42 @@ function chunkMarkdown(path: string, relativePath: string, content: string): Ind
   return chunks
 }
 
-async function readIndexableFile(path: string, deadline: number): Promise<string> {
-  if (deadlineExceeded(deadline)) return ''
-  const info = await stat(path)
-  if (!info.isFile() || info.size <= 0) return ''
-  const maxBytes = Math.min(info.size, MAX_FILE_BYTES)
-  const handle = await openFile(path, 'r')
-  try {
-      const buffer = Buffer.alloc(maxBytes)
-      const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0)
-      const bytes = buffer.subarray(0, bytesRead)
-      if (bytes.includes(0)) return ''
-      if (deadlineExceeded(deadline)) return ''
-      return bytes.toString('utf8')
-  } finally {
-    await handle.close()
-  }
-}
-
-async function buildWorkspaceIndex(workspaceRoot: string): Promise<WorkspaceIndex> {
-  const deadline = Date.now() + MAX_INDEX_BUILD_MS
-  const files = await scanWorkspaceFiles(workspaceRoot, deadline)
+async function buildWorkspaceIndex(source: WriteDocumentIndex): Promise<WorkspaceIndex> {
   const chunks: IndexedChunk[] = []
   let indexedFiles = 0
-
-  for (const path of files) {
-    if (chunks.length >= MAX_INDEX_CHUNKS || deadlineExceeded(deadline)) break
-    try {
-      const content = await readIndexableFile(path, deadline)
-      if (!content.trim()) continue
-      const relativePath = normalizeRelativePath(relative(workspaceRoot, path) || basename(path))
-      const fileChunks = chunkMarkdown(path, relativePath, content)
-      if (fileChunks.length > 0) indexedFiles += 1
-      chunks.push(...fileChunks.slice(0, Math.max(0, MAX_INDEX_CHUNKS - chunks.length)))
-    } catch {
-      /* Ignore unreadable files and keep completion responsive. */
+  let indexedTokens = 0
+  let truncated = source.truncated
+  for (let documentIndex = 0; documentIndex < source.documents.length; documentIndex += 1) {
+    const document = source.documents[documentIndex]
+    if (!document.content.trim()) continue
+    const fileChunks = chunkMarkdown(document.path, document.relativePath, document.content)
+    let included = false
+    for (const chunk of fileChunks) {
+      if (chunks.length >= MAX_INDEX_CHUNKS || indexedTokens + chunk.tokens.length > MAX_INDEX_TOKENS) { truncated = true; break }
+      chunks.push(chunk)
+      indexedTokens += chunk.tokens.length
+      included = true
     }
+    if (included) indexedFiles += 1
+    if (documentIndex % 16 === 0) await yieldToEventLoop()
+    if (chunks.length >= MAX_INDEX_CHUNKS || indexedTokens >= MAX_INDEX_TOKENS) { truncated = true; break }
   }
-
   const documentFrequency = new Map<string, number>()
-  let tokenCount = 0
-  for (const chunk of chunks) {
-    tokenCount += chunk.tokens.length
-    for (const token of new Set(chunk.tokens)) {
-      documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1)
-    }
-  }
-
+  for (const chunk of chunks) for (const token of new Set(chunk.tokens)) documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1)
   return {
-    workspaceRoot,
-    builtAt: Date.now(),
-    files: indexedFiles,
-    chunks,
-    averageLength: chunks.length > 0 ? tokenCount / chunks.length : 1,
-    documentFrequency
+    workspaceRoot: source.workspaceRoot, builtAt: source.builtAt, files: indexedFiles,
+    chunks, averageLength: chunks.length ? indexedTokens / chunks.length : 1,
+    documentFrequency, source, truncated
   }
 }
 
 async function loadWorkspaceIndex(workspaceRoot: string): Promise<WorkspaceIndex> {
-  const cached = indexCache.get(workspaceRoot)
-  if (cached && Date.now() - cached.builtAt <= INDEX_CACHE_TTL_MS) return cached
-  const existing = inFlightIndexCache.get(workspaceRoot)
+  const source = await loadWriteDocumentIndex(workspaceRoot)
+  const existing = indexCache.get(source)
   if (existing) return existing
-
-  const build = buildWorkspaceIndex(workspaceRoot)
-    .then((index) => {
-      indexCache.set(workspaceRoot, index)
-      return index
-    })
-    .finally(() => {
-      inFlightIndexCache.delete(workspaceRoot)
-    })
-
-  inFlightIndexCache.set(workspaceRoot, build)
-  return build
+  const operation = buildWorkspaceIndex(source)
+  indexCache.set(source, operation)
+  return operation
 }
 
 function addWeightedTerms(weights: Map<string, number>, text: string, weight: number): void {
@@ -565,8 +457,12 @@ export async function retrieveWriteInlineCompletionContext(
 ): Promise<WriteRetrievalContext | null> {
   const workspaceRoot = resolveWorkspaceRoot(request.workspaceRoot)
   if (!workspaceRoot) return null
-  const currentFilePath = resolveComparablePath(request.currentFilePath)
-  if (currentFilePath && !isWithinWorkspace(workspaceRoot, currentFilePath)) return null
+  let currentFilePath = ''
+  if (request.currentFilePath) {
+    try {
+      currentFilePath = await resolveContainedPath({ root: workspaceRoot, target: resolveComparablePath(request.currentFilePath), expect: 'file', rejectFinalLink: true })
+    } catch { return null }
+  }
 
   const index = await loadWorkspaceIndex(workspaceRoot)
   if (index.chunks.length === 0) return null
@@ -588,11 +484,14 @@ export async function retrieveWriteInlineCompletionContext(
     keywords: query.terms.slice(0, 12),
     snippets,
     indexedFiles: index.files,
-    indexedChunks: index.chunks.length
+    indexedChunks: index.chunks.length,
+    skippedFiles: index.source.skippedFiles,
+    truncated: index.truncated,
+    limits: { ...index.source.limits, maxChunks: MAX_INDEX_CHUNKS, maxTokens: MAX_INDEX_TOKENS }
   }
 }
 
 export function clearWriteRetrievalCache(): void {
-  indexCache.clear()
-  inFlightIndexCache.clear()
+  indexCache = new WeakMap()
+  invalidateWriteDocumentIndex()
 }

@@ -9,7 +9,8 @@ import type {
   InstalledPackagePermissionV1,
   InstalledPackageV1,
   MarketplacePackageV1,
-  PreparedPluginImportV1
+  PreparedPluginImportV1,
+  PluginUpdateDiagnosticV1
 } from '../../shared/marketplace'
 import { isCanonicalPathContained } from './canonical-containment'
 import {
@@ -17,11 +18,12 @@ import {
   inspectPackageDirectory,
   marketplacePackagePermissionUpdateIdentity,
   marketplacePackageReviewSha256,
+  classifyMarketplacePackageDrift,
   packageInstallLimitsFor,
   stagePackageDirectory,
   type UpdatePackagePermissionsRequestV1
 } from './package-installation-service'
-import { PLUGIN_ARCHIVE_LIMITS } from './plugin-archive-security'
+import { extractPluginArchive, PLUGIN_ARCHIVE_LIMITS } from './plugin-archive-security'
 import {
   installPreparedPluginPackage,
   parsePreparedPluginDirectory,
@@ -31,6 +33,7 @@ import {
   type TrustedPluginSigningKeyV1
 } from './plugin-package-formats'
 import { materializePypiPackage } from './pypi-package-materializer'
+import { describeNetworkFailure, systemFetch } from './system-network'
 import { parseCatalogPackageArtifact } from './marketplace-catalog-service'
 import {
   marketplaceCommandEnvironment,
@@ -42,6 +45,7 @@ const MAX_CATALOG_ARTIFACT_BYTES = 10 * 1024 * 1024
 const UUID_DIRECTORY = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const execFileAsync = promisify(execFile)
 const EXEC_MAX_BUFFER = 8 * 1024 * 1024
+const MAX_GITHUB_ARCHIVE_BYTES = PLUGIN_ARCHIVE_LIMITS.maxArchiveBytes
 
 export type PreparePluginImportRequestV1 = {
   sourcePath: string
@@ -119,6 +123,64 @@ export class PluginManagementService {
 
   listInstalled(): Promise<InstalledPackageV1[]> {
     return this.installationService.list()
+  }
+
+  async diagnoseUpdates(packages: MarketplacePackageV1[]): Promise<PluginUpdateDiagnosticV1[]> {
+    const installed = await this.installationService.list()
+    const byId = new Map(packages.map((item) => [item.id, item]))
+    const diagnostics: PluginUpdateDiagnosticV1[] = []
+    for (const record of installed) {
+      const item = byId.get(record.packageId)
+      if (!item || item.source.id !== record.source.id || item.availability.status !== 'available') {
+        diagnostics.push({
+          packageId: record.packageId,
+          installedVersion: record.version,
+          state: 'unavailable',
+          message: 'The installed package is not available from its current catalog source.'
+        })
+        continue
+      }
+      if (item.version !== record.version) {
+        diagnostics.push({
+          packageId: record.packageId,
+          installedVersion: record.version,
+          catalogVersion: item.version,
+          state: 'update-available',
+          message: 'A newer package version is available.'
+        })
+        continue
+      }
+      if (marketplacePackageReviewSha256(item) === record.reviewSha256) {
+        diagnostics.push({
+          packageId: record.packageId,
+          installedVersion: record.version,
+          catalogVersion: item.version,
+          state: 'current',
+          message: 'The installed package matches the current catalog review.'
+        })
+        continue
+      }
+      let reviewed: MarketplacePackageV1
+      try {
+        reviewed = await this.reviewedPackageFor(record)
+      } catch {
+        diagnostics.push({ packageId: record.packageId, installedVersion: record.version,
+          catalogVersion: item.version, state: 'runtime-drift',
+          message: 'Installed review metadata cannot be verified. A complete update is required.' })
+        continue
+      }
+      const drift = classifyMarketplacePackageDrift(reviewed, item)
+      diagnostics.push({
+        packageId: record.packageId,
+        installedVersion: record.version,
+        catalogVersion: item.version,
+        state: drift === 'metadata-refresh' ? 'metadata-refresh' : 'runtime-drift',
+        message: drift === 'metadata-refresh'
+          ? 'Catalog metadata changed and can be refreshed after review.'
+          : 'Runtime or provenance metadata changed without a package version update.'
+      })
+    }
+    return diagnostics.sort((left, right) => left.packageId.localeCompare(right.packageId))
   }
 
   async prepareCatalogPackage(item: MarketplacePackageV1): Promise<PreparedPluginImportV1> {
@@ -601,7 +663,37 @@ async function materializeGithubPackage(
     throw new Error('Catalog GitHub package must use an immutable commit.')
   }
   const repository = `https://github.com/${source.owner}/${source.repository}.git`
-  await command('git', ['clone', '--filter=blob:none', '--no-checkout', repository, targetDirectory])
+  // GUI Electron processes do not inherit the interactive shell's proxy. Prefer
+  // Chromium's network stack in the packaged app, while keeping the git path for
+  // CLI/tests and as a fallback when codeload is unavailable.
+  if (process.versions.electron) {
+    try {
+      await materializeGithubArchive(
+        source.owner,
+        source.repository,
+        source.resolvedRef,
+        targetDirectory,
+        source.subpath
+      )
+      return
+    } catch (error) {
+      if (!isGithubNetworkFailure(error)) throw error
+    }
+  }
+  try {
+    await command('git', ['clone', '--filter=blob:none', '--no-checkout', repository, targetDirectory])
+  } catch (error) {
+    if (!isGithubNetworkFailure(error)) throw error
+    await rm(targetDirectory, { recursive: true, force: true })
+    await materializeGithubArchive(
+      source.owner,
+      source.repository,
+      source.resolvedRef,
+      targetDirectory,
+      source.subpath
+    )
+    return
+  }
   try {
     await command('git', ['fetch', '--depth=1', 'origin', source.resolvedRef], { cwd: targetDirectory })
     await command('git', ['checkout', '--detach', source.resolvedRef], { cwd: targetDirectory })
@@ -626,6 +718,98 @@ async function materializeGithubPackage(
   } catch (error) {
     await rm(`${targetDirectory}.payload`, { recursive: true, force: true }).catch(() => undefined)
     throw error
+  }
+}
+
+function isGithubNetworkFailure(error: unknown): boolean {
+  const value = error as { message?: unknown; stderr?: unknown; cause?: { message?: unknown } }
+  const detail = [value?.message, value?.stderr, value?.cause?.message]
+    .filter((item): item is string => typeof item === 'string')
+    .join(' ')
+  return /unable to access|could not resolve host|failed to connect|connection timed out|connection reset|network is unreachable|connection refused|operation timed out|fetch failed|archive download failed \((?:408|429|5\d\d)\)/i.test(detail)
+}
+
+async function downloadGithubArchive(owner: string, repository: string, commit: string): Promise<Buffer> {
+  const url = `https://codeload.github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/zip/${encodeURIComponent(commit)}`
+  let response: Response
+  try {
+    response = await systemFetch(url, {
+      headers: {
+        Accept: 'application/zip',
+        'User-Agent': 'RailWise AI'
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(120_000)
+    })
+  } catch (error) {
+    throw new Error(describeNetworkFailure(error, `GitHub (${owner}/${repository})`), { cause: error })
+  }
+  if (!response.ok) throw new Error(`GitHub archive download failed (${response.status}).`)
+  const declared = Number(response.headers.get('content-length') ?? 0)
+  if (Number.isFinite(declared) && declared > MAX_GITHUB_ARCHIVE_BYTES) {
+    throw new Error(`GitHub archive exceeds the ${Math.floor(MAX_GITHUB_ARCHIVE_BYTES / (1024 * 1024))} MiB limit.`)
+  }
+  if (!response.body) {
+    const bytes = Buffer.from(await response.arrayBuffer())
+    if (bytes.byteLength > MAX_GITHUB_ARCHIVE_BYTES) {
+      throw new Error(`GitHub archive exceeds the ${Math.floor(MAX_GITHUB_ARCHIVE_BYTES / (1024 * 1024))} MiB limit.`)
+    }
+    return bytes
+  }
+  const reader = response.body.getReader()
+  const chunks: Buffer[] = []
+  let total = 0
+  try {
+    while (true) {
+      const next = await reader.read()
+      if (next.done) break
+      const chunk = Buffer.from(next.value)
+      total += chunk.byteLength
+      if (total > MAX_GITHUB_ARCHIVE_BYTES) {
+        throw new Error(`GitHub archive exceeds the ${Math.floor(MAX_GITHUB_ARCHIVE_BYTES / (1024 * 1024))} MiB limit.`)
+      }
+      chunks.push(chunk)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return Buffer.concat(chunks, total)
+}
+
+export async function materializeGithubArchive(
+  owner: string,
+  repository: string,
+  commit: string,
+  targetDirectory: string,
+  subpath?: string
+): Promise<void> {
+  const archiveDirectory = `${targetDirectory}.archive`
+  try {
+    const archive = await downloadGithubArchive(owner, repository, commit)
+    // GitHub repositories may commit internal symlinks (for example a
+    // workbench demo directory). The archive extractor resolves those links
+    // into regular files/directories while continuing to reject links that
+    // escape the repository or create cycles.
+    await extractPluginArchive(archive, archiveDirectory, { allowInternalLinks: true })
+    const roots = (await readdir(archiveDirectory, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
+    if (roots.length !== 1) {
+      throw new Error('GitHub archive must contain exactly one repository root directory.')
+    }
+    const repositoryRoot = join(archiveDirectory, roots[0]!.name)
+    if (subpath) {
+      const selected = resolve(repositoryRoot, subpath)
+      if (!isCanonicalPathContained(repositoryRoot, selected)) {
+        throw new Error('Catalog package subpath escapes its repository.')
+      }
+      await stagePackageDirectory(selected, targetDirectory)
+      await copyLicense(repositoryRoot, targetDirectory)
+    } else {
+      await rename(repositoryRoot, targetDirectory)
+      await copyLicense(targetDirectory, targetDirectory)
+    }
+  } finally {
+    await rm(archiveDirectory, { recursive: true, force: true }).catch(() => undefined)
   }
 }
 

@@ -1,0 +1,49 @@
+{
+  "candidateHead": "5c88bfd6de0a65e0436cb33bcc1c6528154e20dd",
+  "installedApp": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/Applications/RailWise AI Candidate 5c88bfd6de0a.app",
+  "version": "0.5.4",
+  "bundleId": "com.wangjiawei508.workwise.candidate.head5c88bfd6de0a",
+  "asarSha256": "487f5c5ff8236e9e92f4d83f4e52c87afd2e06503b72918fcb07856545cccc4a",
+  "checks": {
+    "asar": {
+      "exitCode": 0,
+      "log": "asar.txt"
+    },
+    "native": {
+      "exitCode": 0,
+      "log": "native.txt"
+    },
+    "codesign-info": {
+      "exitCode": 0,
+      "log": "codesign-info.txt"
+    },
+    "codesign-verify": {
+      "exitCode": 0,
+      "log": "codesign-verify.txt"
+    },
+    "notarization": {
+      "exitCode": 66,
+      "log": "notarization.txt"
+    },
+    "gatekeeper": {
+      "exitCode": 0,
+      "log": "gatekeeper.txt"
+    },
+    "document-license": {
+      "exitCode": 0,
+      "log": "document-license.txt"
+    },
+    "security-inventory": {
+      "exitCode": 0,
+      "log": "security-inventory.txt"
+    },
+    "dependency-artifacts": {
+      "exitCode": 0,
+      "log": "dependency-artifacts.txt"
+    }
+  },
+  "publicRelease": false,
+  "updaterRoundTrip": "not-tested",
+  "persistentRuntime": "persistent-copy.json",
+  "sourceLineage": "source-lineage.json"
+}

@@ -160,7 +160,7 @@ function canonicalJson(value: unknown): string {
   ).join(',') + '}'
 }
 
-export function marketplacePackagePermissionUpdateIdentity(item: MarketplacePackageV1): string {
+export function marketplacePackageRuntimeIdentity(item: MarketplacePackageV1): string {
   return canonicalJson({
     schemaVersion: item.schemaVersion,
     id: item.id,
@@ -177,10 +177,35 @@ export function marketplacePackagePermissionUpdateIdentity(item: MarketplacePack
     signature: item.signature,
     configuration: item.configuration,
     updatePolicy: item.updatePolicy,
-    compatibility: item.compatibility,
-    availability: item.availability,
     installation: item.installation
   })
+}
+
+/**
+ * Compatibility and availability are catalog metadata. They may be refreshed
+ * for an already installed artifact without replacing the artifact itself.
+ * Runtime, provenance, authentication, and installation metadata remain
+ * immutable until a real package version changes.
+ */
+export function marketplacePackagePermissionUpdateIdentity(item: MarketplacePackageV1): string {
+  return marketplacePackageRuntimeIdentity(item)
+}
+
+export type MarketplacePackageDriftV1 =
+  | 'unchanged'
+  | 'metadata-refresh'
+  | 'runtime-drift'
+
+export function classifyMarketplacePackageDrift(
+  previous: MarketplacePackageV1,
+  next: MarketplacePackageV1
+): MarketplacePackageDriftV1 {
+  if (marketplacePackageReviewSha256(previous) === marketplacePackageReviewSha256(next)) {
+    return 'unchanged'
+  }
+  return marketplacePackageRuntimeIdentity(previous) === marketplacePackageRuntimeIdentity(next)
+    ? 'metadata-refresh'
+    : 'runtime-drift'
 }
 
 function requiredString(value: unknown, label: string): string {

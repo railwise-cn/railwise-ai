@@ -21,12 +21,13 @@ describe('AgentLoop V4.1 model routing', () => {
   it.each([
     { name: 'current Flash recommendation', selected: 'auto', reply: '{"model":"deepseek-flash","thinking":"high"}', expected: 'deepseek-flash', effort: 'high' },
     { name: 'legacy Flash recommendation', selected: 'auto', reply: '{"model":"deepseek-v4-flash","thinking":"high"}', expected: 'deepseek-flash', effort: 'high' },
-    { name: 'Pro recommendation', selected: 'auto', reply: '{"model":"deepseek-v4-pro","thinking":"max"}', expected: 'deepseek-v4-pro', effort: 'max' },
+    { name: 'old Pro recommendation uses current auto default', selected: 'auto', reply: '{"model":"deepseek-v4-pro","thinking":"max"}', expected: 'deepseek-flash', effort: 'max' },
     { name: 'invalid recommendation fallback', selected: 'auto', reply: 'not JSON', expected: 'deepseek-flash' },
     { name: 'classifier failure fallback', selected: 'auto', reply: null, expected: 'deepseek-flash' },
     { name: 'explicit saved legacy Flash', selected: 'deepseek-v4-flash', reply: null, expected: 'deepseek-v4-flash' },
     { name: 'explicit saved V4.1 Flash', selected: 'deepseek-flash', reply: null, expected: 'deepseek-flash' },
-    { name: 'explicit saved Pro', selected: 'deepseek-v4-pro', reply: null, expected: 'deepseek-v4-pro' }
+    { name: 'explicit saved Pro', selected: 'deepseek-v4-pro', reply: null, expected: 'deepseek-v4-pro' },
+    { name: 'explicit custom model', selected: 'vendor/custom-model', reply: null, expected: 'vendor/custom-model' }
   ])('$name', async ({ selected, reply, expected, effort }) => {
     const threadId = 'thread_v41_routing'
     const nowIso = () => '2026-09-20T00:00:00.000Z'
@@ -83,7 +84,8 @@ describe('AgentLoop V4.1 model routing', () => {
     if (selected === 'auto') {
       expect(classifiers).toHaveLength(1)
       expect(classifiers[0]).toMatchObject({ model: 'deepseek-flash', stream: false, responseFormat: 'json_object', tools: [] })
-      expect(classifiers[0].systemPrompt).toContain('"model":"deepseek-flash|deepseek-v4-pro"')
+      expect(classifiers[0].systemPrompt).toContain('"model":"deepseek-flash"')
+      expect(classifiers[0].systemPrompt).not.toContain('deepseek-v4-pro')
       expect(classifiers[0].systemPrompt).not.toContain('deepseek-v4-flash')
     } else {
       expect(classifiers).toHaveLength(0)

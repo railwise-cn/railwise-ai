@@ -1,0 +1,372 @@
+Window: "RailWise AI", App: RailWise AI Candidate 209a17ecc2ab.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final5/Applications/RailWise%20AI%20Candidate%20209a17ecc2ab.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 按钮 Write
+								14 开合三角标记 Tools
+									15 文本 Tools
+								16 按钮 Plugins
+							17 按钮 New file
+							18 按钮 New requirement
+							19 按钮 Add writing space
+						20 container
+							21 文本 Writing spaces
+							22 按钮 Add writing space
+							23 container /private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench
+								24 按钮 markdown-workbench
+								25 按钮 New file
+								26 按钮 New folder
+								27 按钮 Refresh workspace
+							28 文本 Default writing space
+							29 container
+								30 按钮 .workwise
+								31 按钮 New file in this folder
+								32 按钮 New folder in this folder
+								33 按钮 Rename
+								34 按钮 Move
+								35 按钮 Delete folder
+							36 container
+								37 按钮 assets
+								38 按钮 New file in this folder
+								39 按钮 New folder in this folder
+								40 按钮 Rename
+								41 按钮 Move
+								42 按钮 Delete folder
+							43 container
+								44 按钮 assets.md
+								45 按钮 Rename
+								46 按钮 Move
+								47 按钮 Delete file
+							48 container
+								49 按钮 export-check.md
+								50 按钮 Rename
+								51 按钮 Move
+								52 按钮 Delete file
+							53 container
+								54 按钮 external-edit.md
+								55 按钮 Rename
+								56 按钮 Move
+								57 按钮 Delete file
+							58 container
+								59 按钮 index.md
+								60 按钮 Rename
+								61 按钮 Move
+								62 按钮 Delete file
+							63 container
+								64 按钮 large-protection.md
+								65 按钮 Rename
+								66 按钮 Move
+								67 按钮 Delete file
+							68 container
+								69 按钮 README.md
+								70 按钮 Rename
+								71 按钮 Move
+								72 按钮 Delete file
+							73 container
+								74 按钮 relocated-target.md
+								75 按钮 Rename
+								76 按钮 Move
+								77 按钮 Delete file
+							78 container
+								79 按钮 syntax.md
+								80 按钮 Rename
+								81 按钮 Move
+								82 按钮 Delete file
+							83 container
+								84 按钮 table.md
+								85 按钮 Rename
+								86 按钮 Move
+								87 按钮 Delete file
+							88 container
+								89 按钮 welcome.md
+								90 按钮 Rename
+								91 按钮 Move
+								92 按钮 Delete file
+							93 container
+								94 按钮 保留语法.mdx
+								95 按钮 Rename
+								96 按钮 Move
+								97 按钮 Delete file
+							98 container
+								99 按钮 工程文档-01.md
+								100 按钮 Rename
+								101 按钮 Move
+								102 按钮 Delete file
+							103 container
+								104 按钮 工程文档-02.md
+								105 按钮 Rename
+								106 按钮 Move
+								107 按钮 Delete file
+							108 container
+								109 按钮 工程文档-03.md
+								110 按钮 Rename
+								111 按钮 Move
+								112 按钮 Delete file
+							113 container
+								114 按钮 工程文档-04.md
+								115 按钮 Rename
+								116 按钮 Move
+								117 按钮 Delete file
+							118 container
+								119 按钮 工程文档-05.md
+								120 按钮 Rename
+								121 按钮 Move
+								122 按钮 Delete file
+							123 container
+								124 按钮 工程文档-06.md
+								125 按钮 Rename
+								126 按钮 Move
+								127 按钮 Delete file
+							128 container
+								129 按钮 工程文档-07.md
+								130 按钮 Rename
+								131 按钮 Move
+								132 按钮 Delete file
+							133 container
+								134 按钮 工程文档-08.md
+								135 按钮 Rename
+								136 按钮 Move
+								137 按钮 Delete file
+							138 container
+								139 按钮 工程文档-09.md
+								140 按钮 Rename
+								141 按钮 Move
+								142 按钮 Delete file
+							143 container
+								144 按钮 工程文档-10.md
+								145 按钮 Rename
+								146 按钮 Move
+								147 按钮 Delete file
+							148 container
+								149 按钮 工程文档-11.md
+								150 按钮 Rename
+								151 按钮 Move
+								152 按钮 Delete file
+							153 container
+								154 按钮 工程文档-12.md
+								155 按钮 Rename
+								156 按钮 Move
+								157 按钮 Delete file
+							158 container
+								159 按钮 工程文档-13.md
+								160 按钮 Rename
+								161 按钮 Move
+								162 按钮 Delete file
+							163 container
+								164 按钮 工程文档-14.md
+								165 按钮 Rename
+								166 按钮 Move
+								167 按钮 Delete file
+							168 container
+								169 按钮 工程文档-15.md
+								170 按钮 Rename
+								171 按钮 Move
+								172 按钮 Delete file
+							173 container
+								174 按钮 工程文档-16.md
+								175 按钮 Rename
+								176 按钮 Move
+								177 按钮 Delete file
+							178 container
+								179 按钮 工程文档-17.md
+								180 按钮 Rename
+								181 按钮 Move
+								182 按钮 Delete file
+							183 container
+								184 按钮 工程文档-18.md
+								185 按钮 Rename
+								186 按钮 Move
+								187 按钮 Delete file
+							188 container
+								189 按钮 工程文档-19.md
+								190 按钮 Rename
+								191 按钮 Move
+								192 按钮 Delete file
+							193 container
+								194 按钮 工程文档-20.md
+								195 按钮 Rename
+								196 按钮 Move
+								197 按钮 Delete file
+						198 container
+							199 切换按钮 Connect phone, Value: 0
+							200 按钮 Settings
+					201 container
+						202 text export-check.md export-check.md
+						203 按钮 Live editor
+						204 弹出式按钮 Preview only
+						205 按钮 Toggle AI panel
+						206 按钮 Generate PPT
+						207 弹出式按钮 writeMoreActions
+						208 弹出式按钮 Export
+						209 按钮 Save file
+						210 文本 Saved
+					211 container
+						212 标签页组 Open documents
+							213 标签 (settable, integer) 工程文档-20.md, Value: 0
+							214 按钮 Description: Unpin 工程文档-20.md, Help: Unpin
+							215 按钮 Close 工程文档-20.md
+							216 标签 (settable, integer) index.md, Value: 0
+							217 按钮 Description: Pin index.md, Help: Pin
+							218 按钮 Close index.md
+							219 标签 (settable, integer) 工程文档-01.md, Value: 0
+							220 按钮 Description: Pin 工程文档-01.md, Help: Pin
+							221 按钮 Close 工程文档-01.md
+							222 标签 (settable, integer) 工程文档-02.md, Value: 0
+							223 按钮 Description: Pin 工程文档-02.md, Help: Pin
+							224 按钮 Close 工程文档-02.md
+							225 标签 (settable, integer) 工程文档-03.md, Value: 0
+							226 按钮 Description: Pin 工程文档-03.md, Help: Pin
+							227 按钮 Close 工程文档-03.md
+							228 标签 (settable, integer) 工程文档-04.md, Value: 0
+							229 按钮 Description: Pin 工程文档-04.md, Help: Pin
+							230 按钮 Close 工程文档-04.md
+							231 标签 (settable, integer) 工程文档-05.md, Value: 0
+							232 按钮 Description: Pin 工程文档-05.md, Help: Pin
+							233 按钮 Close 工程文档-05.md
+							234 标签 (settable, integer) 工程文档-06.md, Value: 0
+							235 按钮 Description: Pin 工程文档-06.md, Help: Pin
+							236 按钮 Close 工程文档-06.md
+							237 标签 (settable, integer) 工程文档-07.md, Value: 0
+							238 按钮 Description: Pin 工程文档-07.md, Help: Pin
+							239 按钮 Close 工程文档-07.md
+							240 标签 (settable, integer) 工程文档-08.md, Value: 0
+							241 按钮 Description: Pin 工程文档-08.md, Help: Pin
+							242 按钮 Close 工程文档-08.md
+							243 标签 (settable, integer) 工程文档-09.md, Value: 0
+							244 按钮 Description: Pin 工程文档-09.md, Help: Pin
+							245 按钮 Close 工程文档-09.md
+							246 标签 (settable, integer) 工程文档-10.md, Value: 0
+							247 按钮 Description: Pin 工程文档-10.md, Help: Pin
+							248 按钮 Close 工程文档-10.md
+							249 标签 (settable, integer) 工程文档-11.md, Value: 0
+							250 按钮 Description: Pin 工程文档-11.md, Help: Pin
+							251 按钮 Close 工程文档-11.md
+							252 标签 (settable, integer) 工程文档-12.md, Value: 0
+							253 按钮 Description: Pin 工程文档-12.md, Help: Pin
+							254 按钮 Close 工程文档-12.md
+							255 标签 (settable, integer) 工程文档-13.md, Value: 0
+							256 按钮 Description: Pin 工程文档-13.md, Help: Pin
+							257 按钮 Close 工程文档-13.md
+							258 标签 (settable, integer) 工程文档-14.md, Value: 0
+							259 按钮 Description: Pin 工程文档-14.md, Help: Pin
+							260 按钮 Close 工程文档-14.md
+							261 标签 (settable, integer) 工程文档-15.md, Value: 0
+							262 按钮 Description: Pin 工程文档-15.md, Help: Pin
+							263 按钮 Close 工程文档-15.md
+							264 标签 (settable, integer) 工程文档-16.md, Value: 0
+							265 按钮 Description: Pin 工程文档-16.md, Help: Pin
+							266 按钮 Close 工程文档-16.md
+							267 标签 (settable, integer) 工程文档-17.md, Value: 0
+							268 按钮 Description: Pin 工程文档-17.md, Help: Pin
+							269 按钮 Close 工程文档-17.md
+							270 标签 (settable, integer) 工程文档-18.md, Value: 0
+							271 按钮 Description: Pin 工程文档-18.md, Help: Pin
+							272 按钮 Close 工程文档-18.md
+							273 标签 (settable, integer) 工程文档-19.md, Value: 0
+							274 按钮 Description: Pin 工程文档-19.md, Help: Pin
+							275 按钮 Close 工程文档-19.md
+							276 标签 (settable, integer) syntax.md, Value: 0
+							277 按钮 Description: Pin syntax.md, Help: Pin
+							278 按钮 Close syntax.md
+							279 标签 (settable, integer) large-protection.md, Value: 0
+							280 按钮 Description: Pin large-protection.md, Help: Pin
+							281 按钮 Close large-protection.md
+							282 标签 (settable, integer) relocated-target.md, Value: 0
+							283 按钮 Description: Pin relocated-target.md, Help: Pin
+							284 按钮 Close relocated-target.md
+							285 标签 (selected) export-check.md, Value: 1
+							286 按钮 Description: Pin export-check.md, Help: Pin
+							287 按钮 Close export-check.md
+						288 按钮 Reopen, Help: Restore the last closed document
+						289 按钮 Recent
+					290 按钮 Search documents
+					291 按钮 AI writing
+					292 按钮 Properties
+					293 按钮 Links
+					294 按钮 History
+					295 按钮 Comments
+					296 工具栏 Markdown formatting
+						297 按钮 Bold
+						298 按钮 Italic
+						299 按钮 Heading
+						300 按钮 Bulleted list
+						301 按钮 Numbered list
+						302 按钮 Quote
+					303 文本输入区 (settable) Description: Markdown visual editor, Value: ---
+title: 导出验收
+stage: reviewed
+---
+文档工作台导出验收
+本地图片、表格和代码必须保留。
+流程示意
+
+测点
+本期值
+状态
+DB-01
+1.25 mm
+正常
+export const source = 'markdown'
+
+						304 文本 ---
+title: 导出验收
+stage: reviewed
+---
+
+						305 文本输入区 (settable) 文档工作台导出验收
+							306 标题 文档工作台导出验收, Value: 1
+								307 文本 文档工作台导出验收
+						308 文本输入区 (settable) 本地图片、表格和代码必须保留。
+							309 文本 本地图片、表格和代码必须保留。
+						310 文本输入区 (settable) 流程示意
+
+							311 container
+								312 文本 流程示意
+								313 图像 流程示意
+						314 文本输入区 (settable) 测点
+本期值
+状态
+DB-01
+1.25 mm
+正常
+							315 表格
+								316 row
+									317 列标题
+										318 文本 测点
+									319 列标题
+										320 文本 本期值
+									321 列标题
+										322 文本 状态
+								323 row
+									324 单元格
+										325 文本 DB-01
+									326 单元格
+										327 文本 1.25 mm
+									328 单元格
+										329 文本 正常
+						330 文本输入区 (settable) export const source = 'markdown'
+
+							331 文本 export const source = 'markdown'
+
+	332 关闭按钮
+	333 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	334 最小化按钮
+335 menu bar
+	336 RailWise AI Candidate 209a17ecc2ab
+	337 File
+	338 Edit
+	339 View
+	340 Window
+	341 Help
+
+The focused UI element is 285 标签 (selected) export-check.md, Value: 1

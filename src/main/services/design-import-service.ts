@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import {
@@ -16,9 +17,13 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { parseSvgStringsToDocument } from '../../shared/design-svg-parser'
 import {
   generateDesignElementId,
+  createDesignDocument,
+  createDesignPage,
   type DesignDocumentV1,
   type DesignElement,
-  type DesignPage
+  type DesignPage,
+  type DesignImportDiagnostic,
+  type DesignImportReportV1
 } from '../../shared/design-document'
 import type { DesignFidelityWarning } from '../../shared/design-workspace'
 import { resolvePptMasterScript } from './design-ppt-master-paths'
@@ -26,6 +31,8 @@ import {
   isPptMasterSidecarAvailable,
   runPptMasterSidecar
 } from './ppt-master-sidecar'
+import { inspectPptxPackage } from './pptx-integrity'
+import type { PptxImportReport } from '../../shared/pptx-document'
 
 /**
  * Design 工作区导入服务（main 进程）。
@@ -94,10 +101,195 @@ export type DesignImportResult =
   | {
       ok: true
       document: DesignDocumentV1
+      /** Exact staged bytes used by conversion; never re-read a mutable original after conversion. */
+      sourcePptxBytes: Uint8Array
       images: ImportedDesignImage[]
       warnings: DesignFidelityWarning[]
+      importReport: DesignImportReportV1
     }
-  | { ok: false; message: string }
+  | { ok: false; message: string; code?: 'import_quality_failed'; importReport?: DesignImportReportV1 }
+
+/**
+ * Validate the converted document before image persistence or UI activation.
+ * Slight page bleed is normal in presentation artwork; coordinates beyond ten
+ * slide dimensions indicate a broken unit/transform conversion, not clipping.
+ */
+export function createDesignImportReport(input: {
+  document: DesignDocumentV1
+  sourceFileName: string
+  sourceSlideCount: number
+  warnings?: readonly DesignFidelityWarning[]
+  importedAt?: number
+}): DesignImportReportV1 {
+  const { document } = input
+  const diagnostics: DesignImportDiagnostic[] = []
+  let warningCount = 0
+  let errorCount = 0
+  const add = (diagnostic: DesignImportDiagnostic): void => {
+    if (diagnostic.severity === 'warning') warningCount += 1
+    if (diagnostic.severity === 'error') errorCount += 1
+    if (diagnostics.length < 1_999) diagnostics.push(diagnostic)
+  }
+  if (document.pages.length !== input.sourceSlideCount) {
+    add({
+      code: 'slide_count_mismatch', severity: 'error',
+      message: `The PPTX contains ${input.sourceSlideCount} slides, but conversion produced ${document.pages.length}.`
+    })
+  }
+  let elementCount = 0
+  let textElementCount = 0
+  let imageElementCount = 0
+  for (const [pageIndex, page] of document.pages.entries()) {
+    const pageNumber = pageIndex + 1
+    if (!Number.isFinite(page.width) || !Number.isFinite(page.height) || page.width <= 0 || page.height <= 0) {
+      add({ code: 'invalid_page_geometry', severity: 'error', pageNumber, pageId: page.id,
+        message: `Page ${pageNumber} has an invalid canvas size.` })
+    }
+    for (const element of page.elements) {
+      elementCount += 1
+      if (element.type === 'text' && element.text?.trim()) textElementCount += 1
+      if (element.type === 'image') imageElementCount += 1
+      const location = { pageNumber, pageId: page.id, elementId: element.id }
+      const geometry = [element.x, element.y, element.w, element.h, element.rotation]
+      if (
+        geometry.some((value) => !Number.isFinite(value)) ||
+        (element.type !== 'line' && (element.w < 0 || element.h < 0))
+      ) {
+        add({ code: 'invalid_element_geometry', severity: 'error', ...location,
+          message: `Page ${pageNumber} contains an element with invalid geometry.` })
+      } else if (
+        Math.abs(element.x) > page.width * 10 || Math.abs(element.y) > page.height * 10 ||
+        Math.abs(element.w) > page.width * 10 || Math.abs(element.h) > page.height * 10
+      ) {
+        add({ code: 'extreme_element_geometry', severity: 'error', ...location,
+          message: `Page ${pageNumber} contains an element more than ten canvas dimensions away or oversized; conversion units may be invalid.` })
+      } else if (
+        element.type === 'text' && element.text?.trim() && !element.hidden &&
+        (element.x + element.w < 0 || element.y + element.h < 0 || element.x > page.width || element.y > page.height)
+      ) {
+        add({ code: 'text_outside_canvas', severity: 'warning', ...location,
+          message: `Page ${pageNumber} contains text entirely outside the visible canvas.` })
+      }
+    }
+  }
+  for (const warning of input.warnings ?? []) {
+    const legacyPageNumber = warning.pageId?.match(/^page-(\d+)$/)?.[1]
+    const pageIndex = legacyPageNumber
+      ? Number(legacyPageNumber) - 1
+      : document.pages.findIndex((page) => page.id === warning.pageId)
+    const page = document.pages[pageIndex]
+    add({
+      code: warning.code, severity: 'warning', message: warning.message,
+      ...(page ? { pageNumber: pageIndex + 1, pageId: page.id } : {}),
+      ...(warning.elementId ? { elementId: warning.elementId } : {})
+    })
+  }
+  if (warningCount + errorCount > diagnostics.length) {
+    diagnostics.push({ code: 'diagnostics_truncated', severity: 'info',
+      message: 'Only the first 1999 diagnostics are stored; summary counts include all findings.' })
+  }
+  const fidelityPages = document.pages.filter((page) => page.displayMode === 'fidelity').length
+  return {
+    schemaVersion: 'v1', sourceType: 'pptx', sourceFileName: basename(input.sourceFileName),
+    sourceSlideCount: input.sourceSlideCount, convertedSlideCount: document.pages.length,
+    importedAt: input.importedAt ?? Date.now(),
+    mode: fidelityPages === 0 ? 'editable' : fidelityPages === document.pages.length ? 'fidelity' : 'mixed',
+    summary: { elementCount, textElementCount, imageElementCount, warningCount, errorCount },
+    diagnostics
+  }
+}
+
+/**
+ * A valid OOXML source must remain openable even when the optional compatibility
+ * renderer cannot produce a reference SVG. The native editor reads the source
+ * bytes directly; these empty pages are only the durable document shell and
+ * carry an explicit diagnostic so the UI never presents a broken SVG as truth.
+ */
+function createNativeOnlyPptxDocument(
+  name: string,
+  sourceSlideCount: number,
+  sourceSha256: string,
+  sourceBytes: number,
+  conversionMessage: string | null,
+  nativeReport: PptxImportReport
+): { document: DesignDocumentV1; report: DesignImportReportV1; warnings: DesignFidelityWarning[] } {
+  const base = createDesignDocument({ name, format: 'ppt169' })
+  const pages = Array.from({ length: sourceSlideCount }, (_, index) => ({
+    ...createDesignPage({ format: 'ppt169', name: `Slide ${index + 1}` }),
+    width: nativeReport.pages[index]?.width ?? 1280,
+    height: nativeReport.pages[index]?.height ?? 720
+  }))
+  const warnings: DesignFidelityWarning[] = [...(conversionMessage ? [{
+    code: 'native_import_diagnostic' as const,
+    message: `Compatibility preview unavailable; the original PPTX remains available in the native editor. ${conversionMessage}`
+  }] : []), ...nativeReport.warnings.map((message) => ({ code: 'native_object_diagnostic' as const, message }))]
+  const document: DesignDocumentV1 = {
+    ...base,
+    schemaVersion: 'v2',
+    documentKind: 'pptx',
+    pages,
+    pptx: {
+      editorBackend: 'pptx-vanilla-viewer',
+      editorVersion: '3.61.0',
+      source: { sha256: sourceSha256, bytes: sourceBytes, cachedFilename: 'source.pptx' },
+      importReport: nativeReport,
+      editorModel: {
+        schemaVersion: 1,
+        kind: 'native-pptx-index',
+        slideCount: sourceSlideCount,
+        pages: nativeReport.pages.map((page) => ({
+          pageIndex: page.pageIndex,
+          sourceName: page.sourceName,
+          objectCount: page.objectCount,
+          editableObjectCount: page.editableObjectCount,
+          protectedObjectCount: page.protectedObjectCount,
+          failedObjectCount: page.failedObjectCount
+        })),
+        sourceObjectIds: nativeReport.objects.map((object) => ({
+          id: object.id,
+          pageIndex: object.pageIndex,
+          type: object.type,
+          support: object.support
+        }))
+      },
+      // Clone the inventory entries. The resource validator treats repeated
+      // object references as corruption, and the report itself remains the
+      // canonical immutable inventory.
+      protectedObjects: nativeReport.objects
+        .filter((object) => object.support === 'protected')
+        .map((object) => ({
+          ...object,
+          ...(object.fonts ? { fonts: [...object.fonts] } : {}),
+          ...(object.geometry ? { geometry: { ...object.geometry } } : {}),
+          ...(object.table ? { table: { ...object.table } } : {})
+        }))
+    }
+  }
+  const report = createDesignImportReport({
+    document,
+    sourceFileName: `${name}.pptx`,
+    sourceSlideCount,
+    warnings
+  })
+  report.summary.elementCount = nativeReport.objects.length
+  report.summary.textElementCount = nativeReport.objects.filter((item) => item.type === 'text').length
+  report.summary.imageElementCount = nativeReport.objects.filter((item) => item.type === 'image').length
+  for (const message of nativeReport.errors) {
+    report.diagnostics.push({ code: 'native_source_quality_failed', severity: 'error', message })
+    report.summary.errorCount += 1
+  }
+  for (const object of nativeReport.objects.filter((item) => item.support !== 'editable')) {
+    report.diagnostics.push({ code: 'protected_object', severity: 'warning', pageNumber: object.pageIndex + 1,
+      elementId: object.id, message: `${object.name || object.id}: ${object.reason || 'Original OOXML is protected.'}` })
+    report.summary.warningCount += 1
+  }
+  document.importReport = report
+  return { document, report, warnings }
+}
+
+export function hasBlockingDesignImportErrors(report: DesignImportReportV1): boolean {
+  return report.summary.errorCount > 0 || report.diagnostics.some((diagnostic) => diagnostic.severity === 'error')
+}
 
 function resolvePythonCommand(): string {
   return process.env.WORKWISE_PYTHON?.trim() || (process.platform === 'win32' ? 'python' : 'python3')
@@ -411,7 +603,10 @@ export async function preflightPptxForDesignImport(
  * 3. 读 svg/ 目录下所有 slide_NN.svg
  * 4. 用 parseSvgStringsToDocument 解析
  */
-export async function importPptxToDesign(pptxPath: string): Promise<DesignImportResult> {
+export async function importPptxToDesign(
+  pptxPath: string,
+  options: { compatibilityPreview?: boolean } = {}
+): Promise<DesignImportResult> {
   if (!existsSync(pptxPath)) {
     return { ok: false, message: `File not found: ${pptxPath}` }
   }
@@ -434,6 +629,22 @@ export async function importPptxToDesign(pptxPath: string): Promise<DesignImport
     }
     await copyFile(pptxPath, stagedPptxPath)
     const preflight = await preflightPptxForDesignImport(stagedPptxPath)
+    const sourcePptxBytes = await readFile(stagedPptxPath)
+    const sourceSha256 = createHash('sha256').update(sourcePptxBytes).digest('hex')
+    const nativeInspection = await inspectPptxPackage(sourcePptxBytes)
+    if (nativeInspection.report.errors.length) {
+      const native = createNativeOnlyPptxDocument(basename(pptxPath, extname(pptxPath)),
+        preflight.slideCount, sourceSha256, sourcePptxBytes.length, null, nativeInspection.report)
+      return { ok: false, code: 'import_quality_failed',
+        message: `PPTX source quality checks failed: ${nativeInspection.report.errors.join(' ')}`,
+        importReport: native.report }
+    }
+    if (!options.compatibilityPreview) {
+      const native = createNativeOnlyPptxDocument(basename(pptxPath, extname(pptxPath)),
+        preflight.slideCount, sourceSha256, sourcePptxBytes.length, null, nativeInspection.report)
+      return { ok: true, document: native.document, sourcePptxBytes, images: [], warnings: native.warnings,
+        importReport: native.report }
+    }
     await mkdir(conversionDirectory, { recursive: true })
 
     // 2. 优先使用原生 PPTX 解析（python-pptx 直读形状/段落/字体），
@@ -461,44 +672,80 @@ export async function importPptxToDesign(pptxPath: string): Promise<DesignImport
         nativeSvgReady = false
       }
     }
-    if (!nativeSvgReady && isPptMasterSidecarAvailable()) {
-      await runPptMasterSidecar({
-        operation: 'ppt-master-import-pptx',
-        workspaceRoot: tempDir,
-        inputPath: stagedPptxPath,
-        outputDirectory: conversionDirectory
-      }, { timeoutMs: IMPORT_TIMEOUT_MS })
-    }
-    if (!nativeSvgReady && !isPptMasterSidecarAvailable()) {
-      const developmentFallbackAllowed =
-        process.env.NODE_ENV !== 'production' || process.defaultApp === true
-      if (!developmentFallbackAllowed) {
-        throw new Error('The bundled PPT Master runtime is unavailable.')
+    let conversionMessage: string | null = null
+    try {
+      if (!nativeSvgReady && isPptMasterSidecarAvailable()) {
+        await runPptMasterSidecar({
+          operation: 'ppt-master-import-pptx',
+          workspaceRoot: tempDir,
+          inputPath: stagedPptxPath,
+          outputDirectory: conversionDirectory
+        }, { timeoutMs: IMPORT_TIMEOUT_MS })
       }
-      const scriptPath = resolvePptMasterScript('pptx_to_svg.py')
-      if (!scriptPath) {
-        throw new Error('PPT Master scripts not found.')
+      if (!nativeSvgReady && !isPptMasterSidecarAvailable()) {
+        const developmentFallbackAllowed =
+          process.env.NODE_ENV !== 'production' || process.defaultApp === true
+        if (!developmentFallbackAllowed) {
+          throw new Error('The bundled PPT Master runtime is unavailable.')
+        }
+        const scriptPath = resolvePptMasterScript('pptx_to_svg.py')
+        if (!scriptPath) {
+          throw new Error('PPT Master scripts not found.')
+        }
+        await runPptxToSvg(
+          scriptPath,
+          stagedPptxPath,
+          conversionDirectory,
+          resolvePythonCommand()
+        )
       }
-      await runPptxToSvg(
-        scriptPath,
-        stagedPptxPath,
-        conversionDirectory,
-        resolvePythonCommand()
-      )
+    } catch (error) {
+      conversionMessage = error instanceof Error ? error.message : String(error)
     }
 
     // 3. 读 SVG 文件（flat 模式输出到 svg/ 目录）
+    const nativeDiagnostics = await readNativeImportDiagnostics(conversionDirectory)
     const svgDir = join(conversionDirectory, 'svg')
     if (!existsSync(svgDir)) {
-      return { ok: false, message: 'Import completed but no SVG output found.' }
+      const nativeOnly = createNativeOnlyPptxDocument(
+        basename(pptxPath, '.pptx'),
+        preflight.slideCount,
+        sourceSha256,
+        sourceInfo.size,
+        conversionMessage ?? 'No compatibility renderer output was produced.',
+        nativeInspection.report
+      )
+      return {
+        ok: true,
+        document: nativeOnly.document,
+        sourcePptxBytes,
+        images: [],
+        warnings: nativeOnly.warnings,
+        importReport: nativeOnly.report
+      }
     }
 
     const svgFiles = (await readdir(svgDir))
       .filter((name) => name.toLowerCase().endsWith('.svg') && name.startsWith('slide_'))
-      .sort() // slide_01, slide_02...
+      .sort((left, right) => left.localeCompare(right, 'en', { numeric: true }))
 
-    if (svgFiles.length === 0) {
-      return { ok: false, message: 'No slides found in PPTX.' }
+    if (svgFiles.length === 0 || svgFiles.length !== preflight.slideCount) {
+      const nativeOnly = createNativeOnlyPptxDocument(
+        basename(pptxPath, '.pptx'),
+        preflight.slideCount,
+        sourceSha256,
+        sourceInfo.size,
+        conversionMessage ?? `Compatibility renderer produced ${svgFiles.length} of ${preflight.slideCount} slides.`,
+        nativeInspection.report
+      )
+      return {
+        ok: true,
+        document: nativeOnly.document,
+        sourcePptxBytes,
+        images: [],
+        warnings: nativeOnly.warnings,
+        importReport: nativeOnly.report
+      }
     }
     if (svgFiles.length > preflight.slideCount || svgFiles.length > PPTX_IMPORT_LIMITS.slides) {
       throw new Error('PPT Master produced more SVG pages than the validated PPTX contains.')
@@ -525,7 +772,7 @@ export async function importPptxToDesign(pptxPath: string): Promise<DesignImport
     }
 
     // 5. Fidelity warnings from the raw SVG conversion.
-    const warnings: DesignFidelityWarning[] = []
+    const warnings: DesignFidelityWarning[] = [...nativeDiagnostics]
     for (let pageIndex = 0; pageIndex < svgStrings.length; pageIndex += 1) {
       const svg = svgStrings[pageIndex]
       warnings.push(...inspectDesignSvgFidelity(svg, pageIndex))
@@ -605,6 +852,20 @@ export async function importPptxToDesign(pptxPath: string): Promise<DesignImport
     })
     const document: DesignDocumentV1 = {
       ...parsedWithImages,
+      // Mark the result as a native PPTX document so the renderer can select
+      // the PPTX adapter even though the editable fallback is SVG-backed.
+      schemaVersion: 'v2',
+      documentKind: 'pptx',
+      pptx: {
+        editorBackend: 'pptx-vanilla-viewer',
+        editorVersion: '3.61.0',
+        importReport: nativeInspection.report,
+        source: {
+          sha256: sourceSha256,
+          bytes: sourceInfo.size,
+          cachedFilename: 'source.pptx'
+        }
+      },
       pages: parsedWithImages.pages.map((page, pageIndex) => {
         const base = keepVector[pageIndex]
           ? buildEditablePage(page)
@@ -623,7 +884,23 @@ export async function importPptxToDesign(pptxPath: string): Promise<DesignImport
       })
     }
 
-    return { ok: true, document, images: importedImages, warnings: dedupeWarnings(warnings) }
+    const uniqueWarnings = dedupeWarnings(warnings)
+    const importReport = createDesignImportReport({
+      document,
+      sourceFileName: basename(pptxPath),
+      sourceSlideCount: preflight.slideCount,
+      warnings: uniqueWarnings
+    })
+    if (hasBlockingDesignImportErrors(importReport)) {
+      return {
+        ok: false,
+        code: 'import_quality_failed',
+        message: `PPTX import failed quality checks (${importReport.summary.errorCount} errors). ${importReport.diagnostics.find((diagnostic) => diagnostic.severity === 'error')?.message ?? ''}`.trim(),
+        importReport
+      }
+    }
+    document.importReport = importReport
+    return { ok: true, document, sourcePptxBytes, images: importedImages, warnings: uniqueWarnings, importReport }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return {
@@ -768,6 +1045,20 @@ export function inspectDesignSvgFidelity(
       message: `Page ${pageIndex + 1} contains masks that cannot be edited in Design.`
     })
   }
+  if (/<(?:linear|radial)Gradient\b/i.test(svg) || /fill\s*=\s*["']url\(/i.test(svg)) {
+    warnings.push({
+      code: 'gradient_approximation',
+      pageId,
+      message: `Page ${pageIndex + 1} contains gradient fills; editable mode keeps a representative solid color and the fidelity reference preserves the original appearance.`
+    })
+  }
+  if (/<(?:text|tspan)\b[^>]*(?:fill-opacity|stroke-opacity)\s*=/i.test(svg)) {
+    warnings.push({
+      code: 'transparency_approximation',
+      pageId,
+      message: `Page ${pageIndex + 1} contains translucent paint; editable mode stores a single element opacity and may approximate per-run alpha.`
+    })
+  }
   if (/<g\b/i.test(svg)) {
     warnings.push({
       code: 'flattened_group',
@@ -793,6 +1084,47 @@ function dedupeWarnings(warnings: DesignFidelityWarning[]): DesignFidelityWarnin
     seen.add(key)
     return true
   })
+}
+
+/**
+ * The native converter writes a bounded JSON sidecar next to its SVG output.
+ * Preserve one actionable warning per diagnostic code/slide instead of
+ * copying every repeated shape approximation into the design document.
+ */
+async function readNativeImportDiagnostics(conversionDirectory: string): Promise<DesignFidelityWarning[]> {
+  const reportPath = join(conversionDirectory, 'native-import-report.json')
+  if (!existsSync(reportPath)) return []
+  try {
+    const parsed = JSON.parse(await readFile(reportPath, 'utf8')) as {
+      diagnostics?: unknown
+    }
+    if (!Array.isArray(parsed.diagnostics)) return []
+    const grouped = new Map<string, { count: number; slides: Set<number>; message: string }>()
+    for (const value of parsed.diagnostics) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+      const item = value as Record<string, unknown>
+      const code = typeof item.code === 'string' ? item.code.trim() : ''
+      const message = typeof item.message === 'string' ? item.message.trim() : ''
+      const slide = typeof item.slide === 'number' && Number.isSafeInteger(item.slide) ? item.slide : 0
+      if (!code || !message) continue
+      const key = `${code}\0${message}`
+      const current = grouped.get(key) ?? { count: 0, slides: new Set<number>(), message }
+      current.count += 1
+      if (slide > 0 && current.slides.size < 8) current.slides.add(slide)
+      grouped.set(key, current)
+    }
+    return [...grouped.entries()].slice(0, 32).map(([key, item]) => {
+      const code = key.split('\0', 1)[0]
+      const slideText = item.slides.size > 0 ? ` Slides: ${[...item.slides].join(', ')}.` : ''
+      return {
+        code: 'native_import_diagnostic' as const,
+        pageId: item.slides.size === 1 ? `page-${[...item.slides][0]}` : undefined,
+        message: `Native PPTX import reported ${code} ${item.count} time${item.count === 1 ? '' : 's'}: ${item.message}.${slideText}`
+      }
+    })
+  } catch {
+    return []
+  }
 }
 
 export async function readImportedDesignImage(

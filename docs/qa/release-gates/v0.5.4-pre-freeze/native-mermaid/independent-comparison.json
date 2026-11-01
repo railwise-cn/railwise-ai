@@ -1,0 +1,111 @@
+{
+  "scope": "Independent review of preserved real Electron probe evidence; not final packaged-app acceptance",
+  "coreReportSha256": "d8c88b8721701077028901ea6254336fc4c95344b1bd461ffae4a3fb3e7b2cb4",
+  "controlReportSha256": "7baf9119adb1911c38a00a526e74053f585cedef90b22da03ce7f39e4bcb16de",
+  "coreActualVersions": {
+    "mermaid": "11.16.1",
+    "dompurify": "3.4.17",
+    "katex": "0.16.46"
+  },
+  "controlActualEmbeddedVersions": {
+    "mermaid": "11.16.1",
+    "dompurify": "3.4.0",
+    "katex": "0.16.45"
+  },
+  "controlReportVersionsCaveat": "bundle.versions is copied from the controlled build metadata; it does not measure embedded UMD versions. Raw report is preserved unchanged.",
+  "cases": [
+    {
+      "name": "flowchart-zh",
+      "coreStatus": "passed",
+      "controlStatus": "passed",
+      "sameText": true,
+      "samePng": true,
+      "pngSha256": "080beb86029ba365cc731f3bc24e490316a92f9f0197fc51ea90dde751eee664",
+      "cssSize": [
+        792,
+        328
+      ],
+      "pngSize": {
+        "width": 1584,
+        "height": 656
+      },
+      "sameRawSvg": true
+    },
+    {
+      "name": "sequence",
+      "coreStatus": "passed",
+      "controlStatus": "passed",
+      "sameText": true,
+      "samePng": true,
+      "pngSha256": "12c5591e8b463c1eb9fa4dac7fc09e317c3a41f34e9a8a6b1bfffd9da22a0418",
+      "cssSize": [
+        699,
+        491
+      ],
+      "pngSize": {
+        "width": 1398,
+        "height": 982
+      },
+      "sameRawSvg": true
+    },
+    {
+      "name": "class",
+      "coreStatus": "passed",
+      "controlStatus": "passed",
+      "sameText": true,
+      "samePng": true,
+      "pngSha256": "96f24c70c71e259fba6120aa35eeabf67a5fe0c2b774e3df6bc05c37ed9cfd3e",
+      "cssSize": [
+        325,
+        507
+      ],
+      "pngSize": {
+        "width": 650,
+        "height": 1014
+      },
+      "sameRawSvg": false
+    },
+    {
+      "name": "state",
+      "coreStatus": "passed",
+      "controlStatus": "passed",
+      "sameText": true,
+      "samePng": true,
+      "pngSha256": "9824f10c46b16d1c183a693a4a227f6ef8396e10c33e3923b21aff1068b63e2d",
+      "cssSize": [
+        225,
+        609
+      ],
+      "pngSize": {
+        "width": 450,
+        "height": 1218
+      },
+      "sameRawSvg": true
+    },
+    {
+      "name": "math-label-katex",
+      "coreStatus": "passed",
+      "controlStatus": "passed",
+      "sameText": true,
+      "samePng": true,
+      "pngSha256": "40823b9103489c9e0f04be7114ca79ed5935c5e36be2e9d9565cb9b949f2207e",
+      "cssSize": [
+        665,
+        147
+      ],
+      "pngSize": {
+        "width": 1330,
+        "height": 294
+      },
+      "sameRawSvg": true
+    }
+  ],
+  "classXmlDifference": {
+    "elementsEach": 151,
+    "changedElements": 6,
+    "onlyChangedAttributes": [
+      "path.d"
+    ],
+    "pngIdentical": true
+  }
+}

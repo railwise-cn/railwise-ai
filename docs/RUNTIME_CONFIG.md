@@ -53,12 +53,24 @@ GUI 启动 WorkWise Agent Runtime 时会按下面的顺序合并配置。
     "runtimeToken": "",
     "apiKey": "",
     "baseUrl": "https://api.deepseek.com",
-    "model": "deepseek-v4-pro",
+    "model": "deepseek-flash",
     "approvalPolicy": "auto",
     "sandboxMode": "workspace-write"
   },
   "models": {
     "profiles": {
+      "deepseek-flash": {
+        "contextWindowTokens": 1000000,
+        "maxOutputTokens": 384000,
+        "contextCompaction": {
+          "softThreshold": 980000,
+          "hardThreshold": 990000
+        },
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "supportsToolCalling": true,
+        "messageParts": ["text", "image_url"]
+      },
       "deepseek-v4-pro": {
         "contextWindowTokens": 1000000,
         "maxOutputTokens": 384000,
@@ -92,7 +104,7 @@ GUI 启动 WorkWise Agent Runtime 时会按下面的顺序合并配置。
 
 DeepSeek 的通用 Chat Completions 与 Responses 请求使用稳定基础地址 `https://api.deepseek.com`。`https://api.deepseek.com/beta` 仅用于 FIM 和前缀续写等 beta 接口；WorkWise Write 的 FIM 路径会单独选择该地址，不应把整个 Agent Runtime 配置到 beta 地址。
 
-GUI 管理的官方 DeepSeek V4 Pro / Flash Runtime 会自动启用 `deepseek-responses` 搜索 provider。普通对话仍使用 Chat Completions；只有本地 `web_search` 工具通过 `/v1/responses` 调用官方服务端搜索。第三方兼容 provider 不会被自动开启或改写。
+GUI 管理的官方 DeepSeek V4.1 Flash 及显式选择 Pro 的 Runtime 会自动启用 `deepseek-responses` 搜索 provider。普通对话仍使用 Chat Completions；只有本地 `web_search` 工具通过 `/v1/responses` 调用官方服务端搜索。第三方兼容 provider 不会被自动开启或改写。
 
 ```json
 {
@@ -132,7 +144,7 @@ GUI 管理的官方 DeepSeek V4 Pro / Flash Runtime 会自动启用 `deepseek-re
 
 ## 默认模型 profile
 
-WorkWise Agent Runtime 内置 DeepSeek V4 默认模型画像：
+WorkWise Agent Runtime 默认使用 DeepSeek V4.1 Flash（`deepseek-flash`），同时保留显式 Pro 与旧模型配置的兼容画像：
 
 ```json
 {
@@ -167,7 +179,7 @@ WorkWise Agent Runtime 内置 DeepSeek V4 默认模型画像：
 }
 ```
 
-也就是说，V4 是 1M 上下文并报告 384K 最大输出能力，正常情况下接近 `980k` input tokens 才触发上下文压缩；接近 `990k` 时进入更强的压缩策略。
+也就是说，默认的 V4.1 Flash 使用 1M 上下文并报告 384K 最大输出能力，正常情况下接近 `980k` input tokens 才触发上下文压缩；接近 `990k` 时进入更强的压缩策略。
 
 ## 全局压缩配置写在哪里
 
@@ -207,7 +219,7 @@ WorkWise Agent Runtime 内置 DeepSeek V4 默认模型画像：
       "port": 8899,
       "autoStart": true,
       "dataDir": "~/.workwise/runtime",
-      "model": "deepseek-v4-pro",
+      "model": "deepseek-flash",
       "approvalPolicy": "auto",
       "sandboxMode": "workspace-write",
       "tokenEconomyMode": false,

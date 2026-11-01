@@ -1,0 +1,42 @@
+[
+  {
+    "name": "flowchart-zh",
+    "text": " | 是 | 否 |  | 开始编写 | 资料完整吗 | 生成报告 | 补充资料",
+    "script": 0,
+    "foreignObject": 0,
+    "math": 0,
+    "activeAttributes": []
+  },
+  {
+    "name": "sequence",
+    "text": "RailWise AI | 用户 | RailWise AI | 用户 | 本地文档工作台 | 整理工程资料 | 返回可审阅草稿",
+    "script": 0,
+    "foreignObject": 0,
+    "math": 0,
+    "activeAttributes": []
+  },
+  {
+    "name": "class",
+    "text": "history | 1 | many | Document | +String title | +save() | Revision | +String fingerprint",
+    "script": 0,
+    "foreignObject": 0,
+    "math": 0,
+    "activeAttributes": []
+  },
+  {
+    "name": "state",
+    "text": " | submit | accept | revise |  | Draft | Review | Published",
+    "script": 0,
+    "foreignObject": 0,
+    "math": 0,
+    "activeAttributes": []
+  },
+  {
+    "name": "math-label-katex",
+    "text": " | $$\\int_0^1x^2\\,dx=\\frac{1}{3}$$ | $$E=mc^2$$",
+    "script": 0,
+    "foreignObject": 0,
+    "math": 0,
+    "activeAttributes": []
+  }
+]

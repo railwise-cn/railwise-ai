@@ -14,10 +14,11 @@ import { hashFile, startFrozenReleaseFeed } from './frozen-release-updater-feed.
 import { assertRetainedFiles, snapshotFiles } from './frozen-release-updater-data.mjs'
 import { boundedCommand } from './updater-acceptance-process.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
+import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptRoot = dirname(fileURLToPath(import.meta.url))
-const BASE_VERSION = '0.5.2'; const TARGET_VERSION = '0.5.3'
+const BASE_VERSION = FROZEN_BASE_VERSION
 const FROZEN_MANIFEST_READINESS_TIMEOUT_MS = 5 * 60_000
 const FROZEN_UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`
 const UPDATE_URL = 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
@@ -126,10 +127,11 @@ function verifyBundle(app, version, head, run) {
   return { version, bundleId: info.CFBundleIdentifier, signature: 'verified', stapledNotarization: 'verified', gatekeeper: 'accepted', designatedRequirement: requirements[0] }
 }
 
-export function validateNativeReport(report, arch) {
+export function validateNativeReport(report, arch, targetVersion) {
+  validateFrozenTargetVersion(targetVersion)
   equal(report.schemaVersion, 1, 'Native report schema')
   equal(report.status, 'passed', 'Native updater status'); equal(report.platform, 'darwin', 'Native platform'); equal(report.arch, arch, 'Native architecture')
-  equal(report.baseVersion, BASE_VERSION, 'Native baseline'); equal(report.targetVersion, TARGET_VERSION, 'Native target')
+  equal(report.baseVersion, BASE_VERSION, 'Native baseline'); equal(report.targetVersion, targetVersion, 'Native target')
   equal(report.browserOpened, false, 'No browser path'); equal(report.userDataPreserved, true, 'Native data probe')
   const names = ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved']
   equal(JSON.stringify(report.stages?.map(stage => stage.name)), JSON.stringify(names), 'Native updater stages')
@@ -323,7 +325,7 @@ async function startTunnel(executable, origin, root, env, progress) {
   } catch (error) { processRun.stop(); await processRun.completed.catch(() => {}); throw error }
 }
 
-async function downloadFrozenArtifacts(build, root, run) {
+async function downloadFrozenArtifacts(build, root, run, targetVersion) {
   const downloads = join(root, 'downloads'); mkdirSync(downloads)
   for (const artifact of build.artifacts) {
     const archive = join(root, `${artifact.name}.zip`)
@@ -338,7 +340,7 @@ async function downloadFrozenArtifacts(build, root, run) {
     run('/usr/bin/ditto', ['-x', '-k', archive, directory])
   }
   const output = join(root, 'verified')
-  await verifyDownloadedReleaseArtifacts({ build, version: TARGET_VERSION, sourceHead: build.sourceHead, downloads, output })
+  await verifyDownloadedReleaseArtifacts({ build, version: targetVersion, sourceHead: build.sourceHead, downloads, output })
   return output
 }
 
@@ -431,11 +433,12 @@ export async function stopOwnedApplications(nativeRoot, run, {
 export async function main() {
   const evidence = resolve(argument('evidence-dir') ?? '')
   const provenance = requireFrozenRunner()
+  const targetVersion = readFrozenSourceVersion()
   const runnerTemp = realpathSync(process.env.RUNNER_TEMP)
   if (!argument('evidence-dir') || !evidence.startsWith(runnerTemp + '/') || existsSync(evidence)) throw new Error('Evidence must be a new directory beneath RUNNER_TEMP.')
   mkdirSync(evidence, { mode: 0o700 })
   const root = mkdtempSync(join(runnerTemp, 'railwise-frozen-update-'))
-  const report = { schemaVersion: 1, status: 'running', baseVersion: BASE_VERSION, targetVersion: TARGET_VERSION, platform: 'darwin', arch: process.arch, provenance,
+  const report = { schemaVersion: 1, status: 'running', baseVersion: BASE_VERSION, targetVersion, platform: 'darwin', arch: process.arch, provenance,
     productionTouched: false, systemTrustModified: false, officialFeedsModified: false, publicReleasePerformed: false,
     transport: 'Temporary externally reachable Cloudflare Quick Tunnel with default CA TLS and a 256-bit bearer capability path; no persistent remote storage.', steps: [] }
   const secrets = []
@@ -451,24 +454,24 @@ export async function main() {
     assertFreshProfile(home)
     const build = JSON.parse(readFileSync(resolve(argument('build-file')), 'utf8'))
     validateUpdaterBuildProvenance(provenance, build)
-    validateReviewedBuild(build, { version: TARGET_VERSION, sourceHead: build.sourceHead })
-    verifyReviewedBuildSource(build, { version: TARGET_VERSION, sourceHead: build.sourceHead })
+    validateReviewedBuild(build, { version: targetVersion, sourceHead: build.sourceHead })
+    verifyReviewedBuildSource(build, { version: targetVersion, sourceHead: build.sourceHead })
     report.reviewedBuild = build
-    const verified = await downloadFrozenArtifacts(build, root, run)
+    const verified = await downloadFrozenArtifacts(build, root, run, targetVersion)
     // Recheck immutable provenance after transport and before launching either package.
-    verifyReviewedBuildSource(build, { version: TARGET_VERSION, sourceHead: build.sourceHead })
+    verifyReviewedBuildSource(build, { version: targetVersion, sourceHead: build.sourceHead })
     const pin = BASELINE_PINS[process.arch]; const baselineDmg = join(root, pin.name)
     await downloadPinned(`https://github.com/${RELEASE_REPOSITORY}/releases/download/v${BASE_VERSION}/${pin.name}`, baselineDmg, pin)
     report.baselineAsset = { tag: 'v0.5.2', ...pin }
     const baseline = installBaseline(baselineDmg, root, run)
     report.baselineIdentity = verifyBundle(baseline, BASE_VERSION, undefined, run)
-    const targetZip = join(verified, `WorkWise-${TARGET_VERSION}-mac-${process.arch}.zip`)
+    const targetZip = join(verified, `WorkWise-${targetVersion}-mac-${process.arch}.zip`)
     const targetRoot = join(root, 'target'); mkdirSync(targetRoot)
     const zipEntries = run('/usr/bin/unzip', ['-Z1', targetZip], { maxBuffer: 20 * 1024 * 1024 }).stdout.trim().split(/\r?\n/)
     if (zipEntries.some(name => !/^(?:RailWise AI\.app|__MACOSX)(?:\/|$)/.test(name) || name.split('/').includes('..'))) throw new Error('Target ZIP has entries outside its public app bundle.')
     run('/usr/bin/ditto', ['-x', '-k', targetZip, targetRoot])
     const target = join(targetRoot, 'RailWise AI.app')
-    report.targetIdentity = verifyBundle(target, TARGET_VERSION, build.sourceHead, run)
+    report.targetIdentity = verifyBundle(target, targetVersion, build.sourceHead, run)
     equal(report.targetIdentity.designatedRequirement, report.baselineIdentity.designatedRequirement, 'Baseline/target signing requirement')
     report.targetZipSha256 = await hashFile(targetZip)
     report.targetAsarSha256 = await hashFile(join(target, 'Contents/Resources/app.asar'))
@@ -489,7 +492,7 @@ export async function main() {
     seedConfiguration(paths)
     const beforeRefs = snapshotFiles(paths.workwise)
     const beforeSentinel = readFileSync(join(paths.profile, 'frozen-release-sentinel.json'))
-    feed = await startFrozenReleaseFeed({ zipPath: targetZip, manifestPath: join(verified, 'latest-mac.yml'), version: TARGET_VERSION, arch: process.arch })
+    feed = await startFrozenReleaseFeed({ zipPath: targetZip, manifestPath: join(verified, 'latest-mac.yml'), version: targetVersion, arch: process.arch })
     secrets.push(feed.prefix)
     tunnel = await startTunnel(join(root, 'cloudflared'), feed.origin, root, env, progress)
     secrets.push(tunnel.url)
@@ -498,22 +501,22 @@ export async function main() {
     report.frozenManifestReadiness = await waitForFrozenManifest({ origin: tunnel.url, prefix: feed.prefix,
       manifestSize: lstatSync(join(verified, 'latest-mac.yml')).size, manifestSha256: feed.manifestSha256, isRunning: tunnel.isRunning, progress })
     const beforeNativeRequests = { ...feed.requests }
-    harness = startCapturedProcess(process.execPath, [join(scriptRoot, 'run-native-updater-acceptance.mjs'), `--installer=${baselineDmg}`, `--feed-url=${feedUrl}`, `--base-version=${BASE_VERSION}`, `--target-version=${TARGET_VERSION}`, '--channel=frontier', `--expected-arch=${process.arch}`, `--report=${join(root, 'native-updater.json')}`], { env, logPath: join(root, 'harness.log'), timeoutMs: 25 * 60_000 })
+    harness = startCapturedProcess(process.execPath, [join(scriptRoot, 'run-native-updater-acceptance.mjs'), `--installer=${baselineDmg}`, `--feed-url=${feedUrl}`, `--base-version=${BASE_VERSION}`, `--target-version=${targetVersion}`, '--channel=frontier', `--expected-arch=${process.arch}`, `--report=${join(root, 'native-updater.json')}`], { env, logPath: join(root, 'harness.log'), timeoutMs: 25 * 60_000 })
     report.strictNonceProbe = await observeStrictProbe(paths.profile, harness)
     await harness.completed
     const native = JSON.parse(readFileSync(join(root, 'native-updater.json'), 'utf8'))
-    validateNativeReport(native, process.arch)
+    validateNativeReport(native, process.arch, targetVersion)
     if (feed.requests.manifest <= beforeNativeRequests.manifest || feed.requests.zip <= beforeNativeRequests.zip || feed.requests.bytesServed < lstatSync(targetZip).size) throw new Error('Native updater did not fetch the actual manifest and complete ZIP.')
     const nativeRoots = readdirSync(join(root, 'native-temp')).filter(name => /^workwise-native-updater-/.test(name))
     equal(nativeRoots.length, 1, 'Owned native installation count')
     const installed = join(root, 'native-temp', nativeRoots[0], 'Applications/RailWise AI.app')
-    report.installedIdentity = verifyBundle(installed, TARGET_VERSION, build.sourceHead, run)
+    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run)
     report.installedAsarSha256 = await hashFile(join(installed, 'Contents/Resources/app.asar'))
     equal(report.installedAsarSha256, report.targetAsarSha256, 'Installed/exact frozen ZIP ASAR')
     equal(readFileSync(join(paths.profile, 'frozen-release-sentinel.json')).toString(), beforeSentinel.toString(), 'Independent user-data sentinel')
     report.dataReadback = fixture(installed, 'verify', root, paths, env, run, build.sourceHead)
     report.dataRestartReadback = fixture(installed, 'verify', root, paths, env, run, build.sourceHead, 'verify-restart-data.json')
-    validateUpdaterServiceEvidence(report, { sourceHead: build.sourceHead, version: TARGET_VERSION })
+    validateUpdaterServiceEvidence(report, { sourceHead: build.sourceHead, version: targetVersion })
     assertRetainedFiles(beforeRefs, snapshotFiles(paths.workwise))
     report.configReferences = { status: 'byte-preserved', kinds: ['disabled MCP', 'plugin manifest reference', 'Skill text', 'inert credential reference'], scope: 'Stored bytes only; updater acceptance exits before configuration activation. No real credential, plugin activation or complete catalog migration is certified.' }
     report.separateSentinelPreserved = true; report.feedRequests = feed.requests; report.frozenManifestSha256 = feed.manifestSha256

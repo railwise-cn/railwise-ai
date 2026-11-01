@@ -13,6 +13,17 @@ assert(!/(?:markitdown-ocr|pymupdf|\bfitz\b|agpl)/i.test(requirements), 'MarkItD
 assert(lock.packages?.['node_modules/pdfjs-dist']?.version === '5.4.624', 'PDF.js must remain pinned to the audited Electron-compatible version.')
 assert(lock.packages?.['node_modules/pdfjs-dist']?.license === 'Apache-2.0', 'PDF.js license metadata must be Apache-2.0.')
 const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies }
+for (const [name, version] of [['katex', '0.16.46'], ['mermaid', '11.16.1'], ['markdown-it-footnote', '4.0.0']]) {
+  assert(packageJson.dependencies[name] === version, `${name} must remain pinned to the reviewed document-rendering version.`)
+  assert(lock.packages?.[`node_modules/${name}`]?.version === version, `${name} lockfile version must match its reviewed pin.`)
+  assert(lock.packages?.[`node_modules/${name}`]?.license === 'MIT', `${name} must retain MIT license metadata.`)
+}
+assert(packageJson.overrides?.dompurify === '3.4.17', 'Offline Mermaid must use the reviewed DOMPurify override.')
+assert(lock.packages?.['node_modules/dompurify']?.version === '3.4.17', 'DOMPurify lockfile version must match the reviewed browser bundle.')
+assert(lock.packages?.['node_modules/dompurify']?.license === '(MPL-2.0 OR Apache-2.0)', 'DOMPurify must retain its Apache-2.0 license alternative.')
+const markdownNotices = readFileSync(resolve(root, 'src/asset/markdown-rendering/NOTICE.md'), 'utf8')
+assert(markdownNotices.includes('DOMPurify') && markdownNotices.includes('Apache-2.0'), 'Offline rendering notices must cover DOMPurify.')
+assert(readFileSync(resolve(root, 'src/asset/markdown-rendering/DOMPurify-LICENSE.txt'), 'utf8').includes('Apache License'), 'DOMPurify Apache-2.0 license text must be shipped.')
 assert(!Object.keys(dependencies).some((name) => /mineru|markitdown-ocr|pymupdf/i.test(name)), 'MinerU and OCR engines must not enter the client dependency graph.')
 assert(/Microsoft MarkItDown/i.test(notices) && /MinerU/i.test(notices) && /PDF\.js/i.test(notices), 'Third-party notices must cover MarkItDown, MinerU, and PDF.js.')
 

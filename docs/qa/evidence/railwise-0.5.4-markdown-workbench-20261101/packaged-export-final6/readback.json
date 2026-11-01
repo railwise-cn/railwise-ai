@@ -1,0 +1,107 @@
+{
+  "schema": "railwise.markdown-workbench.packaged-docx-readback.v1",
+  "inspectedAt": "2026-11-01T07:05:25.079Z",
+  "provenance": {
+    "product": "RailWise AI",
+    "version": "0.5.4",
+    "candidate": "final6",
+    "sourceHead": "1864d44d23f5328d5fc435edec9323b57db53ece",
+    "asarSha256": "1661b8e597be4c69634e0c9b1ebdc4941f7defed6bbc96508e5bf6f103dafe07",
+    "sourcePath": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/home/workspace/markdown-workbench/export-final6.docx",
+    "exportOrigin": "Fresh filename exported by parent agent through installed final6 GUI; this independent tool only copies and reads the existing file."
+  },
+  "file": {
+    "evidencePath": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/packaged-export-final6/export-final6.docx",
+    "sizeBytes": 10349,
+    "sha256": "b59b60ad05310d96c56522a4c394ff7eb45f8e0ccd6a42780997f1ed4869a749"
+  },
+  "fixture": {
+    "path": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/home/workspace/markdown-workbench/export-check.md",
+    "sha256": "9478c65b7a71131982a4ac8954b58b3ab38c2fb9fe5b1915a16196fae6d94396",
+    "expectedCode": "export const source = 'markdown'",
+    "imageSha256": "96e1187529d021dd9af36888a1526b3e1c8abaaf86a6cc07126bfd52f2415890"
+  },
+  "tableCount": 1,
+  "drawingCount": 1,
+  "paragraphs": [
+    {
+      "style": "Heading1",
+      "text": "文档工作台导出验收"
+    },
+    {
+      "style": null,
+      "text": "本地图片、表格和代码必须保留。"
+    },
+    {
+      "style": null,
+      "text": ""
+    },
+    {
+      "style": null,
+      "text": "测点"
+    },
+    {
+      "style": null,
+      "text": "本期值"
+    },
+    {
+      "style": null,
+      "text": "状态"
+    },
+    {
+      "style": null,
+      "text": "DB-01"
+    },
+    {
+      "style": null,
+      "text": "1.25 mm"
+    },
+    {
+      "style": null,
+      "text": "正常"
+    },
+    {
+      "style": null,
+      "text": "export const source = 'markdown'"
+    }
+  ],
+  "documentText": "文档工作台导出验收\n本地图片、表格和代码必须保留。\n\n测点\n本期值\n状态\nDB-01\n1.25 mm\n正常\nexport const source = 'markdown'",
+  "media": [
+    {
+      "name": "word/media/908b107fcff362246e8c719acc76da3095902c3e.png",
+      "sizeBytes": 1044,
+      "sha256": "96e1187529d021dd9af36888a1526b3e1c8abaaf86a6cc07126bfd52f2415890"
+    }
+  ],
+  "checks": {
+    "exactCopy": true,
+    "heading": true,
+    "table": true,
+    "sourceImagePreserved": true,
+    "metadataHidden": true,
+    "codeExact": true,
+    "quotesPreserved": true,
+    "noSpuriousQuoteEntities": true
+  },
+  "allChecksPassed": true,
+  "previousFinding": {
+    "id": "PACKAGED-EXPORT-01",
+    "previousCandidate": "final5",
+    "previousEvidence": "../packaged-export-final5/readback.json",
+    "resolvedInThisArtifact": true
+  },
+  "stress": {
+    "evidence": "stress-readback.json",
+    "artifact": "export-stress-final6.docx",
+    "sizeBytes": 9466,
+    "sha256": "6ddf668662fd826294f4512ff6ea8a0af8cde82e4bc438fc7d9fac13bd1d1062",
+    "checks": {
+      "exactCopy": true,
+      "codeBlockCount": true,
+      "allCodeExact": true,
+      "noHighlightSpanMarkup": true,
+      "literalEntitiesPreserved": true
+    },
+    "allChecksPassed": true
+  }
+}

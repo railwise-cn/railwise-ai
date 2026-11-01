@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-11-01T10:25:22.696437+00:00",
+  "url": "https://api-docs.deepseek.com/quick_start/pricing",
+  "retrievedHtmlSha256": "579412351262de19f1b067420542d042dc9433f389be6d252d0f4c41b82f515b",
+  "currentDefault": {
+    "apiModelId": "deepseek-flash",
+    "version": "DeepSeek-V4.1-Flash-1017"
+  },
+  "explicitlySelectable": {
+    "apiModelId": "deepseek-v4-pro",
+    "version": "DeepSeek-V4-Pro-0813"
+  },
+  "retiredAliases": [
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp"
+  ],
+  "retiredAliasesServedBy": "DeepSeek-V4.1-Flash-1017",
+  "officialExcerpt": "Models & Pricing On this page Copy Markdown Copy Markdown Open Markdown Models & Pricing Model prices are listed in units of per 1M tokens. A token, the smallest unit of text that the model recognizes, can be a word, a number, or even a punctuation mark. We bill model usage based on the total number of input and output tokens by the model. Model Details ​ MODEL deepseek-flash (1) deepseek-v4-pro BASE URL (OpenAI Format) https://api.deepseek.com BASE URL (Anthropic Format) https://api.deepseek.com/anthropic MODEL VERSION DeepSeek-V4.1-Flash-1017 DeepSeek-V4-Pro-0813 THINKING MODE Supports both non-thinking and thinking (default) modes See Thinking Mode for how to switch CONTEXT LENGTH 1M MAX OUTPUT MAXIMUM: 384K FEATURES Json Output ✓ ✓ Tool Calls ✓ ✓ Responses API ✓ ✓ Anthropic API ✓ ✓ Chat Prefix Completion（Beta） ✓ ✓ FIM Completion（Beta） Non-thinking mode only Non-thinking mode only Vision ✓ Not supported PRICING (2) 1M INPUT TOKENS (CACHE HIT) OFF-PEAK $0.003 $0.022 PEAK $0.006 $0.044 1M INPUT TOKENS (CACHE MISS) OFF-PEAK $0.15 $0.66 PEAK $0.3 $1.32 1M OUTPUT TOKENS OFF-PEAK $0.6 $1.98 PEAK $1.2 $3.96 Concurrency Limit (3) 2500 500 (1) Use deepseek-flash as the model name. The legacy names deepseek-v4-flash and deepseek-v4-flash-vision-exp are still accepted, but the corresponding models have been retired, their requests are served by the DeepSeek-V4.1-Flash-1017 model and billed at the Flash price. (2) Off-peak rates are half of the peak rates. Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday, excluding Chinese public holidays. All other hours are off-peak, including weekends and Chinese public holidays in full. (3) For more details on concurrency limits, please refer to Rate Limit & Isolation . ",
+  "credentialValuesSaved": false
+}

@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "scope": "isolated 0.5.4 pre-freeze dependency remediation",
+  "node": "22.23.1",
+  "npm": "10.9.4",
+  "audit": {
+    "desktop": {
+      "before": {
+        "critical": 2,
+        "high": 9,
+        "moderate": 5,
+        "low": 6,
+        "total": 22
+      },
+      "after": {
+        "critical": 0,
+        "high": 0,
+        "moderate": 0,
+        "low": 3,
+        "total": 3
+      }
+    },
+    "kun": {
+      "before": {
+        "critical": 1,
+        "high": 7,
+        "moderate": 4,
+        "low": 0,
+        "total": 12
+      },
+      "after": {
+        "critical": 0,
+        "high": 0,
+        "moderate": 0,
+        "low": 0,
+        "total": 0
+      }
+    }
+  },
+  "tests": {
+    "desktopTargeted": {
+      "filesPassed": 5,
+      "passed": 86,
+      "failed": 0
+    },
+    "kunTargeted": {
+      "filesPassed": 6,
+      "passed": 45,
+      "failed": 0
+    },
+    "kunComplete": {
+      "filesPassed": 221,
+      "filesSkipped": 2,
+      "passed": 3209,
+      "skipped": 22,
+      "failed": 0
+    }
+  },
+  "checks": {
+    "desktopWebTypes": "passed",
+    "desktopNodeTypes": "passed",
+    "kunTypes": "passed",
+    "documentDependencyLicenses": "passed"
+  },
+  "manifestHashes": {
+    "package.json": "7761eb16a17ae08ee09ff25cde7d36f3b6349b9a52d0278cdb066accaa1acf8e",
+    "package-lock.json": "91d522ae4da5d49bea49f15dfba40dc692ea898d915e1d81b4cb47337dcf54fc",
+    "kun/package.json": "0190e7265c75fabe3d56ec0baf0cbda377729a9995cb79e1a108684f0ea243f0",
+    "kun/package-lock.json": "4b4970beac44d284023bd4cf6e5b35bb0197cf92fc9bc5c11903bae9849255fa"
+  },
+  "userDataChanged": false,
+  "publicOperations": false,
+  "offlineMermaid": {
+    "status": "source-build-and-independent-review-passed",
+    "versions": {
+      "mermaid": "11.16.1",
+      "dompurify": "3.4.17",
+      "katex": "0.16.46"
+    },
+    "bundleSha256": "4247d8d3e825d1ff43a3cd2a54d226ce0a07545ef074c53c92d8769058c620d4",
+    "residualRisk": "KaTeX low advisory and embedded JSON_SCHEMA-limited js-yaml inventory retained; final ASAR/native verification separate"
+  }
+}

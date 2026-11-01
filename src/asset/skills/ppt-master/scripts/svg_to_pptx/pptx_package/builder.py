@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import mimetypes
 import os
 import posixpath
@@ -19,20 +18,36 @@ import zipfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 from xml.etree import ElementTree as ET
-from xml.sax.saxutils import escape
+from xml.parsers import expat
+from xml.sax.saxutils import escape, quoteattr
 
 from pptx import Presentation
-from pptx.util import Emu
 
+from pptx_embedded_fonts import (
+    FONT_CONTENT_TYPE,
+    FONT_REL_TYPE,
+    PML_NS as EMBEDDED_FONT_PML_NS,
+    REL_NS as EMBEDDED_FONT_REL_NS,
+    EmbeddedFontBundle,
+    EmbeddedFontError,
+    embedded_font_typefaces,
+)
 from pptx_transitions import (
+    AdvanceUpdate,
+    DEFAULT_TRANSITION_DURATION,
+    EnterUpdate,
     MorphPairExpectation,
     NATIVE_TRANSITIONS,
+    apply_slide_motion_xml,
     create_transition_xml,
     normalize_transition_effect_request,
+    read_slide_transition_xml,
+    serialize_source_xml,
     set_directory_use_timings,
+    transition_carriers,
     validate_generated_transition_xml,
     validate_pptx_morph_pairs,
     validate_pptx_transition_package,
@@ -45,6 +60,7 @@ from pptx_animations import (
     normalize_animation_effect,
     normalize_animation_effect_request,
     normalize_animation_trigger,
+    object_animation_fingerprint,
     pick_animation_effect,
     validate_generated_animation_xml,
     validate_pptx_animation_package,
@@ -54,7 +70,14 @@ from pptx_opc_validation import (
     resolve_internal_opc_target as _resolve_internal_opc_target,
     verify_internal_relationships,
 )
-from language_tags import normalize_language_tag
+from pptx_workspace import WorkspaceResourceSpec
+from pptx_ooxml.clone import clone_presentation_slides
+from pptx_ooxml.package import PackagePartRegistry, prune_unreferenced_directory_parts
+from language_tags import language_uses_rtl, office_language_tag
+from hyperlink_contract import (
+    HYPERLINK_REL_TYPE,
+    trigger_shape_hyperlink_errors,
+)
 
 from ..animation_config import (
     MorphPair,
@@ -65,6 +88,7 @@ from ..animation_config import (
 from ..drawingml.context import resolve_text_flow
 from ..drawingml.converter import convert_svg_to_slide_shapes
 from ..drawingml.theme_colors import (
+    ThemeColorError,
     ThemeColorSpec,
     apply_theme_color_spec,
     rewrite_chart_accent_colors,
@@ -75,7 +99,7 @@ from ..drawingml.theme_fonts import (
     apply_master_text_style_spec,
     apply_theme_font_spec,
 )
-from ..drawingml.utils import EMU_PER_PX
+from ..drawingml.utils import EMU_PER_PX, detect_text_lang
 from ..semantic_markers import (
     chrome_token_from_markers,
     page_layout_name_from_svg,
@@ -99,12 +123,15 @@ from .narration import (
     AUDIO_CONTENT_TYPES,
     AUDIO_REL_TYPE,
     AUDIO_MARKER_PNG_BYTES,
+    DEFAULT_NARRATION_START_FLOOR,
     IMAGE_REL_TYPE,
     MEDIA_REL_TYPE,
     apply_recorded_timing,
     inject_narration,
+    narration_lead_in_seconds,
     next_shape_id,
     probe_audio_duration,
+    remove_narration,
 )
 from .slide_xml import (
     create_slide_xml_with_svg, create_slide_rels_xml,
@@ -134,16 +161,51 @@ SLIDE_REL_TYPE = (
 SLIDE_MASTER_REL_TYPE = (
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster"
 )
+NOTES_SLIDE_REL_TYPE = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide"
+)
 THEME_REL_TYPE = (
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
 )
 THEME_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.theme+xml"
 PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+# ST_SlideSizeType tokens for the standard screen ratios; every other canvas
+# (portrait story, banner, print) is ``custom``. python-pptx's default
+# template says ``screen4x3`` whatever cx/cy are set to afterwards.
+_SLIDE_SIZE_TYPES = ((4, 3, "screen4x3"), (16, 9, "screen16x9"), (16, 10, "screen16x10"))
+
+
+def _slide_size_type(width_emu: int, height_emu: int) -> str:
+    """Return the ``p:sldSz type`` token matching a slide size."""
+    for ratio_w, ratio_h, token in _SLIDE_SIZE_TYPES:
+        if abs(width_emu * ratio_h - height_emu * ratio_w) <= max(width_emu, height_emu) // 200:
+            return token
+    return "custom"
+
+
+def _set_slide_size_type(presentation, width_emu: int, height_emu: int) -> None:
+    """Make the ``type`` token agree with the cx/cy the exporter just set."""
+    slide_size = presentation.element.find(f"{{{PML_NS}}}sldSz")
+    if slide_size is not None:
+        slide_size.set("type", _slide_size_type(width_emu, height_emu))
 DML_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 P14_NS = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+A14_NS = "http://schemas.microsoft.com/office/drawing/2010/main"
+MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
-for _prefix, _uri in (("p", PML_NS), ("a", DML_NS), ("r", REL_NS), ("p14", P14_NS)):
+for _prefix, _uri in (
+    ("p", PML_NS),
+    ("a", DML_NS),
+    ("r", REL_NS),
+    ("p14", P14_NS),
+    ("mc", MC_NS),
+    ("a14", A14_NS),
+    ("m", MATH_NS),
+):
     try:
         ET.register_namespace(_prefix, _uri)
     except (ValueError, AttributeError):
@@ -174,6 +236,31 @@ class PptxStructureContext:
             raise RuntimeError(
                 f"Missing slide master relationship for generated slide {slide_num}"
             ) from exc
+
+
+@dataclass(frozen=True)
+class RoundtripSlidePatch:
+    """One authoring slide overlay applied onto its preserved source part."""
+
+    source_ref_ids: frozenset[str]
+    edited_ref_ids: frozenset[str]
+    deleted_ref_ids: frozenset[str]
+    visual_changed: bool
+    authoring_visual_changed: bool
+    motion_changed: bool
+    transition_changed: bool
+    transition_replaced: bool
+    animation_changed: bool
+    notes_changed: bool
+    advance_changed: bool = False
+
+
+@dataclass(frozen=True)
+class _NotesMasterReference:
+    """Notes master selected for one generated notes slide."""
+
+    package_part: str
+    created_theme_part: str | None = None
 
 
 @dataclass
@@ -238,10 +325,15 @@ def _find_relationship_id(
     rels_path: Path,
     rel_type: str,
     target: str,
+    target_mode: str | None = None,
 ) -> str | None:
     """Find an existing relationship by type and target."""
     for rel_id, attrs in _read_relationships(rels_path).items():
-        if attrs.get("Type") == rel_type and attrs.get("Target") == target:
+        if (
+            attrs.get("Type") == rel_type
+            and attrs.get("Target") == target
+            and attrs.get("TargetMode") == target_mode
+        ):
             return rel_id
     return None
 
@@ -421,6 +513,7 @@ _TOP_LEVEL_SHAPE_TAGS = {
     f"{{{PML_NS}}}pic",
     f"{{{PML_NS}}}cxnSp",
     f"{{{PML_NS}}}graphicFrame",
+    f"{{{MC_NS}}}AlternateContent",
 }
 _FLAT_SYSTEM_PLACEHOLDER_TYPES = frozenset({"dt", "ftr", "sldNum"})
 _REL_ATTRS = {
@@ -454,6 +547,9 @@ def _trace_chrome_shape_ids(
         return result
     for event in trace.get("events", []):
         if event.get("decision") != "native":
+            continue
+        if event.get("animation_override"):
+            # Explicitly animated chrome stays slide-local.
             continue
         semantic_role = event.get("data-pptx-role")
         placeholder = event.get("data-pptx-placeholder")
@@ -511,11 +607,94 @@ def _set_shape_name(elem: ET.Element, name: str) -> None:
     )
 
 
+def _roundtrip_morph_shape_ids(svg_path: Path, group_ids: set[str]) -> dict[tuple[str, str], int]:
+    """Resolve preserved endpoints from imported identity, never SVG id spelling."""
+    if not group_ids:
+        return {}
+    root = ET.parse(svg_path).getroot()
+    result: dict[tuple[str, str], int] = {}
+    for group_id in sorted(group_ids):
+        groups = [node for node in root if node.tag == '{http://www.w3.org/2000/svg}g'
+                  and node.get('id') == group_id]
+        shape_id = groups[0].get('data-pptx-shape-id', '') if len(groups) == 1 else ''
+        if (not shape_id.isdecimal()
+                or groups[0].get('data-pptx-shape-scope') != 'slide'):
+            raise TemplateStructureError(
+                f'Morph target "{svg_path.stem}/{group_id}" has no unique imported '
+                'Slide-local shape identity; edit this endpoint page as well, or '
+                'pair groups on two edited pages'
+            )
+        result[(svg_path.stem, group_id)] = int(shape_id)
+    return result
+
+
+_XML_START_TAG_RE = re.compile(r'''<(?:"[^"]*"|'[^']*'|[^'">])*>''')
+_XML_ATTRIBUTE_RE = re.compile(r'''\s+([^\s=/>]+)\s*=\s*(["'])(.*?)\2''', re.DOTALL)
+
+
+def _patch_morph_name_bytes(
+    source: bytes,
+    assignments: dict[str, tuple[str, str]],
+    slide_number: int,
+) -> bytes:
+    """Replace only cNvPr name values, retaining all other source XML bytes."""
+    parser = expat.ParserCreate(namespace_separator='}')
+    offsets: dict[str, list[tuple[int, str | None]]] = {}
+    encoding = 'utf-8'
+
+    def declaration(_version: str, declared_encoding: str | None, _standalone: int) -> None:
+        nonlocal encoding
+        encoding = declared_encoding or encoding
+
+    def start(name: str, attributes: dict[str, str]) -> None:
+        shape_id = attributes.get('id')
+        if name == f'{PML_NS}}}cNvPr' and shape_id in assignments:
+            offsets.setdefault(shape_id, []).append((parser.CurrentByteIndex, attributes.get('name')))
+
+    parser.XmlDeclHandler = declaration
+    parser.StartElementHandler = start
+    parser.Parse(source, True)
+    # Byte offsets come from Expat; encode individual spans without a BOM.
+    if source.startswith((b'\xff\xfe', b'<\x00')):
+        encoding = 'utf-16-le'
+    elif source.startswith((b'\xfe\xff', b'\x00<')):
+        encoding = 'utf-16-be'
+    replacements: list[tuple[int, int, bytes]] = []
+    for shape_id, (name, group_id) in assignments.items():
+        locations = offsets.get(shape_id, [])
+        error = (
+            f'Morph target "{group_id}" on slide {slide_number} cannot patch '
+            f'cNvPr@name for source shape {shape_id} without rewriting XML; '
+            'edit this endpoint page as well, or pair groups on two edited pages'
+        )
+        if len(locations) != 1:
+            raise TemplateStructureError(error)
+        offset, existing_name = locations[0]
+        if existing_name == name:
+            continue
+        tag = _XML_START_TAG_RE.match(source[offset:].decode(encoding))
+        attribute = next(
+            (match for match in _XML_ATTRIBUTE_RE.finditer(tag.group()) if match[1] == 'name'),
+            None,
+        ) if tag is not None else None
+        if attribute is None:
+            raise TemplateStructureError(error)
+        start_offset = offset + len(tag.group()[:attribute.start(3)].encode(encoding))
+        end_offset = offset + len(tag.group()[:attribute.end(3)].encode(encoding))
+        escaped = escape(name, {'"': '&quot;', "'": '&apos;'})
+        replacements.append((start_offset, end_offset, escaped.encode(encoding, errors='xmlcharrefreplace')))
+    for start_offset, end_offset, value in sorted(replacements, reverse=True):
+        source = source[:start_offset] + value + source[end_offset:]
+    return source
+
+
 def _apply_morph_shape_names(
     extract_dir: Path,
     pairs: tuple[MorphPair, ...],
     slide_numbers: dict[str, int],
     shape_ids: dict[tuple[str, str], int],
+    *,
+    preserved_slides: set[int],
 ) -> dict[int, dict[str, str]]:
     """Write forced-Morph names after all structure transformations finish."""
     assignments: dict[int, dict[str, tuple[str, str]]] = {}
@@ -526,14 +705,21 @@ def _apply_morph_shape_names(
             (pair.destination_slide, pair.destination_group_id),
         ):
             slide_number = slide_numbers[slide_name]
-            shape_id = str(shape_ids[(slide_name, group_id)])
+            resolved_id = shape_ids.get((slide_name, group_id))
+            if resolved_id is None:
+                raise TemplateStructureError(
+                    f'Morph target "{slide_name}/{group_id}" has no exported '
+                    'Slide-local shape identity; edit this endpoint page as well, '
+                    'or pair groups on two edited pages'
+                )
+            shape_id = str(resolved_id)
             slide_assignments = assignments.setdefault(slide_number, {})
             previous = slide_assignments.setdefault(
                 shape_id,
                 (pair.shape_name, group_id),
             )
             if previous[0] != pair.shape_name:
-                raise RuntimeError(
+                raise TemplateStructureError(
                     f'Morph target "{slide_name}/{group_id}" resolves to shape '
                     f'{shape_id} with conflicting names "{previous[0]}" and '
                     f'"{pair.shape_name}"'
@@ -541,7 +727,7 @@ def _apply_morph_shape_names(
             slide_names = names_by_slide.setdefault(slide_number, {})
             previous_group = slide_names.setdefault(pair.shape_name, group_id)
             if previous_group != group_id:
-                raise RuntimeError(
+                raise TemplateStructureError(
                     f'Morph name "{pair.shape_name}" maps to multiple objects '
                     f'on slide "{slide_name}"'
                 )
@@ -566,7 +752,7 @@ def _apply_morph_shape_names(
                 c_nv_pr.get("name") if c_nv_pr is not None else None
             )
             if existing_name in desired_names:
-                raise RuntimeError(
+                raise TemplateStructureError(
                     f'Morph name "{existing_name}" already belongs to an '
                     f'unmapped object on slide {slide_number}'
                 )
@@ -574,13 +760,18 @@ def _apply_morph_shape_names(
         for shape_id, (shape_name, group_id) in slide_assignments.items():
             shape = top_level_shapes.get(shape_id)
             if shape is None:
-                raise RuntimeError(
+                raise TemplateStructureError(
                     f'Morph target "{group_id}" no longer resolves to a '
                     f'Slide-local shape on slide {slide_number}'
                 )
             _set_shape_name(shape, shape_name)
             trace_names.setdefault(slide_number, {})[group_id] = shape_name
-        _write_xml_tree(slide_path, tree)
+        if slide_number in preserved_slides:
+            slide_path.write_bytes(_patch_morph_name_bytes(
+                slide_path.read_bytes(), slide_assignments, slide_number,
+            ))
+        else:
+            _write_xml_tree(slide_path, tree)
     return trace_names
 
 
@@ -639,15 +830,20 @@ def _shape_relationships_supported(
     elem: ET.Element,
     rels: dict[str, dict[str, str]],
 ) -> bool:
-    """Only image relationships are safe to copy into a slide master here."""
+    """Return whether every shape relation can move to Master/Layout parts."""
     for rel_id in _relationship_ids_in_shape(elem):
         attrs = rels.get(rel_id)
         if not attrs:
             return False
-        if attrs.get("TargetMode"):
-            return False
-        if attrs.get("Type") != IMAGE_REL_TYPE:
-            return False
+        rel_type = attrs.get("Type")
+        target_mode = attrs.get("TargetMode")
+        if rel_type == IMAGE_REL_TYPE and not target_mode:
+            continue
+        if rel_type == HYPERLINK_REL_TYPE and target_mode == "External":
+            continue
+        if rel_type == SLIDE_REL_TYPE and not target_mode:
+            continue
+        return False
     return True
 
 
@@ -677,7 +873,8 @@ def _canonical_shape_xml(
             attrs = rels.get(value, {})
             node.set(
                 attr_name,
-                f"{attrs.get('Type', '')}|{attrs.get('Target', '')}",
+                f"{attrs.get('Type', '')}|{attrs.get('Target', '')}|"
+                f"{attrs.get('TargetMode', '')}",
             )
     return ET.tostring(clone, encoding="utf-8")
 
@@ -686,11 +883,37 @@ def _ensure_relationship(
     rels_path: Path,
     rel_type: str,
     target: str,
+    target_mode: str | None = None,
 ) -> str:
-    existing = _find_relationship_id(rels_path, rel_type, target)
+    existing = _find_relationship_id(
+        rels_path,
+        rel_type,
+        target,
+        target_mode,
+    )
     if existing:
         return existing
-    return _append_relationship(rels_path, rel_type, target)
+    return _append_relationship(
+        rels_path,
+        rel_type,
+        target,
+        target_mode=target_mode,
+    )
+
+
+def _part_name_for_relationships_path(rels_path: Path) -> str:
+    """Recover one ``ppt/...`` package part from its relationship sidecar."""
+    if rels_path.parent.name != "_rels" or not rels_path.name.endswith(".rels"):
+        raise RuntimeError(f"Invalid PPTX relationship path: {rels_path}")
+    part_path = rels_path.parent.parent / rels_path.name.removesuffix(".rels")
+    parts = part_path.parts
+    try:
+        ppt_index = len(parts) - 1 - tuple(reversed(parts)).index("ppt")
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Relationship path is not under a ppt package: {rels_path}"
+        ) from exc
+    return PurePosixPath(*parts[ppt_index:]).as_posix()
 
 
 def _copy_shape_relationships_to_part(
@@ -700,6 +923,7 @@ def _copy_shape_relationships_to_part(
 ) -> ET.Element:
     """Clone a shape and retarget supported relationship ids to another part."""
     clone = ET.fromstring(ET.tostring(elem, encoding="utf-8"))
+    target_part = _part_name_for_relationships_path(target_rels_path)
     for node in clone.iter():
         for attr_name, value in list(node.attrib.items()):
             if attr_name not in _REL_ATTRS:
@@ -707,10 +931,22 @@ def _copy_shape_relationships_to_part(
             rel = slide_rels.get(value)
             if not rel:
                 raise RuntimeError(f"Missing slide relationship for {value}")
+            target_mode = rel.get("TargetMode")
+            relationship_target = rel["Target"]
+            if target_mode != "External":
+                resolved_target = _resolve_package_target(
+                    "ppt/slides/source.xml",
+                    relationship_target,
+                )
+                relationship_target = posixpath.relpath(
+                    resolved_target,
+                    posixpath.dirname(target_part),
+                )
             new_rid = _ensure_relationship(
                 target_rels_path,
                 rel["Type"],
-                rel["Target"],
+                relationship_target,
+                target_mode,
             )
             node.set(attr_name, new_rid)
     return clone
@@ -771,7 +1007,1206 @@ def _append_shape_to_part(part_path: Path, elem: ET.Element) -> None:
 
 
 def _write_xml_tree(path: Path, tree: ET.ElementTree) -> None:
+    root = tree.getroot()
+    if root.tag == f"{{{PACKAGE_REL_NS}}}Relationships":
+        ET.register_namespace("", PACKAGE_REL_NS)
     tree.write(path, encoding="utf-8", xml_declaration=True)
+
+
+def _slide_ref_shape_ids(values: frozenset[str]) -> set[str]:
+    """Return Slide-local ids from authoring source references."""
+    result: set[str] = set()
+    for value in values:
+        if value.startswith("slide:") and len(value) > len("slide:"):
+            result.add(value.split(":", 1)[1])
+    return result
+
+
+def _roundtrip_synthetic_shape_id(source_order: tuple[int, ...]) -> str:
+    """Return the importer's stable identity for a shape with no native id."""
+    return "missing-" + "-".join(str(value) for value in source_order)
+
+
+def _direct_shape_id(element: ET.Element) -> str | None:
+    """Return one shape's own cNvPr id without descending into child shapes."""
+    if element.tag == f"{{{MC_NS}}}AlternateContent":
+        return _shape_id(element)
+    for child in element:
+        c_nv_pr = child.find(f"{{{PML_NS}}}cNvPr")
+        if c_nv_pr is not None:
+            return c_nv_pr.get("id")
+    return None
+
+
+def _roundtrip_shape_id_closure(
+    element: ET.Element,
+    source_order: tuple[int, ...],
+) -> set[str]:
+    """Return native and synthetic identities in one source shape subtree."""
+    identity = _direct_shape_id(element) or _roundtrip_synthetic_shape_id(
+        source_order
+    )
+    identities = _shape_ids_in_element(element) | {identity}
+    if element.tag != f"{{{PML_NS}}}grpSp":
+        return identities
+    child_order = 0
+    for child in element:
+        if child.tag not in _TOP_LEVEL_SHAPE_TAGS:
+            continue
+        child_order += 1
+        identities.update(
+            _roundtrip_shape_id_closure(
+                child,
+                (*source_order, child_order),
+            )
+        )
+    return identities
+
+
+def _index_roundtrip_source_shape(
+    element: ET.Element,
+    source_order: tuple[int, ...],
+    shapes: dict[str, ET.Element],
+    key_by_element: dict[int, str],
+) -> None:
+    """Index one native source shape subtree by stable round-trip identity."""
+    shape_id = _direct_shape_id(element) or _roundtrip_synthetic_shape_id(
+        source_order
+    )
+    if shape_id in shapes:
+        raise TemplateStructureError(
+            f"Round-trip source slide repeats shape id {shape_id}"
+        )
+    shapes[shape_id] = element
+    key_by_element[id(element)] = shape_id
+    if element.tag != f"{{{PML_NS}}}grpSp":
+        return
+    child_order = 0
+    for child in element:
+        if child.tag not in _TOP_LEVEL_SHAPE_TAGS:
+            continue
+        child_order += 1
+        _index_roundtrip_source_shape(
+            child,
+            (*source_order, child_order),
+            shapes,
+            key_by_element,
+        )
+
+
+def _roundtrip_source_shape_roster(
+    source_tree: ET.Element,
+) -> tuple[
+    dict[str, ET.Element],
+    dict[str, set[str]],
+    dict[int, str],
+    dict[str, ET.Element],
+]:
+    """Index source top-level shapes without mutating missing native ids."""
+    shapes: dict[str, ET.Element] = {}
+    descendant_ids: dict[str, set[str]] = {}
+    key_by_element: dict[int, str] = {}
+    all_shapes: dict[str, ET.Element] = {}
+    source_order = 0
+    for child in source_tree:
+        if child.tag not in _TOP_LEVEL_SHAPE_TAGS:
+            continue
+        source_order += 1
+        order_path = (source_order,)
+        _index_roundtrip_source_shape(
+            child,
+            order_path,
+            all_shapes,
+            key_by_element,
+        )
+        shape_id = key_by_element[id(child)]
+        shapes[shape_id] = child
+        descendant_ids[shape_id] = _roundtrip_shape_id_closure(
+            child,
+            order_path,
+        )
+    return shapes, descendant_ids, key_by_element, all_shapes
+
+
+def _roundtrip_nested_restore_ids(
+    source_shapes: dict[str, ET.Element],
+    source_key_by_element: dict[int, str],
+    affected_top_ids: set[str],
+    unchanged_ids: set[str],
+    deleted_ids: set[str],
+) -> set[str]:
+    """Return outermost unchanged source shapes inside rebuilt top-level groups."""
+    restore_ids: set[str] = set()
+
+    def visit(element: ET.Element) -> None:
+        shape_id = source_key_by_element[id(element)]
+        if shape_id in unchanged_ids:
+            restore_ids.add(shape_id)
+            return
+        if shape_id in deleted_ids or element.tag != f"{{{PML_NS}}}grpSp":
+            return
+        for child in element:
+            if child.tag in _TOP_LEVEL_SHAPE_TAGS:
+                visit(child)
+
+    for shape_id in affected_top_ids:
+        visit(source_shapes[shape_id])
+    return restore_ids
+
+
+def _restore_roundtrip_nested_source_shapes(
+    generated_nodes: list[ET.Element],
+    source_shapes: dict[str, ET.Element],
+    restore_ids: set[str],
+    traced_ids: dict[str, list[str]],
+) -> None:
+    """Replace converter-safe nested placeholders with exact source shapes."""
+    locations: dict[str, tuple[ET.Element, ET.Element]] = {}
+
+    def index_children(parent: ET.Element) -> None:
+        for child in parent:
+            if child.tag not in _TOP_LEVEL_SHAPE_TAGS:
+                continue
+            shape_id = _direct_shape_id(child)
+            if shape_id is not None:
+                previous = locations.setdefault(shape_id, (parent, child))
+                if previous[1] is not child:
+                    raise TemplateStructureError(
+                        "Generated round-trip slide repeats nested shape id "
+                        f"{shape_id}"
+                    )
+            if child.tag == f"{{{PML_NS}}}grpSp":
+                index_children(child)
+
+    for node in generated_nodes:
+        if node.tag == f"{{{PML_NS}}}grpSp":
+            index_children(node)
+
+    for source_id in sorted(restore_ids, key=_roundtrip_shape_sort_key):
+        candidate_ids = {source_id}
+        candidate_ids.update(traced_ids.get(f"shape-{source_id}", []))
+        matches = {
+            candidate_id: locations[candidate_id]
+            for candidate_id in candidate_ids
+            if candidate_id in locations
+        }
+        if len(matches) != 1:
+            raise TemplateStructureError(
+                "Unchanged nested round-trip source object did not produce "
+                f"exactly one restore placeholder: {source_id}"
+            )
+        parent, placeholder = next(iter(matches.values()))
+        source = source_shapes.get(source_id)
+        if source is None:
+            raise TemplateStructureError(
+                f"Round-trip source shape is missing for nested ref {source_id}"
+            )
+        clone = ET.fromstring(ET.tostring(source, encoding="utf-8"))
+        clone.tail = placeholder.tail
+        position = list(parent).index(placeholder)
+        parent.remove(placeholder)
+        parent.insert(position, clone)
+
+
+def _roundtrip_shape_sort_key(value: str) -> tuple[int, int | str]:
+    """Sort native numeric ids before stable synthetic ids."""
+    return (0, int(value)) if value.isdigit() else (1, value)
+
+
+def _relationship_key(attrs: dict[str, str]) -> tuple[str, str, str | None]:
+    """Return the identity used to reuse one source relationship."""
+    return (
+        attrs.get("Type", ""),
+        attrs.get("Target", ""),
+        attrs.get("TargetMode"),
+    )
+
+
+def _merge_roundtrip_relationships(
+    source_rels: bytes,
+    generated_rels_path: Path,
+    generated_slide_root: ET.Element,
+    required_generated_ids: set[str],
+) -> None:
+    """Retarget generated references into the preserved source rel roster."""
+    try:
+        source_root = ET.fromstring(source_rels)
+        generated_root = ET.parse(generated_rels_path).getroot()
+    except ET.ParseError as exc:
+        raise TemplateStructureError(
+            "Round-trip slide relationships are not valid XML"
+        ) from exc
+
+    source_by_key: dict[tuple[str, str, str | None], str] = {}
+    used_ids: set[str] = set()
+    for relationship in source_root:
+        attrs = _relationship_attrs(relationship)
+        rel_id = attrs.get("Id")
+        if not rel_id:
+            continue
+        used_ids.add(rel_id)
+        source_by_key.setdefault(_relationship_key(attrs), rel_id)
+    numeric_ids = [
+        int(match.group(1))
+        for rel_id in used_ids
+        if (match := re.fullmatch(r"rId(\d+)", rel_id)) is not None
+    ]
+    next_id = max(numeric_ids, default=0) + 1
+
+    id_map: dict[str, str] = {}
+    added_relationship = False
+    for relationship in generated_root:
+        attrs = _relationship_attrs(relationship)
+        generated_id = attrs.get("Id")
+        if not generated_id:
+            raise TemplateStructureError(
+                "Generated round-trip relationship has no Id"
+            )
+        if generated_id not in required_generated_ids:
+            continue
+        existing_id = source_by_key.get(_relationship_key(attrs))
+        if existing_id is not None:
+            id_map[generated_id] = existing_id
+            continue
+
+        assigned_id = generated_id
+        if assigned_id in used_ids:
+            while f"rId{next_id}" in used_ids:
+                next_id += 1
+            assigned_id = f"rId{next_id}"
+            next_id += 1
+        clone = ET.fromstring(ET.tostring(relationship, encoding="utf-8"))
+        clone.set("Id", assigned_id)
+        source_root.append(clone)
+        added_relationship = True
+        used_ids.add(assigned_id)
+        source_by_key[_relationship_key(attrs)] = assigned_id
+        id_map[generated_id] = assigned_id
+
+    missing_relationships = required_generated_ids - set(id_map)
+    if missing_relationships:
+        raise TemplateStructureError(
+            "Generated round-trip slide references missing relationship(s): "
+            + ", ".join(sorted(missing_relationships))
+        )
+
+    for node in generated_slide_root.iter():
+        for attr_name, value in list(node.attrib.items()):
+            if attr_name in _REL_ATTRS and value in id_map:
+                node.set(attr_name, id_map[value])
+    if added_relationship:
+        _write_xml_tree(generated_rels_path, ET.ElementTree(source_root))
+    else:
+        generated_rels_path.write_bytes(source_rels)
+
+
+def _replace_roundtrip_motion(
+    source_root: ET.Element,
+    generated_root: ET.Element,
+    *,
+    transition_changed: bool,
+    transition_replaced: bool,
+    animation_changed: bool,
+    advance_changed: bool = True,
+) -> None:
+    """Replace only explicitly changed transition and animation state."""
+    if transition_changed and transition_replaced:
+        if not advance_changed:
+            _replace_roundtrip_transition_advance(generated_root, source_root)
+        generated_carriers = transition_carriers(generated_root)
+        if len(generated_carriers) > 1:
+            raise TemplateStructureError(
+                "Generated round-trip slide has multiple transition carriers"
+            )
+        for carrier in transition_carriers(source_root):
+            source_root.remove(carrier)
+        if generated_carriers:
+            clone = ET.fromstring(
+                ET.tostring(generated_carriers[0], encoding="utf-8")
+            )
+            children = list(source_root)
+            insert_at = next(
+                (
+                    index
+                    for index, child in enumerate(children)
+                    if child.tag in {
+                        f"{{{PML_NS}}}timing",
+                        f"{{{PML_NS}}}extLst",
+                    }
+                ),
+                len(children),
+            )
+            source_root.insert(insert_at, clone)
+    elif transition_changed:
+        _replace_roundtrip_transition_advance(source_root, generated_root)
+
+    if animation_changed:
+        timing_tag = f"{{{PML_NS}}}timing"
+        existing_timing = source_root.find(timing_tag)
+        generated_timing = generated_root.find(timing_tag)
+        if existing_timing is not None:
+            source_root.remove(existing_timing)
+        if generated_timing is None:
+            return
+        clone = ET.fromstring(ET.tostring(generated_timing, encoding="utf-8"))
+        children = list(source_root)
+        insert_at = next(
+            (
+                index
+                for index, child in enumerate(children)
+                if child.tag == f"{{{PML_NS}}}extLst"
+            ),
+            len(children),
+        )
+        source_root.insert(insert_at, clone)
+
+
+def _replace_roundtrip_transition_advance(
+    source_root: ET.Element,
+    generated_root: ET.Element,
+) -> None:
+    """Copy only advance attributes while preserving the source visual effect."""
+    source_carriers = transition_carriers(source_root)
+    generated_carriers = transition_carriers(generated_root)
+    if len(source_carriers) > 1 or len(generated_carriers) > 1:
+        raise TemplateStructureError(
+            "Round-trip transition advance patch requires at most one carrier"
+        )
+
+    transition_tag = f"{{{PML_NS}}}transition"
+
+    def _elements(carrier: ET.Element) -> list[ET.Element]:
+        if carrier.tag == transition_tag:
+            return [carrier]
+        return list(carrier.iter(transition_tag))
+
+    generated_transitions = (
+        _elements(generated_carriers[0]) if generated_carriers else []
+    )
+    advance_values = {
+        (transition.get("advClick"), transition.get("advTm"))
+        for transition in generated_transitions
+    }
+    if len(advance_values) > 1:
+        raise TemplateStructureError(
+            "Generated transition branches disagree on advance attributes"
+        )
+    advance_click, advance_after = (
+        next(iter(advance_values)) if advance_values else (None, None)
+    )
+
+    if not source_carriers:
+        if advance_click is not None or advance_after is not None:
+            clone = ET.Element(transition_tag)
+            if advance_click is not None:
+                clone.set("advClick", advance_click)
+            if advance_after is not None:
+                clone.set("advTm", advance_after)
+            children = list(source_root)
+            insert_at = next(
+                (
+                    index
+                    for index, child in enumerate(children)
+                    if child.tag in {
+                        f"{{{PML_NS}}}timing",
+                        f"{{{PML_NS}}}extLst",
+                    }
+                ),
+                len(children),
+            )
+            source_root.insert(insert_at, clone)
+        return
+
+    source_transitions = _elements(source_carriers[0])
+    if not source_transitions:
+        raise TemplateStructureError(
+            "Source logical transition carrier contains no p:transition"
+        )
+    for transition in source_transitions:
+        for attribute, value in (
+            ("advClick", advance_click),
+            ("advTm", advance_after),
+        ):
+            if value is None:
+                transition.attrib.pop(attribute, None)
+            else:
+                transition.set(attribute, value)
+
+
+_RAW_ALTERNATE_CONTENT_RE = re.compile(
+    rb"<mc:AlternateContent\b[^>]*>.*?</mc:AlternateContent\s*>",
+    re.DOTALL,
+)
+_RAW_DIRECT_TRANSITION_RE = re.compile(
+    rb"<p:transition\b(?:[^>]*/>|[^>]*>.*?</p:transition\s*>)",
+    re.DOTALL,
+)
+_RAW_TIMING_RE = re.compile(
+    rb"<p:timing\b(?:[^>]*/>|[^>]*>.*?</p:timing\s*>)",
+    re.DOTALL,
+)
+
+
+def _raw_transition_carrier_span(xml_data: bytes) -> tuple[int, int] | None:
+    """Locate one raw root transition carrier in PowerPoint slide XML."""
+    alternate_spans = [
+        match.span()
+        for match in _RAW_ALTERNATE_CONTENT_RE.finditer(xml_data)
+    ]
+    carriers = [
+        span
+        for span in alternate_spans
+        if _RAW_DIRECT_TRANSITION_RE.search(xml_data[span[0]:span[1]])
+    ]
+    for match in _RAW_DIRECT_TRANSITION_RE.finditer(xml_data):
+        if any(start <= match.start() < end for start, end in alternate_spans):
+            continue
+        carriers.append(match.span())
+    if len(carriers) > 1:
+        raise TemplateStructureError(
+            "Round-trip slide has multiple raw transition carriers"
+        )
+    return carriers[0] if carriers else None
+
+
+def _preserve_roundtrip_transition_markup(
+    serialized_slide: bytes,
+    source_slide: bytes,
+) -> bytes:
+    """Restore an unchanged source transition carrier byte-for-byte."""
+    source_span = _raw_transition_carrier_span(source_slide)
+    serialized_span = _raw_transition_carrier_span(serialized_slide)
+    if source_span is None:
+        if serialized_span is not None:
+            raise TemplateStructureError(
+                "Round-trip serialization introduced a transition carrier"
+            )
+        return serialized_slide
+    if serialized_span is None:
+        raise TemplateStructureError(
+            "Round-trip serialization removed the preserved transition carrier"
+        )
+    return (
+        serialized_slide[:serialized_span[0]]
+        + source_slide[source_span[0]:source_span[1]]
+        + serialized_slide[serialized_span[1]:]
+    )
+
+
+def _raw_timing_span(xml_data: bytes) -> tuple[int, int] | None:
+    """Locate one raw logical object-animation timing carrier in slide XML."""
+    alternate_spans = [
+        match.span()
+        for match in _RAW_ALTERNATE_CONTENT_RE.finditer(xml_data)
+    ]
+    timings = [
+        span
+        for span in alternate_spans
+        if _RAW_TIMING_RE.search(xml_data[span[0]:span[1]])
+    ]
+    for match in _RAW_TIMING_RE.finditer(xml_data):
+        if any(start <= match.start() < end for start, end in alternate_spans):
+            continue
+        timings.append(match.span())
+    if len(timings) > 1:
+        raise TemplateStructureError(
+            "Round-trip slide has multiple raw object-animation timing carriers"
+        )
+    return timings[0] if timings else None
+
+
+def _preserve_roundtrip_timing_markup(
+    serialized_slide: bytes,
+    source_slide: bytes,
+) -> bytes:
+    """Restore unchanged source object-animation timing byte-for-byte."""
+    source_span = _raw_timing_span(source_slide)
+    serialized_span = _raw_timing_span(serialized_slide)
+    if source_span is None:
+        if serialized_span is not None:
+            raise TemplateStructureError(
+                "Round-trip serialization introduced object-animation timing"
+            )
+        return serialized_slide
+    if serialized_span is None:
+        raise TemplateStructureError(
+            "Round-trip serialization removed preserved object-animation timing"
+        )
+    return (
+        serialized_slide[:serialized_span[0]]
+        + source_slide[source_span[0]:source_span[1]]
+        + serialized_slide[serialized_span[1]:]
+    )
+
+
+def _apply_roundtrip_transition_overlay(
+    slide_path: Path,
+    *,
+    effect: str | None,
+    effect_options: dict[str, object],
+    duration: float,
+    auto_advance: float | None,
+    replace_transition: bool,
+    advance_changed: bool = True,
+) -> bool:
+    """Patch only transition/advance state while preserving source timing."""
+    source_bytes = slide_path.read_bytes()
+    source_xml = source_bytes.decode("utf-8")
+    source_animation = object_animation_fingerprint(source_xml)
+    if not replace_transition:
+        enter = EnterUpdate(policy="preserve", duration=duration)
+    elif effect is None:
+        enter = EnterUpdate(
+            policy="none",
+            effect=None,
+            duration=(duration or DEFAULT_TRANSITION_DURATION),
+        )
+    else:
+        enter = EnterUpdate(
+            policy="replace",
+            effect=effect,
+            duration=duration,
+            effect_options=effect_options,
+        )
+    advance = (
+        AdvanceUpdate(mode="preserve")
+        if not advance_changed else (
+            AdvanceUpdate(mode="click")
+            if auto_advance is None
+            else AdvanceUpdate(mode="both", after=auto_advance)
+        )
+    )
+    updated_xml, uses_timings = apply_slide_motion_xml(
+        source_xml,
+        enter=enter,
+        advance=advance,
+    )
+    if object_animation_fingerprint(updated_xml) != source_animation:
+        raise RuntimeError(
+            "Round-trip transition overlay changed source object animations"
+        )
+    if replace_transition:
+        original = read_slide_transition_xml(source_xml)
+        validate_generated_transition_xml(
+            updated_xml,
+            effect=effect,
+            effect_options=effect_options,
+            duration=duration,
+            advance_on_click=True if advance_changed else original.advance_on_click,
+            advance_after=auto_advance if advance_changed else (
+                original.advance_after_ms / 1000 if original.advance_after_ms is not None else None
+            ),
+        )
+    slide_path.write_bytes(
+        _preserve_roundtrip_timing_markup(
+            updated_xml.encode("utf-8"),
+            source_bytes,
+        )
+    )
+    return uses_timings
+
+
+def _shape_ids_in_element(element: ET.Element) -> set[str]:
+    """Return every non-visual DrawingML id owned by one shape subtree."""
+    return {
+        value
+        for node in element.iter(f"{{{PML_NS}}}cNvPr")
+        if (value := node.get("id"))
+    }
+
+
+def _rewrite_roundtrip_timing_shape_ids(
+    slide_root: ET.Element,
+    id_map: dict[str, str],
+) -> None:
+    """Rewrite every timing reference to a remapped Slide-local shape id."""
+    if not id_map:
+        return
+    timing = slide_root.find(f"{{{PML_NS}}}timing")
+    if timing is None:
+        return
+    for node in timing.iter():
+        old_id = node.get("spid")
+        if old_id in id_map:
+            node.set("spid", id_map[old_id])
+
+
+def _renumber_roundtrip_generated_shapes(
+    generated_shapes: list[ET.Element],
+    retained_source_nodes: list[ET.Element],
+    slide_root: ET.Element,
+    *,
+    rewrite_timing: bool,
+) -> dict[str, str]:
+    """Keep generated additions disjoint from retained source shape ids."""
+    used_ids = {
+        value
+        for element in retained_source_nodes
+        for value in _shape_ids_in_element(element)
+    }
+    all_ids = set(used_ids)
+    for element in generated_shapes:
+        all_ids.update(_shape_ids_in_element(element))
+    numeric_ids = [int(value) for value in all_ids if value.isdigit()]
+    next_id = max(numeric_ids, default=1) + 1
+    id_map: dict[str, str] = {}
+    for element in generated_shapes:
+        for node in element.iter(f"{{{PML_NS}}}cNvPr"):
+            old_id = node.get("id")
+            if not old_id:
+                continue
+            if old_id in used_ids:
+                while str(next_id) in all_ids:
+                    next_id += 1
+                new_id = str(next_id)
+                next_id += 1
+                node.set("id", new_id)
+                id_map[old_id] = new_id
+                all_ids.add(new_id)
+                used_ids.add(new_id)
+            else:
+                used_ids.add(old_id)
+
+    if not id_map:
+        return {}
+    for element in generated_shapes:
+        for connector_tag in ("stCxn", "endCxn"):
+            for connector in element.iter(f"{{{PML_NS}}}{connector_tag}"):
+                old_id = connector.get("id")
+                if old_id in id_map:
+                    connector.set("id", id_map[old_id])
+    if rewrite_timing:
+        _rewrite_roundtrip_timing_shape_ids(slide_root, id_map)
+    return id_map
+
+
+def _apply_roundtrip_slide_overlay(
+    source_slide: bytes,
+    source_rels: bytes,
+    generated_slide_path: Path,
+    generated_rels_path: Path,
+    patch: RoundtripSlidePatch,
+    conversion_trace: dict[str, Any] | None,
+) -> dict[int, int]:
+    """Overlay authored Slide objects onto the exact source slide package part."""
+    try:
+        source_root = ET.fromstring(source_slide)
+        generated_tree = ET.parse(generated_slide_path)
+    except ET.ParseError as exc:
+        raise TemplateStructureError(
+            "Round-trip source or generated slide is not valid XML"
+        ) from exc
+    generated_root = generated_tree.getroot()
+
+    source_tree = source_root.find(
+        f".//{{{PML_NS}}}cSld/{{{PML_NS}}}spTree"
+    )
+    generated_sp_tree = generated_root.find(
+        f".//{{{PML_NS}}}cSld/{{{PML_NS}}}spTree"
+    )
+    if source_tree is None or generated_sp_tree is None:
+        raise TemplateStructureError(
+            "Round-trip slide overlay requires source and generated p:spTree"
+        )
+
+    (
+        source_shapes,
+        source_descendant_ids,
+        source_key_by_element,
+        all_source_shapes,
+    ) = _roundtrip_source_shape_roster(source_tree)
+
+    generated_order: list[str] = []
+    generated_shapes: dict[str, ET.Element] = {}
+    generated_top_id_by_descendant: dict[str, str] = {}
+    for child in generated_sp_tree:
+        if child.tag not in _TOP_LEVEL_SHAPE_TAGS:
+            continue
+        shape_id = _shape_id(child)
+        if not shape_id:
+            raise TemplateStructureError(
+                "Generated round-trip slide contains a top-level shape without id"
+            )
+        if shape_id in generated_shapes:
+            raise TemplateStructureError(
+                f"Generated round-trip slide repeats top-level shape id {shape_id}"
+            )
+        generated_order.append(shape_id)
+        generated_shapes[shape_id] = child
+        for descendant_id in _shape_ids_in_element(child):
+            previous = generated_top_id_by_descendant.setdefault(
+                descendant_id,
+                shape_id,
+            )
+            if previous != shape_id:
+                raise TemplateStructureError(
+                    "Generated round-trip slide repeats a shape id across "
+                    f"top-level objects: {descendant_id}"
+                )
+
+    source_ref_ids = _slide_ref_shape_ids(patch.source_ref_ids)
+    edited_ids = _slide_ref_shape_ids(patch.edited_ref_ids)
+    deleted_ids = _slide_ref_shape_ids(patch.deleted_ref_ids)
+    unchanged_ids = source_ref_ids - edited_ids - deleted_ids
+    affected_top_ids = {
+        shape_id
+        for shape_id, descendant_ids in source_descendant_ids.items()
+        if descendant_ids & (edited_ids | deleted_ids)
+    }
+    nested_restore_ids = _roundtrip_nested_restore_ids(
+        source_shapes,
+        source_key_by_element,
+        affected_top_ids,
+        unchanged_ids,
+        deleted_ids,
+    )
+    authored_top_ids = {
+        shape_id
+        for shape_id in source_shapes
+        if shape_id in source_ref_ids or shape_id in affected_top_ids
+    }
+    deleted_top_ids = authored_top_ids & deleted_ids
+    traced_ids = _trace_native_shape_ids(conversion_trace)
+    generated_by_source_id: dict[str, ET.Element] = {}
+    source_id_by_generated_top_id: dict[str, str] = {}
+    for source_id in authored_top_ids - deleted_top_ids:
+        candidate_ids = [source_id]
+        candidate_ids.extend(traced_ids.get(f"shape-{source_id}", []))
+        generated_top_ids = {
+            generated_top_id_by_descendant[candidate_id]
+            for candidate_id in candidate_ids
+            if candidate_id in generated_top_id_by_descendant
+        }
+        if len(generated_top_ids) > 1:
+            raise TemplateStructureError(
+                "Generated round-trip source object maps to multiple top-level "
+                f"shapes: {source_id}"
+            )
+        if not generated_top_ids:
+            continue
+        generated_top_id = next(iter(generated_top_ids))
+        previous_source_id = source_id_by_generated_top_id.setdefault(
+            generated_top_id,
+            source_id,
+        )
+        if previous_source_id != source_id:
+            raise TemplateStructureError(
+                "Generated round-trip top-level shape maps to multiple source "
+                f"objects: {previous_source_id}, {source_id}"
+            )
+        generated_by_source_id[source_id] = generated_shapes[generated_top_id]
+
+    authored_order = [
+        source_id_by_generated_top_id[generated_top_id]
+        for generated_top_id in generated_order
+        if generated_top_id in source_id_by_generated_top_id
+    ]
+    if len(authored_order) != len(set(authored_order)):
+        raise TemplateStructureError(
+            "Generated round-trip slide has an ambiguous authored shape order"
+        )
+    missing_authored = (
+        authored_top_ids - deleted_top_ids - set(authored_order)
+    )
+    if missing_authored:
+        raise TemplateStructureError(
+            "Edited round-trip source object did not produce a DrawingML shape: "
+            + ", ".join(sorted(missing_authored, key=_roundtrip_shape_sort_key))
+        )
+
+    selected_by_id: dict[str, tuple[ET.Element, bool]] = {}
+    for shape_id in authored_order:
+        if shape_id in affected_top_ids:
+            selected_by_id[shape_id] = (
+                generated_by_source_id[shape_id],
+                True,
+            )
+        else:
+            selected_by_id[shape_id] = (source_shapes[shape_id], False)
+    # New objects keep their SVG paint position: each one follows the nearest
+    # preceding authored object, and leading ones precede the first slot.
+    extra_generated: dict[str | None, list[ET.Element]] = {}
+    preceding_authored_id: str | None = None
+    for shape_id in generated_order:
+        if shape_id in source_id_by_generated_top_id:
+            preceding_authored_id = source_id_by_generated_top_id[shape_id]
+        else:
+            extra_generated.setdefault(preceding_authored_id, []).append(
+                generated_shapes[shape_id]
+            )
+
+    authored_iterator = iter(authored_order)
+    merged_children: list[tuple[ET.Element, bool]] = []
+    final_authored_slot = 0
+    anchor_slots: dict[str | None, int] = {}
+    for child in list(source_tree):
+        shape_id = (
+            source_key_by_element.get(id(child))
+            if child.tag in _TOP_LEVEL_SHAPE_TAGS
+            else None
+        )
+        if shape_id not in authored_top_ids:
+            merged_children.append((child, False))
+            continue
+        anchor_slots.setdefault(None, len(merged_children))
+        next_shape_id = next(authored_iterator, None)
+        if next_shape_id is not None:
+            merged_children.append(selected_by_id[next_shape_id])
+            anchor_slots[next_shape_id] = len(merged_children)
+        final_authored_slot = len(merged_children)
+    if next(authored_iterator, None) is not None:
+        raise TemplateStructureError(
+            "Generated authored shape roster exceeds the source overlay slots"
+        )
+    if not authored_top_ids:
+        anchor_slots[None] = next(
+            (
+                index
+                for index, (element, _generated) in enumerate(merged_children)
+                if element.tag in _TOP_LEVEL_SHAPE_TAGS
+            ),
+            len(merged_children),
+        )
+    if authored_order:
+        # Trailing additions stay after every source authored slot, so unlisted
+        # source shapes past the last filled slot keep painting below them.
+        anchor_slots[authored_order[-1]] = final_authored_slot
+    # Anchors ascend in authored order; splice from the back to keep indexes valid.
+    for anchor, elements in reversed(list(extra_generated.items())):
+        insert_at = anchor_slots[anchor]
+        merged_children[insert_at:insert_at] = [
+            (element, True) for element in elements
+        ]
+
+    generated_nodes = [
+        element for element, generated in merged_children if generated
+    ]
+    retained_source_nodes = [
+        element for element, generated in merged_children if not generated
+    ]
+    required_generated_relationship_ids = {
+        relationship_id
+        for element in generated_nodes
+        for relationship_id in _relationship_ids_in_shape(element)
+    }
+    if patch.transition_changed:
+        for carrier in transition_carriers(generated_root):
+            required_generated_relationship_ids.update(
+                _relationship_ids_in_shape(carrier)
+            )
+    if patch.animation_changed:
+        motion_node = generated_root.find(f"{{{PML_NS}}}timing")
+        if motion_node is not None:
+            required_generated_relationship_ids.update(
+                _relationship_ids_in_shape(motion_node)
+            )
+    _merge_roundtrip_relationships(
+        source_rels,
+        generated_rels_path,
+        generated_root,
+        required_generated_relationship_ids,
+    )
+    _restore_roundtrip_nested_source_shapes(
+        generated_nodes,
+        all_source_shapes,
+        nested_restore_ids,
+        traced_ids,
+    )
+    if patch.transition_changed or patch.animation_changed:
+        _replace_roundtrip_motion(
+            source_root,
+            generated_root,
+            transition_changed=patch.transition_changed,
+            transition_replaced=patch.transition_replaced,
+            animation_changed=patch.animation_changed,
+            advance_changed=patch.advance_changed,
+        )
+    restored_shape_id_map = {
+        generated_top_id: source_id
+        for generated_top_id, source_id in source_id_by_generated_top_id.items()
+        if source_id not in affected_top_ids
+        and generated_top_id != source_id
+    }
+    if patch.animation_changed:
+        _rewrite_roundtrip_timing_shape_ids(
+            source_root,
+            restored_shape_id_map,
+        )
+    renumbered_shape_id_map = _renumber_roundtrip_generated_shapes(
+        generated_nodes,
+        retained_source_nodes,
+        source_root,
+        rewrite_timing=patch.animation_changed,
+    )
+
+    for child in list(source_tree):
+        source_tree.remove(child)
+    for child, _generated in merged_children:
+        source_tree.append(child)
+
+    visible_shape_ids = {
+        value
+        for element in source_tree
+        for value in _shape_ids_in_element(element)
+    }
+    if not patch.animation_changed:
+        missing_timing_targets = _timing_shape_ids(source_root) - visible_shape_ids
+        if missing_timing_targets:
+            raise TemplateStructureError(
+                "Edited slide removed source animation target(s); update "
+                "animations.json explicitly: "
+                + ", ".join(sorted(missing_timing_targets, key=int))
+            )
+    serialized_slide = serialize_source_xml(source_root, source_slide)
+    if not patch.transition_changed:
+        serialized_slide = _preserve_roundtrip_transition_markup(
+            serialized_slide,
+            source_slide,
+        )
+    if not patch.animation_changed:
+        serialized_slide = _preserve_roundtrip_timing_markup(
+            serialized_slide,
+            source_slide,
+        )
+    generated_slide_path.write_bytes(serialized_slide)
+    combined_id_map = {
+        **restored_shape_id_map,
+        **renumbered_shape_id_map,
+    }
+    return {
+        int(old_id): int(new_id)
+        for old_id, new_id in combined_id_map.items()
+        if old_id.isdigit() and new_id.isdigit()
+    }
+
+
+def _remove_relationships_by_type(rels_path: Path, rel_type: str) -> int:
+    """Remove every relationship of one type and return the removed count."""
+    tree = ET.parse(rels_path)
+    root = tree.getroot()
+    removed = 0
+    for relationship in list(root):
+        if _relationship_attrs(relationship).get("Type") != rel_type:
+            continue
+        root.remove(relationship)
+        removed += 1
+    if removed:
+        _write_xml_tree(rels_path, tree)
+    return removed
+
+
+def _part_has_relationship_references(extract_dir: Path, part_name: str) -> bool:
+    """Return whether any relationships file in the package still targets a part."""
+    for rels_path in (extract_dir / 'ppt').rglob('*.rels'):
+        source_part = _part_name_for_relationships_path(rels_path)
+        for attrs in _read_relationships(rels_path).values():
+            if attrs.get('TargetMode') == 'External':
+                continue
+            target = attrs.get('Target')
+            if target and _resolve_package_target(source_part, target) == part_name:
+                return True
+    return False
+
+
+def _unused_part_path(directory: Path, filename: str) -> Path:
+    """Allocate a part name without overwriting any existing package member."""
+    requested = Path(filename)
+    occupied = {path.name.casefold() for path in directory.iterdir()}
+    candidate = directory / requested.name
+    suffix = 1
+    while candidate.name.casefold() in occupied:
+        candidate = directory / f"{requested.stem}_{suffix}{requested.suffix}"
+        suffix += 1
+    return candidate
+
+
+def _remove_all_notes_parts(extract_dir: Path) -> None:
+    """Remove notes slides, masters, their relationships, and type overrides."""
+    content_types_path = extract_dir / '[Content_Types].xml'
+    content_tree = ET.parse(content_types_path)
+    content_root = content_tree.getroot()
+    notes_content_types = {
+        'application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml',
+        _NOTES_MASTER_CONTENT_TYPE,
+    }
+    notes_parts = {
+        _canonical_opc_part_path(node.get('PartName', '').lstrip('/'))
+        for node in content_root
+        if node.get('ContentType') in notes_content_types
+    } - {None}
+    notes_files = [
+        path for path in extract_dir.rglob('*')
+        if path.is_file() and (
+            _canonical_opc_part_path(path.relative_to(extract_dir).as_posix()) in notes_parts
+            or path.relative_to(extract_dir).as_posix().startswith((
+                'ppt/notesSlides/', 'ppt/notesMasters/',
+            ))
+        )
+    ]
+    notes_parts.update(
+        _canonical_opc_part_path(path.relative_to(extract_dir).as_posix())
+        for path in notes_files
+    )
+    for rels_path in extract_dir.rglob('*.rels'):
+        tree = ET.parse(rels_path)
+        root = tree.getroot()
+        removed = False
+        rels_name = rels_path.relative_to(extract_dir).as_posix()
+        for relationship in list(root):
+            if (
+                relationship.get('Type') in {NOTES_SLIDE_REL_TYPE, _NOTES_MASTER_REL_TYPE}
+                or (
+                    relationship.get('TargetMode', '').lower() != 'external'
+                    and _resolve_internal_opc_target(
+                        rels_name, relationship.get('Target', ''),
+                    ) in notes_parts
+                )
+            ):
+                root.remove(relationship)
+                removed = True
+        if removed:
+            _write_xml_tree(rels_path, tree)
+    presentation = extract_dir / 'ppt/presentation.xml'
+    tree = ET.parse(presentation)
+    notes_masters = tree.getroot().find(f'{{{PML_NS}}}notesMasterIdLst')
+    if notes_masters is not None:
+        tree.getroot().remove(notes_masters)
+        _write_xml_tree(presentation, tree)
+    for path in notes_files:
+        rels_path = _relationships_path_for_part(extract_dir, path.relative_to(extract_dir).as_posix())
+        rels_path.unlink(missing_ok=True)
+        path.unlink(missing_ok=True)
+    removed = False
+    for node in list(content_root):
+        if _canonical_opc_part_path(node.get('PartName', '').lstrip('/')) in notes_parts:
+            content_root.remove(node)
+            removed = True
+    if removed:
+        _write_xml_tree(content_types_path, content_tree)
+
+
+def _apply_slide_notes(
+    extract_dir: Path,
+    rels_path: Path,
+    slide_num: int,
+    notes_content: str,
+    primary_language: str | None,
+    *,
+    enable_notes: bool,
+) -> _NotesMasterReference | None:
+    """Replace one slide's notes relationship and return its notes master."""
+    existing_target = _find_relationship_target(rels_path, NOTES_SLIDE_REL_TYPE)
+    source_part = _part_name_for_relationships_path(rels_path)
+    existing_part = (
+        _resolve_package_target(source_part, existing_target) if existing_target else None
+    )
+    exclusive = existing_part is not None
+    if exclusive:
+        for other_rels in rels_path.parent.glob('*.rels'):
+            if other_rels == rels_path:
+                continue
+            other_part = _part_name_for_relationships_path(other_rels)
+            if any(
+                attrs.get('Type') == NOTES_SLIDE_REL_TYPE
+                and _resolve_package_target(other_part, attrs.get('Target', '')) == existing_part
+                for attrs in _read_relationships(other_rels).values()
+            ):
+                exclusive = False
+                break
+    _remove_relationships_by_type(rels_path, NOTES_SLIDE_REL_TYPE)
+    if not enable_notes:
+        return None
+    notes_text = markdown_to_plain_text(notes_content) if notes_content else ''
+    if not notes_text:
+        return None
+
+    notes_master = _ensure_notes_master(extract_dir, primary_language)
+    notes_slides_dir = extract_dir / 'ppt' / 'notesSlides'
+    notes_slides_dir.mkdir(exist_ok=True)
+    notes_xml_path = (
+        extract_dir / existing_part if exclusive
+        else _unused_part_path(notes_slides_dir, f'notesSlide{slide_num}.xml')
+    )
+    notes_part = notes_xml_path.relative_to(extract_dir).as_posix()
+    notes_xml_path.write_text(
+        create_notes_slide_xml(slide_num, notes_text, primary_language),
+        encoding='utf-8',
+    )
+    notes_rels_dir = notes_xml_path.parent / '_rels'
+    notes_rels_dir.mkdir(exist_ok=True)
+    notes_rels_path = notes_rels_dir / f'{notes_xml_path.name}.rels'
+    notes_rels_path.write_text(
+        create_notes_slide_rels_xml(
+            slide_num,
+            posixpath.relpath(notes_master.package_part, posixpath.dirname(notes_part)),
+        ),
+        encoding='utf-8',
+    )
+    _ensure_relationship(
+        rels_path,
+        NOTES_SLIDE_REL_TYPE,
+        posixpath.relpath(notes_part, posixpath.dirname(source_part)),
+    )
+    return notes_master
+
+
+def _roundtrip_resource_payloads(
+    resource_root: Path | None,
+    resources: tuple[WorkspaceResourceSpec, ...],
+) -> dict[str, bytes]:
+    """Read changed, validated round-trip resources by package part."""
+    changed = [resource for resource in resources if resource.changed]
+    if not changed:
+        return {}
+    if resource_root is None:
+        raise TemplateStructureError(
+            "Round-trip resource reinjection requires an explicit project root"
+        )
+    workspace = resource_root.resolve()
+    payloads: dict[str, bytes] = {}
+    for resource in changed:
+        source = (workspace / resource.workspace_path).resolve()
+        try:
+            source.relative_to(workspace)
+        except ValueError as exc:
+            raise TemplateStructureError(
+                "Round-trip resource resolves outside the project: "
+                f"{resource.workspace_path.as_posix()}"
+            ) from exc
+        if not source.is_file():
+            raise TemplateStructureError(
+                "Materialized round-trip resource is missing: "
+                f"{resource.workspace_path.as_posix()}"
+            )
+        payload = source.read_bytes()
+        current_sha256 = hashlib.sha256(payload).hexdigest()
+        if current_sha256 != resource.current_sha256:
+            raise TemplateStructureError(
+                "Round-trip resource changed after validation: "
+                f"{resource.workspace_path.as_posix()}"
+            )
+        payloads[resource.package_part] = payload
+    return payloads
+
+
+def _reinject_roundtrip_resources(
+    extract_dir: Path,
+    resource_root: Path | None,
+    resources: tuple[WorkspaceResourceSpec, ...],
+) -> int:
+    """Write changed resource bytes back to their exact source package parts."""
+    payloads = _roundtrip_resource_payloads(resource_root, resources)
+    written = 0
+    for package_part, payload in payloads.items():
+        target = extract_dir.joinpath(*PurePosixPath(package_part).parts)
+        if not target.is_file():
+            raise TemplateStructureError(
+                "Round-trip source package part is missing: "
+                f"{package_part}"
+            )
+        target.write_bytes(payload)
+        written += 1
+    return written
 
 
 COVER_LAYOUT_NAME = "Cover"
@@ -1808,6 +3243,9 @@ def _unwrap_placeholder_carrier(
         state.shapes.pop(wrapper_id, None)
     if carrier_id:
         state.shapes[carrier_id] = carrier
+    if wrapper_id and carrier_id:
+        # An animation that names the slot group now targets its carrier.
+        _rewrite_roundtrip_timing_shape_ids(state.root, {wrapper_id: carrier_id})
     return carrier
 
 
@@ -1925,9 +3363,21 @@ def _remove_template_shape(
     sp_tree.remove(shape)
 
 
+def _template_reference_indices(
+    states: list[_TemplateRuntimeSlide],
+    public_slide_count: int | None,
+) -> list[int]:
+    """Use public pages as truth, or prototypes for an otherwise unused Master."""
+    return [
+        index for index, state in enumerate(states)
+        if public_slide_count is None or state.spec.slide_num <= public_slide_count
+    ] or list(range(len(states)))
+
+
 def _move_template_background(
     states: list[_TemplateRuntimeSlide],
     target_path: Path,
+    public_slide_count: int | None = None,
 ) -> str:
     backgrounds = [
         _extract_slide_background_xml(state.slide_path.read_text(encoding="utf-8"))
@@ -1938,8 +3388,10 @@ def _move_template_background(
             "Template background metadata must resolve to an explicit background "
             "on every affected slide"
         )
+    reference_indices = _template_reference_indices(states, public_slide_count)
     canonical_backgrounds = set()
-    for background in backgrounds:
+    for index in reference_indices:
+        background = backgrounds[index]
         if background is None:
             continue
         wrapper = ET.fromstring(
@@ -1949,11 +3401,11 @@ def _move_template_background(
             ET.tostring(list(wrapper)[0], encoding="utf-8")
         )
     if len(canonical_backgrounds) != 1:
-        slide_names = ", ".join(state.spec.svg_path.name for state in states)
+        slide_names = ", ".join(states[index].spec.svg_path.name for index in reference_indices)
         raise TemplateStructureError(
             f"Explicit template background differs across slides: {slide_names}"
         )
-    background_xml = backgrounds[0]
+    background_xml = backgrounds[reference_indices[0]]
     if background_xml is None:
         raise TemplateStructureError("Template background is unexpectedly empty")
     target_xml = target_path.read_text(encoding="utf-8")
@@ -1982,6 +3434,7 @@ def _move_template_solid_background_shapes(
     shapes: list[ET.Element],
     target_path: Path,
     slide_size_emu: tuple[int, int],
+    public_slide_count: int | None = None,
 ) -> str | None:
     """Move repeated full-slide solid rects into a master/layout p:bg."""
     backgrounds = [
@@ -1995,13 +3448,14 @@ def _move_template_solid_background_shapes(
             "A template background resolves to a full-slide solid rect on only "
             "some slides sharing the structure"
         )
-    canonical = {background for background in backgrounds if background is not None}
+    reference_indices = _template_reference_indices(states, public_slide_count)
+    canonical = {backgrounds[index] for index in reference_indices}
     if len(canonical) != 1:
-        slide_names = ", ".join(state.spec.svg_path.name for state in states)
+        slide_names = ", ".join(states[index].spec.svg_path.name for index in reference_indices)
         raise TemplateStructureError(
             f"Explicit template solid background differs across slides: {slide_names}"
         )
-    background_xml = backgrounds[0]
+    background_xml = backgrounds[reference_indices[0]]
     if background_xml is None:
         return None
     target_xml = target_path.read_text(encoding="utf-8")
@@ -2088,6 +3542,7 @@ def _move_template_static_shape(
     target_path: Path,
     target_rels_path: Path,
     slide_size_emu: tuple[int, int],
+    public_slide_count: int | None = None,
 ) -> str | None:
     shapes = [_template_shape_for_item(state, item) for state in states]
     if any(shape is None for shape in shapes):
@@ -2095,7 +3550,7 @@ def _move_template_static_shape(
             raise TemplateStructureError(
                 f"{item.element_id}: structure item is a background on only some slides"
             )
-        return _move_template_background(states, target_path)
+        return _move_template_background(states, target_path, public_slide_count)
 
     resolved_shapes = [shape for shape in shapes if shape is not None]
     if item.is_background:
@@ -2104,18 +3559,27 @@ def _move_template_static_shape(
             resolved_shapes,
             target_path,
             slide_size_emu,
+            public_slide_count,
         )
         if background_xml is None:
             raise TemplateStructureError(
                 f"{item.element_id!r} must compile to one exact p:bg payload"
             )
         return background_xml
+    # Internal Layout carriers compile unused prototypes as authored; their
+    # copy of a master atom leaves with the carrier slide, so the published
+    # pages alone decide the atom (a re-skinned rule must not be refused
+    # because an unused prototype still carries the original paint).
+    reference = [
+        (states[index], resolved_shapes[index])
+        for index in _template_reference_indices(states, public_slide_count)
+    ]
     canonical = {
         _canonical_shape_xml(shape, state.rels)
-        for state, shape in zip(states, resolved_shapes)
+        for state, shape in reference
     }
     if len(canonical) != 1:
-        slide_names = ", ".join(state.spec.svg_path.name for state in states)
+        slide_names = ", ".join(state.spec.svg_path.name for state, _shape in reference)
         raise TemplateStructureError(
             f"Explicit structure element {item.element_id!r} differs across slides: "
             f"{slide_names}"
@@ -2130,11 +3594,10 @@ def _move_template_static_shape(
         if not _shape_relationships_supported(shape, state.rels):
             raise TemplateStructureError(
                 f"{state.spec.svg_path.name}: structure element {item.element_id!r} "
-                "uses a non-image or external relationship"
+                "uses a relationship that cannot move to a template part"
             )
 
-    prototype_state = states[0]
-    prototype_shape = resolved_shapes[0]
+    prototype_state, prototype_shape = reference[0]
     target_shape = _copy_shape_relationships_to_part(
         prototype_shape,
         prototype_state.rels,
@@ -2505,13 +3968,15 @@ def _set_placeholder_theme_font_role(
     item: TemplateElementSpec,
     theme_font_spec: ThemeFontSpec | None,
 ) -> None:
-    """Force semantic text placeholders onto the correct theme font role."""
+    """Use the placeholder's theme role only when it preserves the actual face."""
     if theme_font_spec is None:
         return
     if item.placeholder == "title":
         prefix = "+mj"
+        target_face = theme_font_spec.major
     elif item.placeholder in TEMPLATE_PLACEHOLDER_TYPES:
         prefix = "+mn"
+        target_face = theme_font_spec.minor
     else:
         return
     for props_tag in ("rPr", "defRPr", "endParaRPr"):
@@ -2519,7 +3984,13 @@ def _set_placeholder_theme_font_role(
             for font_tag, suffix in (("latin", "lt"), ("ea", "ea"), ("cs", "cs")):
                 font = props.find(f"{{{DML_NS}}}{font_tag}")
                 if font is not None:
-                    font.set("typeface", f"{prefix}-{suffix}")
+                    face = font.get("typeface")
+                    if face == f"+mj-{suffix}":
+                        face = getattr(theme_font_spec.major, font_tag)
+                    elif face == f"+mn-{suffix}":
+                        face = getattr(theme_font_spec.minor, font_tag)
+                    if face and face == getattr(target_face, font_tag):
+                        font.set("typeface", f"{prefix}-{suffix}")
 
 
 def _layout_placeholder_shape(
@@ -2727,6 +4198,7 @@ def _apply_explicit_layout_structure(
     theme_font_spec: ThemeFontSpec | None,
     *,
     use_layout_placeholder_frames: bool = False,
+    public_slide_count: int | None = None,
     verbose: bool = False,
 ) -> tuple[
     dict[str, str | None],
@@ -2766,6 +4238,7 @@ def _apply_explicit_layout_structure(
                 master_path,
                 master_rels_path,
                 slide_size_emu,
+                public_slide_count=public_slide_count,
             )
             if background_xml is not None:
                 expected_backgrounds[master_part] = background_xml
@@ -3265,8 +4738,16 @@ def _replace_literal_run_with_slidenum_field(
     if tx_body is None:
         return False
     a_t = f"{{{DML_NS}}}t"
+
+    def _is_expected(text: str) -> bool:
+        # A zero-padded literal ("02") names the same slide as "2".
+        stripped = text.strip()
+        return stripped == expected_text or (
+            stripped.isdigit() and str(int(stripped)) == expected_text
+        )
+
     total_text = "".join(t.text or "" for t in tx_body.iter(a_t))
-    if total_text.strip() != expected_text:
+    if not _is_expected(total_text):
         return False
     text_runs = [
         (paragraph, run)
@@ -3277,7 +4758,7 @@ def _replace_literal_run_with_slidenum_field(
     if len(text_runs) != 1:
         return False
     paragraph, run = text_runs[0]
-    if (run.findtext(a_t) or "").strip() != expected_text:
+    if not _is_expected(run.findtext(a_t) or ""):
         return False
 
     fld = ET.Element(f"{{{DML_NS}}}fld", {"id": field_guid, "type": "slidenum"})
@@ -3433,11 +4914,15 @@ def _remove_trailing_layout_definition_slides(
     return removed
 
 
-def _prune_unreferenced_definition_payload_parts(extract_dir: Path) -> int:
+def _prune_unreferenced_definition_payload_parts(
+    extract_dir: Path,
+    *,
+    preserved_parts: frozenset[str] = frozenset(),
+) -> int:
     """Remove generated native/media payload left by deleted carrier slides.
 
-    Definition-only SVGs are first converted as ordinary slides so their
-    reusable structure can be promoted. Removing those internal slides may
+    Unselected complete Slide prototypes are first converted as carrier slides
+    so their reusable Layout can be registered. Removing those carriers may
     leave chart, workbook, or media parts with no remaining relationship. Run
     an iterative incoming-reference sweep so chart-owned workbooks/styles are
     removed after their orphan chart part and relationship sidecar disappear.
@@ -3478,6 +4963,8 @@ def _prune_unreferenced_definition_payload_parts(extract_dir: Path) -> int:
             if "/_rels/" in part_name:
                 continue
             if not part_name.startswith(candidate_prefixes):
+                continue
+            if part_name in preserved_parts:
                 continue
             canonical = _canonical_opc_part_path(part_name)
             if canonical is not None and canonical not in referenced_parts:
@@ -3762,6 +5249,8 @@ def _append_relationship(
     rels_path: Path,
     rel_type: str,
     target: str,
+    *,
+    target_mode: str | None = None,
 ) -> str:
     """Append a relationship entry with the next available rId."""
     with open(rels_path, 'r', encoding='utf-8') as f:
@@ -3769,9 +5258,14 @@ def _append_relationship(
 
     rid_numbers = [int(match) for match in re.findall(r'Id="rId(\d+)"', rels_content)]
     next_rid = f'rId{max(rid_numbers, default=0) + 1}'
+    mode_attr = (
+        f" TargetMode={quoteattr(target_mode)}"
+        if target_mode is not None
+        else ""
+    )
     rel_xml = (
-        f'  <Relationship Id="{next_rid}" '
-        f'Type="{rel_type}" Target="{target}"/>'
+        f"  <Relationship Id={quoteattr(next_rid)} "
+        f"Type={quoteattr(rel_type)} Target={quoteattr(target)}{mode_attr}/>"
     )
     rels_content = rels_content.replace(
         '</Relationships>', rel_xml + '\n</Relationships>',
@@ -3800,8 +5294,39 @@ def _add_content_type_override(content_types: str, part_name: str, content_type:
     normalized = '/' + part_name.lstrip('/')
     if f'PartName="{normalized}"' in content_types:
         return content_types
+    extension = PurePosixPath(part_name).suffix.lstrip('.').casefold()
+    try:
+        root = ET.fromstring(content_types)
+    except ET.ParseError:
+        root = None
+    if root is not None:
+        for child in root:
+            if child.tag.rsplit('}', 1)[-1] != 'Default':
+                continue
+            if (
+                child.get('Extension', '').casefold() == extension
+                and child.get('ContentType') == content_type
+            ):
+                return content_types
     entry = f'  <Override PartName="{normalized}" ContentType="{content_type}"/>'
     return content_types.replace('</Types>', entry + '\n</Types>')
+
+
+def _content_type_contract(payload: bytes) -> tuple[tuple[str, tuple[tuple[str, str], ...]], ...] | None:
+    """Return the semantic Default/Override roster for exact-byte restoration."""
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError:
+        return None
+    entries = [
+        (
+            child.tag.rsplit('}', 1)[-1],
+            tuple(sorted(child.attrib.items())),
+        )
+        for child in root
+        if child.tag.rsplit('}', 1)[-1] in {'Default', 'Override'}
+    ]
+    return tuple(sorted(entries))
 
 
 _IMAGE_CONTENT_TYPES = {
@@ -3900,14 +5425,19 @@ def _relax_output_permissions(output_path: Path) -> list[str]:
         result = subprocess.run(
             ['icacls', str(output_path), '/grant', '*S-1-5-32-545:R'],
             capture_output=True,
-            text=True,
             check=False,
         )
     except OSError as exc:
         warnings.append(f"icacls skipped for {output_path}: {exc}")
     else:
         if result.returncode != 0:
-            message = (result.stderr or result.stdout or '').strip()
+            # icacls writes in the console OEM code page, so decode lazily
+            # and leniently; text mode would decode under the interpreter's
+            # encoding (UTF-8 in UTF-8 mode) and raise inside the reader
+            # thread on non-ASCII bytes.
+            message = (result.stderr or result.stdout or b'').decode(
+                'oem', errors='replace',
+            ).strip()
             details = f": {message}" if message else ''
             warnings.append(f"icacls failed for {output_path}{details}")
 
@@ -3917,72 +5447,246 @@ def _relax_output_permissions(output_path: Path) -> list[str]:
 _NOTES_MASTER_REL_TYPE = (
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster'
 )
+_NOTES_MASTER_CONTENT_TYPE = (
+    'application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml'
+)
+
+
+def _content_type_overrides(extract_dir: Path) -> dict[str, str]:
+    """Return package part content-type overrides keyed without a leading slash."""
+    content_types_path = extract_dir / '[Content_Types].xml'
+    try:
+        root = ET.parse(content_types_path).getroot()
+    except (OSError, ET.ParseError) as exc:
+        raise RuntimeError(
+            f'Cannot read package content types: {content_types_path}'
+        ) from exc
+    overrides: dict[str, str] = {}
+    for child in root:
+        if child.tag.rsplit('}', 1)[-1] != 'Override':
+            continue
+        part_name = child.get('PartName', '').lstrip('/')
+        content_type = child.get('ContentType', '')
+        if part_name:
+            overrides[part_name] = content_type
+    return overrides
+
+
+def _notes_master_part_from_target(target: str) -> str | None:
+    """Resolve one presentation relationship target to a notes-master part."""
+    part_name = _resolve_package_target(
+        'ppt/presentation.xml',
+        target,
+    ).lstrip('/')
+    prefix = 'ppt/notesMasters/'
+    if not part_name.startswith(prefix) or part_name == prefix:
+        return None
+    return part_name
+
+
+def _validate_notes_master_part(
+    extract_dir: Path,
+    part_name: str,
+    content_types: dict[str, str],
+) -> str:
+    """Validate one existing notes-master package part and return its name."""
+    normalized = posixpath.normpath(part_name.lstrip('/'))
+    if not normalized.startswith('ppt/notesMasters/'):
+        raise RuntimeError(
+            f'Notes master resolves outside ppt/notesMasters: {part_name}'
+        )
+    part_path = extract_dir / PurePosixPath(normalized)
+    if not part_path.is_file():
+        raise RuntimeError(f'Notes master part is missing: {normalized}')
+    try:
+        root = ET.parse(part_path).getroot()
+    except (OSError, ET.ParseError) as exc:
+        raise RuntimeError(f'Cannot parse notes master part: {normalized}') from exc
+    if root.tag != f'{{{PML_NS}}}notesMaster':
+        raise RuntimeError(f'Notes master part has an invalid root: {normalized}')
+    declared_type = content_types.get(normalized)
+    if declared_type is not None and declared_type != _NOTES_MASTER_CONTENT_TYPE:
+        raise RuntimeError(
+            'Notes master content type mismatch for '
+            f'{normalized}: {declared_type}'
+        )
+    return normalized
+
+
+def _register_notes_master_id(
+    presentation_path: Path,
+    relationship_id: str,
+) -> None:
+    """Register a notes-master relationship in presentation.xml by XML identity."""
+    try:
+        tree = ET.parse(presentation_path)
+    except (OSError, ET.ParseError) as exc:
+        raise RuntimeError(
+            f'Cannot parse presentation package part: {presentation_path}'
+        ) from exc
+    root = tree.getroot()
+    list_tag = f'{{{PML_NS}}}notesMasterIdLst'
+    id_tag = f'{{{PML_NS}}}notesMasterId'
+    relationship_attr = f'{{{REL_NS}}}id'
+    notes_master_list = root.find(list_tag)
+    if notes_master_list is not None:
+        if any(
+            child.tag == id_tag
+            and child.get(relationship_attr) == relationship_id
+            for child in notes_master_list
+        ):
+            return
+    else:
+        slide_master_list = root.find(f'{{{PML_NS}}}sldMasterIdLst')
+        if slide_master_list is None:
+            raise RuntimeError(
+                'presentation.xml is missing p:sldMasterIdLst'
+            )
+        notes_master_list = ET.Element(list_tag)
+        insert_at = list(root).index(slide_master_list) + 1
+        root.insert(insert_at, notes_master_list)
+    ET.SubElement(
+        notes_master_list,
+        id_tag,
+        {relationship_attr: relationship_id},
+    )
+    _write_xml_tree(presentation_path, tree)
 
 
 def _ensure_notes_master(
     extract_dir: Path,
     primary_language: str | None = None,
-) -> None:
-    """Create notesMaster parts and wire them into the presentation package."""
+) -> _NotesMasterReference:
+    """Reuse or create a notes master and wire it into the presentation package."""
     ppt_dir = extract_dir / 'ppt'
     notes_masters_dir = ppt_dir / 'notesMasters'
     notes_masters_dir.mkdir(exist_ok=True)
+    presentation_rels_path = ppt_dir / '_rels' / 'presentation.xml.rels'
+    presentation_path = ppt_dir / 'presentation.xml'
+    content_types = _content_type_overrides(extract_dir)
+    relationships = _read_relationships(presentation_rels_path)
 
-    notes_master_path = notes_masters_dir / 'notesMaster1.xml'
-    if not notes_master_path.exists():
+    try:
+        presentation_root = ET.parse(presentation_path).getroot()
+    except (OSError, ET.ParseError) as exc:
+        raise RuntimeError(
+            f'Cannot parse presentation package part: {presentation_path}'
+        ) from exc
+    relationship_attr = f'{{{REL_NS}}}id'
+    referenced_ids = [
+        elem.get(relationship_attr, '')
+        for elem in presentation_root.findall(
+            f'./{{{PML_NS}}}notesMasterIdLst/{{{PML_NS}}}notesMasterId'
+        )
+    ]
+    notes_relationship_ids = [
+        rel_id
+        for rel_id, attrs in relationships.items()
+        if attrs.get('Type') == _NOTES_MASTER_REL_TYPE
+        and attrs.get('TargetMode') != 'External'
+    ]
+    ordered_relationship_ids = list(
+        dict.fromkeys(referenced_ids + notes_relationship_ids)
+    )
+    relationship_id_by_part: dict[str, str] = {}
+    selected_part: str | None = None
+    selected_rid: str | None = None
+    for rel_id in ordered_relationship_ids:
+        attrs = relationships.get(rel_id)
+        if (
+            not attrs
+            or attrs.get('Type') != _NOTES_MASTER_REL_TYPE
+            or attrs.get('TargetMode') == 'External'
+        ):
+            continue
+        target = attrs.get('Target', '')
+        part_name = _notes_master_part_from_target(target)
+        if part_name is None:
+            raise RuntimeError(
+                f'Notes master relationship {rel_id} has an invalid target: {target}'
+            )
+        part_name = _validate_notes_master_part(
+            extract_dir,
+            part_name,
+            content_types,
+        )
+        relationship_id_by_part.setdefault(part_name, rel_id)
+        if selected_part is None:
+            selected_part = part_name
+            selected_rid = rel_id
+
+    if selected_part is None:
+        for part_name, content_type in sorted(content_types.items()):
+            if content_type != _NOTES_MASTER_CONTENT_TYPE:
+                continue
+            selected_part = _validate_notes_master_part(
+                extract_dir,
+                part_name,
+                content_types,
+            )
+            selected_rid = relationship_id_by_part.get(selected_part)
+            break
+
+    created_theme_part: str | None = None
+    if selected_part is None:
+        occupied_parts = set(content_types)
+        occupied_parts.update(
+            part_name
+            for attrs in relationships.values()
+            if attrs.get('Type') == _NOTES_MASTER_REL_TYPE
+            and (part_name := _notes_master_part_from_target(
+                attrs.get('Target', '')
+            )) is not None
+        )
+        index = 1
+        while True:
+            selected_part = f'ppt/notesMasters/notesMaster{index}.xml'
+            if (
+                selected_part not in occupied_parts
+                and not (extract_dir / selected_part).exists()
+            ):
+                break
+            index += 1
+        notes_master_path = extract_dir / selected_part
         notes_master_path.write_text(
             create_notes_master_xml(primary_language),
             encoding='utf-8',
         )
 
-    theme_dir = ppt_dir / 'theme'
-    theme_dir.mkdir(exist_ok=True)
-    theme1_path = theme_dir / 'theme1.xml'
-    theme2_path = theme_dir / 'theme2.xml'
-    if not theme2_path.exists():
-        if theme1_path.exists():
-            shutil.copy2(theme1_path, theme2_path)
-        else:
-            raise RuntimeError('Cannot create notes theme: ppt/theme/theme1.xml is missing')
+        theme_dir = ppt_dir / 'theme'
+        theme_dir.mkdir(exist_ok=True)
+        theme1_path = theme_dir / 'theme1.xml'
+        theme2_path = theme_dir / 'theme2.xml'
+        if not theme2_path.exists():
+            if theme1_path.exists():
+                shutil.copy2(theme1_path, theme2_path)
+            else:
+                raise RuntimeError(
+                    'Cannot create notes theme: ppt/theme/theme1.xml is missing'
+                )
+        created_theme_part = 'ppt/theme/theme2.xml'
 
-    notes_master_rels_dir = notes_masters_dir / '_rels'
-    notes_master_rels_dir.mkdir(exist_ok=True)
-    notes_master_rels_path = notes_master_rels_dir / 'notesMaster1.xml.rels'
-    if not notes_master_rels_path.exists():
+        notes_master_rels_path = _relationships_path_for_part(
+            extract_dir,
+            selected_part,
+        )
+        notes_master_rels_path.parent.mkdir(parents=True, exist_ok=True)
         notes_master_rels_path.write_text(
             create_notes_master_rels_xml(),
             encoding='utf-8',
         )
 
-    presentation_rels_path = ppt_dir / '_rels' / 'presentation.xml.rels'
-    notes_master_rid = _find_relationship_id(
-        presentation_rels_path,
-        _NOTES_MASTER_REL_TYPE,
-        'notesMasters/notesMaster1.xml',
-    )
-    if notes_master_rid is None:
-        notes_master_rid = _append_relationship(
+    if selected_rid is None:
+        selected_rid = _append_relationship(
             presentation_rels_path,
             _NOTES_MASTER_REL_TYPE,
-            'notesMasters/notesMaster1.xml',
+            posixpath.relpath(selected_part, 'ppt'),
         )
-
-    presentation_path = ppt_dir / 'presentation.xml'
-    presentation_xml = presentation_path.read_text(encoding='utf-8')
-    if '<p:notesMasterIdLst>' in presentation_xml:
-        return
-    notes_master_lst = (
-        f'<p:notesMasterIdLst><p:notesMasterId r:id="{notes_master_rid}"/>'
-        '</p:notesMasterIdLst>'
+    _register_notes_master_id(presentation_path, selected_rid)
+    return _NotesMasterReference(
+        package_part=selected_part,
+        created_theme_part=created_theme_part,
     )
-    if '</p:sldMasterIdLst>' not in presentation_xml:
-        raise RuntimeError('presentation.xml is missing p:sldMasterIdLst')
-    presentation_xml = presentation_xml.replace(
-        '</p:sldMasterIdLst>',
-        '</p:sldMasterIdLst>' + notes_master_lst,
-        1,
-    )
-    presentation_path.write_text(presentation_xml, encoding='utf-8')
 
 
 def _slide_config(animation_config: dict[str, Any] | None, svg_stem: str) -> dict[str, Any]:
@@ -4000,13 +5704,15 @@ def _slide_config(animation_config: dict[str, Any] | None, svg_stem: str) -> dic
 
 
 def _slide_transition_settings(
+    default_transition_cfg: dict[str, Any],
     slide_cfg: dict[str, Any],
     transition: str | None,
     transition_effect_options: dict[str, object] | None,
     duration: float,
     auto_advance: float | None,
+    transition_sound: str | None,
     cli_overrides: dict[str, bool],
-) -> tuple[str | None, dict[str, object], float, float | None]:
+) -> tuple[str | None, dict[str, object], float, float | None, str | None]:
     trans_value = slide_cfg.get('transition', {})
     if not isinstance(trans_value, dict):
         raise ValueError('animations.json slide transition must be an object')
@@ -4041,7 +5747,19 @@ def _slide_transition_settings(
             "transition auto_advance",
             allow_zero=True,
         )
-    return effect, effect_options, duration, auto_advance
+    raw_sound = transition_sound
+    if raw_sound is None and not cli_overrides.get('transition_sound'):
+        raw_sound = default_transition_cfg.get('sound')
+    if 'sound' in trans_cfg:
+        raw_sound = trans_cfg['sound']
+    if raw_sound is not None and (
+        not isinstance(raw_sound, str) or not raw_sound.strip()
+    ):
+        raise ValueError(
+            'animations.json transition sound must be a non-empty '
+            'project-relative .wav path or null'
+        )
+    return effect, effect_options, duration, auto_advance, raw_sound
 
 
 def _slide_animation_settings(
@@ -4142,6 +5860,26 @@ def _build_sequence_targets(
         svg_id: sid for sid, svg_id in anim_targets
     }
     ordered: list[tuple[int, int, int, str, str, dict[str, Any]]] = []
+    # A group without a sidecar ``order`` follows the nearest listed group
+    # before it in SVG order (0 before the first one). Numbering unlisted
+    # groups by raw SVG index collided with explicit orders: a headline at
+    # index 2 landed behind the body block the author had numbered 1 and 2.
+    inherited_orders: list[int] = []
+    current_order = 0
+    for _sid, svg_id in anim_targets:
+        group_value = groups_cfg.get(svg_id, {})
+        explicit = [
+            cfg.get('order')
+            for _path, cfg in (
+                animation_group_effect_entries(group_value, path='')
+                if isinstance(group_value, dict) else []
+            )
+            if isinstance(cfg.get('order'), int)
+            and not isinstance(cfg.get('order'), bool)
+        ]
+        if explicit:
+            current_order = max(current_order, max(explicit))
+        inherited_orders.append(current_order)
     for idx, (sid, svg_id) in enumerate(anim_targets):
         group_value = groups_cfg.get(svg_id, {})
         if not isinstance(group_value, dict):
@@ -4171,8 +5909,8 @@ def _build_sequence_targets(
             if animation is None and normalized_effect is None:
                 continue
             order_value = effect_cfg.get('order')
-            order = order_value if order_value is not None else idx + 1
-            if (
+            order = order_value if order_value is not None else inherited_orders[idx]
+            if order_value is not None and (
                 isinstance(order, bool)
                 or not isinstance(order, int)
                 or order <= 0
@@ -4259,15 +5997,12 @@ def _build_sequence_targets(
                     'trigger "on-click" when trigger is explicit'
                 )
             resolved_trigger = 'on-click'
-        default_delay = (
-            stagger
-            if (
-                trigger_shape is None
-                and resolved_trigger == 'after-previous'
-                and main_sequence_count > 0
-            )
-            else 0
-        )
+        if trigger_shape is not None:
+            default_delay = 0
+        elif resolved_trigger == 'after-previous' and main_sequence_count > 0:
+            default_delay = stagger
+        else:
+            default_delay = 0
         delay_seconds = validate_seconds(
             group_cfg.get('delay', default_delay),
             f'animations.json {effect_path}.delay',
@@ -4364,63 +6099,134 @@ def _next_relationship_id(rel_entries: list[dict[str, str]]) -> str:
     return f'rId{candidate}'
 
 
+def _materialize_slide_sound(
+    project_path: Path,
+    raw_sound: str,
+    media_files: dict[str, bytes],
+    rel_entries: list[dict[str, str]],
+    audio_exts_used: set[str],
+    packaged_by_source: dict[Path, tuple[str, str]],
+    *,
+    label: str,
+    media_prefix: str,
+    require_project_relative_wav: bool,
+) -> dict[str, str]:
+    """Package one slide sound and return its relationship descriptor."""
+    if not isinstance(raw_sound, str) or not raw_sound.strip():
+        raise ValueError(f'{label} sound must be a non-empty path string')
+    sound_path = Path(raw_sound)
+    if require_project_relative_wav:
+        if sound_path.is_absolute() or PureWindowsPath(raw_sound).drive:
+            raise ValueError(f'{label} sound must be project-relative: {raw_sound!r}')
+        extension = sound_path.suffix.lower()
+        if extension != '.wav':
+            raise ValueError(f'{label} sound must use .wav')
+        project_root = project_path.resolve()
+        sound_path = (project_root / sound_path).resolve()
+        try:
+            sound_path.relative_to(project_root)
+        except ValueError as exc:
+            raise ValueError(
+                f'{label} sound escapes the project root: {raw_sound!r}'
+            ) from exc
+    else:
+        if not sound_path.is_absolute():
+            sound_path = project_path / sound_path
+        sound_path = sound_path.resolve()
+        extension = sound_path.suffix.lower()
+
+    if not sound_path.is_file():
+        raise ValueError(f'{label} sound file not found: {sound_path}')
+    if extension not in AUDIO_CONTENT_TYPES:
+        valid = ', '.join(sorted(AUDIO_CONTENT_TYPES))
+        raise ValueError(
+            f'unsupported {label} sound format {extension or "(none)"}; '
+            f'valid formats: {valid}'
+        )
+
+    packaged = packaged_by_source.get(sound_path)
+    if packaged is None:
+        payload = sound_path.read_bytes()
+        if require_project_relative_wav and not (
+            len(payload) >= 12
+            and payload[:4] in {b'RIFF', b'RF64'}
+            and payload[8:12] == b'WAVE'
+        ):
+            raise ValueError(f'{label} sound is not a valid WAV file: {sound_path}')
+        digest = hashlib.sha256(payload).hexdigest()[:16]
+        media_name = f'{media_prefix}_{digest}{extension}'
+        relationship_id = _next_relationship_id(rel_entries)
+        media_files.setdefault(media_name, payload)
+        rel_entries.append(
+            {
+                'id': relationship_id,
+                'type': AUDIO_REL_TYPE,
+                'target': f'../media/{media_name}',
+            }
+        )
+        packaged = (relationship_id, media_name)
+        packaged_by_source[sound_path] = packaged
+        audio_exts_used.add(extension)
+
+    relationship_id, _media_name = packaged
+    return {
+        'relationship_id': relationship_id,
+        'name': sound_path.name,
+    }
+
+
+def _materialize_transition_sound(
+    project_path: Path,
+    raw_sound: str | None,
+    media_files: dict[str, bytes],
+    rel_entries: list[dict[str, str]],
+    audio_exts_used: set[str],
+    packaged_by_source: dict[Path, tuple[str, str]],
+) -> dict[str, str] | None:
+    """Package one optional project-local WAV for a slide transition."""
+    if raw_sound is None:
+        return None
+    return _materialize_slide_sound(
+        project_path,
+        raw_sound,
+        media_files,
+        rel_entries,
+        audio_exts_used,
+        packaged_by_source,
+        label='transition',
+        media_prefix='transition_sound',
+        require_project_relative_wav=True,
+    )
+
+
 def _materialize_animation_sounds(
     project_path: Path,
     targets: list[dict[str, Any]],
     media_files: dict[str, bytes],
     rel_entries: list[dict[str, str]],
     audio_exts_used: set[str],
+    packaged_by_source: dict[Path, tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Package sidecar sound files and replace paths with OOXML relationships."""
     materialized: list[dict[str, Any]] = []
-    packaged_by_source: dict[Path, tuple[str, str]] = {}
+    packaged_by_source = packaged_by_source if packaged_by_source is not None else {}
     for index, raw_target in enumerate(targets, 1):
         target = dict(raw_target)
         raw_sound = target.pop('_sound_path', None)
         if raw_sound is None:
             materialized.append(target)
             continue
-        if not isinstance(raw_sound, str) or not raw_sound.strip():
-            raise ValueError(
-                f'animation target {index} sound must be a non-empty path string'
-            )
-        sound_path = Path(raw_sound)
-        if not sound_path.is_absolute():
-            sound_path = project_path / sound_path
-        sound_path = sound_path.resolve()
-        if not sound_path.is_file():
-            raise ValueError(f'animation sound file not found: {sound_path}')
-        extension = sound_path.suffix.lower()
-        if extension not in AUDIO_CONTENT_TYPES:
-            valid = ', '.join(sorted(AUDIO_CONTENT_TYPES))
-            raise ValueError(
-                f'unsupported animation sound format {extension or "(none)"}; '
-                f'valid formats: {valid}'
-            )
-
-        packaged = packaged_by_source.get(sound_path)
-        if packaged is None:
-            payload = sound_path.read_bytes()
-            digest = hashlib.sha256(payload).hexdigest()[:16]
-            media_name = f'animation_sound_{digest}{extension}'
-            relationship_id = _next_relationship_id(rel_entries)
-            media_files.setdefault(media_name, payload)
-            rel_entries.append(
-                {
-                    'id': relationship_id,
-                    'type': AUDIO_REL_TYPE,
-                    'target': f'../media/{media_name}',
-                }
-            )
-            packaged = (relationship_id, media_name)
-            packaged_by_source[sound_path] = packaged
-            audio_exts_used.add(extension)
-
-        relationship_id, _media_name = packaged
-        target['sound'] = {
-            'relationship_id': relationship_id,
-            'name': sound_path.name,
-        }
+        target['sound'] = _materialize_slide_sound(
+            project_path,
+            raw_sound,
+            media_files,
+            rel_entries,
+            audio_exts_used,
+            packaged_by_source,
+            label=f'animation target {index}',
+            media_prefix='animation_sound',
+            require_project_relative_wav=False,
+        )
         materialized.append(target)
     return materialized
 
@@ -4478,6 +6284,68 @@ def _prerender_legacy_pngs(
                 print(f"  [PNG {done}/{len(targets)}] {svg.name} - {tag}")
 
     return results
+
+
+def _rtl_text_levels(xml: str) -> str:
+    """Flip template text-level defaults (``rtl="0"``) to right-to-left."""
+    def flip(match: re.Match[str]) -> str:
+        tag = match.group(0).replace('rtl="0"', 'rtl="1"')
+        return tag.replace('algn="l"', 'algn="r"')
+
+    return re.sub(r'<a:(?:lvl\dpPr|pPr)\b[^>]*\brtl="0"[^>]*>', flip, xml)
+
+
+def _apply_template_text_language(extract_dir: Path, language: str) -> None:
+    """Tag template defaults with the deck language and authored runs by script.
+
+    Covers the presentation default text style (new text boxes) and master and
+    layout placeholders, so proofing follows the deck rather than en-US; a
+    right-to-left deck also gets right-to-left, right-aligned default levels.
+    """
+    rtl = language_uses_rtl(language)
+    ppt_dir = extract_dir / "ppt"
+    parts = [ppt_dir / "presentation.xml"]
+    parts += sorted((ppt_dir / "slideMasters").glob("slideMaster*.xml"))
+    parts += sorted((ppt_dir / "slideLayouts").glob("slideLayout*.xml"))
+    for part in parts:
+        if not part.is_file():
+            continue
+        xml = part.read_text(encoding="utf-8")
+        root = ET.fromstring(xml)
+        language_updates = {
+            props: language
+            for tag in ("defRPr", "endParaRPr")
+            for props in root.iter(f"{{{DML_NS}}}{tag}")
+        }
+        for tag in ("r", "fld"):
+            for run in root.iter(f"{{{DML_NS}}}{tag}"):
+                text = run.find(f"{{{DML_NS}}}t")
+                if text is None or not (text.text or "").strip():
+                    continue
+                props = run.find(f"{{{DML_NS}}}rPr")
+                if props is None:
+                    props = ET.Element(f"{{{DML_NS}}}rPr")
+                    run.insert(0, props)
+                language_updates[props] = detect_text_lang(text.text, language)
+        for shape in root.iter(f"{{{PML_NS}}}sp"):
+            placeholder = shape.find(
+                f"{{{PML_NS}}}nvSpPr/{{{PML_NS}}}nvPr/{{{PML_NS}}}ph"
+            )
+            if placeholder is not None and not any(
+                (text.text or "").strip() for text in shape.iter(f"{{{DML_NS}}}t")
+            ):
+                for props in shape.iter(f"{{{DML_NS}}}rPr"):
+                    language_updates[props] = language
+        changed = False
+        for props, text_language in language_updates.items():
+            if props.get("lang") != text_language:
+                props.set("lang", text_language)
+                changed = True
+        updated = serialize_source_xml(root, xml).decode("utf-8") if changed else xml
+        if rtl:
+            updated = _rtl_text_levels(updated)
+        if updated != xml:
+            part.write_text(updated, encoding="utf-8")
 
 
 def _presentation_format(width: float, height: float) -> str:
@@ -4581,8 +6449,58 @@ def _create_preserved_base_pptx(
     specs: list[TemplateSlideSpec],
     output_path: Path,
     slide_size_emu: tuple[int, int],
-) -> None:
-    """Create empty slides bound to the source package's original layouts."""
+    *,
+    roundtrip_page_sources: tuple[int, ...] | None = None,
+    package_overrides: dict[str, bytes] | None = None,
+    slide_patches: dict[int, RoundtripSlidePatch] | None = None,
+) -> bool:
+    """Create the preserve base and report whether source Slides were retained."""
+    if roundtrip_page_sources is not None:
+        if len(roundtrip_page_sources) != len(specs):
+            raise TemplateStructureError(
+                "Round-trip page plan length does not match the SVG roster"
+            )
+        if contract.slide_size_emu != slide_size_emu:
+            raise TemplateStructureError(
+                "Generated SVG canvas does not match the preserved source template size"
+            )
+        for spec, source_index in zip(specs, roundtrip_page_sources):
+            source_slide = contract.slide(source_index)
+            if spec.layout_key != source_slide.layout_key:
+                raise TemplateStructureError(
+                    f"{spec.svg_path.name} declares layout {spec.layout_key!r}, "
+                    f"but source slide {source_index} uses "
+                    f"{source_slide.layout_key!r}"
+                )
+        try:
+            clone_presentation_slides(
+                contract.source_template,
+                roundtrip_page_sources,
+                output_path,
+                package_overrides=package_overrides,
+                discarded_shape_links={
+                    index: _slide_ref_shape_ids(patch.edited_ref_ids | patch.deleted_ref_ids)
+                    for index, patch in (slide_patches or {}).items()
+                },
+            )
+        except (OSError, RuntimeError, zipfile.BadZipFile) as exc:
+            raise TemplateStructureError(
+                f"Round-trip page-plan cloning failed: {exc}"
+            ) from exc
+        return True
+
+    source_roster_matches = (
+        len(specs) == len(contract.slides)
+        and all(
+            spec.slide_num == source_slide.index
+            and spec.layout_key == source_slide.layout_key
+            for spec, source_slide in zip(specs, contract.slides)
+        )
+    )
+    if source_roster_matches:
+        shutil.copy2(contract.source_template, output_path)
+        return True
+
     presentation = Presentation(str(contract.source_template))
     actual_size = (int(presentation.slide_width), int(presentation.slide_height))
     if actual_size != contract.slide_size_emu:
@@ -4615,6 +6533,7 @@ def _create_preserved_base_pptx(
             )
         presentation.slides.add_slide(layout)
     presentation.save(str(output_path))
+    return False
 
 
 def _clear_preserved_slide_collections(extract_dir: Path) -> None:
@@ -4636,14 +6555,186 @@ def _clear_preserved_slide_collections(extract_dir: Path) -> None:
     _write_xml_tree(presentation_path, tree)
 
 
+def _validate_source_theme_xml(payload: bytes) -> None:
+    """Validate one imported Theme part before package installation."""
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError as exc:
+        raise ThemeColorError(f"Imported source theme is malformed: {exc}") from exc
+    if root.tag != f"{{{DML_NS}}}theme":
+        raise ThemeColorError("Imported source theme root must be a:theme")
+    if any(
+        isinstance(name, str) and name.startswith(f"{{{REL_NS}}}")
+        for node in root.iter()
+        for name in node.attrib
+    ):
+        raise ThemeColorError("Imported source theme cannot contain relationships")
+
+
+def _install_source_theme_xml(extract_dir: Path, payload: bytes) -> None:
+    """Install a validated imported theme into the generated flat package."""
+    _validate_source_theme_xml(payload)
+
+    theme_paths = sorted((extract_dir / "ppt" / "theme").glob("theme*.xml"))
+    if not theme_paths:
+        raise ThemeColorError("Generated PPTX package has no theme part")
+    for theme_path in theme_paths:
+        theme_path.write_bytes(payload)
+
+
+def _install_source_themes_by_master(
+    extract_dir: Path,
+    master_parts_by_key: dict[str, str],
+    payloads_by_key: dict[str, bytes],
+) -> None:
+    """Install one exact source Theme into each structured mirror Master."""
+    expected = set(master_parts_by_key)
+    actual = set(payloads_by_key)
+    if actual != expected:
+        raise ThemeColorError(
+            "Structured source Theme roster differs from Master roster; "
+            f"missing={sorted(expected - actual)}, extra={sorted(actual - expected)}"
+        )
+    for master_key, master_part in master_parts_by_key.items():
+        payload = payloads_by_key[master_key]
+        _validate_source_theme_xml(payload)
+        master_rels = _relationships_path_for_part(extract_dir, master_part)
+        targets = [
+            attrs["Target"]
+            for attrs in _read_relationships(master_rels).values()
+            if attrs.get("Type") == THEME_REL_TYPE and attrs.get("Target")
+        ]
+        if len(targets) != 1:
+            raise ThemeColorError(
+                f"Structured Master {master_key!r} must own one Theme relationship"
+            )
+        theme_part = _resolve_package_target(master_part, targets[0])
+        theme_path = extract_dir / theme_part
+        if not theme_path.is_file():
+            raise ThemeColorError(
+                f"Structured Master {master_key!r} Theme part is missing: {theme_part}"
+            )
+        theme_path.write_bytes(payload)
+
+
+def _install_source_embedded_fonts(
+    extract_dir: Path,
+    bundle: EmbeddedFontBundle,
+) -> tuple[str, ...]:
+    """Install validated source font parts into the generated PPTX package."""
+    typefaces = embedded_font_typefaces(bundle)
+    try:
+        font_list = ET.fromstring(bundle.font_list_xml)
+    except ET.ParseError as exc:
+        raise EmbeddedFontError(
+            f"Embedded font list XML is malformed: {exc}"
+        ) from exc
+
+    ppt_dir = extract_dir / "ppt"
+    presentation_path = ppt_dir / "presentation.xml"
+    presentation_rels_path = ppt_dir / "_rels" / "presentation.xml.rels"
+    presentation_tree = ET.parse(presentation_path)
+    presentation_root = presentation_tree.getroot()
+    rels_tree = ET.parse(presentation_rels_path)
+    rels_root = rels_tree.getroot()
+
+    fonts_dir = ppt_dir / "fonts"
+    fonts_dir.mkdir(exist_ok=True)
+    for relationship in list(rels_root):
+        if relationship.attrib.get("Type") != FONT_REL_TYPE:
+            continue
+        target = relationship.attrib.get("Target", "")
+        target_path = PurePosixPath(target)
+        if (
+            not target_path.is_absolute()
+            and target_path.parts[:1] == ("fonts",)
+            and target_path.suffix.lower() == ".fntdata"
+        ):
+            candidate = ppt_dir.joinpath(*target_path.parts)
+            if candidate.is_file():
+                candidate.unlink()
+        rels_root.remove(relationship)
+
+    rid_numbers = [
+        int(match.group(1))
+        for relationship in rels_root
+        if (match := re.fullmatch(
+            r"rId(\d+)",
+            relationship.attrib.get("Id", ""),
+        ))
+    ]
+    next_rid = max(rid_numbers, default=0) + 1
+    relationship_mapping: dict[str, str] = {}
+    for index, part in enumerate(bundle.parts, start=1):
+        filename = f"font{index}.fntdata"
+        (fonts_dir / filename).write_bytes(part.payload)
+        relationship_id = f"rId{next_rid}"
+        next_rid += 1
+        ET.SubElement(
+            rels_root,
+            f"{{{PACKAGE_REL_NS}}}Relationship",
+            {
+                "Id": relationship_id,
+                "Type": FONT_REL_TYPE,
+                "Target": f"fonts/{filename}",
+            },
+        )
+        relationship_mapping[part.relationship_id] = relationship_id
+
+    for node in font_list.iter():
+        relationship_attr = f"{{{EMBEDDED_FONT_REL_NS}}}id"
+        original_id = node.attrib.get(relationship_attr)
+        if original_id is None:
+            continue
+        replacement_id = relationship_mapping.get(original_id)
+        if replacement_id is None:
+            raise EmbeddedFontError(
+                f"Embedded font list references an unknown part: {original_id}"
+            )
+        node.set(relationship_attr, replacement_id)
+
+    existing = presentation_root.find(
+        f"{{{EMBEDDED_FONT_PML_NS}}}embeddedFontLst"
+    )
+    if existing is not None:
+        insertion_index = list(presentation_root).index(existing)
+        presentation_root.remove(existing)
+    else:
+        default_text_style = presentation_root.find(
+            f"{{{EMBEDDED_FONT_PML_NS}}}defaultTextStyle"
+        )
+        insertion_index = (
+            list(presentation_root).index(default_text_style)
+            if default_text_style is not None
+            else len(presentation_root)
+        )
+    presentation_root.insert(insertion_index, font_list)
+    _write_xml_tree(presentation_path, presentation_tree)
+    _write_xml_tree(presentation_rels_path, rels_tree)
+
+    content_types_path = extract_dir / "[Content_Types].xml"
+    content_types_path.write_text(
+        _add_default_content_type(
+            content_types_path.read_text(encoding="utf-8"),
+            "fntdata",
+            FONT_CONTENT_TYPE,
+        ),
+        encoding="utf-8",
+    )
+    return typefaces
+
+
 def create_pptx_with_native_svg(
     svg_files: list[Path],
     output_path: Path,
+    *,
+    resource_root: Path,
     canvas_format: str | None = None,
     verbose: bool = True,
     transition: str | None = 'fade',
     transition_duration: float = 0.5,
     auto_advance: float | None = None,
+    kiosk: bool = False,
     use_compat_mode: bool = True,
     notes: dict[str, str] | None = None,
     enable_notes: bool = True,
@@ -4667,42 +6758,56 @@ def create_pptx_with_native_svg(
     image_quality: int = 85,
     native_objects: bool = False,
     conversion_trace_path: Path | None = None,
+    dangerous_nonconforming_export: bool = False,
     doc_metadata: dict[str, Any] | None = None,
     structure_name: str | None = None,
     pptx_structure: str = "structured",
     use_layout_placeholder_frames: bool = False,
     native_structure_contract: NativeStructureContract | None = None,
+    roundtrip_passthrough_slides: set[int] | None = None,
+    roundtrip_slide_patches: dict[int, RoundtripSlidePatch] | None = None,
+    roundtrip_resources: tuple[WorkspaceResourceSpec, ...] = (),
+    roundtrip_page_sources: tuple[int, ...] | None = None,
     theme_font_spec: ThemeFontSpec | None = None,
     master_text_style_spec: MasterTextStyleSpec | None = None,
     theme_color_spec: ThemeColorSpec | None = None,
+    source_theme_xml: bytes | None = None,
+    source_theme_xml_by_master: dict[str, bytes] | None = None,
+    source_embedded_fonts: EmbeddedFontBundle | None = None,
     structured_baseline: bool = False,
     baseline_layout_specs: list[TemplateSlideSpec] | None = None,
     layout_definition_files: list[Path] | None = None,
     expected_viewbox: str | None = None,
     animation_resource_root: Path | None = None,
     transition_effect_options: dict[str, object] | None = None,
+    transition_sound: str | None = None,
     text_flow: str | None = None,
     primary_language: str | None = None,
+    narration_start_floor: float = DEFAULT_NARRATION_START_FLOOR,
 ) -> bool:
     """Create a PPTX file with native DrawingML shapes.
 
     Args:
         svg_files: List of SVG files.
         output_path: Output PPTX path.
-        layout_definition_files: Optional structured SVG prototypes for Layouts
-            that no generated page uses. They are converted on internal carrier
-            slides, registered, and removed before the package is published.
+        layout_definition_files: Optional complete Slide SVG prototypes for
+            Layouts that no generated page uses. They are converted on internal
+            carrier slides, registered, and removed before publication.
         canvas_format: Canvas format key.
         expected_viewbox: Optional project/template-lock canvas contract. Every
-            public page and internal Layout definition must match it.
-        animation_resource_root: Base directory for relative animation sound
-            paths. Defaults to the parent of the SVG source directory.
+            public page and internal Layout carrier prototype must match it.
+        animation_resource_root: Project root for sidecar sound paths. Object
+            animation sounds retain existing absolute-path compatibility;
+            transition sounds must remain project-relative WAV files.
         verbose: Whether to output detailed information.
         transition: Transition effect name.
         transition_effect_options: PowerPoint Effect Options for the selected
             native page transition.
+        transition_sound: Optional project-relative WAV path used by the
+            generated page transition.
         transition_duration: Transition duration in seconds.
         auto_advance: Auto-advance interval in seconds.
+        kiosk: Write a looping kiosk show (no click/keyboard advance).
         use_compat_mode: Retained for API compatibility; ignored in native mode.
         notes: Notes dict, key is SVG stem, value is notes content.
         enable_notes: Whether to enable notes embedding.
@@ -4723,6 +6828,8 @@ def create_pptx_with_native_svg(
         narration_audio: Optional dict mapping SVG stem to narration audio file.
         use_narration_timings: Whether to set slide auto-advance from audio duration.
         narration_padding: Extra seconds added after each narration before advancing.
+        narration_start_floor: Minimum seconds from transition start to narration
+            start. Any remainder after the transition becomes silent lead-in.
         merge_paragraphs: Legacy compatibility option. True selects reflow;
             False selects split. Do not combine with ``text_flow``.
         text_flow: Positional-tspan policy: preserve authored line breaks in
@@ -4733,9 +6840,14 @@ def create_pptx_with_native_svg(
             oversized sources; ``display`` sizes from rendered SVG boxes.
         image_scale: Target image pixels per SVG display pixel.
         image_quality: JPEG quality used when opaque rasters are re-encoded.
-        native_objects: Replace explicit ``data-pptx-replace-with`` chart/table
-            fallback groups with native PowerPoint Chart/Table objects. Default off.
+        native_objects: Replace opt-in ``data-pptx-replace-with`` chart/table
+            fallback groups with native PowerPoint Chart/Table objects. Formula
+            markers remain intrinsically native; Chart/Table markers stay off otherwise.
         conversion_trace_path: Optional JSON path for native conversion diagnostics.
+        dangerous_nonconforming_export: Apply narrowly defined compatibility
+            normalizations before strict SVG conversion. Actual contract,
+            conversion, and package failures remain blocking.
+        resource_root: Explicit project boundary for SVG-local resource paths.
         structure_name: Current deck identity used to name a flat Master, Layout,
             and theme.
         pptx_structure: PPTX structure strategy. ``baseline`` promotes safe
@@ -4752,13 +6864,28 @@ def create_pptx_with_native_svg(
             of the tight SVG content frame. Default off for generated decks.
         native_structure_contract: Validated source package contract for
             ``preserve`` mode.
+        roundtrip_passthrough_slides: Source slide indices whose SVG, notes,
+            and motion sidecars are unchanged and may retain their original
+            slide XML and relationships byte-for-byte.
+        roundtrip_slide_patches: Authoring metadata for rebuilt slides that
+            overlay edited objects onto their preserved source slide parts.
+        roundtrip_resources: Semantic workspace payloads copied back to their
+            exact source package parts after slide conversion.
+        roundtrip_page_sources: Optional output-order tuple of one-based source
+            slide indices. Presence activates deck-level source slide cloning.
         theme_font_spec: Locked project major/minor fonts for flat/structured
             release-theme inheritance. Direct diagnostic flat callers may omit it.
-        master_text_style_spec: Required declared title/body anchors for structured
-            and release flat slide-master text styles. Direct diagnostic flat
-            callers may omit it; other routes ignore this value.
+        master_text_style_spec: Required declared or inferred title/body anchors
+            for structured and release flat slide-master text styles. Direct
+            diagnostic flat callers may omit it; other routes ignore this value.
         theme_color_spec: Locked project color scheme for context-aware
             flat/structured theme inheritance. Preserve mode ignores this value.
+        source_theme_xml: Complete validated source theme used only by an
+            explicit PPTX-import diagnostic round-trip.
+        source_theme_xml_by_master: Exact validated source themes keyed by
+            structured mirror Master identity.
+        source_embedded_fonts: Validated source font-list metadata and font
+            parts used only by an explicit PPTX-import diagnostic round-trip.
         primary_language: Canonical BCP-47 deck content language. ``None``
             preserves legacy per-run language detection.
         structured_baseline: Obsolete compatibility argument; must remain false.
@@ -4767,10 +6894,76 @@ def create_pptx_with_native_svg(
     Returns:
         Whether all slides were successfully created.
     """
+    if source_theme_xml is not None and source_theme_xml_by_master is not None:
+        raise ThemeColorError(
+            "Use either one diagnostic source Theme or per-Master mirror Themes"
+        )
+    if source_theme_xml_by_master is not None and pptx_structure != "structured":
+        raise ThemeColorError(
+            "Per-Master source Themes are allowed only in structured export"
+        )
     text_flow = resolve_text_flow(text_flow, merge_paragraphs)
     if primary_language is not None:
-        primary_language = normalize_language_tag(primary_language)
+        primary_language = office_language_tag(primary_language)
     public_svg_files = list(svg_files)
+    passthrough_slides = set(roundtrip_passthrough_slides or set())
+    slide_patches = dict(roundtrip_slide_patches or {})
+    overlay_slides = set(slide_patches)
+    page_plan_export = roundtrip_page_sources is not None
+    roundtrip_export = bool(
+        passthrough_slides
+        or overlay_slides
+        or roundtrip_resources
+        or page_plan_export
+    )
+    source_motion_slides = passthrough_slides | {
+        index
+        for index, patch in slide_patches.items()
+        if not patch.animation_changed
+    }
+    invalid_passthrough = sorted(
+        index
+        for index in passthrough_slides
+        if index < 1 or index > len(public_svg_files)
+    )
+    if invalid_passthrough:
+        raise ValueError(
+            "Round-trip passthrough slide indices are outside the SVG roster: "
+            + ", ".join(str(index) for index in invalid_passthrough)
+        )
+    invalid_overlays = sorted(
+        index
+        for index in overlay_slides
+        if index < 1 or index > len(public_svg_files)
+    )
+    if invalid_overlays:
+        raise ValueError(
+            "Round-trip overlay slide indices are outside the SVG roster: "
+            + ", ".join(str(index) for index in invalid_overlays)
+        )
+    overlap = sorted(passthrough_slides & overlay_slides)
+    if overlap:
+        raise ValueError(
+            "Round-trip slides cannot be both passthrough and overlay: "
+            + ", ".join(str(index) for index in overlap)
+        )
+    if passthrough_slides and pptx_structure != "preserve":
+        raise ValueError(
+            "Round-trip slide passthrough is available only in preserve mode"
+        )
+    if (overlay_slides or roundtrip_resources) and pptx_structure != "preserve":
+        raise ValueError(
+            "Round-trip overlays and resource reinjection require preserve mode"
+        )
+    if page_plan_export:
+        if pptx_structure != "preserve":
+            raise ValueError(
+                "Round-trip page plans are available only in preserve mode"
+            )
+        if len(roundtrip_page_sources) != len(public_svg_files):
+            raise ValueError(
+                "Round-trip page-plan source roster differs from the SVG roster"
+            )
     definition_svg_files = list(layout_definition_files or [])
     public_slide_names = [path.stem for path in public_svg_files]
     morph_pairs = resolve_morph_pairs(
@@ -4807,22 +7000,23 @@ def create_pptx_with_native_svg(
             set(),
         ).add(pair.destination_group_id)
     morph_shape_ids: dict[tuple[str, str], int] = {}
+    morph_preserved_slides: set[int] = set()
     if definition_svg_files and pptx_structure != "structured":
         raise ValueError(
-            "layout_definition_files requires pptx_structure='structured'"
+            "unselected Layout prototypes require pptx_structure='structured'"
         )
     public_paths = {path.resolve() for path in public_svg_files}
     seen_definition_paths: set[Path] = set()
     for path in definition_svg_files:
         resolved = path.resolve()
         if not path.is_file():
-            raise ValueError(f"Layout definition SVG does not exist: {path}")
+            raise ValueError(f"Layout prototype SVG does not exist: {path}")
         if resolved in public_paths:
             raise ValueError(
-                f"Layout definition SVG is already a generated page: {path}"
+                f"Layout prototype SVG is already a generated page: {path}"
             )
         if resolved in seen_definition_paths:
-            raise ValueError(f"Layout definition SVG is repeated: {path}")
+            raise ValueError(f"Layout prototype SVG is repeated: {path}")
         seen_definition_paths.add(resolved)
     public_slide_count = len(public_svg_files)
     svg_files = public_svg_files + definition_svg_files
@@ -4869,8 +7063,8 @@ def create_pptx_with_native_svg(
         )
     if pptx_structure == "structured" and master_text_style_spec is None:
         raise ValueError(
-            "Structured export requires declared typography title/body anchors "
-            "in master_text_style_spec"
+            "Structured export requires declared or inferred typography "
+            "title/body anchors in master_text_style_spec"
         )
     if use_native_shapes and pptx_structure == "structured":
         template_specs = parse_template_slides(svg_files)
@@ -4940,14 +7134,19 @@ def create_pptx_with_native_svg(
         print(f"  SVG file count: {public_slide_count}")
         if definition_svg_files:
             print(
-                "  Unused Layout definitions: "
-                f"{len(definition_svg_files)} internal prototype(s)"
+                "  Unselected Layout prototype carriers: "
+                f"{len(definition_svg_files)}"
             )
         if use_native_shapes:
             print(f"  Mode: Native DrawingML shapes (directly editable)")
+            native_object_mode = (
+                "Chart/Table replacement enabled"
+                if native_objects
+                else "Chart/Table replacement disabled"
+            )
             print(
                 "  Native table/chart objects: "
-                f"{'Enabled' if native_objects else 'Disabled'}"
+                f"{native_object_mode}"
             )
             print(f"  PPTX structure: {pptx_structure}")
             if image_optimize:
@@ -4988,12 +7187,14 @@ def create_pptx_with_native_svg(
                 else transition
             )
             print(f"  Transition effect: {trans_name}")
-        if enable_notes and notes:
-            print(f"  Speaker notes: {len(notes)} page(s)")
-        elif enable_notes:
-            print(f"  Speaker notes: Enabled (no notes files found)")
-        else:
-            print(f"  Speaker notes: Disabled")
+        # Round-trip counts include inherited notes from the finished package.
+        if not roundtrip_export:
+            if enable_notes and notes:
+                print(f"  Speaker notes: {len(notes)} page(s)")
+            elif enable_notes:
+                print(f"  Speaker notes: Enabled (no notes files found)")
+            else:
+                print(f"  Speaker notes: Disabled")
         print()
 
     animation_cli_overrides = animation_cli_overrides or {}
@@ -5002,23 +7203,36 @@ def create_pptx_with_native_svg(
 
     try:
         base_pptx = temp_dir / 'base.pptx'
+        preserved_source_slides = False
+        page_plan_package_overrides = (
+            _roundtrip_resource_payloads(resource_root, roundtrip_resources)
+            if page_plan_export
+            else None
+        )
+        late_roundtrip_resources = (
+            () if page_plan_export else roundtrip_resources
+        )
         if (
             use_native_shapes
             and pptx_structure == "preserve"
             and native_structure_contract is not None
             and template_specs is not None
         ):
-            _create_preserved_base_pptx(
+            preserved_source_slides = _create_preserved_base_pptx(
                 native_structure_contract,
                 template_specs,
                 base_pptx,
                 (width_emu, height_emu),
+                roundtrip_page_sources=roundtrip_page_sources,
+                package_overrides=page_plan_package_overrides,
+                slide_patches=slide_patches,
             )
         else:
             # Create the standard base PPTX with python-pptx.
             prs = Presentation()
             prs.slide_width = width_emu
             prs.slide_height = height_emu
+            _set_slide_size_type(prs, width_emu, height_emu)
 
             blank_layout = prs.slide_layouts[6]
             for _ in svg_files:
@@ -5029,8 +7243,35 @@ def create_pptx_with_native_svg(
         extract_dir = temp_dir / 'pptx_content'
         with zipfile.ZipFile(base_pptx, 'r') as zf:
             zf.extractall(extract_dir)
-        if use_native_shapes and pptx_structure == "preserve":
+        source_content_types_bytes = (
+            (extract_dir / '[Content_Types].xml').read_bytes()
+            if roundtrip_export
+            else None
+        )
+        roundtrip_source_parts = (
+            frozenset(
+                path.relative_to(extract_dir).as_posix()
+                for path in extract_dir.rglob('*')
+                if path.is_file()
+            )
+            if roundtrip_export
+            else frozenset()
+        )
+        if (
+            use_native_shapes
+            and pptx_structure == "preserve"
+            and not preserved_source_slides
+        ):
             _clear_preserved_slide_collections(extract_dir)
+        if (
+            passthrough_slides
+            or overlay_slides
+            or roundtrip_resources
+            or page_plan_export
+        ) and not preserved_source_slides:
+            raise TemplateStructureError(
+                "Round-trip export requires the original source package roster"
+            )
         active_theme_font_spec = (
             theme_font_spec
             if use_native_shapes
@@ -5047,6 +7288,22 @@ def create_pptx_with_native_svg(
         )
         if active_theme_color_spec is not None:
             apply_theme_color_spec(extract_dir, active_theme_color_spec)
+        if (
+            source_theme_xml is not None
+            and native_structure_contract is None
+        ):
+            _install_source_theme_xml(extract_dir, source_theme_xml)
+        if source_embedded_fonts is not None and not roundtrip_export:
+            installed_typefaces = _install_source_embedded_fonts(
+                extract_dir,
+                source_embedded_fonts,
+            )
+            if verbose:
+                print(
+                    "  Embedded fonts: preserved "
+                    f"{len(source_embedded_fonts.parts)} part(s) for "
+                    + ", ".join(installed_typefaces)
+                )
         structure = _read_slide_layout_targets(extract_dir, len(svg_files))
 
         media_dir = extract_dir / 'ppt' / 'media'
@@ -5075,14 +7332,23 @@ def create_pptx_with_native_svg(
         image_exts_used: set[str] = set()
         package_exts_used: set[str] = set()
         package_content_overrides: dict[str, str] = {}
+        package_parts = PackagePartRegistry(extract_dir, _content_type_overrides(extract_dir))
         notes_slides_created: set[int] = set()
+        notes_master_parts_used: set[str] = set()
+        notes_master_theme_parts_created: set[str] = set()
         narration_slides_created: set[int] = set()
+        replaced_narration_parts: set[str] = set()
         audio_exts_used: set[str] = set()
         package_uses_timings = False
         mixed_animation_offset = 0
-        animation_defaults_value = _as_dict(
-            _as_dict(animation_config).get('defaults')
-        ).get('animation', {})
+        config_defaults = _as_dict(_as_dict(animation_config).get('defaults'))
+        transition_defaults_value = config_defaults.get('transition', {})
+        if not isinstance(transition_defaults_value, dict):
+            raise ValueError(
+                'animations.json defaults transition must be an object'
+            )
+        default_transition_cfg = transition_defaults_value
+        animation_defaults_value = config_defaults.get('animation', {})
         if not isinstance(animation_defaults_value, dict):
             raise ValueError(
                 'animations.json defaults animation must be an object'
@@ -5110,7 +7376,7 @@ def create_pptx_with_native_svg(
             slide_num = i
             is_layout_definition = slide_num > public_slide_count
             progress_label = (
-                f"[Layout definition {slide_num - public_slide_count}/"
+                f"[Layout carrier {slide_num - public_slide_count}/"
                 f"{len(definition_svg_files)}]"
                 if is_layout_definition
                 else f"[Slide {slide_num}/{public_slide_count}]"
@@ -5118,8 +7384,191 @@ def create_pptx_with_native_svg(
             expected_animation_targets: list[dict[str, Any]] = []
             expected_animation_duration = animation_duration
             expected_animation_trigger = normalize_animation_trigger(animation_trigger)
+            expected_transition_sound: dict[str, str] | None = None
 
             try:
+                slide_xml_path = (
+                    extract_dir / 'ppt' / 'slides' / f'slide{slide_num}.xml'
+                )
+                rels_path = (
+                    extract_dir / 'ppt' / 'slides' / '_rels'
+                    / f'slide{slide_num}.xml.rels'
+                )
+                slide_patch = slide_patches.get(slide_num)
+                source_slide_bytes: bytes | None = None
+                source_rels_bytes: bytes | None = None
+                if slide_patch is not None:
+                    if is_layout_definition:
+                        raise TemplateStructureError(
+                            "Internal Layout definitions cannot use round-trip overlays"
+                        )
+                    try:
+                        source_slide_bytes = slide_xml_path.read_bytes()
+                        source_rels_bytes = rels_path.read_bytes()
+                    except OSError as exc:
+                        raise TemplateStructureError(
+                            f"Cannot read source slide {slide_num} for overlay: {exc}"
+                        ) from exc
+                if slide_num in passthrough_slides:
+                    if is_layout_definition:
+                        raise TemplateStructureError(
+                            "Internal Layout definitions cannot use source-slide passthrough"
+                        )
+                    morph_shape_ids.update(_roundtrip_morph_shape_ids(
+                        svg_path, morph_group_overrides_by_slide.get(svg_path.stem, set()),
+                    ))
+                    morph_preserved_slides.add(slide_num)
+                    if verbose:
+                        print(
+                            f"  {progress_label} {svg_path.name} "
+                            "(Source slide passthrough)"
+                        )
+                    success_count += 1
+                    continue
+                if (
+                    slide_patch is not None
+                    and not slide_patch.visual_changed
+                    and slide_patch.motion_changed
+                ):
+                    overlay_slide_cfg = _slide_config(
+                        animation_config,
+                        svg_path.stem,
+                    )
+                    overlay_groups = overlay_slide_cfg.get("groups", {})
+                    if not isinstance(overlay_groups, dict):
+                        raise ValueError(
+                            "animations.json slide groups must be an object"
+                        )
+                    (
+                        overlay_transition,
+                        overlay_transition_options,
+                        overlay_transition_duration,
+                        overlay_auto_advance,
+                        overlay_transition_sound,
+                    ) = _slide_transition_settings(
+                        default_transition_cfg,
+                        overlay_slide_cfg,
+                        transition,
+                        transition_effect_options,
+                        transition_duration,
+                        auto_advance,
+                        transition_sound,
+                        animation_cli_overrides,
+                    )
+                    (
+                        overlay_animation,
+                        _overlay_animation_duration,
+                        _overlay_animation_stagger,
+                        _overlay_animation_trigger,
+                        _overlay_animation_cfg,
+                    ) = _slide_animation_settings(
+                        overlay_slide_cfg,
+                        default_animation_cfg,
+                        animation,
+                        animation_duration,
+                        animation_stagger,
+                        animation_trigger,
+                        animation_cli_overrides,
+                    )
+                    animation_override_requested = any(
+                        animation_cli_overrides.get(key, False)
+                        for key in (
+                            "animation",
+                            "animation_duration",
+                            "animation_stagger",
+                            "animation_trigger",
+                        )
+                    )
+                    direct_transition_overlay = (
+                        overlay_animation is None
+                        and not slide_patch.animation_changed
+                        and not overlay_groups
+                        and not animation_override_requested
+                        and overlay_transition_sound is None
+                        and not morph_group_overrides_by_slide.get(
+                            svg_path.stem
+                        )
+                        and not (
+                            narration_audio
+                            and narration_audio.get(svg_path.stem) is not None
+                        )
+                        and not use_narration_timings
+                    )
+                    if direct_transition_overlay:
+                        if _apply_roundtrip_transition_overlay(
+                            slide_xml_path,
+                            effect=overlay_transition,
+                            effect_options=overlay_transition_options,
+                            duration=overlay_transition_duration,
+                            auto_advance=overlay_auto_advance,
+                            replace_transition=slide_patch.transition_replaced,
+                            advance_changed=slide_patch.advance_changed,
+                        ):
+                            package_uses_timings = True
+                        if slide_patch.notes_changed:
+                            notes_content = (
+                                notes.get(svg_path.stem, '') if notes else ''
+                            )
+                            notes_master = _apply_slide_notes(
+                                extract_dir,
+                                rels_path,
+                                slide_num,
+                                notes_content,
+                                primary_language,
+                                enable_notes=enable_notes,
+                            )
+                            if notes_master is not None:
+                                notes_slides_created.add(slide_num)
+                                notes_master_parts_used.add(
+                                    notes_master.package_part
+                                )
+                                if notes_master.created_theme_part is not None:
+                                    notes_master_theme_parts_created.add(
+                                        notes_master.created_theme_part
+                                    )
+                        if verbose:
+                            print(
+                                f"  {progress_label} {svg_path.name} "
+                                "(Source slide motion overlay)"
+                            )
+                        success_count += 1
+                        continue
+                if (
+                    slide_patch is not None
+                    and not slide_patch.visual_changed
+                    and not slide_patch.motion_changed
+                    and (slide_patch.notes_changed or morph_group_overrides_by_slide.get(svg_path.stem))
+                ):
+                    morph_shape_ids.update(_roundtrip_morph_shape_ids(
+                        svg_path, morph_group_overrides_by_slide.get(svg_path.stem, set()),
+                    ))
+                    morph_preserved_slides.add(slide_num)
+                    notes_master = None
+                    if slide_patch.notes_changed:
+                        notes_content = notes.get(svg_path.stem, '') if notes else ''
+                        notes_master = _apply_slide_notes(
+                            extract_dir,
+                            rels_path,
+                            slide_num,
+                            notes_content,
+                            primary_language,
+                            enable_notes=enable_notes,
+                        )
+                    if notes_master is not None:
+                        notes_slides_created.add(slide_num)
+                        notes_master_parts_used.add(notes_master.package_part)
+                        if notes_master.created_theme_part is not None:
+                            notes_master_theme_parts_created.add(
+                                notes_master.created_theme_part
+                            )
+                    if verbose:
+                        print(
+                            f"  {progress_label} {svg_path.name} "
+                            "(Source slide notes / identity overlay)"
+                        )
+                    success_count += 1
+                    continue
+
                 # ---- Native shapes mode ----
                 if use_native_shapes:
                     slide_cfg = (
@@ -5132,6 +7581,7 @@ def create_pptx_with_native_svg(
                         slide_transition_effect_options = {}
                         slide_transition_duration = transition_duration
                         slide_auto_advance = None
+                        slide_transition_sound_path = None
                         slide_animation = None
                         slide_animation_duration = animation_duration
                         slide_animation_stagger = animation_stagger
@@ -5143,12 +7593,15 @@ def create_pptx_with_native_svg(
                             slide_transition_effect_options,
                             slide_transition_duration,
                             slide_auto_advance,
+                            slide_transition_sound_path,
                         ) = _slide_transition_settings(
+                            default_transition_cfg,
                             slide_cfg,
                             transition,
                             transition_effect_options,
                             transition_duration,
                             auto_advance,
+                            transition_sound,
                             animation_cli_overrides,
                         )
                         (
@@ -5225,6 +7678,13 @@ def create_pptx_with_native_svg(
                     explicit_animation_groups = frozenset(
                         explicit_group_ids | trigger_group_ids
                     )
+                    if trigger_group_ids:
+                        hyperlink_trigger_errors = trigger_shape_hyperlink_errors(
+                            ET.parse(svg_path).getroot(),
+                            trigger_group_ids,
+                        )
+                        if hyperlink_trigger_errors:
+                            raise ValueError('; '.join(hyperlink_trigger_errors))
                     converter_group_overrides = (
                         explicit_animation_groups
                         | frozenset(
@@ -5243,7 +7703,9 @@ def create_pptx_with_native_svg(
                         content_type_overrides,
                     ) = (
                         convert_svg_to_slide_shapes(
-                            svg_path, slide_num=slide_num, verbose=verbose,
+                            svg_path, slide_num=slide_num,
+                            slide_count=public_slide_count,
+                            verbose=verbose,
                             text_flow=text_flow,
                             image_optimize=image_optimize,
                             image_max_dimension=image_max_dimension,
@@ -5251,11 +7713,21 @@ def create_pptx_with_native_svg(
                             image_scale=image_scale,
                             image_quality=image_quality,
                             native_objects=native_objects,
+                            package_parts=package_parts,
                             animation_group_overrides=converter_group_overrides,
                             theme_font_spec=active_theme_font_spec,
                             theme_color_spec=active_theme_color_spec,
                             primary_language=primary_language,
-                            promote_background=pptx_structure != "structured",
+                            # A round-trip overlay keeps the source p:bg, so a
+                            # new full-canvas rect must stay a shape to survive.
+                            promote_background=(
+                                pptx_structure != "structured"
+                                and slide_patch is None
+                            ),
+                            dangerous_nonconforming_export=(
+                                dangerous_nonconforming_export
+                            ),
+                            resource_root=resource_root,
                             trace_out=conversion_trace
                             if conversion_trace is not None
                             else structure_trace,
@@ -5290,12 +7762,30 @@ def create_pptx_with_native_svg(
                     # to precede <p:timing> inside <p:sld>. Both use the same
                     # </p:sld> string-replace anchor, so transition must be
                     # injected first and timing second.
-                    if slide_transition is not None or slide_auto_advance is not None:
+                    packaged_sounds_by_source: dict[Path, tuple[str, str]] = {}
+                    expected_transition_sound = _materialize_transition_sound(
+                        (
+                            animation_resource_root
+                            if animation_resource_root is not None
+                            else svg_files[0].parent.parent
+                        ),
+                        slide_transition_sound_path,
+                        media_files_dict,
+                        rel_entries,
+                        audio_exts_used,
+                        packaged_sounds_by_source,
+                    )
+                    if (
+                        slide_transition is not None
+                        or slide_auto_advance is not None
+                        or expected_transition_sound is not None
+                    ):
                         transition_fragment = create_transition_xml(
                             effect=slide_transition,
                             duration=slide_transition_duration,
                             advance_after=slide_auto_advance,
                             effect_options=slide_transition_effect_options,
+                            sound=expected_transition_sound,
                         )
                         if transition_fragment:
                             slide_xml = slide_xml.replace(
@@ -5333,6 +7823,7 @@ def create_pptx_with_native_svg(
                             media_files_dict,
                             rel_entries,
                             audio_exts_used,
+                            packaged_sounds_by_source,
                         )
                         expected_animation_targets = seq_targets
                         if mixed_count:
@@ -5409,9 +7900,16 @@ def create_pptx_with_native_svg(
 
                     extra_rels = ''
                     for rel in rel_entries:
+                        target_mode = rel.get('target_mode')
+                        mode_attr = (
+                            f" TargetMode={quoteattr(target_mode)}"
+                            if target_mode is not None
+                            else ''
+                        )
                         extra_rels += (
-                            f'\n  <Relationship Id="{rel["id"]}" '
-                            f'Type="{rel["type"]}" Target="{rel["target"]}"/>'
+                            f"\n  <Relationship Id={quoteattr(rel['id'])} "
+                            f"Type={quoteattr(rel['type'])} "
+                            f"Target={quoteattr(rel['target'])}{mode_attr}/>"
                         )
 
                     rels_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -5442,13 +7940,16 @@ def create_pptx_with_native_svg(
                         slide_transition_effect_options,
                         slide_transition_duration,
                         slide_auto_advance,
+                        slide_transition_sound_path,
                     ) = (
                         _slide_transition_settings(
+                            default_transition_cfg,
                             slide_cfg,
                             transition,
                             transition_effect_options,
                             transition_duration,
                             auto_advance,
+                            transition_sound,
                             animation_cli_overrides,
                         )
                     )
@@ -5507,43 +8008,83 @@ def create_pptx_with_native_svg(
                     with open(rels_path, 'w', encoding='utf-8') as f:
                         f.write(rels_xml)
 
+                if slide_patch is not None:
+                    if source_slide_bytes is None or source_rels_bytes is None:
+                        raise TemplateStructureError(
+                            f"Round-trip slide {slide_num} source snapshot is missing"
+                        )
+                    trace_sink = (
+                        conversion_trace
+                        if conversion_trace is not None
+                        else structure_trace
+                    )
+                    slide_conversion_trace = next(
+                        (
+                            entry
+                            for entry in reversed(trace_sink or [])
+                            if entry.get("slide_num") == slide_num
+                        ),
+                        None,
+                    )
+                    overlay_shape_id_map = _apply_roundtrip_slide_overlay(
+                        source_slide_bytes,
+                        source_rels_bytes,
+                        slide_xml_path,
+                        rels_path,
+                        slide_patch,
+                        slide_conversion_trace,
+                    )
+                    for target in expected_animation_targets:
+                        for field in ("shape_id", "trigger_shape_id"):
+                            shape_id = target.get(field)
+                            if (
+                                isinstance(shape_id, int)
+                                and not isinstance(shape_id, bool)
+                                and shape_id in overlay_shape_id_map
+                            ):
+                                target[field] = overlay_shape_id_map[shape_id]
+                    for morph_key, shape_id in tuple(
+                        morph_shape_ids.items()
+                    ):
+                        if (
+                            morph_key[0] == svg_path.stem
+                            and shape_id in overlay_shape_id_map
+                        ):
+                            morph_shape_ids[morph_key] = (
+                                overlay_shape_id_map[shape_id]
+                            )
+
                 resolved_advance_after = slide_auto_advance
                 resolved_advance_on_click = True
+                if slide_patch is not None and not slide_patch.advance_changed:
+                    source_motion = read_slide_transition_xml(source_slide_bytes)
+                    resolved_advance_on_click = source_motion.advance_on_click
+                    resolved_advance_after = (
+                        source_motion.advance_after_ms / 1000
+                        if source_motion.advance_after_ms is not None else None
+                    )
 
                 # --- Process notes (shared between native and legacy mode) ---
-                notes_content = ''
-                if enable_notes and not is_layout_definition:
-                    svg_stem = svg_path.stem
-                    notes_content = notes.get(svg_stem, '') if notes else ''
-                    notes_text = markdown_to_plain_text(notes_content) if notes_content else ''
-                    if notes_text:
-                        _ensure_notes_master(extract_dir, primary_language)
-
-                        notes_slides_dir = extract_dir / 'ppt' / 'notesSlides'
-                        notes_slides_dir.mkdir(exist_ok=True)
-
-                        notes_xml_path = notes_slides_dir / f'notesSlide{slide_num}.xml'
-                        notes_xml = create_notes_slide_xml(
-                            slide_num,
-                            notes_text,
-                            primary_language,
-                        )
-                        with open(notes_xml_path, 'w', encoding='utf-8') as f:
-                            f.write(notes_xml)
-
-                        notes_rels_dir = notes_slides_dir / '_rels'
-                        notes_rels_dir.mkdir(exist_ok=True)
-                        notes_rels_path = notes_rels_dir / f'notesSlide{slide_num}.xml.rels'
-                        notes_rels_xml = create_notes_slide_rels_xml(slide_num)
-                        with open(notes_rels_path, 'w', encoding='utf-8') as f:
-                            f.write(notes_rels_xml)
-
-                        _append_relationship(
-                            rels_path,
-                            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide',
-                            f'../notesSlides/notesSlide{slide_num}.xml',
-                        )
+                notes_changed = slide_patch is None or slide_patch.notes_changed
+                if not is_layout_definition and notes_changed:
+                    notes_content = (
+                        notes.get(svg_path.stem, '') if notes else ''
+                    )
+                    notes_master = _apply_slide_notes(
+                        extract_dir,
+                        rels_path,
+                        slide_num,
+                        notes_content,
+                        primary_language,
+                        enable_notes=enable_notes,
+                    )
+                    if notes_master is not None:
                         notes_slides_created.add(slide_num)
+                        notes_master_parts_used.add(notes_master.package_part)
+                        if notes_master.created_theme_part is not None:
+                            notes_master_theme_parts_created.add(
+                                notes_master.created_theme_part
+                            )
 
                 # --- Process narration audio (shared between native and legacy mode) ---
                 svg_stem = svg_path.stem
@@ -5557,12 +8098,38 @@ def create_pptx_with_native_svg(
                     rels_path = extract_dir / 'ppt' / 'slides' / '_rels' / f'slide{slide_num}.xml.rels'
 
                     ext = audio_path.suffix.lower()
-                    media_name = f'narration{slide_num}{ext}'
+                    slide_xml, removed_rids = remove_narration(slide_xml_path.read_text(encoding='utf-8'))
+                    source_relationships = _read_relationships(rels_path)
+                    for rel_id in removed_rids:
+                        relationship = source_relationships.get(rel_id, {})
+                        if relationship.get('Target') and relationship.get('TargetMode') != 'External':
+                            replaced_narration_parts.add(_resolve_package_target(
+                                f'ppt/slides/slide{slide_num}.xml', relationship['Target'],
+                            ))
+                        _remove_relationship(rels_path, rel_id)
+                    requested_media = media_dir / f'narration{slide_num}{ext}'
+                    if (
+                        requested_media.exists()
+                        and requested_media.relative_to(extract_dir).as_posix()
+                        in replaced_narration_parts
+                        and not _part_has_relationship_references(
+                            extract_dir,
+                            requested_media.relative_to(extract_dir).as_posix(),
+                        )
+                    ):
+                        # The earlier PPT Master narration for this slide was
+                        # just unlinked; reuse its name instead of growing a
+                        # `_1`, `_1_1`, ... suffix with every re-recording.
+                        requested_media.unlink()
+                    media_name = _unused_part_path(media_dir, f'narration{slide_num}{ext}').name
                     shutil.copy2(audio_path, media_dir / media_name)
                     audio_exts_used.add(ext)
 
                     poster_name = 'narration_poster.png'
                     poster_path = media_dir / poster_name
+                    if poster_path.exists() and poster_path.read_bytes() != AUDIO_MARKER_PNG_BYTES:
+                        poster_path = _unused_part_path(media_dir, poster_name)
+                        poster_name = poster_path.name
                     if not poster_path.exists():
                         poster_path.write_bytes(AUDIO_MARKER_PNG_BYTES)
                     has_any_image = True
@@ -5584,8 +8151,16 @@ def create_pptx_with_native_svg(
                         f'../media/{poster_name}',
                     )
 
-                    slide_xml = slide_xml_path.read_text(encoding='utf-8')
                     narration_shape_id = next_shape_id(slide_xml)
+                    narration_transition_duration = (
+                        slide_transition_duration
+                        if slide_transition is not None
+                        else 0.0
+                    )
+                    narration_lead_in = narration_lead_in_seconds(
+                        narration_transition_duration,
+                        start_floor=narration_start_floor,
+                    )
                     slide_xml = inject_narration(
                         slide_xml,
                         shape_id=narration_shape_id,
@@ -5593,6 +8168,7 @@ def create_pptx_with_native_svg(
                         audio_rid=audio_rid,
                         media_rid=media_rid,
                         poster_rid=poster_rid,
+                        start_delay=narration_lead_in,
                     )
 
                     if use_narration_timings:
@@ -5601,50 +8177,73 @@ def create_pptx_with_native_svg(
                             raise RuntimeError(
                                 f"Unable to read narration duration with ffprobe: {audio_path}"
                             )
+                        narration_advance_after = (
+                            narration_lead_in + duration + narration_padding
+                        )
                         slide_xml = apply_recorded_timing(
                             slide_xml,
-                            advance_after=duration + narration_padding,
+                            advance_after=narration_advance_after,
                             transition_duration=slide_transition_duration,
                             transition_effect=slide_transition,
                         )
-                        resolved_advance_after = duration + narration_padding
+                        resolved_advance_after = narration_advance_after
                         resolved_advance_on_click = False
                         package_uses_timings = True
                     slide_xml_path.write_text(slide_xml, encoding='utf-8')
                     narration_slides_created.add(slide_num)
 
                 final_slide_xml = slide_xml_path.read_text(encoding='utf-8')
-                try:
-                    resolved_motion = validate_generated_transition_xml(
-                        final_slide_xml,
-                        effect=slide_transition,
-                        effect_options=slide_transition_effect_options,
-                        duration=slide_transition_duration,
-                        advance_on_click=resolved_advance_on_click,
-                        advance_after=resolved_advance_after,
-                    )
-                except ValueError as exc:
-                    raise RuntimeError(
-                        f'Slide {slide_num} transition validation failed: {exc}'
-                    ) from exc
-                try:
-                    resolved_animation = validate_generated_animation_xml(
-                        final_slide_xml,
-                        expected_animation_targets,
-                        duration=expected_animation_duration,
-                        trigger=expected_animation_trigger,
-                    )
-                except ValueError as exc:
-                    raise RuntimeError(
-                        f'Slide {slide_num} animation validation failed: {exc}'
-                    ) from exc
+                preserved_source_transition = (
+                    slide_patch is not None
+                    and not slide_patch.transition_replaced
+                )
+                preserved_source_animation = (
+                    slide_patch is not None and not slide_patch.animation_changed
+                )
+                resolved_motion = None
+                resolved_animation = None
+                if not preserved_source_transition:
+                    try:
+                        resolved_motion = validate_generated_transition_xml(
+                            final_slide_xml,
+                            effect=slide_transition,
+                            effect_options=slide_transition_effect_options,
+                            duration=slide_transition_duration,
+                            advance_on_click=resolved_advance_on_click,
+                            advance_after=resolved_advance_after,
+                            sound=expected_transition_sound,
+                        )
+                    except ValueError as exc:
+                        raise RuntimeError(
+                            f'Slide {slide_num} transition validation failed: {exc}'
+                        ) from exc
+                if not preserved_source_animation:
+                    try:
+                        resolved_animation = validate_generated_animation_xml(
+                            final_slide_xml,
+                            expected_animation_targets,
+                            duration=expected_animation_duration,
+                            trigger=expected_animation_trigger,
+                        )
+                    except ValueError as exc:
+                        raise RuntimeError(
+                            f'Slide {slide_num} animation validation failed: {exc}'
+                        ) from exc
 
                 if conversion_trace is not None:
-                    motion_summary = asdict(resolved_motion)
+                    motion_summary = (
+                        {"source_preserved": True}
+                        if resolved_motion is None
+                        else asdict(resolved_motion)
+                    )
                     for trace_entry in reversed(conversion_trace):
                         if trace_entry.get('slide_num') == slide_num:
                             trace_entry['motion'] = motion_summary
-                            trace_entry['animation'] = asdict(resolved_animation)
+                            trace_entry['animation'] = (
+                                {"source_preserved": True}
+                                if resolved_animation is None
+                                else asdict(resolved_animation)
+                            )
                             break
 
                 if verbose:
@@ -5758,8 +8357,15 @@ def create_pptx_with_native_svg(
                 conversion_trace if conversion_trace is not None else structure_trace,
                 active_theme_font_spec,
                 use_layout_placeholder_frames=use_layout_placeholder_frames,
+                public_slide_count=public_slide_count,
                 verbose=verbose,
             )
+            if source_theme_xml_by_master is not None:
+                _install_source_themes_by_master(
+                    extract_dir,
+                    template_master_parts_by_key,
+                    source_theme_xml_by_master,
+                )
             master_count = apply_master_text_style_spec(
                 extract_dir,
                 master_text_style_spec,
@@ -5796,13 +8402,32 @@ def create_pptx_with_native_svg(
                 raise TemplateStructureError(
                     "Preserved structure metadata was not parsed before export"
                 )
-            _apply_preserved_structure(
-                extract_dir,
-                template_specs,
-                native_structure_contract,
-                conversion_trace if conversion_trace is not None else structure_trace,
-                verbose=verbose,
+            rebuilt_specs = [
+                spec
+                for spec in template_specs
+                if spec.slide_num not in passthrough_slides | overlay_slides
+            ]
+            if rebuilt_specs:
+                _apply_preserved_structure(
+                    extract_dir,
+                    rebuilt_specs,
+                    native_structure_contract,
+                    conversion_trace if conversion_trace is not None else structure_trace,
+                    verbose=verbose,
+                )
+
+        if roundtrip_export:
+            pruned_roundtrip_payloads = (
+                _prune_unreferenced_definition_payload_parts(
+                    extract_dir,
+                    preserved_parts=roundtrip_source_parts - replaced_narration_parts,
+                )
             )
+            if verbose and pruned_roundtrip_payloads:
+                print(
+                    "  Round-trip overlay: pruned "
+                    f"{pruned_roundtrip_payloads} unused payload part(s)"
+                )
 
         if (
             use_native_shapes
@@ -5836,6 +8461,7 @@ def create_pptx_with_native_svg(
             morph_pairs,
             public_slide_numbers,
             morph_shape_ids,
+            preserved_slides=morph_preserved_slides,
         )
         if template_shape_roster_expectations is not None:
             for slide_number in morph_trace_names:
@@ -5892,36 +8518,84 @@ def create_pptx_with_native_svg(
 
         # Add notes master / slides content types
         if enable_notes and notes_slides_created:
-            notes_theme_override = (
-                '  <Override PartName="/ppt/theme/theme2.xml" '
-                'ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'
-            )
-            if notes_theme_override not in content_types:
-                content_types = content_types.replace(
-                    '</Types>',
-                    notes_theme_override + '\n</Types>',
+            for part_name in sorted(notes_master_theme_parts_created):
+                content_types = _add_content_type_override(
+                    content_types,
+                    part_name,
+                    THEME_CONTENT_TYPE,
                 )
-            notes_master_override = (
-                '  <Override PartName="/ppt/notesMasters/notesMaster1.xml" '
-                'ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>'
-            )
-            if notes_master_override not in content_types:
-                content_types = content_types.replace(
-                    '</Types>',
-                    notes_master_override + '\n</Types>',
+            for part_name in sorted(notes_master_parts_used):
+                content_types = _add_content_type_override(
+                    content_types,
+                    part_name,
+                    _NOTES_MASTER_CONTENT_TYPE,
                 )
             for i in sorted(notes_slides_created):
-                override = (
-                    f'  <Override PartName="/ppt/notesSlides/notesSlide{i}.xml" '
-                    f'ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>'
+                notes_target = _find_relationship_target(
+                    extract_dir / 'ppt' / 'slides' / '_rels' / f'slide{i}.xml.rels',
+                    NOTES_SLIDE_REL_TYPE,
                 )
-                if override not in content_types:
-                    content_types = content_types.replace('</Types>', override + '\n</Types>')
+                if notes_target is None:
+                    raise RuntimeError(f"Slide {i} lost its generated notes relationship")
+                content_types = _add_content_type_override(
+                    content_types,
+                    '/' + _resolve_package_target(f'ppt/slides/slide{i}.xml', notes_target),
+                    'application/vnd.openxmlformats-officedocument.presentationml.'
+                    'notesSlide+xml',
+                )
             with open(content_types_path, 'w', encoding='utf-8') as f:
                 f.write(content_types)
 
-        if package_uses_timings:
-            set_directory_use_timings(extract_dir)
+        if source_content_types_bytes is not None:
+            current_content_types = content_types_path.read_bytes()
+            if (
+                _content_type_contract(current_content_types)
+                == _content_type_contract(source_content_types_bytes)
+            ):
+                content_types_path.write_bytes(source_content_types_bytes)
+
+        if roundtrip_export:
+            edited_slide_parts = {
+                f"ppt/slides/slide{index}.xml" for index, patch in slide_patches.items()
+                if patch.visual_changed
+            }
+        else:
+            # Generated slides own every relationship they carry; a shape
+            # promoted to a Master/Layout part leaves its slide entry behind.
+            edited_slide_parts = {
+                path.relative_to(extract_dir).as_posix()
+                for path in (extract_dir / 'ppt' / 'slides').glob('slide*.xml')
+            }
+        if page_plan_export or edited_slide_parts:
+            pruned_page_plan_parts = prune_unreferenced_directory_parts(
+                extract_dir, edited_slide_parts=edited_slide_parts,
+            )
+            if verbose and pruned_page_plan_parts:
+                print(
+                    "  Package: pruned "
+                    f"{pruned_page_plan_parts} unreachable part(s)"
+                )
+
+        if package_uses_timings or kiosk:
+            set_directory_use_timings(
+                extract_dir,
+                enabled=True if package_uses_timings else None,
+                kiosk=kiosk,
+            )
+
+        reinjected_resources = _reinject_roundtrip_resources(
+            extract_dir,
+            resource_root,
+            late_roundtrip_resources,
+        )
+        if verbose and reinjected_resources:
+            print(
+                "  Round-trip resources: reinjected "
+                f"{reinjected_resources} source package part(s)"
+            )
+
+        if not enable_notes:
+            _remove_all_notes_parts(extract_dir)
 
         rels_problems = verify_internal_relationships(extract_dir)
         if rels_problems:
@@ -5931,6 +8605,9 @@ def create_pptx_with_native_svg(
                 'PowerPoint will report the file as corrupt:\n' + details
             )
 
+        if primary_language is not None and not roundtrip_export:
+            _apply_template_text_language(extract_dir, primary_language)
+
         # Replace the python-pptx base-template metadata (stale "Steve Canny"
         # author, 2013 dates, "generated using python-pptx", Slides=0) with
         # accurate, tool-neutral document properties.
@@ -5938,12 +8615,13 @@ def create_pptx_with_native_svg(
         effective_doc_metadata = dict(doc_metadata or {})
         if primary_language is not None:
             effective_doc_metadata['language'] = primary_language
-        _stamp_docprops(
-            extract_dir,
-            public_slide_count,
-            pres_format,
-            effective_doc_metadata,
-        )
+        if not roundtrip_export or doc_metadata:
+            _stamp_docprops(
+                extract_dir,
+                public_slide_count,
+                pres_format,
+                effective_doc_metadata,
+            )
 
         # Repackage PPTX to a temporary file first. The public output path is
         # replaced only after every slide and relationship has succeeded.
@@ -5998,6 +8676,7 @@ def create_pptx_with_native_svg(
             validate_pptx_animation_package(
                 temp_output_path,
                 require_supported_effects=True,
+                skip_slide_numbers=source_motion_slides,
             )
         except ValueError as exc:
             raise RuntimeError(
@@ -6011,6 +8690,13 @@ def create_pptx_with_native_svg(
             payload = {
                 'output': str(output_path),
                 'slide_count': public_slide_count,
+                'project_contract': {
+                    'mode': (
+                        'strict-after-dangerous-normalization'
+                        if dangerous_nonconforming_export
+                        else 'strict'
+                    ),
+                },
                 'slides': [
                     entry
                     for entry in conversion_trace
@@ -6025,13 +8711,20 @@ def create_pptx_with_native_svg(
         if verbose:
             print()
             print(f"[Done] Saved: {output_path}")
+            if roundtrip_export:
+                from pptx_to_svg.notes_import import import_speaker_notes
+                from pptx_to_svg.ooxml_loader import OoxmlPackage
+
+                with OoxmlPackage(output_path) as package:
+                    print(f"  Speaker notes: {len(import_speaker_notes(package))} page(s)")
             for warning in permission_warnings:
                 print(f"  [warn] {warning}")
             if conversion_trace_path and conversion_trace is not None:
                 print(f"  Trace: {conversion_trace_path}")
             print(
                 f"  Slides: {public_slide_count}; "
-                f"Layout definitions: {len(definition_svg_files)}"
+                "unselected Layout prototype carriers: "
+                f"{len(definition_svg_files)}"
             )
             if use_compat_mode and has_any_image:
                 print(f"  Mode: Office compatibility mode (supports all Office versions)")

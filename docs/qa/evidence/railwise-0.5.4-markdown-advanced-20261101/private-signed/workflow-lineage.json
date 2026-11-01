@@ -1,0 +1,42 @@
+{
+  "publicVersion": "0.5.4",
+  "publicOperations": false,
+  "runs": [
+    {
+      "id": 41289594352,
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/41289594352",
+      "head": "7d22ae2a096be1c2a06257705d9056012a2b9664",
+      "branch": "codex/markdown-advanced-private-20261101",
+      "conclusion": "failure",
+      "stage": "npm ci",
+      "reason": "npm10missingoptionalpeerlockrecords",
+      "signingNotarizationReached": false,
+      "accepted": false
+    },
+    {
+      "id": 41290290057,
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/41290290057",
+      "head": "f5830297a11627d4f6aeacdadda6b0b7766d4ba4",
+      "branch": "codex/markdown-advanced-private-20261101-lockfix",
+      "conclusion": "cancelled",
+      "stage": "npm ci",
+      "reason": "RootpausedfinalacceptanceforactualCUAdetectedUIcorrections",
+      "signingNotarizationReached": false,
+      "accepted": false
+    },
+    {
+      "id": 41291059117,
+      "url": "https://github.com/railwise-cn/railwise-ai/actions/runs/41291059117",
+      "head": "4124ac8c745ab24ad04b7e4ce9850702e89f8ed3",
+      "branch": "codex/markdown-advanced-private-20261101-finalui",
+      "conclusion": null,
+      "latestStage": "Build audited document sidecar",
+      "passedStages": [
+        "npm ci",
+        "private transport and isolation guards",
+        "actual Electron HTTPS certificate pinning"
+      ],
+      "accepted": false
+    }
+  ]
+}

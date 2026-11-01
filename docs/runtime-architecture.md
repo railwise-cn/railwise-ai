@@ -153,7 +153,7 @@ Renderer 只应展示 WorkWise Agent Runtime。需要删除或保持删除的 UI
       "baseUrl": "https://api.deepseek.com",
       "runtimeToken": "",
       "dataDir": "~/.workwise/runtime",
-      "model": "deepseek-v4-pro",
+      "model": "deepseek-flash",
       "approvalPolicy": "auto",
       "sandboxMode": "workspace-write",
       "insecure": false

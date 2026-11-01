@@ -239,6 +239,15 @@ describe('workspace-service boundary checks', () => {
     expect(result.dataUrl).toBe('data:image/png;base64,iVBORw==')
   })
 
+  it('previews passive workspace SVG and rejects active or externally linked SVG', async () => {
+    await writeFile(join(workspaceRoot, 'passive.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>')
+    await writeFile(join(workspaceRoot, 'script.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+    await writeFile(join(workspaceRoot, 'external.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><use href="https://example.com/image.svg#icon"/></svg>')
+    expect((await readWorkspaceImage({ path: 'passive.svg', workspaceRoot })).ok).toBe(true)
+    expect((await readWorkspaceImage({ path: 'script.svg', workspaceRoot })).ok).toBe(false)
+    expect((await readWorkspaceImage({ path: 'external.svg', workspaceRoot })).ok).toBe(false)
+  })
+
   it('renames files within the selected workspace', async () => {
     const result = await renameWorkspaceEntry({
       path: 'inside.txt',
@@ -276,6 +285,40 @@ describe('workspace-service boundary checks', () => {
     if (!result.ok) {
       expect(result.message).toContain('already exists')
     }
+  })
+
+  it('moves files into an existing workspace directory without changing the basename', async () => {
+    await mkdir(join(workspaceRoot, 'archive'))
+    const result = await renameWorkspaceEntry({ path: 'inside.txt', workspaceRoot, newName: 'inside.txt', targetDirectory: 'archive' })
+    expect(result.ok).toBe(true)
+    expect(await readFile(join(workspaceRoot, 'archive', 'inside.txt'), 'utf8')).toBe('inside')
+    await expect(readFile(join(workspaceRoot, 'inside.txt'), 'utf8')).rejects.toThrow()
+  })
+
+  it('rejects a move outside the workspace and preserves the original file', async () => {
+    const result = await renameWorkspaceEntry({ path: 'inside.txt', workspaceRoot, newName: 'inside.txt', targetDirectory: '..' })
+    expect(result.ok).toBe(false)
+    expect(await readFile(join(workspaceRoot, 'inside.txt'), 'utf8')).toBe('inside')
+    expect(await readFile(outsideFile, 'utf8')).toBe('outside')
+  })
+
+  it('rejects moving a directory into its descendant', async () => {
+    await mkdir(join(workspaceRoot, 'notes', 'child'), { recursive: true })
+    const result = await renameWorkspaceEntry({ path: 'notes', workspaceRoot, newName: 'notes', targetDirectory: 'notes/child' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('child directory')
+    expect(await readdir(join(workspaceRoot, 'notes'))).toEqual(['child'])
+  })
+
+  it('rejects move overwrites and missing destination directories', async () => {
+    await mkdir(join(workspaceRoot, 'archive'))
+    await writeFile(join(workspaceRoot, 'archive', 'inside.txt'), 'keep existing')
+    const conflict = await renameWorkspaceEntry({ path: 'inside.txt', workspaceRoot, newName: 'inside.txt', targetDirectory: 'archive' })
+    expect(conflict.ok).toBe(false)
+    expect(await readFile(join(workspaceRoot, 'archive', 'inside.txt'), 'utf8')).toBe('keep existing')
+    const missing = await renameWorkspaceEntry({ path: 'inside.txt', workspaceRoot, newName: 'inside.txt', targetDirectory: 'does-not-exist' })
+    expect(missing.ok).toBe(false)
+    expect(await readFile(join(workspaceRoot, 'inside.txt'), 'utf8')).toBe('inside')
   })
 
   it('deletes files within the selected workspace', async () => {

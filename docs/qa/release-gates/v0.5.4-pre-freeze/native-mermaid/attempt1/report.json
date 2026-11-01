@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "scope": "Real Electron sandboxed offline bundle probe; not final packaged application UI acceptance.",
+  "startedAt": "2026-11-01T14:31:43.323Z",
+  "status": "failed",
+  "versions": {
+    "node": "24.18.0",
+    "acorn": "8.16.0",
+    "ada": "3.4.4",
+    "amaro": "1.1.9",
+    "ares": "1.34.6",
+    "brotli": "1.2.0",
+    "cldr": "48.0",
+    "icu": "78.2",
+    "llhttp": "9.4.2",
+    "merve": "1.2.2",
+    "modules": "148",
+    "napi": "10",
+    "nbytes": "0.1.4",
+    "ncrypto": "0.0.1",
+    "nghttp2": "1.69.0",
+    "nghttp3": "",
+    "ngtcp2": "",
+    "openssl": "0.0.0",
+    "simdjson": "4.6.4",
+    "simdutf": "7.7.0",
+    "sqlite": "3.53.1",
+    "tz": "2025c",
+    "undici": "7.28.0",
+    "unicode": "17.0",
+    "uv": "1.52.1",
+    "uvwasi": "0.0.23",
+    "v8": "15.0.245.15-electron.0",
+    "zlib": "1.3.2.1-motley",
+    "zstd": "1.6.0",
+    "electron": "43.1.1",
+    "chrome": "150.0.7871.114"
+  },
+  "source": "/private/tmp/railwise-release-0.5.4-20261101",
+  "sandbox": {
+    "nodeIntegration": false,
+    "sandbox": true,
+    "contextIsolation": true,
+    "webSecurity": true
+  },
+  "requests": [],
+  "permissionRequests": [],
+  "permissionChecks": [
+    "media",
+    "media",
+    "web-app-installation",
+    "geolocation"
+  ],
+  "navigations": [],
+  "windowOpen": [],
+  "console": [],
+  "cases": [
+    {
+      "name": "flowchart-zh",
+      "source": "flowchart LR\n A[开始编写] --> B{资料完整吗}\n B -->|是| C[生成报告]\n B -->|否| D[补充资料]\n D --> A",
+      "status": "passed",
+      "parserErrors": 0,
+      "activeContent": [],
+      "text": "rrowheadPath{fill:#333333;}#probe0 .edgePath .path{stroke:#333333;stroke-width:1px;}#probe0 .flowchart-link{stroke:#333333;fill:none;}#probe0 .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#probe0 .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#probe0 .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#probe0 .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#probe0 .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#probe0 .cluster text{fill:#333;}#probe0 .cluster span{color:#333;}#probe0 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:Arial,PingFang SC,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#probe0 .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#probe0 rect.text{fill:none;stroke-width:0;}#probe0 .icon-shape,#probe0 .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#probe0 .icon-shape p,#probe0 .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#probe0 .icon-shape .label rect,#probe0 .image-shape .label rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#probe0 .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#probe0 .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#probe0 .node .neo-node{stroke:#9370DB;}#probe0 [data-look=\"neo\"].node rect,#probe0 [data-look=\"neo\"].cluster rect,#probe0 [data-look=\"neo\"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe0 [data-look=\"neo\"].swimlane.cluster rect{filter:none;}#probe0 [data-look=\"neo\"].node path{stroke:#9370DB;stroke-width:1px;}#probe0 [data-look=\"neo\"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe0 [data-look=\"neo\"].node .neo-line path{stroke:#9370DB;filter:none;}#probe0 [data-look=\"neo\"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe0 [data-look=\"neo\"].node circle .state-start{fill:#000000;}#probe0 [data-look=\"neo\"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe0 [data-look=\"neo\"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe0 :root{--mermaid-font-family:Arial,PingFang SC,sans-serif;}是否开始编写资料完整吗生成报告补充资料",
+      "viewBox": {
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 202.5
+      },
+      "width": 792,
+      "height": 328,
+      "paths": 11,
+      "textElements": 8,
+      "foreignObjects": 0,
+      "mathML": 0,
+      "katexNodes": 0,
+      "mermaidError": 0,
+      "diagramType": "flowchart-v2",
+      "svgBytes": 14634,
+      "svgSha256": "3197198b0eb3f438123c30b77c20a21c701de506c13f067e7f548908da72535a",
+      "pngBytes": 37925,
+      "pngSha256": "080beb86029ba365cc731f3bc24e490316a92f9f0197fc51ea90dde751eee664",
+      "pngSize": {
+        "width": 1584,
+        "height": 656
+      }
+    },
+    {
+      "name": "sequence",
+      "source": "sequenceDiagram\n participant U as 用户\n participant A as RailWise AI\n U->>A: 整理工程资料\n A-->>U: 返回可审阅草稿\n Note over U,A: 本地文档工作台",
+      "status": "failed",
+      "parserErrors": 0,
+      "activeContent": [],
+      "text": "fill:black;stroke:none;}#probe1 .actor-line{stroke:#9370DB;}#probe1 .innerArc{stroke-width:1.5;stroke-dasharray:none;}#probe1 .messageLine0{stroke-width:1.5;stroke-dasharray:none;stroke:#333;}#probe1 .messageLine1{stroke-width:1.5;stroke-dasharray:2,2;stroke:#333;}#probe1 [id$=\"-arrowhead\"] path{fill:#333;stroke:#333;}#probe1 .sequenceNumber{fill:white;}#probe1 [id$=\"-sequencenumber\"]{fill:#333;}#probe1 [id$=\"-crosshead\"] path{fill:#333;stroke:#333;}#probe1 .messageText{fill:#333;stroke:none;}#probe1 .labelBox{stroke:#9370DB;fill:#ECECFF;filter:none;}#probe1 .labelText,#probe1 .labelText>tspan{fill:black;stroke:none;}#probe1 .loopText,#probe1 .loopText>tspan{fill:black;stroke:none;}#probe1 .sectionTitle,#probe1 .sectionTitle>tspan{fill:black;stroke:none;}#probe1 .loopLine{stroke-width:2px;stroke-dasharray:2,2;stroke:#9370DB;fill:#9370DB;}#probe1 .note{stroke:#aaaa33;fill:#fff5ad;}#probe1 .noteText,#probe1 .noteText>tspan{fill:black;stroke:none;font-weight:normal;}#probe1 .activation0{fill:#f4f4f4;stroke:#666;}#probe1 .activation1{fill:#f4f4f4;stroke:#666;}#probe1 .activation2{fill:#f4f4f4;stroke:#666;}#probe1 .actorPopupMenu{position:absolute;}#probe1 .actorPopupMenuPanel{position:absolute;fill:#ECECFF;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);filter:drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4));}#probe1 .actor-man circle,#probe1 line{fill:#ECECFF;stroke-width:2px;}#probe1 g rect.rect{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));stroke:#9370DB;}#probe1 .node .neo-node{stroke:#9370DB;}#probe1 [data-look=\"neo\"].node rect,#probe1 [data-look=\"neo\"].cluster rect,#probe1 [data-look=\"neo\"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe1 [data-look=\"neo\"].swimlane.cluster rect{filter:none;}#probe1 [data-look=\"neo\"].node path{stroke:#9370DB;stroke-width:1px;}#probe1 [data-look=\"neo\"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe1 [data-look=\"neo\"].node .neo-line path{stroke:#9370DB;filter:none;}#probe1 [data-look=\"neo\"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe1 [data-look=\"neo\"].node circle .state-start{fill:#000000;}#probe1 [data-look=\"neo\"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe1 [data-look=\"neo\"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe1 :root{--mermaid-font-family:Arial,PingFang SC,sans-serif;}本地文档工作台整理工程资料返回可审阅草稿",
+      "viewBox": {
+        "x": -50,
+        "y": -10,
+        "width": 450,
+        "height": 311
+      },
+      "width": 699,
+      "height": 491,
+      "paths": 10,
+      "textElements": 7,
+      "foreignObjects": 0,
+      "mathML": 0,
+      "katexNodes": 0,
+      "mermaidError": 0,
+      "diagramType": "sequence",
+      "svgBytes": 23138,
+      "svgSha256": "e4009b49fe2f8422b68b8cb21c3c2e3ed8779ce30f8f571c3055d0a7765114e9",
+      "failure": "AssertionError [ERR_ASSERTION]: missing expected diagram text 用户\n    at /private/tmp/railwise-054-mermaid-native-probe.cjs:80:54"
+    },
+    {
+      "name": "class",
+      "source": "classDiagram\n class Document {\n +String title\n +save()\n }\n class Revision {\n +String fingerprint\n }\n Document \"1\" --> \"many\" Revision : history",
+      "status": "passed",
+      "parserErrors": 0,
+      "activeContent": [],
+      "text": "width:1;}#probe2 [id$=\"-dependencyEnd\"],#probe2 .dependency{fill:#333333!important;stroke:#333333!important;stroke-width:1;}#probe2 [id$=\"-extensionStart\"],#probe2 .extension{fill:transparent!important;stroke:#333333!important;stroke-width:1;}#probe2 [id$=\"-extensionEnd\"],#probe2 .extension{fill:transparent!important;stroke:#333333!important;stroke-width:1;}#probe2 [id$=\"-aggregationStart\"],#probe2 .aggregation{fill:transparent!important;stroke:#333333!important;stroke-width:1;}#probe2 [id$=\"-aggregationEnd\"],#probe2 .aggregation{fill:transparent!important;stroke:#333333!important;stroke-width:1;}#probe2 [id$=\"-lollipopStart\"],#probe2 .lollipop{fill:#ECECFF!important;stroke:#333333!important;stroke-width:1;}#probe2 [id$=\"-lollipopEnd\"],#probe2 .lollipop{fill:#ECECFF!important;stroke:#333333!important;stroke-width:1;}#probe2 .edgeTerminals{font-size:11px;line-height:initial;}#probe2 .classTitleText{text-anchor:middle;font-size:18px;fill:#333;}#probe2 .edgeLabel[data-look=\"neo\"]{background-color:rgba(232,232,232, 0.8);text-align:center;}#probe2 .edgeLabel[data-look=\"neo\"] p{background-color:rgba(232,232,232, 0.8);}#probe2 .edgeLabel[data-look=\"neo\"] rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#probe2 .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#probe2 .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#probe2 .node .neo-node{stroke:#9370DB;}#probe2 [data-look=\"neo\"].node rect,#probe2 [data-look=\"neo\"].cluster rect,#probe2 [data-look=\"neo\"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe2 [data-look=\"neo\"].swimlane.cluster rect{filter:none;}#probe2 [data-look=\"neo\"].node path{stroke:#9370DB;stroke-width:1px;}#probe2 [data-look=\"neo\"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe2 [data-look=\"neo\"].node .neo-line path{stroke:#9370DB;filter:none;}#probe2 [data-look=\"neo\"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe2 [data-look=\"neo\"].node circle .state-start{fill:#000000;}#probe2 [data-look=\"neo\"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe2 [data-look=\"neo\"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe2 :root{--mermaid-font-family:Arial,PingFang SC,sans-serif;}history1manyDocument+String title+save()Revision+String fingerprint",
+      "viewBox": {
+        "x": 0,
+        "y": 0,
+        "width": 200.078125,
+        "height": 322
+      },
+      "width": 325,
+      "height": 507,
+      "paths": 23,
+      "textElements": 8,
+      "foreignObjects": 0,
+      "mathML": 0,
+      "katexNodes": 0,
+      "mermaidError": 0,
+      "diagramType": "class",
+      "svgBytes": 18643,
+      "svgSha256": "cebc1c65811aec1b67fc32f8512c179f3f44e75c9ed68064ba706a1920958192",
+      "pngBytes": 36014,
+      "pngSha256": "96f24c70c71e259fba6120aa35eeabf67a5fe0c2b774e3df6bc05c37ed9cfd3e",
+      "pngSize": {
+        "width": 650,
+        "height": 1014
+      }
+    },
+    {
+      "name": "state",
+      "source": "stateDiagram-v2\n [*] --> Draft\n Draft --> Review: submit\n Review --> Published: accept\n Review --> Draft: revise\n Published --> [*]",
+      "status": "passed",
+      "parserErrors": 0,
+      "activeContent": [],
+      "text": "ke:#9370DB;stroke-width:1px;}#probe3 [id$=\"-barbEnd\"]{fill:#333333;}#probe3 .statediagram-cluster rect{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#probe3 .cluster-label,#probe3 .nodeLabel{color:#131300;}#probe3 .statediagram-cluster rect.outer{rx:5px;ry:5px;}#probe3 .statediagram-state .divider{stroke:#9370DB;}#probe3 .statediagram-state .title-state{rx:5px;ry:5px;}#probe3 .statediagram-cluster.statediagram-cluster .inner{fill:white;}#probe3 .statediagram-cluster.statediagram-cluster-alt .inner{fill:#f0f0f0;}#probe3 .statediagram-cluster .inner{rx:0;ry:0;}#probe3 .statediagram-state rect.basic{rx:5px;ry:5px;}#probe3 .statediagram-state rect.divider{stroke-dasharray:10,10;fill:#f0f0f0;}#probe3 .note-edge{stroke-dasharray:5;}#probe3 .statediagram-note rect{fill:#fff5ad;stroke:#aaaa33;stroke-width:1px;rx:0;ry:0;}#probe3 .statediagram-note rect{fill:#fff5ad;stroke:#aaaa33;stroke-width:1px;rx:0;ry:0;}#probe3 .statediagram-note text{fill:black;}#probe3 .statediagram-note .nodeLabel{color:black;}#probe3 .statediagram .edgeLabel{color:red;}#probe3 [id$=\"-dependencyStart\"],#probe3 [id$=\"-dependencyEnd\"]{fill:#333333;stroke:#333333;stroke-width:1;}#probe3 .statediagramTitleText{text-anchor:middle;font-size:18px;fill:#333;}#probe3 [data-look=\"neo\"].statediagram-cluster rect{fill:#ECECFF;stroke:#9370DB;stroke-width:1;}#probe3 [data-look=\"neo\"].statediagram-cluster rect.outer{rx:5px;ry:5px;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe3 .node .neo-node{stroke:#9370DB;}#probe3 [data-look=\"neo\"].node rect,#probe3 [data-look=\"neo\"].cluster rect,#probe3 [data-look=\"neo\"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe3 [data-look=\"neo\"].swimlane.cluster rect{filter:none;}#probe3 [data-look=\"neo\"].node path{stroke:#9370DB;stroke-width:1px;}#probe3 [data-look=\"neo\"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe3 [data-look=\"neo\"].node .neo-line path{stroke:#9370DB;filter:none;}#probe3 [data-look=\"neo\"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe3 [data-look=\"neo\"].node circle .state-start{fill:#000000;}#probe3 [data-look=\"neo\"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe3 [data-look=\"neo\"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe3 :root{--mermaid-font-family:Arial,PingFang SC,sans-serif;}submitacceptreviseDraftReviewPublished",
+      "viewBox": {
+        "x": 0,
+        "y": 0,
+        "width": 133.8046875,
+        "height": 390
+      },
+      "width": 225,
+      "height": 609,
+      "paths": 10,
+      "textElements": 8,
+      "foreignObjects": 0,
+      "mathML": 0,
+      "katexNodes": 0,
+      "mermaidError": 0,
+      "diagramType": "stateDiagram",
+      "svgBytes": 29547,
+      "svgSha256": "3245c62d506730319ac2c593751a320098b468e20f67c8086966819029cb4e09",
+      "pngBytes": 33192,
+      "pngSha256": "9824f10c46b16d1c183a693a4a227f6ef8396e10c33e3923b21aff1068b63e2d",
+      "pngSize": {
+        "width": 450,
+        "height": 1218
+      }
+    },
+    {
+      "name": "math-label-katex",
+      "source": "flowchart LR\n A[\"$$\\int_0^1 x^2\\,dx=\\frac{1}{3}$$\"] --> B[\"$$E=mc^2$$\"]",
+      "status": "failed",
+      "parserErrors": 0,
+      "activeContent": [],
+      "text": "333;}#probe4 .edgePath .path{stroke:#333333;stroke-width:1px;}#probe4 .flowchart-link{stroke:#333333;fill:none;}#probe4 .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#probe4 .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#probe4 .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#probe4 .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#probe4 .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#probe4 .cluster text{fill:#333;}#probe4 .cluster span{color:#333;}#probe4 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:Arial,PingFang SC,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#probe4 .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#probe4 rect.text{fill:none;stroke-width:0;}#probe4 .icon-shape,#probe4 .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#probe4 .icon-shape p,#probe4 .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#probe4 .icon-shape .label rect,#probe4 .image-shape .label rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#probe4 .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#probe4 .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#probe4 .node .neo-node{stroke:#9370DB;}#probe4 [data-look=\"neo\"].node rect,#probe4 [data-look=\"neo\"].cluster rect,#probe4 [data-look=\"neo\"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe4 [data-look=\"neo\"].swimlane.cluster rect{filter:none;}#probe4 [data-look=\"neo\"].node path{stroke:#9370DB;stroke-width:1px;}#probe4 [data-look=\"neo\"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe4 [data-look=\"neo\"].node .neo-line path{stroke:#9370DB;filter:none;}#probe4 [data-look=\"neo\"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe4 [data-look=\"neo\"].node circle .state-start{fill:#000000;}#probe4 [data-look=\"neo\"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe4 [data-look=\"neo\"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#probe4 :root{--mermaid-font-family:Arial,PingFang SC,sans-serif;}$$\\int_0^1x^2\\,dx=\\frac{1}{3}$$$$E=mc^2$$",
+      "viewBox": {
+        "x": 0,
+        "y": 0,
+        "width": 426.96875,
+        "height": 81.5999984741211
+      },
+      "width": 665,
+      "height": 147,
+      "paths": 8,
+      "textElements": 3,
+      "foreignObjects": 0,
+      "mathML": 0,
+      "katexNodes": 0,
+      "mermaidError": 0,
+      "diagramType": "flowchart-v2",
+      "svgBytes": 11071,
+      "svgSha256": "b4b19ddf128df3417d82c7ca682213973a4c7fb2e239d5c43ea3397db42012ed",
+      "failure": "AssertionError [ERR_ASSERTION]: KaTeX math nodes must be present\n    at /private/tmp/railwise-054-mermaid-native-probe.cjs:81:35"
+    }
+  ],
+  "bundle": {
+    "path": "/private/tmp/railwise-release-0.5.4-20261101/out/markdown-rendering/mermaid.js",
+    "bytes": 3454991,
+    "sha256": "4247d8d3e825d1ff43a3cd2a54d226ce0a07545ef074c53c92d8769058c620d4",
+    "versions": {
+      "mermaid": "11.16.1",
+      "dompurify": "3.4.17",
+      "katex": "0.16.46"
+    }
+  },
+  "csp": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+  "rendererEnvironment": {
+    "require": "undefined",
+    "process": "undefined",
+    "Buffer": "undefined",
+    "MathMLElement": "function",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.7871.114 Electron/43.1.1 Safari/537.36"
+  },
+  "mermaidConfig": {
+    "startOnLoad": false,
+    "securityLevel": "strict",
+    "theme": "default",
+    "htmlLabels": false,
+    "maxTextSize": 50000,
+    "maxEdges": 500,
+    "suppressErrorRendering": true,
+    "fontFamily": "Arial, PingFang SC, sans-serif",
+    "flowchart": {
+      "htmlLabels": false,
+      "useMaxWidth": false
+    },
+    "sequence": {
+      "useMaxWidth": false
+    }
+  },
+  "cspViolations": [],
+  "executedActiveContent": false,
+  "failure": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert.ok(report.cases.every(item => item.status === 'passed'))\n\n    at /private/tmp/railwise-054-mermaid-native-probe.cjs:96:12",
+  "completedAt": "2026-11-01T14:31:44.276Z"
+}

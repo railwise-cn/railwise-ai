@@ -3,6 +3,7 @@ import { createReadStream, lstatSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { basename } from 'node:path'
 import { parse } from 'yaml'
+import { validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 export async function hashFile(path, algorithm = 'sha256', encoding = 'hex') {
   const hash = createHash(algorithm)
@@ -11,7 +12,8 @@ export async function hashFile(path, algorithm = 'sha256', encoding = 'hex') {
 }
 
 export async function validateFrozenFeed({ zipPath, manifestPath, version, arch }) {
-  if (version !== '0.5.3' || !['arm64', 'x64'].includes(arch)) throw new Error('Only frozen 0.5.3 macOS packages are supported.')
+  validateFrozenTargetVersion(version)
+  if (!['arm64', 'x64'].includes(arch)) throw new Error('Only frozen native macOS packages are supported.')
   const filename = basename(zipPath)
   if (filename !== `WorkWise-${version}-mac-${arch}.zip`) throw new Error('Unexpected public ZIP filename.')
   for (const path of [zipPath, manifestPath]) {
