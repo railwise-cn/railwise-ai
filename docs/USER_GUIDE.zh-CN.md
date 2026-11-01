@@ -7,13 +7,13 @@
 - 问题反馈：https://github.com/railwise-cn/railwise-ai/issues
 - 维护者：https://github.com/wangjiawei508
 
-## DeepSeek V4 Pro 与 DeepSeek Harness
+## DeepSeek V4.1 Flash 与 DeepSeek Harness
 
-DeepSeek 已于 2026 年 8 月 13 日正式发布 `DeepSeek-V4-Pro-0813`。WorkWise 中继续选择 `deepseek-v4-pro` 即可使用正式服务端版本，不需要为模型更新重新安装应用。默认官方服务地址是 `https://api.deepseek.com`；只有 Write 的 FIM/前缀续写会使用 `/beta` 接口。
+默认模型和自动模式统一使用 `deepseek-flash`，这是 DeepSeek V4.1 Flash 的官方 API ID；截至 2026 年 11 月 1 日，官方对应版本为 `DeepSeek-V4.1-Flash-1017`。自动模式按任务选择思考强度，所有任务都使用这一模型。已明确保存的 Pro、旧 Flash 或自定义模型保持原样；需要切换现有配置时，在模型设置中选择 `deepseek-flash`。默认官方服务地址是 `https://api.deepseek.com`；只有 Write 的 FIM/前缀续写会使用 `/beta` 接口。
 
 正式模型提供 100 万 token 上下文和最高 384K 输出。WorkWise 已将 DeepSeek Harness 接入 Runtime 的附件处理链：模型支持图片时使用结构化 `text/image` 消息部分；文本模型使用本机回环视觉证据分析器生成 OCR、布局、语义和视觉摘要。分析器不可用或失败时，本回合明确失败，不把图片改写成 Base64 文本。这里的名称指上游 DeepSeek Harness 项目；本文只记录 WorkWise 实际接入的适配和证据链，不宣称支持上游尚未接入的能力。
 
-0.4.2 支持 JPEG、PNG、GIF 和 WebP 图片。图片回合使用 `auto` 时，WorkWise 只会在当前配置使用 DeepSeek 官方地址，或当前 Provider 显式配置或实际发现 `deepseek-v4-flash-vision-exp` 时，为这一回合选择该模型；发送前未确认可用或模型设置读取失败时，编辑器中的文字和附件保持原样。手动选模和 PDF/Office 文档解析方式不变。
+支持 JPEG、PNG、GIF 和 WebP 图片。图片回合使用 `auto` 时，官方 DeepSeek 地址使用支持视觉输入的 `deepseek-flash`；第三方 Provider 需要明确配置或实际发现可用的视觉模型。发送前未确认可用或模型设置读取失败时，编辑器中的文字和附件保持原样。手动选模和 PDF/Office 文档解析方式不变。
 
 实现边界、数据传输边界和配置说明见 [DeepSeek Harness 接入说明](./DEEPSEEK_HARNESS.zh-CN.md)。
 

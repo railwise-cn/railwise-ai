@@ -6,7 +6,7 @@
     "runtimeToken": "",
     "apiKey": "",
     "baseUrl": "https://api.deepseek.com",
-    "model": "deepseek-v4-pro",
+    "model": "deepseek-flash",
     "approvalPolicy": "auto",
     "sandboxMode": "workspace-write",
     "tokenEconomyMode": false,
@@ -39,6 +39,18 @@
   },
   "models": {
     "profiles": {
+      "deepseek-flash": {
+        "contextWindowTokens": 1000000,
+        "maxOutputTokens": 384000,
+        "contextCompaction": {
+          "softThreshold": 980000,
+          "hardThreshold": 990000
+        },
+        "inputModalities": ["text", "image"],
+        "outputModalities": ["text"],
+        "supportsToolCalling": true,
+        "messageParts": ["text", "image_url"]
+      },
       "deepseek-v4-pro": {
         "contextWindowTokens": 1000000,
         "maxOutputTokens": 384000,

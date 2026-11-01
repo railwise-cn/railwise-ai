@@ -9,9 +9,9 @@ import { makeAssistantTextItem, makeToolResultItem, makeUserItem } from '../src/
 import type { ModelClient, ModelRequest, ModelStreamChunk } from '../src/ports/model-client.js'
 
 describe('auto model router', () => {
-  it('parses trusted router model recommendations', () => {
+  it('normalizes old router recommendations to the current default without changing effort', () => {
     expect(parseAutoRouteRecommendation('{"model":"pro","thinking":"max"}')).toEqual({
-      model: 'deepseek-v4-pro',
+      model: 'deepseek-flash',
       reasoningEffort: 'max'
     })
     expect(parseAutoRouteRecommendation('noise {"model":"v4-flash"} tail')).toEqual({
@@ -21,11 +21,25 @@ describe('auto model router', () => {
     expect(parseAutoRouteRecommendation('not json')).toBeNull()
   })
 
-  it('falls back to the DeepSeek TUI heuristic shape', () => {
+  it('keeps the V4.1 default for complex, long and simple fallback requests', () => {
     expect(autoModelHeuristic('hello')).toBe('deepseek-flash')
-    expect(autoModelHeuristic('please debug this failing migration')).toBe('deepseek-v4-pro')
-    expect(autoModelHeuristic('x'.repeat(501))).toBe('deepseek-v4-pro')
+    expect(autoModelHeuristic('please debug this failing migration')).toBe('deepseek-flash')
+    expect(autoModelHeuristic('x'.repeat(501))).toBe('deepseek-flash')
     expect(autoModelHeuristic('x'.repeat(200))).toBe('deepseek-flash')
+  })
+
+  it('retains the V4.1 default and reasoning effort when the classifier fails for a complex task', async () => {
+    const modelClient: ModelClient = {
+      provider: 'fake', model: 'fake',
+      async *stream(): AsyncIterable<ModelStreamChunk> {
+        yield { kind: 'error', message: 'synthetic classifier unavailable' }
+      }
+    }
+    await expect(resolveAutoModelRoute({
+      modelClient, threadId: 'thr_1', turnId: 'turn_1',
+      latestRequest: 'Please debug the security migration before release.', recentContext: '',
+      selectedModelMode: 'auto', abortSignal: new AbortController().signal
+    })).resolves.toEqual({ model: 'deepseek-flash', reasoningEffort: 'max', source: 'heuristic' })
   })
 
   it('builds recent context without the active turn', () => {

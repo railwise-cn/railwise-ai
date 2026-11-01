@@ -163,7 +163,7 @@ Saved settings should now be just:
       "baseUrl": "https://api.deepseek.com",
       "runtimeToken": "",
       "dataDir": "~/.workwise/runtime",
-      "model": "deepseek-v4-pro",
+      "model": "deepseek-flash",
       "approvalPolicy": "auto",
       "sandboxMode": "workspace-write",
       "insecure": false

@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-11-01T10:19:52.785Z",
+  "origin": "https://api.deepseek.com",
+  "path": "/models",
+  "status": 200,
+  "modelIds": [
+    "deepseek-flash",
+    "deepseek-v4-pro"
+  ],
+  "credentialValuesSaved": false,
+  "productionSettingsModified": false
+}

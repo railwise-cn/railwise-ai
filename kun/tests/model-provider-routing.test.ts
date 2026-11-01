@@ -132,7 +132,7 @@ describe('configured provider identity over real HTTP', () => {
     const a = await endpoint('a'); const b = await endpoint('b')
     const router = new ProviderRoutingModelClient(new DeepseekCompatModelClient(a.route), [a.route, b.route])
     const auto = await resolveAutoModelRoute({ modelClient: router, threadId: 'parent', turnId: 'turn', providerId: 'b', latestRequest: '2+3', recentContext: '', selectedModelMode: 'auto', abortSignal: new AbortController().signal })
-    expect(auto).toMatchObject({ model: 'deepseek-v4-pro', source: 'flash-router' })
+    expect(auto).toMatchObject({ model: 'deepseek-flash', reasoningEffort: 'max', source: 'flash-router' })
     expect(b.requests[0]?.body.model).toBe('deepseek-flash')
     const executor = createChildAgentExecutor({ model: router, defaultModel: 'wrong-default',
       parentSelection: async () => ({ model: 'child-model', providerId: 'b', reasoningEffort: 'off' }),

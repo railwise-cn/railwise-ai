@@ -85,7 +85,7 @@ Recent local edits in this file...
 
 ```json
 {
-  "model": "deepseek-v4-flash",
+  "model": "deepseek-flash",
   "messages": [
     {
       "role": "system",
