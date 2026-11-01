@@ -1,0 +1,19 @@
+{
+  "archiveEntries": 28711,
+  "forbiddenSecretPathCount": 0,
+  "forbiddenSecretPaths": [],
+  "updateManifest": null,
+  "updateDisabledDirBuild": true,
+  "metadata": {
+    "version": "0.5.4",
+    "updateChannel": "frontier",
+    "buildProvenance": {
+      "sourceHead": "c3377f463b496f5db794343ac77b437f924dfcee"
+    }
+  },
+  "noOpenKnowledgeRuntimeDependency": true,
+  "permittedExamplePaths": [
+    "src/asset/skills/ppt-master/.env.example"
+  ],
+  "scope": "Path-based packaged-secret inventory; not a content or credential certification"
+}

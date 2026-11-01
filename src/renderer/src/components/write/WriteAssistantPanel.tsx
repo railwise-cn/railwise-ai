@@ -135,7 +135,7 @@ export function WriteAssistantPanel({
 
   return (
     <aside
-      className={`write-assistant-panel ds-no-drag flex min-h-0 w-[380px] flex-col border-l border-ds-border-muted bg-white backdrop-blur-xl dark:bg-ds-canvas ${className}`}
+      className={`write-assistant-panel ds-no-drag flex min-h-0 w-full min-w-0 flex-col border-l border-ds-border-muted bg-white backdrop-blur-xl dark:bg-ds-canvas ${className}`}
     >
       <div className="shrink-0 border-b border-ds-border-muted bg-white/92 dark:bg-ds-card">
         <div className="flex h-12 min-w-0 items-center gap-2 px-4">

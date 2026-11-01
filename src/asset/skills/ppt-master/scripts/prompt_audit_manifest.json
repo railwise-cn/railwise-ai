@@ -101,7 +101,7 @@
         "bootstrap.routing"
       ],
       "files": [
-        "skills/ppt-master/workflows/native-enhance-pptx.md"
+        "skills/ppt-master/workflows/edit-native-pptx.md"
       ],
       "max_tokens": 8100
     },
@@ -112,7 +112,7 @@
         "bootstrap.routing"
       ],
       "files": [
-        "skills/ppt-master/workflows/template-fill-pptx.md"
+        "skills/ppt-master/workflows/edit-native-pptx.md"
       ],
       "max_tokens": 10800
     },

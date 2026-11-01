@@ -1,0 +1,5 @@
+
+> workwise@0.5.4 verify:document-licenses
+> node ./scripts/verify-document-dependencies.mjs
+
+Document dependency and license policy verified.

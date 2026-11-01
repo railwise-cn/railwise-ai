@@ -1,0 +1,12 @@
+{
+  "fromCandidate": "1864d44d23f5328d5fc435edec9323b57db53ece",
+  "toCandidate": "5c88bfd6de0a65e0436cb33bcc1c6528154e20dd",
+  "changedSourcePaths": [
+    "src/renderer/src/write/tiptap/WriteRichEditor.test.ts",
+    "src/renderer/src/write/tiptap/write-rich-projection.ts"
+  ],
+  "runtimeSourceChangedPaths": [
+    "src/renderer/src/write/tiptap/write-rich-projection.ts"
+  ],
+  "scope": "Byte SHA-256 comparison of all inventoried src files; excludes packaging config/scripts/evidence"
+}

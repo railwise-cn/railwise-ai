@@ -11,6 +11,7 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "zod": ["node_modules/zod"],
       "@renderer/*": ["src/renderer/src/*"],
       "@shared/*": ["src/shared/*"]
     },

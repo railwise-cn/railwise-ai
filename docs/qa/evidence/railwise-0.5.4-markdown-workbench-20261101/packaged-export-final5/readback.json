@@ -1,0 +1,134 @@
+{
+  "schema": "railwise.markdown-workbench.packaged-export-readback.v1",
+  "inspectedAt": "2026-11-01T06:07:33.835Z",
+  "provenance": {
+    "product": "RailWise AI",
+    "version": "0.5.4",
+    "candidate": "final5",
+    "sourceHead": "209a17ecc2ab8359dd22e210d22c806c1633744f",
+    "asarSha256": "12c4f2e8b0a2e6b173a63227e98ad00ec6d0daef5da9c043c212f732461d9bad",
+    "exportOrigin": "Parent agent reports these three files were produced through the installed final5 packaged GUI; this independent check copies and parses their bytes without invoking UI or regenerating exports."
+  },
+  "files": {
+    "html": {
+      "sourcePath": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench/export-check.html",
+      "evidencePath": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/packaged-export-final5/export-check.html",
+      "sizeBytes": 5894,
+      "sha256": "0685ebd4d5c1d646a5194b2ea468f0cf4dde0ac3fded9ae9626f0b798d0811b4",
+      "copyMatchesSource": true
+    },
+    "pdf": {
+      "sourcePath": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench/export-check.pdf",
+      "evidencePath": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/packaged-export-final5/export-check.pdf",
+      "sizeBytes": 76188,
+      "sha256": "a5a2e746dc40c9f0ab541637cfa1ae57797710b778d057e456c499d896c4d1da",
+      "copyMatchesSource": true
+    },
+    "docx": {
+      "sourcePath": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench/export-check.docx",
+      "evidencePath": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/packaged-export-final5/export-check.docx",
+      "sizeBytes": 10352,
+      "sha256": "47852511d68ffdb40fba29e59d7b1113eefb7b0d228d7f910f8fe9b40f0a6c0d",
+      "copyMatchesSource": true
+    }
+  },
+  "sourceFixture": {
+    "path": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench/export-check.md",
+    "sha256": "9478c65b7a71131982a4ac8954b58b3ab38c2fb9fe5b1915a16196fae6d94396",
+    "imageSha256": "96e1187529d021dd9af36888a1526b3e1c8abaaf86a6cc07126bfd52f2415890"
+  },
+  "pdf": {
+    "pageCount": 1,
+    "pages": [
+      {
+        "page": 1,
+        "width": 594.95996,
+        "height": 841.91998,
+        "text": "⽂ 档 ⼯ 作 台 导 出 验 收  本 地图 ⽚ 、 表 格 和 代 码 必 须 保 留 。  测 点   本期 值   状 态  DB -01   1.25   mm   正 常  export   const   source   =   'markdown'",
+        "imagePaintOperations": 1,
+        "images": [
+          {
+            "kind": "image-xobject",
+            "objectId": "img_p0_1",
+            "width": 480,
+            "height": 180,
+            "colorKind": 2,
+            "decodedBytes": 259200
+          }
+        ]
+      }
+    ],
+    "checks": {
+      "heading": true,
+      "table": true,
+      "code": true,
+      "metadataHidden": true,
+      "hasImagePaint": true
+    },
+    "normalization": "NFKC plus removal of whitespace for text assertions; raw text preserved. PDF font text maps some Chinese characters to compatibility radical codepoints such as ⽂ and ⼯."
+  },
+  "docx": {
+    "documentText": "文档工作台导出验收本地图片、表格和代码必须保留。测点本期值状态DB-011.25 mm正常export const source = &#x27;markdown&#x27;",
+    "tableCount": 1,
+    "drawingCount": 1,
+    "media": [
+      {
+        "name": "word/media/908b107fcff362246e8c719acc76da3095902c3e.png",
+        "sizeBytes": 1044,
+        "sha256": "96e1187529d021dd9af36888a1526b3e1c8abaaf86a6cc07126bfd52f2415890"
+      }
+    ],
+    "checks": {
+      "headingText": true,
+      "headingStyle": true,
+      "table": true,
+      "code": false,
+      "metadataHidden": true,
+      "sourceImagePreserved": true
+    }
+  },
+  "html": {
+    "dataImages": [
+      {
+        "mimeType": "image/png",
+        "sizeBytes": 1044,
+        "sha256": "96e1187529d021dd9af36888a1526b3e1c8abaaf86a6cc07126bfd52f2415890"
+      }
+    ],
+    "csp": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+    "checks": {
+      "heading": true,
+      "table": true,
+      "codeLanguage": true,
+      "code": true,
+      "metadataHidden": true,
+      "localDataImage": true,
+      "noExternalImage": true,
+      "strictCsp": true
+    }
+  },
+  "largeFixture": {
+    "path": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench/large-protection.md",
+    "expectedSizeBytes": 3145728,
+    "expectedSha256": "60dc074dc5e61af2f43a1f902c6730dc54a4eb2b62592010e81269d7aeec83b4",
+    "actualSizeBytes": 3145728,
+    "actualSha256": "60dc074dc5e61af2f43a1f902c6730dc54a4eb2b62592010e81269d7aeec83b4",
+    "unchanged": true,
+    "tailPresent": true
+  },
+  "allChecksPassed": false,
+  "findings": [
+    {
+      "id": "PACKAGED-EXPORT-01",
+      "priority": "P2",
+      "status": "open",
+      "format": "docx",
+      "trigger": "TypeScript fence includes export const source = 'markdown'",
+      "expected": "export const source = 'markdown'",
+      "actual": "export const source = &#x27;markdown&#x27;",
+      "evidence": "word/document.xml stores &amp;#x27;markdown&amp;#x27; inside w:t; after one XML decode, Word text contains the entity literally.",
+      "implication": "Quoted code is altered in DOCX. The HTML/PDF versions retain the original apostrophes."
+    }
+  ],
+  "result": "failed-docx-code-fidelity"
+}

@@ -57,6 +57,8 @@ export type WorkspaceEntryRenamePayload = {
   path: string
   workspaceRoot: string
   newName: string
+  /** Optional existing destination directory; relative values resolve from the workspace root. */
+  targetDirectory?: string
 }
 
 export type WorkspaceEntryDeletePayload = {

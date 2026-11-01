@@ -8,11 +8,12 @@ import {
   PackageInstallationService,
   marketplacePackageReviewSha256
 } from './package-installation-service'
-import { PluginManagementService } from './plugin-management-service'
+import { materializeCatalogPackage, materializeGithubArchive, PluginManagementService } from './plugin-management-service'
 
 const roots: string[] = []
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -67,6 +68,78 @@ function createService(root: string, now?: () => Date): PluginManagementService 
 }
 
 describe('PluginManagementService', () => {
+  it('materializes a pinned GitHub Skill from the system network archive when git is unavailable', async () => {
+    const root = await tempRoot('github-archive')
+    const commit = '0123456789abcdef0123456789abcdef01234567'
+    const archiveRoot = `BrowserSkill-${commit}`
+    const zip = new JSZip()
+    zip.file(`${archiveRoot}/skills/browser-skill/SKILL.md`, '# BrowserSkill\n')
+    // GitHub repositories may contain an internal symlink. The GitHub
+    // materializer must expand it into a regular directory before staging the
+    // requested Skill subpath.
+    zip.file(`${archiveRoot}/workbench/demos/demo.md`, 'demo\n')
+    zip.file(`${archiveRoot}/workbench/demosrc`, 'demos', { unixPermissions: 0o120777 })
+    zip.file(`${archiveRoot}/LICENSE`, 'MIT License\n')
+    const archive = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', platform: 'UNIX' })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(archive as unknown as BodyInit, {
+      status: 200,
+      headers: { 'content-length': String(archive.byteLength) }
+    })))
+    const source = {
+      id: 'browser-skill-source',
+      catalogSourceId: 'workwise-official',
+      kind: 'github' as const,
+      location: 'https://github.com/Tencent/BrowserSkill',
+      owner: 'Tencent',
+      repository: 'BrowserSkill',
+      defaultBranch: 'main',
+      requestedRef: 'main',
+      resolvedRef: commit,
+      subpath: 'skills/browser-skill'
+    }
+    const item: MarketplacePackageV1 = {
+      schemaVersion: 1,
+      id: 'browser-skill',
+      name: 'BrowserSkill',
+      summary: 'Browser automation Skill.',
+      tier: 'advanced',
+      productType: 'workflow',
+      categories: ['browser-automation'],
+      version: commit,
+      publisher: { id: 'tencent', name: 'Tencent', verified: false },
+      license: 'MIT',
+      source,
+      sources: [source],
+      components: [{
+        id: 'browser-skill-skill',
+        name: 'BrowserSkill',
+        type: 'skill',
+        sourceId: source.id,
+        skillNames: ['browser-skill'],
+        runtime: {
+          kind: 'github',
+          repository: source.location,
+          resolvedCommit: commit,
+          subpath: source.subpath,
+          install: { strategy: 'managed-git', verifyBeforeActivation: true }
+        }
+      }],
+      permissions: [],
+      auth: { type: 'none' },
+      licenseEvidence: [{ license: 'MIT', sourceId: source.id, path: 'LICENSE', includeInInstall: true, required: true }],
+      dependencies: [],
+      updatePolicy: { strategy: 'manual', channel: 'stable', allowMajor: false },
+      compatibility: { workwise: '>=0.3.6', platforms: ['darwin', 'win32', 'linux'], architectures: ['arm64', 'x64'] },
+      availability: { status: 'available' },
+      installation: { mode: 'direct-mirror', installedByDefault: false, reinstallable: true }
+    }
+    const target = join(root, 'prepared')
+    await materializeGithubArchive('Tencent', 'BrowserSkill', commit, target, source.subpath)
+    await expect(readFile(join(target, 'SKILL.md'), 'utf8')).resolves.toBe('# BrowserSkill\n')
+    await expect(readFile(join(target, 'LICENSE'), 'utf8')).resolves.toBe('MIT License\n')
+    await expect(access(join(target, '.git'))).rejects.toThrow()
+  })
+
   it('prepares catalog packages through the same private review transaction', async () => {
     const root = await tempRoot('catalog')
     const source = {
@@ -128,6 +201,24 @@ describe('PluginManagementService', () => {
     })
     await expect(readFile(join(installed.artifact.location, 'payload.txt'), 'utf8'))
       .resolves.toBe('verified catalog payload\n')
+    await expect(service.diagnoseUpdates([item])).resolves.toMatchObject([{
+      packageId: item.id,
+      state: 'current'
+    }])
+    await expect(service.diagnoseUpdates([{
+      ...item,
+      compatibility: { ...item.compatibility, workwise: '>=0.3.6' }
+    }])).resolves.toMatchObject([{
+      packageId: item.id,
+      state: 'metadata-refresh'
+    }])
+    await expect(service.diagnoseUpdates([{
+      ...item,
+      auth: { type: 'token', provider: 'fixture', environmentVariables: ['FIXTURE_TOKEN'] }
+    }])).resolves.toMatchObject([{
+      packageId: item.id,
+      state: 'runtime-drift'
+    }])
   })
 
   it('keeps private staging paths out of the renderer contract and installs by prepared ID', async () => {

@@ -1,0 +1,21 @@
+{
+  "candidateHead": "4124ac8c745ab24ad04b7e4ce9850702e89f8ed3",
+  "files": 6477,
+  "largeFilesOver25MiB": [],
+  "secretShapeHits": [],
+  "sensitiveFilenames": [],
+  "links": [],
+  "inventoryMismatch": [],
+  "reviewHashMismatch": [],
+  "runtimeSourceChanges": [
+    "src/renderer/src/components/write/WriteMarkdownPreview.tsx",
+    "src/renderer/src/styles/write-rich-editor.css",
+    "src/renderer/src/write/tiptap/WriteRichEditor.test.ts",
+    "src/renderer/src/write/tiptap/WriteRichEditor.tsx",
+    "src/renderer/src/write/tiptap/write-rich-projection.ts",
+    "src/renderer/src/write/write-advanced-rendering.test.ts",
+    "src/renderer/src/write/write-advanced-rendering.ts"
+  ],
+  "unreviewedRuntimeChange": [],
+  "passed": true
+}

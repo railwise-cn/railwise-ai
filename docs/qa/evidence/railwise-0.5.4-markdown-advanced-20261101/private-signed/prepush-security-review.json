@@ -1,0 +1,13 @@
+{
+  "candidateHead": "7d22ae2a096be1c2a06257705d9056012a2b9664",
+  "inventorySha256": "8e6ab58094b12cf507fbab4c0fb439239495450bd29dae3797de41200e263bd4",
+  "files": 6466,
+  "sourceBytes": 345510229,
+  "largeFilesOver25MiB": [],
+  "secretShapeHits": [],
+  "sensitiveFilenames": [],
+  "links": [],
+  "inventoryMismatch": [],
+  "reviewHashMismatch": [],
+  "passed": true
+}

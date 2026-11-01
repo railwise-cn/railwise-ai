@@ -1,0 +1,39 @@
+{
+  "candidateHead": "c3377f463b496f5db794343ac77b437f924dfcee",
+  "installedApp": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/Applications/RailWise AI Candidate c3377f463b49.app",
+  "version": "0.5.4",
+  "bundleId": "com.wangjiawei508.workwise.candidate.headc3377f463b49",
+  "asarSha256": "2c623cd6e03d80c1bc936fdc1ce4dc6f8bf7a28df493e7ce691bc7a71845880d",
+  "checks": {
+    "asar": {
+      "exitCode": 0,
+      "log": "asar.txt"
+    },
+    "native": {
+      "exitCode": 0,
+      "log": "native.txt"
+    },
+    "codesign-info": {
+      "exitCode": 0,
+      "log": "codesign-info.txt"
+    },
+    "codesign-verify": {
+      "exitCode": 0,
+      "log": "codesign-verify.txt"
+    },
+    "notarization": {
+      "exitCode": 66,
+      "log": "notarization.txt"
+    },
+    "gatekeeper": {
+      "exitCode": 0,
+      "log": "gatekeeper.txt"
+    },
+    "document-license": {
+      "exitCode": 0,
+      "log": "document-license.txt"
+    }
+  },
+  "publicRelease": false,
+  "updaterRoundTrip": "not-tested"
+}

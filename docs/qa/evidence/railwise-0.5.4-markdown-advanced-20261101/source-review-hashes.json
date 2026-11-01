@@ -1,0 +1,65 @@
+{
+  "review": "Independent AI senior engineer source review; no unresolved blocker for private candidate",
+  "tests": {
+    "files": 7,
+    "passed": 50
+  },
+  "files": {
+    "src/shared/write-advanced-markdown.ts": "5d62932861b83fd750eff393a74d246504d3c562c3bb9016fe714acba18967a4",
+    "src/shared/write-mermaid-policy.ts": "36dbff138561c6456db3ca30ea12376fcadafc87e01a672dc174dcd4c0208115",
+    "src/shared/write-mermaid-preview.ts": "14a8078def0515a118dd6cdace031cd1a8acae04a0109e69bb1eda948b535fad",
+    "src/main/services/write-math-omml.ts": "9488d1eeb6c5bbf69e4e5b090e8ac7554ed74dbc97892db462e02174605d87f0",
+    "src/main/services/write-advanced-renderer.ts": "b033d94aad90360e67a59fad03e10bc1f97f80c16fa65a9bc5b5e05b9f093d4b",
+    "src/main/services/write-mermaid-preview.ts": "10b9aa4c136d500d4681ffede553c7af8c36d09148b0b8514aa4b377f4fc02b6",
+    "src/main/services/write-docx-service.ts": "c906f0e96077d7c165f2dd0b8e77eee00ce1588941645fdc7d506af4c2d92789",
+    "src/main/services/write-export-service.ts": "be7191f2c14a787e0a2495267cd3154bade731a336f542d9d5246ade94ec095d",
+    "src/main/services/write-advanced-export.test.ts": "aaf8fa48783b6e93162bbea9ec50887c851837641f79165f5778e22013253013",
+    "src/main/ipc/app-ipc-schemas.ts": "d4029285cf2e146c9464a443ffeaf7d97b84ce6bf29345570fa06b62c7c59759",
+    "src/main/ipc/register-app-ipc-handlers.ts": "7d162e0e3075a54c67eccad9bc057f502f939cc35ad26b9614e031e276d859e3",
+    "src/preload/index.ts": "3639785ee473cd37972caefffd4ec802ec239bc81db715c1388cbb8f33b01ff6",
+    "src/shared/workwise-api.ts": "40d16b6ff27a56376b49b8e0da4524e4caba13c02f31b457d8f8274a58cb4256",
+    "src/renderer/src/write/write-advanced-rendering.ts": "1f214b77b8240cdae97459057d865f2d7802a33d4d28e588ab770534320549dc",
+    "src/renderer/src/write/tiptap/write-rich-projection.ts": "9ab9a65a4f5e268b1823b1104b8f6281b150defa538519b4a24d3d59f38ab9ce",
+    "src/renderer/src/write/tiptap/WriteRichEditor.tsx": "673efba7b61737ddb87becab3cf1167d167452220c797f0d1d0059bd62b65bc2",
+    "src/renderer/src/components/write/WriteMarkdownPreview.tsx": "29a9e7847f763c36c774435f84224e426e308d0e3c805dae4d68168968e4101b",
+    "src/renderer/src/write/markdown-live-widgets.ts": "abd1200628446eb20a9ec2c0596ea8affa6b520a8fb7a2c22225084d1c484dea",
+    "src/renderer/src/write/markdown-live-preview.ts": "5b0e1f30fdc473d0695f20793313e6d8dfce2e81ef376d1696385162e9a895cd",
+    "electron-builder.cjs": "9a60c74319ab390afee1ea4d347884332f233c03c4122d41adbd8ee743cc8b13",
+    "scripts/after-pack.cjs": "86454bd8c53fe7952e9732f3faed3cabef7ad2cf9621c02f1168c4c711cff043",
+    "scripts/verify-packaged-markdown-rendering.cjs": "a4e0dfb94c7b494139cc3d500d1afee9c2c7313309bf8c93bcf1a1511de77344",
+    "scripts/verify-document-dependencies.mjs": "cbc17dabaf17aeb3dbc74068664482dff427d01fb9476994ce0988aa9dde3897",
+    "package.json": "3839b035a3ad972f095bf9ed7797ca1aeacf4d7757f99aac71cbcc8f853b4884",
+    "package-lock.json": "9d1df3abcfc3bfe5967cb5ec27cec0b4865e002be4d25bb0c7962475ce8e4787",
+    "src/renderer/src/styles/write-rich-editor.css": "e9a85f10e2de54d0c5f8be17406a2ea5534a21e36511665947e87cc70002d6b2",
+    "src/renderer/src/write/tiptap/WriteRichEditor.test.ts": "09c64c49a6b10e26c704c332abe20021a1e32be06bdcf5ff78d1e5db7f458dd8",
+    "src/renderer/src/write/write-advanced-rendering.test.ts": "a7dff7a214ec8a1be566160e21f8144d3b7b626f3536458feaed627ab58fe474",
+    ".github/workflows/private-updater-acceptance.yml": "6917ddbc4e01123343080cc7b4f7d50a8107b8d88f637689822c7d10be4222e6"
+  },
+  "lockRepair": "Reviewed minimal24optional MITcanvas peer entries after npm10 CI lock validation failure; existing records unchanged",
+  "rendererFollowup": {
+    "base": "f5830297a11627d4f6aeacdadda6b0b7766d4ba4",
+    "files": [
+      "src/renderer/src/write/tiptap/write-rich-projection.ts",
+      "src/renderer/src/write/tiptap/WriteRichEditor.tsx",
+      "src/renderer/src/components/write/WriteMarkdownPreview.tsx",
+      "src/renderer/src/styles/write-rich-editor.css",
+      "src/renderer/src/write/tiptap/WriteRichEditor.test.ts",
+      "src/renderer/src/write/write-advanced-rendering.ts",
+      "src/renderer/src/write/write-advanced-rendering.test.ts"
+    ],
+    "blockers": 0,
+    "targetedTests": {
+      "files": 8,
+      "passed": 62
+    }
+  },
+  "privateBuildHeapRepair": {
+    "path": ".github/workflows/private-updater-acceptance.yml",
+    "scope": "Prepare clean-source candidate identity step only",
+    "env": {
+      "NODE_OPTIONS": "--max-old-space-size=6144"
+    },
+    "runtimeSourceChanged": false,
+    "publicWorkflowJobsChanged": false
+  }
+}

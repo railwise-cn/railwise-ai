@@ -23,7 +23,14 @@ from pptx_shapes import (
     load_shape_type_values,
     validate_ooxml_xfrm,
 )
-from pptx_effects import EFFECT_REASON_ATTR, EFFECT_STATUS_ATTR
+from pptx_effects import (
+    EFFECT_REASON_ATTR,
+    EFFECT_STATUS_ATTR,
+    NATIVE_EFFECT_ATTR,
+    NATIVE_EFFECT_SHA256_ATTR,
+    preserved_native_effect_xml,
+)
+from hyperlink_contract import svg_hyperlink_href
 from pptx_to_svg.preset_authoring import AUTHORING_ATTR, AUTHORING_VALUE
 from resource_paths import (
     resolve_external_image_reference,
@@ -36,11 +43,19 @@ from .context import (
     ConvertContext,
     ShapeResult,
 )
+from .hyperlinks import (
+    HYPERLINK_ACTION_KEY,
+    HYPERLINK_RID_KEY,
+    hyperlink_click_xml,
+    hyperlink_run_metadata,
+)
 from .theme_colors import color_node_xml
 from .theme_fonts import theme_font_tokens
+from .text_baseline import drawingml_text_baseline_offset
 from .text_properties import (
     drawingml_letter_spacing,
     normalize_project_text_segments,
+    parse_project_baseline_shift,
     parse_project_font_style,
     parse_project_font_weight,
     parse_project_letter_spacing,
@@ -56,9 +71,10 @@ from .utils import (
     ctx_x, ctx_y, ctx_w, ctx_h,
     rect_to_dml_xfrm,
     combine_opacity, parse_hex_color, parse_svg_color,
-    resolve_url_id, get_effective_filter_id,
+    resolve_project_text_image_fill, resolve_url_id, get_effective_filter_id,
     parse_inline_style, parse_font_family, is_cjk_char,
     detect_text_lang, estimate_text_cluster_widths, font_px_to_hpt,
+    get_font_advances, primary_font_family,
     resolve_text_run_fonts, split_project_text_clusters,
     text_has_rtl_characters, text_uses_rtl,
     is_thick_circle_shorthand, parse_project_geometry_length,
@@ -68,6 +84,8 @@ from .utils import (
     parse_project_stroke_dasharray,
     quantize_ooxml_alpha,
     project_definition_index,
+    svg_hidden_reason,
+    is_stroked_zero_axis_shape,
     matrix_multiply, parse_transform_matrix, parse_transform_operations,
     transform_point, _xml_escape,
 )
@@ -83,16 +101,21 @@ from .paths import (
 )
 
 
-def _resolve_external_image(svg_dir: Path, href: str) -> Path:
+def _resolve_external_image(
+    svg_dir: Path,
+    href: str,
+    resource_root: Path | None = None,
+) -> Path:
     """Resolve a non-data-URI image href to a file on disk.
 
-    Search order: next to the SVG (``svg_output/``), the project root, the
-    project's ``images/`` (the single runtime image pool — template-bundled
-    bitmaps plus AI / web / user images all live here), then ``templates/``
-    (legacy flat-copied template assets). Raises ``FileNotFoundError`` if none
-    of these exist.
+    The href is interpreted exactly relative to the owning SVG and must remain
+    inside the project. No root, ``images/``, or template-path guessing occurs.
     """
-    candidate = resolve_external_image_reference(svg_dir, href)
+    candidate = resolve_external_image_reference(
+        svg_dir,
+        href,
+        project_root=resource_root,
+    )
     if candidate is not None:
         return candidate
     raise FileNotFoundError(f'External image not found: {href}')
@@ -287,6 +310,10 @@ def _valid_project_image_payload(img_format: str, img_data: bytes) -> bool:
             image.verify()
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
         return False
+    if expected == 'JPEG' and actual == 'MPO':
+        # A camera multi-picture JPEG is a JPEG stream followed by sibling
+        # frames; every JPEG decoder renders its primary frame.
+        return True
     return actual == expected
 
 
@@ -348,6 +375,7 @@ def _project_image_href(elem: ET.Element) -> str:
 def load_project_image_source(
     elem: ET.Element,
     svg_dir: Path | None,
+    resource_root: Path | None = None,
 ) -> ProjectImageSource:
     """Load one exact SVG image source or raise a contract error."""
     if elem.tag != f'{{{SVG_NS}}}image':
@@ -366,7 +394,7 @@ def load_project_image_source(
     if svg_dir is None:
         raise ValueError('external image requires an SVG directory context')
     try:
-        img_path = _resolve_external_image(svg_dir, href)
+        img_path = _resolve_external_image(svg_dir, href, resource_root)
     except FileNotFoundError as exc:
         raise ValueError(str(exc)) from exc
     img_format = _normalize_project_image_format(img_path.suffix)
@@ -391,6 +419,7 @@ def project_image_errors(
     svg_dir: Path | None,
     *,
     allow_template_placeholders: bool = False,
+    resource_root: Path | None = None,
 ) -> list[str]:
     """Return source and frame errors for exact SVG image elements."""
     errors: list[str] = []
@@ -435,10 +464,24 @@ def project_image_errors(
         ):
             continue
         try:
-            load_project_image_source(elem, svg_dir)
+            load_project_image_source(elem, svg_dir, resource_root)
         except ValueError as exc:
             errors.append(f'{label} invalid image source: {exc}')
     return sorted(errors)
+
+
+def shape_display_name(elem: ET.Element, fallback: str) -> str:
+    """Name a PowerPoint object after its SVG identity when it has one.
+
+    ``data-pptx-shape-name`` wins, then the SVG ``id`` (or ``data-name``), so
+    the Selection and Animation panes show ``p08-rail-edge`` rather than
+    ``Freeform 9``; unnamed objects keep the positional fallback.
+    """
+    for attribute in ('data-pptx-shape-name', 'id', 'data-name'):
+        value = (elem.get(attribute) or '').strip()
+        if value:
+            return value
+    return fallback
 
 
 def _wrap_shape(
@@ -449,6 +492,7 @@ def _wrap_shape(
     effect_xml: str = '', extra_xml: str = '',
     rot: int = 0,
     xfrm_attr: str = '',
+    placeholder_xml: str = '',
 ) -> str:
     """Wrap DrawingML content into a <p:sp> shape element."""
     rot_attr = f' rot="{rot}"' if rot else ''
@@ -456,7 +500,7 @@ def _wrap_shape(
     return f'''<p:sp>
 <p:nvSpPr>
 <p:cNvPr id="{shape_id}" name="{_xml_escape(name)}"/>
-<p:cNvSpPr/><p:nvPr/>
+<p:cNvSpPr/><p:nvPr>{placeholder_xml}</p:nvPr>
 </p:nvSpPr>
 <p:spPr>
 <a:xfrm{xfrm_attrs}><a:off x="{off_x}" y="{off_y}"/><a:ext cx="{ext_cx}" cy="{ext_cy}"/></a:xfrm>
@@ -520,7 +564,9 @@ def _wrap_geometry_object(
     xfrm_attr: str = '',
 ) -> str:
     """Wrap a semantic leaf as a shape or connector without guessing."""
-    name = elem.get('data-pptx-shape-name') or name
+    if not effect_xml:
+        effect_xml = _element_effect_xml(elem, ctx)
+    name = shape_display_name(elem, name)
     shape_style_xml = _decode_shape_style(elem)
     object_kind = elem.get('data-pptx-object')
     if object_kind != 'connector':
@@ -537,6 +583,7 @@ def _wrap_geometry_object(
             effect_xml,
             extra_xml=shape_style_xml,
             xfrm_attr=xfrm_attr,
+            placeholder_xml=_imported_placeholder_xml(elem),
         )
 
     prst = elem.get('data-pptx-prst')
@@ -561,6 +608,56 @@ def _wrap_geometry_object(
         connection_xml=_connector_connection_xml(elem, ctx),
         extra_xml=shape_style_xml,
     )
+
+
+def _imported_placeholder_xml(elem: ET.Element) -> str:
+    """Restore an imported slide placeholder marker when its identity is exact."""
+    placeholder_type = elem.get('data-ph-type')
+    placeholder_index = elem.get('data-pptx-placeholder-index')
+    if placeholder_type is None and placeholder_index is None:
+        return ''
+    if placeholder_type is not None and not re.fullmatch(r'[A-Za-z][A-Za-z0-9]*', placeholder_type):
+        raise ValueError(
+            f'Invalid imported placeholder type: {placeholder_type!r}'
+        )
+    if placeholder_index is not None and (
+        not placeholder_index.isdigit() or int(placeholder_index) > 0xFFFFFFFF
+    ):
+        raise ValueError(
+            f'Invalid imported placeholder index: {placeholder_index!r}'
+        )
+    attrs = {name: value for name, value in (('type', placeholder_type), ('idx', placeholder_index))
+             if value is not None}
+    placeholder_size = elem.get('data-pptx-placeholder-size')
+    if placeholder_size is not None:
+        if placeholder_size not in {'full', 'half', 'quarter'}:
+            raise ValueError(
+                f'Invalid imported placeholder size: {placeholder_size!r}'
+            )
+        attrs['sz'] = placeholder_size
+    orientation = elem.get('data-pptx-placeholder-orientation')
+    if orientation is not None:
+        if orientation not in {'horz', 'vert'}:
+            raise ValueError(
+                f'Invalid imported placeholder orientation: {orientation!r}'
+            )
+        attrs['orient'] = orientation
+    serialized = ' '.join(
+        f'{name}="{_xml_escape(value)}"'
+        for name, value in attrs.items()
+    )
+    return f'<p:ph {serialized}/>'
+
+
+def _element_effect_xml(elem: ET.Element, ctx: ConvertContext) -> str:
+    """Honor an authored SVG filter before the imported native fallback."""
+    filt_id = get_effective_filter_id(elem, ctx)
+    if filt_id and filt_id in ctx.defs:
+        return build_effect_xml(
+            ctx.defs[filt_id],
+            get_element_opacity(elem, ctx),
+        )
+    return preserved_native_effect_xml(elem) or ''
 
 
 def _decode_shape_style(elem: ET.Element) -> str:
@@ -686,6 +783,7 @@ def _shape_xfrm_from_svg_rect(
     off_y = px_to_emu(resolved_y)
     ext_cx = px_to_emu(resolved_w)
     ext_cy = px_to_emu(resolved_h)
+    validate_ooxml_xfrm(off_x, off_y, ext_cx, ext_cy)
     return '', off_x, off_y, ext_cx, ext_cy, (off_x, off_y, off_x + ext_cx, off_y + ext_cy)
 
 
@@ -710,6 +808,7 @@ _PPTX_GUIDE_NAME_RE = re.compile(r'[A-Za-z_][A-Za-z0-9_.-]{0,63}')
 _PPTX_VAL_FORMULA_RE = re.compile(r'val[\t ]+([+-]?\d+)')
 def _parse_preset_geometry_metadata(
     elem: ET.Element,
+    ctx: ConvertContext | None = None,
 ) -> tuple[str | None, list[tuple[str, str]], tuple[float, float, float, float] | None]:
     """Parse and validate rendering-neutral preset geometry metadata."""
     status = (elem.get('data-pptx-geometry-status') or '').strip()
@@ -851,10 +950,15 @@ def _parse_preset_geometry_metadata(
             elem.get('data-pptx-object') == 'connector'
             or prst in CONNECTOR_PRESET_TYPES
         )
-        if is_connector:
+        is_native_group = (
+            elem.tag.rsplit('}', 1)[-1] == 'g'
+            and elem.get('data-pptx-object') == 'group'
+        )
+        if is_connector or is_native_group or is_stroked_zero_axis_shape(elem, ctx):
             if frame[2] < 0 or frame[3] < 0 or (frame[2] == 0 and frame[3] == 0):
+                kind = 'Connector' if is_connector else 'Group'
                 raise ValueError(
-                    'Connector data-pptx-frame dimensions must be non-negative '
+                    f'{kind} data-pptx-frame dimensions must be non-negative '
                     f'and not both zero, got {raw_frame!r}'
                 )
         elif frame[2] <= 0 or frame[3] <= 0:
@@ -871,11 +975,14 @@ def _parse_preset_geometry_metadata(
     return prst, guides, frame
 
 
-def validate_preset_geometry_metadata(elem: ET.Element) -> list[str]:
+def validate_preset_geometry_metadata(
+    elem: ET.Element,
+    ctx: ConvertContext | None = None,
+) -> list[str]:
     """Return native shape metadata errors for authoring-time validation."""
     errors: list[str] = []
     try:
-        _parse_preset_geometry_metadata(elem)
+        _parse_preset_geometry_metadata(elem, ctx)
     except ValueError as exc:
         errors.append(str(exc))
     if elem.get('data-pptx-custgeom') is not None:
@@ -923,16 +1030,32 @@ def validate_preset_geometry_metadata(elem: ET.Element) -> list[str]:
     return errors
 
 
-def _build_preset_geom_from_meta(elem: ET.Element) -> str | None:
+def complete_preset_adjustments(
+    prst: str,
+    guides: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Fill missing preset adjustments in the definition's native order."""
+    # PowerPoint repairs a preset whose avLst lists only some of the
+    # adjustments the preset defines, so emit the full set in the preset's own
+    # order with authored values overriding the normative defaults.
+    authored = dict(guides)
+    return [
+        (guide.name, authored.get(guide.name, guide.formula))
+        for guide in get_preset_registry().get(prst).adjustments
+    ]
+
+
+def _build_preset_geom_from_meta(elem: ET.Element, ctx: ConvertContext) -> str | None:
     """Build validated native DrawingML preset geometry from SVG metadata."""
-    prst, guides, _frame = _parse_preset_geometry_metadata(elem)
+    prst, guides, _frame = _parse_preset_geometry_metadata(elem, ctx)
     if prst is None:
         return None
     if not guides:
         return f'<a:prstGeom prst="{prst}"><a:avLst/></a:prstGeom>'
+    completed = complete_preset_adjustments(prst, guides)
     guide_xml = ''.join(
         f'<a:gd name="{_xml_escape(name)}" fmla="{_xml_escape(fmla)}"/>'
-        for name, fmla in guides
+        for name, fmla in completed
     )
     return f'<a:prstGeom prst="{prst}"><a:avLst>{guide_xml}</a:avLst></a:prstGeom>'
 
@@ -981,7 +1104,7 @@ def _shape_xfrm_from_preset_frame(
     transform: str | None,
 ) -> tuple[str, int, int, int, int, tuple[int, int, int, int]]:
     """Use the preserved logical frame for native preset size when present."""
-    prst, _guides, frame = _parse_preset_geometry_metadata(elem)
+    prst, _guides, frame = _parse_preset_geometry_metadata(elem, ctx)
     if frame is None:
         raw_x, raw_y, raw_w, raw_h = fallback_raw_rect
         x, y, w, h = fallback_resolved_rect
@@ -994,6 +1117,7 @@ def _shape_xfrm_from_preset_frame(
     preserves_zero_axis = (
         elem.get('data-pptx-object') == 'connector'
         or prst in CONNECTOR_PRESET_TYPES
+        or is_stroked_zero_axis_shape(elem, ctx)
     )
     xfrm_attr, off_x, off_y, ext_cx, ext_cy, bounds_emu = _shape_xfrm_from_svg_rect(
         ctx,
@@ -1030,7 +1154,7 @@ def _pathlike_preset_xfrm(
     height: float,
 ) -> tuple[str, int, int, int, int, tuple[int, int, int, int]]:
     """Resolve a path-like preset xfrm from its logical frame or visual bounds."""
-    _prst, _guides, frame = _parse_preset_geometry_metadata(elem)
+    _prst, _guides, frame = _parse_preset_geometry_metadata(elem, ctx)
     if frame is None:
         if _uses_full_transform(ctx, transform):
             tag = elem.tag.rsplit('}', 1)[-1]
@@ -1169,9 +1293,11 @@ def convert_rect(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     y = ctx_y(raw_y, ctx)
     w = ctx_w(raw_w, ctx)
     h = ctx_h(raw_h, ctx)
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
 
-    if w <= 0 or h <= 0:
+    if (w <= 0 or h <= 0) and not (
+        preset_geom is not None and is_stroked_zero_axis_shape(elem, ctx)
+    ):
         return None
 
     # SVG spec: when only one of rx/ry is specified, the other inherits its
@@ -1316,7 +1442,7 @@ def _build_arc_ring_path(
     width = max_x - min_x
     height = max_y - min_y
 
-    if width < 0.5 or height < 0.5:
+    if width <= 0 or height <= 0:
         return '', 0, 0, 0, 0
 
     w_emu = px_to_emu(width)
@@ -1359,7 +1485,7 @@ def convert_circle(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     cx_ = svg_length_x(elem.get('cx'), ctx)
     cy_ = svg_length_y(elem.get('cy'), ctx)
     r = svg_length_size(elem.get('r'), ctx)
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
 
     if r <= 0:
         return None
@@ -1523,7 +1649,7 @@ def convert_line(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     heads (headEnd / tailEnd) correctly.  Plain lines (no markers) continue to
     use custom geometry which is sufficient and avoids flipH/flipV complexity.
     """
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
     transform = elem.get('transform')
     raw_x1 = svg_length_x(elem.get('x1'), ctx)
     raw_y1 = svg_length_y(elem.get('y1'), ctx)
@@ -1684,7 +1810,7 @@ def convert_line(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 
 def convert_path(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <path> to DrawingML custom geometry shape."""
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
     preserved_custom_geom = _build_preserved_custom_geom(elem)
     native_geom = preset_geom or preserved_custom_geom
     d = elem.get('d', '')
@@ -1772,7 +1898,7 @@ def convert_path(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 
 def convert_polygon(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <polygon> to DrawingML custom geometry shape."""
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
     points = parse_svg_points(elem.get('points', ''), min_points=3)
 
     commands = [PathCommand('M', [points[0][0], points[0][1]])]
@@ -1811,6 +1937,14 @@ def convert_polygon(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None
     fill = build_fill_xml(elem, ctx, fill_op)
     stroke = build_stroke_xml(elem, ctx, stroke_op)
 
+    effect = ''
+    filt_id = get_effective_filter_id(elem, ctx)
+    if filt_id and filt_id in ctx.defs:
+        effect = build_effect_xml(
+            ctx.defs[filt_id],
+            get_element_opacity(elem, ctx),
+        )
+
     shape_id = _claim_element_shape_id(elem, ctx)
     xfrm_attr = ''
     off_x = px_to_emu(min_x)
@@ -1833,7 +1967,7 @@ def convert_polygon(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None
             ctx,
             shape_id, f'Polygon {shape_id}',
             off_x, off_y, w_emu, h_emu,
-            geom, fill, stroke, xfrm_attr=xfrm_attr,
+            geom, fill, stroke, effect, xfrm_attr=xfrm_attr,
         ),
         bounds_emu=bounds_emu,
     )
@@ -1841,7 +1975,7 @@ def convert_polygon(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None
 
 def convert_polyline(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <polyline> to DrawingML custom geometry shape."""
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
     points = parse_svg_points(elem.get('points', ''), min_points=2)
 
     commands = [PathCommand('M', [points[0][0], points[0][1]])]
@@ -1931,14 +2065,17 @@ _TEXTBOX_PADDING_MIN_PX = 0.5
 _TEXTBOX_PADDING_MAX_PX = 2.0
 _TEXTBOX_PADDING_RATIO = 0.04
 # Single-line auto-fit headroom interpolates between a low-caps base and an
-# all-caps ceiling for each run. The crude per-char width estimate undercounts
-# capitals most, so all-caps runs need the ceiling to keep wrap-ignoring
-# renderers (LibreOffice) from folding. Applying headroom per run also prevents
-# a short serif label from forcing a conservative serif multiplier onto an
-# otherwise sans-serif line. Values are calibrated against LibreOffice renders
-# of all-caps bold lines, with bases left above mixed-case and CJK render
-# ratios; exact ratios shift with font substitution, so these carry deliberate
-# margin rather than tracking one environment's numbers.
+# all-caps ceiling for each script segment of a run. The crude per-char width
+# estimate undercounts capitals most, so all-caps Latin segments need the
+# ceiling to keep wrap-ignoring renderers (LibreOffice) from folding. The
+# serif tier follows the typeface that draws the segment (``latin`` or ``ea``
+# as resolved by parse_font_family), so a CJK segment drawn by Microsoft YaHei
+# never takes the Times New Roman tier of the same stack, and a short serif
+# label cannot force its multiplier onto an otherwise sans-serif line. Values
+# are calibrated against LibreOffice renders of all-caps bold lines, with bases
+# left above mixed-case and CJK render ratios; exact ratios shift with font
+# substitution, so these carry deliberate margin rather than tracking one
+# environment's numbers.
 _TEXT_WIDTH_HEADROOM_BASE = 1.06
 _TEXT_WIDTH_HEADROOM_CAPS = 1.12
 _SERIF_TEXT_WIDTH_HEADROOM_BASE = 1.12
@@ -1957,6 +2094,41 @@ _TEXT_BULLET_MARKERS = {
 _TEXT_BULLET_RE = re.compile(
     r'^(?P<prefix>\s*)(?P<marker>[·•●▪■◆◇◦‣])(?P<space>\s*)'
 )
+_INLINE_FORMULA_ATTR = 'data-pptx-inline-formula'
+_INLINE_FORMULA_KEY = '_inline_formula_latex'
+
+
+def _text_line_vertical_extent(
+    runs: list[dict[str, Any]],
+    font_size: float,
+) -> tuple[float, float, bool]:
+    """Return native-math-aware ascent/descent for one authored text line."""
+    ascent = font_size * 0.85
+    descent = font_size * 0.35
+    has_inline_formula = False
+    from ..native_objects.formula_compiler import (
+        estimate_inline_formula_vertical_extent,
+    )
+
+    for run in runs:
+        latex = run.get(_INLINE_FORMULA_KEY)
+        if latex is None:
+            continue
+        has_inline_formula = True
+        run_font_size = float(run.get('font_size', font_size))
+        extent = estimate_inline_formula_vertical_extent(str(latex))
+        ascent = max(ascent, run_font_size * extent.ascent_em)
+        descent = max(descent, run_font_size * extent.descent_em)
+    return ascent, descent, has_inline_formula
+
+
+def _native_text_line_frame_height(
+    ascent: float,
+    descent: float,
+    font_size: float,
+) -> float:
+    """Add the ordinary text-frame headroom to one visible line extent."""
+    return ascent + descent + font_size * 0.30
 
 
 def _normalize_text_run_whitespace(
@@ -1968,7 +2140,21 @@ def _normalize_text_run_whitespace(
         (str(run.get('_xml_space', 'default')), str(run.get('text', '')))
         for run in runs
     ]
-    for index, text in normalize_project_text_segments(segments):
+    text_by_index = dict(normalize_project_text_segments(segments))
+    for index, source_run in enumerate(runs):
+        if '_inline_dx' in source_run:
+            # Insert after whitespace normalization so dx neither preserves
+            # indentation nor disappears with an empty/whitespace-only tspan.
+            run = {**source_run, 'text': ' ', 'letter_spacing': 0.0, 'text_decoration': 'none'}
+            dx = run.pop('_inline_dx')
+            run['letter_spacing'] = dx - _estimate_run_text_width(run)
+            run.update(text='\u00a0', _inline_dx=dx)
+            run.pop('_xml_space', None)
+            normalized.append(run)
+            continue
+        text = text_by_index.get(index)
+        if text is None:
+            continue
         run = {**runs[index], 'text': text}
         run.pop('_xml_space', None)
         normalized.append(run)
@@ -1983,21 +2169,168 @@ def _letter_spacing_to_drawingml_spc(letter_spacing_px: float) -> str:
     return f' spc="{spacing}"'
 
 
-def _is_serif_run(run: dict[str, Any]) -> bool:
-    """Return whether a text run uses a serif-like family."""
-    for family in str(run.get('font_family', '')).split(','):
-        name = family.strip().strip("'\"").lower()
-        if not name or name in {'sans-serif', 'sans serif'}:
-            continue
-        if name in _SERIF_WIDTH_FAMILIES:
-            return True
-        if 'serif' in name and 'sans' not in name:
-            return True
-    return False
+def _is_serif_face(typeface: str) -> bool:
+    """Return whether one resolved DrawingML typeface is serif-like."""
+    name = typeface.strip().strip("'\"").lower()
+    if not name or name in {'sans-serif', 'sans serif'}:
+        return False
+    if name in _SERIF_WIDTH_FAMILIES:
+        return True
+    return 'serif' in name and 'sans' not in name
+
+
+def _run_script_segments(run: dict[str, Any]) -> list[tuple[str, bool]]:
+    """Split one run's text into ``(text, is_cjk)`` segments.
+
+    PowerPoint draws CJK clusters (fullwidth punctuation included) with the
+    run's ``ea`` typeface and every other cluster with ``latin``, the same
+    split :func:`parse_font_family` resolves. Width headroom is a property of
+    the face that actually draws a glyph, so it is applied per segment.
+    """
+    segments: list[list[Any]] = []
+    for cluster in split_project_text_clusters(str(run.get('text', ''))):
+        cjk = any(is_cjk_char(ch) for ch in cluster)
+        if segments and segments[-1][1] == cjk:
+            segments[-1][0] += cluster
+        else:
+            segments.append([cluster, cjk])
+    return [(text, cjk) for text, cjk in segments]
+
+
+def _estimate_run_width_with_headroom(run: dict[str, Any]) -> float:
+    """Estimate one run with headroom chosen per script segment.
+
+    The serif/sans tier follows the typeface that draws each segment (``ea``
+    for CJK, ``latin`` otherwise), and the uppercase interpolation only ever
+    applies to the Latin segments: CJK advances are fixed-width, so a Chinese
+    sentence that mentions ``AI`` keeps its own base headroom instead of
+    inheriting the all-caps ceiling for the whole line.
+    """
+    segments = _run_script_segments(run)
+    if not segments:
+        return 0.0
+    faces = parse_font_family(str(run.get('font_family', '')))
+    serif_by_script = {
+        False: _is_serif_face(faces['latin']),
+        True: _is_serif_face(faces['ea']),
+    }
+    letter_spacing_px = (
+        drawingml_letter_spacing(
+            float(run.get('letter_spacing', 0.0) or 0.0)
+        )
+        / FONT_PX_TO_HUNDREDTHS_PT
+    )
+    width = 0.0
+    for text, cjk in segments:
+        segment = dict(run, text=text)
+        if serif_by_script[cjk]:
+            base = _SERIF_TEXT_WIDTH_HEADROOM_BASE
+            ceiling = _SERIF_TEXT_WIDTH_HEADROOM_CAPS
+        else:
+            base = _TEXT_WIDTH_HEADROOM_BASE
+            ceiling = _TEXT_WIDTH_HEADROOM_CAPS
+        caps = 0.0 if cjk else _uppercase_fraction([segment])
+        width += _estimate_run_text_width(segment) * (
+            base + (ceiling - base) * caps
+        )
+    # Splitting the run drops the tracking gap at each segment boundary; add
+    # it back unscaled so a negative gap is not amplified by the headroom of
+    # the segment that follows it. Headroom is a safety margin, so the result
+    # never falls below the run's raw advance either.
+    width += letter_spacing_px * (len(segments) - 1)
+    return max(width, _estimate_run_text_width(run))
+
+
+# Faces whose glyphs run wider than the generic advance table at the same
+# weight. Measured against the installed fonts on 2026-09-04: Arial Black
+# renders 24% wider than the caps estimate, Verdana 6%. Only factors ≥ 1 are
+# listed — a narrower face wastes space, a wider one overflows the bounds.
+# (mixed-case factor, all-caps factor): the generic table is already
+# pessimistic on lowercase and optimistic on capitals, so the correction
+# scales with the run's uppercase fraction like the headroom does.
+_WIDE_FAMILY_WIDTH_FACTORS = {
+    'arial black': (1.06, 1.25),
+    'verdana': (1.02, 1.08),
+}
+
+# Monospaced faces advance every Latin glyph by one fixed em fraction, so the
+# per-glyph table (tuned for proportional sans faces) undershoots them by
+# 14–22%: measured 2026-09-05 at 20px, Courier New, DejaVu Sans Mono and Noto
+# Sans Mono all render 0.600 em per character where the generic estimate gives
+# 0.46–0.50. A monospaced run is therefore measured as characters × advance
+# instead of scaled by a factor; CJK glyphs in these faces stay full-width and
+# keep the generic estimate. Advances are the faces' published hmtx values.
+_MONOSPACE_ADVANCE_EM = {
+    'andale mono': 0.60,
+    'cascadia code': 0.586,
+    'cascadia mono': 0.586,
+    'consolas': 0.55,
+    'courier': 0.60,
+    'courier new': 0.60,
+    'dejavu sans mono': 0.602,
+    'fira code': 0.60,
+    'fira mono': 0.60,
+    'hack': 0.602,
+    'ibm plex mono': 0.60,
+    'inconsolata': 0.50,
+    'jetbrains mono': 0.60,
+    'liberation mono': 0.60,
+    'lucida console': 0.60,
+    'menlo': 0.602,
+    'monaco': 0.60,
+    'monospace': 0.60,
+    'noto sans mono': 0.60,
+    'pt mono': 0.60,
+    'roboto mono': 0.60,
+    'sf mono': 0.602,
+    'source code pro': 0.60,
+    'ubuntu mono': 0.50,
+}
+
+
+def _run_primary_family(run: dict[str, Any]) -> str:
+    return primary_font_family(run.get('font_family'))
+
+
+# Fixed-pitch faces outside the table almost always say so in their name
+# (Cascadia Mono, Fira Code, Victor Mono, Noto Sans Mono CJK); 0.60 em is the
+# common advance of the Courier-derived and modern coding families alike.
+# "Arial Unicode MS" and "Monotype Corsiva" are proportional despite the letters.
+_MONOSPACE_NAME_HINT_RE = re.compile(r'mono(?!type)|(?<!uni)code|courier|consol|typewriter')
+_MONOSPACE_DEFAULT_ADVANCE_EM = 0.60
+
+
+def _monospace_advance_em(run: dict[str, Any]) -> float | None:
+    """Return the fixed per-character advance of a monospaced run, if any."""
+    family = _run_primary_family(run)
+    if not family:
+        return None
+    advance = _MONOSPACE_ADVANCE_EM.get(family)
+    if advance is not None:
+        return advance
+    if _MONOSPACE_NAME_HINT_RE.search(family):
+        return _MONOSPACE_DEFAULT_ADVANCE_EM
+    return None
+
+
+def _family_width_factor(run: dict[str, Any]) -> float:
+    if get_font_advances(
+        run.get('font_family'),
+        str(run.get('font_weight', '400')),
+        str(run.get('font_style', 'normal')),
+    ) is not None:
+        return 1.0
+    factors = _WIDE_FAMILY_WIDTH_FACTORS.get(_run_primary_family(run))
+    if factors is None:
+        return 1.0
+    base, caps = factors
+    return base + (caps - base) * _uppercase_fraction([run])
 
 
 def _estimate_run_text_width(run: dict[str, Any]) -> float:
     """Estimate one run using the metrics actually emitted to DrawingML."""
+    if '_inline_dx' in run:
+        return float(run['_inline_dx'])
     text = str(run.get('text', ''))
     font_size_px = (
         font_px_to_hpt(float(run.get('font_size', 16)))
@@ -2007,17 +2340,38 @@ def _estimate_run_text_width(run: dict[str, Any]) -> float:
         text,
         font_size_px,
         str(run.get('font_weight', '400')),
+        font_family=run.get('font_family'),
+        font_style=str(run.get('font_style', 'normal')),
     )
+    clusters = split_project_text_clusters(text)
+    cjk_flags = [any(is_cjk_char(ch) for ch in cluster) for cluster in clusters]
+    monospace_advance = _monospace_advance_em(run)
+    if monospace_advance is not None:
+        # Fixed-pitch faces ignore weight and glyph shape for Latin text.
+        cluster_widths = [
+            width if cjk else monospace_advance * font_size_px
+            for cjk, width in zip(cjk_flags, cluster_widths)
+        ]
+    # The wide-face correction belongs to the Latin typeface only: CJK
+    # clusters draw with the ``ea`` face, so they neither widen with the
+    # family nor count toward its uppercase fraction.
+    latin_factor = _family_width_factor(dict(
+        run,
+        text=''.join(
+            cluster for cluster, cjk in zip(clusters, cjk_flags) if not cjk
+        ),
+    ))
+    cluster_widths = [
+        width if cjk else width * latin_factor
+        for cjk, width in zip(cjk_flags, cluster_widths)
+    ]
     letter_spacing_px = (
         drawingml_letter_spacing(
             float(run.get('letter_spacing', 0.0) or 0.0)
         )
         / FONT_PX_TO_HUNDREDTHS_PT
     )
-    return sum(cluster_widths) + letter_spacing_px * max(
-        len(cluster_widths) - 1,
-        0,
-    )
+    return sum(cluster_widths) + letter_spacing_px * max(len(cluster_widths) - 1, 0)
 
 
 def validate_text_run_advances(runs: list[dict[str, Any]]) -> None:
@@ -2065,36 +2419,41 @@ def _estimate_text_runs_width(
 
     ``include_headroom`` is useful for single-line auto-fit boxes where a
     renderer that measures text slightly wider would otherwise wrap. The
-    headroom scales independently with each run's family and uppercase
-    fraction. This keeps mixed-font lines from inheriting the most conservative
-    run's multiplier. Paragraph boxes use this value as a wrapping constraint,
-    so adding headroom there stretches the merged text frame beyond the
-    author's source line width.
+    headroom scales independently with each script segment's typeface and,
+    for Latin segments, its uppercase fraction. This keeps mixed-font and
+    mixed-script lines from inheriting the most conservative segment's
+    multiplier. Paragraph boxes use this value as a wrapping constraint, so
+    adding headroom there stretches the merged text frame beyond the author's
+    source line width.
     """
+    if any('_inline_dx' in run for run in runs):
+        # A negative dx moves the cursor back; it must not subtract space
+        # already occupied by earlier glyphs or make the frame extent negative.
+        advance = right = 0.0
+        for run in runs:
+            if '_inline_dx' in run:
+                advance += float(run['_inline_dx'])
+                continue
+            advance += _estimate_text_runs_width([run], include_headroom=include_headroom)
+            right = max(right, advance)
+        return right
     if not include_headroom:
         return sum(_estimate_run_text_width(run) for run in runs)
 
-    width = 0.0
-    for run in runs:
-        if _is_serif_run(run):
-            base = _SERIF_TEXT_WIDTH_HEADROOM_BASE
-            ceiling = _SERIF_TEXT_WIDTH_HEADROOM_CAPS
-        else:
-            base = _TEXT_WIDTH_HEADROOM_BASE
-            ceiling = _TEXT_WIDTH_HEADROOM_CAPS
-        caps = _uppercase_fraction([run])
-        width += _estimate_run_text_width(run) * (
-            base + (ceiling - base) * caps
-        )
-    return width
+    return sum(_estimate_run_width_with_headroom(run) for run in runs)
 
 
 def estimate_single_line_text_frame_width(
     runs: list[dict[str, Any]],
+    *,
+    include_headroom: bool = True,
 ) -> float:
-    """Estimate the content width used by one generated DrawingML textbox."""
+    """Estimate one DrawingML textbox width with optional safety headroom."""
     content_runs, bullet = _extract_text_bullet(runs)
-    width = _estimate_text_runs_width(content_runs)
+    width = _estimate_text_runs_width(
+        content_runs,
+        include_headroom=include_headroom,
+    )
     if bullet:
         font_size = (
             float(content_runs[0].get('font_size', 16))
@@ -2167,6 +2526,16 @@ def _extract_text_bullet(
     runs: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     """Convert a leading text bullet marker into paragraph metadata."""
+    if any('_inline_dx' in run for run in runs):
+        # Keep positioned markers literal so bullet normalization cannot
+        # discard or relocate an authored displacement.
+        return runs, None
+    first_nonspace = _first_nonspace_run(runs)
+    if first_nonspace and (
+        first_nonspace.get(_INLINE_FORMULA_KEY) is not None
+        or first_nonspace.get(HYPERLINK_RID_KEY) is not None
+    ):
+        return runs, None
     full_text = ''.join(str(run.get('text', '')) for run in runs)
     match = _TEXT_BULLET_RE.match(full_text)
     if not match:
@@ -2329,6 +2698,11 @@ def _override_run_attrs(
         run_attrs['font_weight'] = parse_project_font_weight(
             tspan_attr('font-weight')
         ).canonical
+    raw_baseline_shift = tspan.get('baseline-shift')
+    if raw_baseline_shift is not None:
+        run_attrs['baseline_shift'] = int(
+            parse_project_baseline_shift(raw_baseline_shift).value
+        )
     if tspan_attr('fill'):
         child_fill = tspan_attr('fill')
         run_attrs['fill_raw'] = child_fill
@@ -2380,33 +2754,77 @@ def _collect_tspan_runs(
     ctx: ConvertContext,
     inherited_xml_space: str = 'default',
 ) -> list[dict[str, Any]]:
-    """Recursively turn a tspan subtree into runs, propagating styling through nested tspans.
+    """Recursively turn one inline SVG subtree into DrawingML text runs."""
+    return _collect_inline_runs(
+        tspan,
+        inherited_attrs,
+        ctx,
+        inherited_xml_space,
+    )
 
-    Order: tspan.text → (each nested child tspan's runs → that child's tail under THIS tspan's attrs).
-    """
+
+def _collect_inline_runs(
+    container: ET.Element,
+    inherited_attrs: dict[str, Any],
+    ctx: ConvertContext,
+    inherited_xml_space: str = 'default',
+    inherited_hyperlink: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Collect nested ``tspan``/``a`` content with style and link inheritance."""
     runs: list[dict[str, Any]] = []
-    own_attrs = _override_run_attrs(inherited_attrs, tspan, ctx)
-    own_xml_space = resolve_project_xml_space(tspan, inherited_xml_space)
+    own_attrs = _override_run_attrs(inherited_attrs, container, ctx)
+    own_xml_space = resolve_project_xml_space(container, inherited_xml_space)
+    container_tag = container.tag.replace(f'{{{SVG_NS}}}', '')
+    own_hyperlink = inherited_hyperlink
+    if container_tag == 'a':
+        own_hyperlink = hyperlink_run_metadata(
+            ctx,
+            svg_hyperlink_href(container),
+        )
 
-    if tspan.text:
-        runs.append({
+    if container_tag == 'tspan' and container.get('dx') is not None:
+        dx = parse_svg_length(
+            container.get('dx'),
+            percent_base=ctx.viewport_width,
+            font_size=float(own_attrs.get('font_size', 16)) / (ctx.scale_y or 1.0),
+        ) * ctx.scale_x
+        if dx:
+            runs.append({**own_attrs, 'text': '', '_inline_dx': dx})
+
+    if container.text:
+        run = {
             **own_attrs,
-            'text': tspan.text,
+            'text': container.text,
             '_xml_space': own_xml_space,
-        })
+        }
+        if own_hyperlink is not None:
+            run.update(own_hyperlink)
+        inline_formula = container.get(_INLINE_FORMULA_ATTR)
+        if inline_formula is not None:
+            run[_INLINE_FORMULA_KEY] = inline_formula
+        runs.append(run)
 
-    for child in tspan:
+    for child in container:
         child_tag = child.tag.replace(f'{{{SVG_NS}}}', '')
-        if child_tag == 'tspan':
+        if child_tag in {'tspan', 'a'}:
             runs.extend(
-                _collect_tspan_runs(child, own_attrs, ctx, own_xml_space)
+                _collect_inline_runs(
+                    child,
+                    own_attrs,
+                    ctx,
+                    own_xml_space,
+                    own_hyperlink,
+                )
             )
             if child.tail:
-                runs.append({
+                tail_run = {
                     **own_attrs,
                     'text': child.tail,
                     '_xml_space': own_xml_space,
-                })
+                }
+                if own_hyperlink is not None:
+                    tail_run.update(own_hyperlink)
+                runs.append(tail_run)
 
     return runs
 
@@ -2418,9 +2836,9 @@ def _build_text_runs(
 ) -> list[dict[str, Any]]:
     """Build a list of text runs from a <text> element, handling <tspan> children.
 
-    Each run is a dict with keys: text, fill, fill_raw, font_weight,
-    font_style, font_family, font_size, letter_spacing. Nested tspans are walked
-    recursively so inline format changes inside a tspan still produce distinct runs.
+    Each run carries text plus resolved paint, typography, tracking, and baseline
+    shift. Nested tspans are walked recursively so inline format changes still
+    produce distinct runs.
     """
     runs: list[dict[str, Any]] = []
     xml_space = resolve_project_xml_space(elem)
@@ -2434,10 +2852,13 @@ def _build_text_runs(
 
     for child in elem:
         child_tag = child.tag.replace(f'{{{SVG_NS}}}', '')
-        if child_tag == 'tspan':
-            runs.extend(
-                _collect_tspan_runs(child, parent_attrs, ctx, xml_space)
-            )
+        if child_tag in {'tspan', 'a'}:
+            runs.extend(_collect_inline_runs(
+                child,
+                parent_attrs,
+                ctx,
+                xml_space,
+            ))
             if child.tail:
                 runs.append({
                     **parent_attrs,
@@ -2458,14 +2879,36 @@ def _build_text_fill_xml(
     if fill_raw.strip().lower() in ('none', 'transparent'):
         return '<a:noFill/>'
 
-    grad_id = resolve_url_id(fill_raw)
-    if grad_id and ctx and grad_id in ctx.defs:
-        return build_gradient_fill(
-            ctx.defs[grad_id],
-            opacity,
-            ctx.theme_color_spec,
-            "text",
-        )
+    paint_id = resolve_url_id(fill_raw)
+    if paint_id and ctx and paint_id in ctx.defs:
+        paint = ctx.defs[paint_id]
+        paint_tag = paint.tag.rsplit('}', 1)[-1]
+        if paint_tag in {'linearGradient', 'radialGradient'}:
+            return build_gradient_fill(
+                paint,
+                opacity,
+                ctx.theme_color_spec,
+                "text",
+            )
+        if paint_tag == 'pattern':
+            mode, image = resolve_project_text_image_fill(paint)
+            source = load_project_image_source(
+                image,
+                ctx.svg_dir,
+                ctx.resource_root,
+            )
+            r_id = _register_image_media(
+                ctx,
+                source.img_format,
+                source.img_data,
+                reuse_text_fill=True,
+            )
+            blip_xml = _build_image_blip_xml(r_id, opacity)
+            if mode == 'stretch':
+                fill_mode_xml = '<a:stretch><a:fillRect/></a:stretch>'
+            else:
+                fill_mode_xml = '<a:tile/>'
+            return f'<a:blipFill>{blip_xml}{fill_mode_xml}</a:blipFill>'
 
     parsed_color, color_alpha = parse_svg_color(fill_raw)
     fill = parsed_color or fill
@@ -2517,6 +2960,7 @@ def _build_run_properties_xml(
     default_fonts: dict[str, str],
     ctx: ConvertContext | None = None,
     effect_xml: str = '',
+    fixed_font_family: str | None = None,
 ) -> str:
     """Build the final ``a:rPr`` used to compare and emit one text run."""
     text = str(run['text'])
@@ -2527,6 +2971,7 @@ def _build_run_properties_xml(
     fstyle = run.get('font_style', '')
     ff = run.get('font_family', '')
     letter_spacing_px = float(run.get('letter_spacing', 0.0) or 0.0)
+    baseline_shift = int(run.get('baseline_shift', 0) or 0)
     opacity = run.get('opacity')
 
     text_dec = run.get('text_decoration', '')
@@ -2544,16 +2989,28 @@ def _build_run_properties_xml(
     u_attr = ' u="sng"' if underline else ''
     strike_attr = ' strike="sngStrike"' if strike else ''
     spc_attr = _letter_spacing_to_drawingml_spc(letter_spacing_px)
+    baseline_attr = f' baseline="{baseline_shift}"' if baseline_shift else ''
 
-    fonts = parse_font_family(ff) if ff else default_fonts
-    run_fonts = theme_font_tokens(
-        fonts,
-        ctx.theme_font_spec if ctx is not None else None,
-    ) or resolve_text_run_fonts(text, fonts)
-    lang = detect_text_lang(
+    fonts = (
+        parse_font_family(ff, ctx.primary_language if ctx is not None else None)
+        if ff else default_fonts
+    )
+    run_fonts = (
+        {
+            'latin': fixed_font_family,
+            'ea': fixed_font_family,
+            'cs': fixed_font_family,
+        }
+        if fixed_font_family is not None
+        else theme_font_tokens(
+            fonts,
+            ctx.theme_font_spec if ctx is not None else None,
+        ) or resolve_text_run_fonts(text, fonts)
+    )
+    lang = str(run.get('_language_override') or detect_text_lang(
         text,
         ctx.primary_language if ctx is not None else None,
-    )
+    ))
     rtl_xml = (
         '\n<a:rtl val="1"/>'
         if text_has_rtl_characters(text)
@@ -2562,14 +3019,26 @@ def _build_run_properties_xml(
 
     fill_xml = _build_text_fill_xml(fill, fill_raw, opacity, ctx)
     outline_xml = _build_text_outline_xml(run, ctx)
+    relationship_id = run.get(HYPERLINK_RID_KEY)
+    hyperlink_xml = (
+        hyperlink_click_xml(
+            str(relationship_id),
+            str(run.get(HYPERLINK_ACTION_KEY))
+            if run.get(HYPERLINK_ACTION_KEY) is not None
+            else None,
+        )
+        if relationship_id is not None
+        else ''
+    )
 
-    return f'''<a:rPr lang="{lang}" sz="{sz}"{b_attr}{i_attr}{u_attr}{strike_attr}{spc_attr} dirty="0">
+    return f'''<a:rPr lang="{lang}" sz="{sz}"{b_attr}{i_attr}{u_attr}{strike_attr}{spc_attr}{baseline_attr} dirty="0">
 {outline_xml}
 {fill_xml}
 {effect_xml}
 <a:latin typeface="{_xml_escape(run_fonts['latin'])}"/>
 <a:ea typeface="{_xml_escape(run_fonts['ea'])}"/>
-<a:cs typeface="{_xml_escape(run_fonts['cs'])}"/>{rtl_xml}
+<a:cs typeface="{_xml_escape(run_fonts['cs'])}"/>
+{hyperlink_xml}{rtl_xml}
 </a:rPr>'''
 
 
@@ -2589,8 +3058,18 @@ def _coalesce_text_runs(
         text = str(run.get('text', ''))
         if not text:
             continue
+        if run.get(_INLINE_FORMULA_KEY) is not None or '_inline_dx' in run:
+            merged.append({**run, 'text': text})
+            previous_properties = None
+            continue
         properties = _build_run_properties_xml(run, default_fonts, ctx)
-        if merged and properties == previous_properties:
+        if (
+            merged
+            and merged[-1].get(_INLINE_FORMULA_KEY) is None
+            and merged[-1].get(HYPERLINK_RID_KEY) == run.get(HYPERLINK_RID_KEY)
+            and merged[-1].get(HYPERLINK_ACTION_KEY) == run.get(HYPERLINK_ACTION_KEY)
+            and properties == previous_properties
+        ):
             candidate = {
                 **merged[-1],
                 'text': str(merged[-1].get('text', '')) + text,
@@ -2619,6 +3098,15 @@ def _text_axis_transform(ctx: ConvertContext) -> tuple[bool, bool, bool]:
     return True, a < 0, d < 0
 
 
+def _inline_formula_preview_run(run: dict[str, Any]) -> dict[str, Any]:
+    """Return an inline formula run as its ordinary SVG preview-text run."""
+    if run.get(_INLINE_FORMULA_KEY) is None:
+        return run
+    preview = dict(run)
+    del preview[_INLINE_FORMULA_KEY]
+    return preview
+
+
 def _build_run_xml(
     run: dict[str, Any],
     default_fonts: dict[str, str],
@@ -2627,8 +3115,45 @@ def _build_run_xml(
 ) -> str:
     """Build a single <a:r> XML from a run dict. Supports gradient fills on text."""
     if run.get('_line_break'):
+        break_run = run.get('_line_break_run')
+        if break_run is not None:
+            properties = dict(break_run)
+            properties.pop(HYPERLINK_RID_KEY, None)
+            properties.pop(HYPERLINK_ACTION_KEY, None)
+            return f'<a:br>{_build_run_properties_xml(properties, default_fonts, ctx)}</a:br>'
         return '<a:br/>'
     text = str(run['text'])
+    inline_formula = run.get(_INLINE_FORMULA_KEY)
+    if inline_formula is not None:
+        fill_raw = str(run.get('fill_raw') or f"#{run.get('fill', '000000')}")
+        fill_color, fill_alpha = parse_svg_color(fill_raw)
+        if fill_color is None or fill_alpha <= 0:
+            raise ValueError(
+                'inline formula text requires one visible solid fill color'
+            )
+        math_run = {
+            **run,
+            'font_family': 'Cambria Math',
+            'font_weight': '400',
+            'font_style': 'normal',
+            'text_decoration': 'none',
+            'letter_spacing': 0.0,
+            'stroke_raw': '',
+            'stroke_opacity': None,
+            '_language_override': (
+                ctx.primary_language
+                if ctx is not None and ctx.primary_language is not None
+                else 'en-US'
+            ),
+        }
+        properties_xml = _build_run_properties_xml(
+            math_run,
+            default_fonts,
+            ctx,
+            fixed_font_family='Cambria Math',
+        )
+        from ..native_objects.inline_formula import build_inline_formula_xml
+        return build_inline_formula_xml(str(inline_formula), properties_xml)
     properties_xml = _build_run_properties_xml(
         run,
         default_fonts,
@@ -2704,7 +3229,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     else:
         letter_spacing_px = 0.0
 
-    fonts = parse_font_family(font_family_str)
+    fonts = parse_font_family(font_family_str, ctx.primary_language)
 
     parent_attrs: dict[str, Any] = {
         'fill': fill_color,
@@ -2715,6 +3240,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         'font_style': font_style,
         'text_decoration': text_decoration,
         'letter_spacing': letter_spacing_px,
+        'baseline_shift': 0,
         '_scale_x': ctx.scale_x or 1.0,
         '_object_opacity': object_opacity,
         '_fill_opacity': fill_opacity,
@@ -2741,6 +3267,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     # of how many merge into one <a:p>; used to size the textbox so PowerPoint
     # has room to wrap text to the SVG's original line widths.
     visual_line_widths: list[float] = []
+    visual_line_runs: list[list[dict[str, Any]]] = []
     if line_height_px is not None and line_height_px > 0:
         xml_space = resolve_project_xml_space(elem)
         paragraph_runs = []
@@ -2756,6 +3283,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             line_runs = _normalize_text_run_whitespace(line_runs)
             if not line_runs:
                 continue
+            visual_line_runs.append(line_runs)
             visual_line_widths.append(
                 _estimate_bullet_line_width(line_runs, fonts, ctx)
             )
@@ -2779,11 +3307,15 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
                 if prev and not prev_text.endswith(' ') \
                         and not next_text.startswith(' ') \
                         and not boundary_is_cjk:
-                    prev.append({
+                    joining_space = {
                         **prev[-1],
                         'text': ' ',
                         'letter_spacing': 0.0,
-                    })
+                    }
+                    joining_space.pop(_INLINE_FORMULA_KEY, None)
+                    joining_space.pop(HYPERLINK_RID_KEY, None)
+                    joining_space.pop(HYPERLINK_ACTION_KEY, None)
+                    prev.append(joining_space)
                 prev.extend(line_runs)
             else:
                 paragraph_runs.append(line_runs)
@@ -2793,6 +3325,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             paragraph_runs = None
             paragraph_space_before = []
             visual_line_widths = []
+            visual_line_runs = []
         else:
             stripped_paragraphs: list[list[dict[str, Any]]] = []
             for line_runs in paragraph_runs:
@@ -2824,24 +3357,105 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         paragraph_space_before = []
         paragraph_bullets = []
         visual_line_widths = []
+        visual_line_runs = []
         single_bullet = None
 
     # Estimate text dimensions
     if paragraph_runs is not None:
         # Use the widest authored visual line, not a reflow-joined paragraph.
         text_width = max(visual_line_widths) if visual_line_widths else 0.0
-        # Keep the authored visual-line count as the source height contract.
-        text_height = (
-            line_height_px * (len(visual_line_widths) - 1)
-            + sum(paragraph_space_before)
-            + font_size * 1.5
-        )
+        line_extents = [
+            _text_line_vertical_extent(line, font_size)
+            for line in visual_line_runs
+        ]
+        text_height = sum(paragraph_space_before)
+        for ascent, descent, has_formula in line_extents[:-1]:
+            line_advance = line_height_px
+            if has_formula:
+                line_advance = max(
+                    line_advance,
+                    _native_text_line_frame_height(
+                        ascent,
+                        descent,
+                        font_size,
+                    ),
+                )
+            text_height += line_advance
+        first_line_ascent = line_extents[0][0]
+        last_ascent, last_descent, last_has_formula = line_extents[-1]
+        last_line_height = font_size * 1.5
+        if last_has_formula:
+            last_line_height = max(
+                last_line_height,
+                _native_text_line_frame_height(
+                    last_ascent,
+                    last_descent,
+                    font_size,
+                ),
+            )
+        text_height += last_line_height
     else:
         text_width = _estimate_text_runs_width(runs)
         if single_bullet:
             fs_px = float(runs[0].get('font_size', font_size)) if runs else font_size
             text_width += _bullet_margin_px(single_bullet, fs_px)
+        first_line_ascent, line_descent, has_formula = (
+            _text_line_vertical_extent(runs, font_size)
+        )
         text_height = font_size * 1.5
+        if has_formula:
+            text_height = max(
+                text_height,
+                _native_text_line_frame_height(
+                    first_line_ascent,
+                    line_descent,
+                    font_size,
+                ),
+            )
+    # Legacy imported frames retain their original baseline/inset convention.
+    # Native math and shifted runs retain their own vertical-extent model.
+    # Ordinary text instead needs PowerPoint's first-line baseline, which is
+    # distinct from the glyph bounds used above and by SVG quality checks.
+    metrics_baseline = (
+        elem.get('data-pptx-frame') is None
+        or elem.get('data-pptx-text-baseline') == 'metrics-v1'
+    )
+    if metrics_baseline and not any(
+        run.get(_INLINE_FORMULA_KEY) is not None or run.get('baseline_shift')
+        for run in runs
+    ):
+        first_line_runs = runs
+        last_line_runs = runs
+        if paragraph_runs is not None:
+            # Paragraph extraction replaces a typed marker with a native bullet
+            # that inherits the body font; its discarded run is not line ink.
+            first_line_runs, _bullet = _extract_text_bullet(visual_line_runs[0])
+            last_line_runs = paragraph_runs[-1]
+            for index, run in enumerate(last_line_runs):
+                if run.get('_line_break'):
+                    last_line_runs = paragraph_runs[-1][index + 1:]
+        first_line_ascent = drawingml_text_baseline_offset(
+            first_line_runs,
+            fonts,
+            default_size=font_size,
+            line_spacing_px=line_height_px if paragraph_runs is not None else None,
+            language=ctx.primary_language,
+        )
+        largest_last_size = max(
+            (font_px_to_hpt(run.get('font_size', font_size)) / FONT_PX_TO_HUNDREDTHS_PT
+             for run in last_line_runs if run.get('text')),
+            default=font_size,
+        )
+        text_height += max(0.0, (largest_last_size - font_size) * 1.5)
+        # An unformatted break can inherit the presentation's default size
+        # instead of the preceding run, changing first-line ascent and advance.
+        for paragraph in paragraph_runs or []:
+            previous_run = None
+            for run in paragraph:
+                if run.get('_line_break') and previous_run is not None:
+                    run['_line_break_run'] = previous_run
+                elif not run.get('_line_break'):
+                    previous_run = run
     padding = _textbox_padding(font_size)
 
     # Adjust position based on text-anchor. This first box follows the visible
@@ -2854,7 +3468,7 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     else:
         box_x = x - padding
 
-    box_y = y - font_size * 0.85
+    box_y = y - first_line_ascent
     box_w = text_width + padding * 2
     box_h = text_height + padding
     if reflect_y:
@@ -2998,42 +3612,61 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     shape_id = _claim_element_shape_id(elem, ctx)
     rot_attr = f' rot="{text_rot}"' if text_rot else ''
 
-    if paragraph_runs is not None:
-        # SVG dy(px) -> hundredths-of-a-point: dy_pt = dy_px * 0.75, then x100.
-        line_spc_val = round(line_height_px * FONT_PX_TO_HUNDREDTHS_PT)
-        ln_spc_xml = f'<a:lnSpc><a:spcPts val="{line_spc_val}"/></a:lnSpc>'
-        paragraph_xml_chunks = []
-        for line, extra_px, bullet in zip(paragraph_runs, paragraph_space_before, paragraph_bullets):
-            spc_bef_xml = ''
-            if extra_px > 0:
-                spc_bef_val = round(extra_px * FONT_PX_TO_HUNDREDTHS_PT)
-                spc_bef_xml = f'<a:spcBef><a:spcPts val="{spc_bef_val}"/></a:spcBef>'
-            runs_inner = '\n'.join(_build_run_xml(r, fonts, ctx, text_effect_xml) for r in line)
-            first_text_run = next(
-                (run for run in line if not run.get('_line_break')),
-                None,
+    def _paragraphs_xml(formula_previews: bool) -> str:
+        # The MCE Fallback copy writes each inline formula as its SVG preview
+        # text so a reader without a14 math still shows the formula.
+        def _runs_xml(line_runs: list[dict[str, Any]]) -> str:
+            return '\n'.join(
+                _build_run_xml(
+                    _inline_formula_preview_run(r) if formula_previews else r,
+                    fonts,
+                    ctx,
+                    text_effect_xml,
+                )
+                for r in line_runs
             )
-            p_pr_xml = _paragraph_pr_xml(
-                algn=algn,
-                font_size=(
-                    float(first_text_run.get('font_size', font_size))
-                    if first_text_run is not None
-                    else font_size
-                ),
-                body_xml=f'{ln_spc_xml}{spc_bef_xml}',
-                bullet=bullet,
-                ctx=ctx,
-                rtl=text_uses_rtl(
-                    ''.join(str(run.get('text', '')) for run in line),
-                    ctx.primary_language,
-                ),
-            )
-            paragraph_xml_chunks.append(
-                f'<a:p>\n{p_pr_xml}\n{runs_inner}\n</a:p>'
-            )
-        paragraphs_xml = '\n'.join(paragraph_xml_chunks)
-    else:
-        runs_xml = '\n'.join(_build_run_xml(r, fonts, ctx, text_effect_xml) for r in runs)
+
+        if paragraph_runs is not None:
+            # SVG dy(px) -> hundredths-of-a-point: dy_pt = dy_px * 0.75, then x100.
+            line_spc_val = round(line_height_px * FONT_PX_TO_HUNDREDTHS_PT)
+            ln_spc_xml = f'<a:lnSpc><a:spcPts val="{line_spc_val}"/></a:lnSpc>'
+            paragraph_xml_chunks = []
+            for line, extra_px, bullet in zip(paragraph_runs, paragraph_space_before, paragraph_bullets):
+                spc_bef_xml = ''
+                if extra_px > 0:
+                    spc_bef_val = round(extra_px * FONT_PX_TO_HUNDREDTHS_PT)
+                    spc_bef_xml = f'<a:spcBef><a:spcPts val="{spc_bef_val}"/></a:spcBef>'
+                runs_inner = _runs_xml(line)
+                first_text_run = next(
+                    (run for run in line if not run.get('_line_break')),
+                    None,
+                )
+                effective_line_spacing = (
+                    ''
+                    if any(run.get(_INLINE_FORMULA_KEY) is not None for run in line)
+                    else ln_spc_xml
+                )
+                p_pr_xml = _paragraph_pr_xml(
+                    algn=algn,
+                    font_size=(
+                        float(first_text_run.get('font_size', font_size))
+                        if first_text_run is not None
+                        else font_size
+                    ),
+                    body_xml=f'{effective_line_spacing}{spc_bef_xml}',
+                    bullet=bullet,
+                    ctx=ctx,
+                    rtl=text_uses_rtl(
+                        ''.join(str(run.get('text', '')) for run in line),
+                        ctx.primary_language,
+                    ),
+                )
+                paragraph_xml_chunks.append(
+                    f'<a:p>\n{p_pr_xml}\n{runs_inner}\n</a:p>'
+                )
+            return '\n'.join(paragraph_xml_chunks)
+
+        runs_xml = _runs_xml(runs)
         p_pr_xml = _paragraph_pr_xml(
             algn=algn,
             font_size=float(runs[0].get('font_size', font_size)) if runs else font_size,
@@ -3041,7 +3674,9 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             ctx=ctx,
             rtl=text_uses_rtl(full_text, ctx.primary_language),
         )
-        paragraphs_xml = f'<a:p>\n{p_pr_xml}\n{runs_xml}\n</a:p>'
+        return f'<a:p>\n{p_pr_xml}\n{runs_xml}\n</a:p>'
+
+    paragraphs_xml = _paragraphs_xml(False)
 
     off_x = px_to_emu(box_x)
     off_y = px_to_emu(box_y)
@@ -3105,9 +3740,10 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
             'anchor="t" anchorCtr="0">\n<a:spAutoFit/>\n</a:bodyPr>'
         )
 
-    return ShapeResult(xml=f'''<p:sp>
+    def _shape_xml(sp_id: int, sp_paragraphs_xml: str) -> str:
+        return f'''<p:sp>
 <p:nvSpPr>
-<p:cNvPr id="{shape_id}" name="TextBox {shape_id}"/>
+<p:cNvPr id="{sp_id}" name="{_xml_escape(shape_display_name(elem, f'TextBox {sp_id}'))}"/>
 <p:cNvSpPr txBox="1"/><p:nvPr/>
 </p:nvSpPr>
 <p:spPr>
@@ -3121,9 +3757,21 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 <p:txBody>
 {body_pr_xml}
 <a:lstStyle/>
-{paragraphs_xml}
+{sp_paragraphs_xml}
 </p:txBody>
-</p:sp>''', bounds_emu=(off_x, off_y, off_x + ext_cx, off_y + ext_cy))
+</p:sp>'''
+
+    shape_xml = _shape_xml(shape_id, paragraphs_xml)
+    if any(run.get(_INLINE_FORMULA_KEY) is not None for run in runs):
+        from ..native_objects.inline_formula import wrap_inline_formula_shape
+        shape_xml = wrap_inline_formula_shape(
+            shape_xml,
+            _shape_xml(ctx.next_id(), _paragraphs_xml(True)),
+        )
+    return ShapeResult(
+        xml=shape_xml,
+        bounds_emu=(off_x, off_y, off_x + ext_cx, off_y + ext_cy),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -3435,6 +4083,35 @@ def _nested_crop_clip_preset_geometry_error(
     )
 
 
+def _visible_clip_shapes(
+    clip: ET.Element,
+    parent_by_id: dict[int, ET.Element],
+) -> list[ET.Element]:
+    """Resolve clip children with the same inherited visibility as visuals."""
+    return [
+        child for child in clip
+        if child.tag not in _CLIP_NON_VISUAL_ELEMENTS
+        and svg_hidden_reason(child, parent_by_id) is None
+    ]
+
+
+def empty_clip_path_reason(
+    element: ET.Element,
+    definitions: dict[str, ET.Element],
+    parent_by_id: dict[int, ET.Element],
+) -> str | None:
+    """Identify a valid clip reference whose children are all hidden."""
+    clip_id = resolve_url_id(element.get('clip-path', ''))
+    clip = definitions.get(clip_id)
+    if clip is not None and clip.tag == f'{{{SVG_NS}}}clipPath':
+        if (
+            any(child.tag not in _CLIP_NON_VISUAL_ELEMENTS for child in clip)
+            and not _visible_clip_shapes(clip, parent_by_id)
+        ):
+            return f'empty clip: url(#{clip_id})'
+    return None
+
+
 def project_clip_path_errors(root: ET.Element) -> list[str]:
     """Return clip-path errors that would otherwise degrade picture geometry."""
     definitions, duplicates = project_definition_index(root)
@@ -3502,10 +4179,9 @@ def project_clip_path_errors(root: ET.Element) -> list[str]:
                 f'{clip_label} cannot use {", ".join(clip_rules)}; native '
                 'picture geometry has no equivalent winding-rule control'
             )
-        visual_children = [
-            child for child in list(clip)
-            if child.tag not in _CLIP_NON_VISUAL_ELEMENTS
-        ]
+        visual_children = _visible_clip_shapes(clip, parent_by_id)
+        if not visual_children and empty_clip_path_reason(elem, definitions, parent_by_id):
+            continue
         if len(visual_children) != 1:
             errors.add(
                 f'{clip_label} must contain exactly one direct supported shape'
@@ -3588,16 +4264,12 @@ def _resolve_clip_geometry(
     if clip_tag != 'clipPath':
         return DEFAULT
 
-    # Find the first shape child of the clipPath
-    shape = None
-    for child in clip_elem:
-        child_tag = child.tag.replace(f'{{{SVG_NS}}}', '')
-        if child_tag in ('circle', 'ellipse', 'rect', 'path', 'polygon'):
-            shape = child
-            break
-
-    if shape is None:
+    shapes = _visible_clip_shapes(clip_elem, ctx.parent_by_id)
+    if not shapes:
         return DEFAULT
+    if len(shapes) != 1:
+        raise ValueError('clipPath must contain exactly one direct supported shape')
+    shape = shapes[0]
 
     shape_tag = shape.tag.replace(f'{{{SVG_NS}}}', '')
     is_obb = clip_elem.get('clipPathUnits') == 'objectBoundingBox'
@@ -4262,6 +4934,34 @@ def _build_image_blip_xml(r_id: str, opacity: float | None) -> str:
     )
 
 
+def _register_image_media(
+    ctx: ConvertContext,
+    img_format: str,
+    img_data: bytes,
+    *,
+    reuse_text_fill: bool = False,
+) -> str:
+    """Register image bytes and return a DrawingML relationship id."""
+    cache_key: tuple[str, str] | None = None
+    if reuse_text_fill:
+        cache_key = (img_format, hashlib.sha256(img_data).hexdigest())
+        if cache_key in ctx.text_image_fill_cache:
+            return ctx.text_image_fill_cache[cache_key]
+
+    img_idx = len(ctx.media_files) + 1
+    img_filename = f's{ctx.slide_num}_img{img_idx}.{img_format}'
+    ctx.media_files[img_filename] = img_data
+    r_id = ctx.next_rel_id()
+    ctx.rel_entries.append({
+        'id': r_id,
+        'type': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+        'target': f'../media/{img_filename}',
+    })
+    if cache_key is not None:
+        ctx.text_image_fill_cache[cache_key] = r_id
+    return r_id
+
+
 def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <image> to DrawingML picture element.
 
@@ -4269,7 +4969,7 @@ def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     to DrawingML picture geometry (prstGeom or custGeom) so the image is
     natively clipped in PowerPoint.
     """
-    source = load_project_image_source(elem, ctx.svg_dir)
+    source = load_project_image_source(elem, ctx.svg_dir, ctx.resource_root)
 
     # Raw coordinates (pre-context-transform) for clip path calculations
     raw_x = svg_length_x(elem.get('x'), ctx)
@@ -4337,26 +5037,11 @@ def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         visible_source_fraction=visible_source_fraction,
     )
 
-    img_idx = len(ctx.media_files) + 1
-    img_filename = f's{ctx.slide_num}_img{img_idx}.{img_format}'
-    ctx.media_files[img_filename] = img_data
-
-    r_id = ctx.next_rel_id()
-    ctx.rel_entries.append({
-        'id': r_id,
-        'type': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
-        'target': f'../media/{img_filename}',
-    })
+    r_id = _register_image_media(ctx, img_format, img_data)
 
     # Resolve clip-path → DrawingML geometry
     clip_geom = _resolve_clip_geometry(elem, ctx, raw_x, raw_y, raw_w, raw_h)
-    effect_xml = ''
-    filter_id = get_effective_filter_id(elem, ctx)
-    if filter_id and filter_id in ctx.defs:
-        effect_xml = build_effect_xml(
-            ctx.defs[filter_id],
-            get_element_opacity(elem, ctx),
-        )
+    effect_xml = _element_effect_xml(elem, ctx)
 
     # Resolve preserveAspectRatio="<align> slice" as DrawingML crop metadata.
     # Image optimization only downscales the full source image; it never crops
@@ -4414,7 +5099,7 @@ def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 
     return ShapeResult(xml=f'''<p:pic>
 <p:nvPicPr>
-<p:cNvPr id="{shape_id}" name="Image {shape_id}"/>
+<p:cNvPr id="{shape_id}" name="{_xml_escape(shape_display_name(elem, f'Image {shape_id}'))}"/>
 <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
 <p:nvPr/>
 </p:nvPicPr>
@@ -4437,7 +5122,7 @@ def convert_image(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 
 def convert_ellipse(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <ellipse> to DrawingML ellipse shape."""
-    preset_geom = _build_preset_geom_from_meta(elem)
+    preset_geom = _build_preset_geom_from_meta(elem, ctx)
     raw_cx = svg_length_x(elem.get('cx'), ctx)
     raw_cy = svg_length_y(elem.get('cy'), ctx)
     rx_attr = elem.get('rx')
@@ -4453,7 +5138,9 @@ def convert_ellipse(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None
     rx = raw_rx * ctx.scale_x
     ry = raw_ry * ctx.scale_y
 
-    if rx <= 0 or ry <= 0:
+    if (rx <= 0 or ry <= 0) and not (
+        preset_geom is not None and is_stroked_zero_axis_shape(elem, ctx)
+    ):
         return None
 
     x = cx_ - rx
@@ -4539,6 +5226,8 @@ _NESTED_CROP_OUTER_ATTRIBUTES = frozenset({
     'data-pptx-editable',
     EFFECT_REASON_ATTR,
     EFFECT_STATUS_ATTR,
+    NATIVE_EFFECT_ATTR,
+    NATIVE_EFFECT_SHA256_ATTR,
     'data-pptx-frame',
     'data-pptx-layer',
     'data-pptx-object',
@@ -4827,17 +5516,12 @@ def _resolve_nested_svg_clip_geometry(
     if not clip_id or clip_id not in ctx.defs:
         return default
     clip_elem = ctx.defs[clip_id]
-    shape = next(
-        (
-            child
-            for child in clip_elem
-            if child.tag.rsplit('}', 1)[-1]
-            in {'circle', 'ellipse', 'rect', 'path', 'polygon'}
-        ),
-        None,
-    )
-    if shape is None:
+    shapes = _visible_clip_shapes(clip_elem, ctx.parent_by_id)
+    if not shapes:
         return default
+    if len(shapes) != 1:
+        raise ValueError('clipPath must contain exactly one direct supported shape')
+    shape = shapes[0]
     if (
         clip_elem.get('clipPathUnits', 'userSpaceOnUse')
         != 'userSpaceOnUse'
@@ -4895,7 +5579,7 @@ def _resolve_nested_svg_clip_geometry(
     )
 
 
-def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
+def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert a nested <svg> sprite-crop wrapper to a DrawingML picture.
 
     Pattern produced by pptx_to_svg::
@@ -4909,7 +5593,13 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
     """
     crop = parse_project_nested_svg_crop(elem)
     image_elem = crop.image
-    source = load_project_image_source(image_elem, ctx.svg_dir)
+    if empty_clip_path_reason(image_elem, ctx.defs, ctx.parent_by_id):
+        return None
+    source = load_project_image_source(
+        image_elem,
+        ctx.svg_dir,
+        ctx.resource_root,
+    )
 
     svg_x = crop.x
     svg_y = crop.y
@@ -4960,16 +5650,7 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
         ),
     )
 
-    img_idx = len(ctx.media_files) + 1
-    img_filename = f's{ctx.slide_num}_img{img_idx}.{img_format}'
-    ctx.media_files[img_filename] = img_data
-
-    r_id = ctx.next_rel_id()
-    ctx.rel_entries.append({
-        'id': r_id,
-        'type': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
-        'target': f'../media/{img_filename}',
-    })
+    r_id = _register_image_media(ctx, img_format, img_data)
 
     shape_id = _claim_element_shape_id(elem, ctx)
     xfrm_attr, off_x, off_y, ext_cx, ext_cy, bounds_emu = _picture_xfrm_from_svg_rect(
@@ -4995,13 +5676,7 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
             svg_w,
             svg_h,
         )
-    effect_xml = ''
-    filter_id = get_effective_filter_id(elem, ctx)
-    if filter_id and filter_id in ctx.defs:
-        effect_xml = build_effect_xml(
-            ctx.defs[filter_id],
-            get_element_opacity(elem, ctx),
-        )
+    effect_xml = _element_effect_xml(elem, ctx)
     blip_xml = _build_image_blip_xml(
         r_id,
         get_element_opacity(image_elem, ctx),
@@ -5009,7 +5684,7 @@ def convert_nested_svg(elem: ET.Element, ctx: ConvertContext) -> ShapeResult:
 
     return ShapeResult(xml=f'''<p:pic>
 <p:nvPicPr>
-<p:cNvPr id="{shape_id}" name="Image {shape_id}"/>
+<p:cNvPr id="{shape_id}" name="{_xml_escape(shape_display_name(elem, f'Image {shape_id}'))}"/>
 <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
 <p:nvPr/>
 </p:nvPicPr>

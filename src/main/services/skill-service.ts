@@ -108,6 +108,13 @@ export async function guiSkillRootsForRuntime(
     join(homedir(), '.kun', 'skills'),
     ...bundledSkillRootCandidates()
   ]
+  // The Codex home skill folder is an already-installed local source. Its
+  // entry files remain strict, while optional reference links/assets can be
+  // skipped during discovery without being followed or read.
+  const trustedGlobalRoots = new Set([
+    normalizeSkillRootPath(process.env.CODEX_HOME ? join(process.env.CODEX_HOME, 'skills') : ''),
+    normalizeSkillRootPath(join(homedir(), '.codex', 'skills'))
+  ].filter(Boolean))
   const codexPluginRoots = await discoverCodexPluginSkillRoots()
   const workwisePluginRoots = await discoverInstalledPluginSkillRoots()
   const configuredExtraRoots = [
@@ -121,7 +128,13 @@ export async function guiSkillRootsForRuntime(
       .map((path) => ({ path, scope: 'project' as const, validation: 'strict' as const })),
     ...globalRoots
       .filter((root) => existsSync(root))
-      .map((path) => ({ path, scope: 'global' as const, validation: 'strict' as const })),
+      .map((path) => ({
+        path,
+        scope: 'global' as const,
+        validation: trustedGlobalRoots.has(normalizeSkillRootPath(path))
+          ? 'trusted-plugin' as const
+          : 'strict' as const
+      })),
     ...codexPluginRoots
       .filter((root) => existsSync(root))
       .map((path) => ({ path, scope: 'global' as const, validation: 'trusted-plugin' as const })),
@@ -460,7 +473,17 @@ async function loadSkillSummary(
       ? TRUSTED_SKILL_DISCOVERY_LIMITS
       : usesAuditedBundleLimits
         ? BUNDLED_SKILL_LIMITS
-        : SKILL_PACKAGE_LIMITS
+        : SKILL_PACKAGE_LIMITS,
+    validation === 'trusted-plugin'
+      ? {
+          skipUnsafeNonEntryFiles: true,
+          allowTrustedEntryLinks: true,
+          trustedEntryLinkRoots: [
+            root,
+            join(homedir(), '.gstack', 'repos')
+          ]
+        }
+      : undefined
   )
   const source = sourceForList(storedSource, root)
   const manifestPath = join(root, 'skill.json')
@@ -1016,7 +1039,7 @@ function titleFromSlug(value: string): string {
 
 function displaySkillName(frontmatterName: string | undefined, folderName: string): string {
   const value = frontmatterName?.trim() ?? ''
-  if ((value || folderName).toLowerCase() === 'ppt-master') return 'PPT Master 4.3.0'
+  if ((value || folderName).toLowerCase() === 'ppt-master') return 'PPT Master'
   if (!value) return titleFromSlug(folderName)
   return /^[a-z0-9][a-z0-9_-]*$/i.test(value) ? titleFromSlug(value) : value
 }

@@ -9,6 +9,7 @@ import type { DesignDocumentV1 } from '../../shared/design-document'
 import { atomicWriteFile } from './durable-file'
 import { resolvePptMasterScript } from './design-ppt-master-paths'
 import { isPptMasterSidecarAvailable, runPptMasterSidecar } from './ppt-master-sidecar'
+import { preserveProtectedPptxContent, validatePptxRoundTrip } from './pptx-integrity'
 
 /**
  * Design 工作区导出服务（main 进程）。
@@ -288,14 +289,32 @@ async function validatePowerPointBytes(bytes: Buffer, expectedSlideCount: number
 export async function validateAndCommitPowerPoint(
   candidatePath: string,
   outputPath: string,
-  expectedSlideCount: number
+  expectedSlideCount: number,
+  sourceBytes?: Uint8Array
 ): Promise<void> {
   const info = await lstat(candidatePath)
   if (!info.isFile() || info.isSymbolicLink()) {
     throw new Error('Exported PowerPoint package is not a regular file.')
   }
-  const bytes = await readFile(candidatePath)
+  const candidateBytes = await readFile(candidatePath)
+  const bytes = sourceBytes ? await preserveProtectedPptxContent(sourceBytes, candidateBytes) : candidateBytes
   await validatePowerPointBytes(bytes, expectedSlideCount)
+  if (sourceBytes) await validatePptxRoundTrip(sourceBytes, bytes)
+  await atomicWriteFile(outputPath, bytes)
+}
+
+export async function validateAndCommitPowerPointBytes(
+  candidateBytes: Uint8Array,
+  outputPath: string,
+  expectedSlideCount: number,
+  sourceBytes?: Uint8Array
+): Promise<void> {
+  if (candidateBytes.byteLength <= 0 || candidateBytes.byteLength > MAX_PPTX_BYTES) {
+    throw new Error(`PowerPoint export exceeds the ${MAX_PPTX_BYTES} byte limit.`)
+  }
+  const bytes = sourceBytes ? await preserveProtectedPptxContent(sourceBytes, candidateBytes) : Buffer.from(candidateBytes)
+  await validatePowerPointBytes(bytes, expectedSlideCount)
+  if (sourceBytes) await validatePptxRoundTrip(sourceBytes, bytes)
   await atomicWriteFile(outputPath, bytes)
 }
 

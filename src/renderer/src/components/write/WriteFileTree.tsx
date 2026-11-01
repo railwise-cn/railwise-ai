@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { ChevronDown, ChevronRight, FileText, FilePlus2, Folder, FolderPlus, Image, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, FilePlus2, Folder, FolderInput, FolderPlus, Image, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { WorkspaceEntry } from '@shared/workspace-file'
 import { isWriteImageFileExtension, isWriteWorkspaceEntry } from '@shared/write-text-file'
@@ -22,6 +22,7 @@ type Props = {
   onCreateFile: (directoryPath?: string) => void
   onCreateDirectory: (directoryPath?: string) => void
   onRenameEntry: (entry: WorkspaceEntry) => void
+  onMoveEntry?: (entry: WorkspaceEntry) => void
   onDeleteEntry: (entry: WorkspaceEntry) => void
   onRefresh: () => void
   showHeader?: boolean
@@ -99,6 +100,7 @@ export function WriteFileTree({
   onCreateFile,
   onCreateDirectory,
   onRenameEntry,
+  onMoveEntry,
   onDeleteEntry,
   onRefresh,
   showHeader = true,
@@ -149,6 +151,11 @@ export function WriteFileTree({
                 >
                   <Pencil className="h-3.5 w-3.5" strokeWidth={1.85} />
                 </TreeActionButton>
+                {onMoveEntry ? (
+                  <TreeActionButton title={t('writeMoveEntry')} onClick={() => onMoveEntry(entry)}>
+                    <FolderInput className="h-3.5 w-3.5" strokeWidth={1.85} />
+                  </TreeActionButton>
+                ) : null}
                 <TreeActionButton
                   title={isDirectory ? t('writeDeleteFolder') : t('writeDeleteFile')}
                   onClick={() => onDeleteEntry(entry)}

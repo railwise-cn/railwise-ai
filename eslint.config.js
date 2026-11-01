@@ -5,7 +5,12 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['build/**', 'dist/**', 'node_modules/**', 'out/**', 'coverage/**', 'src/asset/skills/**']
+    ignores: [
+      'build/**', 'dist/**', 'node_modules/**', 'out/**', 'coverage/**',
+      'src/asset/skills/**', 'src/asset/pptx-editors/third-party/**',
+      // User-authored media projects are workspace content, not application code.
+      'railwise-video-skills/**', 'railwise-video-v4/**', 'deliverables/**'
+    ]
   },
   js.configs.recommended,
   {

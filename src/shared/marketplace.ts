@@ -419,6 +419,12 @@ export type PackageConfigurationFieldV1 = {
   defaultValue?: string | number | boolean | string[]
 }
 
+export type PackageUsageV1 = {
+  howToUse: string
+  examples?: string[]
+  requirements?: string[]
+}
+
 export type MarketplacePackageV1 = {
   schemaVersion: 1
   id: string
@@ -439,6 +445,7 @@ export type MarketplacePackageV1 = {
   auth: PackageAuthV1
   licenseEvidence: PackageLicenseEvidenceV1[]
   dependencies: PackageDependencyV1[]
+  usage?: PackageUsageV1
   hooks?: PackageHookV1[]
   signature?: PackageSignatureV1
   configuration?: PackageConfigurationFieldV1[]
@@ -482,6 +489,21 @@ export type MarketplaceCatalogSyncResultV1 = {
   stale: boolean
   snapshot: CatalogSnapshotV1 | null
   error?: string
+}
+
+export type PluginUpdateDiagnosticStateV1 =
+  | 'current'
+  | 'metadata-refresh'
+  | 'update-available'
+  | 'runtime-drift'
+  | 'unavailable'
+
+export type PluginUpdateDiagnosticV1 = {
+  packageId: string
+  installedVersion: string
+  catalogVersion?: string
+  state: PluginUpdateDiagnosticStateV1
+  message: string
 }
 
 export type PreparedPluginImportV1 = {

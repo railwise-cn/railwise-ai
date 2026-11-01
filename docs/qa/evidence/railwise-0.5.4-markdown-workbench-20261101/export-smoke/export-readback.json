@@ -1,0 +1,20 @@
+{
+  "pdfPages": 1,
+  "pdfText": "M a r kd own   wor kbe n ch   e xport  L o ca l   e xport   r eg r e ss i on .  I t e m   V a lu e  T ab l e   P r e s e rv ed  const   local   =   true  B lo cked   r e mot e   i m age\n",
+  "checks": {
+    "pdfHeading": true,
+    "pdfTable": true,
+    "pdfCode": true,
+    "pdfMetadataHidden": true,
+    "docxTable": true,
+    "docxImages": 1,
+    "htmlNoRemoteImage": true,
+    "htmlMetadataHidden": true
+  },
+  "sha256": {
+    "html": "024592f1b033fead6fb7ed4ca24555fc157b0c60d96c1a84b84d061bde264f94",
+    "docx": "84f385067cfcb8853e37a656e3ee15a4773dafbc9c42ae1e8405115d65016c6c",
+    "pdf": "d84ac87341088e2836d8037c5915337f443ad8705f9c2a846d1322e36f516805"
+  },
+  "pdfTextNormalizedForValidation": "MarkdownworkbenchexportLocalexportregression.ItemValueTablePreservedconstlocal=trueBlockedremoteimage"
+}

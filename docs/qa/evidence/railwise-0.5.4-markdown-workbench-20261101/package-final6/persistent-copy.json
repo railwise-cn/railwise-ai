@@ -1,0 +1,14 @@
+{
+  "sourceCandidateRoot": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final6",
+  "privateCheckpoint": "1864d44d23f5328d5fc435edec9323b57db53ece",
+  "persistentRoot": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final",
+  "appPathsAndAsarSha256": {
+    "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final6/dist/mac-arm64/RailWise AI Candidate 1864d44d23f5.app": "1661b8e597be4c69634e0c9b1ebdc4941f7defed6bbc96508e5bf6f103dafe07",
+    "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final6/Applications/RailWise AI Candidate 1864d44d23f5.app": "1661b8e597be4c69634e0c9b1ebdc4941f7defed6bbc96508e5bf6f103dafe07",
+    "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/Applications/RailWise AI Candidate 1864d44d23f5.app": "1661b8e597be4c69634e0c9b1ebdc4941f7defed6bbc96508e5bf6f103dafe07"
+  },
+  "sameAsar": true,
+  "sourceCopied": false,
+  "nodeModulesCopied": false,
+  "publicRelease": false
+}

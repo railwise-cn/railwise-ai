@@ -46,7 +46,10 @@ export function buildDesignPrompt(
     height: page.height,
     background: page.background ?? 'FFFFFF',
     selectedElementIds,
-    elements: page.elements.slice(0, 120).map((element) => ({
+    selectedElements: page.elements.filter((element) => selectedElementIds.includes(element.id)),
+    capabilities: ['add', 'update', 'remove', 'group', 'ungroup', 'undo'],
+    constraints: ['Preserve locked objects', 'Apply one atomic undoable command batch'],
+    elements: page.elements.map((element) => ({
       id: element.id,
       type: element.type,
       name: element.name,
@@ -57,6 +60,8 @@ export function buildDesignPrompt(
       rotation: element.rotation,
       fill: element.fill,
       stroke: element.stroke,
+      locked: element.locked,
+      opacity: element.opacity,
       text: element.type === 'text' ? element.text?.slice(0, 500) : undefined,
       childIds: element.type === 'group' ? element.childIds : undefined,
       zIndex: element.zIndex
@@ -64,8 +69,8 @@ export function buildDesignPrompt(
     elementCount: page.elements.length
   }
   return [
-    '[WorkWise Design active-canvas request]',
-    'You are editing the currently open WorkWise Design canvas.',
+    '[RailWise AI Design active-canvas request]',
+    'You are editing the currently open RailWise AI Design canvas.',
     'For any visual change, call design_apply_canvas_commands exactly once with one atomic operation batch.',
     'Do not write SVG, HTML, JSON, scripts, or other files as a substitute for changing the canvas.',
     ...(hasImportedSlideReference ? [

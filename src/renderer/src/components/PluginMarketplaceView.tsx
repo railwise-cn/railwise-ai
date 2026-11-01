@@ -38,14 +38,15 @@ import type {
   MarketplacePackageV1,
   MarketplaceProductTypeV1,
   PackagePermissionV1,
-  PreparedPluginImportV1
+  PreparedPluginImportV1,
+  PluginUpdateDiagnosticV1
 } from '@shared/marketplace'
 import type { SkillListItem } from '@shared/workwise-api'
 import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import brand from '@shared/product-brand.json'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
-import { friendlyMarketplaceError } from './plugin-marketplace-compat'
+import { friendlyMarketplaceError, skillValidationWarning } from './plugin-marketplace-compat'
 
 export * from './plugin-marketplace-compat'
 
@@ -145,10 +146,23 @@ function isInstalled(
 function hasUpdate(
   item: MarketplacePackageV1,
   record: InstalledPackageV1 | undefined,
-  reviewSha256?: string
+  _reviewSha256?: string,
+  diagnostic?: PluginUpdateDiagnosticV1
 ): boolean {
-  return Boolean(record && item.availability.status === 'available' &&
-    (record.version !== item.version || (reviewSha256 && record.reviewSha256 !== reviewSha256)))
+  if (!record || item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') return false
+  return diagnostic?.state === 'metadata-refresh' || diagnostic?.state === 'update-available'
+}
+
+function diagnosticLabel(diagnostic: PluginUpdateDiagnosticV1, text: Text): string {
+  const labels = {
+    current: ['pluginUpdateCurrent', 'Up to date'],
+    'metadata-refresh': ['pluginUpdateReview', 'Review metadata changes'],
+    'update-available': ['pluginUnifiedUpdateAvailable', 'Update available'],
+    'runtime-drift': ['pluginUpdateFull', 'Complete update required'],
+    unavailable: ['pluginUpdateUnavailable', 'Source unavailable']
+  } as const
+  const [key, fallback] = labels[diagnostic.state]
+  return text(key, fallback)
 }
 
 function needsConfiguration(
@@ -251,6 +265,18 @@ function skillSourceUrl(skill: SkillListItem): string | null {
 }
 
 const SKILL_RESULT_LIMIT = 50
+const FEATURED_SKILL_HINTS = [
+  'ppt-master',
+  'browser-skill',
+  'blender-skills',
+  'video-shotcraft',
+  'diagram-design',
+  'arch-diagram-skill',
+  'report-writing',
+  'data-analysis',
+  'frontend-design',
+  'humanizer'
+] as const
 const MARKETPLACE_CATEGORY_ORDER = [
   'development',
   'documents',
@@ -260,7 +286,22 @@ const MARKETPLACE_CATEGORY_ORDER = [
   'collaboration',
   'engineering'
 ] as const
-const FEATURED_PACKAGE_IDS = ['github-mcp', 'playwright-mcp', 'context7-mcp', 'markitdown'] as const
+const FEATURED_PACKAGE_IDS = [
+  'github-mcp',
+  'playwright-mcp',
+  'context7-mcp',
+  'markitdown',
+  // User-requested GitHub Skills shown directly in the featured catalog.
+  'browser-skill',
+  'blender-skills',
+  'video-shotcraft',
+  'diagram-design',
+  'arch-diagram-skill'
+] as const
+
+function isFeaturedPackage(item: MarketplacePackageV1): boolean {
+  return FEATURED_PACKAGE_IDS.includes(item.id as typeof FEATURED_PACKAGE_IDS[number])
+}
 
 function marketplaceCollection(item: MarketplacePackageV1): string {
   if (item.collections?.[0]) return item.collections[0]
@@ -333,6 +374,8 @@ export function PluginMarketplaceView(): ReactElement {
   const [catalogCredentials, setCatalogCredentials] = useState<CatalogCredentialStatusV1[]>([])
   const [entries, setEntries] = useState<MarketplaceCatalogPackageEntryV1[]>([])
   const [installedPackages, setInstalledPackages] = useState<InstalledPackageV1[]>([])
+  const [updateDiagnostics, setUpdateDiagnostics] = useState<PluginUpdateDiagnosticV1[]>([])
+  const diagnosticMap = useMemo(() => new Map(updateDiagnostics.map((item) => [item.packageId, item])), [updateDiagnostics])
   const [mcpServers, setMcpServers] = useState<McpServerConfigV2[]>([])
   const [skills, setSkills] = useState<SkillListItem[]>([])
   const [skillValidationErrors, setSkillValidationErrors] = useState<Array<{ root: string; message: string }>>([])
@@ -372,10 +415,11 @@ export function PluginMarketplaceView(): ReactElement {
   const refresh = useCallback(async (showSpinner = false): Promise<void> => {
     if (showSpinner) setLoading(true)
     try {
-      const [catalogSources, catalog, packageRecords, servers, skills, credentialStatuses] = await Promise.all([
+      const [catalogSources, catalog, packageRecords, diagnostics, servers, skills, credentialStatuses] = await Promise.all([
         window.workwise.listCatalogSources(),
         window.workwise.listCatalogPackages(),
         window.workwise.listInstalledPlugins(),
+        window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
         window.workwise.listMcpServers(workspaceRoot || undefined),
         window.workwise.listSkills(workspaceRoot || undefined).catch(() => null),
         window.workwise.listCatalogCredentialStatuses()
@@ -383,6 +427,7 @@ export function PluginMarketplaceView(): ReactElement {
       setSources(catalogSources)
       setEntries(catalog.packages)
       setInstalledPackages(packageRecords)
+      setUpdateDiagnostics(diagnostics)
       setMcpServers(servers)
       setCatalogCredentials(credentialStatuses)
       if (skills?.ok) {
@@ -397,6 +442,17 @@ export function PluginMarketplaceView(): ReactElement {
             'pluginUnifiedCatalogConflicts',
             '{{count}} package name conflicts are isolated by source.',
             { count: catalog.conflicts.length }
+          )
+        })
+      }
+      const blocked = diagnostics.filter((item) => item.state === 'runtime-drift' || item.state === 'unavailable')
+      if (blocked.length > 0 && catalog.conflicts.length === 0) {
+        setNotice({
+          tone: 'info',
+          message: text(
+            'pluginUnifiedUpdateDiagnostics',
+            '{{count}} installed plugins need attention before updating: {{packages}}.',
+            { count: blocked.length, packages: blocked.map((item) => item.packageId).join(', ') }
           )
         })
       }
@@ -446,9 +502,9 @@ export function PluginMarketplaceView(): ReactElement {
       if (sourceAudience(sourceMap.get(entry.sourceId)) !== audienceFilter) return false
       if (sourceFilter !== 'all' && entry.sourceId !== sourceFilter) return false
       if (categoryFilter !== 'all' && marketplaceCollection(item) !== categoryFilter) return false
-      if (statusFilter === 'recommended' && item.tier !== 'recommended') return false
+      if (statusFilter === 'recommended' && !isFeaturedPackage(item) && item.tier !== 'recommended') return false
       if (statusFilter === 'installed' && !added) return false
-      if (statusFilter === 'updates' && !hasUpdate(item, record, entry.reviewSha256)) return false
+      if (statusFilter === 'updates' && !hasUpdate(item, record, entry.reviewSha256, diagnosticMap.get(item.id))) return false
       if (statusFilter === 'configuration' && !needsConfiguration(item, record, server)) return false
       if (!needle) return true
       return [
@@ -469,7 +525,7 @@ export function PluginMarketplaceView(): ReactElement {
       if (left.package.tier !== right.package.tier) return left.package.tier === 'recommended' ? -1 : 1
       return left.package.name.localeCompare(right.package.name)
     })
-  }, [audienceFilter, categoryFilter, entries, installed, mcpServers, query, sourceFilter, sourceMap, statusFilter, text])
+  }, [diagnosticMap, audienceFilter, categoryFilter, entries, installed, mcpServers, query, sourceFilter, sourceMap, statusFilter, text])
 
   const installedEntries = useMemo(
     () => entries.filter((entry) => isInstalled(entry.package, installed, mcpServers)),
@@ -482,13 +538,14 @@ export function PluginMarketplaceView(): ReactElement {
       return sourceFilter === 'all' || entry.sourceId === sourceFilter
     })
     return {
-      recommended: scoped.filter((entry) => entry.package.tier === 'recommended').length,
+      recommended: scoped.filter((entry) => isFeaturedPackage(entry.package) || entry.package.tier === 'recommended').length,
       all: scoped.length,
       installed: scoped.filter((entry) => isInstalled(entry.package, installed, mcpServers)).length,
       updates: scoped.filter((entry) => hasUpdate(
         entry.package,
         installed.get(entry.package.id),
-        entry.reviewSha256
+        entry.reviewSha256,
+        diagnosticMap.get(entry.package.id)
       )).length,
       configuration: scoped.filter((entry) => needsConfiguration(
         entry.package,
@@ -496,12 +553,12 @@ export function PluginMarketplaceView(): ReactElement {
         installedServerForPackage(entry.package, mcpServers)
       )).length
     }
-  }, [audienceFilter, entries, installed, mcpServers, sourceFilter, sourceMap])
+  }, [diagnosticMap, audienceFilter, entries, installed, mcpServers, sourceFilter, sourceMap])
 
   const visibleEntryGroups = useMemo(() => {
     const showFeatured = categoryFilter === 'all' && statusFilter === 'recommended' && !query.trim()
     const preferred = showFeatured
-      ? visibleEntries.filter((entry) => FEATURED_PACKAGE_IDS.includes(entry.package.id as typeof FEATURED_PACKAGE_IDS[number])).slice(0, 4)
+      ? visibleEntries.filter((entry) => isFeaturedPackage(entry.package))
       : []
     const featured = preferred.length ? preferred : showFeatured ? visibleEntries.slice(0, 2) : []
     const featuredKeys = new Set(featured.map(packageKey))
@@ -788,6 +845,12 @@ export function PluginMarketplaceView(): ReactElement {
 
   const invokePrimaryAction = async (entry: MarketplaceCatalogPackageEntryV1): Promise<void> => {
     const item = entry.package
+    const diagnostic = diagnosticMap.get(item.id)
+    if (diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)) {
+      setSelectedKey(packageKey(entry))
+      setDetailsOpen(true)
+      return
+    }
     if (item.installation.mode === 'direct-mirror') {
       await prepareCatalog(entry)
       return
@@ -952,6 +1015,7 @@ export function PluginMarketplaceView(): ReactElement {
         {viewMode === 'skills' ? (
           <LocalSkillsList
             skills={visibleSkills}
+            allSkills={skills}
             totalIndexed={skillCount}
             totalMatches={matchingSkills.length}
             filter={skillFilter}
@@ -992,6 +1056,7 @@ export function PluginMarketplaceView(): ReactElement {
                       key={packageKey(entry)}
                       entry={entry}
                       installed={installed.get(entry.package.id)}
+                      diagnostic={diagnosticMap.get(entry.package.id)}
                       reviewSha256={entry.reviewSha256}
                       server={installedServerForPackage(entry.package, mcpServers)}
                       busy={busy === packageKey(entry) || busy === `connect:${entry.package.id}`}
@@ -1013,6 +1078,7 @@ export function PluginMarketplaceView(): ReactElement {
       {detailsOpen && selected ? (
         <DetailsDrawer
           entry={selected}
+          diagnostic={diagnosticMap.get(selected.package.id)}
           source={sourceMap.get(selected.sourceId)}
           installed={installed.get(selected.package.id)}
           server={installedServerForPackage(selected.package, mcpServers)}
@@ -1193,6 +1259,7 @@ export function PluginMarketplaceView(): ReactElement {
 
 function LocalSkillsList({
   skills,
+  allSkills,
   totalIndexed,
   totalMatches,
   filter,
@@ -1206,6 +1273,7 @@ function LocalSkillsList({
   onOpenSource
 }: {
   skills: SkillListItem[]
+  allSkills: SkillListItem[]
   totalIndexed: number
   totalMatches: number
   filter: SkillBrowseFilter
@@ -1220,6 +1288,19 @@ function LocalSkillsList({
 }): ReactElement {
   const invalidRoots = new Set(validationErrors.map((item) => item.root))
   const browsing = filter !== 'overview' || Boolean(query.trim())
+  const featuredSkills = useMemo(() => {
+    const candidates = allSkills.filter((skill) => skill.source?.type === 'bundled' || skill.source?.type === 'github')
+    return [...candidates].sort((left, right) => {
+      const leftText = `${left.id} ${left.name} ${left.description ?? ''}`.toLowerCase()
+      const rightText = `${right.id} ${right.name} ${right.description ?? ''}`.toLowerCase()
+      const leftRank = FEATURED_SKILL_HINTS.findIndex((hint) => leftText.includes(hint))
+      const rightRank = FEATURED_SKILL_HINTS.findIndex((hint) => rightText.includes(hint))
+      const normalizedLeft = leftRank < 0 ? FEATURED_SKILL_HINTS.length : leftRank
+      const normalizedRight = rightRank < 0 ? FEATURED_SKILL_HINTS.length : rightRank
+      if (normalizedLeft !== normalizedRight) return normalizedLeft - normalizedRight
+      return (left.name || left.id).localeCompare(right.name || right.id)
+    }).slice(0, 8)
+  }, [allSkills])
   const filters: Array<[SkillBrowseFilter, string, number | null]> = [
     ['overview', text('pluginUnifiedSkillOverview', 'Overview'), null],
     ['workwise', text('pluginUnifiedSkillWorkWise', brand.platform, { productName: brand.platform }), groupCounts.workwise],
@@ -1266,20 +1347,59 @@ function LocalSkillsList({
             {text('pluginUnifiedSkillScanIssues', '{{count}} Skill roots need attention.', { count: validationErrors.length })}
           </div>
           <div className="mt-1 space-y-1 opacity-80">
-            {validationErrors.slice(0, 3).map((error) => <div key={`${error.root}:${error.message}`} className="break-words">{error.root}: {error.message}</div>)}
+            {validationErrors.slice(0, 3).map((error) => <div key={`${error.root}:${error.message}`} className="break-words">{skillValidationWarning(error.root, error.message, (key) => text(key, key))}</div>)}
           </div>
         </div>
       ) : null}
 
       {!browsing ? (
-        <div className="flex min-h-[260px] flex-col items-center justify-center px-6 text-center text-ds-muted">
-          <Sparkles className="h-7 w-7 text-accent" />
-          <p className="mt-3 text-[15px] font-semibold text-ds-ink">
-            {text('pluginUnifiedSkillOverviewTitle', '{{count}} Skills indexed', { count: totalIndexed })}
-          </p>
-          <p className="mt-1 max-w-[520px] text-[12px] leading-5">
-            {text('pluginUnifiedSkillOverviewDesc', 'These Skills remain in their source folders and are not added to the curated plugin catalog.')}
-          </p>
+        <div className="px-5 pb-8 md:px-7">
+          <div className="flex items-end justify-between border-b border-ds-border py-4">
+            <div>
+              <h3 className="text-[14px] font-semibold text-ds-ink">
+                {text('pluginUnifiedSkillFeaturedTitle', '精选推荐')}
+              </h3>
+              <p className="mt-1 text-[12px] text-ds-muted">
+                {text('pluginUnifiedSkillFeaturedDesc', '从当前已索引技能中挑选适合直接开始的工作流。')}
+              </p>
+            </div>
+            <span className="text-[11px] text-ds-faint">
+              {text('pluginUnifiedSkillOverviewTitle', '{{count}} Skills indexed', { count: totalIndexed })}
+            </span>
+          </div>
+          {featuredSkills.length > 0 ? (
+            <div className="grid gap-3 py-4 md:grid-cols-2">
+              {featuredSkills.map((skill) => {
+                const source = skill.source?.type === 'github'
+                  ? `${skill.source.owner}/${skill.source.repo}`
+                  : text('pluginUnifiedSkillBundled', `${brand.platform} bundled`, { productName: brand.platform })
+                return (
+                  <div key={`${skill.root}:${skill.id}`} className="flex min-w-0 items-start gap-3 rounded-lg border border-ds-border bg-ds-card p-3">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ds-subtle text-accent">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold text-ds-ink">{skill.name || skill.id}</div>
+                      <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-ds-muted">{skill.description || skill.id}</div>
+                      <div className="mt-2 text-[10px] text-ds-faint">{source}</div>
+                    </div>
+                    {skillSourceUrl(skill) ? (
+                      <IconButton label={text('pluginUnifiedSkillOpenSource', 'Open Skill source')} onClick={() => onOpenSource(skill)}>
+                        <ExternalLink className="h-4 w-4" />
+                      </IconButton>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="flex min-h-[180px] flex-col items-center justify-center px-6 text-center text-ds-muted">
+              <Sparkles className="h-7 w-7 text-accent" />
+              <p className="mt-3 max-w-[520px] text-[12px] leading-5">
+                {text('pluginUnifiedSkillOverviewDesc', 'These Skills remain in their source folders and are not added to the curated plugin catalog.')}
+              </p>
+            </div>
+          )}
         </div>
       ) : skills.length === 0 ? (
         <div className="flex min-h-[240px] flex-col items-center justify-center px-6 text-center text-ds-muted">
@@ -1464,14 +1584,16 @@ function InstalledPluginStrip({ entries, text, onSelect }: {
   )
 }
 
-function PackageStatus({ item, installed, server, reviewSha256, text }: {
+function PackageStatus({ item, installed, server, reviewSha256, diagnostic, text }: {
   item: MarketplacePackageV1
   installed?: InstalledPackageV1
   server?: McpServerConfigV2
   reviewSha256?: string
+  diagnostic?: PluginUpdateDiagnosticV1
   text: Text
 }): ReactElement {
-  if (hasUpdate(item, installed, reviewSha256)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedPermissionsChanged', 'Permissions changed') : text('pluginUnifiedUpdateAvailable', 'Update available')}</span>
+  if (diagnostic && diagnostic.state !== 'current') return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{diagnosticLabel(diagnostic, text)}</span>
+  if (hasUpdate(item, installed, reviewSha256, diagnostic)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedPermissionsChanged', 'Permissions changed') : text('pluginUnifiedUpdateAvailable', 'Update available')}</span>
   if (needsConfiguration(item, installed, server)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{text('pluginUnifiedNeedsConfig', 'Needs configuration')}</span>
   if (installed || server || isManagedInstalled(item)) return <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />{text('pluginFilterInstalled', 'Installed')}</span>
   if (item.availability.status === 'unavailable') return <span className="text-[11px] font-medium text-ds-faint">{text('pluginUnifiedUnavailable', 'Unavailable')}</span>
@@ -1479,41 +1601,44 @@ function PackageStatus({ item, installed, server, reviewSha256, text }: {
   return <span className="text-[11px] font-medium text-ds-faint">{item.version}</span>
 }
 
-function PrimaryAction({ item, installed, server, reviewSha256, busy, text, onClick }: {
+function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy, text, onClick }: {
   item: MarketplacePackageV1
   installed?: InstalledPackageV1
   server?: McpServerConfigV2
   reviewSha256?: string
+  diagnostic?: PluginUpdateDiagnosticV1
   busy: boolean
   text: Text
   onClick: () => void
 }): ReactElement | null {
   if (item.installation.mode === 'system-managed') return null
   const added = Boolean(installed || server || isManagedInstalled(item))
-  const update = hasUpdate(item, installed, reviewSha256)
+  const update = hasUpdate(item, installed, reviewSha256, diagnostic)
+  const blocked = diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)
   const managesPermissions = item.installation.mode === 'direct-mirror' && added && !update
   const remote = item.components.some((component) => component.type === 'mcp' && component.runtime.kind === 'remote')
   const canAct = item.installation.mode === 'direct-mirror' || remote || isHttpUrl(item.source.location)
   if (!canAct) return null
-  const label = update
+  const label = blocked ? diagnosticLabel(diagnostic!, text) : update
     ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
     : item.installation.mode === 'direct-mirror' && !added ? text('pluginUnifiedInstall', 'Install')
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
     : text('pluginOpenSource', 'Open source')
   return (
-    <button type="button" disabled={busy || (item.availability.status === 'unavailable' && !isHttpUrl(item.source.location))} onClick={(event) => { event.stopPropagation(); onClick() }} className="inline-flex h-8 min-w-[92px] items-center justify-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50">
+    <button type="button" disabled={busy || Boolean(blocked) || (item.availability.status === 'unavailable' && !isHttpUrl(item.source.location))} onClick={(event) => { event.stopPropagation(); onClick() }} className="inline-flex h-8 min-w-[92px] items-center justify-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50">
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : item.installation.mode === 'external' ? <ExternalLink className="h-3.5 w-3.5" /> : update ? <RefreshCw className="h-3.5 w-3.5" /> : managesPermissions ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
       {label}
     </button>
   )
 }
 
-function PluginRow({ entry, installed, server, reviewSha256, busy, text, onSelect, onAction }: {
+function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, text, onSelect, onAction }: {
   entry: MarketplaceCatalogPackageEntryV1
   installed?: InstalledPackageV1
   server?: McpServerConfigV2
   reviewSha256?: string
+  diagnostic?: PluginUpdateDiagnosticV1
   busy: boolean
   text: Text
   onSelect: () => void
@@ -1532,11 +1657,11 @@ function PluginRow({ entry, installed, server, reviewSha256, busy, text, onSelec
         <p className="mt-1 line-clamp-1 text-[12px] text-ds-muted">{packageDisplaySummary(item, text)}</p>
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-ds-faint">
           <span>{item.publisher.name}</span>
-          <PackageStatus item={item} installed={installed} server={server} reviewSha256={reviewSha256} text={text} />
+          <PackageStatus item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} text={text} />
         </div>
       </div>
       <div className="flex items-center gap-1.5">
-        <PrimaryAction item={item} installed={installed} server={server} reviewSha256={reviewSha256} busy={busy} text={text} onClick={onAction} />
+        <PrimaryAction item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={reviewSha256} busy={busy} text={text} onClick={onAction} />
         <ChevronRight className="h-4 w-4 text-ds-faint" />
       </div>
     </div>
@@ -1561,11 +1686,12 @@ function DetailSection({ title, children }: { title: string; children: ReactNode
   return <section className="border-b border-ds-border px-5 py-4"><h3 className="mb-2 text-[11px] font-semibold uppercase text-ds-faint">{title}</h3>{children}</section>
 }
 
-function DetailsDrawer({ entry, source, installed, server, busy, text, onClose, onAction, onRollback, onOpenSource }: {
+function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, text, onClose, onAction, onRollback, onOpenSource }: {
   entry: MarketplaceCatalogPackageEntryV1
   source?: CatalogSourceV1
   installed?: InstalledPackageV1
   server?: McpServerConfigV2
+  diagnostic?: PluginUpdateDiagnosticV1
   busy: string
   text: Text
   onClose: () => void
@@ -1585,7 +1711,7 @@ function DetailsDrawer({ entry, source, installed, server, busy, text, onClose, 
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <PrimaryAction item={item} installed={installed} server={server} reviewSha256={entry.reviewSha256} busy={busy === packageKey(entry) || busy === `connect:${item.id}`} text={text} onClick={onAction} />
+          <PrimaryAction item={item} installed={installed} server={server} diagnostic={diagnostic} reviewSha256={entry.reviewSha256} busy={busy === packageKey(entry) || busy === `connect:${item.id}`} text={text} onClick={onAction} />
           {installed?.rollback.available ? (
             <button type="button" disabled={busy === `rollback:${item.id}`} onClick={() => onRollback(installed)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-ds-border px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:opacity-50">
               <RotateCcw className="h-3.5 w-3.5" />{text('pluginUnifiedRollback', 'Rollback')}
@@ -1593,6 +1719,7 @@ function DetailsDrawer({ entry, source, installed, server, busy, text, onClose, 
           ) : null}
         </div>
       </div>
+      {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>
         <DefinitionList values={[
           [text('pluginUnifiedVersion', 'Version'), installed ? `${installed.version} / ${item.version}` : item.version],
@@ -1604,6 +1731,13 @@ function DetailsDrawer({ entry, source, installed, server, busy, text, onClose, 
         ]} />
         {isHttpUrl(item.source.location) ? <button type="button" onClick={onOpenSource} className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"><ExternalLink className="h-3.5 w-3.5" />{text('pluginOpenSource', 'Open source')}</button> : null}
       </DetailSection>
+      {item.usage ? (
+        <DetailSection title={text('pluginUnifiedHowToUse', 'How to use')}>
+          <p className="whitespace-pre-wrap text-[12px] leading-5 text-ds-muted">{item.usage.howToUse}</p>
+          {item.usage.requirements?.length ? <p className="mt-2 text-[11px] text-ds-faint">{text('pluginUnifiedRequirements', 'Requirements')}: {item.usage.requirements.join(' · ')}</p> : null}
+          {item.usage.examples?.length ? <div className="mt-2 space-y-1.5">{item.usage.examples.map((example) => <code key={example} className="block rounded bg-ds-subtle px-2 py-1 text-[11px] text-ds-ink">{example}</code>)}</div> : null}
+        </DetailSection>
+      ) : null}
       <DetailSection title={text('pluginUnifiedImplementation', 'Implementation')}>
         {isManagedConnector(item)
           ? <p className="text-[12px] text-ds-muted">{text('pluginUnifiedManagedConnector', `${brand.platform} managed connector`, { productName: brand.platform })}</p>

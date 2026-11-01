@@ -1,0 +1,18 @@
+Executable=/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/Applications/RailWise AI Candidate 1864d44d23f5.app/Contents/MacOS/RailWise AI Candidate 1864d44d23f5
+Identifier=com.wangjiawei508.workwise.candidate.head1864d44d23f5
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=462 flags=0x2(adhoc) hashes=3+7 location=embedded
+Hash type=sha256 size=32
+CandidateCDHash sha256=1983e4de2d536ebcd27858d030fa1e4f4d373da8
+CandidateCDHashFull sha256=1983e4de2d536ebcd27858d030fa1e4f4d373da8259f45b2537595ea026dc57a
+Hash choices=sha256
+CMSDigest=1983e4de2d536ebcd27858d030fa1e4f4d373da8259f45b2537595ea026dc57a
+CMSDigestType=2
+CDHash=1983e4de2d536ebcd27858d030fa1e4f4d373da8
+Signature=adhoc
+Info.plist entries=32
+TeamIdentifier=not set
+Sealed Resources version=2 rules=13 files=9605
+Internal requirements count=0 size=12
+Total signatures=1
+Chosen signature=1

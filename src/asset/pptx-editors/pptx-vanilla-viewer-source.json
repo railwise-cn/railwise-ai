@@ -1,0 +1,33 @@
+{
+  "name": "pptx-vanilla-viewer",
+  "repository": "https://github.com/ChristopherVR/ooxml",
+  "repositoryPath": "viewers/pptx/packages/vanilla",
+  "ref": "d8f80c291c1f9ecc23278c4b2ac8674915d30828",
+  "tag": "pptx-vanilla-viewer@3.61.0",
+  "version": "3.61.0",
+  "license": "Apache-2.0",
+  "npmIntegrity": "sha512-FnLcfBHwUssQIxySEeHZb9hny+1Ov7oLkZ6W5NZl94eNh+htW9tBh8JSP1rfwfF5SHEKYmPnHSLQ4g8CHFCZrw==",
+  "releaseArtifactSha256": "a1afedbcc861daa3332365e6d5c9c8454820eafbd0305e8e77568b16e6e17623",
+  "integration": "local-vanilla-dom",
+  "status": "bundled-dependency-verified",
+  "externalContent": false,
+  "googleFonts": false,
+  "bundledComponents": [
+    {
+      "name": "mtx-decompressor",
+      "license": "MPL-2.0",
+      "source": "https://github.com/ChristopherVR/mtx-decompressor/tree/d818c57f494bd6ba103291a9d706def706992e5a",
+      "repository": "https://github.com/ChristopherVR/mtx-decompressor",
+      "sourceRef": "d818c57f494bd6ba103291a9d706def706992e5a",
+      "sourceTag": "v1.8.0",
+      "npmVersion": "1.8.0",
+      "npmIntegrity": "sha512-suXE376dUmLX4PPxSmVmdWvu09oeesqmlE5NfKjb6XIUpDRjF2Mn47kM8nXWRkHb3l7ac0P+Crp0J0O984imRQ==",
+      "sourceArchive": "https://github.com/ChristopherVR/mtx-decompressor/archive/d818c57f494bd6ba103291a9d706def706992e5a.tar.gz",
+      "sourceArchiveSha256": "983d8184fdbb9e6023c4d178f622ac10eb7d0dfb57d1c4eb44bc081021bbe761",
+      "sourceAvailability": "vendored-source-and-license-with-upstream-source-offer",
+      "vendorPath": "src/asset/pptx-editors/third-party/mtx-decompressor",
+      "sourcePath": "src/asset/pptx-editors/third-party/mtx-decompressor/src"
+    }
+  ],
+  "notes": "The Apache-2.0 viewer bundle includes the separately licensed MPL-2.0 MTX font decompressor. Preserve its license and corresponding source availability notice in distributions."
+}
