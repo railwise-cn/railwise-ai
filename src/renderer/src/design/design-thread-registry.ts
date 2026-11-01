@@ -216,6 +216,33 @@ export function rememberActiveDesignDocument(
   }
 }
 
+/** Forget the document that should be restored when this workspace is opened. */
+export function clearActiveDesignDocument(
+  workspaceRoot: string,
+  storage: BrowserStorageLike | null = browserStorage()
+): void {
+  const workspace = workspaceRoot.trim().replaceAll('\\', '/').replace(/\/+$/, '')
+  if (!workspace || !storage) return
+  try {
+    const current = JSON.parse(storage.getItem(ACTIVE_DESIGN_DOCUMENTS_KEY) ?? '{}') as unknown
+    if (!current || typeof current !== 'object' || Array.isArray(current)) return
+    const records = { ...(current as Record<string, unknown>) }
+    delete records[workspace]
+    if (Object.keys(records).length === 0) storage.removeItem?.(ACTIVE_DESIGN_DOCUMENTS_KEY)
+    else storage.setItem(ACTIVE_DESIGN_DOCUMENTS_KEY, JSON.stringify(records))
+  } catch {
+    /* Design remains usable when browser storage is unavailable or malformed. */
+  }
+}
+
+/** Forget the document that should be restored when this workspace is opened again. */
+export function forgetActiveDesignDocumentForWorkspace(
+  workspaceRoot: string,
+  storage: BrowserStorageLike | null = browserStorage()
+): void {
+  clearActiveDesignDocument(workspaceRoot, storage)
+}
+
 export function isDesignAssistantThreadId(
   threadId: string | null | undefined,
   registry: DesignThreadRegistry = readDesignThreadRegistry()

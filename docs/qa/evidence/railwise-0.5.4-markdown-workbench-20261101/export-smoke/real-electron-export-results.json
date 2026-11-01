@@ -1,0 +1,24 @@
+{
+  "testedAt": "2026-11-01T05:11:37.518Z",
+  "electron": "43.1.1",
+  "results": [
+    {
+      "format": "html",
+      "path": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/export-smoke/document.html",
+      "bytes": 4511,
+      "signature": "<!DOCTYP"
+    },
+    {
+      "format": "docx",
+      "path": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/export-smoke/document.docx",
+      "bytes": 10088,
+      "signature": "PK\u0003\u0004\n\u0000\u0000\u0000"
+    },
+    {
+      "format": "pdf",
+      "path": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/export-smoke/document.pdf",
+      "bytes": 63656,
+      "signature": "%PDF-1.4"
+    }
+  ]
+}

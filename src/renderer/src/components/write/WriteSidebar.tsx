@@ -61,6 +61,7 @@ type EntryDialog =
   | { kind: 'create-file'; parentDirectory?: string; value: string }
   | { kind: 'create-folder'; parentDirectory?: string; value: string }
   | { kind: 'rename'; entry: WorkspaceEntry; value: string }
+  | { kind: 'move'; entry: WorkspaceEntry; value: string }
   | { kind: 'delete'; entry: WorkspaceEntry }
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string
@@ -201,6 +202,11 @@ export function WriteSidebar({
     setEntryDialog({ kind: 'delete', entry })
   }
 
+  const openMoveEntryDialog = (entry: WorkspaceEntry): void => {
+    const parent = writeDirnameFromPath(entry.path)
+    setEntryDialog({ kind: 'move', entry, value: parent === root ? '.' : writeRelativeToWorkspace(root, parent) })
+  }
+
   const submitEntryDialog = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     if (!entryDialog) return
@@ -213,6 +219,12 @@ export function WriteSidebar({
 
     const value = entryDialog.value.trim()
     if (!value) return
+
+    if (entryDialog.kind === 'move') {
+      const moved = await renameEntry(workspaceRoot, entryDialog.entry.path, entryDialog.entry.name, value)
+      if (moved) setEntryDialog(null)
+      return
+    }
 
     if (entryDialog.kind === 'rename') {
       if (value === entryDialog.entry.name) {
@@ -479,6 +491,7 @@ export function WriteSidebar({
                       onCreateFile={(directoryPath) => void openCreateFileDialog(directoryPath)}
                       onCreateDirectory={(directoryPath) => void openCreateDirectoryDialog(directoryPath)}
                       onRenameEntry={openRenameEntryDialog}
+                      onMoveEntry={openMoveEntryDialog}
                       onDeleteEntry={openDeleteEntryDialog}
                       onRefresh={() => void refreshWorkspace(workspaceRoot)}
                       showHeader={false}
@@ -515,11 +528,13 @@ function entryDialogTitle(dialog: EntryDialog, t: Translate): string {
   if (dialog.kind === 'create-file') return t('writeCreateFile')
   if (dialog.kind === 'create-folder') return t('writeCreateFolder')
   if (dialog.kind === 'rename') return t('writeRenameEntry')
+  if (dialog.kind === 'move') return t('writeMoveEntry')
   return dialog.entry.type === 'directory' ? t('writeDeleteFolder') : t('writeDeleteFile')
 }
 
 function entryDialogSubmitLabel(dialog: EntryDialog, t: Translate): string {
   if (dialog.kind === 'rename') return t('writeEntryDialogRename')
+  if (dialog.kind === 'move') return t('writeEntryDialogMove')
   if (dialog.kind === 'delete') return t('writeEntryDialogDelete')
   return t('writeEntryDialogCreate')
 }
@@ -531,6 +546,7 @@ function entryDialogDescription(dialog: EntryDialog, t: Translate): string {
       : t('writeDeleteFileConfirm', { name: dialog.entry.name })
   }
   if (dialog.kind === 'rename') return t('writeRenameEntryPrompt')
+  if (dialog.kind === 'move') return t('writeMoveEntryPrompt', { name: dialog.entry.name })
   if (dialog.kind === 'create-file') return t('writeCreateFilePrompt')
   return t('writeCreateFolderPrompt')
 }
@@ -568,6 +584,7 @@ function WriteEntryDialog({
         {!deleting ? (
           <input
             autoFocus
+            aria-label={dialog.kind === 'move' ? t('writeMoveTargetDirectory') : entryDialogTitle(dialog, t)}
             value={dialog.value}
             onChange={(event) => onValueChange(event.target.value)}
             className="mt-4 w-full rounded-xl border border-ds-border bg-ds-main/65 px-3 py-2 text-[14px] text-ds-ink outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/25"

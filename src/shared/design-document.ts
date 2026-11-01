@@ -20,6 +20,8 @@
  * 架构详见 docs/DESIGN_WORKSPACE_ARCHITECTURE.md。
  */
 
+import { normalizePptxImportReport, type PptxDocumentMetadata } from './pptx-document'
+
 // ---------------------------------------------------------------------------
 // 画布格式预设
 // ---------------------------------------------------------------------------
@@ -280,6 +282,40 @@ export type DesignPage = {
   displayMode?: 'editable' | 'fidelity'
 }
 
+export type DesignImportDiagnosticSeverity = 'info' | 'warning' | 'error'
+
+export type DesignImportDiagnostic = {
+  code: string
+  severity: DesignImportDiagnosticSeverity
+  message: string
+  pageNumber?: number
+  pageId?: string
+  elementId?: string
+}
+
+/**
+ * Durable provenance and quality report for an imported PPTX.
+ * The source path is intentionally excluded; only the user-visible filename
+ * and bounded conversion facts are persisted with the design document.
+ */
+export type DesignImportReportV1 = {
+  schemaVersion: 'v1'
+  sourceType: 'pptx'
+  sourceFileName: string
+  sourceSlideCount: number
+  convertedSlideCount: number
+  importedAt: number
+  mode: 'editable' | 'mixed' | 'fidelity'
+  summary: {
+    elementCount: number
+    textElementCount: number
+    imageElementCount: number
+    warningCount: number
+    errorCount: number
+  }
+  diagnostics: DesignImportDiagnostic[]
+}
+
 // ---------------------------------------------------------------------------
 // 资源（图片等）
 // ---------------------------------------------------------------------------
@@ -313,7 +349,8 @@ export type DesignAsset = {
  * - 导出 PPTX：每页 → <svg viewBox="0 0 W H"> → svg_to_pptx.py
  */
 export type DesignDocumentV1 = {
-  schemaVersion: 'v1'
+  /** v2 is used for documents carrying a native PPTX editing model. */
+  schemaVersion: 'v1' | 'v2'
   id: string
   /**
    * 单调递增的内容 revision。任何可持久化画板变更必须递增，
@@ -322,6 +359,8 @@ export type DesignDocumentV1 = {
   revision: number
   /** 文档名（也是项目目录名） */
   name: string
+  /** Free-canvas documents omit this for legacy compatibility. */
+  documentKind?: 'free-canvas' | 'pptx'
   /** 画布格式（新建文档时选，影响默认尺寸）。custom 时各页可不同尺寸 */
   format: DesignCanvasFormat
   /** 页面列表 */
@@ -333,6 +372,10 @@ export type DesignDocumentV1 = {
    * 使运行时重放同一命令时可以返回原始确认而不会再次修改画板。
    */
   appliedCommands: DesignAppliedCommandRecord[]
+  /** Native PPTX provenance and adapter state. */
+  pptx?: PptxDocumentMetadata
+  /** Structured conversion report retained for diagnostics and re-imports. */
+  importReport?: DesignImportReportV1
   /** 可选设计 Token（颜色、字体和间距规范） */
   designTokens?: {
     colors?: string[]
@@ -341,6 +384,12 @@ export type DesignDocumentV1 = {
   }
   createdAt: number
   updatedAt: number
+}
+
+/** Explicit V2 alias used by new PPTX integrations without breaking V1 readers. */
+export type DesignDocumentV2 = Omit<DesignDocumentV1, 'schemaVersion' | 'documentKind'> & {
+  schemaVersion: 'v2'
+  documentKind: 'free-canvas' | 'pptx'
 }
 
 // ---------------------------------------------------------------------------
@@ -488,6 +537,7 @@ export function createDesignDocument(options?: {
     id: generateDesignDocumentId(),
     revision: 0,
     name: options?.name ?? '未命名设计',
+    documentKind: 'free-canvas',
     format,
     pages: [createDesignPage({ format, customSize: options?.customSize })],
     assets: [],
@@ -722,6 +772,47 @@ export function validateDesignDocumentResourceLimits(input: unknown): DesignDocu
       }
     }
   }
+  if (raw.importReport !== undefined) {
+    const report = raw.importReport as Record<string, unknown>
+    if (
+      !report ||
+      typeof report !== 'object' ||
+      report.schemaVersion !== 'v1' ||
+      report.sourceType !== 'pptx' ||
+      typeof report.sourceFileName !== 'string' ||
+      report.sourceFileName.length > 255 ||
+      !Number.isSafeInteger(report.sourceSlideCount) ||
+      (report.sourceSlideCount as number) < 1 ||
+      !Number.isSafeInteger(report.convertedSlideCount) ||
+      (report.convertedSlideCount as number) < 0 ||
+      typeof report.importedAt !== 'number' ||
+      !Number.isFinite(report.importedAt) ||
+      !['editable', 'mixed', 'fidelity'].includes(String(report.mode)) ||
+      !report.summary ||
+      typeof report.summary !== 'object' ||
+      !Array.isArray(report.diagnostics) ||
+      report.diagnostics.length > 2_000
+    ) {
+      return { ok: false, message: 'Design document contains an invalid PPTX import report.' }
+    }
+    const summary = report.summary as Record<string, unknown>
+    for (const key of ['elementCount', 'textElementCount', 'imageElementCount', 'warningCount', 'errorCount']) {
+      if (!Number.isSafeInteger(summary[key]) || (summary[key] as number) < 0) {
+        return { ok: false, message: 'Design document contains an invalid PPTX import summary.' }
+      }
+    }
+    for (const diagnostic of report.diagnostics) {
+      if (
+        !diagnostic ||
+        typeof diagnostic !== 'object' ||
+        typeof (diagnostic as Record<string, unknown>).code !== 'string' ||
+        typeof (diagnostic as Record<string, unknown>).message !== 'string' ||
+        !['info', 'warning', 'error'].includes(String((diagnostic as Record<string, unknown>).severity))
+      ) {
+        return { ok: false, message: 'Design document contains an invalid PPTX import diagnostic.' }
+      }
+    }
+  }
   if (raw.designTokens && typeof raw.designTokens === 'object' && !Array.isArray(raw.designTokens)) {
     const tokens = raw.designTokens as Record<string, unknown>
     for (const value of [tokens.colors, tokens.fonts, tokens.spacing]) {
@@ -840,6 +931,70 @@ export function normalizeDesignElement(input: Partial<DesignElement> | null | un
   return element
 }
 
+function normalizeDesignImportReport(input: unknown): DesignImportReportV1 | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null
+  const raw = input as Partial<DesignImportReportV1>
+  if (
+    raw.schemaVersion !== 'v1' ||
+    raw.sourceType !== 'pptx' ||
+    typeof raw.sourceFileName !== 'string' ||
+    raw.sourceFileName.length === 0 ||
+    raw.sourceFileName.length > 255 ||
+    !Number.isSafeInteger(raw.sourceSlideCount) ||
+    raw.sourceSlideCount! < 1 ||
+    !Number.isSafeInteger(raw.convertedSlideCount) ||
+    raw.convertedSlideCount! < 0 ||
+    typeof raw.importedAt !== 'number' ||
+    !Number.isFinite(raw.importedAt) ||
+    !['editable', 'mixed', 'fidelity'].includes(String(raw.mode)) ||
+    !raw.summary ||
+    typeof raw.summary !== 'object' ||
+    !Array.isArray(raw.diagnostics) ||
+    raw.diagnostics.length > 2_000
+  ) return null
+  const summary = raw.summary
+  const summaryKeys = ['elementCount', 'textElementCount', 'imageElementCount', 'warningCount', 'errorCount'] as const
+  if (summaryKeys.some((key) => !Number.isSafeInteger(summary[key]) || summary[key] < 0)) return null
+  const diagnostics: DesignImportDiagnostic[] = []
+  for (const value of raw.diagnostics) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    const diagnostic = value as Partial<DesignImportDiagnostic>
+    if (
+      typeof diagnostic.code !== 'string' || diagnostic.code.length === 0 || diagnostic.code.length > 80 ||
+      typeof diagnostic.message !== 'string' || diagnostic.message.length === 0 || diagnostic.message.length > 2_000 ||
+      (diagnostic.severity !== 'info' && diagnostic.severity !== 'warning' && diagnostic.severity !== 'error')
+    ) return null
+    diagnostics.push({
+      code: diagnostic.code,
+      severity: diagnostic.severity,
+      message: diagnostic.message,
+      ...(typeof diagnostic.pageNumber === 'number' && Number.isSafeInteger(diagnostic.pageNumber) && diagnostic.pageNumber > 0
+        ? { pageNumber: diagnostic.pageNumber } : {}),
+      ...(typeof diagnostic.pageId === 'string' && diagnostic.pageId.length <= DESIGN_DOCUMENT_LIMITS.idChars
+        ? { pageId: diagnostic.pageId } : {}),
+      ...(typeof diagnostic.elementId === 'string' && diagnostic.elementId.length <= DESIGN_DOCUMENT_LIMITS.idChars
+        ? { elementId: diagnostic.elementId } : {})
+    })
+  }
+  return {
+    schemaVersion: 'v1',
+    sourceType: 'pptx',
+    sourceFileName: raw.sourceFileName,
+    sourceSlideCount: raw.sourceSlideCount!,
+    convertedSlideCount: raw.convertedSlideCount!,
+    importedAt: raw.importedAt,
+    mode: raw.mode!,
+    summary: {
+      elementCount: summary.elementCount,
+      textElementCount: summary.textElementCount,
+      imageElementCount: summary.imageElementCount,
+      warningCount: summary.warningCount,
+      errorCount: summary.errorCount
+    },
+    diagnostics
+  }
+}
+
 /**
  * 归一化文档（从存盘 JSON 读取时的防御性处理）。
  * 跳过损坏的页面/元素，保证返回值始终合法可用。
@@ -885,8 +1040,12 @@ export function normalizeDesignDocument(input: Partial<DesignDocumentV1> | null 
   const designTokens = normalizeDesignTokens(input.designTokens)
   const appliedCommands = normalizeAppliedCommands(input.appliedCommands)
   if (appliedCommands === null) return null
+  const importReport = input.importReport === undefined
+    ? undefined
+    : normalizeDesignImportReport(input.importReport)
+  if (input.importReport !== undefined && importReport === null) return null
   const normalized: DesignDocumentV1 = {
-    schemaVersion: 'v1',
+    schemaVersion: input.schemaVersion === 'v2' ? 'v2' : 'v1',
     id: typeof input.id === 'string' && input.id.trim() ? input.id.trim() : generateDesignDocumentId(),
     revision:
       typeof input.revision === 'number' &&
@@ -895,17 +1054,77 @@ export function normalizeDesignDocument(input: Partial<DesignDocumentV1> | null 
         ? input.revision
         : 0,
     name: typeof input.name === 'string' && input.name.trim() ? input.name.trim() : '未命名设计',
+    ...(input.documentKind === 'pptx' || input.documentKind === 'free-canvas'
+      ? { documentKind: input.documentKind }
+      : {}),
     format: input.format && DESIGN_CANVAS_FORMATS.includes(input.format as DesignCanvasFormat)
       ? (input.format as DesignCanvasFormat)
       : DEFAULT_DESIGN_CANVAS_FORMAT,
     pages,
     assets: normalizeDesignAssets(input.assets),
     appliedCommands,
+    ...(input.pptx && typeof input.pptx === 'object' && !Array.isArray(input.pptx)
+      ? { pptx: normalizePptxMetadata(input.pptx) }
+      : {}),
+    ...(importReport ? { importReport } : {}),
     ...(designTokens ? { designTokens } : {}),
     createdAt: typeof input.createdAt === 'number' ? input.createdAt : now,
     updatedAt: typeof input.updatedAt === 'number' ? input.updatedAt : now
   }
   return validateDesignDocumentStructure(normalized) ? normalized : null
+}
+
+function boundedString(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed && trimmed.length <= max ? trimmed : undefined
+}
+
+function normalizePptxMetadata(input: unknown): PptxDocumentMetadata | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined
+  const raw = input as Record<string, unknown>
+  const backend = raw.editorBackend === 'pptx-vanilla-viewer' || raw.editorBackend === 'pptist' || raw.editorBackend === 'legacy-svg'
+    ? raw.editorBackend
+    : 'legacy-svg'
+  const editorVersion = boundedString(raw.editorVersion, 128) ?? 'unknown'
+  const editorModel = normalizeBoundedPptxObject(raw.editorModel)
+  const protectedObjects = Array.isArray(raw.protectedObjects)
+    ? raw.protectedObjects.map((value) => normalizeBoundedPptxObject(value)).filter((value): value is Record<string, unknown> => Boolean(value)).slice(0, 30_000)
+    : undefined
+  const source = raw.source && typeof raw.source === 'object' && !Array.isArray(raw.source)
+    ? (() => {
+        const value = raw.source as Record<string, unknown>
+        return {
+          ...(boundedString(value.path, 1024) ? { path: boundedString(value.path, 1024) } : {}),
+          ...(boundedString(value.sha256, 128) ? { sha256: boundedString(value.sha256, 128) } : {}),
+          ...(typeof value.bytes === 'number' && Number.isSafeInteger(value.bytes) && value.bytes >= 0 ? { bytes: value.bytes } : {}),
+          ...(boundedString(value.cachedFilename, 256) ? { cachedFilename: boundedString(value.cachedFilename, 256) } : {})
+        }
+      })()
+    : undefined
+  return {
+    editorBackend: backend,
+    editorVersion,
+    ...(editorModel ? { editorModel } : {}),
+    ...(protectedObjects?.length ? { protectedObjects } : {}),
+    ...(normalizePptxImportReport(raw.importReport) ? { importReport: normalizePptxImportReport(raw.importReport) } : {}),
+    ...(source && Object.keys(source).length > 0 ? { source } : {})
+  }
+}
+
+/** Preserve the native editor model without allowing prototype-bearing or oversized payloads. */
+function normalizeBoundedPptxObject(input: unknown): Record<string, unknown> | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined
+  try {
+    const serialized = JSON.stringify(input)
+    if (!serialized || serialized.length > 8 * 1024 * 1024) return undefined
+    const parsed = JSON.parse(serialized) as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 const SAFE_COMMAND_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,160}$/
@@ -1017,6 +1236,8 @@ function normalizeDesignTokens(input: unknown): DesignDocumentV1['designTokens']
  */
 export function validateDesignDocumentStructure(document: DesignDocumentV1): boolean {
   if (!validateDesignDocumentResourceLimits(document).ok) return false
+  if (document.schemaVersion === 'v2' && document.documentKind !== 'pptx' && document.documentKind !== 'free-canvas') return false
+  if (document.documentKind === 'pptx' && !document.pptx) return false
   if (!Number.isSafeInteger(document.revision) || document.revision < 0) return false
   if (
     !Array.isArray(document.appliedCommands) ||

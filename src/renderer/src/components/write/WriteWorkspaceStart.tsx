@@ -1,8 +1,10 @@
-import type { ReactElement } from 'react'
-import { FilePenLine, FilePlus2, FolderOpen, ListTodo, Presentation, RefreshCw, Sparkles } from 'lucide-react'
+import { useState, type ReactElement } from 'react'
+import { FilePenLine, FilePlus2, FolderOpen, ListTodo, Presentation, RefreshCw, Sparkles, Target, Users, PackageOpen, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { WorkspaceEntry } from '@shared/workspace-file'
 
 export function WriteWorkspaceStart({
+  busy = false,
   onAskAssistant,
   onCreateDraft,
   onCreatePresentation,
@@ -11,15 +13,67 @@ export function WriteWorkspaceStart({
   workspaceName,
   workspacePathLabel
 }: {
-  onAskAssistant: () => void
-  onCreateDraft: () => void
-  onCreatePresentation: () => void
+  busy?: boolean
+  onAskAssistant: (prompt: string) => void
+  onCreateDraft: (brief?: string) => void
+  onCreatePresentation: (brief?: string) => void
   onPickWorkspace: () => void
   onRefreshWorkspace: () => void
   workspaceName: string
   workspacePathLabel: string
 }): ReactElement {
   const { t, i18n } = useTranslation('common')
+  const [goal, setGoal] = useState('')
+  const [materials, setMaterials] = useState('')
+  const [audience, setAudience] = useState('')
+  const [output, setOutput] = useState('')
+  const [materialFiles, setMaterialFiles] = useState<WorkspaceEntry[]>([])
+  const [materialPickerOpen, setMaterialPickerOpen] = useState(false)
+  const [materialPickerBusy, setMaterialPickerBusy] = useState(false)
+  const [materialPickerError, setMaterialPickerError] = useState('')
+  const brief = [
+    goal.trim() ? `${t('writeStartGoalLabel')}: ${goal.trim()}` : '',
+    materials.trim() ? `${t('writeStartMaterialsLabel')}: ${materials.trim()}` : '',
+    audience.trim() ? `${t('writeStartAudienceLabel')}: ${audience.trim()}` : '',
+    output.trim() ? `${t('writeStartOutputLabel')}: ${output.trim()}` : ''
+  ].filter(Boolean).join('\n')
+  const outlinePrompt = `${t('writeStartOutlinePrompt')}\n\n${brief || t('writeStartClarifyPrompt')}`
+  const openMaterialPicker = async (): Promise<void> => {
+    if (materialPickerBusy) return
+    setMaterialPickerOpen(true)
+    setMaterialPickerBusy(true)
+    setMaterialPickerError('')
+    try {
+      const rootPath = workspacePathLabel
+      const queue: Array<{ path?: string; depth: number }> = [{ depth: 0 }]
+      const files: WorkspaceEntry[] = []
+      const visited = new Set<string>()
+      while (queue.length && visited.size < 120) {
+        const current = queue.shift()!
+        const result = await window.workwise.listWorkspaceDirectory({ workspaceRoot: rootPath, path: current.path })
+        if (!result.ok) throw new Error(result.message)
+        if (visited.has(result.root)) continue
+        visited.add(result.root)
+        for (const entry of result.entries) {
+          if (entry.type === 'directory' && current.depth < 3) queue.push({ path: entry.path, depth: current.depth + 1 })
+          else if (entry.type === 'file' && /\.(md|markdown|txt|docx|pdf|csv|xlsx|pptx)$/i.test(entry.name)) files.push(entry)
+        }
+      }
+      setMaterialFiles(files.sort((left, right) => left.path.localeCompare(right.path)))
+    } catch (error) {
+      setMaterialPickerError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setMaterialPickerBusy(false)
+    }
+  }
+  const selectMaterial = (path: string): void => {
+    if (!path) return
+    const reference = `@${path}`
+    setMaterials((current) => current.split('\n').some((line) => line.trim() === reference)
+      ? current
+      : [current.trim(), reference].filter(Boolean).join('\n'))
+    setMaterialPickerOpen(false)
+  }
   return (
     <div className="write-start-shell relative h-full min-h-[420px] overflow-auto rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(247,250,255,0.62))] px-5 py-5 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] sm:px-8 sm:py-8">
       <div className="write-start-grid mx-auto grid min-h-full w-full max-w-6xl gap-6">
@@ -28,33 +82,70 @@ export function WriteWorkspaceStart({
             <Sparkles className="h-3.5 w-3.5" strokeWidth={1.9} />
             <span>{t('writeStudio')}</span>
           </div>
-          <h2 className="write-start-heading mt-5 max-w-[12ch] text-[clamp(2.25rem,5vw,3.25rem)] font-semibold leading-[1.08] tracking-[0] text-ds-ink">
+          <h2 className="write-start-heading mt-5 max-w-[16ch] text-[clamp(2.1rem,4vw,3rem)] font-semibold leading-[1.08] tracking-[0] text-ds-ink">
             {t('writeStartTitle')}
           </h2>
           <p className="write-start-copy mt-4 max-w-[56ch] text-[15px] leading-7 text-ds-muted">
             {t('writeStartSub')}
           </p>
 
-          <div className="write-start-primary-actions mt-7 grid gap-3">
+          <div className="write-start-brief mt-7 grid gap-3 rounded-[22px] border border-ds-border-muted bg-white/62 p-4 shadow-sm dark:bg-white/[0.035]">
+            <label className="grid gap-1.5">
+              <span className="flex items-center gap-2 text-[12px] font-semibold text-ds-muted"><Target className="h-3.5 w-3.5 text-accent" />{t('writeStartGoalLabel')}</span>
+              <input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder={t('writeStartGoalPlaceholder')} className="h-10 rounded-xl border border-ds-border-muted bg-white/80 px-3 text-[13px] text-ds-ink outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/10 dark:bg-white/[0.06]" />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="flex items-center gap-2 text-[12px] font-semibold text-ds-muted"><PackageOpen className="h-3.5 w-3.5 text-violet-500" />{t('writeStartMaterialsLabel')}</span>
+              <textarea value={materials} onChange={(event) => setMaterials(event.target.value)} placeholder={t('writeStartMaterialsPlaceholder')} rows={2} className="resize-none rounded-xl border border-ds-border-muted bg-white/80 px-3 py-2 text-[13px] leading-5 text-ds-ink outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/10 dark:bg-white/[0.06]" />
+              <button type="button" onClick={() => void openMaterialPicker()} disabled={materialPickerBusy || !workspacePathLabel} className="inline-flex h-8 w-fit items-center gap-1.5 rounded-md border border-ds-border px-2.5 text-[11px] font-medium text-ds-ink hover:bg-ds-hover disabled:opacity-50"><FileText className="h-3.5 w-3.5" />{t('writeStartChooseMaterials')}</button>
+              {materialPickerOpen ? <div className="grid gap-2 border-t border-ds-border-muted pt-2">
+                {materialPickerBusy ? <span className="text-[12px] text-ds-muted">{t('writeStartLoadingMaterials')}</span> : null}
+                {materialPickerError ? <span role="alert" className="text-[12px] text-red-600">{materialPickerError}</span> : null}
+                {!materialPickerBusy && !materialPickerError && materialFiles.length === 0 ? <span className="text-[12px] text-ds-muted">{t('writeStartNoMaterials')}</span> : null}
+                {materialFiles.length > 0 ? <select aria-label={t('writeStartChooseMaterials')} defaultValue="" onChange={(event) => selectMaterial(event.target.value)} className="h-9 min-w-0 rounded-md border border-ds-border-muted bg-ds-card px-2 text-[12px] text-ds-ink">
+                  <option value="" disabled>{t('writeStartSelectMaterial')}</option>
+                  {materialFiles.map((file) => <option key={file.path} value={file.path}>{file.path}</option>)}
+                </select> : null}
+              </div> : null}
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1.5">
+                <span className="flex items-center gap-2 text-[12px] font-semibold text-ds-muted"><Users className="h-3.5 w-3.5 text-emerald-500" />{t('writeStartAudienceLabel')}</span>
+                <input value={audience} onChange={(event) => setAudience(event.target.value)} placeholder={t('writeStartAudiencePlaceholder')} className="h-10 rounded-xl border border-ds-border-muted bg-white/80 px-3 text-[13px] text-ds-ink outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/10 dark:bg-white/[0.06]" />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="flex items-center gap-2 text-[12px] font-semibold text-ds-muted"><FilePenLine className="h-3.5 w-3.5 text-amber-500" />{t('writeStartOutputLabel')}</span>
+                <input value={output} onChange={(event) => setOutput(event.target.value)} placeholder={t('writeStartOutputPlaceholder')} className="h-10 rounded-xl border border-ds-border-muted bg-white/80 px-3 text-[13px] text-ds-ink outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/10 dark:bg-white/[0.06]" />
+              </label>
+            </div>
+          </div>
+
+          <div className="write-start-primary-actions mt-5 grid gap-3">
             <button
               type="button"
-              onClick={onCreateDraft}
+              disabled={busy}
+              onClick={() => onAskAssistant(outlinePrompt)}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-semibold text-white shadow-[0_14px_30px_rgba(0,136,255,0.22)] transition hover:brightness-110"
             >
-              <FilePlus2 className="h-4 w-4" strokeWidth={1.9} />
-              {t('writeStartNewDraft')}
+              <ListTodo className="h-4 w-4" strokeWidth={1.9} />
+              {t('writeStartOutlineAction')}
+            </button>
+            <button type="button" disabled={busy || !materials.trim()} onClick={() => onAskAssistant(`${t('writeStartFromMaterialsPrompt')}\n\n${brief}`)} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-ds-border bg-ds-card px-5 text-[14px] font-semibold text-ds-ink hover:bg-ds-hover disabled:opacity-50">
+              <PackageOpen className="h-4 w-4" />{t('writeStartFromMaterialsAction')}
             </button>
             <button
               type="button"
-              onClick={onAskAssistant}
+              disabled={busy}
+              onClick={() => onCreateDraft(brief)}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-ds-border bg-white/70 px-5 text-[14px] font-semibold text-ds-ink shadow-sm transition hover:bg-white dark:bg-white/[0.055] dark:hover:bg-white/[0.08]"
             >
-              <ListTodo className="h-4 w-4 text-emerald-600 dark:text-emerald-300" strokeWidth={1.9} />
-              {t('writeStartAskAi')}
+              <FilePlus2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" strokeWidth={1.9} />
+              {t('writeStartDraftAction')}
             </button>
             <button
               type="button"
-              onClick={onCreatePresentation}
+              disabled={busy}
+              onClick={() => onCreatePresentation(brief)}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-ds-border bg-white/70 px-5 text-[14px] font-semibold text-ds-ink shadow-sm transition hover:bg-white dark:bg-white/[0.055] dark:hover:bg-white/[0.08]"
             >
               <Presentation className="h-4 w-4 text-violet-600 dark:text-violet-300" strokeWidth={1.9} />

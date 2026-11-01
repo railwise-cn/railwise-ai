@@ -63,6 +63,47 @@ describe('画布格式预设', () => {
   })
 })
 
+describe('PPTX import report persistence', () => {
+  it('preserves import diagnostics across JSON serialization and normalization', () => {
+    const document = createDesignDocument()
+    document.importReport = {
+      schemaVersion: 'v1', sourceType: 'pptx', sourceFileName: 'training.pptx',
+      sourceSlideCount: 1, convertedSlideCount: 1, importedAt: 123, mode: 'editable',
+      summary: { elementCount: 0, textElementCount: 0, imageElementCount: 0, warningCount: 1, errorCount: 0 },
+      diagnostics: [{ code: 'font_substitution', severity: 'warning', message: 'A font was substituted.', pageNumber: 1, pageId: document.pages[0].id }]
+    }
+    expect(normalizeDesignDocument(JSON.parse(JSON.stringify(document)))?.importReport).toEqual(document.importReport)
+  })
+
+  it('keeps legacy documents readable without adding fabricated provenance', () => {
+    const document = createDesignDocument()
+    expect(normalizeDesignDocument(document)).not.toBeNull()
+    expect(normalizeDesignDocument(document)?.importReport).toBeUndefined()
+  })
+
+  it('retains bounded native editor and protected object metadata', () => {
+    const document = createDesignDocument()
+    document.documentKind = 'pptx'
+    document.pptx = {
+      editorBackend: 'pptx-vanilla-viewer', editorVersion: '3.61.0',
+      editorModel: { slides: [{ id: 'slide-1', elements: [{ id: 'shape-1', type: 'smartArt' }] }] },
+      protectedObjects: [{ id: 'shape-1', rawXml: { preserved: true } }]
+    }
+    const normalized = normalizeDesignDocument(JSON.parse(JSON.stringify(document)))
+    expect(normalized?.pptx?.editorModel).toEqual(document.pptx.editorModel)
+    expect(normalized?.pptx?.protectedObjects).toEqual(document.pptx.protectedObjects)
+  })
+
+  it('rejects an invalid report instead of silently discarding its findings', () => {
+    const document = createDesignDocument()
+    const invalid = {
+      ...document,
+      importReport: { schemaVersion: 'v1', sourceType: 'pptx', diagnostics: 'invalid' }
+    }
+    expect(normalizeDesignDocument(invalid as unknown as DesignDocumentV1)).toBeNull()
+  })
+})
+
 describe('元素类型', () => {
   it('包含 8 种基础类型', () => {
     expect(DESIGN_ELEMENT_TYPES).toHaveLength(8)

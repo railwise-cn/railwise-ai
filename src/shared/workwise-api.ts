@@ -46,6 +46,23 @@ import type {
   WorkspaceFileWriteResult
 } from './workspace-file'
 import type {
+  CheckedDocumentWritePayload,
+  CheckedDocumentWriteResult,
+  DocumentReadPayload,
+  DocumentSearchPayload,
+  DocumentSnapshot,
+  DocumentHistoryEntry,
+  DocumentHistoryListResult,
+  DocumentHistoryPayload,
+  DocumentRestorePayload,
+  DocumentComment,
+  DocumentCommentCreatePayload,
+  DocumentCommentUpdatePayload,
+  DocumentSemantics,
+  DocumentSemanticsPayload,
+  WorkspaceSearchResponse
+} from './write-document'
+import type {
   PptMasterDeliverableVerifyRequest,
   PptMasterDeliverableVerifyResult,
   PptMasterPythonEnvEnsureResult,
@@ -68,6 +85,7 @@ import type {
   WriteRichClipboardResult
 } from './write-export'
 import type { DesignWriteAssetPayload, DesignWriteAssetResult } from './design-write'
+import type { WriteMermaidPreviewRequest, WriteMermaidPreviewResult } from './write-mermaid-preview'
 import type {
   DesignAssetReadPayload,
   DesignAssetReadResult,
@@ -80,7 +98,13 @@ import type {
   DesignImageImportPayload,
   DesignImageImportResult,
   DesignPptxImportPayload,
-  DesignPptxImportResult
+  DesignPptxImportResult,
+  DesignPptxRevisionReadPayload,
+  DesignPptxRevisionReadResult,
+  DesignPptxRevisionSavePayload,
+  DesignPptxRevisionSaveResult,
+  DesignPptxBytesExportPayload,
+  DesignPptxBytesExportResult
 } from './design-workspace'
 import type {
   AgnesImageGenerationPayload,
@@ -108,7 +132,8 @@ import type {
   InstalledPackageV1,
   MarketplaceCatalogPackagesResultV1,
   MarketplaceCatalogSyncResultV1,
-  PreparedPluginImportV1
+  PreparedPluginImportV1,
+  PluginUpdateDiagnosticV1
 } from './marketplace'
 import type { WindowAppearanceV1 } from './window-appearance'
 import type { ImChannelHealthV1, ImDiagnosticsV1, ImLifecycleResultV1, ImSelfCheckResultV1 } from './im-communication'
@@ -402,6 +427,7 @@ export type WorkWiseApi = {
   removeCatalogSource: (sourceId: string) => Promise<void>
   syncCatalogSource: (sourceId: string) => Promise<MarketplaceCatalogSyncResultV1>
   listInstalledPlugins: () => Promise<InstalledPackageV1[]>
+  listPluginUpdateDiagnostics: () => Promise<PluginUpdateDiagnosticV1[]>
   preparePluginImport: (request: {
     sourcePath: string
     format?: 'wwx' | 'codex' | 'mcpb'
@@ -565,6 +591,16 @@ export type WorkWiseApi = {
   revealWorkspaceFile: (options: WorkspaceFileTarget) => Promise<PathOpenResult>
   saveWorkspaceFileAs: (payload: WorkspaceFileSaveAsPayload) => Promise<WorkspaceFileSaveAsResult>
   writeWorkspaceFile: (payload: WorkspaceFileWritePayload) => Promise<WorkspaceFileWriteResult>
+  readDocumentSnapshot: (payload: DocumentReadPayload) => Promise<DocumentSnapshot>
+  searchWorkspaceDocuments: (payload: DocumentSearchPayload) => Promise<WorkspaceSearchResponse>
+  writeDocumentChecked: (payload: CheckedDocumentWritePayload) => Promise<CheckedDocumentWriteResult>
+  listDocumentHistory: (payload: DocumentReadPayload) => Promise<DocumentHistoryListResult>
+  getDocumentHistoryEntry: (payload: DocumentHistoryPayload) => Promise<DocumentHistoryEntry>
+  restoreDocumentHistory: (payload: DocumentRestorePayload) => Promise<CheckedDocumentWriteResult>
+  listDocumentComments: (payload: DocumentReadPayload) => Promise<DocumentComment[]>
+  createDocumentComment: (payload: DocumentCommentCreatePayload) => Promise<DocumentComment>
+  updateDocumentComment: (payload: DocumentCommentUpdatePayload) => Promise<DocumentComment>
+  getDocumentSemantics: (payload: DocumentSemanticsPayload) => Promise<DocumentSemantics>
   createWorkspaceFile: (payload: WorkspaceFileCreatePayload) => Promise<WorkspaceFileCreateResult>
   createWorkspaceDirectory: (
     payload: WorkspaceDirectoryCreatePayload
@@ -602,6 +638,7 @@ export type WorkWiseApi = {
   refreshWriteKnowledgeBase: () => Promise<WriteKnowledgeBaseStatus>
   searchWriteKnowledge: (query: string) => Promise<WriteKnowledgeSearchResult>
   exportWriteDocument: (payload: WriteExportPayload) => Promise<WriteExportResult>
+  renderWriteMermaidPreview: (payload: WriteMermaidPreviewRequest) => Promise<WriteMermaidPreviewResult>
   copyWriteDocumentAsRichText: (
     payload: WriteRichClipboardPayload
   ) => Promise<WriteRichClipboardResult>
@@ -614,6 +651,9 @@ export type WorkWiseApi = {
   importDesignImageAsset: (payload: DesignImageImportPayload) => Promise<DesignImageImportResult>
   readDesignAsset: (payload: DesignAssetReadPayload) => Promise<DesignAssetReadResult>
   importPptxToDesign: (payload: DesignPptxImportPayload) => Promise<DesignPptxImportResult>
+  readDesignPptxRevision: (payload: DesignPptxRevisionReadPayload) => Promise<DesignPptxRevisionReadResult>
+  saveDesignPptxRevision: (payload: DesignPptxRevisionSavePayload) => Promise<DesignPptxRevisionSaveResult>
+  exportDesignPptxBytes: (payload: DesignPptxBytesExportPayload) => Promise<DesignPptxBytesExportResult>
   saveDesignAssetToWrite: (
     payload: DesignWriteAssetPayload
   ) => Promise<DesignWriteAssetResult>

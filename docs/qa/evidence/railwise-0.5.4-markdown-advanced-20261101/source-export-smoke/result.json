@@ -1,0 +1,24 @@
+{
+  "electron": "43.1.1",
+  "diagram": {
+    "width": 808,
+    "height": 152,
+    "pngBytes": 13066,
+    "svgBytes": 14324
+  },
+  "html": {
+    "bytes": 1489371,
+    "hasMath": true,
+    "hasSvg": true,
+    "hasFootnotes": true,
+    "hasRemoteFonts": false
+  },
+  "docx": {
+    "bytes": 21453,
+    "sha256": "7eb4ebea2c8e33cdb3f78cb676d6358d69466833d6d1b8d42d6e22d5581ec7c3"
+  },
+  "pdf": {
+    "bytes": 91806,
+    "sha256": "340bef456fc1f3c95f7dc7b5f946dbd29b8c754b7a1a7399a67abc9717a158c8"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "sourceCandidateRoot": "/private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final7",
+  "runtimeRoot": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7",
+  "workspaceRoot": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/home/workspace/markdown-workbench",
+  "settingsPolicy": "Candidate-only settings retargeted to final7; fresh Chromium session, no production credentials or state",
+  "sourceCopied": false,
+  "nodeModulesCopied": false,
+  "publicRelease": false,
+  "fixtureFiles": {
+    "export-check.md": true,
+    "export-stress.md": true
+  }
+}

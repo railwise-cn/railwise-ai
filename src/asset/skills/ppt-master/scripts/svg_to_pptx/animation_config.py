@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import math
 import re
+import statistics
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 from xml.etree import ElementTree as ET
+
+from hyperlink_contract import SHAPE_HYPERLINK_ATTR
 
 from pptx_animations import (
     ANIMATIONS,
@@ -31,7 +34,7 @@ from pptx_transitions import (
 )
 from slide_roster import discover_slide_svgs
 
-from .drawingml.utils import SVG_NS
+from .drawingml.utils import SVG_NS, XLINK_NS
 from .pptx_package.narration import AUDIO_CONTENT_TYPES
 from .semantic_markers import is_static_page_frame
 
@@ -64,7 +67,15 @@ _CHROME_ID_TOKENS = frozenset({
     'header', 'footer',
     'chrome', 'watermark',
     'pagenumber', 'pagenum', 'slidenumber', 'slidenum',
-    'logo', 'nav', 'rule',
+    'logo', 'nav',
+})
+# `rule` is chrome only as a bare id or a decorative line name (`rule`,
+# `rule-2`, `hairline-rule`); a content group such as `commit-rule` is not.
+_RULE_TOKENS = frozenset({'rule', 'rules'})
+_RULE_QUALIFIERS = frozenset({
+    'hairline', 'thin', 'horizontal', 'vertical', 'h', 'v',
+    'top', 'bottom', 'left', 'right', 'mid', 'middle',
+    'section', 'page', 'title', 'header', 'footer', 'divider',
 })
 
 
@@ -77,6 +88,10 @@ class GroupTarget:
     order: int
     chrome: bool = False
     structurally_static: bool = False
+    has_hyperlink: bool = False
+    hidden_reason: str | None = None
+    placeholder: str | None = None
+    on_structured_page: bool = False
 
 
 @dataclass(frozen=True)
@@ -107,8 +122,131 @@ def is_chrome_id(elem_id: str | None) -> bool:
     compact = lower.replace('-', '').replace('_', '')
     if compact in _CHROME_ID_TOKENS:
         return True
-    tokens = re.split(r'[-_]', lower)
-    return any(t in _CHROME_ID_TOKENS for t in tokens if t)
+    tokens = [t for t in re.split(r'[-_]', lower) if t]
+    if any(t in _CHROME_ID_TOKENS for t in tokens):
+        return True
+    if compact in _RULE_TOKENS:
+        return True
+    if tokens and tokens[0] in _RULE_TOKENS and all(
+        t.isdigit() or t in _RULE_QUALIFIERS for t in tokens[1:]
+    ):
+        return True
+    if tokens and tokens[-1] in _RULE_TOKENS and all(
+        t in _RULE_QUALIFIERS or t.isdigit() for t in tokens[:-1]
+    ):
+        return True
+    return False
+
+
+_TITLE_BLOCK_TOKENS = frozenset({'header', 'footer'})
+_FONT_SIZE_RE = re.compile(r'font-size\s*:\s*([0-9.]+)')
+
+
+def _font_size_px(elem: ET.Element) -> float | None:
+    """Return an element's own font-size in px from its attribute or style."""
+    raw = elem.get('font-size')
+    if raw is None:
+        match = _FONT_SIZE_RE.search(elem.get('style') or '')
+        raw = match.group(1) if match else None
+    if raw is None:
+        return None
+    try:
+        return float(re.match(r'[0-9.]+', raw.strip()).group(0))
+    except (AttributeError, ValueError):
+        return None
+
+
+def _text_sizes(scope: ET.Element) -> list[float]:
+    """Return every declared font-size among text runs under ``scope``."""
+    return [
+        size
+        for elem in scope.iter()
+        if _tag_name(elem) in {'text', 'tspan'}
+        for size in (_font_size_px(elem),)
+        if size is not None
+    ]
+
+
+def _max_text_size(scope: ET.Element) -> float | None:
+    sizes = _text_sizes(scope)
+    return max(sizes) if sizes else None
+
+
+def _page_reference_size(root: ET.Element) -> float | None:
+    """Return the median of the page's distinct text sizes.
+
+    Running labels and page numbers sit below it; a title block sits at or
+    above it even when a hero numeral is the page's largest text.
+    """
+    distinct = sorted(set(_text_sizes(root)))
+    return statistics.median(distinct) if distinct else None
+
+
+def _holds_page_title(group: ET.Element, reference_size: float | None) -> bool:
+    """A header/footer-named group whose text reaches the page's median size
+    is the title block, not chrome."""
+    if reference_size is None:
+        return False
+    group_max = _max_text_size(group)
+    return group_max is not None and group_max >= reference_size - 1e-6
+
+
+def _names_title_block(group_id: str) -> bool:
+    tokens = re.split(r'[-_]', group_id.lower())
+    return any(t in _TITLE_BLOCK_TOKENS for t in tokens if t)
+
+
+def scan_root_primitives(svg_path: Path) -> dict[str, str]:
+    """Return id -> description for visible direct-root non-group elements."""
+    root = ET.parse(str(svg_path)).getroot()
+    primitives: dict[str, str] = {}
+    for child in root:
+        child = effective_top_level(child)
+        tag = _tag_name(child)
+        if tag in _NON_VISUAL_TAGS or tag == 'g':
+            continue
+        elem_id = usable_animation_group_id(child.get('id'))
+        if elem_id is None:
+            continue
+        role = child.get('data-pptx-role')
+        description = f'<{tag}>'
+        if role:
+            description += f' with data-pptx-role="{role}"'
+        primitives[elem_id] = description
+    return primitives
+
+
+_ANCHOR_OWN_ATTRIBUTES = frozenset((
+    'href',
+    f'{{{XLINK_NS}}}href',
+    'xlink:href',
+))
+
+
+def anchor_wrapped_group(elem: ET.Element) -> ET.Element | None:
+    """Return the single ``<g>`` a bare hyperlink anchor wraps, else ``None``.
+
+    ``<a href><g id>…</g></a>`` is the canonical whole-object link
+    (native-hyperlinks.md §2). The anchor carries only its target, so the
+    group inside is the page's real top-level unit: it stays the animation
+    anchor and the checker's grouping unit, and export attaches the click to
+    its leaves. An anchor with other attributes or several children is an
+    ordinary container.
+    """
+    if _tag_name(elem) != 'a':
+        return None
+    if any(attr not in _ANCHOR_OWN_ATTRIBUTES for attr in elem.attrib):
+        return None
+    visual = [child for child in elem if _tag_name(child) not in _NON_VISUAL_TAGS]
+    if len(visual) != 1 or _tag_name(visual[0]) != 'g':
+        return None
+    return visual[0]
+
+
+def effective_top_level(elem: ET.Element) -> ET.Element:
+    """Return the element a top-level scan should treat ``elem`` as."""
+    wrapped = anchor_wrapped_group(elem)
+    return elem if wrapped is None else wrapped
 
 
 def usable_animation_group_id(raw: str | None) -> str | None:
@@ -116,23 +254,37 @@ def usable_animation_group_id(raw: str | None) -> str | None:
     return raw if raw and raw.strip() else None
 
 
-def scan_svg_targets(svg_path: Path) -> tuple[list[GroupTarget], list[str]]:
+def scan_svg_targets(
+    svg_path: Path,
+    *,
+    include_hidden: bool = False,
+) -> tuple[list[GroupTarget], list[str]]:
     """Scan one SVG for top-level visible group ids and anonymous groups."""
+    # The converter imports animation policy; defer this shared visibility scan.
+    from .drawingml.converter import collect_hidden_visuals
+
     root = ET.parse(str(svg_path)).getroot()
+    hidden_by_id = {id(element): reason for element, reason in collect_hidden_visuals(root)}
     targets: list[GroupTarget] = []
     anonymous_groups: list[str] = []
     visual_index = 0
+    page_reference_size = _page_reference_size(root)
 
     for child in root:
+        child = effective_top_level(child)
         tag = _tag_name(child)
         if tag in _NON_VISUAL_TAGS:
             continue
         visual_index += 1
         if tag != 'g':
             continue
+        hidden_reason = hidden_by_id.get(id(child))
+        if hidden_reason and not include_hidden:
+            continue
         group_id = usable_animation_group_id(child.get('id'))
         if group_id is None:
-            anonymous_groups.append(f'{svg_path.stem}: top-level group #{visual_index}')
+            if hidden_reason is None:
+                anonymous_groups.append(f'{svg_path.stem}: top-level group #{visual_index}')
             continue
         role = child.get('data-pptx-role')
         placeholder = child.get('data-pptx-placeholder')
@@ -142,13 +294,23 @@ def scan_svg_targets(svg_path: Path) -> tuple[list[GroupTarget], list[str]]:
             has_explicit_semantics
             and is_static_page_frame(role, placeholder)
         )
-        structurally_static = has_structural_layer or semantic_static
+        # A static role/placeholder marker makes a group chrome (kept out of
+        # scaffold, listing, and automatic animation) but not structural: an
+        # explicit sidecar entry may still animate or Morph-pair it. Only a
+        # ``data-pptx-layer`` group is structural.
+        structurally_static = has_structural_layer
         if has_structural_layer:
             chrome = True
         elif has_explicit_semantics:
             chrome = semantic_static
         else:
             chrome = is_chrome_id(group_id)
+            if (
+                chrome
+                and _names_title_block(group_id)
+                and _holds_page_title(child, page_reference_size)
+            ):
+                chrome = False
         targets.append(
             GroupTarget(
                 slide=svg_path.stem,
@@ -156,6 +318,14 @@ def scan_svg_targets(svg_path: Path) -> tuple[list[GroupTarget], list[str]]:
                 order=visual_index,
                 chrome=chrome,
                 structurally_static=structurally_static,
+                hidden_reason=hidden_reason,
+                placeholder=placeholder,
+                on_structured_page=root.get('data-pptx-layout') is not None,
+                has_hyperlink=any(
+                    _tag_name(descendant) == 'a'
+                    or descendant.get(SHAPE_HYPERLINK_ATTR) is not None
+                    for descendant in child.iter()
+                ),
             )
         )
 
@@ -187,22 +357,72 @@ def _require_unique_target_ids(
         raise ValueError(_duplicate_target_error(slide_name, duplicates))
 
 
+ROUNDTRIP_AUTHORING_DIR = 'authoring-svg-flat'
+ROUNDTRIP_PAGE_PLAN = 'page_plan.json'
+
+
+def resolve_slide_svg_files(project_path: Path) -> tuple[list[Path], str | None]:
+    """Return the project's slide SVGs in output order, or an error message.
+
+    A Generate project keeps its roster in ``svg_output/``. A round-trip
+    workspace keeps it in ``authoring-svg-flat/``; when ``page_plan.json``
+    exists its ``pages`` order is the output roster (each entry's ``svg``
+    name, else the source page's ``slide_NN.svg``), which is the roster the
+    round-trip exporter reads the sidecar against. A plan the exporter would
+    reject falls back to the authoring files in filename order.
+    """
+    svg_dir = project_path / 'svg_output'
+    if svg_dir.is_dir():
+        return discover_slide_svgs(svg_dir), None
+    authoring_dir = project_path / ROUNDTRIP_AUTHORING_DIR
+    if not authoring_dir.is_dir():
+        return [], f'svg_output directory not found: {svg_dir}'
+    files = discover_slide_svgs(authoring_dir)
+    plan_path = project_path / ROUNDTRIP_PAGE_PLAN
+    if not plan_path.is_file():
+        return files, None
+    by_source: dict[int, Path] = {}
+    for path in files:
+        match = re.fullmatch(r'slide_(\d+)', path.stem)
+        if match:
+            by_source[int(match.group(1))] = path
+    try:
+        pages = json.loads(plan_path.read_text(encoding='utf-8')).get('pages')
+    except (OSError, ValueError, AttributeError):
+        return files, None
+    if not isinstance(pages, list):
+        return files, None
+    ordered: list[Path] = []
+    for raw in pages:
+        if not isinstance(raw, dict):
+            return files, None
+        svg_name = raw.get('svg')
+        if isinstance(svg_name, str) and svg_name:
+            path = authoring_dir / svg_name
+        else:
+            path = by_source.get(raw.get('source_slide'))
+        if path is None or not path.is_file():
+            return files, None
+        ordered.append(path)
+    return (ordered or files), None
+
+
 def scan_project_targets(
     project_path: Path,
     *,
     svg_files: list[Path] | None = None,
+    include_hidden: bool = False,
 ) -> tuple[dict[str, list[GroupTarget]], list[str]]:
-    """Scan selected SVG files, defaulting to ``svg_output/*.svg``."""
+    """Scan selected SVG files, defaulting to the project's slide roster."""
     targets_by_slide: dict[str, list[GroupTarget]] = {}
     anonymous_groups: list[str] = []
     if svg_files is None:
-        svg_dir = project_path / 'svg_output'
-        if not svg_dir.is_dir():
-            return targets_by_slide, [f'svg_output directory not found: {svg_dir}']
-        svg_files = discover_slide_svgs(svg_dir)
+        svg_files, error = resolve_slide_svg_files(project_path)
+        if error is not None:
+            return targets_by_slide, [error]
 
     for svg_path in svg_files:
-        targets, anonymous = scan_svg_targets(svg_path)
+        targets, anonymous = scan_svg_targets(svg_path, include_hidden=include_hidden)
         targets_by_slide[svg_path.stem] = targets
         anonymous_groups.extend(anonymous)
 
@@ -541,7 +761,13 @@ def _transition_scope_errors(
 
     errors = _unknown_field_errors(
         transition,
-        frozenset({'effect', 'effect_options', 'duration', 'auto_advance'}),
+        frozenset({
+            'effect',
+            'effect_options',
+            'duration',
+            'auto_advance',
+            'sound',
+        }),
         f'{label} transition',
     )
     effect = transition.get('effect', inherited_effect)
@@ -576,6 +802,24 @@ def _transition_scope_errors(
             )
         except ValueError as exc:
             errors.append(str(exc))
+    if 'sound' in transition:
+        sound = transition['sound']
+        if sound is None:
+            return errors
+        if not isinstance(sound, str) or not sound.strip():
+            errors.append(
+                f'animations.json {label} transition sound must be a '
+                'non-empty project-relative .wav path or null'
+            )
+        elif Path(sound).is_absolute() or PureWindowsPath(sound).drive:
+            errors.append(
+                f'animations.json {label} transition sound must be '
+                f'project-relative: {sound!r}'
+            )
+        elif Path(sound).suffix.lower() != '.wav':
+            errors.append(
+                f'animations.json {label} transition sound must use .wav'
+            )
     return errors
 
 
@@ -1252,6 +1496,77 @@ def _animation_sound_path_errors(
     return errors
 
 
+def _declared_transition_sounds(
+    config: dict[str, Any],
+) -> tuple[tuple[str, object], ...]:
+    """Return explicitly declared non-null transition sound values."""
+    sounds: list[tuple[str, object]] = []
+    defaults = config.get('defaults', {})
+    if isinstance(defaults, dict):
+        transition = defaults.get('transition', {})
+        if (
+            isinstance(transition, dict)
+            and transition.get('sound') is not None
+        ):
+            sounds.append(('defaults transition', transition['sound']))
+
+    slides = config.get('slides', {})
+    if not isinstance(slides, dict):
+        return tuple(sounds)
+    for slide_name, slide_cfg in slides.items():
+        if not isinstance(slide_cfg, dict):
+            continue
+        transition = slide_cfg.get('transition', {})
+        if (
+            isinstance(transition, dict)
+            and transition.get('sound') is not None
+        ):
+            sounds.append(
+                (f'slide "{slide_name}" transition', transition['sound'])
+            )
+    return tuple(sounds)
+
+
+def _transition_sound_path_errors(
+    project_path: Path,
+    config: dict[str, Any],
+) -> list[str]:
+    """Validate transition sounds as project-contained WAV files."""
+    errors: list[str] = []
+    project_root = project_path.resolve()
+    for label, raw_sound in _declared_transition_sounds(config):
+        if not isinstance(raw_sound, str) or not raw_sound.strip():
+            continue
+        sound_path = Path(raw_sound)
+        if sound_path.is_absolute() or PureWindowsPath(raw_sound).drive:
+            errors.append(
+                f'animations.json {label} sound must be project-relative: '
+                f'{raw_sound!r}'
+            )
+            continue
+        if sound_path.suffix.lower() != '.wav':
+            continue
+        resolved_path = (project_root / sound_path).resolve()
+        try:
+            resolved_path.relative_to(project_root)
+        except ValueError:
+            errors.append(
+                f'animations.json {label} sound escapes the project root: '
+                f'{raw_sound!r}'
+            )
+            continue
+        if not resolved_path.exists():
+            errors.append(
+                f'animations.json {label} sound file not found: {resolved_path}'
+            )
+        elif not resolved_path.is_file():
+            errors.append(
+                f'animations.json {label} sound path is not a regular file: '
+                f'{resolved_path}'
+            )
+    return errors
+
+
 def validate_animation_config(
     project_path: Path,
     config: dict[str, Any] | None = None,
@@ -1273,9 +1588,11 @@ def validate_animation_config(
         return []
 
     warnings = _animation_sound_path_errors(project_path, config)
+    warnings.extend(_transition_sound_path_errors(project_path, config))
     targets_by_slide, anonymous_groups = scan_project_targets(
         project_path,
         svg_files=svg_files,
+        include_hidden=True,
     )
     for item in anonymous_groups:
         warnings.append(f'{item} has no id and cannot be customized in animations.json')
@@ -1343,6 +1660,12 @@ def validate_animation_config(
                 )
                 continue
             target = known_groups[group_id]
+            if target.hidden_reason:
+                warnings.append(
+                    f'animations.json {path} references a group that is '
+                    f'hidden, not exported ({target.hidden_reason})'
+                )
+                continue
             if not isinstance(group_cfg, dict):
                 continue
             try:
@@ -1390,11 +1713,23 @@ def validate_animation_config(
                         f'animations.json {effect_path}.trigger_shape '
                         f'references missing group {trigger_shape!r}'
                     )
+                elif trigger_target.hidden_reason:
+                    warnings.append(
+                        f'animations.json {effect_path}.trigger_shape '
+                        f'references group {trigger_shape!r} that is hidden, '
+                        f'not exported ({trigger_target.hidden_reason})'
+                    )
                 elif trigger_target.structurally_static:
                     warnings.append(
                         f'animations.json {effect_path}.trigger_shape '
                         f'references non-triggerable structural group '
                         f'{trigger_shape!r}'
+                    )
+                elif trigger_target.has_hyperlink:
+                    warnings.append(
+                        f'animations.json {effect_path}.trigger_shape '
+                        f'references hyperlink-bearing group {trigger_shape!r}; '
+                        'use an ordinary animation or a separate trigger'
                     )
 
     morph_pairs, morph_errors = _resolve_morph_pairs(
@@ -1402,6 +1737,13 @@ def validate_animation_config(
         config,
     )
     warnings.extend(morph_errors)
+    root_primitives_by_slide: dict[str, dict[str, str]] = {}
+    if morph_pairs:
+        scan_files = svg_files
+        if scan_files is None:
+            scan_files, _error = resolve_slide_svg_files(project_path)
+        for svg_path in scan_files:
+            root_primitives_by_slide[svg_path.stem] = scan_root_primitives(svg_path)
     for pair in morph_pairs:
         for slide_name, group_id in (
             (pair.source_slide, pair.source_group_id),
@@ -1409,16 +1751,63 @@ def validate_animation_config(
         ):
             target = known_groups_by_slide.get(slide_name, {}).get(group_id)
             if target is None:
+                primitive = root_primitives_by_slide.get(slide_name, {}).get(group_id)
+                if primitive is not None:
+                    warnings.append(
+                        f'animations.json Morph endpoint {slide_name}/{group_id} '
+                        f'is a root primitive ({primitive}), not a direct-root '
+                        '<g>; wrap it in a group (drop a static role marker) '
+                        'before pairing'
+                    )
+                else:
+                    warnings.append(
+                        'animations.json Morph references missing or ambiguous group: '
+                        f'{slide_name}/{group_id}'
+                    )
+            elif target.hidden_reason:
                 warnings.append(
-                    'animations.json Morph references missing or ambiguous group: '
-                    f'{slide_name}/{group_id}'
+                    f'animations.json Morph endpoint {slide_name}/{group_id} '
+                    f'is hidden, not exported ({target.hidden_reason})'
                 )
             elif target.structurally_static:
                 warnings.append(
                     'animations.json Morph references structural group: '
                     f'{slide_name}/{group_id}'
                 )
+            elif (
+                target.placeholder is not None
+                and target.on_structured_page
+                and _lock_structure_mode(project_path) != 'flat'
+            ):
+                warnings.append(
+                    f'animations.json Morph endpoint {slide_name}/{group_id} '
+                    f'is the placeholder slot {target.placeholder!r}: structured '
+                    'export rewrites a slot into a layout placeholder, so it '
+                    'cannot carry a Morph name; pair a Slide-local group instead'
+                )
     return list(dict.fromkeys(warnings))
+
+
+def _lock_structure_mode(project_path: Path) -> str | None:
+    """Return ``spec_lock.md``'s ``pptx_structure.mode``, or None without one."""
+    lock_path = project_path / 'spec_lock.md'
+    try:
+        text = lock_path.read_text(encoding='utf-8-sig')
+    except OSError:
+        return None
+    section = re.search(
+        r'^##[ \t]+pptx_structure[ \t]*$(?P<body>.*?)(?=^##[ \t]|\Z)',
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if section is None:
+        return None
+    mode = re.search(
+        r'^-[ \t]+mode[ \t]*:[ \t]*([A-Za-z_-]+)',
+        section.group('body'),
+        flags=re.MULTILINE,
+    )
+    return mode.group(1).lower() if mode else None
 
 
 def build_scaffold(project_path: Path) -> dict[str, Any]:
@@ -1431,7 +1820,11 @@ def build_scaffold(project_path: Path) -> dict[str, Any]:
     to remind the editor that deck-wide overrides exist and most pages should
     inherit them.
     """
-    transition_defaults = {'effect': 'fade', 'duration': 0.4}
+    transition_defaults = {
+        'effect': 'fade',
+        'duration': 0.4,
+        'sound': None,
+    }
     animation_defaults = {
         'effect': 'none',
         'duration': 0.4,
@@ -1448,7 +1841,10 @@ def build_scaffold(project_path: Path) -> dict[str, Any]:
                 continue
             groups[target.group_id] = {}
         slides[slide_name] = {
-            'transition': dict(transition_defaults),
+            'transition': {
+                'effect': transition_defaults['effect'],
+                'duration': transition_defaults['duration'],
+            },
             'animation': dict(animation_defaults),
             'groups': groups,
         }
@@ -1469,15 +1865,24 @@ def build_group_listing(project_path: Path) -> tuple[list[str], list[str]]:
     listing reflects exactly what an editor can override. Returns
     ``(lines, anonymous_warnings)``.
     """
-    targets_by_slide, anonymous = scan_project_targets(project_path)
+    targets_by_slide, anonymous = scan_project_targets(project_path, include_hidden=True)
     lines: list[str] = []
     for slide_name, targets in targets_by_slide.items():
         _require_unique_target_ids(slide_name, targets)
-        ids = [t.group_id for t in targets if not t.chrome]
+        ids = [t.group_id for t in targets if not t.chrome and not t.hidden_reason]
+        chrome_ids = [t.group_id for t in targets if t.chrome and not t.hidden_reason]
+        hidden_ids = [t.group_id for t in targets if t.hidden_reason]
         if not ids:
-            lines.append(f'{slide_name}: (no animatable groups)')
+            line = f'{slide_name}: (no animatable groups)'
         else:
-            lines.append(f'{slide_name}: {", ".join(ids)}')
+            line = f'{slide_name}: {", ".join(ids)}'
+        if chrome_ids:
+            # Name what was dropped so an id like ``takeaway-rule`` is seen
+            # as chrome-by-token rather than silently missing.
+            line += f'  [chrome, animates only when named: {", ".join(chrome_ids)}]'
+        if hidden_ids:
+            line += f'  [hidden, not exported: {", ".join(hidden_ids)}]'
+        lines.append(line)
     return lines, anonymous
 
 

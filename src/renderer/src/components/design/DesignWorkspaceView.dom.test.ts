@@ -1,12 +1,23 @@
 // @vitest-environment happy-dom
 
-import { act, createElement } from 'react'
+import { act, createElement, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDesignDocument } from '@shared/design-document'
 import i18n from '../../i18n'
 import { useDesignWorkspaceStore } from '../../design/design-workspace-store'
 import { DesignWorkspaceView } from './DesignWorkspaceView'
+
+const { nativeSave, nativeDirty } = vi.hoisted(() => ({ nativeSave: vi.fn(async () => true), nativeDirty: { value: false } }))
+vi.mock('./PptxEditorAdapter', () => ({
+  PptxEditorAdapter: ({ onControllerReady }: { onControllerReady?: (controller: unknown) => void }) => {
+    useEffect(() => {
+      onControllerReady?.({ save: nativeSave, isDirty: () => nativeDirty.value })
+      return () => onControllerReady?.(null)
+    }, [onControllerReady])
+    return createElement('div', { 'data-testid': 'native-deck-editor' }, 'Native editor')
+  }
+}))
 
 let container: HTMLDivElement
 let root: Root
@@ -27,6 +38,9 @@ function buttonWithText(text: string): HTMLButtonElement {
 }
 
 beforeEach(async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  nativeSave.mockClear()
+  nativeDirty.value = false
   await i18n.changeLanguage('en')
   const document = createDesignDocument({ name: 'QA board' })
   const openWorkspaceFile = vi.fn(async () => ({ ok: true as const }))
@@ -96,6 +110,48 @@ afterEach(async () => {
 })
 
 describe('DesignWorkspaceView export delivery', () => {
+  it('closes the current document after saving native PPTX changes', async () => {
+    const deck = createDesignDocument({ name: 'Native deck' })
+    deck.documentKind = 'pptx'
+    deck.pptx = { editorBackend: 'pptx-vanilla-viewer', editorVersion: '3.61.0' }
+    await act(async () => useDesignWorkspaceStore.getState().loadDocument(deck, {
+      activePageId: deck.pages[0].id, persistedRevision: deck.revision
+    }))
+    await settle()
+    nativeDirty.value = true
+    await act(async () => {
+      buttonWithText('Close document').click()
+    })
+    await settle()
+    expect(nativeSave).toHaveBeenCalledOnce()
+    expect(useDesignWorkspaceStore.getState().document).toBeNull()
+    expect(container.textContent).toContain('New document')
+  })
+
+  it('uses only native PPTX controls and saves the native revision before importing another deck', async () => {
+    const deck = createDesignDocument({ name: 'Native deck' })
+    deck.documentKind = 'pptx'
+    deck.pptx = { editorBackend: 'pptx-vanilla-viewer', editorVersion: '3.61.0' }
+    Object.assign(window.workwise, { importPptxToDesign: vi.fn(async () => ({ ok: false, canceled: true })) })
+    await act(async () => useDesignWorkspaceStore.getState().loadDocument(deck, {
+      activePageId: deck.pages[0].id, persistedRevision: deck.revision
+    }))
+    await settle()
+    expect(container.querySelector('[data-testid="native-deck-editor"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="free-canvas-toolbar"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Add page"]')).toBeNull()
+    nativeDirty.value = true
+    await act(async () => {
+      const importButton = [...container.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === i18n.t('common:designImportPptx'))
+      expect(importButton).toBeDefined()
+      importButton!.click()
+    })
+    await settle()
+    expect(nativeSave).toHaveBeenCalledOnce()
+    expect(window.workwise.importPptxToDesign).toHaveBeenCalledOnce()
+    expect(window.workwise.exportDesignToPptx).not.toHaveBeenCalled()
+  })
+
   it('renders working open, save-as, and reveal actions after a PPTX export', async () => {
     await act(async () => {
       buttonWithText('Export PPTX').click()

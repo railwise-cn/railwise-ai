@@ -1,0 +1,10 @@
+{
+  "name": "PPTist",
+  "repository": "https://github.com/pipipi-pikachu/PPTist",
+  "ref": "99a0eeeeaa5ba217e2058089706a45bb65881318",
+  "version": "2.0.0",
+  "license": "AGPL-3.0",
+  "integration": "isolated-editor-bundle",
+  "status": "paused-license-decision",
+  "notes": "Paused after review found the upstream project is AGPL-3.0. No PPTist editor code is integrated or loaded. This historical source record is retained for auditability."
+}

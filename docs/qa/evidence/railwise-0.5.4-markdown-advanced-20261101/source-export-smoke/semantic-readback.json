@@ -1,0 +1,54 @@
+{
+  "kind": "Real source-level Electron export integration, not installed-package acceptance",
+  "electron": "43.1.1",
+  "checks": {
+    "editableOfficeMath": true,
+    "fraction": true,
+    "matrixRows": true,
+    "realFootnoteReference": true,
+    "footnoteWordPart": true,
+    "footnoteFormula": true,
+    "footnoteText": true,
+    "diagramEmbeddedAsPng": true,
+    "diagramChineseLabels": true,
+    "diagramPassiveSvg": true,
+    "htmlMathAndFootnotes": true,
+    "htmlLocalFonts": true,
+    "frontmatterHidden": true
+  },
+  "allPassed": true,
+  "files": {
+    "advanced.md": {
+      "sizeBytes": 360,
+      "sha256": "1751e748ab41577b94ebd40c3539cc19144ffc4fa45c6956887e844b082287d2"
+    },
+    "advanced.html": {
+      "sizeBytes": 1489371,
+      "sha256": "66b3fd36c0f77d0d66b6e64e20946b0b3ea11ab56af153d67df33c8a1ae25107"
+    },
+    "advanced.docx": {
+      "sizeBytes": 21453,
+      "sha256": "7eb4ebea2c8e33cdb3f78cb676d6358d69466833d6d1b8d42d6e22d5581ec7c3"
+    },
+    "advanced.pdf": {
+      "sizeBytes": 91806,
+      "sha256": "340bef456fc1f3c95f7dc7b5f946dbd29b8c754b7a1a7399a67abc9717a158c8"
+    },
+    "diagram.svg": {
+      "sizeBytes": 14324,
+      "sha256": "910e2de00d95242abd4a30531d3899ceb5bf229441cf18278d6f24aafc46faef"
+    },
+    "diagram.png": {
+      "sizeBytes": 13066,
+      "sha256": "4b64dd81d3c59c26f63f49d1f35f39a6f3273e0467042610cbc22835a670a683"
+    },
+    "boxed-formula.png": {
+      "sizeBytes": 2708,
+      "sha256": "b9d8b1517f713890bce2e354fbbf1f760112f8cb5dcf0d5a28c500e42c35002f"
+    },
+    "result.json": {
+      "sizeBytes": 497,
+      "sha256": "345b05d2e95ee08f09330c0d413050ecb93d97e49c4142b6d0f40a1b71f4f00a"
+    }
+  }
+}

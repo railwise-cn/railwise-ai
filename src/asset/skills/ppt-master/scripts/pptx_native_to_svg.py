@@ -5,11 +5,12 @@ Reads the PPTX directly with python-pptx and emits one SVG per slide with:
 - slide-size coordinates (96 dpi px)
 - shapes (rect/ellipse/line/textbox/picture/table/group) with frame geometry
 - real text paragraphs: font family/size/weight/color/letter-spacing/alignment
-- solid/gradient-first-stop fills, outline colors
+- solid and gradient fills with color/alpha transforms, outline colors
 - theme color resolution (theme1.xml schemeClr → srgbClr)
 - pictures written to `<output>/svg/media/<name>` and referenced as href
 
-WorkWise uses this instead of pptx_to_svg when it yields real editable text.
+RailWise AI uses this compatibility importer for editable design elements.
+The conversion report records approximations; it is not a fidelity guarantee.
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ import re
 import sys
 import zipfile
 import math
+import hashlib
+import json
 from pathlib import Path
 from typing import Any, Optional
 
@@ -26,7 +29,10 @@ from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.util import Emu
+from pptx.util import Length
+
+from pptx_to_svg.color_resolver import ColorPalette, resolve_color
+from pptx_to_svg.fill_to_svg import resolve_fill
 
 EMU_PER_PX = 9525.0
 PT_TO_PX = 96.0 / 72.0
@@ -150,11 +156,17 @@ def color_hex(color: Any, theme_colors: dict[str, str]) -> Optional[str]:
     try:
         if color.type is None:
             return None
+        # ColorFormat.type is SCHEME, not ACCENT_2. Resolve the actual color
+        # node so that theme slots and luminance/tint transforms are retained.
+        node = getattr(getattr(color, "_color", None), "_xClr", None)
+        if node is not None:
+            value, _alpha = resolve_color(node, color_palette(theme_colors))
+            return value
         type_name = str(color.type)
         if "RGB" in type_name or "NOT_THEME" in type_name:
             rgb: RGBColor = color.rgb
             return "#%02X%02X%02X" % (rgb[0], rgb[1], rgb[2])
-        enum_name = type_name.rsplit(".", 1)[-1]
+        enum_name = str(color.theme_color).rsplit(".", 1)[-1]
         match = re.match(r"([A-Z][A-Z_0-9]*)", enum_name)
         key = THEME_KEY_BY_TYPE.get(match.group(1) if match else enum_name)
         return theme_colors.get(key) if key else None
@@ -162,45 +174,52 @@ def color_hex(color: Any, theme_colors: dict[str, str]) -> Optional[str]:
         return None
 
 
-def shape_fill(shape: Any, theme_colors: dict[str, str]) -> Optional[str]:
+def color_palette(theme_colors: dict[str, str]) -> ColorPalette:
+    palette = ColorPalette(None, None)
+    palette.scheme = {key: value.lstrip("#") for key, value in theme_colors.items()}
+    return palette
+
+
+def color_opacity(color: Any, theme_colors: dict[str, str]) -> float:
+    node = getattr(getattr(color, "_color", None), "_xClr", None)
+    if node is None:
+        return 1.0
+    return resolve_color(node, color_palette(theme_colors))[1]
+
+
+def shape_fill(shape: Any, theme_colors: dict[str, str], defs: list[str],
+               id_prefix: str) -> dict[str, str]:
+    """Use the upstream DrawingML resolver instead of flattening gradients."""
     try:
         fill = shape.fill
-        if fill.type is None:
-            return None
-        type_name = str(fill.type)
-        if "SOLID" in type_name:
-            return color_hex(fill.fore_color, theme_colors) or "#FFFFFF"
-        if "GRADIENT" in type_name:
-            try:
-                stops = list(fill.gradient_stops)
-                if stops:
-                    return color_hex(stops[0].color, theme_colors) or "#FFFFFF"
-            except Exception:
-                pass
-        return None
-    except Exception:
-        return None
+    except AttributeError:
+        return {}
+    result = resolve_fill(fill._xPr, color_palette(theme_colors), id_prefix=id_prefix)
+    defs.extend(result.defs)
+    return result.attrs
 
 
-def shape_stroke(shape: Any, theme_colors: dict[str, str]) -> tuple[Optional[str], Optional[float]]:
+def shape_stroke(shape: Any, theme_colors: dict[str, str]) -> tuple[Optional[str], Optional[float], float]:
     try:
         line = shape.line
         fill = line.fill
         if fill.type is None:
-            return None, None
+            return None, None, 1.0
         type_name = str(fill.type)
         color = None
+        opacity = 1.0
         if "SOLID" in type_name:
             color = color_hex(fill.fore_color, theme_colors)
+            opacity = color_opacity(fill.fore_color, theme_colors)
         width = None
         try:
             if line.width is not None:
                 width = max(0.0, px(line.width))
         except Exception:
             width = None
-        return color, width
+        return color, width, opacity
     except Exception:
-        return None, None
+        return None, None, 1.0
 
 
 def run_letter_spacing(run: Any) -> Optional[float]:
@@ -261,7 +280,9 @@ def paragraph_line_height(paragraph: Any, base_font_size_px: float) -> float:
     if spacing is None:
         return base_font_size_px * 1.2
     try:
-        if isinstance(spacing, Emu):
+        # python-pptx returns Centipoints (a Length) for a:spcPts. Treating
+        # it as a multiplier can move text tens of millions of pixels away.
+        if isinstance(spacing, Length):
             return max(base_font_size_px, px(spacing))
     except Exception:
         pass
@@ -273,35 +294,33 @@ def paragraph_line_height(paragraph: Any, base_font_size_px: float) -> float:
 
 def emit_text(shape: Any, tf: Any, shape_left: float, shape_top: float,
               shape_w: float, shape_h: float, theme_colors: dict[str, str],
-              minor_font: str, out: list[str]) -> None:
+              minor_font: str, out: list[str],
+              diagnostics: Optional[list[dict[str, Any]]] = None,
+              slide_index: int = 1) -> None:
     try:
         ml = px(tf.margin_left, 7.2)
+        mr = px(tf.margin_right, 7.2)
         mt = px(tf.margin_top, 3.6)
         mb = px(tf.margin_bottom, 3.6)
         anchor = tf.vertical_anchor
     except Exception:
-        ml, mt, mb, anchor = 7.2, 3.6, 3.6, None
+        ml, mr, mt, mb, anchor = 7.2, 7.2, 3.6, 3.6, None
 
     paragraphs = list(tf.paragraphs)
     if not paragraphs:
         return
 
-    base_font = minor_font
     # First non-empty run gives the paragraph font baseline.
     first_size = 18.0
     for paragraph in paragraphs:
-        for run in paragraph.runs:
-            if run.text.strip():
-                first_size = pt_to_px(run.font.size, 18.0)
-                break
-        break
+        nonempty = next((run for run in paragraph.runs if run.text.strip()), None)
+        if nonempty is not None:
+            first_size = pt_to_px(nonempty.font.size, pt_to_px(paragraph.font.size, 18.0))
+            break
 
     heights: list[float] = []
     for paragraph in paragraphs:
-        if not any(run.text.strip() for run in paragraph.runs):
-            heights.append(base_font * 1.2)
-            continue
-        size = base_font
+        size = pt_to_px(paragraph.font.size, first_size)
         for run in paragraph.runs:
             if run.text.strip():
                 size = pt_to_px(run.font.size, first_size)
@@ -321,14 +340,34 @@ def emit_text(shape: Any, tf: Any, shape_left: float, shape_top: float,
         if not runs:
             cursor_y += height
             continue
+        if len(runs) > 1 and diagnostics is not None:
+            style_keys = {
+                (
+                    run_font_name(run, minor_font),
+                    round(pt_to_px(run.font.size, first_size), 3),
+                    bool(run.font.bold),
+                    bool(run.font.italic),
+                    color_hex(run.font.color, theme_colors) if run.font.color and run.font.color.type is not None else None,
+                )
+                for run in runs
+            }
+            if len(style_keys) > 1:
+                diagnostics.append({
+                    "slide": slide_index,
+                    "shapeId": shape.shape_id,
+                    "code": "rich-text-approximated",
+                    "message": "Paragraph contains mixed run styles; editable compatibility output uses the first run style.",
+                })
         first = runs[0]
         font_size = pt_to_px(first.font.size, first_size)
-        family = run_font_name(first, base_font)
+        family = run_font_name(first, minor_font)
         bold = bool(first.font.bold)
         italic = bool(first.font.italic)
         fill = color_hex(first.font.color, theme_colors) if first.font.color and first.font.color.type is not None else None
+        opacity = color_opacity(first.font.color, theme_colors)
         if not fill:
-            fill = shape_fill(shape, theme_colors)
+            fill = color_hex(paragraph.font.color, theme_colors)
+            opacity = color_opacity(paragraph.font.color, theme_colors)
         if not fill:
             fill = "#000000"
         spacing = run_letter_spacing(first)
@@ -336,9 +375,9 @@ def emit_text(shape: Any, tf: Any, shape_left: float, shape_top: float,
         # Baseline: top + y_offset + ascent approximation (0.85em for CJK/Latin mix).
         baseline = shape_top + cursor_y + font_size * 0.85
         if align == "middle":
-            x = shape_left + (shape_w - ml - mb) / 2.0 + ml
+            x = shape_left + (shape_w - ml - mr) / 2.0 + ml
         elif align == "end":
-            x = shape_left + shape_w - mb
+            x = shape_left + shape_w - mr
         else:
             x = shape_left + ml
         attrs = [
@@ -347,6 +386,7 @@ def emit_text(shape: Any, tf: Any, shape_left: float, shape_top: float,
             f'font-family="{esc(family)}"',
             f'font-size="{fmt(font_size)}"',
             f'fill="{fill}"',
+            f'fill-opacity="{fmt(opacity)}"',
             f'text-anchor="{align}"',
         ]
         if bold:
@@ -410,14 +450,25 @@ TOP_LEVEL_CTX: dict[str, float] = {
 
 def shape_to_svg(shape: Any, ctx: dict[str, float],
                  theme_colors: dict[str, str], minor_font: str,
-                 media_dir: Path, out: list[str]) -> None:
+                 media_dir: Path, out: list[str], slide_index: int = 1,
+                 defs: Optional[list[str]] = None,
+                 diagnostics: Optional[list[dict[str, Any]]] = None) -> None:
+    if defs is None:
+        defs = []
+    if diagnostics is None:
+        diagnostics = []
+
+    def diagnose(code: str, message: str) -> None:
+        diagnostics.append({"slide": slide_index, "shapeId": shape.shape_id,
+                            "code": code, "message": message})
+
     try:
         shape_type = shape.shape_type
     except Exception:
         shape_type = None
 
-    # python-pptx reports group-child coordinates in absolute slide space,
-    # so no group offset/scale math is applied here.
+    # Group children are in the group's chOff/chExt coordinate system. An SVG
+    # group transform below preserves nested scale, rotation, and reflection.
     left = px(shape.left)
     top = px(shape.top)
     width = max(0.0, px(shape.width))
@@ -428,8 +479,14 @@ def shape_to_svg(shape: Any, ctx: dict[str, float],
     except Exception:
         rotation = 0.0
 
-    fill = shape_fill(shape, theme_colors)
-    stroke, stroke_width = shape_stroke(shape, theme_colors)
+    try:
+        fill_attrs = shape_fill(shape, theme_colors, defs,
+                                f"s{slide_index}_shape{shape.shape_id}_")
+    except (ValueError, TypeError, AttributeError) as exc:
+        fill_attrs = {}
+        diagnose("unsupported-fill", str(exc))
+    fill = fill_attrs.get("fill")
+    stroke, stroke_width, stroke_opacity = shape_stroke(shape, theme_colors)
 
     transform = ""
     if rotation:
@@ -441,33 +498,51 @@ def shape_to_svg(shape: Any, ctx: dict[str, float],
         f'x="{fmt(left)}" y="{fmt(top)}" width="{fmt(max(width, 0.1))}" '
         f'height="{fmt(max(height, 0.1))}"'
     )
-    style = []
-    if fill:
-        style.append(f'fill="{fill}"')
-    else:
+    style = [f'{key}="{esc(value)}"' for key, value in fill_attrs.items()]
+    if not fill:
         style.append('fill="none"')
     if stroke:
         style.append(f'stroke="{stroke}"')
         style.append(f'stroke-width="{fmt(stroke_width if stroke_width is not None else 1.0)}"')
+        style.append(f'stroke-opacity="{fmt(stroke_opacity)}"')
     else:
         style.append('stroke="none"')
 
     if shape_type == MSO_SHAPE_TYPE.GROUP:
+        child_ctx = group_child_context(shape, left, top, width, height)
+        xfrm = shape._element.find(f".//{{{XML_NS_A}}}xfrm")
+        flip_x = -1 if xfrm is not None and xfrm.get("flipH") in ("1", "true") else 1
+        flip_y = -1 if xfrm is not None and xfrm.get("flipV") in ("1", "true") else 1
+        group_transform = (
+            f"translate({fmt(left + width / 2)} {fmt(top + height / 2)}) "
+            f"rotate({fmt(rotation)}) scale({flip_x} {flip_y}) "
+            f"translate({fmt(-width / 2)} {fmt(-height / 2)}) "
+            f"scale({fmt(child_ctx['scaleX'])} {fmt(child_ctx['scaleY'])}) "
+            f"translate({fmt(-child_ctx['chOffX'])} {fmt(-child_ctx['chOffY'])})"
+        )
+        out.append(f'<g transform="{group_transform}">')
         try:
             for child in shape.shapes:
-                shape_to_svg(child, TOP_LEVEL_CTX, theme_colors, minor_font, media_dir, out)
-        except Exception:
-            pass
+                shape_to_svg(child, TOP_LEVEL_CTX, theme_colors, minor_font, media_dir,
+                             out, slide_index, defs, diagnostics)
+        except Exception as exc:
+            diagnose("group-conversion-failed", str(exc))
+        finally:
+            out.append("</g>")
         return
 
     if shape_type == MSO_SHAPE_TYPE.PICTURE:
         try:
             image = shape.image
             ext = image.ext or "png"
-            filename = f"pic_{shape.shape_id}.{ext}"
+            # Shape IDs are only unique within a slide. The digest also
+            # prevents collisions in reused output directories.
+            digest = hashlib.sha256(image.blob).hexdigest()[:16]
+            filename = f"slide_{slide_index:03d}_pic_{shape.shape_id}_{digest}.{ext}"
             (media_dir / filename).write_bytes(image.blob)
             out.append(f'<image href="media/{filename}" {common}{transform}/>')
-        except Exception:
+        except Exception as exc:
+            diagnose("picture-conversion-failed", str(exc))
             out.append(f'<rect {common} fill="#D9D9D9" stroke="#B0B0B0" stroke-width="1"{transform}/>')
         return
 
@@ -475,7 +550,8 @@ def shape_to_svg(shape: Any, ctx: dict[str, float],
         out.append(
             f'<line x1="{fmt(left)}" y1="{fmt(top)}" x2="{fmt(left + width)}" '
             f'y2="{fmt(top + height)}" stroke="{stroke or "#000000"}" '
-            f'stroke-width="{fmt(stroke_width if stroke_width is not None else 1.0)}"{transform}/>'
+            f'stroke-width="{fmt(stroke_width if stroke_width is not None else 1.0)}" '
+            f'stroke-opacity="{fmt(stroke_opacity)}"{transform}/>'
         )
         return
 
@@ -560,6 +636,7 @@ def shape_to_svg(shape: Any, ctx: dict[str, float],
         return
 
     if shape_type == MSO_SHAPE_TYPE.TABLE:
+        diagnose("table-flattened", "Table cells are approximated as shapes and text; native table semantics are not retained.")
         try:
             table = shape.table
             row_heights = [px(row.height) for row in table.rows]
@@ -592,14 +669,21 @@ def shape_to_svg(shape: Any, ctx: dict[str, float],
             f'rx="{fmt(width / 2.0)}" ry="{fmt(height / 2.0)}" {" ".join(style)}{transform}/>'
         )
     else:
+        if prst not in (None, "rect"):
+            diagnose("shape-geometry-approximated", f"Preset geometry {prst!r} is approximated as a rectangle.")
+        elif sp_pr is not None and sp_pr.find(f"{{{XML_NS_A}}}custGeom") is not None:
+            diagnose("shape-geometry-approximated", "Custom geometry is approximated as a rectangle.")
+        if shape_type == MSO_SHAPE_TYPE.CHART:
+            diagnose("chart-not-editable", "Native chart geometry and data are not supported by this compatibility importer.")
         out.append(f'<rect {common} {" ".join(style)}{transform}/>')
 
     # Text frame
     try:
         if shape.has_text_frame:
-            emit_text(shape, shape.text_frame, left, top, width, height, theme_colors, minor_font, out)
-    except Exception:
-        pass
+            emit_text(shape, shape.text_frame, left, top, width, height, theme_colors, minor_font, out,
+                      diagnostics, slide_index)
+    except Exception as exc:
+        diagnose("text-conversion-failed", str(exc))
 
 
 def convert_pptx_to_svg(pptx_path: str, output_dir: str) -> dict[str, Any]:
@@ -618,26 +702,38 @@ def convert_pptx_to_svg(pptx_path: str, output_dir: str) -> dict[str, Any]:
     slide_h = px(prs.slide_height, 720.0)
 
     converted = 0
+    diagnostics: list[dict[str, Any]] = []
     for index, slide in enumerate(prs.slides, start=1):
+        defs: list[str] = []
         out: list[str] = [
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {fmt(slide_w)} {fmt(slide_h)}" '
             f'width="{fmt(slide_w)}" height="{fmt(slide_h)}">'
         ]
-        background = "#FFFFFF"
+        background_attrs = {"fill": "#FFFFFF"}
         try:
-            bg_fill = shape_fill(slide.background, theme_colors)
+            bg_fill = shape_fill(slide.background, theme_colors, defs, f"s{index}_background_")
             if bg_fill:
-                background = bg_fill
-        except Exception:
-            pass
-        out.append(f'<rect x="0" y="0" width="{fmt(slide_w)}" height="{fmt(slide_h)}" fill="{background}"/>')
+                background_attrs = bg_fill
+        except Exception as exc:
+            diagnostics.append({"slide": index, "code": "background-conversion-failed", "message": str(exc)})
+        background_style = " ".join(f'{key}="{esc(value)}"' for key, value in background_attrs.items())
+        out.append(f'<rect x="0" y="0" width="{fmt(slide_w)}" height="{fmt(slide_h)}" {background_style}/>')
         for shape in slide.shapes:
-            shape_to_svg(shape, TOP_LEVEL_CTX, theme_colors, minor_font, media_dir, out)
+            shape_to_svg(shape, TOP_LEVEL_CTX, theme_colors, minor_font, media_dir,
+                         out, index, defs, diagnostics)
+        if defs:
+            out.insert(1, "<defs>" + "\n".join(defs) + "</defs>")
         out.append("</svg>")
         (svg_dir / f"slide_{index:02d}.svg").write_text("\n".join(out), encoding="utf-8")
         converted += 1
 
-    return {"slides": converted, "mediaFiles": len(list(media_dir.iterdir()))}
+    report = {"slides": converted, "mediaFiles": len(list(media_dir.iterdir())),
+              "diagnostics": diagnostics, "renderer": "native-compatibility",
+              "originalRendering": False}
+    (output / "native-import-report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return report
 
 
 if __name__ == "__main__":

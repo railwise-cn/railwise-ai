@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FolderOpen,
   Group,
+  Search,
   ImagePlus,
   Loader2,
   Minus,
@@ -23,7 +24,8 @@ import {
   Type,
   Ungroup,
   Undo2,
-  Upload
+  Upload,
+  X
 } from 'lucide-react'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { useDesignWorkspaceStore, type DesignTool } from '../../design/design-workspace-store'
@@ -43,7 +45,9 @@ import { DesignLayersPanel } from './DesignLayersPanel'
 import { DesignNewDocumentDialog } from './DesignNewDocumentDialog'
 import { DesignPropertiesPanel } from './DesignPropertiesPanel'
 import { DesignShapeLibraryPanel } from './DesignShapeLibraryPanel'
-import type { DesignCanvasFormat, DesignDocumentV1, DesignPage } from '@shared/design-document'
+import { PptxEditorAdapter, type NativePptxController } from './PptxEditorAdapter'
+import type { DesignEditorMode } from './design-editor-mode'
+import type { DesignCanvasFormat, DesignDocumentV1, DesignImportDiagnostic, DesignPage } from '@shared/design-document'
 import type {
   DesignCanvasCommandV1,
   DesignDocumentLoadResult,
@@ -53,6 +57,7 @@ import { useChatStore } from '../../store/chat-store'
 import {
   activeDesignDocumentForWorkspace,
   consumeRequestedDesignDocument,
+  forgetActiveDesignDocumentForWorkspace,
   rememberActiveDesignDocument
 } from '../../design/design-thread-registry'
 import {
@@ -136,6 +141,7 @@ export function DesignWorkspaceView({
     historyRedoCount,
     activePageId,
     addPage,
+    movePage,
     removePage,
     setActivePage,
     setPageDisplayMode,
@@ -169,6 +175,7 @@ export function DesignWorkspaceView({
       historyRedoCount: s.history.redoStack.length,
       activePageId: s.activePageId,
       addPage: s.addPage,
+      movePage: s.movePage,
       removePage: s.removePage,
       setActivePage: s.setActivePage,
       setPageDisplayMode: s.setPageDisplayMode,
@@ -262,6 +269,30 @@ export function DesignWorkspaceView({
     tone: 'success' | 'error'
     message: string
   } | null>(null)
+  const editorMode: DesignEditorMode = document?.documentKind === 'pptx' || document?.pptx ? 'pptx' : 'canvas'
+  const nativeControllerRef = useRef<NativePptxController | null>(null)
+  const [nativeDirty, setNativeDirty] = useState(false)
+  const [closingDocument, setClosingDocument] = useState(false)
+  const nativeDiagnostics = useMemo<DesignImportDiagnostic[]>(() => {
+    const report = document?.pptx?.importReport
+    if (!report) return document?.importReport?.diagnostics ?? []
+    return [
+      ...report.errors.map((message) => ({ code: 'native-error', severity: 'error' as const, message })),
+      ...report.warnings.map((message) => ({ code: 'native-warning', severity: 'warning' as const, message })),
+      ...report.pages.flatMap((page) => page.warnings.map((message) => ({ code: 'native-page', severity: 'warning' as const, pageNumber: page.pageIndex + 1, message }))),
+      ...report.objects.filter((object) => object.reason).map((object) => ({
+        code: 'native-object', severity: object.support === 'failed' ? 'error' as const : 'warning' as const,
+        pageNumber: object.pageIndex + 1, elementId: object.id, message: `${object.id}: ${object.reason}`
+      }))
+    ]
+  }, [document?.pptx?.importReport, document?.importReport?.diagnostics])
+  const handleNativeController = useCallback((controller: NativePptxController | null) => {
+    nativeControllerRef.current = controller
+  }, [])
+
+  useEffect(() => {
+    setNativeDirty(false)
+  }, [document?.id])
 
   useEffect(() => {
     canvasCommandScopeRef.current += 1
@@ -294,6 +325,8 @@ export function DesignWorkspaceView({
     const operation = saveQueueRef.current
       .catch(() => false)
       .then(async () => {
+        const native = nativeControllerRef.current
+        if (native?.isDirty() && !(await native.save())) return false
         const state = useDesignWorkspaceStore.getState()
         const currentDocument = state.document
         const currentPageId = state.activePageId
@@ -340,7 +373,33 @@ export function DesignWorkspaceView({
     return operation
   }, [t, workspaceRoot])
 
+  const handleCloseDocument = useCallback(async (): Promise<void> => {
+    if (closingDocument) return
+    setClosingDocument(true)
+    try {
+      const saved = await flushDesignSave()
+      if (!saved) {
+        setOperationNotice({ tone: 'error', message: t('designCloseSaveFailed') })
+        return
+      }
+      canvasCommandScopeRef.current += 1
+      restoreGenerationRef.current += 1
+      forgetActiveDesignDocumentForWorkspace(workspaceRoot)
+      closeDocument()
+      setNativeDirty(false)
+      setOperationNotice(null)
+    } finally {
+      setClosingDocument(false)
+    }
+  }, [closeDocument, closingDocument, flushDesignSave, t, workspaceRoot])
+
   useEffect(() => registerGuiUpdateSaveHandler('Design', flushDesignSave), [flushDesignSave])
+
+  useEffect(() => {
+    if (!nativeDirty) return
+    const timer = window.setTimeout(() => void flushDesignSave(), 1500)
+    return () => window.clearTimeout(timer)
+  }, [nativeDirty, flushDesignSave])
 
   const restoreDesignDocument = useCallback(async (
     documentId?: string
@@ -356,6 +415,13 @@ export function DesignWorkspaceView({
           activePageId: result.activePageId,
           persistedRevision: result.revision ?? result.document.revision
         })
+        if (result.sourceStatus?.state === 'missing') {
+          setOperationNotice({ tone: 'warning', message: t('designPptxSourceMissing') })
+        } else if (result.sourceStatus?.state === 'corrupt') {
+          setOperationNotice({ tone: 'warning', message: t('designPptxSourceCorrupt') })
+        } else if (result.sourceStatus?.state === 'metadata_missing') {
+          setOperationNotice({ tone: 'warning', message: t('designPptxSourceMetadataMissing') })
+        }
         rememberActiveDesignDocument(workspaceRoot, result.document.id)
         await Promise.all(result.document.assets.map(async (asset) => {
           const assetResult = await window.workwise.readDesignAsset({
@@ -430,13 +496,14 @@ export function DesignWorkspaceView({
   }, [
     activePageId,
     document,
+    editorMode,
     flushDesignSave,
     persistedRevision,
     restoring
   ])
 
   useEffect(() => {
-    if (restoring || !document || !activePageId) return
+    if (restoring || !document || !activePageId || editorMode === 'pptx') return
     let latestUserBlockIndex = -1
     for (let index = runtimeBlocks.length - 1; index >= 0; index -= 1) {
       if (runtimeBlocks[index].kind === 'user') {
@@ -522,6 +589,7 @@ export function DesignWorkspaceView({
     applyCanvasCommand,
     canvasCommandRetryGeneration,
     document,
+    editorMode,
     flushDesignSave,
     restoring,
     runtimeBlocks,
@@ -690,7 +758,9 @@ export function DesignWorkspaceView({
             return false
           })
         )
-        if (hasVectorElements) {
+        if (result.document.documentKind === 'pptx') {
+          setOperationNotice({ tone: 'warning', message: t('designPptxNativeImportNotice') })
+        } else if (hasVectorElements) {
           setOperationNotice({
             tone: 'success',
             message: result.warnings?.length
@@ -727,6 +797,10 @@ export function DesignWorkspaceView({
   // 导出 PPTX
   const handleExportPptx = async (): Promise<void> => {
     if (!document || exporting !== null) return
+    if (editorMode === 'pptx') {
+      await nativeControllerRef.current?.exportPptx()
+      return
+    }
     if (typeof window.workwise?.exportDesignToPptx !== 'function') return
     setExporting('pptx')
     try {
@@ -768,6 +842,10 @@ export function DesignWorkspaceView({
 
   const handleExportImage = async (format: 'png' | 'svg'): Promise<void> => {
     if (!document || exporting !== null) return
+    if (editorMode === 'pptx') {
+      await nativeControllerRef.current?.exportImage(format)
+      return
+    }
     const page = useDesignWorkspaceStore.getState().getActivePage()
     if (!page) return
     setExporting(format)
@@ -863,11 +941,13 @@ export function DesignWorkspaceView({
           path
         }).catch(() => undefined)
       }
-      const dataBase64 = await designPageToPngBase64(page, assetDataUrls)
+      const dataBase64 = editorMode === 'pptx'
+        ? (await nativeControllerRef.current!.captureImage('png')).replace(/^data:image\/png;base64,/, '')
+        : await designPageToPngBase64(page, assetDataUrls)
       const result = await window.workwise.saveDesignAssetToWrite({
         workspaceRoot: writeSnapshot.workspaceRoot,
         currentFilePath: writeSnapshot.activeFilePath,
-        fileName: `${designExportFileStem(document.name)}-${designExportFileStem(page.name)}.png`,
+        fileName: `${designExportFileStem(document.name)}-${editorMode === 'pptx' ? `slide-${(nativeControllerRef.current?.getCurrentSlide() ?? 0) + 1}` : designExportFileStem(page.name)}.png`,
         dataBase64
       })
       if (!result.ok) {
@@ -923,7 +1003,7 @@ export function DesignWorkspaceView({
   // 键盘快捷键：Ctrl/Cmd+Z 撤销，Ctrl/Cmd+Shift+Z 或 Ctrl+Y 重做
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (!document) return
+      if (!document || editorMode === 'pptx') return
       // 只在焦点不在 input/textarea 时响应（避免与文字编辑冲突）
       const target = event.target as HTMLElement
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
@@ -942,8 +1022,10 @@ export function DesignWorkspaceView({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [document, undo, redo])
+  }, [document, editorMode, undo, redo])
   const [sidebarTab, setSidebarTab] = useState<'assistant' | 'properties' | 'layers' | 'shapes'>('assistant')
+  const [pptxSlidesRailOpen, setPptxSlidesRailOpen] = useState(() => window.innerWidth >= 900)
+  const [pptxPanelsOpen, setPptxPanelsOpen] = useState(false)
 
   return (
     <div className="ds-opaque-work-surface ds-no-drag flex h-full min-h-0 flex-col bg-ds-main">
@@ -964,6 +1046,9 @@ export function DesignWorkspaceView({
         {document ? (
           <span className="ml-2 truncate text-[13px] text-ds-faint">{document.name}</span>
         ) : null}
+        {editorMode === 'pptx' ? (
+          <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent">{t('designPptxModeActive')}</span>
+        ) : null}
         {document && (savedDocuments.length > 0) ? (
           <select
             value={document.id}
@@ -983,7 +1068,27 @@ export function DesignWorkspaceView({
             ))}
           </select>
         ) : null}
-        <span
+        {document ? (
+          <button
+            type="button"
+            onClick={() => void handleCloseDocument()}
+            disabled={closingDocument || restoring || saveState === 'saving'}
+            title={t('designCloseDocument')}
+            aria-label={t('designCloseDocument')}
+            className="ml-1 flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] text-ds-faint hover:bg-ds-hover hover:text-ds-ink disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={1.85} />
+            <span className="hidden sm:inline">{t('designCloseDocument')}</span>
+          </button>
+        ) : null}
+        {editorMode === 'pptx' ? (
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <span className="hidden text-[11px] text-ds-muted lg:inline">{nativeDirty ? t('designPptxNativeUnsaved') : ''}</span>
+            <button type="button" onClick={() => void handleImportPptx()} disabled={importing} title={t('designImportPptx')} aria-label={t('designImportPptx')} className="flex min-h-8 min-w-8 items-center justify-center rounded-md px-2 text-ds-faint hover:bg-ds-hover"><Upload className="h-4 w-4" /></button>
+            <button type="button" onClick={() => void handleInsertIntoWrite()} title={t('designInsertWrite')} aria-label={t('designInsertWrite')} className="flex min-h-8 min-w-8 items-center justify-center rounded-md px-2 text-ds-faint hover:bg-ds-hover"><Share2 className="h-4 w-4" /></button>
+            <button type="button" onClick={() => void flushDesignSave().then((saved) => { if (saved) onOpenWrite() })} title={t('write')} aria-label={t('write')} className="min-h-8 rounded-md px-2 text-[11px] text-ds-faint hover:bg-ds-hover">{t('write')}</button>
+          </div>
+        ) : <span
           className={`ml-auto text-[11px] ${
             saveState === 'error' ? 'text-red-600' : 'text-ds-faint'
           }`}
@@ -998,7 +1103,7 @@ export function DesignWorkspaceView({
                 : saveState === 'saved'
                   ? t('designSaved')
                   : ''}
-        </span>
+        </span>}
       </header>
 
       {!document && restoring ? (
@@ -1022,12 +1127,15 @@ export function DesignWorkspaceView({
               <Plus className="h-4 w-4" strokeWidth={1.9} />
               {t('designNewDocument')}
             </button>
+            <button type="button" onClick={() => void handleImportPptx()} disabled={importing} className="ml-2 inline-flex min-h-10 items-center gap-2 rounded-lg border border-ds-border px-4 py-2 text-[13px] text-ds-ink hover:bg-ds-hover">
+              <Upload className="h-4 w-4" />{importing ? t('designImporting') : t('designImportPptx')}
+            </button>
           </div>
         </div>
       ) : (
         /* 有文档：工具栏 + 画布 */
         <>
-          <div className="flex h-10 shrink-0 items-center gap-1 border-b border-ds-border-muted px-3">
+          {editorMode === 'canvas' ? <div data-testid="free-canvas-toolbar" className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-ds-border-muted px-3">
             {TOOL_BUTTONS.map(({ tool, icon: Icon, labelKey }) => (
               <button
                 key={tool}
@@ -1225,7 +1333,7 @@ export function DesignWorkspaceView({
                 <span className="text-[12px]">{t('designNew')}</span>
               </button>
             </div>
-          </div>
+          </div> : null}
           {operationNotice ? (
             <div
               role={operationNotice.tone === 'error' ? 'alert' : 'status'}
@@ -1245,6 +1353,36 @@ export function DesignWorkspaceView({
               >
                 {t('close')}
               </button>
+            </div>
+          ) : null}
+          {editorMode === 'canvas' && document?.importReport ? (
+            <div
+              className={`mx-3 mt-2 shrink-0 rounded-xl border px-3 py-2 text-[12px] leading-5 ${
+                document.importReport.summary.errorCount > 0
+                  ? 'border-red-200 bg-red-50 text-red-800'
+                  : document.importReport.summary.warningCount > 0
+                    ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              }`}
+              data-testid="pptx-import-report"
+            >
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-medium">
+                <span>{t('designPptxImportReportTitle')}</span>
+                <span>{t('designPptxImportReportSlides', { count: document.importReport.convertedSlideCount })}</span>
+                <span>{t('designPptxImportReportElements', { count: document.importReport.summary.elementCount })}</span>
+                {document.importReport.summary.warningCount > 0 ? (
+                  <span>{t('designPptxImportReportWarnings', { count: document.importReport.summary.warningCount })}</span>
+                ) : null}
+              </div>
+              {document.importReport.diagnostics.length > 0 ? (
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px]">
+                  {document.importReport.diagnostics.slice(0, 3).map((diagnostic, index) => (
+                    <li key={`${diagnostic.code}-${diagnostic.pageNumber ?? 'all'}-${index}`}>
+                      {diagnostic.pageNumber ? `${t('designPage')} ${diagnostic.pageNumber}: ` : ''}{diagnostic.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
           {exportArtifact ? (
@@ -1292,7 +1430,7 @@ export function DesignWorkspaceView({
             </div>
           ) : null}
           {/* 预设形状面板（可折叠） */}
-          {presetPanelOpen ? (
+          {editorMode === 'canvas' && presetPanelOpen ? (
             <div className="flex max-h-48 shrink-0 flex-col border-b border-ds-border-muted bg-ds-card/95">
               <div className="flex items-center gap-2 border-b border-ds-border-muted px-3 py-1.5">
                 <input
@@ -1322,7 +1460,7 @@ export function DesignWorkspaceView({
               </div>
             </div>
           ) : null}
-          {isFlatImagePage ? (
+          {editorMode === 'canvas' && isFlatImagePage ? (
             <div className="mx-3 mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-200">
               <span className="min-w-0 flex-1">{t('designFlatImagePageNotice')}</span>
               <button
@@ -1335,38 +1473,69 @@ export function DesignWorkspaceView({
               </button>
             </div>
           ) : null}
-          {activePage?.displayMode === 'fidelity' ? (
+          {editorMode === 'canvas' && activePage?.displayMode === 'fidelity' ? (
             <div className="mx-3 mt-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] leading-5 text-blue-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-blue-200">
               {t('designFidelityModeNotice')}
             </div>
           ) : null}
           {/* 画布 + 右侧面板（属性/图层） */}
           <div className="flex min-h-0 flex-1">
-            <DesignCanvas />
-            {/* 右侧面板区：切换属性/图层 */}
-            <div className="flex w-72 shrink-0 flex-col border-l border-ds-border-muted bg-ds-card/95">
-              <DesignSidebarTabs
-                sidebarTab={sidebarTab}
-                onTabChange={setSidebarTab}
-                document={document}
+            {editorMode === 'pptx' && persistedRevision === null ? (
+              <div className="flex flex-1 items-center justify-center gap-2 text-sm text-ds-muted"><Loader2 className="h-4 w-4 animate-spin" />{saveState === 'error' ? saveError : t('designPptxNativeLoading')}</div>
+            ) : editorMode === 'pptx' && document ? (
+              <PptxEditorAdapter
+                documentName={document.name}
+                documentId={document.id}
                 workspaceRoot={workspaceRoot}
-                selectedElementIds={selectedElementIds}
-                assistantCommandNotice={assistantCommandNotice}
-                restoring={restoring}
-                presetShapes={presetShapes}
-                onLoadPresets={loadPresetShapes}
-                onInsertPreset={handleInsertPreset}
-              />
-            </div>
+                expectedSourceSha256={document.pptx?.source?.sha256}
+                slidesRailOpen={pptxSlidesRailOpen}
+                panelsOpen={pptxPanelsOpen}
+                reportStatus={document.pptx?.importReport?.status ?? 'partial'}
+                diagnostics={nativeDiagnostics}
+                protectedObjectCount={document.pptx?.importReport?.objects.filter((item) => item.support === 'protected').length ?? 0}
+                protectedSourceIds={document.pptx?.importReport?.objects.filter((item) => item.support === 'protected').map((item) => ({ pageIndex: item.pageIndex, id: item.id, sourcePart: item.sourcePart, reason: item.reason })) ?? []}
+                unsupportedObjectCount={document.pptx?.importReport?.objects.filter((item) => item.support === 'unsupported' || item.support === 'failed').length ?? 0}
+                onToggleSlides={() => setPptxSlidesRailOpen((value) => !value)}
+                onTogglePanels={() => setPptxPanelsOpen((value) => !value)}
+                referencePreview={activePage?.fidelityImageAssetId ? assetDataUrls[activePage.fidelityImageAssetId] : undefined}
+                onUseCanvas={() => setNewDocDialogOpen(true)}
+                onControllerReady={handleNativeController}
+                onDirtyChange={setNativeDirty}
+              >
+                <div className="flex h-full items-center justify-center p-6 text-sm text-ds-muted">
+                  {t('designPptxNativeFallbackNotice')}
+                </div>
+              </PptxEditorAdapter>
+            ) : (
+              <DesignCanvas />
+            )}
+            {editorMode !== 'pptx' ? (
+              <div className="flex w-72 shrink-0 flex-col border-l border-ds-border-muted bg-ds-card/95">
+                <DesignSidebarTabs
+                  sidebarTab={sidebarTab}
+                  onTabChange={setSidebarTab}
+                  document={document}
+                  workspaceRoot={workspaceRoot}
+                  selectedElementIds={selectedElementIds}
+                  assistantCommandNotice={assistantCommandNotice}
+                  restoring={restoring}
+                  presetShapes={presetShapes}
+                  onLoadPresets={loadPresetShapes}
+                  onInsertPreset={handleInsertPreset}
+                />
+              </div>
+            ) : null}
           </div>
           {/* 底部页面导航条 */}
-          <DesignPageBar
+          {editorMode === 'canvas' ? <DesignPageBar
             document={document}
             activePageId={activePageId}
+            assetDataUrls={assetDataUrls}
             onAddPage={addPage}
             onSelectPage={setActivePage}
+            onMovePage={movePage}
             onRemovePage={() => activePageId && removePage(activePageId)}
-          />
+          /> : null}
         </>
       )}
 
@@ -1513,20 +1682,31 @@ function DesignSidebarTabs({
 function DesignPageBar({
   document,
   activePageId,
+  assetDataUrls,
   onAddPage,
   onSelectPage,
+  onMovePage,
   onRemovePage
 }: {
   document: DesignDocumentV1 | null
   activePageId: string | null
+  assetDataUrls: Record<string, string>
   onAddPage: () => void
   onSelectPage: (id: string) => void
+  onMovePage: (fromIndex: number, toIndex: number) => void
   onRemovePage: () => void
 }): ReactElement {
   const { t } = useTranslation('common')
   const allPages = document?.pages ?? []
+  const [query, setQuery] = useState('')
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const visiblePages = allPages.filter((page, index) => {
+    if (!query.trim()) return true
+    const term = query.trim().toLowerCase()
+    return page.name.toLowerCase().includes(term) || String(index + 1).includes(term)
+  })
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-t border-ds-border-muted bg-ds-card/95 px-2">
+    <div className="flex h-14 shrink-0 items-center gap-1 border-t border-ds-border-muted bg-ds-card/95 px-2">
       <button
         type="button"
         onClick={onAddPage}
@@ -1536,23 +1716,51 @@ function DesignPageBar({
       >
         <Plus className="h-4 w-4" strokeWidth={1.85} />
       </button>
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {allPages.map((page, index) => (
+      <label className="flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border border-ds-border bg-ds-main px-2 text-ds-faint">
+        <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t('designPageSearch')}
+          aria-label={t('designPageSearch')}
+          className="min-w-0 flex-1 bg-transparent text-[11px] text-ds-ink outline-none placeholder:text-ds-faint"
+        />
+      </label>
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1">
+        {visiblePages.map((page) => {
+          const index = allPages.findIndex((item) => item.id === page.id)
+          const reference = page.fidelityImageAssetId ? assetDataUrls[page.fidelityImageAssetId] : undefined
+          return (
           <button
             key={page.id}
             type="button"
             onClick={() => onSelectPage(page.id)}
-            className={`flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11.5px] transition ${
+            draggable={allPages.length > 1 && !query}
+            onDragStart={() => setDraggedIndex(index)}
+            onDragEnd={() => setDraggedIndex(null)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => {
+              if (draggedIndex !== null && draggedIndex !== index) onMovePage(draggedIndex, index)
+              setDraggedIndex(null)
+            }}
+            className={`flex h-11 min-w-[74px] shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] transition ${
               page.id === activePageId
-                ? 'bg-accent/15 text-accent'
-                : 'text-ds-faint hover:bg-ds-hover/50 hover:text-ds-ink'
+                ? 'border-accent/50 bg-accent/10 text-accent'
+                : 'border-transparent text-ds-faint hover:border-ds-border hover:bg-ds-hover/50 hover:text-ds-ink'
             }`}
             title={page.name}
           >
-            <span className="font-mono opacity-60">{index + 1}</span>
-            <span className="max-w-[80px] truncate">{page.name}</span>
+            <span className="flex h-8 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-ds-border-muted bg-white">
+              {reference ? (
+                <img src={reference} alt="" className="h-full w-full object-contain" draggable={false} />
+              ) : (
+                <span className="h-full w-full" style={{ background: `linear-gradient(135deg, #${page.background ?? 'FFFFFF'} 0%, #E8EDF3 100%)` }} />
+              )}
+            </span>
+            <span className="min-w-0 text-left"><span className="block font-mono opacity-60">{index + 1}</span><span className="block max-w-[54px] truncate">{page.name}</span></span>
           </button>
-        ))}
+          )
+        })}
       </div>
       {allPages.length > 1 ? (
         <button

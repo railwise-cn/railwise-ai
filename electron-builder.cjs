@@ -4,6 +4,7 @@ const { join } = require('node:path')
 const { verifyCandidateSourceTree } = require('./scripts/candidate-source-provenance.cjs')
 const { markitdownResourceFilter } = require('./scripts/markitdown-packaging-policy.cjs')
 const { agentPackResourceFilter, asarBlockedSkillFilters } = require('./scripts/specialist-skill-audit.cjs')
+const { dependencyArtifactFilters } = require('./scripts/dependency-artifact-policy.cjs')
 
 // Keep these paths absolute. electron-builder resolves hook configuration from
 // its own process context, and a relative entitlements path can silently fall
@@ -212,6 +213,13 @@ const builderConfig = {
     // dependency collector omit them even though the lockfile requires them.
     'node_modules/bindings/**/*',
     'node_modules/file-uri-to-path/**/*',
+    // Local document preview/export reads these offline rendering assets.
+    'node_modules/katex/**/*',
+    'node_modules/mermaid/**/*',
+    'node_modules/markdown-it-footnote/**/*',
+    // Dependency packages can contain upstream browser-debug logs/reports.
+    // Keep these out of both the main bundle and managed runtime below.
+    ...dependencyArtifactFilters('**/node_modules/**'),
     '!**/*.map',
     '!**/*.d.ts',
     '!**/*.ts',
@@ -228,6 +236,19 @@ const builderConfig = {
   extraResources: [
     ...markitdownExtraResources,
     {
+      from: 'src/asset/markdown-rendering',
+      to: 'third-party/markdown-rendering',
+      filter: ['**/*']
+    },
+    {
+      // Keep third-party editor notices and the MPL-2.0 component's source
+      // offer available beside the packaged application. These legal files
+      // must not be filtered by the app.asar source exclusions below.
+      from: 'src/asset/pptx-editors',
+      to: 'third-party/pptx-editors',
+      filter: ['**/*']
+    },
+    {
       from: 'kun',
       to: 'app.asar.unpacked/kun',
       filter: [
@@ -241,7 +262,8 @@ const builderConfig = {
       from: 'kun/node_modules',
       to: 'app.asar.unpacked/kun/runtime-deps',
       filter: [
-        ...managedRuntimeProductionRoots.map((root) => `${root.slice('kun/node_modules/'.length)}/**/*`)
+        ...managedRuntimeProductionRoots.map((root) => `${root.slice('kun/node_modules/'.length)}/**/*`),
+        ...dependencyArtifactFilters()
       ]
     },
     {

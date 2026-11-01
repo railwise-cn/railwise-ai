@@ -123,6 +123,23 @@ describe('registerAppIpcHandlers', () => {
     }
   })
 
+  it('registers native PPTX revision IPC channels and rejects malformed payloads', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions())
+    const readRevision = handlers.get('design:pptx-revision:read')
+    const saveRevision = handlers.get('design:pptx-revision:save')
+    expect(readRevision).toBeTypeOf('function')
+    expect(saveRevision).toBeTypeOf('function')
+    await expect(readRevision?.({}, { workspaceRoot: '/tmp/workspace', documentId: '../outside' }))
+      .rejects.toThrow(/Invalid payload for design:pptx-revision:read/)
+    await expect(saveRevision?.({}, {
+      workspaceRoot: '/tmp/workspace',
+      documentId: 'doc_test',
+      expectedSha256: 'not-a-digest',
+      bytes: [80, 75]
+    })).rejects.toThrow(/Invalid payload for design:pptx-revision:save/)
+  })
+
   it('rejects invalid Survey draft requests before reaching the runtime', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const runtimeRequest = vi.fn(async () => ({ ok: true, status: 200, body: '{}' }))

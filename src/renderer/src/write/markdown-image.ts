@@ -33,7 +33,11 @@ export function resolveWriteMarkdownImage(
 ): WriteMarkdownImageResolution {
   const rawSrc = src?.trim() ?? ''
   const localPath = resolveWriteMarkdownResourcePath(rawSrc, filePath)
-  const fallbackSrc = resolveWriteMarkdownResource(rawSrc, filePath)
+  // Local files are loaded through the workspace bridge. Network images never
+  // load just because a document was opened; raster data URIs are self-contained.
+  const fallbackSrc = /^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z\d+/=\s]+$/i.test(rawSrc)
+    ? resolveWriteMarkdownResource(rawSrc, filePath)
+    : undefined
   return {
     rawSrc,
     ...(fallbackSrc ? { fallbackSrc } : {}),
@@ -52,7 +56,8 @@ export function initialWriteMarkdownImageSrc(
 
 export async function loadWriteMarkdownImage(
   src: string | undefined,
-  filePath?: string | null
+  filePath?: string | null,
+  workspaceRoot?: string
 ): Promise<WriteMarkdownImageLoadResult> {
   const resolved = resolveWriteMarkdownImage(src, filePath)
   if (!resolved.localPath) {
@@ -76,7 +81,7 @@ export async function loadWriteMarkdownImage(
   }
 
   try {
-    const result = await window.workwise.readWorkspaceImage({ path: resolved.localPath })
+    const result = await window.workwise.readWorkspaceImage({ path: resolved.localPath, ...(workspaceRoot ? { workspaceRoot } : {}) })
     if (result.ok) {
       return {
         ok: true,
