@@ -113,13 +113,35 @@ export function verifyBundle(app, head, version, progress) {
   const info = JSON.parse(run('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents/Info.plist')]))
   validateBundleIdentity(info, head, version)
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app])
-  run('/usr/bin/xcrun', ['stapler', 'validate', app])
+  validateStapleWithTransportRetry(app, progress)
   run('/usr/sbin/spctl', ['--assess', '--type', 'execute', app])
   validatePrivateUpdateMetadata(readFileSync(join(app, 'Contents/Resources/app-update.yml'), 'utf8'), head)
   packagedAsar._internals.verifyPackagedSourceHead(join(app, 'Contents/Resources/app.asar'), head)
   const identity = boundedCommand('/usr/bin/codesign', ['-d', '-r-', app], { progress })
   const requirement = parseDesignatedRequirement(identity)
   return { bundleId: info.CFBundleIdentifier, version, designatedRequirement: requirement }
+}
+
+export function validateStapleWithTransportRetry(app, progress = () => {}, options = {}) {
+  const run = options.run ?? boundedCommand
+  const wait = options.wait ?? ((ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms))
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    // Capture both streams before making a classification. Exit 68 alone is
+    // insufficient: invalid/absent tickets must continue to block acceptance.
+    const result = run('/usr/bin/xcrun', ['stapler', 'validate', app], { progress, allowedExitCodes: [0, 68] })
+    const diagnostic = redactAcceptanceLog(`${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim())
+    if (result.status === 0) {
+      progress({ operation: 'stapler-validation', status: 'completed', attempt })
+      return
+    }
+    const retryable = result.status === 68 && /NSURLErrorDomain\s+Code=-1005\b/.test(diagnostic)
+      && /https:\/\/api\.apple-cloudkit\.com\//.test(diagnostic) && /The network connection was lost/.test(diagnostic)
+    progress({ operation: 'stapler-validation', status: 'failed', attempt, retryable, diagnostic })
+    if (!retryable || attempt === 3) throw new Error(`stapler validation failed (exit ${result.status}); attempts=${attempt}: ${diagnostic}`)
+    const delayMs = attempt * 2000
+    progress({ operation: 'stapler-transport-retry', status: 'started', attempt, delayMs })
+    wait(delayMs)
+  }
 }
 
 async function sha256(path) {

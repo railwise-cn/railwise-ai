@@ -108,14 +108,26 @@ async function sha256File(path) {
   return hash.digest('hex')
 }
 
-function runStapler(args, { timeoutMs }) {
+function runStapler(args, { timeoutMs, run = execFileSync }) {
   try {
-    execFileSync('xcrun', ['stapler', ...args], { stdio: 'inherit', timeout: timeoutMs, killSignal: 'SIGKILL' })
+    const output = run('xcrun', ['stapler', ...args], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: timeoutMs, killSignal: 'SIGKILL'
+    })
+    if (output) console.log(redactNotaryText(output))
   } catch (error) {
-    throw notaryError(
+    const detail = redactNotaryText(`${error?.stdout || ''}\n${error?.stderr || ''}`.trim()).slice(0, 8000)
+    if (detail) console.log(detail)
+    const failure = notaryError(
       error?.code === 'ETIMEDOUT' ? 'command-timeout' : 'stapler-failure',
       `stapler ${args[0]} ${error?.code === 'ETIMEDOUT' ? `did not return within ${timeoutMs} ms` : `failed (exit ${error?.status ?? error?.code ?? 'unknown'})`}`
     )
+    // Retry only the observed Apple ticket-service connection loss. Exit 68
+    // alone can also mean an invalid or absent ticket and must still fail.
+    failure.retryableStaplerTransport = error?.status === 68 &&
+      /NSURLErrorDomain\s+Code=-1005\b/.test(detail) &&
+      /https:\/\/api\.apple-cloudkit\.com\//.test(detail) &&
+      /The network connection was lost/.test(detail)
+    throw failure
   }
 }
 
@@ -207,11 +219,32 @@ async function notarizeArchive(zipPath, appBundle, creds, options = {}) {
     }
 
     record('accepted')
-    record('stapling')
-    await staple(['staple', appBundle], { timeoutMs: settings.staplerTimeoutMs })
+    const stapleWithTransportRetry = async (operation, phase) => {
+      const maxAttempts = 3
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        record(phase, { attempt, maxAttempts })
+        try {
+          await staple([operation, appBundle], { timeoutMs: settings.staplerTimeoutMs })
+          return
+        } catch (error) {
+          const retryable = error.retryableStaplerTransport === true
+          record('stapler-attempt-failed', {
+            operation, attempt, maxAttempts, retryable,
+            kind: error.code || 'stapler-failure', message: redactNotaryText(error.message, creds)
+          })
+          if (!retryable || attempt === maxAttempts) {
+            record(phase, { attempt, maxAttempts, retryExhausted: retryable })
+            throw error
+          }
+          const delayMs = attempt * 2000
+          record('stapler-transport-retry', { operation, attempt, maxAttempts, delayMs })
+          await wait(delayMs)
+        }
+      }
+    }
+    await stapleWithTransportRetry('staple', 'stapling')
     evidence.stapled = true
-    record('validating-staple')
-    await staple(['validate', appBundle], { timeoutMs: settings.staplerTimeoutMs })
+    await stapleWithTransportRetry('validate', 'validating-staple')
     evidence.stapleValidated = true
     evidence.completedAt = new Date(now()).toISOString()
     record('complete')
@@ -408,6 +441,7 @@ exports._internals = {
   notarizeArchive,
   notarySettings,
   runNotaryToolJson,
+  runStapler,
   redactNotaryText,
   notaryError,
   collectSignedCodeCandidates,

@@ -1,23 +1,36 @@
-name: Private candidate native updater
+name: Private db75 retained-target updater recovery
 
 on:
   workflow_call:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   native-macos:
-    name: Private macOS arm64 native updater round-trip
+    name: Exact db75 target with fresh same-source baseline
     runs-on: macos-15
     timeout-minutes: 150
     env:
+      PRODUCT_SOURCE_HEAD: db75a1fd2f48c6ba6878c81b67daec5191929362
+      RETAINED_TARGET_RUN: '41302196344'
+      RETAINED_TARGET_ARTIFACT: '13083680905'
+      RETAINED_TARGET_ZIP_SHA256: 5a71bb0749cd295ad8e7f8203b4b5b9918ca813b6871094ce2997d9e83e3fa17
       WORKWISE_REQUIRE_DOCUMENT_SIDECAR: '1'
       WORKWISE_SIDECAR_ARCH: arm64
       WORKWISE_PYTHON: python
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out recovery harness provenance
+        uses: actions/checkout@v7
         with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out immutable product source separately
+        uses: actions/checkout@v7
+        with:
+          ref: db75a1fd2f48c6ba6878c81b67daec5191929362
+          path: product-source
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -29,25 +42,60 @@ jobs:
           python-version: '3.12'
           architecture: arm64
           cache: pip
-          cache-dependency-path: sidecars/markitdown/requirements.lock
-      - run: npm ci
-      - name: Check private transport and isolation guards
-        run: node --test scripts/private-updater-acceptance.test.mjs
+          cache-dependency-path: product-source/sidecars/markitdown/requirements.lock
+      - name: Install recovery harness dependencies
+        run: npm ci
+      - name: Check strict retry, transport and isolation guards
+        run: |
+          node --test scripts/private-updater-acceptance.test.mjs scripts/private-updater-stapler-recovery.test.mjs scripts/mac-notarize-transport-recovery.test.cjs
+          npx vitest run src/main/mac-notarize.test.ts
+      - name: Download authenticated retained final target
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: railwise-cn/railwise-ai
+          run-id: '41302196344'
+          artifact-ids: '13083680905'
+          merge-multiple: true
+          path: ${{ runner.temp }}/retained-db75-target
+      - name: Verify retained target and separate helper provenance
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/private-updater-build/target/mac-arm64" "${RUNNER_TEMP}/private-updater-evidence"
+          export TARGET_ZIP="${RUNNER_TEMP}/retained-db75-target/WorkWise-Candidate-db75a1fd2f48-0.5.4-mac-arm64.zip"
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto'
+          import { createReadStream, writeFileSync } from 'node:fs'
+          const hash = createHash('sha256')
+          for await (const chunk of createReadStream(process.env.TARGET_ZIP)) hash.update(chunk)
+          const actual = hash.digest('hex')
+          if (actual !== process.env.RETAINED_TARGET_ZIP_SHA256) throw new Error('Retained target ZIP digest mismatch')
+          writeFileSync(`${process.env.RUNNER_TEMP}/private-updater-evidence/recovery-provenance.json`, JSON.stringify({
+            productSourceHead: process.env.PRODUCT_SOURCE_HEAD, harnessSourceHead: process.env.GITHUB_SHA,
+            retainedTargetRun: process.env.RETAINED_TARGET_RUN, retainedTargetArtifact: process.env.RETAINED_TARGET_ARTIFACT,
+            retainedTargetZipSha256: actual, productVersion: '0.5.4', publicOperations: false,
+            baselinePurpose: 'Rebuilt immutable db75 product source; external packaging hook contains bounded Apple transport retry only.'
+          }, null, 2) + '\n')
+          NODE
+          cp "${TARGET_ZIP}" "${RUNNER_TEMP}/private-updater-build/target/"
+          ditto -x -k "${TARGET_ZIP}" "${RUNNER_TEMP}/private-updater-build/target/mac-arm64"
+      - name: Install immutable product dependencies
+        working-directory: product-source
+        run: npm ci
       - name: Preflight actual Electron HTTPS certificate pinning
         timeout-minutes: 3
         run: node scripts/run-private-updater-tls-preflight.mjs --evidence-dir="${RUNNER_TEMP}/private-updater-evidence"
-      - name: Build audited document sidecar
+      - name: Build audited document sidecar from immutable product source
+        working-directory: product-source
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check --requirement sidecars/markitdown/requirements.lock
           npm run build:markitdown-sidecar
           python sidecars/markitdown/generate_sbom.py build/sidecars/markitdown-darwin-arm64/SBOM-python.json
           node scripts/verify-document-dependencies.mjs --python-sbom build/sidecars/markitdown-darwin-arm64/SBOM-python.json
-      - name: Prepare clean-source candidate identity
+      - name: Build clean immutable product source
+        working-directory: product-source
         env:
-          # The renderer includes local Markdown and PPTX editors. macOS Node
-          # defaults to a 2 GiB heap, below Rollup's measured build requirement.
-          # This applies only to the ephemeral build process, never the app.
           NODE_OPTIONS: --max-old-space-size=6144
         run: |
           set -euo pipefail
@@ -56,8 +104,11 @@ jobs:
           printf 'AUTHORIZE WORKWISE CANDIDATE\n' | bash scripts/authorize-workwise-candidate.sh --prepare
           source "${WORKWISE_CANDIDATE_ROOT}/candidate.env"
           npm run build
-      - name: Sign and notarize isolated baseline and target
+          test "$(git rev-parse HEAD)" = "${PRODUCT_SOURCE_HEAD}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Sign and notarize same-source baseline with external transport helper
         id: signed
+        working-directory: product-source
         env:
           MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -79,52 +130,39 @@ jobs:
           NODE
           unset RELEASE_CHANNEL WORKWISE_PUBLIC_BASE_URL WORKWISE_UPDATE_URL WORKWISE_APP_VERSION
           source "${RUNNER_TEMP}/private-updater-build/candidate.env"
-          target_version="$(node -p 'require("./package.json").version')"
-          for stage in baseline target; do
-            if [[ "$stage" == baseline ]]; then
-              export WORKWISE_APP_VERSION=0.0.0
-            else
-              export WORKWISE_APP_VERSION="$target_version"
-            fi
-            export WORKWISE_DIST_DIR="${RUNNER_TEMP}/private-updater-build/${stage}"
-            node scripts/with-mac-signing-keychain.mjs npx --yes electron-builder@26.8.1 \
-              --config electron-builder.cjs --config.directories.output="${WORKWISE_DIST_DIR}" \
-              --config.extraMetadata.name="workwise-private-updater-${GITHUB_SHA:0:12}" \
-              --publish never --mac dmg --arm64
-            if [[ "$stage" == target ]]; then node scripts/zip-mac-app.cjs arm64; fi
-          done
-          git diff --exit-code -- package.json package-lock.json
+          export WORKWISE_APP_VERSION=0.0.0
+          export WORKWISE_DIST_DIR="${RUNNER_TEMP}/private-updater-build/baseline"
+          node scripts/with-mac-signing-keychain.mjs npx --yes electron-builder@26.8.1 \
+            --config electron-builder.cjs --config.directories.output="${WORKWISE_DIST_DIR}" \
+            --config.afterSign="${GITHUB_WORKSPACE}/scripts/mac-notarize.cjs" \
+            --config.extraMetadata.name="workwise-private-updater-${PRODUCT_SOURCE_HEAD:0:12}" \
+            --publish never --mac dmg --arm64
+          test "$(git rev-parse HEAD)" = "${PRODUCT_SOURCE_HEAD}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Retain authenticated baseline before native probe
+        if: ${{ steps.signed.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-updater-recovery-baseline-db75-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/private-updater-build/baseline/*.dmg
       - name: Exercise actual private HTTPS download and Squirrel relaunch
         timeout-minutes: 35
         run: |
-          set -euo pipefail
           node scripts/run-private-macos-updater-acceptance.mjs \
-            --source-head="${GITHUB_SHA}" \
-            --target-version="$(node -p 'require("./package.json").version')" \
+            --source-head="${PRODUCT_SOURCE_HEAD}" --target-version=0.5.4 \
             --base-dist="${RUNNER_TEMP}/private-updater-build/baseline" \
             --target-dist="${RUNNER_TEMP}/private-updater-build/target" \
             --evidence-dir="${RUNNER_TEMP}/private-updater-evidence"
-      - name: Retain native updater evidence
+      - name: Retain exact native updater recovery evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: private-updater-arm64-${{ github.sha }}
+          name: private-updater-recovery-evidence-db75-${{ github.sha }}
           retention-days: 7
           if-no-files-found: warn
           path: |
-            ${{ runner.temp }}/private-updater-evidence/private-updater.json
-            ${{ runner.temp }}/private-updater-evidence/native-updater.json
-            ${{ runner.temp }}/private-updater-evidence/tls-preflight.json
-            ${{ runner.temp }}/private-updater-evidence/native-updater.redacted.log
+            ${{ runner.temp }}/private-updater-evidence/*.json
+            ${{ runner.temp }}/private-updater-evidence/*.redacted.log
             ${{ runner.temp }}/private-updater-build/baseline/**/notarization-*.json
-            ${{ runner.temp }}/private-updater-build/target/**/notarization-*.json
-      - name: Retain authenticated exact target package
-        if: ${{ always() && steps.signed.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-updater-target-arm64-${{ github.sha }}
-          retention-days: 7
-          if-no-files-found: error
-          path: |
-            ${{ runner.temp }}/private-updater-build/target/*.dmg
-            ${{ runner.temp }}/private-updater-build/target/*.zip

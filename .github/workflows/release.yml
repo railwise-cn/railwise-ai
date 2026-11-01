@@ -141,6 +141,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true }}
     permissions:
       contents: read
+      actions: read
     uses: ./.github/workflows/private-updater-acceptance.yml
     secrets: inherit
 
