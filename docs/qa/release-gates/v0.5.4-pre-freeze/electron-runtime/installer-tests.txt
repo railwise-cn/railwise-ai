@@ -1,0 +1,9 @@
+
+ RUN  v4.1.7 /private/tmp/railwise-release-0.5.4-20261101
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  23:01:48
+   Duration  95ms (transform 14ms, setup 0ms, import 20ms, tests 5ms, environment 0ms)
+

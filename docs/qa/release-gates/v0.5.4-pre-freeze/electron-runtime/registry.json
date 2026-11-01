@@ -1,0 +1,23 @@
+{
+  "version": "43.8.6",
+  "dist": {
+    "shasum": "b4795ef8b000663ec5da440e18c0d5c9cff6b116",
+    "tarball": "https://registry.npmjs.org/electron/-/electron-43.8.6.tgz",
+    "fileCount": 9,
+    "integrity": "sha512-2k3n5cjPHZqYTOn8iaJrm4fmb/QsvciomLD7PG9IECd0N/jr8Hxcu6Z/3mvMRrtXWCOp/i8qm5ZAcSnUzAa5Mw==",
+    "signatures": [
+      {
+        "sig": "MEYCIQDWRSkUD+jzbHzfCqJ5lyMWB9/LZMlxJO2sZxolM5hOQwIhAP1qkUmPB1TRXPil07CTTwpurMOOS/HoWOQM0twuDL5p",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      },
+      {
+        "sig": "MEUCIQDni9i8B8aoWbUN4HBPVJDCK9Tmoe9bu1mHbJQqRXlLGwIgUYF48KtrzW95XR+qcETjSsZOszUeMqS9kz9hYjUsTlU=",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      }
+    ],
+    "unpackedSize": 1159026
+  },
+  "engines": {
+    "node": ">= 22.12.0"
+  }
+}

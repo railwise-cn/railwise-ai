@@ -29,3 +29,7 @@ The first complete desktop run failed because the inherited root SQLite binary u
 The dependency migration matrix and before/after reports disclose desktop 3 low-severity entries for one KaTeX advisory and runtime zero production advisories. The independent embedded-asset review also inventories Mermaid's precompiled JSON_SCHEMA-limited YAML/parser code. This checkpoint does not claim zero vulnerabilities or third-party native Office interoperability.
 
 Original test/build logs are retained losslessly as `.txt.gz` to preserve their exact whitespace and terminal bytes. The generated policy probe is archived as `.cjs.txt`, not treated as authored application code.
+
+## Later runtime security correction
+
+The original full test/render evidence above preceded the Electron security upgrade from 43.1.1 to exact locked 43.8.6. See [runtime correction](electron-runtime/validation.md), full before/after audits, and the independent AI source review. Final CI and packaged acceptance must bind the upgraded source; historical results are not relabeled.

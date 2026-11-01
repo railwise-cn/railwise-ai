@@ -1,0 +1,179 @@
+[
+  {
+    "name": "undici",
+    "version": "7.28.0",
+    "location": "node_modules/undici",
+    "isWorkspace": false,
+    "dependents": [
+      {
+        "type": "optional",
+        "name": "undici",
+        "spec": "^7.24.4",
+        "from": {
+          "name": "@electron/get",
+          "version": "5.0.0",
+          "location": "node_modules/@electron/get",
+          "isWorkspace": false,
+          "dependents": [
+            {
+              "type": "prod",
+              "name": "@electron/get",
+              "spec": "^5.0.0",
+              "from": {
+                "name": "electron",
+                "version": "43.8.6",
+                "location": "node_modules/electron",
+                "isWorkspace": false,
+                "dependents": [
+                  {
+                    "type": "dev",
+                    "name": "electron",
+                    "spec": "^43.8.6",
+                    "from": {
+                      "location": "/private/tmp/railwise-release-0.5.4-20261101"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "dev": true,
+    "optional": true,
+    "devOptional": false,
+    "peer": false,
+    "bundled": false,
+    "overridden": false
+  },
+  {
+    "name": "tar",
+    "version": "7.5.20",
+    "location": "node_modules/tar",
+    "isWorkspace": false,
+    "dependents": [
+      {
+        "type": "prod",
+        "name": "tar",
+        "spec": "^7.5.6",
+        "from": {
+          "name": "@electron/rebuild",
+          "version": "4.0.3",
+          "location": "node_modules/@electron/rebuild",
+          "isWorkspace": false,
+          "dependents": [
+            {
+              "type": "dev",
+              "name": "@electron/rebuild",
+              "spec": "4.0.3",
+              "from": {
+                "location": "/private/tmp/railwise-release-0.5.4-20261101"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "prod",
+        "name": "tar",
+        "spec": "^7.4.3",
+        "from": {
+          "name": "cacache",
+          "version": "19.0.1",
+          "location": "node_modules/cacache",
+          "isWorkspace": false,
+          "dependents": [
+            {
+              "type": "prod",
+              "name": "cacache",
+              "spec": "^19.0.1",
+              "from": {
+                "name": "make-fetch-happen",
+                "version": "14.0.3",
+                "location": "node_modules/make-fetch-happen",
+                "isWorkspace": false,
+                "dependents": [
+                  {
+                    "type": "prod",
+                    "name": "make-fetch-happen",
+                    "spec": "^14.0.3",
+                    "from": {
+                      "name": "node-gyp",
+                      "version": "11.5.0",
+                      "location": "node_modules/node-gyp",
+                      "isWorkspace": false,
+                      "dependents": [
+                        {
+                          "type": "prod",
+                          "name": "node-gyp",
+                          "spec": "^11.2.0",
+                          "from": {
+                            "name": "@electron/rebuild",
+                            "version": "4.0.3",
+                            "location": "node_modules/@electron/rebuild",
+                            "isWorkspace": false,
+                            "dependents": [
+                              {
+                                "type": "dev",
+                                "name": "@electron/rebuild",
+                                "spec": "4.0.3",
+                                "from": {
+                                  "location": "/private/tmp/railwise-release-0.5.4-20261101"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "prod",
+        "name": "tar",
+        "spec": "^7.4.3",
+        "from": {
+          "name": "node-gyp",
+          "version": "11.5.0",
+          "location": "node_modules/node-gyp",
+          "isWorkspace": false,
+          "dependents": [
+            {
+              "type": "prod",
+              "name": "node-gyp",
+              "spec": "^11.2.0",
+              "from": {
+                "name": "@electron/rebuild",
+                "version": "4.0.3",
+                "location": "node_modules/@electron/rebuild",
+                "isWorkspace": false,
+                "dependents": [
+                  {
+                    "type": "dev",
+                    "name": "@electron/rebuild",
+                    "spec": "4.0.3",
+                    "from": {
+                      "location": "/private/tmp/railwise-release-0.5.4-20261101"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "dev": true,
+    "optional": false,
+    "devOptional": false,
+    "peer": false,
+    "bundled": false,
+    "overridden": false
+  }
+]
