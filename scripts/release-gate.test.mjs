@@ -16,6 +16,8 @@ import './release-promotion-recovery.test.mjs'
 import './release-build-memory.test.mjs'
 import './build-markdown-rendering.test.cjs'
 import './verify-packaged-markdown-rendering.test.cjs'
+import './verify-markdown-packaging-filesets.test.cjs'
+import './dependency-artifact-policy.test.cjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')

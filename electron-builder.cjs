@@ -5,6 +5,7 @@ const { verifyCandidateSourceTree } = require('./scripts/candidate-source-proven
 const { markitdownResourceFilter } = require('./scripts/markitdown-packaging-policy.cjs')
 const { agentPackResourceFilter, asarBlockedSkillFilters } = require('./scripts/specialist-skill-audit.cjs')
 const { dependencyArtifactFilters } = require('./scripts/dependency-artifact-policy.cjs')
+const { explicitRuntimePackageFiles } = require('./scripts/runtime-package-packaging.cjs')
 
 // Keep these paths absolute. electron-builder resolves hook configuration from
 // its own process context, and a relative entitlements path can silently fall
@@ -202,24 +203,13 @@ const builderConfig = {
     'src/asset/skills/**/*',
     ...asarBlockedSkillFilters(),
     'package.json',
-    // @modelcontextprotocol/sdk imports this peer at runtime from the main
-    // process. Electron-builder's dependency collector can omit the package
-    // when node_modules is supplied through a clean candidate worktree or a
-    // symlinked install, so address the production runtime path explicitly.
-    'node_modules/@modelcontextprotocol/sdk/**/*',
-    'node_modules/zod-to-json-schema/**/*',
-    // better-sqlite3 loads these optional native-loader packages at runtime.
-    // Keep them explicit because a clean/symlinked install can make npm's
-    // dependency collector omit them even though the lockfile requires them.
-    'node_modules/bindings/**/*',
-    'node_modules/file-uri-to-path/**/*',
-    // Local document preview/export reads these offline rendering assets.
-    'node_modules/katex/**/*',
-    'node_modules/mermaid/**/*',
+    // Main AppFileWalker always skips root node_modules, even for positive
+    // globs. Explicit FileSets preserve the SDK and native-loader roots and
+    // offline rendering assets if the dependency collector deduplicates them.
+    ...explicitRuntimePackageFiles(),
     // Only the core ESM-derived offline bundle in out/ is executed. Exclude
     // upstream browser bundles with their separately embedded dependency copies.
     '!**/node_modules/mermaid/dist/**/*',
-    'node_modules/markdown-it-footnote/**/*',
     // Dependency packages can contain upstream browser-debug logs/reports.
     // Keep these out of both the main bundle and managed runtime below.
     ...dependencyArtifactFilters('**/node_modules/**'),
