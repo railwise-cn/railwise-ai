@@ -102,6 +102,14 @@ import {
   workspaceFileTargetPayloadSchema,
   workspaceFileWatchPayloadSchema,
   workspaceFileWritePayloadSchema,
+  documentReadPayloadSchema,
+  documentSearchPayloadSchema,
+  checkedDocumentWritePayloadSchema,
+  documentHistoryPayloadSchema,
+  documentRestorePayloadSchema,
+  documentCommentCreatePayloadSchema,
+  documentCommentUpdatePayloadSchema,
+  documentSemanticsPayloadSchema,
   workspacePreviewPayloadSchema,
   workspaceTrustGetPayloadSchema,
   workspaceTrustSetPayloadSchema,
@@ -109,12 +117,15 @@ import {
   writeExportPayloadSchema,
   writeRichClipboardPayloadSchema,
   designExportPayloadSchema,
+  designPptxBytesExportPayloadSchema,
   designDocumentListPayloadSchema,
   designDocumentLoadPayloadSchema,
   designDocumentSavePayloadSchema,
   designImageImportPayloadSchema,
   designAssetReadPayloadSchema,
   designPptxImportPayloadSchema,
+  designPptxRevisionReadPayloadSchema,
+  designPptxRevisionSavePayloadSchema,
   designPresetRenderSchema,
   designWriteAssetPayloadSchema,
   writeInfographicPayloadSchema,
@@ -158,18 +169,36 @@ import {
   getPptMasterPythonEnvStatus
 } from '../services/ppt-master-python-env'
 import { refreshWriteKnowledgeBase, searchWriteKnowledge } from '../services/write-knowledge-service'
+import {
+  readDocumentSnapshot,
+  searchWorkspaceDocuments,
+  writeDocumentChecked,
+  listDocumentHistory,
+  getDocumentHistoryEntry,
+  restoreDocumentHistory,
+  listDocumentComments,
+  createDocumentComment,
+  updateDocumentComment,
+  getDocumentSemantics
+} from '../services/write-document-service'
 import { copyWriteDocumentAsRichText, exportWriteDocument } from '../services/write-export-service'
+import { renderWriteMermaidPreview } from '../services/write-mermaid-preview'
+import { writeMermaidPreviewPayloadSchema } from './app-ipc-schemas'
 import { exportDesignToPptx } from '../services/design-export-service'
 import { importPptxToDesign } from '../services/design-import-service'
 import { renderPresetShape, listPresetShapes } from '../services/design-preset-service'
 import { saveDesignAssetToWrite } from '../services/design-write-service'
 import {
+  exportDesignPptxRevisionBytes,
   listDesignDocuments,
   loadDesignDocument,
   readDesignAsset,
+  readDesignPptxRevision,
   readSafeDesignImageSource,
+  saveDesignPptxRevision,
   saveDesignDocument,
-  storeDesignImageAsset
+  storeDesignImageAsset,
+  storeDesignSourcePptx
 } from '../services/design-document-service'
 import { normalizeDesignDocument } from '../../shared/design-document'
 import { generateAgnesImage } from '../services/write-agnes-image-service'
@@ -1012,6 +1041,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return marketplaceCatalogService.syncSource(request.sourceId)
   })
   ipcMain.handle('plugin:list-installed', async () => pluginManagementService.listInstalled())
+  ipcMain.handle('plugin:list-update-diagnostics', async () => {
+    const catalog = await marketplaceCatalogService.listPackages()
+    return pluginManagementService.diagnoseUpdates(catalog.packages.map((entry) => entry.package))
+  })
   ipcMain.handle('plugin:pick-package', async (_, payload: unknown): Promise<WorkspacePickResult> => {
     const request = parseIpcPayload('plugin:pick-package', pluginPackagePickerPayloadSchema, payload)
     const { locale } = await store.load()
@@ -1897,6 +1930,41 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       parseIpcPayload('file:write-workspace', workspaceFileWritePayloadSchema, payload)
     )
   )
+  ipcMain.handle('file:read-document-snapshot', async (_, payload: unknown) => {
+    const request = parseIpcPayload('file:read-document-snapshot', documentReadPayloadSchema, payload)
+    return readDocumentSnapshot(request.path, request.workspaceRoot)
+  })
+  ipcMain.handle('file:search-workspace-documents', async (_, payload: unknown) =>
+    searchWorkspaceDocuments(
+      parseIpcPayload('file:search-workspace-documents', documentSearchPayloadSchema, payload)
+    )
+  )
+  ipcMain.handle('file:write-document-checked', async (_, payload: unknown) =>
+    writeDocumentChecked(
+      parseIpcPayload('file:write-document-checked', checkedDocumentWritePayloadSchema, payload)
+    )
+  )
+  ipcMain.handle('file:list-document-history', async (_, payload: unknown) =>
+    listDocumentHistory(parseIpcPayload('file:list-document-history', documentReadPayloadSchema, payload))
+  )
+  ipcMain.handle('file:get-document-history', async (_, payload: unknown) =>
+    getDocumentHistoryEntry(parseIpcPayload('file:get-document-history', documentHistoryPayloadSchema, payload))
+  )
+  ipcMain.handle('file:restore-document-history', async (_, payload: unknown) =>
+    restoreDocumentHistory(parseIpcPayload('file:restore-document-history', documentRestorePayloadSchema, payload))
+  )
+  ipcMain.handle('file:list-document-comments', async (_, payload: unknown) =>
+    listDocumentComments(parseIpcPayload('file:list-document-comments', documentReadPayloadSchema, payload))
+  )
+  ipcMain.handle('file:create-document-comment', async (_, payload: unknown) =>
+    createDocumentComment(parseIpcPayload('file:create-document-comment', documentCommentCreatePayloadSchema, payload))
+  )
+  ipcMain.handle('file:update-document-comment', async (_, payload: unknown) =>
+    updateDocumentComment(parseIpcPayload('file:update-document-comment', documentCommentUpdatePayloadSchema, payload))
+  )
+  ipcMain.handle('file:get-document-semantics', async (_, payload: unknown) =>
+    getDocumentSemantics(parseIpcPayload('file:get-document-semantics', documentSemanticsPayloadSchema, payload))
+  )
   ipcMain.handle('file:create-workspace', async (_, payload: unknown) =>
     createWorkspaceFile(
       parseIpcPayload('file:create-workspace', workspaceFileCreatePayloadSchema, payload)
@@ -1992,6 +2060,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       }
     )
   })
+  ipcMain.handle('write:mermaid-preview', async (_, payload: unknown) =>
+    renderWriteMermaidPreview(parseIpcPayload('write:mermaid-preview', writeMermaidPreviewPayloadSchema, payload))
+  )
   ipcMain.handle('write:copy-rich-text', async (_, payload: unknown) =>
     copyWriteDocumentAsRichText(
       parseIpcPayload('write:copy-rich-text', writeRichClipboardPayloadSchema, payload)
@@ -2023,6 +2094,28 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       }
     }
     return exportDesignToPptx(normalizedDoc, result.filePath, assetDataUrls)
+  })
+  ipcMain.handle('design:export-pptx-bytes', async (_, payload: unknown) => {
+    const parsed = parseIpcPayload('design:export-pptx-bytes', designPptxBytesExportPayloadSchema, payload)
+    const mainWindow = getMainWindow()
+    const fileName = basename(parsed.name || 'presentation.pptx')
+    const dialogOptions: Electron.SaveDialogOptions = {
+      title: 'Export PPTX',
+      defaultPath: fileName.toLowerCase().endsWith('.pptx') ? fileName : `${fileName}.pptx`,
+      filters: [{ name: 'PowerPoint', extensions: ['pptx'] }]
+    }
+    const result = mainWindow
+      ? await dialog.showSaveDialog(mainWindow, dialogOptions)
+      : await dialog.showSaveDialog(dialogOptions)
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true, message: 'Export canceled.' }
+    }
+    try {
+      await exportDesignPptxRevisionBytes(parsed, result.filePath)
+      return { ok: true, path: result.filePath }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
   })
   ipcMain.handle('design:document:load', async (_, payload: unknown) => {
     const parsed = parseIpcPayload('design:document:load', designDocumentLoadPayloadSchema, payload)
@@ -2089,6 +2182,14 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const parsed = parseIpcPayload('design:asset:read', designAssetReadPayloadSchema, payload)
     return readDesignAsset(parsed.workspaceRoot, parsed.documentId, parsed.asset)
   })
+  ipcMain.handle('design:pptx-revision:read', async (_, payload: unknown) => {
+    const parsed = parseIpcPayload('design:pptx-revision:read', designPptxRevisionReadPayloadSchema, payload)
+    return readDesignPptxRevision(parsed)
+  })
+  ipcMain.handle('design:pptx-revision:save', async (_, payload: unknown) => {
+    const parsed = parseIpcPayload('design:pptx-revision:save', designPptxRevisionSavePayloadSchema, payload)
+    return saveDesignPptxRevision(parsed)
+  })
   ipcMain.handle('design:import-pptx', async (_, payload: unknown) => {
     const parsed = parseIpcPayload('design:import-pptx', designPptxImportPayloadSchema, payload)
     const mainWindow = getMainWindow()
@@ -2138,8 +2239,29 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         idMap.set(image.provisionalId, stored.asset.id)
         assets.push(stored.asset)
       }
+      // Commit the immutable source only after all compatibility assets have
+      // passed decoding and persistence. A failed asset cannot leave a source
+      // file that has no corresponding document metadata.
+      const source = await storeDesignSourcePptx({
+        workspaceRoot: parsed.workspaceRoot,
+        documentId: imported.document.id,
+        bytes: imported.sourcePptxBytes
+      })
       const document = {
         ...imported.document,
+        documentKind: 'pptx' as const,
+        schemaVersion: 'v2' as const,
+        pptx: {
+          ...(imported.document.pptx ?? {}),
+          editorBackend: 'pptx-vanilla-viewer' as const,
+          editorVersion: '3.61.0',
+          source: {
+            bytes: source.byteSize,
+            sha256: source.sha256,
+            cachedFilename: source.filename
+          }
+        },
+        importReport: imported.importReport,
         assets,
         pages: imported.document.pages.map((page) => ({
           ...page,
@@ -2166,7 +2288,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         ok: true,
         document,
         activePageId: document.pages[0]?.id,
-        warnings: imported.warnings
+        warnings: imported.warnings,
+        importReport: imported.importReport
       }
     } catch (error) {
       return {

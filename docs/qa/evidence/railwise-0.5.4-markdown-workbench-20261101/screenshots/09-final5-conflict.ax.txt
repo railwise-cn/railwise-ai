@@ -1,0 +1,330 @@
+Window: "RailWise AI", App: RailWise AI Candidate 209a17ecc2ab.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final5/Applications/RailWise%20AI%20Candidate%20209a17ecc2ab.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 收起侧边栏
+						7 container
+							8 container 编程 / 内业
+								9 按钮 编程
+								10 按钮 内业
+							11 切换 Description: 专注模式, Value: off
+							12 container 工作区工具
+								13 按钮 写作
+								14 开合三角标记 工具
+									15 文本 工具
+								16 按钮 插件
+							17 按钮 新建文件
+							18 按钮 新建需求
+							19 按钮 添加写作空间
+						20 container
+							21 文本 写作空间
+							22 按钮 添加写作空间
+							23 container /private/tmp/railwise-0.5.4-markdown-workbench-private-20261101-final3/home/workspace/markdown-workbench
+								24 按钮 markdown-workbench
+								25 按钮 新建文件
+								26 按钮 新建文件夹
+								27 按钮 刷新工作区
+							28 文本 默认写作空间
+							29 container
+								30 按钮 .workwise
+								31 按钮 在此文件夹中新建文件
+								32 按钮 在此文件夹中新建文件夹
+								33 按钮 重命名
+								34 按钮 移动
+								35 按钮 删除文件夹
+							36 container
+								37 按钮 assets
+								38 按钮 在此文件夹中新建文件
+								39 按钮 在此文件夹中新建文件夹
+								40 按钮 重命名
+								41 按钮 移动
+								42 按钮 删除文件夹
+							43 container
+								44 按钮 assets.md
+								45 按钮 重命名
+								46 按钮 移动
+								47 按钮 删除文件
+							48 container
+								49 按钮 external-edit.md
+								50 按钮 重命名
+								51 按钮 移动
+								52 按钮 删除文件
+							53 container
+								54 按钮 external-target.md
+								55 按钮 重命名
+								56 按钮 移动
+								57 按钮 删除文件
+							58 container
+								59 按钮 index.md
+								60 按钮 重命名
+								61 按钮 移动
+								62 按钮 删除文件
+							63 container
+								64 按钮 large-protection.md
+								65 按钮 重命名
+								66 按钮 移动
+								67 按钮 删除文件
+							68 container
+								69 按钮 README.md
+								70 按钮 重命名
+								71 按钮 移动
+								72 按钮 删除文件
+							73 container
+								74 按钮 syntax.md
+								75 按钮 重命名
+								76 按钮 移动
+								77 按钮 删除文件
+							78 container
+								79 按钮 table.md
+								80 按钮 重命名
+								81 按钮 移动
+								82 按钮 删除文件
+							83 container
+								84 按钮 welcome.md
+								85 按钮 重命名
+								86 按钮 移动
+								87 按钮 删除文件
+							88 container
+								89 按钮 保留语法.mdx
+								90 按钮 重命名
+								91 按钮 移动
+								92 按钮 删除文件
+							93 container
+								94 按钮 工程文档-01.md
+								95 按钮 重命名
+								96 按钮 移动
+								97 按钮 删除文件
+							98 container
+								99 按钮 工程文档-02.md
+								100 按钮 重命名
+								101 按钮 移动
+								102 按钮 删除文件
+							103 container
+								104 按钮 工程文档-03.md
+								105 按钮 重命名
+								106 按钮 移动
+								107 按钮 删除文件
+							108 container
+								109 按钮 工程文档-04.md
+								110 按钮 重命名
+								111 按钮 移动
+								112 按钮 删除文件
+							113 container
+								114 按钮 工程文档-05.md
+								115 按钮 重命名
+								116 按钮 移动
+								117 按钮 删除文件
+							118 container
+								119 按钮 工程文档-06.md
+								120 按钮 重命名
+								121 按钮 移动
+								122 按钮 删除文件
+							123 container
+								124 按钮 工程文档-07.md
+								125 按钮 重命名
+								126 按钮 移动
+								127 按钮 删除文件
+							128 container
+								129 按钮 工程文档-08.md
+								130 按钮 重命名
+								131 按钮 移动
+								132 按钮 删除文件
+							133 container
+								134 按钮 工程文档-09.md
+								135 按钮 重命名
+								136 按钮 移动
+								137 按钮 删除文件
+							138 container
+								139 按钮 工程文档-10.md
+								140 按钮 重命名
+								141 按钮 移动
+								142 按钮 删除文件
+							143 container
+								144 按钮 工程文档-11.md
+								145 按钮 重命名
+								146 按钮 移动
+								147 按钮 删除文件
+							148 container
+								149 按钮 工程文档-12.md
+								150 按钮 重命名
+								151 按钮 移动
+								152 按钮 删除文件
+							153 container
+								154 按钮 工程文档-13.md
+								155 按钮 重命名
+								156 按钮 移动
+								157 按钮 删除文件
+							158 container
+								159 按钮 工程文档-14.md
+								160 按钮 重命名
+								161 按钮 移动
+								162 按钮 删除文件
+							163 container
+								164 按钮 工程文档-15.md
+								165 按钮 重命名
+								166 按钮 移动
+								167 按钮 删除文件
+							168 container
+								169 按钮 工程文档-16.md
+								170 按钮 重命名
+								171 按钮 移动
+								172 按钮 删除文件
+							173 container
+								174 按钮 工程文档-17.md
+								175 按钮 重命名
+								176 按钮 移动
+								177 按钮 删除文件
+							178 container
+								179 按钮 工程文档-18.md
+								180 按钮 重命名
+								181 按钮 移动
+								182 按钮 删除文件
+							183 container
+								184 按钮 工程文档-19.md
+								185 按钮 重命名
+								186 按钮 移动
+								187 按钮 删除文件
+							188 container
+								189 按钮 工程文档-20.md
+								190 按钮 重命名
+								191 按钮 移动
+								192 按钮 删除文件
+						193 container
+							194 切换按钮 连接手机, Value: 0
+							195 按钮 设置
+					196 container
+						197 text external-target.md external-target.md
+						198 按钮 实时编辑
+						199 弹出式按钮 仅预览
+						200 按钮 切换 AI 面板
+						201 按钮 生成 PPT
+						202 弹出式按钮 writeMoreActions
+						203 弹出式按钮 导出
+						204 按钮 保存文件
+						205 文本 保存失败
+					206 container
+						207 标签页组 打开的文档
+							208 标签 (settable, integer) 工程文档-20.md, Value: 0
+							209 按钮 Description: 取消固定 工程文档-20.md, Help: 取消固定
+							210 按钮 关闭 工程文档-20.md
+							211 标签 (settable, integer) index.md, Value: 0
+							212 按钮 Description: 固定 index.md, Help: 固定
+							213 按钮 关闭 index.md
+							214 标签 (settable, integer) 工程文档-01.md, Value: 0
+							215 按钮 Description: 固定 工程文档-01.md, Help: 固定
+							216 按钮 关闭 工程文档-01.md
+							217 标签 (settable, integer) 工程文档-02.md, Value: 0
+							218 按钮 Description: 固定 工程文档-02.md, Help: 固定
+							219 按钮 关闭 工程文档-02.md
+							220 标签 (settable, integer) 工程文档-03.md, Value: 0
+							221 按钮 Description: 固定 工程文档-03.md, Help: 固定
+							222 按钮 关闭 工程文档-03.md
+							223 标签 (settable, integer) 工程文档-04.md, Value: 0
+							224 按钮 Description: 固定 工程文档-04.md, Help: 固定
+							225 按钮 关闭 工程文档-04.md
+							226 标签 (settable, integer) 工程文档-05.md, Value: 0
+							227 按钮 Description: 固定 工程文档-05.md, Help: 固定
+							228 按钮 关闭 工程文档-05.md
+							229 标签 (settable, integer) 工程文档-06.md, Value: 0
+							230 按钮 Description: 固定 工程文档-06.md, Help: 固定
+							231 按钮 关闭 工程文档-06.md
+							232 标签 (settable, integer) 工程文档-07.md, Value: 0
+							233 按钮 Description: 固定 工程文档-07.md, Help: 固定
+							234 按钮 关闭 工程文档-07.md
+							235 标签 (settable, integer) 工程文档-08.md, Value: 0
+							236 按钮 Description: 固定 工程文档-08.md, Help: 固定
+							237 按钮 关闭 工程文档-08.md
+							238 标签 (settable, integer) 工程文档-09.md, Value: 0
+							239 按钮 Description: 固定 工程文档-09.md, Help: 固定
+							240 按钮 关闭 工程文档-09.md
+							241 标签 (settable, integer) 工程文档-10.md, Value: 0
+							242 按钮 Description: 固定 工程文档-10.md, Help: 固定
+							243 按钮 关闭 工程文档-10.md
+							244 标签 (settable, integer) 工程文档-11.md, Value: 0
+							245 按钮 Description: 固定 工程文档-11.md, Help: 固定
+							246 按钮 关闭 工程文档-11.md
+							247 标签 (settable, integer) 工程文档-12.md, Value: 0
+							248 按钮 Description: 固定 工程文档-12.md, Help: 固定
+							249 按钮 关闭 工程文档-12.md
+							250 标签 (settable, integer) 工程文档-13.md, Value: 0
+							251 按钮 Description: 固定 工程文档-13.md, Help: 固定
+							252 按钮 关闭 工程文档-13.md
+							253 标签 (settable, integer) 工程文档-14.md, Value: 0
+							254 按钮 Description: 固定 工程文档-14.md, Help: 固定
+							255 按钮 关闭 工程文档-14.md
+							256 标签 (settable, integer) 工程文档-15.md, Value: 0
+							257 按钮 Description: 固定 工程文档-15.md, Help: 固定
+							258 按钮 关闭 工程文档-15.md
+							259 标签 (settable, integer) 工程文档-16.md, Value: 0
+							260 按钮 Description: 固定 工程文档-16.md, Help: 固定
+							261 按钮 关闭 工程文档-16.md
+							262 标签 (settable, integer) 工程文档-17.md, Value: 0
+							263 按钮 Description: 固定 工程文档-17.md, Help: 固定
+							264 按钮 关闭 工程文档-17.md
+							265 标签 (settable, integer) 工程文档-18.md, Value: 0
+							266 按钮 Description: 固定 工程文档-18.md, Help: 固定
+							267 按钮 关闭 工程文档-18.md
+							268 标签 (settable, integer) 工程文档-19.md, Value: 0
+							269 按钮 Description: 固定 工程文档-19.md, Help: 固定
+							270 按钮 关闭 工程文档-19.md
+							271 标签 (settable, integer) syntax.md, Value: 0
+							272 按钮 Description: 固定 syntax.md, Help: 固定
+							273 按钮 关闭 syntax.md
+							274 标签 (selected) external-target.md •, Help: external-target.md, Value: 1
+							275 按钮 Description: 固定 external-target.md, Help: 固定
+							276 按钮 关闭 external-target.md
+						277 按钮 最近打开
+					278 按钮 搜索文档
+					279 按钮 重新定位
+					280 按钮 AI 写作
+					281 按钮 属性
+					282 按钮 链接与关系
+					283 按钮 历史
+					284 按钮 批注
+					285 container
+						286 text 文档在磁盘上发生了变化，当前草稿尚未覆盖磁盘内容。 external-target.md 磁盘版本 # External target
+
+EXTERNAL_CONCURRENT_KEEP
+
+EXTERNAL_TARGET_ORIGINAL_TAIL
+ 当前草稿 # External target
+
+EXTERNAL\_EDIT\_KEEP LOCAL\_DRAFT\_KEEP\_2
+
+EXTERNAL_TARGET_ORIGINAL_TAIL
+
+						287 按钮 采用磁盘版本
+						288 按钮 保留草稿，继续编辑
+					289 工具栏 Markdown 格式
+						290 按钮 粗体
+						291 按钮 斜体
+						292 按钮 标题
+						293 按钮 无序列表
+						294 按钮 有序列表
+						295 按钮 引用
+					296 文本输入区 (settable) Description: Markdown 可视化编辑器, Value: External target
+EXTERNAL_EDIT_KEEP LOCAL_DRAFT_KEEP_2
+EXTERNAL_TARGET_ORIGINAL_TAIL
+						297 文本输入区 (settable) External target
+							298 标题 External target, Value: 1
+								299 文本 External target
+						300 文本输入区 (settable) EXTERNAL_EDIT_KEEP LOCAL_DRAFT_KEEP_2
+							301 文本 EXTERNAL_EDIT_KEEP LOCAL_DRAFT_KEEP_2
+						302 文本输入区 (settable) EXTERNAL_TARGET_ORIGINAL_TAIL
+							303 文本 EXTERNAL_TARGET_ORIGINAL_TAIL
+					304 文本 文档已被外部修改，已保留当前内容，请查看冲突后再保存。
+	305 关闭按钮
+	306 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	307 最小化按钮
+308 menu bar
+	309 RailWise AI Candidate 209a17ecc2ab
+	310 文件
+	311 编辑
+	312 显示
+	313 窗口
+	314 帮助
+
+The focused UI element is 300 文本输入区 (settable) EXTERNAL_EDIT_KEEP LOCAL_DRAFT_KEEP_2

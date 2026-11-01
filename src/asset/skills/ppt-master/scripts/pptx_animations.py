@@ -1761,31 +1761,23 @@ def _build_animation_row_xml(
 def _main_target_offsets(targets: Sequence[AnimationTarget]) -> list[int]:
     """Return each regular row's start offset within its click group."""
     offsets: list[int] = []
-    previous_start_ms = 0
-    previous_duration_ms = 0
-    has_previous = False
+    beat_start_ms = 0
+    timeline_end_ms = 0
     for target in targets:
         if target.trigger == 'on-click':
-            start_ms = target.delay_ms
-        elif target.trigger == 'with-previous':
-            start_ms = (
-                previous_start_ms if has_previous else 0
-            ) + target.delay_ms
-        else:
-            start_ms = (
-                previous_start_ms + previous_duration_ms
-                if has_previous
-                else 0
-            ) + target.delay_ms
+            beat_start_ms = 0
+            timeline_end_ms = 0
+        elif target.trigger == 'after-previous':
+            beat_start_ms = timeline_end_ms
+        # With-previous rows share the beat's trigger, before any row delay.
+        start_ms = beat_start_ms + target.delay_ms
         if start_ms > MAX_OOXML_MILLISECONDS:
             raise ValueError(
                 'animation sequence offset exceeds the OOXML millisecond '
                 f'limit at target {len(offsets) + 1}: {start_ms}'
             )
         offsets.append(start_ms)
-        previous_start_ms = start_ms
-        previous_duration_ms = target.playback_duration_ms
-        has_previous = True
+        timeline_end_ms = max(timeline_end_ms, start_ms + target.playback_duration_ms)
     return offsets
 
 
@@ -1793,7 +1785,7 @@ def _build_mixed_main_steps(
     targets: Sequence[AnimationTarget],
     next_id: int,
 ) -> tuple[str, int]:
-    """Build one mainSeq containing mixed per-row PowerPoint Start modes."""
+    """Build click groups with one shared wrapper per semantic beat."""
     offsets = _main_target_offsets(targets)
     groups: list[list[tuple[AnimationTarget, int]]] = []
     for target, offset_ms in zip(targets, offsets):
@@ -1813,29 +1805,42 @@ def _build_mixed_main_steps(
                 '<p:cond delay="indefinite"/>'
                 '<p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond>'
             )
-        rendered_rows: list[str] = []
+        beats: list[list[tuple[AnimationTarget, int]]] = []
         for target, offset_ms in group:
+            if not beats or target.trigger != 'with-previous':
+                beats.append([])
+            beats[-1].append((target, offset_ms))
+
+        rendered_beats: list[str] = []
+        for beat in beats:
             wrapper_id = next_id
-            row_id = next_id + 1
-            row_xml, next_id = _build_animation_row_xml(
-                target,
-                target.trigger,
-                row_id,
-                next_id + 2,
-            )
-            wrapper_offset_ms = offset_ms - target.delay_ms
-            rendered_rows.append(f'''<p:par>
+            next_id += 1
+            leader, offset_ms = beat[0]
+            wrapper_offset_ms = offset_ms - leader.delay_ms
+            rendered_rows: list[str] = []
+            for target, _ in beat:
+                row_xml, next_id = _build_animation_row_xml(
+                    target,
+                    target.trigger,
+                    next_id,
+                    next_id + 1,
+                )
+                rendered_rows.append(f'<p:par>{row_xml}</p:par>')
+            rows_xml = '\n                      '.join(rendered_rows)
+            rendered_beats.append(f'''<p:par>
                   <p:cTn id="{wrapper_id}" fill="hold">
                     <p:stCondLst><p:cond delay="{wrapper_offset_ms}"/></p:stCondLst>
-                    <p:childTnLst><p:par>{row_xml}</p:par></p:childTnLst>
+                    <p:childTnLst>
+                      {rows_xml}
+                    </p:childTnLst>
                   </p:cTn>
                 </p:par>''')
-        rows_xml = '\n                '.join(rendered_rows)
+        beats_xml = '\n                    '.join(rendered_beats)
         rendered_groups.append(f'''<p:par>
                 <p:cTn id="{group_id}" fill="hold">
                   <p:stCondLst>{group_conditions}</p:stCondLst>
                   <p:childTnLst>
-                    {rows_xml}
+                    {beats_xml}
                   </p:childTnLst>
                 </p:cTn>
               </p:par>''')
@@ -1852,8 +1857,8 @@ def create_sequence_timing_xml(
     Args:
         targets: list of (shape_id, delay_ms, animation_name) or
             (shape_id, delay_ms, animation_name, duration_seconds) tuples, in
-            the order they should play. ``delay_ms`` is the gap before
-            this element starts relative to its Start mode. Mapping targets
+            animation-pane order. ``delay_ms`` is measured from the beat
+            start, before its leader's own delay. Mapping targets
             may set an independent ``trigger``; otherwise they inherit the
             function-level ``trigger``. A target with ``trigger_shape_id``
             must use ``on-click`` and runs in an interactive sequence.
@@ -1861,11 +1866,12 @@ def create_sequence_timing_xml(
             native presets retain their PowerPoint-authored duration.
         trigger: PowerPoint-standard Start mode for each element.
             ``'after-previous'`` — first element fires on slide entry,
-            rest chain after the previous one with ``delay_ms`` spacing
+            rest wait for all earlier rows in the click group to finish,
+            then apply ``delay_ms`` spacing
             (default).
             ``'on-click'`` — one presenter click per element.
-            ``'with-previous'`` — all elements start together on slide
-            entry.
+            ``'with-previous'`` — all elements share the slide-entry beat,
+            each with its own ``delay_ms``.
 
     Returns:
         A ``<p:timing>`` element string. Returns an empty string when
@@ -1897,139 +1903,7 @@ def create_sequence_timing_xml(
         if target.trigger_shape_id is not None
     ]
 
-    main_triggers = {target.trigger for target in main_targets}
-    main_trigger = (
-        next(iter(main_triggers))
-        if len(main_triggers) == 1
-        else None
-    )
-    needs_per_target_layout = (
-        main_trigger is None
-        or (
-            main_trigger == 'with-previous'
-            and any(target.delay_ms for target in main_targets)
-        )
-    )
-
-    if needs_per_target_layout and main_targets:
-        all_steps, next_id = _build_mixed_main_steps(main_targets, next_id)
-    elif main_trigger == 'on-click':
-        # Each element is an independent click-driven par directly under
-        # mainSeq. Three-level nesting per element: outer cTn holds for
-        # the click via delay="indefinite", innermost cTn owns the
-        # clickEffect + animation children. Each click advances the seq.
-        steps = []
-        for target in main_targets:
-            wrapper_id = next_id
-            inner_id = next_id + 1
-            leaf_id = next_id + 2
-            row_xml, next_id = _build_animation_row_xml(
-                target,
-                main_trigger,
-                leaf_id,
-                next_id + 3,
-            )
-            steps.append(f'''<p:par>
-  <p:cTn id="{wrapper_id}" fill="hold">
-    <p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>
-    <p:childTnLst>
-      <p:par>
-        <p:cTn id="{inner_id}" fill="hold">
-          <p:stCondLst><p:cond delay="0"/></p:stCondLst>
-          <p:childTnLst>
-            <p:par>
-              {row_xml}
-            </p:par>
-          </p:childTnLst>
-        </p:cTn>
-      </p:par>
-    </p:childTnLst>
-  </p:cTn>
-</p:par>''')
-        all_steps = '\n              '.join(steps)
-    else:
-        # with-previous / after-previous: wrap the entire cascade in ONE
-        # par so the sequence has a real trigger anchor under mainSeq.
-        #
-        # Native PowerPoint after-previous export uses two timing layers:
-        # each row owns its TriggerDelayTime, while its wrapper owns the
-        # previous row's absolute end. Their sum is the absolute start offset.
-        outer_id = next_id
-        next_id += 1
-        inner_steps = []
-        with_wrapper_id = None
-        if main_trigger == 'with-previous':
-            with_wrapper_id = next_id
-            next_id += 1
-        elapsed_ms = 0
-        for target_index, target in enumerate(main_targets, 1):
-            if main_trigger == 'with-previous':
-                leaf_id = next_id
-                row_xml, next_id = _build_animation_row_xml(
-                    target,
-                    main_trigger,
-                    leaf_id,
-                    next_id + 1,
-                )
-                inner_steps.append(f'''<p:par>
-                  {row_xml}
-                </p:par>''')
-            else:
-                if elapsed_ms > MAX_OOXML_MILLISECONDS:
-                    raise ValueError(
-                        'animation sequence offset exceeds the OOXML '
-                        f'millisecond limit at target {target_index}: {elapsed_ms}'
-                    )
-                wrapper_id = next_id
-                leaf_id = next_id + 1
-                row_xml, next_id = _build_animation_row_xml(
-                    target,
-                    main_trigger,
-                    leaf_id,
-                    next_id + 2,
-                )
-                inner_steps.append(f'''<p:par>
-                  <p:cTn id="{wrapper_id}" fill="hold">
-                    <p:stCondLst><p:cond delay="{elapsed_ms}"/></p:stCondLst>
-                    <p:childTnLst>
-                      <p:par>
-                        {row_xml}
-                      </p:par>
-                    </p:childTnLst>
-                  </p:cTn>
-                </p:par>''')
-                elapsed_ms += target.delay_ms + target.playback_duration_ms
-
-        inner_xml = '\n                '.join(inner_steps)
-        if main_trigger == 'with-previous':
-            # Match PowerPoint's native "Start: With Previous" export:
-            # one delay=0 wrapper begins on slide entry, and all withEffect
-            # rows live under that wrapper so they truly start in parallel.
-            inner_xml = f'''<p:par>
-                      <p:cTn id="{with_wrapper_id}" fill="hold">
-                        <p:stCondLst><p:cond delay="0"/></p:stCondLst>
-                        <p:childTnLst>
-                          {inner_xml}
-                        </p:childTnLst>
-                      </p:cTn>
-                    </p:par>'''
-        if main_trigger in ('with-previous', 'after-previous'):
-            # Match PowerPoint's native slide-entry export: the wrapper waits
-            # for mainSeq to begin, then child nodes resolve their Start modes.
-            outer_start_conditions = (
-                '<p:cond delay="indefinite"/>'
-                '<p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond>'
-            )
-        else:
-            outer_start_conditions = '<p:cond delay="0"/>'
-        all_steps = f'''<p:par>
-                <p:cTn id="{outer_id}" fill="hold">
-                  <p:stCondLst>{outer_start_conditions}</p:stCondLst>
-                  <p:childTnLst>
-                    {inner_xml}
-                  </p:childTnLst>
-                </p:cTn>
-              </p:par>'''
+    all_steps, next_id = _build_mixed_main_steps(main_targets, next_id)
 
     if main_targets:
         main_sequence_xml = f'''<p:seq concurrent="1" nextAc="seek">
@@ -3243,6 +3117,25 @@ def validate_slide_animation_structure(
     return errors
 
 
+def read_slide_click_dependencies(slide_xml: str | bytes) -> tuple[int, ...]:
+    """Read native click/interactive targets without requiring supported effects."""
+    root = ET.fromstring(slide_xml)
+    targets: set[int] = set()
+    for timing in root.iter(_qn(PML_NS, 'timing')):
+        for node in timing.iter(_qn(PML_NS, 'cTn')):
+            conditions = node.findall(f"{_qn(PML_NS, 'stCondLst')}/{_qn(PML_NS, 'cond')}")
+            interactive = node.get('nodeType') in {'clickEffect', 'interactiveSeq'} or any(
+                condition.get('evt') in {'onClick', 'onDblClick', 'onMouseOver', 'onMouseOut', 'onNext', 'onPrev'}
+                for condition in conditions
+            )
+            if interactive:
+                targets.update(
+                    int(value) for target in node.iter(_qn(PML_NS, 'spTgt'))
+                    if (value := target.get('spid', '')).isdigit()
+                )
+    return tuple(sorted(targets))
+
+
 def read_slide_animation_sequence(
     slide_xml: str | bytes,
     *,
@@ -3569,9 +3462,11 @@ def validate_pptx_animation_package(
     pptx_path: str | Path,
     *,
     require_supported_effects: bool = False,
+    skip_slide_numbers: set[int] | None = None,
 ) -> None:
-    """Validate timing placement and shape references for every slide part."""
+    """Validate generated timing, excluding byte-preserved source slides."""
     path = Path(pptx_path)
+    skipped = skip_slide_numbers or set()
     errors: list[str] = []
     try:
         with zipfile.ZipFile(path) as package:
@@ -3581,6 +3476,9 @@ def validate_pptx_animation_package(
                 if re.fullmatch(r'ppt/slides/slide\d+\.xml', name)
             )
             for name in names:
+                match = re.search(r'slide(\d+)\.xml$', name)
+                if match is not None and int(match.group(1)) in skipped:
+                    continue
                 slide_data = package.read(name)
                 try:
                     root = ET.fromstring(slide_data)
@@ -3808,6 +3706,12 @@ def describe_animation_effect(effect: object) -> dict[str, Any]:
         }
         if raw_spec.get('type') == 'enum':
             spec['values'] = list(raw_spec['values'])
+        if name == 'direction':
+            spec['note'] = (
+                'the direction the motion travels; PowerPoint names the origin '
+                'edge, so right = "From Left", left = "From Right", down = '
+                '"From Top", up = "From Bottom"'
+            )
         option_contract[name] = spec
     return {
         'input': effect,
@@ -3855,6 +3759,39 @@ def describe_animation_effect(effect: object) -> dict[str, Any]:
             'smooth_end': 'derived from decelerate',
         },
     }
+
+
+def effective_animation_effect_options(
+    effect: object,
+    effect_options: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Return the effective option values encoded by one registry request."""
+    canonical, normalized_options = normalize_animation_effect_request(
+        effect,
+        effect_options,
+        allow_none=False,
+        allow_modes=False,
+    )
+    assert canonical is not None
+    row = _animation_row_for_options(canonical, normalized_options)
+    errors: list[str] = []
+    filter_name = _row_filter(
+        row,
+        str(NATIVE_ANIMATIONS[canonical]['presetClass']),
+        errors,
+    )
+    effective = _read_effect_options(
+        row,
+        canonical,
+        filter_name,
+        errors,
+    )
+    if errors:
+        raise RuntimeError(
+            f'animation effect {canonical!r} option model failed: '
+            + '; '.join(errors)
+        )
+    return effective
 
 
 def main() -> None:

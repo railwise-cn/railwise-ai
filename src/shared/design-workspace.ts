@@ -1,4 +1,4 @@
-import type { DesignAsset, DesignDocumentV1, DesignElement } from './design-document'
+import type { DesignAsset, DesignDocumentV1, DesignElement, DesignImportReportV1 } from './design-document'
 
 export type DesignFidelityWarningCode =
   | 'unsupported_filter'
@@ -8,6 +8,10 @@ export type DesignFidelityWarningCode =
   | 'missing_image'
   | 'font_substitution'
   | 'layout_approximation'
+  | 'gradient_approximation'
+  | 'transparency_approximation'
+  | 'native_import_diagnostic'
+  | 'native_object_diagnostic'
   | 'reference_regions'
 
 export type DesignFidelityWarning = {
@@ -22,11 +26,22 @@ export type DesignDocumentLoadPayload = {
   documentId?: string
 }
 
+export type DesignPptxSourceStatus = {
+  state: 'available' | 'missing' | 'corrupt' | 'metadata_missing'
+  message?: string
+  expectedSha256?: string
+  actualSha256?: string
+  expectedBytes?: number
+  actualBytes?: number
+}
+
 export type DesignDocumentLoadResult = {
   ok: boolean
   document?: DesignDocumentV1
   activePageId?: string
   revision?: number
+  /** Durable source integrity is reported without preventing recovery of the document. */
+  sourceStatus?: DesignPptxSourceStatus
   code?: 'not_found' | 'corrupt' | 'unsafe_path' | 'read_failed'
   message?: string
 }
@@ -104,6 +119,62 @@ export type DesignPptxImportResult = {
   document?: DesignDocumentV1
   activePageId?: string
   warnings?: DesignFidelityWarning[]
+  /** Also returned on quality-check failure; no partial document is committed. */
+  importReport?: DesignImportReportV1
+  code?: 'import_quality_failed'
+  message?: string
+}
+
+export type DesignPptxRevisionMetadata = {
+  kind: 'source' | 'edited'
+  sha256: string
+  byteSize: number
+  /** Native revision page count; legacy pointers may omit it. */
+  slideCount?: number
+}
+
+export type DesignPptxRevisionReadPayload = {
+  workspaceRoot: string
+  documentId: string
+  /** Original immutable source or the latest validated edit (default). */
+  kind?: 'source' | 'active'
+}
+
+export type DesignPptxRevisionReadResult = {
+  ok: boolean
+  revision?: DesignPptxRevisionMetadata
+  bytes?: Uint8Array
+  code?: 'not_found' | 'invalid_document' | 'corrupt' | 'unsafe_path' | 'read_failed'
+  message?: string
+}
+
+export type DesignPptxRevisionSavePayload = {
+  workspaceRoot: string
+  documentId: string
+  expectedSha256: string
+  bytes: Uint8Array
+}
+
+export type DesignPptxRevisionSaveResult = {
+  ok: boolean
+  revision?: DesignPptxRevisionMetadata
+  code?: 'stale_request' | 'invalid_document' | 'invalid_pptx' | 'unsafe_path' | 'write_failed'
+  currentSha256?: string
+  message?: string
+}
+
+export type DesignPptxBytesExportPayload = {
+  workspaceRoot: string
+  documentId: string
+  name?: string
+  expectedSlideCount: number
+  bytes: Uint8Array
+}
+
+export type DesignPptxBytesExportResult = {
+  ok: boolean
+  canceled?: boolean
+  path?: string
   message?: string
 }
 

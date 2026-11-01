@@ -64,4 +64,12 @@ describe('WorkspaceSecondaryNavigation', () => {
     await act(async () => root.unmount())
     container.remove()
   })
+
+  it('keeps Plugins visible as a sibling of the collapsible Tools group', () => {
+    const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, props('plugins')))
+    const toolsMenu = html.match(/<div id="workspace-tools-menu"[\s\S]*?<\/div>/)?.[0] ?? ''
+    expect(toolsMenu).not.toContain('Plugins')
+    expect(html).toContain('aria-current="page"')
+    expect(html.indexOf('id="workspace-tools-menu"')).toBeLessThan(html.indexOf('Plugins'))
+  })
 })

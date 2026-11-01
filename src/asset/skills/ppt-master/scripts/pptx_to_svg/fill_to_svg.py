@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from xml.etree import ElementTree as ET
 
+from pptx_gradients import native_gradient_metadata
+
 from .color_resolver import (
     COLOR_TAGS,
     ColorPalette,
@@ -81,6 +83,7 @@ def resolve_fill(
     id_prefix: str = "g",
     id_seq: list[int] | None = None,
     placeholder_hex: str | None = None,
+    group_fill: FillResult | None = None,
 ) -> FillResult:
     """Inspect <p:spPr>'s fill children and emit an SVG fill descriptor.
 
@@ -124,7 +127,11 @@ def resolve_fill(
         fill_elem, fill_name = fill_children[0]
 
     if fill_name == "grpFill":
-        raise ValueError("Unsupported DrawingML fill: grpFill")
+        if group_fill is None:
+            raise ValueError(
+                "DrawingML grpFill requires a resolved ancestor group fill"
+            )
+        return FillResult(attrs=dict(group_fill.attrs))
     return handlers[fill_name](
         fill_elem,
         palette,
@@ -177,9 +184,9 @@ def _resolve_grad_fill(elem: ET.Element, palette: ColorPalette | None,
                        prefix: str, seq, placeholder_hex: str | None) -> FillResult:
     """Convert <a:gradFill> to an SVG linearGradient or radialGradient."""
     _validate_gradient_attributes(elem)
-    _validate_gradient_rotation(elem)
+    _validate_gradient_rotation(elem, palette)
     _validate_gradient_flip(elem)
-    _validate_gradient_tile_rect(elem)
+    _validate_or_normalize_gradient_tile_rect(elem, palette)
     if seq is None:
         seq = [0]
     seq[0] += 1
@@ -248,7 +255,7 @@ def _resolve_grad_fill(elem: ET.Element, palette: ColorPalette | None,
         # ang is 1/60000 deg. 0° = horizontal left-to-right.
         _validate_linear_gradient_structure(lin)
         angle = _linear_gradient_angle(lin)
-        _validate_linear_gradient_scaling(lin, angle)
+        _validate_or_normalize_linear_gradient_scaling(lin, angle, palette)
         angle_deg = angle / ANGLE_UNIT
         x1, y1, x2, y2 = _angle_to_unit_endpoints(angle_deg)
         defs_xml = (
@@ -312,10 +319,21 @@ def _resolve_grad_fill(elem: ET.Element, palette: ColorPalette | None,
             + "</linearGradient>"
         )
 
+    defs_xml = _attach_native_gradient_metadata(defs_xml, elem)
     return FillResult(
         attrs={"fill": f"url(#{grad_id})"},
         defs=[defs_xml],
     )
+
+
+def _attach_native_gradient_metadata(
+    svg_gradient_xml: str,
+    grad_fill: ET.Element,
+) -> str:
+    """Bind the normalized SVG preview to its exact source gradFill."""
+    preview = ET.fromstring(svg_gradient_xml)
+    preview.attrib.update(native_gradient_metadata(grad_fill, preview))
+    return ET.tostring(preview, encoding="unicode")
 
 
 def _gradient_stop_position(gs: ET.Element) -> float:
@@ -399,11 +417,12 @@ def _validate_linear_gradient_structure(lin: ET.Element) -> None:
         )
 
 
-def _validate_linear_gradient_scaling(
+def _validate_or_normalize_linear_gradient_scaling(
     lin: ET.Element,
     angle: int,
+    palette: ColorPalette | None,
 ) -> None:
-    """Require a scaling mode representable by unit-box SVG geometry."""
+    """Normalize unscaled oblique gradients only in tolerant import mode."""
     scaled = _parse_ooxml_boolean(
         lin.get("scaled"),
         default=False,
@@ -411,23 +430,42 @@ def _validate_linear_gradient_scaling(
     )
     quarter_turn = 90 * ANGLE_UNIT
     if not scaled and angle % quarter_turn:
-        raise ValueError(
+        message = (
             "Unscaled non-cardinal DrawingML linear gradients are not "
             "representable by the normalized SVG mapping"
         )
+        if palette is None or palette.strict:
+            raise ValueError(message)
+        palette._diagnose(
+            "gradient-scaling-normalized",
+            message,
+            "map the angle to the normalized SVG unit box while preserving "
+            "its stops",
+        )
 
 
-def _validate_gradient_rotation(gradient: ET.Element) -> None:
-    """Require a gradient that rotates with its containing shape."""
+def _validate_gradient_rotation(
+    gradient: ET.Element,
+    palette: ColorPalette | None,
+) -> None:
+    """Normalize fixed-page gradient rotation only in tolerant import mode."""
     rotates_with_shape = _parse_ooxml_boolean(
         gradient.get("rotWithShape"),
         default=True,
         label="gradient rotWithShape value",
     )
     if not rotates_with_shape:
-        raise ValueError(
+        message = (
             "DrawingML gradients that do not rotate with their shape are "
             "not representable by the local SVG mapping"
+        )
+        if palette is None or palette.strict:
+            raise ValueError(message)
+        palette._diagnose(
+            "gradient-rotation-normalized",
+            message,
+            "render the gradient in the shape-local SVG box and preserve "
+            "the exact DrawingML gradient for unchanged round-trip",
         )
 
 
@@ -474,8 +512,11 @@ def _validate_gradient_flip(gradient: ET.Element) -> None:
         raise ValueError(f"Unsupported DrawingML gradient flip: {flip!r}")
 
 
-def _validate_gradient_tile_rect(gradient: ET.Element) -> None:
-    """Accept only the full-area gradient tile rectangle."""
+def _validate_or_normalize_gradient_tile_rect(
+    gradient: ET.Element,
+    palette: ColorPalette | None,
+) -> None:
+    """Ignore a cropped gradient tile only in tolerant import mode."""
     tile_rects = gradient.findall("a:tileRect", NS)
     if len(tile_rects) > 1:
         raise ValueError(
@@ -489,10 +530,19 @@ def _validate_gradient_tile_rect(gradient: ET.Element) -> None:
     )
     for value in values.values():
         if value != 0:
-            raise ValueError(
+            message = (
                 "Non-zero DrawingML gradient tileRect is not representable "
                 "by the project SVG gradient mapping"
             )
+            if palette is None or palette.strict:
+                raise ValueError(message)
+            palette._diagnose(
+                "gradient-tile-rect-normalized",
+                message,
+                "use the full object bounding box while preserving the "
+                "gradient stops and direction",
+            )
+            return
 
 
 def _validate_path_gradient_focus(

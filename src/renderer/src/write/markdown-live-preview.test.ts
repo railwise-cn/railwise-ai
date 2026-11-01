@@ -150,6 +150,17 @@ describe('markdown live preview', () => {
     ])
   })
 
+  it('maps closed display formulas to visual widgets without treating formula text inside code as math', () => {
+    const source = ['$$', '\\frac{x}{2}', '$$', '', '\\[y^2\\]', '', '```ts', '$$literal$$', '```', '', '$$unclosed'].join('\n')
+    const state = EditorState.create({ doc: source })
+    const ranges = markdownLivePreviewTestInternals.collectMarkdownCodeBlockRangesFromState(state, 0, state.doc.length, new Set())
+    expect(ranges.map((range) => range.block)).toEqual([
+      { language: 'math', code: '\\frac{x}{2}' },
+      { language: 'math', code: 'y^2' },
+      { language: 'ts', code: '$$literal$$' }
+    ])
+  })
+
   it('resolves root-level document images through the workspace image bridge', () => {
     vi.stubGlobal('window', {
       workwise: {

@@ -24,7 +24,9 @@ const MARKETPLACE_TEXT_FALLBACKS: Record<string, string> = {
   pluginNoRedistributionLicense: 'No redistribution license',
   pluginDetailExternalProject: `External project · not installed by ${brand.platform}`,
   pluginCliLarkTitle: 'Lark CLI',
-  pluginSkillScanOversized: 'Skipped Skill “{{skill}}”: {{file}} exceeds the {{limit}} discovery limit. Other Skills are unaffected.'
+  pluginSkillScanOversized: 'Skipped Skill “{{skill}}”: {{file}} exceeds the {{limit}} discovery limit. Remove the large file or move it outside the Skill package. Other Skills are unaffected.',
+  pluginSkillScanUnsafeLink: 'Skipped Skill “{{skill}}”: {{file}} is a symbolic link or junction, which is not allowed. Replace it with a regular file. Other Skills are unaffected.',
+  pluginErrorOAuthClient: 'This MCP service needs an OAuth client ID before it can connect.'
 }
 
 function isJsonRecord(value: unknown): value is JsonRecord {
@@ -240,6 +242,16 @@ export function friendlyMarketplaceError(message: string, t: (key: string) => st
   if (/Unsafe Skill package/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorUnsafeSkill', 'Skill package did not pass the safety check.')
   }
+  if (/runtime metadata changed without a version update/i.test(normalized)) {
+    return marketplaceText(
+      t,
+      'pluginErrorRuntimeDrift',
+      'The catalog changed runtime metadata without changing the package version. A maintainer must publish a new version before this plugin can update.'
+    )
+  }
+  if (/OAuth client ID is missing and dynamic registration is unavailable/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorOAuthClient', MARKETPLACE_TEXT_FALLBACKS.pluginErrorOAuthClient)
+  }
   if (/\bfetch failed\b|network|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorNetwork', 'The download source could not be reached.')
   }
@@ -248,6 +260,12 @@ export function friendlyMarketplaceError(message: string, t: (key: string) => st
 
 export function skillValidationWarning(root: string, message: string, t: (key: string) => string): string {
   const skill = root.replace(/\\/g, '/').replace(/\/+$/g, '').split('/').pop() || root
+  const unsafeLink = /links and junctions are not allowed:\s*(.+?)\.?$/i.exec(message.trim())
+  if (unsafeLink) {
+    return marketplaceText(t, 'pluginSkillScanUnsafeLink', MARKETPLACE_TEXT_FALLBACKS.pluginSkillScanUnsafeLink)
+      .replaceAll('{{skill}}', skill)
+      .replaceAll('{{file}}', unsafeLink[1] ?? '')
+  }
   const oversized = /file exceeds\s+([^:]+):\s*(.+?)\.?$/i.exec(message.trim())
   if (!oversized) return friendlyMarketplaceError(message, t)
   return marketplaceText(t, 'pluginSkillScanOversized', MARKETPLACE_TEXT_FALLBACKS.pluginSkillScanOversized)

@@ -1,0 +1,51 @@
+Third-Party Licenses
+====================
+
+This file records notable third-party dependencies distributed with the
+pptx-vanilla-viewer integration. The upstream viewer NOTICE additionally
+identifies the MPL-2.0 mtx-decompressor component bundled into its engine.
+
+JSZip
+-----
+License: MIT (dual-licensed as MIT OR GPL-3.0-or-later; this project uses
+         JSZip under its MIT license)
+URL:     https://github.com/Stuk/jszip
+SPDX:    (MIT OR GPL-3.0-or-later)
+
+fast-xml-parser
+---------------
+License: MIT
+URL:     https://github.com/NaturalIntelligence/fast-xml-parser
+SPDX:    MIT
+
+html2canvas-pro
+---------------
+License: MIT
+URL:     https://github.com/nicbarker/html2canvas-pro
+SPDX:    MIT
+
+jsPDF
+-----
+License: MIT
+URL:     https://github.com/parallax/jsPDF
+SPDX:    MIT
+
+Lucide
+------
+License: ISC
+URL:     https://github.com/lucide-icons/lucide
+SPDX:    ISC
+
+pako
+----
+License: MIT AND Zlib
+URL:     https://github.com/nodeca/pako
+SPDX:    (MIT AND Zlib)
+
+mtx-decompressor
+----------------
+License: Mozilla Public License 2.0
+URL:     https://github.com/ChristopherVR/ooxml/tree/d8f80c291c1f9ecc23278c4b2ac8674915d30828
+SPDX:    MPL-2.0
+Source availability: retain the corresponding upstream source and MPL-2.0 license
+with distributed builds.

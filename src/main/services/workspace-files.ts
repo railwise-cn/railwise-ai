@@ -11,7 +11,10 @@ import {
   writeFile
 } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { relocateDocumentSidecars } from './write-document-service'
+import { readWriteImageResource } from './write-image-resource'
+import { invalidateWriteDocumentIndex } from './write-document-index'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   WorkspaceClipboardImageSavePayload,
   WorkspaceClipboardImageSaveResult,
@@ -137,6 +140,11 @@ export async function readWorkspaceImage(
   payload: WorkspaceFileTarget
 ): Promise<WorkspaceImageReadResult> {
   try {
+    if (payload.workspaceRoot?.trim()) {
+      const resource = await readWriteImageResource({ src: payload.path, sourcePath: join(payload.workspaceRoot, '.railwise-image-source.md'), workspaceRoot: payload.workspaceRoot })
+      if (!resource) return { ok: false, message: 'This image cannot be previewed. Use a local workspace image without active SVG content or symbolic links.' }
+      return { ok: true, path: resource.path, dataUrl: `data:${resource.mimeType};base64,${resource.data.toString('base64')}`, mimeType: resource.mimeType, size: resource.data.length }
+    }
     const targetPath = await resolveOpenTargetPath(payload.path, payload.workspaceRoot)
     const fileInfo = await stat(targetPath)
     if (fileInfo.isDirectory()) {
@@ -179,6 +187,7 @@ export async function writeWorkspaceFile(
     await atomicWriteFile(targetPath, payload.content, {
       beforeReplace: () => recheckContainedParent(workspaceRoot, targetPath)
     })
+    invalidateWriteDocumentIndex(workspaceRoot)
     return {
       ok: true,
       path: targetPath,
@@ -204,6 +213,7 @@ export async function createWorkspaceFile(
       return { ok: false, message: 'File already exists.' }
     }
     await writeFile(targetPath, payload.content ?? '', { encoding: 'utf8', flag: 'wx' })
+    invalidateWriteDocumentIndex(workspaceRoot)
     return {
       ok: true,
       path: targetPath,
@@ -327,10 +337,16 @@ export async function renameWorkspaceEntry(
   try {
     const workspaceRoot = requiredWorkspaceRoot(payload.workspaceRoot)
     const sourcePath = await resolveTargetPathWithinWorkspace(payload.path, payload.workspaceRoot)
-    await stat(sourcePath)
+    const sourceInfo = await stat(sourcePath)
+    if (sourcePath === await canonicalPath(workspaceRoot)) {
+      return { ok: false, message: 'Moving or renaming the workspace root is not supported.' }
+    }
     const nextName = validateEntryName(payload.newName)
+    const targetDirectory = payload.targetDirectory === undefined
+      ? dirname(sourcePath)
+      : await resolveWorkspaceDirectory({ workspaceRoot: payload.workspaceRoot, path: payload.targetDirectory })
     const targetPath = await resolveTargetPathWithinWorkspace(
-      join(dirname(sourcePath), nextName),
+      join(targetDirectory, nextName),
       payload.workspaceRoot
     )
     if (sourcePath === targetPath) {
@@ -341,12 +357,17 @@ export async function renameWorkspaceEntry(
         renamedAt: new Date().toISOString()
       }
     }
+    if (sourceInfo.isDirectory() && targetPath.startsWith(`${sourcePath}${sep}`)) {
+      return { ok: false, message: 'A directory cannot be moved into itself or its child directory.' }
+    }
     if (await pathExists(targetPath)) {
       return { ok: false, message: 'A file or directory with that name already exists.' }
     }
     await recheckContainedParent(workspaceRoot, sourcePath)
     await recheckContainedParent(workspaceRoot, targetPath)
+    await relocateDocumentSidecars({ workspaceRoot, previousPath: sourcePath, path: targetPath })
     await rename(sourcePath, targetPath)
+    invalidateWriteDocumentIndex(workspaceRoot)
     return {
       ok: true,
       path: targetPath,
@@ -380,6 +401,7 @@ export async function deleteWorkspaceEntry(
     } else {
       await unlink(targetPath)
     }
+    invalidateWriteDocumentIndex(workspaceRoot)
     return {
       ok: true,
       path: targetPath,

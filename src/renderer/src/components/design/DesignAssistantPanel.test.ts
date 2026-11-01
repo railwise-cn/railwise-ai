@@ -35,4 +35,18 @@ describe('Design assistant active-canvas prompt', () => {
     expect(designAssistantScopeKey('document-a', 'page-1'))
       .not.toBe(designAssistantScopeKey('document-a', 'page-2'))
   })
+
+  it('includes objects beyond 120 and complete selected properties with lock constraints', () => {
+    const document = createDesignDocument({ name: 'Dense slide' })
+    const page = document.pages[0]
+    page.elements = Array.from({ length: 180 }, (_, index) => createDesignElement('text', {
+      id: `text_${index}`, text: `Item ${index}`, locked: index === 179, fontSize: 27
+    }))
+    const prompt = buildDesignPrompt('修改最后一个对象', document, page, ['text_179'])
+    expect(prompt).toContain('"id":"text_179"')
+    expect(prompt).toContain('"elementCount":180')
+    expect(prompt).toContain('"locked":true')
+    expect(prompt).toContain('"fontSize":27')
+    expect(prompt).toContain('Preserve locked objects')
+  })
 })

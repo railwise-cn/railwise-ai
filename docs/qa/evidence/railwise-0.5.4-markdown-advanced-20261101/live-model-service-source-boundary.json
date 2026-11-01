@@ -1,0 +1,24 @@
+{
+  "schema": "railwise.write.live-model-source-boundary.v1",
+  "capturedAt": "2026-11-01T08:20:04.467480+00:00",
+  "repositoryHead": "7c904709d25c062dd3a7dbde396eb6273fcf1fd5",
+  "sourceState": "Working source at execution; final packaged source checkpoint must compare these relevant service/request-builder files.",
+  "files": [
+    {
+      "path": "scripts/run-write-live-model-acceptance.mjs",
+      "sha256": "2699acc619de86a5166593cb65ea9193ea7b5c77104d24bd91f2ab15540772f0"
+    },
+    {
+      "path": "src/main/services/write-inline-completion-service.ts",
+      "sha256": "1cf833ada515a862b7485a0a084e16793e7b574388bbc6fc589db9772ce6f431"
+    },
+    {
+      "path": "src/renderer/src/write/inline-edit.ts",
+      "sha256": "7c296722835a492ed17ac8b31fc2b03fb2c5a55e7d0b07b50f06cb93706c4046"
+    },
+    {
+      "path": "src/shared/app-settings-write.ts",
+      "sha256": "5408cdf7e7786a38e0f33fe7f1ecfa7f5522c990712d89a69da15bbe440371af"
+    }
+  ]
+}

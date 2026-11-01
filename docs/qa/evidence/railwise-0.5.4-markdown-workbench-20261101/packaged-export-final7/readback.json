@@ -1,0 +1,63 @@
+{
+  "schema": "railwise.markdown-workbench.packaged-docx-readback.v1",
+  "inspectedAt": "2026-11-01T07:39:16.548248+00:00",
+  "provenance": {
+    "product": "RailWise AI",
+    "version": "0.5.4",
+    "candidate": "final7",
+    "sourceHead": "5c88bfd6de0a65e0436cb33bcc1c6528154e20dd",
+    "asarSha256": "487f5c5ff8236e9e92f4d83f4e52c87afd2e06503b72918fcb07856545cccc4a",
+    "sourcePath": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/home/workspace/markdown-workbench/export-stress-final7.docx",
+    "exportOrigin": "Fresh final7 GUI export by root agent after a rich-mode card→panel edit/save; this independent tool only copies and reads existing files.",
+    "xmlDecoding": "Python standard XML parser, exactly one XML entity layer; no HTML/entity decoder."
+  },
+  "file": {
+    "evidencePath": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/packaged-export-final7/export-stress-final7.docx",
+    "sizeBytes": 9467,
+    "sha256": "d2665c89c024a15223c784f3ec1142e0d3798a02ad5159c5beb85c94797e388a"
+  },
+  "fixture": {
+    "path": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/home/workspace/markdown-workbench/export-stress.md",
+    "sizeBytes": 390,
+    "sha256": "a0f489cd9a66353a70de05e9c9c01514adbd5d2e015fcd8b2cd956ec4c7f6499",
+    "expectedCode": {
+      "ts": "const value = \"' & < >\"; const literal = \"&#x27; &quot; &lt;\"; const greeting = `Hello ${'RailWise & < >'}`;",
+      "html": "<div class=\"panel\" data-label='RailWise &amp; AI'>&lt;literal&gt; &#x27; &quot;</div>"
+    }
+  },
+  "previousFixture": {
+    "path": "/Users/wangjiawei/Documents/WorkWise/docs/qa/evidence/railwise-0.5.4-markdown-workbench-20261101/packaged-export-final6/export-stress.source.md",
+    "sha256": "f0246664ac307dbdc1a846b02cda5fbcfddbc493e52fd694b6f861528351450b"
+  },
+  "paragraphs": [
+    {
+      "style": "Heading1",
+      "text": "DOCX 字符保真验收"
+    },
+    {
+      "style": null,
+      "text": "以下代码必须保持原始字符，不能泄漏高亮标签或重复解码实体。"
+    },
+    {
+      "style": null,
+      "text": "const value = \"' & < >\"; const literal = \"&#x27; &quot; &lt;\"; const greeting = `Hello ${'RailWise & < >'}`;"
+    },
+    {
+      "style": null,
+      "text": "<div class=\"panel\" data-label='RailWise &amp; AI'>&lt;literal&gt; &#x27; &quot;</div>"
+    }
+  ],
+  "checks": {
+    "exactFinal7Asar": true,
+    "exactEvidenceCopy": true,
+    "onlyUserCardToPanelChange": true,
+    "twoExpectedCodeBlocks": true,
+    "everyCodeParagraphExact": true,
+    "typeScriptSourceUnchanged": true,
+    "htmlSourceHasPanel": true,
+    "frontmatterHidden": true,
+    "noHighlightMarkupLeak": true,
+    "literalEntitiesRetained": true
+  },
+  "allChecksPassed": true
+}

@@ -1,0 +1,267 @@
+Window: "RailWise AI", App: RailWise AI Candidate 5c88bfd6de0a.
+0 标准窗口 RailWise AI, Secondary Actions: Raise
+	1 container RailWise AI
+		2 container
+			3 HTML 内容 RailWise AI, URL: file:///Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/Applications/RailWise%20AI%20Candidate%205c88bfd6de0a.app/Contents/Resources/app.asar/out/renderer/index.html
+				4 container
+					5 container RailWise AI
+						6 按钮 Collapse sidebar
+						7 container
+							8 container Code / Survey
+								9 按钮 Code
+								10 按钮 Survey
+							11 切换 Description: Focus mode, Value: off
+							12 container Workspace tools
+								13 按钮 Write
+								14 开合三角标记 Tools
+									15 文本 Tools
+								16 按钮 Plugins
+							17 按钮 New file
+							18 按钮 New requirement
+							19 按钮 Add writing space
+						20 container
+							21 文本 Writing spaces
+							22 按钮 Add writing space
+							23 container /Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/home/workspace/markdown-workbench
+								24 按钮 markdown-workbench
+								25 按钮 New file
+								26 按钮 New folder
+								27 按钮 Refresh workspace
+							28 文本 Default writing space
+							29 container
+								30 按钮 .workwise
+								31 按钮 New file in this folder
+								32 按钮 New folder in this folder
+								33 按钮 Rename
+								34 按钮 Move
+								35 按钮 Delete folder
+							36 container
+								37 按钮 assets
+								38 按钮 New file in this folder
+								39 按钮 New folder in this folder
+								40 按钮 Rename
+								41 按钮 Move
+								42 按钮 Delete folder
+							43 container
+								44 按钮 assets.md
+								45 按钮 Rename
+								46 按钮 Move
+								47 按钮 Delete file
+							48 container
+								49 按钮 export-check.md
+								50 按钮 Rename
+								51 按钮 Move
+								52 按钮 Delete file
+							53 container
+								54 按钮 export-stress.md
+								55 按钮 Rename
+								56 按钮 Move
+								57 按钮 Delete file
+							58 container
+								59 按钮 external-edit.md
+								60 按钮 Rename
+								61 按钮 Move
+								62 按钮 Delete file
+							63 container
+								64 按钮 index.md
+								65 按钮 Rename
+								66 按钮 Move
+								67 按钮 Delete file
+							68 container
+								69 按钮 large-protection.md
+								70 按钮 Rename
+								71 按钮 Move
+								72 按钮 Delete file
+							73 container
+								74 按钮 README.md
+								75 按钮 Rename
+								76 按钮 Move
+								77 按钮 Delete file
+							78 container
+								79 按钮 relocated-target.md
+								80 按钮 Rename
+								81 按钮 Move
+								82 按钮 Delete file
+							83 container
+								84 按钮 syntax.md
+								85 按钮 Rename
+								86 按钮 Move
+								87 按钮 Delete file
+							88 container
+								89 按钮 table.md
+								90 按钮 Rename
+								91 按钮 Move
+								92 按钮 Delete file
+							93 container
+								94 按钮 welcome.md
+								95 按钮 Rename
+								96 按钮 Move
+								97 按钮 Delete file
+							98 container
+								99 按钮 保留语法.mdx
+								100 按钮 Rename
+								101 按钮 Move
+								102 按钮 Delete file
+							103 container
+								104 按钮 工程文档-01.md
+								105 按钮 Rename
+								106 按钮 Move
+								107 按钮 Delete file
+							108 container
+								109 按钮 工程文档-02.md
+								110 按钮 Rename
+								111 按钮 Move
+								112 按钮 Delete file
+							113 container
+								114 按钮 工程文档-03.md
+								115 按钮 Rename
+								116 按钮 Move
+								117 按钮 Delete file
+							118 container
+								119 按钮 工程文档-04.md
+								120 按钮 Rename
+								121 按钮 Move
+								122 按钮 Delete file
+							123 container
+								124 按钮 工程文档-05.md
+								125 按钮 Rename
+								126 按钮 Move
+								127 按钮 Delete file
+							128 container
+								129 按钮 工程文档-06.md
+								130 按钮 Rename
+								131 按钮 Move
+								132 按钮 Delete file
+							133 container
+								134 按钮 工程文档-07.md
+								135 按钮 Rename
+								136 按钮 Move
+								137 按钮 Delete file
+							138 container
+								139 按钮 工程文档-08.md
+								140 按钮 Rename
+								141 按钮 Move
+								142 按钮 Delete file
+							143 container
+								144 按钮 工程文档-09.md
+								145 按钮 Rename
+								146 按钮 Move
+								147 按钮 Delete file
+							148 container
+								149 按钮 工程文档-10.md
+								150 按钮 Rename
+								151 按钮 Move
+								152 按钮 Delete file
+							153 container
+								154 按钮 工程文档-11.md
+								155 按钮 Rename
+								156 按钮 Move
+								157 按钮 Delete file
+							158 container
+								159 按钮 工程文档-12.md
+								160 按钮 Rename
+								161 按钮 Move
+								162 按钮 Delete file
+							163 container
+								164 按钮 工程文档-13.md
+								165 按钮 Rename
+								166 按钮 Move
+								167 按钮 Delete file
+							168 container
+								169 按钮 工程文档-14.md
+								170 按钮 Rename
+								171 按钮 Move
+								172 按钮 Delete file
+							173 container
+								174 按钮 工程文档-15.md
+								175 按钮 Rename
+								176 按钮 Move
+								177 按钮 Delete file
+							178 container
+								179 按钮 工程文档-16.md
+								180 按钮 Rename
+								181 按钮 Move
+								182 按钮 Delete file
+							183 container
+								184 按钮 工程文档-17.md
+								185 按钮 Rename
+								186 按钮 Move
+								187 按钮 Delete file
+							188 container
+								189 按钮 工程文档-18.md
+								190 按钮 Rename
+								191 按钮 Move
+								192 按钮 Delete file
+							193 container
+								194 按钮 工程文档-19.md
+								195 按钮 Rename
+								196 按钮 Move
+								197 按钮 Delete file
+							198 container
+								199 按钮 工程文档-20.md
+								200 按钮 Rename
+								201 按钮 Move
+								202 按钮 Delete file
+						203 container
+							204 切换按钮 Connect phone, Value: 0
+							205 按钮 Settings
+					206 container
+						207 text export-stress.md export-stress.md
+						208 按钮 Live editor
+						209 弹出式按钮 Preview only
+						210 按钮 Toggle AI panel
+						211 按钮 Generate PPT
+						212 弹出式按钮 writeMoreActions
+						213 弹出式按钮 Export
+						214 按钮 Save file
+						215 文本 Saved
+					216 container
+						217 标签页组 Open documents
+							218 标签 (selected) export-stress.md, Value: 1
+							219 按钮 Description: Pin export-stress.md, Help: Pin
+							220 按钮 Close export-stress.md
+						221 按钮 Recent
+					222 按钮 Search documents
+					223 按钮 AI writing
+					224 按钮 Properties
+					225 按钮 Links
+					226 按钮 History
+					227 按钮 Comments
+					228 container
+						229 文本输入区 (settable) ---
+title: DOCX 字符保真验收
+stage: reviewed
+---
+# DOCX 字符保真验收
+以下代码必须保持原始字符，不能泄漏高亮标签或重复解码实体。
+```ts
+const value = "' & < >"; const literal = "&#x27; &quot; &lt;"; const greeting = `Hello ${'RailWise & < >'}`;
+```
+```html
+<div class="panel" data-label='RailWise &amp; AI'>&lt;literal&gt; &#x27; &quot;</div>
+```
+
+							230 文本 ---
+							231 文本 title: DOCX 字符保真验收
+							232 文本 stage: reviewed
+							233 文本 ---
+							234 文本 # DOCX 字符保真验收
+							235 文本 以下代码必须保持原始字符，不能泄漏高亮标签或重复解码实体。
+							236 文本 ```ts
+							237 文本 const value = "' & < >"; const literal = "&#x27; &quot; &lt;"; const greeting = `Hello ${'RailWise & < >'}`;
+							238 文本 ```
+							239 文本 ```html
+							240 文本 <div class="panel" data-label='RailWise &amp; AI'>&lt;literal&gt; &#x27; &quot;</div>
+							241 文本 ```
+	242 关闭按钮
+	243 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	244 最小化按钮
+245 menu bar
+	246 RailWise AI Candidate 5c88bfd6de0a
+	247 File
+	248 Edit
+	249 View
+	250 Window
+	251 Help
+
+The focused UI element is 3 HTML 内容 RailWise AI, URL: file:///Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final7/Applications/RailWise%20AI%20Candidate%205c88bfd6de0a.app/Contents/Resources/app.asar/out/renderer/index.html

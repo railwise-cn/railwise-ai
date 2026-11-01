@@ -2380,7 +2380,7 @@ export function Workbench(): ReactElement {
                 ) : null
               }
             />
-            <div className="ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-0 sm:px-4 md:px-6 lg:px-8">
+            <div className="ds-chat-composer-dock ds-no-drag flex shrink-0 justify-center px-2 pb-3 pt-3 sm:px-4 md:px-6 lg:px-8">
               <FloatingComposer
                 input={input}
                 setInput={setInput}

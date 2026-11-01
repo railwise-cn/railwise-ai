@@ -1,0 +1,42 @@
+{
+  "schema": "railwise.markdown-workbench.packaged-stress-docx-readback.v1",
+  "inspectedAt": "2026-11-01T07:08:06.819Z",
+  "provenance": {
+    "version": "0.5.4",
+    "candidate": "final6",
+    "sourceHead": "1864d44d23f5328d5fc435edec9323b57db53ece",
+    "asarSha256": "1661b8e597be4c69634e0c9b1ebdc4941f7defed6bbc96508e5bf6f103dafe07",
+    "exportedPath": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/home/workspace/markdown-workbench/export-stress-final6.docx",
+    "sourcePath": "/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/home/workspace/markdown-workbench/export-stress.md",
+    "guiEvidence": "../screenshots/17-final6-stress-export.png"
+  },
+  "file": {
+    "sizeBytes": 9466,
+    "sha256": "6ddf668662fd826294f4512ff6ea8a0af8cde82e4bc438fc7d9fac13bd1d1062"
+  },
+  "fixture": {
+    "sha256": "f0246664ac307dbdc1a846b02cda5fbcfddbc493e52fd694b6f861528351450b"
+  },
+  "comparisons": [
+    {
+      "language": "ts",
+      "expected": "const value = \"' & < >\"; const literal = \"&#x27; &quot; &lt;\"; const greeting = `Hello ${'RailWise & < >'}`;",
+      "actual": "const value = \"' & < >\"; const literal = \"&#x27; &quot; &lt;\"; const greeting = `Hello ${'RailWise & < >'}`;",
+      "exact": true
+    },
+    {
+      "language": "html",
+      "expected": "<div class=\"card\" data-label='RailWise &amp; AI'>&lt;literal&gt; &#x27; &quot;</div>",
+      "actual": "<div class=\"card\" data-label='RailWise &amp; AI'>&lt;literal&gt; &#x27; &quot;</div>",
+      "exact": true
+    }
+  ],
+  "checks": {
+    "exactCopy": true,
+    "codeBlockCount": true,
+    "allCodeExact": true,
+    "noHighlightSpanMarkup": true,
+    "literalEntitiesPreserved": true
+  },
+  "allChecksPassed": true
+}

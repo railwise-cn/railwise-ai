@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -129,6 +129,38 @@ describe('skill-service', () => {
       scope: 'global'
     }))
     expect(result.validationErrors).not.toContainEqual(expect.objectContaining({ root: pluginSkillRoot }))
+  })
+
+  it('does not block trusted plugin discovery on non-entry links or large reference media', async () => {
+    const workspaceRoot = join(tempRoot, 'workspace-plugin-safe-references')
+    const pluginSkillRoot = join(
+      process.env.CODEX_HOME!,
+      'plugins',
+      'cache',
+      'openai-curated-remote',
+      'gstack',
+      '0.1.0',
+      'skills',
+      'gstack'
+    )
+    await mkdir(join(pluginSkillRoot, 'examples'), { recursive: true })
+    await writeFile(join(pluginSkillRoot, 'SKILL.md'), '# GStack\n', 'utf8')
+    const outside = join(tempRoot, 'outside-ethos.md')
+    await writeFile(outside, '# GStack ethos\n', 'utf8')
+    await symlink(outside, join(pluginSkillRoot, 'ETHOS.md'))
+    await writeFile(join(pluginSkillRoot, 'examples', 'film-preview.webp'), Buffer.alloc(17 * 1024 * 1024))
+
+    const result = await listGuiSkills(createSettings(workspaceRoot), workspaceRoot)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.skills).toContainEqual(expect.objectContaining({
+      id: 'gstack',
+      scope: 'global'
+    }))
+    expect(result.validationErrors).not.toContainEqual(expect.objectContaining({
+      root: pluginSkillRoot
+    }))
   })
 
   it('keeps the strict 1 MiB limit for workspace Skills', async () => {
@@ -544,15 +576,15 @@ describe('skill-service', () => {
     if (!result.ok) return
     expect(result.skills).toContainEqual(expect.objectContaining({
       id: 'ppt-master',
-      name: 'PPT Master 4.3.0',
+      name: 'PPT Master',
       description: expect.stringContaining('presentation workflow'),
       source: expect.objectContaining({
         type: 'github',
         owner: 'hugohe3',
         repo: 'ppt-master',
         path: 'skills/ppt-master',
-        ref: 'v4.3.0',
-        installedSha: '51cb529d00638097e70fd3e9d865a0bf061b5e19',
+        ref: 'v6.8.0',
+        installedSha: '5e8856be0da8e6bc85c4aa28acc614478f7b7137',
         autoUpdate: false,
         overlaySkillId: 'ppt-master'
       })

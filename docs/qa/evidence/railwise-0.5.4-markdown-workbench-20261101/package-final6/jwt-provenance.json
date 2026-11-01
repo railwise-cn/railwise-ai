@@ -1,0 +1,33 @@
+{
+  "file": "app.asar/node_modules/lib0/.playwright-mcp/console-2026-07-11T22-37-21-406Z.log",
+  "items": [
+    {
+      "headerFields": [
+        "alg",
+        "typ"
+      ],
+      "payloadFields": [
+        "sub",
+        "name",
+        "iat"
+      ],
+      "standardJwtIoSampleClaims": true,
+      "signatureMatchesPublicSampleSecret": false,
+      "algorithmClass": "other",
+      "contextClass": {
+        "containsConsoleAssertion": false,
+        "containsTestOrExample": true,
+        "containsError": false
+      },
+      "line": 25
+    }
+  ],
+  "package": {
+    "name": "lib0",
+    "version": "0.2.119"
+  },
+  "matchesPrivateDependencyCopy": true,
+  "matchesOriginalDependencyCopy": true,
+  "lineCount": 2059,
+  "bytes": 429107
+}

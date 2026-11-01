@@ -79,6 +79,7 @@ function createCandidatePackagingRepo(): { repo: string; sourceHead: string } {
   copyFileSync(join(process.cwd(), 'src/shared/product-brand.json'), join(repo, 'src/shared/product-brand.json'))
   mkdirSync(join(repo, 'src', 'asset', 'agent-packs', 'metro-monitoring-agent-pack'), { recursive: true })
   copyFileSync(join(process.cwd(), 'electron-builder.cjs'), join(repo, 'electron-builder.cjs'))
+  copyFileSync(join(process.cwd(), 'scripts/dependency-artifact-policy.cjs'), join(repo, 'scripts/dependency-artifact-policy.cjs'))
   copyFileSync(join(process.cwd(), 'kun', 'package-lock.json'), join(repo, 'kun', 'package-lock.json'))
   copyFileSync(
     join(process.cwd(), 'scripts', 'candidate-source-provenance.cjs'),

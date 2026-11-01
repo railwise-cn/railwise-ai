@@ -5,14 +5,83 @@ import { join } from 'node:path'
 import JSZip from 'jszip'
 import {
   inspectDesignSvgFidelity,
+  createDesignImportReport,
+  hasBlockingDesignImportErrors,
   PPTX_IMPORT_LIMITS,
   preflightPptxForDesignImport,
   readImportedDesignImage,
   shouldKeepVectorElements
 } from './design-import-service'
+import { createDesignDocument, createDesignElement, createDesignPage } from '../../shared/design-document'
 
 const PNG_HEADER = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
 const roots: string[] = []
+
+describe('Design PPTX import quality report', () => {
+  it('reports editable approximations for gradients and translucent paint', () => {
+    const warnings = inspectDesignSvgFidelity(
+      '<svg><defs><linearGradient id="g"><stop offset="0" stop-color="#fff" /></linearGradient></defs><rect fill="url(#g)" /><text fill-opacity="0.4">x</text></svg>',
+      0
+    )
+    expect(warnings.map((warning) => warning.code)).toEqual(expect.arrayContaining([
+      'gradient_approximation',
+      'transparency_approximation'
+    ]))
+  })
+
+  it('blocks the fixed-line-spacing unit failure found in a real imported title', () => {
+    const document = createDesignDocument()
+    document.pages[0].elements.push(createDesignElement('text', {
+      text: '实战培训', x: 58, y: 45_263_006, w: 238, h: 92
+    }))
+    const report = createDesignImportReport({ document, sourceFileName: 'training.pptx', sourceSlideCount: 1 })
+    expect(hasBlockingDesignImportErrors(report)).toBe(true)
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'extreme_element_geometry', severity: 'error', pageNumber: 1,
+      elementId: document.pages[0].elements[0].id
+    }))
+  })
+
+  it('rejects incomplete conversion even when at least one slide was produced', () => {
+    const report = createDesignImportReport({
+      document: createDesignDocument(), sourceFileName: 'training.pptx', sourceSlideCount: 70
+    })
+    expect(hasBlockingDesignImportErrors(report)).toBe(true)
+    expect(report.summary.errorCount).toBe(1)
+    expect(report.diagnostics[0].code).toBe('slide_count_mismatch')
+  })
+
+  it('permits normal decorative bleed but reports fully off-page text', () => {
+    const document = createDesignDocument()
+    document.pages[0].elements.push(
+      createDesignElement('ellipse', { x: -110, y: 400, w: 520, h: 400 }),
+      createDesignElement('text', { text: 'Off-page label', x: 1300, y: 50, w: 120, h: 20 })
+    )
+    const report = createDesignImportReport({ document, sourceFileName: 'training.pptx', sourceSlideCount: 1 })
+    expect(hasBlockingDesignImportErrors(report)).toBe(false)
+    expect(report.summary).toMatchObject({ elementCount: 2, textElementCount: 1, warningCount: 1, errorCount: 0 })
+    expect(report.diagnostics[0].code).toBe('text_outside_canvas')
+  })
+
+  it('links legacy warning page numbers to actual page ids and records mixed mode', () => {
+    const document = createDesignDocument()
+    document.pages.push({ ...createDesignPage(), displayMode: 'fidelity' })
+    const report = createDesignImportReport({
+      document, sourceFileName: '/private/source/training.pptx', sourceSlideCount: 2, importedAt: 123,
+      warnings: [{ code: 'unsupported_mask', pageId: 'page-2', message: 'Mask is not editable.' }]
+    })
+    expect(report).toMatchObject({ sourceFileName: 'training.pptx', importedAt: 123, mode: 'mixed' })
+    expect(report.diagnostics[0]).toMatchObject({ pageNumber: 2, pageId: document.pages[1].id })
+  })
+
+  it('rejects non-finite geometry without hiding the failed element', () => {
+    const document = createDesignDocument()
+    document.pages[0].elements.push(createDesignElement('rect', { x: Number.POSITIVE_INFINITY }))
+    const report = createDesignImportReport({ document, sourceFileName: 'training.pptx', sourceSlideCount: 1 })
+    expect(hasBlockingDesignImportErrors(report)).toBe(true)
+    expect(report.diagnostics[0].code).toBe('invalid_element_geometry')
+  })
+})
 
 async function createImportRoot(): Promise<{ root: string; svgDirectory: string }> {
   const root = await mkdtemp(join(tmpdir(), 'workwise-design-import-test-'))
