@@ -4,6 +4,9 @@ import {
   clawImInstallPollPayloadSchema,
   designDocumentSavePayloadSchema,
   designExportPayloadSchema,
+  designPptxBytesExportPayloadSchema,
+  designPptxRevisionReadPayloadSchema,
+  designPptxRevisionSavePayloadSchema,
   isSafeOpenExternalUrl,
   notificationPayloadSchema,
   runtimeRequestPayloadSchema,
@@ -27,6 +30,31 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('bounds native PPTX revision IPC payloads to typed bytes and fixed digests', () => {
+    const base = {
+      workspaceRoot: '/tmp/workspace',
+      documentId: 'doc_test',
+      expectedSha256: 'a'.repeat(64),
+      bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04])
+    }
+    expect(designPptxRevisionReadPayloadSchema.safeParse({
+      workspaceRoot: base.workspaceRoot,
+      documentId: base.documentId
+    }).success).toBe(true)
+    expect(designPptxRevisionReadPayloadSchema.safeParse({ workspaceRoot: base.workspaceRoot, documentId: base.documentId, kind: 'source' }).success).toBe(true)
+    expect(designPptxRevisionReadPayloadSchema.safeParse({ workspaceRoot: base.workspaceRoot, documentId: base.documentId, kind: 'arbitrary' }).success).toBe(false)
+    expect(designPptxBytesExportPayloadSchema.safeParse({ workspaceRoot: base.workspaceRoot, documentId: base.documentId, bytes: base.bytes, expectedSlideCount: 70 }).success).toBe(true)
+    expect(designPptxBytesExportPayloadSchema.safeParse({ bytes: base.bytes, expectedSlideCount: 70 }).success).toBe(false)
+    expect(designPptxRevisionSavePayloadSchema.safeParse(base).success).toBe(true)
+    expect(designPptxRevisionSavePayloadSchema.safeParse({ ...base, bytes: [80, 75] }).success).toBe(false)
+    expect(designPptxRevisionSavePayloadSchema.safeParse({ ...base, bytes: new Uint8Array() }).success).toBe(false)
+    expect(designPptxRevisionSavePayloadSchema.safeParse({ ...base, expectedSha256: '../source.pptx' }).success).toBe(false)
+    expect(designPptxRevisionReadPayloadSchema.safeParse({
+      workspaceRoot: base.workspaceRoot,
+      documentId: '../outside'
+    }).success).toBe(false)
+  })
+
   it('restricts sampling requests to frozen declarations, stage rules and bounded pages', () => {
     const base = '/v1/engineering/projects/project_1'
     const population = { idempotencyKey: 'population-create-1', expectedProjectRevision: 1,
@@ -851,6 +879,11 @@ describe('app-ipc-schemas', () => {
     })
 
     expect(payload.newName).toBe('final.md')
+  })
+
+  it('accepts an optional destination directory for workspace moves', () => {
+    const payload = workspaceEntryRenamePayloadSchema.parse({ workspaceRoot: '/tmp/workspace', path: '/tmp/workspace/draft.md', newName: 'draft.md', targetDirectory: 'archive' })
+    expect(payload.targetDirectory).toBe('archive')
   })
 
   it('accepts workspace delete payloads', () => {

@@ -1,0 +1,13 @@
+{
+  "fromCandidate": "1864d44d23f5328d5fc435edec9323b57db53ece",
+  "toCandidate": "5c88bfd6de0a65e0436cb33bcc1c6528154e20dd",
+  "removedDependencyArtifactPaths": [
+    "/node_modules/cytoscape/test-results",
+    "/node_modules/cytoscape/test-results/.last-run.json",
+    "/node_modules/lib0/.playwright-mcp",
+    "/node_modules/lib0/.playwright-mcp/console-2026-07-11T22-37-21-406Z.log",
+    "/node_modules/lib0/.playwright-mcp/page-2026-07-11T22-37-22-378Z.yml"
+  ],
+  "remainingDependencyArtifactPaths": [],
+  "claim": "Read-only archive path comparison; no sensitive log contents included"
+}

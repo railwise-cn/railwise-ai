@@ -135,6 +135,7 @@ const api = {
   removeCatalogSource: (sourceId) => ipcRenderer.invoke('catalog:remove-source', { sourceId }),
   syncCatalogSource: (sourceId) => ipcRenderer.invoke('catalog:sync-source', { sourceId }),
   listInstalledPlugins: () => ipcRenderer.invoke('plugin:list-installed'),
+  listPluginUpdateDiagnostics: () => ipcRenderer.invoke('plugin:list-update-diagnostics'),
   preparePluginImport: (request) => ipcRenderer.invoke('plugin:prepare-import', request),
   prepareCatalogPlugin: (request) => ipcRenderer.invoke('plugin:prepare-catalog', request),
   cancelPluginImport: (preparedId) => ipcRenderer.invoke('plugin:cancel-import', { preparedId }),
@@ -241,6 +242,26 @@ const api = {
     ipcRenderer.invoke('file:save-as', payload),
   writeWorkspaceFile: (payload) =>
     ipcRenderer.invoke('file:write-workspace', payload),
+  readDocumentSnapshot: (payload) =>
+    ipcRenderer.invoke('file:read-document-snapshot', payload),
+  searchWorkspaceDocuments: (payload) =>
+    ipcRenderer.invoke('file:search-workspace-documents', payload),
+  writeDocumentChecked: (payload) =>
+    ipcRenderer.invoke('file:write-document-checked', payload),
+  listDocumentHistory: (payload) =>
+    ipcRenderer.invoke('file:list-document-history', payload),
+  getDocumentHistoryEntry: (payload) =>
+    ipcRenderer.invoke('file:get-document-history', payload),
+  restoreDocumentHistory: (payload) =>
+    ipcRenderer.invoke('file:restore-document-history', payload),
+  listDocumentComments: (payload) =>
+    ipcRenderer.invoke('file:list-document-comments', payload),
+  createDocumentComment: (payload) =>
+    ipcRenderer.invoke('file:create-document-comment', payload),
+  updateDocumentComment: (payload) =>
+    ipcRenderer.invoke('file:update-document-comment', payload),
+  getDocumentSemantics: (payload) =>
+    ipcRenderer.invoke('file:get-document-semantics', payload),
   createWorkspaceFile: (payload) =>
     ipcRenderer.invoke('file:create-workspace', payload),
   createWorkspaceDirectory: (payload) =>
@@ -281,6 +302,8 @@ const api = {
   },
   exportWriteDocument: (payload) =>
     ipcRenderer.invoke('write:export', payload),
+  renderWriteMermaidPreview: (payload) =>
+    ipcRenderer.invoke('write:mermaid-preview', payload),
   copyWriteDocumentAsRichText: (payload) =>
     ipcRenderer.invoke('write:copy-rich-text', payload),
   exportDesignToPptx: (payload) =>
@@ -297,6 +320,12 @@ const api = {
     ipcRenderer.invoke('design:asset:read', payload),
   importPptxToDesign: (payload) =>
     ipcRenderer.invoke('design:import-pptx', payload),
+  readDesignPptxRevision: (payload) =>
+    ipcRenderer.invoke('design:pptx-revision:read', payload),
+  saveDesignPptxRevision: (payload) =>
+    ipcRenderer.invoke('design:pptx-revision:save', payload),
+  exportDesignPptxBytes: (payload) =>
+    ipcRenderer.invoke('design:export-pptx-bytes', payload),
   saveDesignAssetToWrite: (payload) =>
     ipcRenderer.invoke('design:save-to-write', payload),
   renderPresetShape: (payload) =>

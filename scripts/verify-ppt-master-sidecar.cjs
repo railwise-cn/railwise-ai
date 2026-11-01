@@ -117,6 +117,12 @@ async function main() {
 
     const pptxPath = join(workspace, 'roundtrip.pptx')
     invoke({
+      operation: 'ppt-master-quality-check',
+      workspaceRoot: workspace,
+      projectPath: workspace,
+      stage: 'final'
+    })
+    invoke({
       operation: 'ppt-master-export-pptx',
       workspaceRoot: workspace,
       projectPath: workspace,

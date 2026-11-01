@@ -1,0 +1,61 @@
+{
+  "schema": "railwise.write.real-model-service-acceptance.v1",
+  "startedAt": "2026-11-01T08:18:37.475Z",
+  "scope": "Real model service integration using the production Write request builder and service; not installed GUI E2E.",
+  "credentialHandling": "Existing configured key read in memory only; no credential/header/source settings are serialized.",
+  "syntheticFixtureOnly": true,
+  "operations": [
+    {
+      "name": "selected-formal-rewrite",
+      "durationMs": 1854,
+      "ok": true,
+      "sourceSha256Before": "52d6ed6d1cc259b9946d61b00eef24fcd2e80a700f6f7529270f73c8d4cc89e6",
+      "sourceSha256AfterRequest": "52d6ed6d1cc259b9946d61b00eef24fcd2e80a700f6f7529270f73c8d4cc89e6",
+      "diskUnchangedBeforeReview": true,
+      "referenceCount": 0,
+      "mode": "edit",
+      "proposal": "监测结果：本周5个测点均完成2轮测量。最大累计沉降为2.1毫米，低于3.0毫米预警值。以上均为合成验收数据。",
+      "proposalSha256": "9579b66c22d3c6845490dc88f96ffd4bbdc33736d7c6db4f7eb41855dfb64ecf",
+      "proposalNonempty": true,
+      "proposalChangesScope": true,
+      "rejectionPreservesOriginal": true,
+      "acceptPreviewPreservesPrefix": true,
+      "acceptPreviewPreservesSuffix": true,
+      "acceptPreviewSha256": "8a2ff10333df0b964a83782f577d55594aa2b90fb0100841462d75caddfdcdf0",
+      "syntheticDataDeclarationPresent": true,
+      "numericFactsRetained": true
+    },
+    {
+      "name": "whole-document-summary-append",
+      "durationMs": 1098,
+      "ok": true,
+      "sourceSha256Before": "52d6ed6d1cc259b9946d61b00eef24fcd2e80a700f6f7529270f73c8d4cc89e6",
+      "sourceSha256AfterRequest": "52d6ed6d1cc259b9946d61b00eef24fcd2e80a700f6f7529270f73c8d4cc89e6",
+      "diskUnchangedBeforeReview": true,
+      "referenceCount": 0,
+      "mode": "long",
+      "proposal": "## 摘要\n\n最大累计沉降为2.1毫米，低于3.0毫米预警值；以上数据均为合成验收数据。",
+      "proposalSha256": "100c9d9da2230f50b827188fb3738797379639be037dfd3a08f03d218cc09320",
+      "proposalNonempty": true,
+      "proposalChangesScope": true,
+      "rejectionPreservesOriginal": true,
+      "acceptPreviewPreservesPrefix": true,
+      "acceptPreviewPreservesSuffix": true,
+      "acceptPreviewSha256": "fda9f3c10586042d771ced5c639bd94cb6162c1e15debe5cb447dddc3026ce8d",
+      "syntheticDataDeclarationPresent": true,
+      "numericFactsRetained": true
+    }
+  ],
+  "provider": {
+    "origin": "https://api.deepseek.com",
+    "model": "deepseek-v4-pro",
+    "configuredCredentialPresent": true
+  },
+  "productionSettingsUnchanged": true,
+  "fixture": {
+    "source": "# 软件验收合成报告\n\n本周5个测点均完成2轮测量。最大累计沉降为2.1毫米，低于3.0毫米预警值。以上均为合成验收数据。\n",
+    "sha256": "52d6ed6d1cc259b9946d61b00eef24fcd2e80a700f6f7529270f73c8d4cc89e6"
+  },
+  "allChecksPassed": true,
+  "finishedAt": "2026-11-01T08:18:40.476Z"
+}

@@ -111,7 +111,8 @@ const PACKAGE_ICON_OVERRIDES: Record<string, MarketplaceIconV1> = {
   'ppt-master': { kind: 'monogram', value: 'PM', tone: 'red', alt: 'PPT Master' },
   'writing-agent': { kind: 'monogram', value: 'WA', tone: 'green', alt: 'Writing Agent' },
   'humanizer-zh': { kind: 'monogram', value: 'HZ', tone: 'violet', alt: 'Humanizer Chinese' },
-  'nuwa-skill': { kind: 'monogram', value: 'NW', tone: 'orange', alt: 'Nuwa Skill' }
+  'nuwa-skill': { kind: 'monogram', value: 'NW', tone: 'orange', alt: 'Nuwa Skill' },
+  'arch-diagram-skill': { kind: 'monogram', value: 'AD', tone: 'violet', alt: 'Arch Diagram' }
 }
 
 function defaultPackageIcon(id: string, name: string): MarketplaceIconV1 {
@@ -214,7 +215,7 @@ const catalogSources: CatalogSourceV1[] = [
   {
     schemaVersion: 1,
     id: OFFICIAL_CATALOG_SOURCE_ID,
-    name: 'WorkWise Official Catalog',
+    name: 'RailWise AI Official Catalog',
     type: 'built-in',
     scope: 'system',
     location: 'workwise://marketplace/official-v1',
@@ -783,8 +784,8 @@ const officialPackages: MarketplacePackageV1[] = [
   managedPackage(
     'schedule',
     'Schedule',
-    'WorkWise built-in scheduling and recurring task capability.',
-    'WorkWise',
+    'RailWise AI built-in scheduling and recurring task capability.',
+    'RailWise AI',
     'workwise://managed-tools/schedule',
     null,
     true,
@@ -816,7 +817,7 @@ const officialPackages: MarketplacePackageV1[] = [
   managedPackage(
     'ego-browser',
     'Ego Browser',
-    'External browser integration discovered and managed by WorkWise.',
+    'External browser integration discovered and managed by RailWise AI.',
     'Cintro Labs',
     'https://lite.ego.app/',
     null,
@@ -840,7 +841,7 @@ const officialPackages: MarketplacePackageV1[] = [
   managedPackage(
     'railwise-kb',
     'RailWise KB',
-    'WorkWise-managed connection to the official RailWise public knowledge base.',
+    'RailWise AI-managed connection to the official RailWise public knowledge base.',
     'RailWise',
     'https://kb.railwise.cn/products/workwise/',
     null,
@@ -854,7 +855,7 @@ const officialPackages: MarketplacePackageV1[] = [
     id: 'di-bao-monitoring',
     name: 'Metro Protection Monitoring',
     summary: 'Produce metro protection-zone monitoring plans, reports, warnings, and review responses.',
-    publisher: publisher('workwise', 'WorkWise', 'https://github.com/railwise-cn/railwise-ai', true),
+    publisher: publisher('workwise', 'RailWise AI', 'https://github.com/railwise-cn/railwise-ai', true),
     location: 'https://github.com/railwise-cn/railwise-ai',
     license: 'MIT',
     category: 'engineering',
@@ -865,7 +866,7 @@ const officialPackages: MarketplacePackageV1[] = [
     id: 'operational-monitoring',
     name: 'Operational Monitoring',
     summary: 'Prepare long-term deformation monitoring plans, period reports, alerts, and archives.',
-    publisher: publisher('workwise', 'WorkWise', 'https://github.com/railwise-cn/railwise-ai', true),
+    publisher: publisher('workwise', 'RailWise AI', 'https://github.com/railwise-cn/railwise-ai', true),
     location: 'https://github.com/railwise-cn/railwise-ai',
     license: 'MIT',
     category: 'engineering',
@@ -876,7 +877,7 @@ const officialPackages: MarketplacePackageV1[] = [
     id: 'rail-any-station-control-network',
     name: '任意设站控制网测量',
     summary: '导入任意设站控制网观测文件，执行预检、确定性平差、精度解释和成果交付。',
-    publisher: publisher('workwise-user-provided', 'WorkWise 用户提供专项技能', 'workwise://skills/rail-any-station-control-network', false),
+    publisher: publisher('workwise-user-provided', 'RailWise AI 用户提供专项技能', 'workwise://skills/rail-any-station-control-network', false),
     location: 'workwise://skills/rail-any-station-control-network',
     license: 'User-provided internal source',
     category: 'engineering',
@@ -888,7 +889,7 @@ const officialPackages: MarketplacePackageV1[] = [
     id: 'tender-master',
     name: 'Tender Master',
     summary: 'Turn tender documents into traceable response matrices, drafts, and compliance checks.',
-    publisher: publisher('workwise', 'WorkWise', 'https://github.com/railwise-cn/railwise-ai', true),
+    publisher: publisher('workwise', 'RailWise AI', 'https://github.com/railwise-cn/railwise-ai', true),
     location: 'https://github.com/railwise-cn/railwise-ai',
     license: 'MIT',
     category: 'documents',
@@ -915,7 +916,7 @@ const officialPackages: MarketplacePackageV1[] = [
     license: 'MIT',
     category: 'documents',
     tier: 'recommended',
-    version: '4.3.0',
+    version: '6.8.0',
     permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION, PROCESS_EXECUTE_PERMISSION]
   }),
   managedSkillPackage({
@@ -1031,7 +1032,7 @@ const officialPackages: MarketplacePackageV1[] = [
       managedBy: 'workwise'
     }],
     updatePolicy: SYSTEM_UPDATE,
-    availability: { status: 'managed', managedBy: 'WorkWise' },
+    availability: { status: 'managed', managedBy: 'RailWise AI' },
     installation: SYSTEM_MANAGED_INSTALL
   }),
   wheelMcpPackage({
@@ -1088,7 +1089,94 @@ const officialPackages: MarketplacePackageV1[] = [
     'https://mcp.linear.app/mcp',
     'https://linear.app',
     'collaboration'
-  )
+  ),
+  githubSkillPackage({
+    id: 'browser-skill',
+    name: 'BrowserSkill',
+    summary: '通过 BrowserSkill 操作已登录的 Chrome 或 Edge 浏览器，读取页面并执行网页任务。',
+    publisher: publisher('tencent', 'Tencent', 'https://github.com/Tencent/BrowserSkill'),
+    owner: 'Tencent',
+    repository: 'BrowserSkill',
+    commit: '9cfba53582cb04d48da36aabd0a5017987d4daea',
+    subpath: 'crates/bsk-cli/skill',
+    skillNames: ['browser-skill'],
+    license: 'MIT',
+    categories: ['browser-automation'],
+    usage: { howToUse: '安装后，让 RailWise AI 操作已登录的 Chrome 或 Edge 页面；先说明要查看或执行的网页任务，再让它读取页面、点击控件或整理结果。', requirements: ['BrowserSkill CLI', 'Chrome 或 Edge 扩展'], examples: ['读取当前浏览器页面，把可见表格整理成摘要。'] },
+    dependencies: [
+      { id: 'bsk-cli', kind: 'system', requirement: 'BrowserSkill CLI', optional: false, managedBy: 'user' },
+      { id: 'browser-extension', kind: 'system', requirement: 'Chrome or Edge extension', optional: false, managedBy: 'user' }
+    ]
+  }),
+  githubSkillPackage({
+    id: 'blender-skills',
+    name: 'Blender Skills',
+    summary: '面向 Blender 的建模、材质、动画和导出工作流技能包。',
+    publisher: publisher('arjun988', 'arjun988', 'https://github.com/arjun988/blender-skills'),
+    owner: 'arjun988',
+    repository: 'blender-skills',
+    commit: '8f778d2405a214b508d4c7d80742be8e43acdd52',
+    subpath: '.claude/skills',
+    skillNames: ['blender-skills'],
+    license: 'MIT',
+    categories: ['development'],
+    usage: { howToUse: '安装 Skill 和 Blender MCP 插件后，直接描述场景、建模、材质、动画或导出任务；AI 会在 Blender 中执行并反馈结果。', requirements: ['Blender', 'Blender MCP 插件'], examples: ['创建一个低多边形地铁车站场景并导出预览。'] },
+    dependencies: [
+      { id: 'blender', kind: 'system', requirement: 'Blender', optional: false, managedBy: 'user' },
+      { id: 'blender-mcp', kind: 'system', requirement: 'Blender MCP add-on', optional: false, managedBy: 'user' }
+    ]
+  }),
+  githubSkillPackage({
+    id: 'video-shotcraft',
+    name: 'Video Shotcraft',
+    summary: '用分镜方案、Remotion、节奏同步和声音设计制作可编辑的产品视频。',
+    publisher: publisher('vincentwei1021', 'Vincent Wei', 'https://github.com/Vincentwei1021/video-shotcraft'),
+    owner: 'Vincentwei1021',
+    repository: 'video-shotcraft',
+    commit: '1266a3ec4831289c4d893d42dd5102723658039a',
+    skillNames: ['video-shotcraft'],
+    license: 'Apache-2.0',
+    categories: ['visualization'],
+    usage: { howToUse: '准备好 Node.js 后安装 Skill，给出视频 brief、时长、画幅和镜头要求；它会生成可继续修改的 Remotion 工程和分镜方案。', requirements: ['Node.js'], examples: ['把这份产品 brief 做成 30 秒、节奏同步的镜头表。'] },
+    dependencies: [{ id: 'node', kind: 'runtime', requirement: 'Node.js', optional: false, managedBy: 'user' }]
+  }),
+  githubSkillPackage({
+    id: 'diagram-design',
+    name: 'Diagram Design',
+    summary: '制作适合报告和演示的高质量 HTML/SVG 图表，并支持继续修改。',
+    publisher: publisher('cathrynlavery', 'Cathryn Lavery', 'https://github.com/cathrynlavery/diagram-design'),
+    owner: 'cathrynlavery',
+    repository: 'diagram-design',
+    commit: '0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1',
+    skillNames: ['diagram-design'],
+    license: 'MIT',
+    categories: ['visualization'],
+    usage: { howToUse: '安装后，描述仓库、文章、PDF 或本地项目，并说明想要的图形或输出格式。Skill 会生成可交互的架构图，并可继续修改规格后重新导出。', requirements: ['Node.js ≥18', 'Chrome/Chromium/Edge', '生成 MP4/GIF 时需要 ffmpeg'], examples: ['把 https://github.com/plausible/analytics 画成架构图', '把这篇文章画成流程图并输出 30 秒视频', '把刚才的图输出成 Mermaid'] },
+    dependencies: [{ id: 'node', kind: 'runtime', requirement: 'Node.js', optional: true, managedBy: 'user' }]
+  }),
+  githubSkillPackage({
+    id: 'arch-diagram-skill',
+    name: 'Arch Diagram',
+    summary: '把仓库、文章、PDF 或本地项目生成可交互的架构图，并导出 HTML、PNG、MP4、GIF 或 Mermaid。',
+    publisher: publisher('bassnova42', 'bassnova42', 'https://github.com/bassnova42/arch-diagram-skill'),
+    owner: 'bassnova42',
+    repository: 'arch-diagram-skill',
+    commit: '879ca7fa503a64ab46b5bc77d2062ded32fadc84',
+    subpath: 'skills/arch-diagram',
+    skillNames: ['arch-diagram'],
+    license: 'MIT',
+    categories: ['visualization'],
+    usage: {
+      howToUse: '安装后直接描述要分析的仓库、文章、PDF 或本地项目，再指定输出 HTML、PNG、Mermaid、MP4 或 GIF。需要调整时，修改生成的 spec.json 后重新运行构建或导出。',
+      requirements: ['Node.js ≥18', 'Chrome/Chromium/Edge', '生成 MP4/GIF 时需要 ffmpeg'],
+      examples: ['把 https://github.com/plausible/analytics 画成架构图', '把这篇文章画成流程图并输出 30 秒视频', '把刚才的图输出成 Mermaid']
+    },
+    dependencies: [
+      { id: 'node', kind: 'runtime', requirement: 'Node.js >=18', optional: false, managedBy: 'user' },
+      { id: 'browser', kind: 'system', requirement: 'Chrome/Chromium/Edge', optional: false, managedBy: 'user' },
+      { id: 'ffmpeg', kind: 'system', requirement: 'ffmpeg（仅 MP4/GIF）', optional: true, managedBy: 'user' }
+    ]
+  })
 ]
 
 function npmMcpPackage(options: {
@@ -1227,7 +1315,7 @@ function managedPackage(
     permissions: [],
     auth: { type: 'tool-managed', provider: id },
     updatePolicy: SYSTEM_UPDATE,
-    availability: { status: 'managed', managedBy: 'WorkWise' },
+    availability: { status: 'managed', managedBy: 'RailWise AI' },
     installation: { ...SYSTEM_MANAGED_INSTALL, installedByDefault }
   })
 }
@@ -1265,7 +1353,7 @@ function managedSkillPackage(options: {
     permissions: options.permissions ?? [],
     auth: { type: 'none' },
     updatePolicy: SYSTEM_UPDATE,
-    availability: { status: 'managed', managedBy: 'WorkWise' },
+    availability: { status: 'managed', managedBy: 'RailWise AI' },
     installation: { ...SYSTEM_MANAGED_INSTALL, installedByDefault: true }
   })
 }
@@ -1300,9 +1388,83 @@ function pendingOauthRemote(
     availability: {
       status: 'unavailable',
       reasonCode: 'oauth-discovery-pending',
-      message: 'OAuth discovery is not available in WorkWise yet.'
+      message: 'OAuth discovery is not available in RailWise AI yet.'
     },
     installation: EXTERNAL_INSTALL
+  })
+}
+
+function githubSkillPackage(options: {
+  id: string
+  name: string
+  summary: string
+  publisher: PackagePublisherV1
+  owner: string
+  repository: string
+  commit: string
+  subpath?: string
+  skillNames: string[]
+  license: string
+  categories: string[]
+  dependencies?: PackageDependencyV1[]
+  usage?: MarketplacePackageV1['usage']
+}): MarketplacePackageV1 {
+  return definePackage({
+    id: options.id,
+    name: options.name,
+    summary: options.summary,
+    tier: 'advanced',
+    productType: 'workflow',
+    categories: options.categories,
+    version: options.commit,
+    publisher: options.publisher,
+    license: options.license,
+    source: {
+      kind: 'github',
+      location: `https://github.com/${options.owner}/${options.repository}`,
+      owner: options.owner,
+      repository: options.repository,
+      defaultBranch: 'main',
+      requestedRef: 'main',
+      resolvedRef: options.commit,
+      ...(options.subpath ? { subpath: options.subpath } : {})
+    },
+    additionalSources: [{
+      kind: 'github',
+      location: `https://github.com/${options.owner}/${options.repository}`,
+      owner: options.owner,
+      repository: options.repository,
+      defaultBranch: 'main',
+      requestedRef: 'main',
+      resolvedRef: options.commit
+    }],
+    components: [{
+      id: `${options.id}-skill`,
+      name: options.name,
+      type: 'skill',
+      skillNames: options.skillNames,
+      runtime: {
+        kind: 'github',
+        repository: `https://github.com/${options.owner}/${options.repository}`,
+        resolvedCommit: options.commit,
+        ...(options.subpath ? { subpath: options.subpath } : {}),
+        install: { strategy: 'managed-git', verifyBeforeActivation: true }
+      }
+    }],
+    permissions: [],
+    auth: { type: 'none' },
+    licenseEvidence: [{
+      license: options.license,
+      sourceId: `${options.id}-source-2`,
+      path: 'LICENSE',
+      includeInInstall: true,
+      required: true
+    }],
+    dependencies: options.dependencies ?? [],
+    usage: options.usage,
+    updatePolicy: MANUAL_UPDATE,
+    availability: { status: 'available' },
+    installation: DIRECT_MIRROR_INSTALL
   })
 }
 

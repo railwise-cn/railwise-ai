@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { lstat, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
@@ -62,6 +62,43 @@ describe('plugin archive security', () => {
 
     const reserved = await archive((zip) => zip.file('assets/CON.txt', 'x'))
     expect(() => inspectPluginArchive(reserved)).toThrow(/portable/i)
+  })
+
+  it('materializes safe internal links as regular files and directories', async () => {
+    const bytes = await archive((zip) => {
+      zip.file('repo/target.txt', 'target')
+      zip.file('repo/assets/icon.svg', '<svg/>')
+      zip.file('repo/assets/icons/', '')
+      zip.file('repo/assets/icons/icon.svg', '<svg/>')
+      zip.file('repo/link.txt', 'target.txt', { unixPermissions: 0o120777 })
+      zip.file('repo/demosrc', 'assets/icons', { unixPermissions: 0o120777 })
+    })
+    const output = await target()
+
+    const inspection = inspectPluginArchive(bytes, { allowInternalLinks: true })
+    expect(inspection.entries.filter((entry) => entry.symbolicLink)).toHaveLength(2)
+    await expect(extractPluginArchive(bytes, output, { allowInternalLinks: true })).resolves.toEqual(inspection)
+    await expect(readFile(join(output, 'repo/link.txt'), 'utf8')).resolves.toBe('target')
+    await expect(readFile(join(output, 'repo/demosrc/icon.svg'), 'utf8')).resolves.toBe('<svg/>')
+    await expect(lstat(join(output, 'repo/link.txt')).then((value) => value.isSymbolicLink())).resolves.toBe(false)
+    await expect(lstat(join(output, 'repo/demosrc')).then((value) => value.isSymbolicLink())).resolves.toBe(false)
+  })
+
+  it('rejects internal links that escape the archive or point to cycles', async () => {
+    const outside = await archive((zip) => {
+      zip.file('repo/link', '../../outside', { unixPermissions: 0o120777 })
+    })
+    const outsideOutput = await target()
+    await expect(extractPluginArchive(outside, outsideOutput, { allowInternalLinks: true }))
+      .rejects.toThrow(/escapes/i)
+
+    const cycle = await archive((zip) => {
+      zip.file('repo/a', 'b', { unixPermissions: 0o120777 })
+      zip.file('repo/b', 'a', { unixPermissions: 0o120777 })
+    })
+    const cycleOutput = await target()
+    await expect(extractPluginArchive(cycle, cycleOutput, { allowInternalLinks: true }))
+      .rejects.toThrow(/cycle|missing/i)
   })
 
   it('rejects declared decompression bombs before inflation', async () => {

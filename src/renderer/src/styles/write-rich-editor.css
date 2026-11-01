@@ -340,3 +340,61 @@
   border-radius: 3px;
   white-space: pre-wrap;
 }
+
+/* Advanced blocks remain source-backed; their preview DOM is never serialized. */
+.write-rich-advanced-body {
+  min-width: 0;
+  overflow-x: auto;
+}
+.write-rich-edit-advanced {
+  margin: 0.25rem 0 1rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--ds-border);
+  border-radius: 0.5rem;
+  background: var(--ds-panel);
+  color: var(--ds-text-muted);
+  font-size: 0.75rem;
+}
+.write-rich-edit-advanced:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+.write-math-block,
+.write-mermaid {
+  max-width: 100%;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+}
+.write-mermaid svg,
+.write-mermaid img[data-write-diagram-image] {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 3rem;
+  max-height: 70vh;
+}
+.write-mermaid img[data-write-diagram-image] {
+  background: #fff;
+  border-radius: 0.5rem;
+}
+.write-math-inline .katex,
+.cm-write-math-inline .katex {
+  white-space: nowrap;
+}
+.write-math-error,
+.write-advanced-error {
+  color: var(--ds-text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+.footnotes {
+  margin-top: 1rem;
+  font-size: 0.9em;
+}
+.footnote-backref {
+  margin-left: 0.25rem;
+}

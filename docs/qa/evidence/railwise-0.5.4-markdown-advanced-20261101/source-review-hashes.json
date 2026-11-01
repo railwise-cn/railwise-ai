@@ -1,0 +1,35 @@
+{
+  "review": "Independent AI senior engineer source review; no unresolved blocker for private candidate",
+  "tests": {
+    "files": 7,
+    "passed": 50
+  },
+  "files": {
+    "src/shared/write-advanced-markdown.ts": "5d62932861b83fd750eff393a74d246504d3c562c3bb9016fe714acba18967a4",
+    "src/shared/write-mermaid-policy.ts": "36dbff138561c6456db3ca30ea12376fcadafc87e01a672dc174dcd4c0208115",
+    "src/shared/write-mermaid-preview.ts": "14a8078def0515a118dd6cdace031cd1a8acae04a0109e69bb1eda948b535fad",
+    "src/main/services/write-math-omml.ts": "9488d1eeb6c5bbf69e4e5b090e8ac7554ed74dbc97892db462e02174605d87f0",
+    "src/main/services/write-advanced-renderer.ts": "b033d94aad90360e67a59fad03e10bc1f97f80c16fa65a9bc5b5e05b9f093d4b",
+    "src/main/services/write-mermaid-preview.ts": "10b9aa4c136d500d4681ffede553c7af8c36d09148b0b8514aa4b377f4fc02b6",
+    "src/main/services/write-docx-service.ts": "c906f0e96077d7c165f2dd0b8e77eee00ce1588941645fdc7d506af4c2d92789",
+    "src/main/services/write-export-service.ts": "be7191f2c14a787e0a2495267cd3154bade731a336f542d9d5246ade94ec095d",
+    "src/main/services/write-advanced-export.test.ts": "aaf8fa48783b6e93162bbea9ec50887c851837641f79165f5778e22013253013",
+    "src/main/ipc/app-ipc-schemas.ts": "d4029285cf2e146c9464a443ffeaf7d97b84ce6bf29345570fa06b62c7c59759",
+    "src/main/ipc/register-app-ipc-handlers.ts": "7d162e0e3075a54c67eccad9bc057f502f939cc35ad26b9614e031e276d859e3",
+    "src/preload/index.ts": "3639785ee473cd37972caefffd4ec802ec239bc81db715c1388cbb8f33b01ff6",
+    "src/shared/workwise-api.ts": "40d16b6ff27a56376b49b8e0da4524e4caba13c02f31b457d8f8274a58cb4256",
+    "src/renderer/src/write/write-advanced-rendering.ts": "f338a0fb646212d7e8472bdd41b3b9075570b1a343214ea806713b37c4b64d48",
+    "src/renderer/src/write/tiptap/write-rich-projection.ts": "c5989fd2d038576b53436caa1ccdc428f79e46cc7320f6c694e7f7edff0d1ce0",
+    "src/renderer/src/write/tiptap/WriteRichEditor.tsx": "1753ea91ea9637cc030ff8b4dcb1e314d5d6c0f1122eb60276700388e8a90b3d",
+    "src/renderer/src/components/write/WriteMarkdownPreview.tsx": "308c0a49201c9b247b74b770d7dc1eacb999425a4183c8c10a694e1d4f4c4528",
+    "src/renderer/src/write/markdown-live-widgets.ts": "abd1200628446eb20a9ec2c0596ea8affa6b520a8fb7a2c22225084d1c484dea",
+    "src/renderer/src/write/markdown-live-preview.ts": "5b0e1f30fdc473d0695f20793313e6d8dfce2e81ef376d1696385162e9a895cd",
+    "electron-builder.cjs": "9a60c74319ab390afee1ea4d347884332f233c03c4122d41adbd8ee743cc8b13",
+    "scripts/after-pack.cjs": "86454bd8c53fe7952e9732f3faed3cabef7ad2cf9621c02f1168c4c711cff043",
+    "scripts/verify-packaged-markdown-rendering.cjs": "a4e0dfb94c7b494139cc3d500d1afee9c2c7313309bf8c93bcf1a1511de77344",
+    "scripts/verify-document-dependencies.mjs": "cbc17dabaf17aeb3dbc74068664482dff427d01fb9476994ce0988aa9dde3897",
+    "package.json": "3839b035a3ad972f095bf9ed7797ca1aeacf4d7757f99aac71cbcc8f853b4884",
+    "package-lock.json": "9d1df3abcfc3bfe5967cb5ec27cec0b4865e002be4d25bb0c7962475ce8e4787"
+  },
+  "lockRepair": "Reviewed minimal24optional MITcanvas peer entries after npm10 CI lock validation failure; existing records unchanged"
+}

@@ -19,7 +19,7 @@ import {
   type WriteSettingsV1
 } from '@shared/app-settings'
 import type { WorkspaceEntry } from '@shared/workspace-file'
-import { isWriteWorkspaceEntry } from '@shared/write-text-file'
+import { isWriteImageFilePath, isWriteWorkspaceEntry, isWriteWorkspaceFilePath } from '@shared/write-text-file'
 import i18n from '../i18n'
 import type { WriteEditorSelectionState } from '../components/write/WriteMarkdownEditor'
 import {
@@ -43,7 +43,10 @@ export function readStoredPreviewMode(): WritePreviewMode {
 }
 
 export function readStoredAssistantOpen(): boolean {
-  return readBrowserStorageItem(WRITE_ASSISTANT_OPEN_KEY) !== '0'
+  // Writing starts in a document-first layout.  The assistant is still one
+  // click away, but it should not consume the editor's horizontal space until
+  // the user asks for it (or quotes a selection).
+  return readBrowserStorageItem(WRITE_ASSISTANT_OPEN_KEY) === '1'
 }
 
 export function readStoredAssistantModel(): string {
@@ -228,6 +231,48 @@ export function readRememberedActiveFile(workspaceRoot: string): string {
   return readBrowserStorageItem(activeFileStorageKey(workspaceRoot)) ?? ''
 }
 
+type WriteWorkspaceSession = Pick<WriteWorkspaceState, 'tabs' | 'activeTabId' | 'recentlyClosedTabs' | 'recentlyOpenedTabs'>
+
+export function workspaceSessionStorageKey(workspaceRoot: string): string {
+  return `workwise.write.document-session.v1:${normalizePath(workspaceRoot)}`
+}
+
+export function rememberWorkspaceSession(workspaceRoot: string, state: WriteWorkspaceSession): void {
+  if (!workspaceRoot.trim()) return
+  // Persist document identities only. Markdown remains authoritative on disk.
+  writeBrowserStorageItem(workspaceSessionStorageKey(workspaceRoot), JSON.stringify({ version: 1, ...state }))
+}
+
+export function readWorkspaceSession(workspaceRoot: string): WriteWorkspaceSession | null {
+  try {
+    const raw = JSON.parse(readBrowserStorageItem(workspaceSessionStorageKey(workspaceRoot)) || 'null')
+    if (raw?.version !== 1 || !Array.isArray(raw.tabs)) return null
+    const safePath = (value: unknown): value is string => typeof value === 'string' &&
+      normalizePath(value).startsWith(`${normalizePath(workspaceRoot)}/`) &&
+      !normalizePath(value).split('/').some((part) => part === '.' || part === '..') && isWriteWorkspaceFilePath(value)
+    const kindForPath = (path: string): 'text' | 'image' => isWriteImageFilePath(path) ? 'image' : 'text'
+    const seen = new Set<string>()
+    const tabs = raw.tabs.filter((tab: { path?: unknown }) => {
+      if (!safePath(tab?.path) || seen.has(normalizePath(tab.path))) return false
+      seen.add(normalizePath(tab.path))
+      return true
+    }).map((tab: { path: string; pinned?: boolean; openedAt?: number }) => ({
+      id: normalizePath(tab.path), path: normalizePath(tab.path), kind: kindForPath(tab.path),
+      pinned: tab.pinned === true, openedAt: Number.isFinite(tab.openedAt) ? tab.openedAt! : 0
+    }))
+    return {
+      tabs,
+      activeTabId: typeof raw.activeTabId === 'string' && tabs.some((tab: { id: string }) => tab.id === raw.activeTabId) ? raw.activeTabId : tabs[0]?.id ?? null,
+      recentlyClosedTabs: Array.isArray(raw.recentlyClosedTabs) ? raw.recentlyClosedTabs
+        .filter((tab: { path?: unknown }) => safePath(tab?.path)).slice(0, 12)
+        .map((tab: { path: string; closedAt?: number }) => ({ path: normalizePath(tab.path), kind: kindForPath(tab.path), closedAt: Number.isFinite(tab.closedAt) ? tab.closedAt! : 0 })) : [],
+      recentlyOpenedTabs: Array.isArray(raw.recentlyOpenedTabs) ? raw.recentlyOpenedTabs
+        .filter((tab: { path?: unknown }) => safePath(tab?.path)).slice(0, 50)
+        .map((tab: { path: string; openedAt?: number }) => ({ path: normalizePath(tab.path), kind: kindForPath(tab.path), openedAt: Number.isFinite(tab.openedAt) ? tab.openedAt! : 0 })) : []
+    }
+  } catch { return null }
+}
+
 export function emptySelection(): WriteEditorSelectionState {
   return { text: '', ranges: [], charCount: 0 }
 }
@@ -271,11 +316,18 @@ export function initialState(): Pick<
   | 'treeError'
   | 'activeFilePath'
   | 'activeFileKind'
+  | 'tabs'
+  | 'activeTabId'
+  | 'recentlyClosedTabs'
+  | 'recentlyOpenedTabs'
   | 'fileContent'
   | 'imageDataUrl'
   | 'imageMimeType'
   | 'fileSize'
   | 'fileTruncated'
+  | 'documentRevision'
+  | 'documentBaselineKnown'
+  | 'documentConflict'
   | 'fileError'
   | 'fileLoading'
   | 'saveStatus'
@@ -293,11 +345,18 @@ export function initialState(): Pick<
     treeError: null,
     activeFilePath: null,
     activeFileKind: null,
+    tabs: [],
+    activeTabId: null,
+    recentlyClosedTabs: [],
+    recentlyOpenedTabs: [],
     fileContent: '',
     imageDataUrl: '',
     imageMimeType: '',
     fileSize: 0,
     fileTruncated: false,
+    documentRevision: null,
+    documentBaselineKnown: false,
+    documentConflict: null,
     fileError: null,
     fileLoading: false,
     saveStatus: 'saved',

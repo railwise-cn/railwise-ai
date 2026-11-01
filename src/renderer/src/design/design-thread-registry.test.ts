@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { BrowserStorageLike } from '../lib/browser-storage'
 import {
   activeDesignDocumentForWorkspace,
+  clearActiveDesignDocument,
   designAssistantThreadIdForDocument,
   consumeRequestedDesignDocument,
   designDocumentIdForAssistantThread,
@@ -77,5 +78,16 @@ describe('Design assistant thread registry', () => {
     const storage = memoryStorage()
     storage.setItem('workwise.design.activeDocumentByWorkspace.v1', '{broken')
     expect(activeDesignDocumentForWorkspace('/workspace/one', storage)).toBe('')
+  })
+
+  it('clears only the active document for the closed workspace', () => {
+    const storage = memoryStorage()
+    rememberActiveDesignDocument('/workspace/one', 'doc-one', storage)
+    rememberActiveDesignDocument('/workspace/two', 'doc-two', storage)
+
+    clearActiveDesignDocument('/workspace/one', storage)
+
+    expect(activeDesignDocumentForWorkspace('/workspace/one', storage)).toBe('')
+    expect(activeDesignDocumentForWorkspace('/workspace/two', storage)).toBe('doc-two')
   })
 })

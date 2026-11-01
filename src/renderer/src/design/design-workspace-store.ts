@@ -20,6 +20,7 @@ import {
 import type {
   DesignCanvasCommandAckV1,
   DesignCanvasCommandV1,
+  DesignCanvasElementPatch,
   DesignCanvasOperation
 } from '@shared/design-workspace'
 import {
@@ -201,6 +202,19 @@ function updateElementInPage(
   return { ...page, elements: recalculateGroupBounds(elements) }
 }
 
+function canUpdateElement(page: DesignPage, elementId: string, patch: Partial<DesignElement> | DesignCanvasElementPatch): boolean {
+  const target = page.elements.find((element) => element.id === elementId)
+  if (!target) return false
+  if (!target.locked) return true
+  return patch.locked === false && Object.keys(patch).every((key) => key === 'locked')
+}
+
+function hasLockedDescendant(page: DesignPage, element: DesignElement): boolean {
+  if (element.type !== 'group') return false
+  return collectDesignDescendantIds(page.elements, element.childIds ?? [])
+    .some((id) => page.elements.find((item) => item.id === id)?.locked)
+}
+
 function removeElementsFromPage(page: DesignPage, rootIds: ReadonlyArray<string>): DesignPage {
   const removeIds = new Set(collectDesignDescendantIds(page.elements, rootIds))
   let elements = page.elements
@@ -339,7 +353,8 @@ function applyCanvasOperations(
       nextPage = { ...nextPage, elements: [...nextPage.elements, normalized] }
       selectedIds = [normalized.id]
     } else if (operation.kind === 'update') {
-      if (!nextPage.elements.some((element) => element.id === operation.elementId)) return null
+      const target = nextPage.elements.find((element) => element.id === operation.elementId)
+      if (!target || !canUpdateElement(nextPage, target.id, operation.patch) || (target.type === 'group' && hasLockedDescendant(nextPage, target))) return null
       const forbidden = ['id', 'type', 'childIds', 'imageAssetId'] as const
       const { fill, stroke, ...remainingPatch } = operation.patch
       const patch: Partial<DesignElement> = {
@@ -351,14 +366,26 @@ function applyCanvasOperations(
       nextPage = updateElementInPage(nextPage, operation.elementId, patch)
       selectedIds = [operation.elementId]
     } else if (operation.kind === 'remove') {
+      if (operation.elementIds.some((id) => {
+        const element = nextPage.elements.find((item) => item.id === id)
+        return element ? Boolean(element.locked || hasLockedDescendant(nextPage, element)) : false
+      })) return null
       nextPage = removeElementsFromPage(nextPage, operation.elementIds)
       selectedIds = []
     } else if (operation.kind === 'group') {
+      if (operation.elementIds.some((id) => {
+        const element = nextPage.elements.find((item) => item.id === id)
+        return element ? Boolean(element.locked || hasLockedDescendant(nextPage, element)) : true
+      })) return null
       const result = groupElements(nextPage, operation.elementIds, operation.name)
       if (!result.groupId) return null
       nextPage = result.page
       selectedIds = [result.groupId]
     } else {
+      if (operation.groupIds.some((id) => {
+        const element = nextPage.elements.find((item) => item.id === id)
+        return element ? Boolean(element.locked || hasLockedDescendant(nextPage, element)) : true
+      })) return null
       const result = ungroupElements(nextPage, operation.groupIds)
       nextPage = result.page
       selectedIds = result.childIds
@@ -381,6 +408,7 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
   ): void => {
     const { document, activePageId } = get()
     if (!document || !activePageId) return
+    if (document.pages.find((page) => page.id === activePageId)?.displayMode === 'fidelity') return
     const pages = document.pages.map((page) => page.id === activePageId ? updater(page) : page)
     set({
       document: touchDocument(document, pages),
@@ -633,24 +661,34 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
       get().addElement(element)
     },
     updateElement: (elementId, patch) => {
-      if (!get().getActivePage()?.elements.some((element) => element.id === elementId)) return
+      const page = get().getActivePage()
+      const target = page?.elements.find((element) => element.id === elementId)
+      if (!page || !target || !canUpdateElement(page, elementId, patch) || (target.type === 'group' && hasLockedDescendant(page, target))) return
       commitBeforeChange()
       updateActivePage((page) => updateElementInPage(page, elementId, patch))
     },
     updateSelectedElements: (patch) => {
-      const ids = get().selectedElementIds
+      const page = get().getActivePage()
+      if (!page) return
+      const ids = topLevelSelection(page.elements, get().selectedElementIds)
+        .filter((id) => {
+          const element = page.elements.find((item) => item.id === id)
+          return Boolean(element && canUpdateElement(page, id, patch) && !(element.type === 'group' && hasLockedDescendant(page, element)))
+        })
       if (ids.length === 0) return
       commitBeforeChange()
       updateActivePage((page) => {
         let next = page
-        for (const id of topLevelSelection(page.elements, ids)) {
+        for (const id of ids) {
           next = updateElementInPage(next, id, patch)
         }
         return next
       })
     },
     removeElement: (elementId) => {
-      if (!get().getActivePage()?.elements.some((element) => element.id === elementId)) return
+      const page = get().getActivePage()
+      const target = page?.elements.find((element) => element.id === elementId)
+      if (!page || !target || target.locked || hasLockedDescendant(page, target)) return
       commitBeforeChange()
       updateActivePage(
         (page) => removeElementsFromPage(page, [elementId]),
@@ -658,7 +696,12 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
       )
     },
     removeSelectedElements: () => {
-      const ids = get().selectedElementIds
+      const page = get().getActivePage()
+      if (!page) return
+      const ids = topLevelSelection(page.elements, get().selectedElementIds).filter((id) => {
+        const element = page.elements.find((item) => item.id === id)
+        return Boolean(element && !element.locked && !hasLockedDescendant(page, element))
+      })
       if (ids.length === 0) return
       commitBeforeChange()
       updateActivePage((page) => removeElementsFromPage(page, ids), [])
@@ -666,7 +709,11 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
     groupSelectedElements: () => {
       const page = get().getActivePage()
       if (!page) return
-      const result = groupElements(page, get().selectedElementIds)
+      const ids = topLevelSelection(page.elements, get().selectedElementIds).filter((id) => {
+        const element = page.elements.find((item) => item.id === id)
+        return Boolean(element && !element.locked && !hasLockedDescendant(page, element))
+      })
+      const result = groupElements(page, ids)
       if (!result.groupId) return
       commitBeforeChange()
       updateActivePage(() => result.page, [result.groupId])
@@ -675,7 +722,10 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
       const page = get().getActivePage()
       if (!page) return
       const groupIds = get().selectedElementIds.filter(
-        (id) => page.elements.find((element) => element.id === id)?.type === 'group'
+        (id) => {
+          const element = page.elements.find((item) => item.id === id)
+          return element?.type === 'group' && !element.locked && !hasLockedDescendant(page, element)
+        }
       )
       if (groupIds.length === 0) return
       commitBeforeChange()
@@ -727,6 +777,9 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
       const page = get().getActivePage()
       if (!page || command.operations.length === 0 || command.operations.length > 64) {
         return { ...base, ok: false, code: 'invalid_command', message: 'Design command is invalid.' }
+      }
+      if (page.displayMode === 'fidelity') {
+        return { ...base, ok: false, code: 'operation_failed', message: 'Reference mode is read-only. Switch to editing before applying a command.' }
       }
       const applied = applyCanvasOperations(page, command.operations)
       if (!applied) {

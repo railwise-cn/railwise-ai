@@ -1,0 +1,2 @@
+/Users/wangjiawei/Documents/WorkWise/dist/railwise-0.5.4-markdown-workbench-private-final/Applications/RailWise AI Candidate 1864d44d23f5.app: accepted
+override=security disabled

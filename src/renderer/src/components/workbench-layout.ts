@@ -16,6 +16,8 @@ const RIGHT_PANEL_WIDTH_KEY = 'workwise.layout.rightInspectorWidth'
 const RIGHT_PANEL_MODE_KEY = 'workwise.layout.rightPanelMode'
 const LEFT_PANEL_DEFAULT = 304
 const RIGHT_PANEL_DEFAULT = 360
+const WRITE_ASSISTANT_MIN = 320
+const WRITE_ASSISTANT_MAX = 420
 export const CODE_PANEL_PREFERRED = 560
 const LEFT_PANEL_MIN = 280
 const LEFT_PANEL_MAX = 480
@@ -177,7 +179,11 @@ export function useWorkbenchLayout({
     : rightPanelMode !== null
 
   useEffect(() => {
-    if (route !== 'write' || !rightPanelVisible) return
+    if (!rightPanelVisible) return
+    if (route === 'write') {
+      setRightSidebarWidth((width) => clampWidth(width, WRITE_ASSISTANT_MIN, WRITE_ASSISTANT_MAX))
+      return
+    }
     setRightSidebarWidth((width) => Math.max(width, 480))
   }, [rightPanelVisible, route])
 

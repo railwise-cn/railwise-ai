@@ -74,10 +74,15 @@ class PictureResult:
     # the SVG. Filename is the basename inside the package's media dir.
     media: dict[str, bytes] = field(default_factory=dict)
     diagnostics: tuple[PictureDiagnostic, ...] = ()
+    external_linked: bool = False
 
 
 class MediaResolutionError(RuntimeError):
     """Raised when a PPTX media relationship cannot be reproduced as SVG."""
+
+
+class LinkedImageResolutionError(MediaResolutionError):
+    """Raised when an external linked image has no embedded preview."""
 
 
 def convert_blip_fill(
@@ -86,7 +91,7 @@ def convert_blip_fill(
     slide_part: PartRef,
     pkg: OoxmlPackage,
     *,
-    media_subdir: str = "assets",
+    media_subdir: str = "images",
     embed_inline: bool = False,
     asset_name_map: dict[str, str] | None = None,
     strict: bool = False,
@@ -99,16 +104,22 @@ def convert_blip_fill(
     """
     blip = blip_fill_elem.find("a:blip", NS)
     if blip is None:
-        return PictureResult()
+        return _missing_picture_result("Picture fill has no a:blip source", strict)
 
     relationship_ids = blip_embed_relationship_ids(blip)
     linked_rid = blip.attrib.get(f"{{{NS['r']}}}link")
+    linked_relationship = slide_part.rels.get(linked_rid or "", {})
+    external_linked = linked_relationship.get("external") == "1"
     if not relationship_ids:
-        if linked_rid:
-            raise MediaResolutionError(
+        if external_linked:
+            raise LinkedImageResolutionError(
                 "Linked image relationships are not supported; embed the image in PowerPoint first"
             )
-        return PictureResult()
+        if linked_rid:
+            raise MediaResolutionError(
+                "Linked image relationship cannot be resolved; embed the image in PowerPoint first"
+            )
+        return _missing_picture_result("Picture source has no embedded image relationship", strict)
 
     target: str | None = None
     img_bytes: bytes | None = None
@@ -130,7 +141,12 @@ def convert_blip_fill(
         break
     if target is None or img_bytes is None:
         details = "; ".join(failures)
-        raise MediaResolutionError(
+        error_type = (
+            LinkedImageResolutionError
+            if external_linked
+            else MediaResolutionError
+        )
+        raise error_type(
             f"No embedded image relationship can be read in {slide_part.path}: {details}"
         )
 
@@ -138,6 +154,12 @@ def convert_blip_fill(
     filename, img_bytes = _normalize_office_media(filename, img_bytes)
     tile_source_bytes = img_bytes
     diagnostics = list(_unsupported_blip_effect_diagnostics(blip))
+    if xfrm.w <= 0 or xfrm.h <= 0:
+        diagnostics.append(PictureDiagnostic(
+            code="picture-degenerate-frame",
+            message=f"Picture has a nonpositive source frame: {xfrm.w} x {xfrm.h}",
+            fallback="retain the source image and exact frame; no positive frame is invented",
+        ))
     filename, img_bytes, effect_diagnostics = _apply_blip_image_effects(
         filename,
         img_bytes,
@@ -153,7 +175,17 @@ def convert_blip_fill(
 
     # srcRect: l/t/r/b in 1/100000ths (so 50000 = 50%).
     src_rect = blip_fill_elem.find("a:srcRect", NS)
-    crop = _parse_src_rect(src_rect)
+    try:
+        crop = _parse_src_rect(src_rect)
+    except ValueError as exc:
+        if strict:
+            raise
+        diagnostics.append(PictureDiagnostic(
+            code="picture-crop-omitted",
+            message=str(exc),
+            fallback="retain the complete source image; the invalid crop cannot be reproduced",
+        ))
+        crop = None
 
     # A tile larger than its frame is visually a crop, not a stretch. Preserve
     # that common PowerPoint background construction through the same nested
@@ -196,6 +228,7 @@ def convert_blip_fill(
         svg=svg,
         media=media,
         diagnostics=tuple(diagnostics),
+        external_linked=external_linked,
     )
 
 
@@ -205,7 +238,7 @@ def convert_picture(
     slide_part: PartRef,
     pkg: OoxmlPackage,
     *,
-    media_subdir: str = "assets",
+    media_subdir: str = "images",
     embed_inline: bool = False,
     asset_name_map: dict[str, str] | None = None,
     strict: bool = False,
@@ -213,7 +246,7 @@ def convert_picture(
     """Translate <p:pic> to SVG <image> (or nested <svg>+<image> for cropping)."""
     blip_fill = pic_elem.find("p:blipFill", NS)
     if blip_fill is None:
-        return PictureResult()
+        return _missing_picture_result("Picture has no p:blipFill source", strict)
 
     return convert_blip_fill(
         blip_fill, xfrm, slide_part, pkg,
@@ -227,6 +260,17 @@ def convert_picture(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _missing_picture_result(message: str, strict: bool) -> PictureResult:
+    """Report an unrecoverable picture source before omitting its empty preview."""
+    if strict:
+        raise MediaResolutionError(message)
+    return PictureResult(diagnostics=(PictureDiagnostic(
+        code="picture-omitted",
+        message=message,
+        fallback="omit the unavailable picture preview; no replacement image is invented",
+    ),))
 
 
 def _blip_opacity_attr(
@@ -370,10 +414,10 @@ def _parse_src_rect(elem: ET.Element | None) -> tuple[float, float, float, float
         return None
     vb_x = l
     vb_y = t
-    vb_w = max(0.0, 1.0 - l - r)
-    vb_h = max(0.0, 1.0 - t - b)
+    vb_w = 1.0 - l - r
+    vb_h = 1.0 - t - b
     if vb_w <= 0 or vb_h <= 0:
-        return None
+        raise ValueError("Picture crop has a nonpositive source rectangle")
     return vb_x, vb_y, vb_w, vb_h
 
 
@@ -614,9 +658,12 @@ def _pct_attr(elem: ET.Element, name: str) -> float:
     if val is None:
         return 0.0
     try:
-        return float(val) / 100000.0
+        value = float(val) / 100000.0
     except ValueError:
-        return 0.0
+        raise ValueError(f"Invalid picture crop {name}={val!r}") from None
+    if not math.isfinite(value):
+        raise ValueError(f"Invalid picture crop {name}={val!r}")
+    return value
 
 
 def _build_href(filename: str, img_bytes: bytes, subdir: str, embed: bool) -> str:

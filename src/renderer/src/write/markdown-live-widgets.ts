@@ -4,6 +4,8 @@ import {
   highlightCodeHtml,
   renderFallbackCodeHtml
 } from '../lib/code-highlighting'
+import { renderWriteMath, hydrateWriteAdvancedDiagrams } from './write-advanced-rendering'
+import { renderWriteMermaidPlaceholder } from '@shared/write-advanced-markdown'
 
 export type BlockRange = {
   from: number
@@ -148,7 +150,8 @@ export class ImageWidget extends WidgetType {
     private src: string,
     private alt: string,
     private from: number,
-    private localPath?: string
+    private localPath?: string,
+    private workspaceRoot?: string
   ) {
     super()
   }
@@ -157,7 +160,7 @@ export class ImageWidget extends WidgetType {
     return other.src === this.src &&
       other.alt === this.alt &&
       other.from === this.from &&
-      other.localPath === this.localPath
+      other.localPath === this.localPath && other.workspaceRoot === this.workspaceRoot
   }
 
   toDOM(view: EditorView): HTMLElement {
@@ -176,7 +179,7 @@ export class ImageWidget extends WidgetType {
     image.loading = 'lazy'
     wrapper.appendChild(image)
     if (this.localPath && typeof window.workwise?.readWorkspaceImage === 'function') {
-      void window.workwise.readWorkspaceImage({ path: this.localPath })
+      void window.workwise.readWorkspaceImage({ path: this.localPath, ...(this.workspaceRoot ? { workspaceRoot: this.workspaceRoot } : {}) })
         .then((result) => {
           if (result.ok) {
             image.src = result.dataUrl
@@ -391,7 +394,8 @@ export class CodeBlockWidget extends WidgetType {
     body.className = 'cm-write-md-code-block-body'
     const html = document.createElement('div')
     html.className = 'cm-write-md-code-block-html'
-    html.innerHTML = renderFallbackCodeHtml(this.block.code)
+    const advanced = /^(?:mermaid|math|latex)$/i.test(this.block.language)
+    html.innerHTML = /^mermaid$/i.test(this.block.language) ? renderWriteMermaidPlaceholder(this.block.code) : advanced ? renderWriteMath(this.block.code, true) : renderFallbackCodeHtml(this.block.code)
     body.appendChild(html)
     wrapper.appendChild(body)
 
@@ -401,12 +405,26 @@ export class CodeBlockWidget extends WidgetType {
       this.editSourceAtClick(view, event, html)
     })
 
-    void highlightCodeHtml(this.block.code, this.block.language).then((nextHtml) => {
+    if (/^mermaid$/i.test(this.block.language)) void hydrateWriteAdvancedDiagrams(html)
+    if (!advanced) void highlightCodeHtml(this.block.code, this.block.language).then((nextHtml) => {
       if (!wrapper.isConnected) return
       html.innerHTML = nextHtml
     })
 
     return wrapper
+  }
+}
+
+export class MathInlineWidget extends WidgetType {
+  constructor(private source: string, private from: number) { super() }
+  eq(other: MathInlineWidget): boolean { return this.source === other.source && this.from === other.from }
+  toDOM(view: EditorView): HTMLElement {
+    const element = document.createElement('span')
+    element.className = 'cm-write-math-inline'
+    element.innerHTML = renderWriteMath(this.source, false)
+    element.title = 'Click to edit formula'
+    element.addEventListener('mousedown', (event) => { if (!isPrimaryMouseDown(event)) return; preventEditorMouseHandling(event); focusSourceAt(view, this.from) })
+    return element
   }
 }
 

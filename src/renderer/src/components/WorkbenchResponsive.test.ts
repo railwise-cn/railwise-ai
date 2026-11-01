@@ -22,6 +22,17 @@ describe('Workbench responsive panel contract', () => {
     expect(baseShell).not.toMatch(/\.ds-workbench-divider:hover::(before|after)/)
   })
 
+  it('keeps the composer dock transparent while preserving the composer surface', async () => {
+    const nodeFs = 'node:fs/promises'
+    const { readFile } = await import(/* @vite-ignore */ nodeFs)
+    const baseShell = await readFile(new URL('../styles/base-shell.css', import.meta.url), 'utf8')
+
+    expect(baseShell).toMatch(
+      /\.ds-chat-composer-dock\s*\{[\s\S]*background:\s*transparent;[\s\S]*\}/
+    )
+    expect(baseShell).toMatch(/\.ds-chat-composer\s*\{[\s\S]*background:\s*rgba\(255, 255, 255, 0\.97\);/)
+  })
+
   it('routes notification clicks to the requested chat thread', async () => {
     const nodeFs = 'node:fs/promises'
     const { readFile } = await import(/* @vite-ignore */ nodeFs)

@@ -1,0 +1,192 @@
+{
+  "failedRun": {
+    "id": 41289594352,
+    "head": "7d22ae2a096be1c2a06257705d9056012a2b9664",
+    "stage": "npm ci",
+    "signingReached": false,
+    "reason": "npm10 detected missing optional canvas peer lock entries from new PPTX dependency graph"
+  },
+  "repair": {
+    "packageJsonChanged": false,
+    "existingPackageRecordsChanged": 0,
+    "addedRecords": [
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-android-arm64",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-darwin-arm64",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-darwin-x64",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-linux-arm-gnueabihf",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-linux-arm64-gnu",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-linux-arm64-musl",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-linux-riscv64-gnu",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-linux-x64-gnu",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-linux-x64-musl",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-win32-arm64-msvc",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/ooxml-ui/node_modules/@napi-rs/canvas-win32-x64-msvc",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-android-arm64",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-darwin-arm64",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-darwin-x64",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-linux-arm-gnueabihf",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-linux-arm64-gnu",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-linux-arm64-musl",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-linux-riscv64-gnu",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-linux-x64-gnu",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-linux-x64-musl",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-win32-arm64-msvc",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      },
+      {
+        "path": "node_modules/pptx-vanilla-viewer/node_modules/@napi-rs/canvas-win32-x64-msvc",
+        "version": "1.1.0",
+        "license": "MIT",
+        "optional": true,
+        "peer": true
+      }
+    ],
+    "lockSha256": "9d1df3abcfc3bfe5967cb5ec27cec0b4865e002be4d25bb0c7962475ce8e4787"
+  },
+  "validation": {
+    "node": "22.23.1",
+    "npm": "10.9.4",
+    "command": "npm ci --dry-run --ignore-scripts --offline --no-audit --no-fund",
+    "exitCode": 0,
+    "nativeDependenciesModifiedLocally": false
+  },
+  "nativePackagingReview": "Optional canvas1.1.0 adds target-specific Darwin arm64 Node-API binaries alongside existing canvas0.1.100; OS/CPU metadata limits install. electron-builder native collection/signature/notary and packaged native checks remain mandatory; a dry run is not native acceptance."
+}

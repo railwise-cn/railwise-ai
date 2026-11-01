@@ -1,0 +1,3 @@
+# Frozen checkpoint whitespace exceptions
+
+The full committed diff whitespace check includes unchanged raw acceptance evidence list-marker trailing spaces in `screenshots/03-twenty-one-tabs.ax.txt`, `04-search-results.ax.txt`, and `06-restart-tabs.ax.txt` from the earlier Markdown workbench evidence, and a final blank line in the preexisting new PPTX shared contracts `src/shared/pptx-document.ts` and `src/shared/pptx-editor-adapter.ts`. The root agent authorized preserving the exact reviewed checkpoint and original raw captures. No advanced Markdown source whitespace violation was found. This is a scoped nonfunctional exception, not a blanket pass of the full diff check.

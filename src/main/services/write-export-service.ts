@@ -1,15 +1,15 @@
 import { app, BrowserWindow, clipboard, dialog } from 'electron'
 import type { ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { createElement, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import { pathToFileURL } from 'node:url'
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { createWriteMarkdownIt } from '../../shared/write-advanced-markdown'
 import type {
   WriteExportFormat,
   WriteExportPayload,
@@ -21,7 +21,10 @@ import { resolveWriteMarkdownResource } from '../../shared/write-markdown-resour
 import type { ExportStyleTemplate } from '../../shared/write-export-templates'
 import { resolveWorkspaceFile } from './workspace-service'
 import { buildDocxFromMarkdown } from './write-docx-service'
+import { parseMarkdownFrontmatter } from './write-document-service'
+import { readWriteImageResource } from './write-image-resource'
 import { resolveExportTemplate } from './write-docx-styles'
+import { loadWriteMathExportCss, renderWriteMermaidDiagrams } from './write-advanced-renderer'
 import {
   legacyConverterRoot,
   legacyMarkdownConverterPath,
@@ -208,6 +211,14 @@ const EXPORT_CSS = `
     margin: 1rem auto;
   }
 
+  .write-math-block { overflow-x: auto; margin: 1em 0; }
+  .write-math-error, .katex-error { color: #9b1c1c; white-space: pre-wrap; }
+  .write-mermaid { margin: 1em 0; break-inside: avoid; }
+  .write-mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
+  .write-mermaid-error { color: #9b1c1c; font-size: .9em; }
+  .footnotes { margin-top: 2em; font-size: .9em; }
+  .footnote-ref { font-size: .8em; }
+
   .markdown-body h1,
   .markdown-body h2,
   .markdown-body h3,
@@ -360,17 +371,6 @@ function runCommand(
     }))
 }
 
-function mimeTypeForPath(filePath: string): string | null {
-  const extension = extname(filePath).toLowerCase()
-  if (extension === '.png') return 'image/png'
-  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg'
-  if (extension === '.gif') return 'image/gif'
-  if (extension === '.webp') return 'image/webp'
-  if (extension === '.bmp') return 'image/bmp'
-  if (extension === '.svg') return 'image/svg+xml'
-  return null
-}
-
 function ensureExportExtension(targetPath: string, format: WriteExportFormat): string {
   const extension = exportExtension(format)
   return extname(targetPath).trim() ? targetPath : `${targetPath}${extension}`
@@ -380,21 +380,10 @@ function defaultExportPath(sourcePath: string, format: WriteExportFormat): strin
   return join(dirname(sourcePath), `${basenameWithoutExtension(sourcePath)}${exportExtension(format)}`)
 }
 
-async function localFileUrlToDataUri(value: string): Promise<string | null> {
-  try {
-    const parsed = new URL(value)
-    if (parsed.protocol !== 'file:') return null
-    const filePath = fileURLToPath(parsed)
-    const mimeType = mimeTypeForPath(filePath)
-    if (!mimeType) return null
-    const buffer = await readFile(filePath)
-    return `data:${mimeType};base64,${buffer.toString('base64')}`
-  } catch {
-    return null
-  }
-}
-
-export async function inlineLocalImagesInHtml(html: string): Promise<string> {
+export async function inlineLocalImagesInHtml(html: string, sourcePath?: string, workspaceRoot?: string): Promise<string> {
+  // React 19 emits eager image preload links during static rendering. The image src is
+  // validated below; generated preload URLs must not bypass that same resource policy.
+  html = html.replace(/<link\b[^>]*\brel="preload"[^>]*\bas="image"[^>]*\/?\s*>/gi, '')
   const matches = [...html.matchAll(LOCAL_IMAGE_PATTERN)]
   if (matches.length === 0) return html
 
@@ -403,14 +392,13 @@ export async function inlineLocalImagesInHtml(html: string): Promise<string> {
     matches.map(async (match) => {
       const rawSrc = match[2]
       if (!rawSrc || replacements.has(rawSrc)) return
-      const dataUri = await localFileUrlToDataUri(rawSrc)
-      if (dataUri) replacements.set(rawSrc, dataUri)
+      const image = sourcePath ? await readWriteImageResource({ src: rawSrc.replaceAll('&amp;', '&'), sourcePath, workspaceRoot }) : null
+      replacements.set(rawSrc, image ? `data:${image.mimeType};base64,${image.data.toString('base64')}` : '')
     })
   )
 
-  if (replacements.size === 0) return html
   return html.replace(LOCAL_IMAGE_PATTERN, (fullMatch, prefix, rawSrc, suffix) => {
-    return `${prefix}${replacements.get(rawSrc) ?? rawSrc}${suffix}`
+    return `${prefix}${replacements.get(rawSrc) ?? ''}${suffix}`
   })
 }
 
@@ -426,52 +414,48 @@ function renderPlainTextFragment(content: string): string {
   )
 }
 
-function renderMarkdownFragment(content: string, sourcePath: string): string {
-  return renderToStaticMarkup(
-    createElement(
-      ReactMarkdown,
-      {
-        remarkPlugins: [remarkGfm],
-        components: {
-          a: ({
-            href,
-            children,
-            ...props
-          }: ComponentPropsWithoutRef<'a'> & { href?: string; children?: ReactNode }): ReactNode =>
-            createElement(
-              'a',
-              {
-                ...props,
-                href: resolveWriteMarkdownResource(href, sourcePath) ?? href
-              },
-              children
-            ),
-          img: ({
-            src,
-            alt,
-            ...props
-          }: ComponentPropsWithoutRef<'img'> & { src?: string; alt?: string | null }): ReactNode =>
-            createElement('img', {
-              ...props,
-              src: resolveWriteMarkdownResource(src, sourcePath),
-              alt: alt ?? ''
-            })
-        }
-      },
-      content
-    )
-  )
+async function renderMarkdownFragment(content: string, sourcePath: string): Promise<string> {
+  const markdown = createWriteMarkdownIt({ html: false, linkify: false })
+  const link = markdown.renderer.rules.link_open ?? ((tokens, index, options, _env, renderer) => renderer.renderToken(tokens, index, options))
+  markdown.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
+    const href = tokens[index].attrGet('href')
+    if (href && !href.startsWith('#')) tokens[index].attrSet('href', resolveWriteMarkdownResource(href, sourcePath) ?? href)
+    return link(tokens, index, options, env, renderer)
+  }
+  const image = markdown.renderer.rules.image!
+  markdown.renderer.rules.image = (tokens, index, options, env, renderer) => {
+    const src = tokens[index].attrGet('src') ?? ''
+    tokens[index].attrSet('src', /^https?:\/\//i.test(src) || /^data:/i.test(src) ? '' : resolveWriteMarkdownResource(src, sourcePath) ?? '')
+    return image(tokens, index, options, env, renderer)
+  }
+  let fragment = markdown.render(content)
+  const placeholders = [...fragment.matchAll(/<div class="write-mermaid" data-write-mermaid="([^"]*)"><pre>[\s\S]*?<\/pre><\/div>/g)]
+  if (placeholders.length) {
+    const sources = placeholders.map((match) => decodeURIComponent(match[1]))
+    const diagrams = await renderWriteMermaidDiagrams(sources)
+    placeholders.forEach((match, index) => {
+      const diagram = diagrams.get(sources[index])
+      const replacement = diagram
+        ? `<figure class="write-mermaid">${diagram.svg}</figure>`
+        : `<figure class="write-mermaid"><p class="write-mermaid-error">Mermaid 图表未能绘制，保留原始代码。</p><pre><code class="language-mermaid">${escapeHtml(sources[index])}</code></pre></figure>`
+      fragment = fragment.replace(match[0], replacement)
+    })
+  }
+  return fragment
 }
 
 export async function buildWriteClipboardHtmlFragment(options: {
   sourcePath: string
   content: string
+  workspaceRoot?: string
 }): Promise<string> {
+  const frontmatter = parseMarkdownFrontmatter(options.content)
   const fragment = isMarkdownFile(options.sourcePath)
-    ? renderMarkdownFragment(options.content, options.sourcePath)
+    ? await renderMarkdownFragment(frontmatter.endOffset ? frontmatter.body : options.content, options.sourcePath)
     : renderPlainTextFragment(options.content)
-  const body = await inlineLocalImagesInHtml(fragment)
-  return `<article class="markdown-body">${body}</article>`
+  const body = await inlineLocalImagesInHtml(fragment, options.sourcePath, options.workspaceRoot)
+  const mathStyles = body.includes('class="katex"') ? `<style>${await loadWriteMathExportCss()}</style>` : ''
+  return `<article class="markdown-body">${mathStyles}${body}</article>`
 }
 
 export function buildWriteExportFileName(sourcePath: string, format: WriteExportFormat): string {
@@ -483,13 +467,14 @@ export async function buildWriteExportHtmlDocument(options: {
   content: string
   title?: string
   wordCompatible?: boolean
+  workspaceRoot?: string
 }): Promise<string> {
   const title = options.title?.trim() || basenameWithoutExtension(options.sourcePath)
   const body = await buildWriteClipboardHtmlFragment({
     sourcePath: options.sourcePath,
+    workspaceRoot: options.workspaceRoot,
     content: options.content
   })
-  const baseHref = pathToFileURL(`${dirname(options.sourcePath)}/`).href
   const namespaces = options.wordCompatible
     ? ' xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"'
     : ''
@@ -500,8 +485,8 @@ export async function buildWriteExportHtmlDocument(options: {
     '<head>',
     '  <meta charset="utf-8" />',
     '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
+    '  <meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; font-src data:; style-src \'unsafe-inline\'; connect-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'" />',
     `  <title>${escapeHtml(title)}</title>`,
-    `  <base href="${escapeHtml(baseHref)}" />`,
     `  <style>${EXPORT_CSS}</style>`,
     '</head>',
     '<body>',
@@ -530,6 +515,7 @@ export async function copyWriteDocumentAsRichText(
 
     const html = await buildWriteClipboardHtmlFragment({
       sourcePath: resolved.path,
+      workspaceRoot: payload.workspaceRoot,
       content: payload.content
     })
 
@@ -619,7 +605,7 @@ async function exportDocxWithMd2docx(options: {
   }
 }
 
-async function renderHtmlToPdf(html: string): Promise<Buffer> {
+export async function renderWriteExportHtmlToPdf(html: string): Promise<Buffer> {
   const tempDir = await mkdtemp(join(tmpdir(), 'kun-export-'))
   const tempHtmlPath = join(tempDir, 'document.html')
   await writeFile(tempHtmlPath, html, 'utf8')
@@ -628,9 +614,24 @@ async function renderHtmlToPdf(html: string): Promise<Buffer> {
     show: false,
     backgroundColor: '#ffffff',
     webPreferences: {
-      sandbox: true
+      sandbox: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      partition: `workwise-export-${randomUUID()}`
     }
   })
+
+  const requestFilter = { urls: ['*://*/*', 'http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }
+  const denyNetwork = (_details: Electron.OnBeforeRequestListenerDetails, callback: (response: Electron.CallbackResponse) => void): void => callback({ cancel: true })
+  hiddenWindow.webContents.session.webRequest.onBeforeRequest(requestFilter, denyNetwork)
+  hiddenWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
+  hiddenWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  const denyNavigation = (event: Electron.Event, url: string): void => {
+    if (url !== pathToFileURL(tempHtmlPath).href) event.preventDefault()
+  }
+  hiddenWindow.webContents.on('will-navigate', denyNavigation)
+  hiddenWindow.webContents.on('will-redirect', denyNavigation)
 
   try {
     await hiddenWindow.loadURL(pathToFileURL(tempHtmlPath).href)
@@ -656,6 +657,8 @@ async function renderHtmlToPdf(html: string): Promise<Buffer> {
     })
     return Buffer.from(pdf)
   } finally {
+    hiddenWindow.webContents.removeListener('will-navigate', denyNavigation)
+    hiddenWindow.webContents.removeListener('will-redirect', denyNavigation)
     if (!hiddenWindow.isDestroyed()) hiddenWindow.destroy()
     await rm(tempDir, { recursive: true, force: true })
   }
@@ -710,8 +713,9 @@ export async function exportWriteDocument(
 
     const targetPath = ensureExportExtension(exportDialogResult.filePath, payload.format)
     const title = basenameWithoutExtension(sourcePath)
-    const html = await buildWriteExportHtmlDocument({
+    const html = payload.format === 'docx' ? '' : await buildWriteExportHtmlDocument({
       sourcePath,
+      workspaceRoot: payload.workspaceRoot,
       content: payload.content,
       title,
       wordCompatible: payload.format === 'doc'
@@ -731,6 +735,7 @@ export async function exportWriteDocument(
         )
         await durableWriteFile(targetPath, await buildDocxFromMarkdown({
           sourcePath,
+          workspaceRoot: payload.workspaceRoot,
           content: payload.content,
           title,
           template
@@ -738,6 +743,7 @@ export async function exportWriteDocument(
       } else {
         await durableWriteFile(targetPath, await buildDocxFromMarkdown({
           sourcePath,
+          workspaceRoot: payload.workspaceRoot,
           content: payload.content,
           title,
           template: resolveExportTemplate(
@@ -748,7 +754,7 @@ export async function exportWriteDocument(
         }))
       }
     } else {
-      await durableWriteFile(targetPath, await renderHtmlToPdf(html))
+      await durableWriteFile(targetPath, await renderWriteExportHtmlToPdf(html))
     }
 
     return {

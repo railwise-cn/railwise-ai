@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-01T08:33:19.602315+00:00",
+  "reviewer": "Independent AI service/export acceptance agent",
+  "scope": "Readback of actual generated export artifacts; PDF visual review and HTML/DOCX structural verification. This is not final installed-package GUI acceptance or Word-vendor visual compatibility certification.",
+  "sourceDirectory": "/private/tmp/railwise-advanced-export-smoke-20261101",
+  "files": {
+    "advanced.md": {
+      "bytes": 360,
+      "sha256": "1751e748ab41577b94ebd40c3539cc19144ffc4fa45c6956887e844b082287d2"
+    },
+    "advanced.html": {
+      "bytes": 1489371,
+      "sha256": "66b3fd36c0f77d0d66b6e64e20946b0b3ea11ab56af153d67df33c8a1ae25107"
+    },
+    "advanced.pdf": {
+      "bytes": 91806,
+      "sha256": "340bef456fc1f3c95f7dc7b5f946dbd29b8c754b7a1a7399a67abc9717a158c8"
+    },
+    "advanced.docx": {
+      "bytes": 21453,
+      "sha256": "7eb4ebea2c8e33cdb3f78cb676d6358d69466833d6d1b8d42d6e22d5581ec7c3"
+    },
+    "diagram.svg": {
+      "bytes": 14324,
+      "sha256": "910e2de00d95242abd4a30531d3899ceb5bf229441cf18278d6f24aafc46faef"
+    },
+    "diagram.png": {
+      "bytes": 13066,
+      "sha256": "4b64dd81d3c59c26f63f49d1f35f39a6f3273e0467042610cbc22835a670a683"
+    }
+  },
+  "html": {
+    "mathMlCount": 3,
+    "renderedKatexPresent": true,
+    "mermaidSvgPresent": true,
+    "footnoteForwardAndBackLinks": [
+      "#fn1",
+      "#fnref1"
+    ],
+    "footnoteLinkTargetsExist": true,
+    "externalAssetUrls": [],
+    "externalFontUrls": [],
+    "scriptCount": 0,
+    "diagramLabelsPresent": true,
+    "mermaidSvgAttributes": [
+      {
+        "id": "writeDiagram06170e2215b34d6b9da8f1753d32f4a6",
+        "width": "392",
+        "xmlns": "http://www.w3.org/2000/svg",
+        "class": "flowchart",
+        "height": "64",
+        "viewbox": "0 0 392 64",
+        "role": "img"
+      }
+    ]
+  },
+  "docx": {
+    "nativeOmmlCounts": {
+      "m:oMath": 2,
+      "m:f": 1,
+      "m:rad": 1,
+      "m:m": 3,
+      "m:sSubSup": 2,
+      "w:footnoteReference": 1,
+      "a:blip": 1
+    },
+    "actualFootnotes": 1,
+    "footnoteReferenceIds": [
+      "1"
+    ],
+    "footnoteTargetsExist": true,
+    "footnoteText": "复核依据包含 加粗 和 x2。",
+    "footnoteNativeMathCount": 1,
+    "embeddedImages": [
+      {
+        "target": "media/03b47a02768fd4a97e2384bb0f143a42915ad803.png",
+        "bytes": 13066,
+        "matchesDiagramPng": true
+      }
+    ],
+    "externalRelationships": []
+  },
+  "pdf": {
+    "pages": 1,
+    "encrypted": false,
+    "textIncludesDiagramLabels": true,
+    "textIncludesFootnoteNumber": true,
+    "textIncludesFootnoteContent": true,
+    "visualInspection": "Pass: actual PDF page rendered with Poppler and inspected. Inline fraction/square-root/sum, block matrix, Chinese diagram nodes/arrows and footnote bold/superscript are readable without clipping or overlap.",
+    "visualInspectionImage": "independent-export-pdf-page-1.png"
+  },
+  "checks": {
+    "htmlMathAndSvg": true,
+    "htmlFootnoteLinks": true,
+    "htmlSelfContained": true,
+    "docxNativeMath": true,
+    "docxFootnote": true,
+    "docxEmbeddedDiagram": true,
+    "pdfSemantics": true
+  },
+  "status": "passed"
+}

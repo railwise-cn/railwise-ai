@@ -116,6 +116,7 @@ import { GUI_UPDATE_CHANNELS } from '../../shared/gui-update'
 import { DOCUMENT_QUALITY_REASONS_V1 } from '../../shared/agent-workbench'
 import { KEYBOARD_SHORTCUT_COMMANDS } from '../../shared/keyboard-shortcuts'
 import { WRITE_EXPORT_FORMATS } from '../../shared/write-export'
+import { WRITE_MERMAID_MAX_LENGTH } from '../../shared/write-mermaid-policy'
 import {
   EXPORT_ELEMENT_TYPES,
   EXPORT_INDENTATION_TYPES,
@@ -1211,6 +1212,53 @@ export const workspaceFileWritePayloadSchema = z
   })
   .strict()
 
+export const documentRevisionSchema = z.object({
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  size: z.number().int().nonnegative(),
+  modifiedAt: z.number().finite().nonnegative()
+}).strict()
+
+export const documentReadPayloadSchema = z.object({
+  path: trimmedString(MAX_PATH_LENGTH),
+  workspaceRoot: trimmedString(MAX_PATH_LENGTH)
+}).strict()
+
+export const documentSearchPayloadSchema = z.object({
+  workspaceRoot: trimmedString(MAX_PATH_LENGTH),
+  query: z.string().trim().max(2_000),
+  limit: z.number().int().positive().max(200).optional()
+}).strict()
+
+export const checkedDocumentWritePayloadSchema = z.object({
+  path: trimmedString(MAX_PATH_LENGTH),
+  workspaceRoot: trimmedString(MAX_PATH_LENGTH),
+  content: z.string().max(MAX_BODY_BYTES),
+  expectedRevision: documentRevisionSchema.nullable().optional(),
+  source: z.enum(['user', 'agent', 'external', 'restore']).optional()
+}).strict()
+
+export const documentHistoryPayloadSchema = documentReadPayloadSchema.extend({
+  id: z.string().regex(/^\d{13}-[a-f0-9-]{36}$/)
+}).strict()
+
+export const documentRestorePayloadSchema = documentHistoryPayloadSchema.extend({
+  expectedRevision: documentRevisionSchema.nullable()
+}).strict()
+
+export const documentCommentCreatePayloadSchema = documentReadPayloadSchema.extend({
+  text: z.string().trim().min(1).max(20_000),
+  anchor: z.object({ from: z.number().int().nonnegative(), to: z.number().int().positive(), text: z.string().min(1).max(MAX_BODY_BYTES) }).strict()
+}).strict()
+
+export const documentCommentUpdatePayloadSchema = documentReadPayloadSchema.extend({
+  id: z.string().uuid(),
+  status: z.enum(['open', 'resolved'])
+}).strict()
+
+export const documentSemanticsPayloadSchema = documentReadPayloadSchema.extend({
+  content: z.string().max(MAX_BODY_BYTES).optional()
+}).strict()
+
 export const workspaceFileSaveAsPayloadSchema = z
   .object({
     suggestedName: optionalTrimmedString(255),
@@ -1251,7 +1299,8 @@ export const workspaceEntryRenamePayloadSchema = z
   .object({
     path: trimmedString(MAX_PATH_LENGTH),
     workspaceRoot: trimmedString(MAX_PATH_LENGTH),
-    newName: trimmedString(255)
+    newName: trimmedString(255),
+    targetDirectory: optionalTrimmedString(MAX_PATH_LENGTH)
   })
   .strict()
 
@@ -1302,6 +1351,10 @@ export const writeExportPayloadSchema = z
   })
   .strict()
 
+export const writeMermaidPreviewPayloadSchema = z.object({
+  source: z.string().min(1).max(WRITE_MERMAID_MAX_LENGTH)
+}).strict()
+
 export const writeRichClipboardPayloadSchema = z
   .object({
     path: trimmedString(MAX_PATH_LENGTH),
@@ -1327,6 +1380,19 @@ export const designExportPayloadSchema = z
     name: z.string().max(256).optional(),
     workspaceRoot: optionalTrimmedString(MAX_PATH_LENGTH),
     document: boundedDesignDocumentSchema
+  })
+  .strict()
+
+export const designPptxBytesExportPayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_PATH_LENGTH),
+    documentId: z.string().regex(/^doc_[A-Za-z0-9_-]{1,120}$/),
+    name: z.string().max(256).optional(),
+    expectedSlideCount: z.number().int().min(1).max(500),
+    bytes: z.instanceof(Uint8Array).refine(
+      (bytes) => bytes.byteLength > 0 && bytes.byteLength <= 200 * 1024 * 1024,
+      'PPTX bytes must be between 1 byte and 200 MiB.'
+    )
   })
   .strict()
 
@@ -1381,6 +1447,28 @@ export const designAssetReadPayloadSchema = z
 export const designPptxImportPayloadSchema = z
   .object({
     workspaceRoot: trimmedString(MAX_PATH_LENGTH)
+  })
+  .strict()
+
+export const designPptxRevisionReadPayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_PATH_LENGTH),
+    documentId: z.string().regex(/^doc_[A-Za-z0-9_-]{1,120}$/),
+    kind: z.enum(['source', 'active']).optional()
+  })
+  .strict()
+
+const designPptxRevisionBytesSchema = z.custom<Uint8Array>(
+  (value) => value instanceof Uint8Array && value.byteLength > 0 && value.byteLength <= 200 * 1024 * 1024,
+  { message: 'PPTX bytes must be a non-empty Uint8Array no larger than 200 MiB.' }
+)
+
+export const designPptxRevisionSavePayloadSchema = z
+  .object({
+    workspaceRoot: trimmedString(MAX_PATH_LENGTH),
+    documentId: z.string().regex(/^doc_[A-Za-z0-9_-]{1,120}$/),
+    expectedSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    bytes: designPptxRevisionBytesSchema
   })
   .strict()
 

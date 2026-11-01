@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import JSZip from 'jszip'
+import { Window } from 'happy-dom'
 
 vi.mock('electron', () => ({
   app: {
@@ -18,6 +19,14 @@ vi.mock('electron', () => ({
   }
 }))
 
+// Unit tests do not own an Electron layout engine. Real local diagram rendering
+// is exercised by the Electron integration fixture; these tests retain the
+// explicit source fallback when no rendered diagram is supplied.
+vi.mock('./write-advanced-renderer', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./write-advanced-renderer')>(),
+  renderWriteMermaidDiagrams: vi.fn(async () => new Map())
+}))
+
 import {
   buildWriteClipboardHtmlFragment,
   buildWriteExportFileName,
@@ -26,7 +35,7 @@ import {
   exportWriteDocument,
   resolveBundledMarkdownConverter
 } from './write-export-service'
-import { buildDocxFromMarkdown } from './write-docx-service'
+import { buildDocxFromMarkdown, decodeHtmlEntities } from './write-docx-service'
 import { resolveExportTemplate } from './write-docx-styles'
 import { BUILTIN_EXPORT_TEMPLATES } from '../../shared/write-export-templates'
 import { clipboard, dialog } from 'electron'
@@ -175,6 +184,28 @@ describe('write-export-service helpers', () => {
     expect(documentXml).toContain('after')
   })
 
+  it.each([
+    { language: 'ts', code: `const value = "' & < >"; const literal = "&#x27; &quot; &lt;"; const greeting = \`Hello \${'RailWise & < >'}\`;` },
+    { language: 'html', code: '<a href="x">text &amp; more</a>' }
+  ])('preserves quotes, operators, nested highlighting and literal entities in real DOCX $language code', async ({ language, code }) => {
+    const docx = await buildDocxFromMarkdown({ sourcePath: join(workspaceRoot, 'code-quotes.md'), content: `\`\`\`${language}\n${code}\n\`\`\`` })
+    const xml = await (await JSZip.loadAsync(docx)).file('word/document.xml')!.async('string')
+    const browser = new Window()
+    try {
+      const document = new browser.DOMParser().parseFromString(xml, 'application/xml')
+      const actual = [...document.getElementsByTagName('w:t')].map((node) => node.textContent).join('')
+      expect(actual).toBe(code)
+      expect(actual).not.toContain('<span')
+    } finally { await browser.happyDOM.close() }
+  })
+
+  it('decodes decimal and hexadecimal entities once while retaining invalid code points safely', () => {
+    expect(decodeHtmlEntities('&#39; &#x27; &#X22; &#38; &#x1F680; &apos;')).toBe(`' ' " & 🚀 '`)
+    expect(decodeHtmlEntities('&amp;#x27; &amp;quot; &amp;lt;')).toBe('&#x27; &quot; &lt;')
+    const invalid = '&#0; &#1; &#xD800; &#x110000; &#xFFFF; &#999999999999999999999999999999;'
+    expect(decodeHtmlEntities(invalid)).toBe(invalid)
+  })
+
   it('exports Markdown through the structured DOCX generator', async () => {
     const sourcePath = join(workspaceRoot, 'quality-report.md')
     const targetPath = join(workspaceRoot, 'quality-report.docx')
@@ -240,6 +271,65 @@ describe('write-export-service helpers', () => {
       .file('word/document.xml')?.async('string')
     expect(documentXml).toContain('第一行纯文本')
     expect(documentXml).toContain('第二行纯文本')
+  })
+
+  it('keeps frontmatter out of HTML, rich clipboard and real DOCX while preserving table and code semantics', async () => {
+    const sourcePath = join(workspaceRoot, 'metadata.md')
+    const content = '---\ntitle: private-metadata-title\ntags: [internal]\n---\n# Actual heading\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n```mermaid\ngraph TD; A-->B\n```'
+    const html = await buildWriteExportHtmlDocument({ sourcePath, content, workspaceRoot })
+    const clipboardHtml = await buildWriteClipboardHtmlFragment({ sourcePath, content, workspaceRoot })
+    expect(html).not.toContain('private-metadata-title')
+    expect(clipboardHtml).not.toContain('private-metadata-title')
+    expect(html).toContain('<table>')
+    expect(html).toContain('class="language-mermaid"')
+    expect(html).toContain('graph TD; A--&gt;B')
+    expect(html).toContain('Content-Security-Policy')
+    expect(html).toContain("default-src 'none'; img-src data:")
+    expect(html).not.toContain('<base ')
+    const zip = await JSZip.loadAsync(await buildDocxFromMarkdown({ sourcePath, content, workspaceRoot }))
+    const xml = await zip.file('word/document.xml')?.async('string')
+    expect(xml).not.toContain('private-metadata-title')
+    expect(xml).toContain('Actual heading')
+    expect(xml).toContain('<w:tbl>')
+    expect(xml?.replace(/<[^>]+>/g, '')).toContain('graph TD; A--&gt;B')
+  })
+
+  it('strips metadata once and preserves a body that begins with thematic-break syntax', async () => {
+    const sourcePath = join(workspaceRoot, 'body.md')
+    const html = await buildWriteExportHtmlDocument({ sourcePath, content: '---\ntitle: Metadata\n---\n---\nBody text\n---\nKept' })
+    expect(html).toContain('Body text')
+    expect(html).toContain('Kept')
+    expect(html).not.toContain('title: Metadata')
+  })
+
+  it('blocks remote, escaped and linked images for HTML and DOCX and keeps valid workspace assets', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'railwise-export-outside-'))
+    await writeFile(join(outside, 'private.png'), TINY_PNG)
+    await mkdir(join(workspaceRoot, 'docs'))
+    await mkdir(join(workspaceRoot, 'assets'))
+    await writeFile(join(workspaceRoot, 'assets', 'cover.png'), TINY_PNG)
+    await symlink(join(outside, 'private.png'), join(workspaceRoot, 'linked.png'))
+    await symlink(join(workspaceRoot, 'assets'), join(workspaceRoot, 'asset-link'))
+    const sourcePath = join(workspaceRoot, 'docs', 'draft.md')
+    const content = `![valid](../assets/cover.png)\n\n![remote](https://example.com/tracker.png)\n\n![private](${join(outside, 'private.png')})\n\n![linked](../linked.png)\n\n![intermediate](../asset-link/cover.png)`
+    const html = await buildWriteExportHtmlDocument({ sourcePath, content, workspaceRoot })
+    expect(html.match(/src="data:image\/png;base64,/g)).toHaveLength(1)
+    expect(html).not.toContain('https://example.com/tracker.png')
+    expect(html).not.toContain('src="file:')
+    const zip = await JSZip.loadAsync(await buildDocxFromMarkdown({ sourcePath, content, workspaceRoot }))
+    const media = Object.keys(zip.files).filter((name) => name.startsWith('word/media/') && !zip.files[name].dir)
+    expect(media).toHaveLength(1)
+    const rels = await zip.file('word/_rels/document.xml.rels')?.async('string')
+    expect(rels).not.toContain('tracker.png')
+    expect(rels).not.toContain('private.png')
+  })
+
+  it('rejects active SVG images instead of embedding external resources', async () => {
+    const sourcePath = join(workspaceRoot, 'draft.md')
+    await writeFile(join(workspaceRoot, 'active.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><style>@import "https://example.com/track";</style></svg>')
+    const html = await buildWriteExportHtmlDocument({ sourcePath, workspaceRoot, content: '![active](./active.svg)' })
+    expect(html).not.toContain('data:image/svg+xml')
+    expect(html).not.toContain('file:')
   })
 
   it('discovers bundled platform converters from WORKWISE_CONVERTER_ROOT', async () => {

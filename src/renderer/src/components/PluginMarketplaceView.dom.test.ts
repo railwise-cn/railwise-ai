@@ -113,6 +113,54 @@ function catalogPackage(id: string, version: string): MarketplacePackageV1 {
   }
 }
 
+function pinnedSkillPackage(id: string): MarketplacePackageV1 {
+  const base = catalogPackage(id, 'a'.repeat(40))
+  const owner = id === 'browser-skill'
+    ? 'Tencent'
+    : id === 'blender-skills'
+      ? 'arjun988'
+      : id === 'video-shotcraft'
+        ? 'Vincentwei1021'
+      : id === 'diagram-design'
+        ? 'cathrynlavery'
+        : 'bassnova42'
+  const source = {
+    ...base.source,
+    kind: 'github' as const,
+    location: `https://github.com/${owner}/${id}`,
+    owner,
+    repository: id,
+    defaultBranch: 'main',
+    requestedRef: 'main',
+    resolvedRef: 'a'.repeat(40)
+  }
+  return {
+    ...base,
+    name: id,
+    tier: 'advanced',
+    productType: 'workflow',
+    publisher: { id: owner.toLowerCase(), name: owner, verified: false },
+    source,
+    sources: [source],
+    components: [{
+      ...base.components[0],
+      type: 'skill' as const,
+      skillNames: [id],
+      runtime: {
+        kind: 'github' as const,
+        repository: source.location,
+        resolvedCommit: source.resolvedRef,
+        install: { strategy: 'managed-git' as const, verifyBeforeActivation: true }
+      }
+    }],
+    usage: {
+      howToUse: `Use ${id} by describing the task you want to perform.`,
+      requirements: ['Node.js'],
+      examples: [`Example request for ${id}`]
+    }
+  }
+}
+
 const BROWSER = catalogPackage('browser-tools', '2.0.0')
 const DOCUMENTS = catalogPackage('document-tools', '1.0.0')
 const ADVANCED = { ...catalogPackage('advanced-reasoning', '1.0.0'), tier: 'advanced' as const }
@@ -211,11 +259,24 @@ beforeEach(async () => {
           },
           { key: `${SOURCE.id}:${DOCUMENTS.id}`, sourceId: SOURCE.id, package: DOCUMENTS, conflicted: false },
           { key: `${SOURCE.id}:${ADVANCED.id}`, sourceId: SOURCE.id, package: ADVANCED, conflicted: false },
-          { key: `${SOURCE.id}:${MANAGED_KB.id}`, sourceId: SOURCE.id, package: MANAGED_KB, conflicted: false }
+          { key: `${SOURCE.id}:${MANAGED_KB.id}`, sourceId: SOURCE.id, package: MANAGED_KB, conflicted: false },
+          ...['browser-skill', 'blender-skills', 'video-shotcraft', 'diagram-design', 'arch-diagram-skill'].map((id) => ({
+            key: `${SOURCE.id}:${id}`,
+            sourceId: SOURCE.id,
+            package: pinnedSkillPackage(id),
+            conflicted: false
+          }))
         ],
         conflicts: []
       })),
       listInstalledPlugins: vi.fn(async () => [INSTALLED]),
+      listPluginUpdateDiagnostics: vi.fn(async () => [{
+        packageId: BROWSER.id,
+        installedVersion: BROWSER.version,
+        catalogVersion: BROWSER.version,
+        state: 'metadata-refresh' as const,
+        message: 'Catalog metadata changed and can be refreshed after review.'
+      }]),
       listMcpServers: vi.fn(async () => []),
       listSkills: vi.fn(async () => ({ ok: true as const, generation: 1, skills: [], validationErrors: [] })),
       onSkillsChanged: vi.fn(() => () => undefined),
@@ -309,6 +370,58 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(button('All plugins').getAttribute('aria-selected')).toBe('true')
   })
 
+  it('shows the five pinned GitHub Skills on the default plugin surface', () => {
+    for (const name of ['browser-skill', 'blender-skills', 'video-shotcraft', 'diagram-design', 'arch-diagram-skill']) {
+      expect(container.textContent).toContain(name)
+    }
+  })
+
+  it('shows featured recommendations on the default Skills overview', async () => {
+    vi.mocked(window.workwise.listSkills).mockResolvedValue({
+      ok: true,
+      generation: 3,
+      skills: [
+        {
+          id: 'ppt-master',
+          name: 'PPT Master',
+          description: 'Create and refine editable presentations.',
+          root: '/Users/test/.workwise/tools/skills/ppt-master',
+          entryPath: '/Users/test/.workwise/tools/skills/ppt-master/SKILL.md',
+          scope: 'global',
+          legacy: false,
+          source: { type: 'bundled', id: 'ppt-master', autoUpdate: false }
+        },
+        {
+          id: 'report-writing',
+          name: 'Report Writing',
+          description: 'Draft clear technical reports.',
+          root: '/Users/test/.codex/skills/report-writing',
+          entryPath: '/Users/test/.codex/skills/report-writing/SKILL.md',
+          scope: 'global',
+          legacy: false,
+          source: { type: 'bundled', id: 'report-writing', autoUpdate: false }
+        }
+      ],
+      validationErrors: []
+    })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => button('Skills').click())
+    expect(container.textContent).toContain('Featured recommendations')
+    expect(container.textContent).toContain('PPT Master')
+    expect(container.textContent).toContain('Report Writing')
+  })
+
+  it('shows a clear usage guide, requirements, and example in Skill details', async () => {
+    const row = [...container.querySelectorAll('[role="button"]')].find((item) => item.textContent?.includes('arch-diagram-skill'))
+    if (!(row instanceof HTMLElement)) throw new Error('Arch Diagram catalog row was not rendered.')
+    await act(async () => row.click())
+    expect(container.textContent).toContain('How to use')
+    expect(container.textContent).toContain('Use arch-diagram-skill by describing the task you want to perform.')
+    expect(container.textContent).toContain('Node.js')
+    expect(container.textContent).toContain('Example request for arch-diagram-skill')
+  })
+
   it('indexes large local Skill sets without flattening them into the default marketplace view', async () => {
     const indexedSkills = Array.from({ length: 200 }, (_, index): SkillListItem => ({
       id: `skill-${index}`,
@@ -348,7 +461,7 @@ describe('PluginMarketplaceView unified catalog', () => {
   it('uses main-process install state and isolates update results', async () => {
     expect(container.textContent).toContain('Browser Tools')
     expect(container.textContent).toContain('Document Tools')
-    expect(container.textContent).toContain('Permissions changed')
+    expect(container.textContent).toContain('Review metadata changes')
     expect(container.textContent).toContain('Review update')
 
     await act(async () => iconButton('Filters').click())
@@ -374,7 +487,32 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(installPrepared).not.toHaveBeenCalled()
   })
 
+  it('does not include runtime drift in Updates or expose an update action', async () => {
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([{
+      packageId: BROWSER.id,
+      installedVersion: BROWSER.version,
+      catalogVersion: BROWSER.version,
+      state: 'runtime-drift',
+      message: 'Runtime or provenance metadata changed without a package version update.'
+    }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+
+    expect(container.textContent).toContain('Complete update required')
+    await act(async () => iconButton('Filters').click())
+    await act(async () => button('Updates').click())
+    expect(container.textContent).not.toContain('Browser Tools')
+    expect(installPrepared).not.toHaveBeenCalled()
+  })
+
   it('labels the installed direct-mirror action as permission management', async () => {
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([{
+      packageId: BROWSER.id,
+      installedVersion: BROWSER.version,
+      catalogVersion: BROWSER.version,
+      state: 'current',
+      message: 'The installed package matches the current catalog review.'
+    }])
     vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({
       packages: [
         {

@@ -4,10 +4,11 @@
 
 ## 1. 产品边界
 
-Design 是与 Code、Write 平级的一级工作区，使用 SVG 作为可编辑画布模型。
+Design 是与 Code、Write 平级的一级工作区，按文档类型提供自由画布和 PPTX 专用编辑模式。
 
 - Design、Write 和 PPT 共用 WorkWise Agent Runtime，不增加第二套 Agent 提供商、模型切换器或诊断系统。
-- Design 画板负责结构化编辑；PPT Master 负责 PowerPoint 语义、模板、导入导出和质量检查。
+- 自由画布负责海报、配图、插画和标注；PPTX 文档通过专用编辑器适配器进入幻灯片工作区。
+- PPT Master 负责 PowerPoint 语义、模板、生成、导入导出和质量检查。
 - 请求 PowerPoint 时必须交付经过验证的 `.pptx`，HTML 或图片预览不能替代 PPTX。
 - PNG、SVG 和 Write 插图是直接导出能力，不依赖 PPTX 转换成功。
 
@@ -17,13 +18,20 @@ Design 是与 Code、Write 平级的一级工作区，使用 SVG 作为可编辑
 
 ```ts
 type DesignDocumentV1 = {
-  schemaVersion: 'v1'
+  schemaVersion: 'v1' | 'v2'
   id: string
   revision: number
   name: string
+  documentKind?: 'free-canvas' | 'pptx'
   format: DesignCanvasFormat
   pages: DesignPage[]
   assets: DesignAsset[]
+  pptx?: {
+    editorBackend: 'pptx-vanilla-viewer' | 'pptist' | 'legacy-svg'
+    editorVersion: string
+    source?: { sha256?: string; bytes?: number; cachedFilename?: string }
+  }
+  importReport?: DesignImportReportV1
   designTokens?: {
     colors?: string[]
     fonts?: string[]
@@ -54,7 +62,8 @@ type DesignDocumentV1 = {
 ├── <document-id>.workwise-design.json
 └── assets/
     └── <document-id>/
-        └── <asset-id>.<ext>
+        ├── <asset-id>.<ext>
+        └── source.pptx (PPTX documents only)
 ```
 
 持久化保证：
@@ -108,15 +117,15 @@ Runtime 工具位于 `kun/src/adapters/tool/design-tool-provider.ts`，正式工
 
 Design 助手复用 WorkWise 的会话、模型、审批、任务状态和诊断。界面只显示简洁进度和结果，不显示私有思维链。
 
-## 6. PPT Master 4.3.0
+## 6. PPT Master 6.8.0
 
 内置快照固定为：
 
 - 上游：`hugohe3/ppt-master`
-- Release：`v4.3.0`
-- Commit：`51cb529d00638097e70fd3e9d865a0bf061b5e19`
+- Release：`v6.8.0`
+- Commit：`5e8856be0da8e6bc85c4aa28acc614478f7b7137`
 
-受控快照保留核心工作流、文本参考、64 个顶层 Python 脚本及模块、图表模板、品牌、Deck、`presentation_core` 布局和 preset shape 定义。
+受控快照保留新版路由与工作流、归因完整性检查、PPTX 导入/编辑/导出脚本、图表模板、品牌、Deck、`presentation_core` 布局和 preset shape 定义。
 
 为控制安装包体积，不分发大体积图标 SVG 库、AI 对比 PNG、用户项目、生成导出物、备份和私有 PPTX。缺失的图标库不会导致整个 PPT 任务失败；工作流使用原生形状、项目内图标或已授权来源。
 
@@ -128,11 +137,17 @@ src/asset/skills/ppt-master/.workwise-skill-source.json
 
 `scripts/prompt_audit_manifest.json` 是 WorkWise 瘦身包适配层；它不参与 runtime prompt，只用于验证路径、引用、注册表和 Token 预算。审计不得出现缺失路径或错误。
 
-正式客户端把 MarkItDown 与上述 PPT Master 4.3.0 导入、导出和 preset 脚本一起冻结为按平台/架构构建的本地 sidecar。打包后的核心路径不依赖系统 Python；每个平台的 GitHub Actions 构建都会用该冻结程序执行一次 SVG → PPTX → SVG 往返验证。开发模式可以回退到审计快照中的 Python 脚本，但不得使用已经从 4.3.0 CLI 删除的旧参数。
+正式客户端把 MarkItDown 与上述 PPT Master 6.8.0 导入、导出、原生 PPTX 编辑和 preset 脚本一起冻结为按平台/架构构建的本地 sidecar。打包后的核心路径不依赖系统 Python；每个平台的构建都会用该冻结程序执行一次 SVG → PPTX → SVG 往返验证。开发模式可以回退到审计快照中的 Python 脚本，但不得绕过 `attribution_guard.py` 或新版路由约束。
 
-## 7. PPTX 导入
+## 7. PPTX 专用工作区与导入
 
-主进程通过官方 `pptx_to_svg.py` 转换源文件，再由 `src/shared/design-svg-parser.ts` 解析为 Design 文档。
+PPTX 文档使用 `PptxEditorAdapter` 作为稳定边界，当前挂载固定版本的 `pptx-vanilla-viewer`（Apache-2.0，仓库 `ChristopherVR/ooxml`，提交 `d8f80c291c1f9ecc23278c4b2ac8674915d30828`）。PPTist 的 AGPL-3.0 来源记录保留为暂停状态，不进入安装包。自由画布文档不会进入该路径。
+
+编辑器来源、npm SRI、制品摘要和许可证入口记录在 `src/asset/pptx-editors/pptx-vanilla-viewer-source.json`。主包同时保留上游 `LICENSE`、`NOTICE`，以及 NOTICE 中单独许可的 MPL-2.0 `mtx-decompressor` 的源码/许可证材料；不能把整个依赖树描述为单一许可证。
+
+导入首先对原始 PPTX 做有界 ZIP/OOXML 预检并以只读字节交给本地 Vanilla 编辑器；源 PPTX 以 `source.pptx` 原位保留，并记录 SHA-256。兼容 SVG 只用于质量报告和明确标注的参考预览，不能冒充原始 PPT 视觉，也不能在转换失败时阻止有效原件进入原生编辑器。
+
+导入文档同时持久化 `editorModel` 原生对象索引和 `protectedObjects` 保护清单；这两项经过有界 JSON 归一化，供 AI 提案、锁定检查、页面诊断和修订恢复使用。原生编辑器的 AI 只提交经过审核的一次性对象更新，不能改写对象来源、关系或受保护 OOXML。
 
 已支持的保真范围：
 
@@ -148,7 +163,7 @@ src/asset/skills/ppt-master/.workwise-skill-source.json
 - 单图片最多 12 MiB，合计最多 48 MiB；
 - 拒绝绝对路径、NUL、路径逃逸、符号链接和错误文件签名。
 
-不支持或可能降级的滤镜、mask、复杂嵌套 transform 等必须返回 `DesignFidelityWarning`，不能静默声称无损。
+不支持或可能降级的滤镜、mask、渐变、透明度、复杂嵌套 transform 等必须返回 `DesignFidelityWarning`，并写入持久化 `importReport`；不能静默声称无损。页数不一致、极端坐标和无效几何会阻断导入。
 
 ## 8. 导出
 
@@ -169,9 +184,9 @@ Renderer 使用当前 SVG 和真实资源渲染 PNG。导出限制为最长边 8
 - 每边在 PowerPoint 支持范围；
 - 可见图片资源完整。
 
-服务把每页写入临时 `svg_output`，调用固定快照中的 PPT Master 转换器，并验证结果是可解包且结构完整的 PPTX。失败时返回错误，不用 HTML 兜底冒充。
+PPTX 专用编辑器使用 Vanilla 的原生导出路径；主进程把导出字节做 ZIP、关系、页数和媒体校验。保存编辑结果时写入按 SHA-256 内容寻址的修订，只有预检与 OOXML 校验通过后才切换活动修订；原件和旧修订可恢复。未支持对象保持受保护状态，不得静默扁平化为错误形状。自由画布仍使用 PPT Master 的 SVG → PPTX 兼容导出路径。
 
-PPT Master 4.0.0 要求明确的发布契约，因此 WorkWise 会在受限临时项目中生成 `spec_lock.md`，声明画布、主题字体、主题颜色和 `pptx_structure.mode: flat`。候选 PPTX 通过页数、关系、媒体和 OOXML 检查后才原子替换用户目标文件。
+PPT Master 要求明确的发布契约，因此 WorkWise 会在受限临时项目中生成 `spec_lock.md`，声明画布、主题字体、主题颜色和 `pptx_structure.mode: flat`。候选 PPTX 通过页数、关系、媒体和 OOXML 检查后才原子替换用户目标文件。
 
 ### Write 联动
 
@@ -193,6 +208,8 @@ Design 页面可以作为 PNG 或 SVG 保存到当前 Write 工作区并插入 M
 - `importDesignImageAsset`
 - `readDesignAsset`
 - `importPptxToDesign`
+- `readDesignPptxRevision` / `saveDesignPptxRevision`
+- `exportDesignPptxBytes`
 - `exportDesignToPptx`
 - `saveDesignAssetToWrite`
 - `listPresetShapes`

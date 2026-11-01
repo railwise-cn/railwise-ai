@@ -132,9 +132,33 @@ describe('official marketplace catalog', () => {
       'officecli',
       'ego-browser',
       'markitdown',
-      'railwise-kb'
+      'railwise-kb',
+      'browser-skill',
+      'blender-skills',
+      'video-shotcraft',
+      'diagram-design',
+      'arch-diagram-skill'
     ]
     for (const id of requiredIds) expect(ids.has(id), `${id} is missing`).toBe(true)
+  })
+
+  it('documents how to use each pinned GitHub Skill', () => {
+    for (const id of ['browser-skill', 'blender-skills', 'video-shotcraft', 'diagram-design', 'arch-diagram-skill']) {
+      const item = packageById(id)
+      expect(item.usage?.howToUse, `${id} must document usage`).toBeTruthy()
+      expect(item.usage?.examples?.length, `${id} must include an example`).toBeGreaterThan(0)
+    }
+  })
+
+  it('pins Arch Diagram to its latest inspected commit and preserves its runtime requirements', () => {
+    const item = packageById('arch-diagram-skill')
+    expect(item.version).toBe('879ca7fa503a64ab46b5bc77d2062ded32fadc84')
+    expect(item.source.kind).toBe('github')
+    if (item.source.kind !== 'github') throw new Error('Arch Diagram source must be GitHub.')
+    expect(item.source.resolvedRef).toBe('879ca7fa503a64ab46b5bc77d2062ded32fadc84')
+    expect(item.source.subpath).toBe('skills/arch-diagram')
+    expect(item.license).toBe('MIT')
+    expect(item.dependencies.map((dependency) => dependency.id)).toEqual(['node', 'browser', 'ffmpeg'])
   })
 
   it('contains exactly the official recommended package set and tiers', () => {
@@ -187,6 +211,11 @@ describe('official marketplace catalog', () => {
       'playwright-cli-skills',
       'redis-mcp',
       'railwise-kb',
+      'browser-skill',
+      'blender-skills',
+      'video-shotcraft',
+      'diagram-design',
+      'arch-diagram-skill',
       'sequential-thinking-mcp',
       'time-mcp'
     ]
@@ -248,7 +277,7 @@ describe('official marketplace catalog', () => {
         installedByDefault: true,
         reinstallable: false
       })
-      expect(item.availability, id).toEqual({ status: 'managed', managedBy: 'WorkWise' })
+      expect(item.availability, id).toEqual({ status: 'managed', managedBy: 'RailWise AI' })
       expect(item.components, id).toEqual([
         expect.objectContaining({
           type: 'skill',
@@ -479,6 +508,44 @@ describe('official marketplace catalog', () => {
       kind: 'github',
       resolvedCommit: '44c9b2d6e889982ac18c27d05a19fefe335194e1'
     })
+  })
+
+  it('ships the five GitHub skills as pinned, installable packages with license evidence', () => {
+    const expected = new Map([
+      ['browser-skill', ['9cfba53582cb04d48da36aabd0a5017987d4daea', 'MIT', 'crates/bsk-cli/skill']],
+      ['blender-skills', ['8f778d2405a214b508d4c7d80742be8e43acdd52', 'MIT', '.claude/skills']],
+      ['video-shotcraft', ['1266a3ec4831289c4d893d42dd5102723658039a', 'Apache-2.0', undefined]],
+      ['diagram-design', ['0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1', 'MIT', undefined]],
+      ['arch-diagram-skill', ['879ca7fa503a64ab46b5bc77d2062ded32fadc84', 'MIT', 'skills/arch-diagram']]
+    ] as const)
+
+    for (const [id, [commit, license, subpath]] of expected) {
+      const item = packageById(id)
+      expect(item.installation.mode).toBe('direct-mirror')
+      expect(item.version).toBe(commit)
+      expect(item.source).toMatchObject({
+        kind: 'github', resolvedRef: commit,
+        ...(subpath ? { subpath } : {})
+      })
+      expect(item.components).toHaveLength(1)
+      expect(item.components[0]).toMatchObject({
+        type: 'skill',
+        runtime: { kind: 'github', resolvedCommit: commit, ...(subpath ? { subpath } : {}) }
+      })
+      expect(item.license).toBe(license)
+      expect(item.licenseEvidence).toHaveLength(1)
+      expect(item.licenseEvidence[0]).toMatchObject({
+        license,
+        path: 'LICENSE',
+        includeInInstall: true,
+        required: true
+      })
+      expect(item.sources.find((source) => source.id === item.licenseEvidence[0]?.sourceId))
+        .toMatchObject({ kind: 'github', resolvedRef: commit })
+    }
+
+    expect(packageById('diagram-design').source.location)
+      .toBe('https://github.com/cathrynlavery/diagram-design')
   })
 
   it('retains immutable root MIT license evidence for official MCP server artifacts', () => {

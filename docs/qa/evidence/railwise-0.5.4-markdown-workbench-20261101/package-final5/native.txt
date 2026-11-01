@@ -1,0 +1,2 @@
+[1101/135147.424998:ERROR:electron/shell/common/mac/codesign_util.cc:79] task_name_for_pid: (os/kern) failure (5)
+Verified packaged RailWise AI Runtime native dependency on macOS arm64: WORKWISE_PACKAGED_SQLITE_OK ABI=148

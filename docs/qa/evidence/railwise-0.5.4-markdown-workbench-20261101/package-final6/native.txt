@@ -1,0 +1,2 @@
+[1101/143029.754354:ERROR:electron/shell/common/mac/codesign_util.cc:79] task_name_for_pid: (os/kern) failure (5)
+WORKWISE_PACKAGED_SQLITE_OK ABI=148

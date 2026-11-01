@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { mkdir, open, readdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, join, posix } from 'node:path'
 import JSZip from 'jszip'
 
 const EOCD_SIGNATURE = 0x06054b50
@@ -20,6 +20,7 @@ export type PluginArchiveEntryV1 = {
   name: string
   path: string
   directory: boolean
+  symbolicLink: boolean
   executable: boolean
   compressedBytes: number
   uncompressedBytes: number
@@ -87,7 +88,19 @@ export function normalizePluginArchivePath(name: string): { path: string; direct
   return { path: segments.join('/'), directory }
 }
 
-export function inspectPluginArchive(buffer: Buffer): PluginArchiveInspectionV1 {
+export type ExtractPluginArchiveOptionsV1 = {
+  /**
+   * GitHub source archives can contain links committed by the repository.
+   * When enabled, links are inspected and materialized as regular files or
+   * directories. They are never created in the extraction directory.
+   */
+  allowInternalLinks?: boolean
+}
+
+export function inspectPluginArchive(
+  buffer: Buffer,
+  options: ExtractPluginArchiveOptionsV1 = {}
+): PluginArchiveInspectionV1 {
   if (buffer.byteLength > PLUGIN_ARCHIVE_LIMITS.maxArchiveBytes) {
     resourceLimit('Plugin archive exceeds the 64 MiB download limit.')
   }
@@ -143,7 +156,8 @@ export function inspectPluginArchive(buffer: Buffer): PluginArchiveInspectionV1 
     }
     collisionKeys.set(collisionKey, normalized.directory)
     const unixMode = (externalAttributes >>> 16) & 0xffff
-    if ((unixMode & 0o170000) === 0o120000) unsafe(`links are not allowed: ${name}`)
+    const symbolicLink = (unixMode & 0o170000) === 0o120000
+    if (symbolicLink && !options.allowInternalLinks) unsafe(`links are not allowed: ${name}`)
     if (entryUncompressed > PLUGIN_ARCHIVE_LIMITS.maxEntryBytes) {
       resourceLimit(`Plugin archive entry exceeds 32 MiB: ${name}`)
     }
@@ -164,6 +178,7 @@ export function inspectPluginArchive(buffer: Buffer): PluginArchiveInspectionV1 
       name,
       path: normalized.path,
       directory: normalized.directory,
+      symbolicLink,
       executable: (unixMode & 0o111) !== 0,
       compressedBytes: entryCompressed,
       uncompressedBytes: entryUncompressed
@@ -184,26 +199,35 @@ export function inspectPluginArchive(buffer: Buffer): PluginArchiveInspectionV1 
 
 export async function extractPluginArchive(
   buffer: Buffer,
-  targetDirectory: string
+  targetDirectory: string,
+  options: ExtractPluginArchiveOptionsV1 = {}
 ): Promise<PluginArchiveInspectionV1> {
-  const inspection = inspectPluginArchive(buffer)
+  const inspection = inspectPluginArchive(buffer, options)
   await mkdir(targetDirectory, { recursive: true, mode: 0o700 })
   if ((await readdir(targetDirectory)).length > 0) unsafe('extraction target must be empty.')
   const archive = await JSZip.loadAsync(buffer, { checkCRC32: true, createFolders: false })
-  for (const item of inspection.entries) {
-    const destination = join(targetDirectory, ...item.path.split('/'))
-    if (item.directory) {
-      await mkdir(destination, { recursive: true, mode: 0o700 })
-      continue
-    }
+  const entriesByPath = new Map(inspection.entries.map((item) => [item.path, item]))
+  const written = new Set<string>()
+  let materializedBytes = 0
+
+  const entryBytes = async (item: PluginArchiveEntryV1): Promise<Buffer> => {
     const entry = archive.file(item.name)
     if (!entry || entry.dir) unsafe(`archive reader could not resolve entry: ${item.name}`)
     if (typeof entry.unixPermissions === 'number' &&
-        (entry.unixPermissions & 0o170000) === 0o120000) {
-      unsafe(`archive reader exposed a symbolic link: ${item.name}`)
+        (entry.unixPermissions & 0o170000) === 0o120000 && !item.symbolicLink) {
+      unsafe(`archive reader exposed an unexpected symbolic link: ${item.name}`)
     }
     const bytes = await entry.async('nodebuffer')
     if (bytes.byteLength !== item.uncompressedBytes) unsafe(`entry size changed during extraction: ${item.name}`)
+    return bytes
+  }
+
+  const writeFile = async (relativePath: string, item: PluginArchiveEntryV1, bytes: Buffer): Promise<void> => {
+    materializedBytes += bytes.byteLength
+    if (materializedBytes > PLUGIN_ARCHIVE_LIMITS.maxUncompressedBytes) {
+      resourceLimit('Plugin archive materializes beyond the 128 MiB limit.')
+    }
+    const destination = join(targetDirectory, ...relativePath.split('/'))
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 })
     const handle = await open(destination, 'wx', item.executable ? 0o700 : 0o600)
     try {
@@ -212,6 +236,73 @@ export async function extractPluginArchive(
     } finally {
       await handle.close()
     }
+    written.add(relativePath)
+  }
+
+  const linkTarget = (item: PluginArchiveEntryV1, target: string): string => {
+    if (!target || target.includes('\0') || target.includes('\\') || target.startsWith('/') ||
+        /^[A-Za-z]:/.test(target) || /[\r\n]/.test(target)) {
+      unsafe(`symbolic link target is outside the archive: ${item.name}`)
+    }
+    const normalized = posix.normalize(posix.join(posix.dirname(item.path), target))
+    if (!normalized || normalized === '..' || normalized.startsWith('../')) {
+      unsafe(`symbolic link target escapes the archive: ${item.name}`)
+    }
+    return normalized
+  }
+
+  const hasArchivePath = (path: string): boolean =>
+    entriesByPath.has(path) || inspection.entries.some((entry) => entry.path.startsWith(`${path}/`))
+
+  const materialize = async (
+    item: PluginArchiveEntryV1,
+    relativePath: string,
+    linkStack: Set<string>
+  ): Promise<void> => {
+    if (item.symbolicLink) {
+      if (!options.allowInternalLinks) unsafe(`links are not allowed: ${item.name}`)
+      if (linkStack.has(item.path)) unsafe(`symbolic link cycle detected: ${item.name}`)
+      const target = linkTarget(item, (await entryBytes(item)).toString('utf8'))
+      if (!hasArchivePath(target)) unsafe(`symbolic link target is missing: ${item.name}`)
+      const targetItem = entriesByPath.get(target)
+      const nextStack = new Set(linkStack)
+      nextStack.add(item.path)
+      if (targetItem && !targetItem.directory && !targetItem.symbolicLink) {
+        await writeFile(relativePath, targetItem, await entryBytes(targetItem))
+        return
+      }
+      if (targetItem?.symbolicLink) {
+        await materialize(targetItem, relativePath, nextStack)
+        return
+      }
+      await mkdir(join(targetDirectory, ...relativePath.split('/')), { recursive: true, mode: 0o700 })
+      for (const child of inspection.entries) {
+        if (!child.path.startsWith(`${target}/`)) continue
+        const childRelative = `${relativePath}/${child.path.slice(target.length + 1)}`
+        if (child.directory) {
+          await mkdir(join(targetDirectory, ...childRelative.split('/')), { recursive: true, mode: 0o700 })
+          continue
+        }
+        await materialize(child, childRelative, nextStack)
+      }
+      return
+    }
+    if (item.directory) {
+      await mkdir(join(targetDirectory, ...relativePath.split('/')), { recursive: true, mode: 0o700 })
+      return
+    }
+    if (!written.has(relativePath)) await writeFile(relativePath, item, await entryBytes(item))
+  }
+
+  // Create ordinary directories and files first. This keeps the output free of
+  // links even when a link points at an entry that appears later in the ZIP.
+  for (const item of inspection.entries) {
+    if (item.symbolicLink) continue
+    await materialize(item, item.path, new Set())
+  }
+  for (const item of inspection.entries) {
+    if (!item.symbolicLink) continue
+    await materialize(item, item.path, new Set())
   }
   const directory = await open(targetDirectory, constants.O_RDONLY)
   try {

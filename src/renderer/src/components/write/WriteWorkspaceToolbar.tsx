@@ -1,5 +1,5 @@
 import type { ReactElement, RefObject } from 'react'
-import { BookOpenCheck, ChevronDown, Copy, Download, FileCode2, FilePenLine, FolderOpen, ImagePlus, Loader2, Presentation, Save, Sparkles } from 'lucide-react'
+import { BookOpenCheck, ChevronDown, Copy, Download, FileCode2, FilePenLine, FolderOpen, ImagePlus, Loader2, MoreHorizontal, Presentation, Save, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { WriteExportFormat } from '@shared/write-export'
 import type { WritePreviewMode, WriteSaveStatus } from '../../write/write-workspace-store'
@@ -23,6 +23,8 @@ type Props = {
   exportInFlight: boolean
   exportMenuOpen: boolean
   exportMenuRef: RefObject<HTMLDivElement | null>
+  moreMenuOpen: boolean
+  moreMenuRef: RefObject<HTMLDivElement | null>
   leftSidebarCollapsed: boolean
   liveModeActive: boolean
   modeMenuItems: WriteModeMenuItem[]
@@ -38,11 +40,11 @@ type Props = {
   onToggleLeftSidebar: () => void
   previewMode: WritePreviewMode
   readOnly: boolean
-  knowledgeBaseEnabled: boolean
   saveLabel: string
   saveStatus: WriteSaveStatus
   setAssistantOpen: (open: boolean) => void
   setExportMenuOpen: (open: boolean | ((open: boolean) => boolean)) => void
+  setMoreMenuOpen: (open: boolean | ((open: boolean) => boolean)) => void
   setModeMenuOpen: (open: boolean | ((open: boolean) => boolean)) => void
   setPreviewMode: (mode: WritePreviewMode) => void
 }
@@ -57,6 +59,8 @@ export function WriteWorkspaceToolbar({
   exportInFlight,
   exportMenuOpen,
   exportMenuRef,
+  moreMenuOpen,
+  moreMenuRef,
   leftSidebarCollapsed,
   liveModeActive,
   modeMenuItems,
@@ -72,11 +76,11 @@ export function WriteWorkspaceToolbar({
   onToggleLeftSidebar,
   previewMode,
   readOnly,
-  knowledgeBaseEnabled,
   saveLabel,
   saveStatus,
   setAssistantOpen,
   setExportMenuOpen,
+  setMoreMenuOpen,
   setModeMenuOpen,
   setPreviewMode
 }: Props): ReactElement {
@@ -182,29 +186,12 @@ export function WriteWorkspaceToolbar({
           <div className="write-workspace-toolbar-actions flex min-w-0 items-center justify-start gap-1.5">
             <button
               type="button"
-              onClick={onPickWorkspace}
-              className={toolbarIconButtonClass()}
-              title={t('changeWorkspace')}
-            >
-              <FolderOpen className="h-4 w-4" strokeWidth={1.85} />
-            </button>
-            <button
-              type="button"
               onClick={() => setAssistantOpen(!assistantOpen)}
               className={toolbarIconButtonClass(assistantOpen)}
               title={t('writeToggleAssistant')}
               aria-label={t('writeToggleAssistant')}
             >
               <Sparkles className="h-4 w-4" strokeWidth={1.85} />
-            </button>
-            <button
-              type="button"
-              onClick={onGenerateImage}
-              className={toolbarIconButtonClass()}
-              title={t('writeAgnesImageGenerate')}
-              aria-label={t('writeAgnesImageGenerate')}
-            >
-              <ImagePlus className="h-4 w-4" strokeWidth={1.85} />
             </button>
             <button
               type="button"
@@ -215,16 +202,26 @@ export function WriteWorkspaceToolbar({
             >
               <Presentation className="h-4 w-4" strokeWidth={1.85} />
             </button>
-            <button
-              type="button"
-              onClick={onAskKnowledgeBase}
-              className={`hidden items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold xl:inline-flex ${knowledgeBaseEnabled ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-ds-subtle text-ds-faint'}`}
-              title={t(knowledgeBaseEnabled ? 'writeKnowledgeBaseConnected' : 'writeKnowledgeBaseDisabled')}
-              aria-label={t('writeKnowledgeBaseAskPrompt')}
-            >
-              <BookOpenCheck className="h-3.5 w-3.5" strokeWidth={1.9} />
-              RailWise KB
-            </button>
+            <div ref={moreMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreMenuOpen((open) => !open)}
+                className={toolbarIconButtonClass(moreMenuOpen)}
+                title={t('writeMoreActions')}
+                aria-label={t('writeMoreActions')}
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
+              >
+                <MoreHorizontal className="h-4 w-4" strokeWidth={1.9} />
+              </button>
+              {moreMenuOpen ? (
+                <div role="menu" className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-ds-border bg-ds-card/95 p-1.5 shadow-[0_22px_48px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+                  <button type="button" role="menuitem" onClick={() => { setMoreMenuOpen(false); onPickWorkspace() }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover/80"><FolderOpen className="h-3.5 w-3.5 text-ds-faint" />{t('changeWorkspace')}</button>
+                  <button type="button" role="menuitem" onClick={() => { setMoreMenuOpen(false); onGenerateImage() }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover/80"><ImagePlus className="h-3.5 w-3.5 text-ds-faint" />{t('writeAgnesImageGenerate')}</button>
+                  <button type="button" role="menuitem" onClick={() => { setMoreMenuOpen(false); onAskKnowledgeBase() }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] text-ds-ink transition hover:bg-ds-hover/80"><BookOpenCheck className="h-3.5 w-3.5 text-emerald-600" />{t('writeKnowledgeBaseAskPrompt')}</button>
+                </div>
+              ) : null}
+            </div>
             <div ref={exportMenuRef} className="relative">
               <button
                 type="button"
