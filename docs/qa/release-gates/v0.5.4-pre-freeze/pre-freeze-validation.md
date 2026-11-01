@@ -17,6 +17,7 @@ Local validation uses Node 22.23.1; authoritative CI remains pinned to Node 22.2
 | Complete runtime suite | 221 files passed, 2 skipped; 3,209 tests passed, 22 skipped; 0 failures |
 | Release gate including offline asset provenance | 290 passed, 0 failures |
 | Frozen updater contract tests | 42 passed; actual native update remains pending frozen public artifacts |
+| Native Electron offline renderer | Five diagram probes passed, zero external requests; PNG bytes match same-configuration upstream control. Mermaid math labels remain source text; block/inline math is separate. See native-mermaid/native-probe-summary.md |
 | Production build with scoped 6 GiB heap | Passed; output freshness passed |
 | Document dependency/license policy | Passed |
 | Secret-shape source scan | No high-specificity matches; image OCR and arbitrary obfuscation not covered |
@@ -26,3 +27,5 @@ Local validation uses Node 22.23.1; authoritative CI remains pinned to Node 22.2
 The first complete desktop run failed because the inherited root SQLite binary used Node ABI 147 instead of Node 22 ABI 127; a concurrent build removed the nested runtime install while a test resolver read it. The isolated native binary was rebuilt, the three affected files passed all 115 tests, and a subsequent complete desktop run passed. No test assertion or product behavior was weakened. Those original and final logs are retained separately.
 
 The dependency migration matrix and before/after reports disclose desktop 3 low-severity entries for one KaTeX advisory and runtime zero production advisories. The independent embedded-asset review also inventories Mermaid's precompiled JSON_SCHEMA-limited YAML/parser code. This checkpoint does not claim zero vulnerabilities or third-party native Office interoperability.
+
+Original test/build logs are retained losslessly as `.txt.gz` to preserve their exact whitespace and terminal bytes. The generated policy probe is archived as `.cjs.txt`, not treated as authored application code.
