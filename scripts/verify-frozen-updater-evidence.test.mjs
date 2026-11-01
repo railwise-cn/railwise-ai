@@ -14,7 +14,7 @@ function serviceIdentity(sourceHead, { version = '0.5.3', layout = 'asar-unpacke
   const dependencyRoot = compatibility ? 'node_modules' : `app.${layout === 'asar' ? 'asar' : 'asar.unpacked'}/kun/node_modules`
   return {
     schemaVersion: 1, packageVersion: version, packageSourceHead: version === '0.5.2' ? null : sourceHead, asarSha256, layout,
-    serviceSourceHead: compatibility || version === '0.5.3' ? sourceHead : null,
+    serviceSourceHead: compatibility || version !== '0.5.2' ? sourceHead : null,
     serviceTreeSha256: 'a'.repeat(64),
     modules: ['engineering-service', 'survey-service'].map(name => ({ path: `dist/engineering/${name}.js`, sha256: 'b'.repeat(64) })),
     dependencies: ['better-sqlite3', 'better-sqlite3-native', 'jszip', 'pdfkit', 'zod'].map(name => ({ name,
@@ -23,25 +23,25 @@ function serviceIdentity(sourceHead, { version = '0.5.3', layout = 'asar-unpacke
   }
 }
 
-function serviceEvidence(sourceHead) {
-  const target = serviceIdentity(sourceHead)
-  return { baseVersion: '0.5.2', targetVersion: '0.5.3', targetAsarSha256: target.asarSha256, installedAsarSha256: target.asarSha256,
+function serviceEvidence(sourceHead, version = '0.5.3') {
+  const target = serviceIdentity(sourceHead, { version })
+  return { baseVersion: '0.5.2', targetVersion: version, targetAsarSha256: target.asarSha256, installedAsarSha256: target.asarSha256,
     targetServiceIdentity: target,
     dataSeed: { serviceSource: 'source-bound-compatibility-service', serviceIdentity: serviceIdentity(sourceHead, { version: '0.5.2', layout: 'source-compatibility', asarSha256: 'f'.repeat(64) }) },
     dataReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) },
     dataRestartReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) } }
 }
 
-function fixture(t) {
+function fixture(t, version = '0.5.3') {
   const sourceHead = 'a'.repeat(40)
   const run = { repository: RELEASE_REPOSITORY, workflowPath: UPDATER_WORKFLOW, sourceHead, runId: 4321, runAttempt: 2,
     artifact: { id: 91, name: 'frozen-updater-arm64-4321', digest: `sha256:${'b'.repeat(64)}` } }
   const nativeBytes = Buffer.from('{"status":"passed","startedAt":"new-run"}\n')
-  const machine = { ...serviceEvidence(sourceHead), arch: 'arm64', nativeReportSha256: reportSha256(nativeBytes), provenance: { repository: run.repository, workflowPath: run.workflowPath,
+  const machine = { ...serviceEvidence(sourceHead, version), arch: 'arm64', nativeReportSha256: reportSha256(nativeBytes), provenance: { repository: run.repository, workflowPath: run.workflowPath,
     workflowRef: UPDATER_WORKFLOW_REF, workflowSha: sourceHead, sourceHead, runId: run.runId, runAttempt: run.runAttempt } }
   const machineBytes = Buffer.from(JSON.stringify(machine) + '\n')
   const root = `repos/${RELEASE_REPOSITORY}`
-  const job = { name: 'Official 0.5.2 to exact frozen 0.5.3 native updater', conclusion: 'success', steps: [
+  const job = { name: 'Official 0.5.2 to exact frozen public package native updater', conclusion: 'success', steps: [
     { name: 'Run default-trust HTTPS download, Squirrel install and historical data readback', conclusion: 'success' },
     { name: 'Retain durable updater evidence including failures', conclusion: 'success' },
   ] }
@@ -80,11 +80,28 @@ function fixture(t) {
 
 test('updater report provenance binds the exact freeze, run and retained native bytes', t => {
   const f = fixture(t)
-  assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), f.run)
+  assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), f.run)
   assert.equal(verifyUpdaterEvidenceSource(f.run, f.api), f.run)
   assert.equal(Object.hasOwn(f.actual, 'workflow_ref'), false)
   assert.equal(Object.hasOwn(f.artifact.workflow_run, 'run_attempt'), false)
   verifyUpdaterEvidenceArchive({ ...f, archive: f.archive() })
+})
+
+test('0.5.4 native provenance requires the independently expected manifest target', t => {
+  const f = fixture(t, '0.5.4')
+  assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), f.run)
+  assert.equal(verifyUpdaterEvidenceSource(f.run, f.api), f.run)
+  verifyUpdaterEvidenceArchive({ ...f, archive: f.archive() })
+  assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /target version mismatch/)
+  assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /explicit stable/)
+  assert.throws(() => validateUpdaterServiceEvidence(f.machine, { sourceHead: f.sourceHead }), /explicit stable/)
+  // Coherent older target identities and readbacks cannot choose the expected
+  // release version by agreeing with one another.
+  const older = fixture(t, '0.5.3')
+  assert.throws(() => validateUpdaterEvidenceRun(older.run, older.machine, older.sourceHead, '0.5.4'), /target version mismatch/)
+  const wrongPackage = structuredClone(f.machine)
+  for (const identity of [wrongPackage.targetServiceIdentity, wrongPackage.dataReadback.serviceIdentity, wrongPackage.dataRestartReadback.serviceIdentity]) identity.packageVersion = '0.5.3'
+  assert.throws(() => validateUpdaterServiceEvidence(wrongPackage, { sourceHead: f.sourceHead, version: '0.5.4' }), /target package version mismatch/)
 })
 
 test('retained archive accepts the runner service inspection and both historical readbacks', t => {
@@ -162,28 +179,28 @@ test('successful workflow jobs can span multiple API pages', t => {
 test('both real native architectures use their exact report architecture in the artifact name', t => {
   for (const arch of ['arm64', 'x64']) {
     const f = fixture(t); f.machine.arch = arch; f.run.artifact.name = `frozen-updater-${arch}-${f.run.runId}`
-    assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), f.run)
+    assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), f.run)
     f.run.artifact.name = `frozen-updater-${arch === 'arm64' ? 'x64' : 'arm64'}-${f.run.runId}`
-    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /artifact name mismatch/)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /artifact name mismatch/)
   }
   for (const arch of [undefined, 'ARM64', 'x86', 'unsupported']) {
     const f = fixture(t); f.machine.arch = arch; f.run.artifact.name = `frozen-updater-${arch}-${f.run.runId}`
-    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /supported native macOS architecture/)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /supported native macOS architecture/)
   }
 })
 
 test('packaged service contracts support both layouts and explicitly labeled baseline compatibility', () => {
   const sourceHead = 'a'.repeat(40)
-  for (const layout of ['asar-unpacked', 'asar']) {
-    const machine = { ...serviceEvidence(sourceHead), arch: 'arm64' }
-    machine.targetServiceIdentity = serviceIdentity(sourceHead, { layout })
+  for (const version of ['0.5.3', '0.5.4']) for (const layout of ['asar-unpacked', 'asar']) {
+    const machine = { ...serviceEvidence(sourceHead, version), arch: 'arm64' }
+    machine.targetServiceIdentity = serviceIdentity(sourceHead, { layout, version })
     for (const key of ['dataReadback', 'dataRestartReadback']) machine[key].serviceIdentity = structuredClone(machine.targetServiceIdentity)
-    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead }), machine)
+    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead, version }), machine)
     machine.dataSeed = { serviceSource: 'baseline-package', serviceIdentity: serviceIdentity(sourceHead, { version: '0.5.2', layout }) }
-    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead }), machine)
+    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead, version }), machine)
     machine.dataSeed.serviceIdentity.packageSourceHead = 'd'.repeat(40)
     machine.dataSeed.serviceIdentity.serviceSourceHead = 'd'.repeat(40)
-    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead }), machine)
+    assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead, version }), machine)
   }
 })
 
@@ -230,6 +247,6 @@ test('source fallback, unbound or changed services and unsafe dependency identit
   }
   for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
     const f = fixture(st); change(f)
-    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /updater-service/)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /updater-service/)
   })
 })

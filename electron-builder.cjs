@@ -216,6 +216,9 @@ const builderConfig = {
     // Local document preview/export reads these offline rendering assets.
     'node_modules/katex/**/*',
     'node_modules/mermaid/**/*',
+    // Only the core ESM-derived offline bundle in out/ is executed. Exclude
+    // upstream browser bundles with their separately embedded dependency copies.
+    '!**/node_modules/mermaid/dist/**/*',
     'node_modules/markdown-it-footnote/**/*',
     // Dependency packages can contain upstream browser-debug logs/reports.
     // Keep these out of both the main bundle and managed runtime below.

@@ -10,6 +10,9 @@ function run(command, args, options = {}) {
 
 require('./ensure-runtime-install.cjs')
 
+const buildMarkdown = run(process.execPath, [require('node:path').join(__dirname, 'build-markdown-rendering.cjs')])
+if (buildMarkdown.status !== 0) process.exit(buildMarkdown.status || 1)
+
 const buildKun = run('npm', ['--prefix', 'kun', 'run', 'build'])
 if (buildKun.status !== 0) {
   process.exit(buildKun.status || 1)

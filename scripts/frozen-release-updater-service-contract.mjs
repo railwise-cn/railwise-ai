@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util'
+import { validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 const MODULE_PATHS = ['dist/engineering/engineering-service.js', 'dist/engineering/survey-service.js']
 const REQUIRED_DEPENDENCIES = ['better-sqlite3', 'better-sqlite3-native', 'jszip', 'pdfkit', 'zod']
@@ -56,7 +57,8 @@ function validateIdentity(identity, label) {
 
 // Pure evidence checks: neither a matching version string nor a source-tree
 // readback can replace services and dependencies from the frozen target ZIP.
-export function validateUpdaterServiceEvidence(machine, { sourceHead, version = '0.5.3' } = {}) {
+export function validateUpdaterServiceEvidence(machine, { sourceHead, version } = {}) {
+  validateFrozenTargetVersion(version)
   object(machine, 'machine report')
   sha(sourceHead, 'frozen source', 40)
   if (!['arm64', 'x64'].includes(machine.arch)) fail('machine report must identify a supported native macOS architecture')

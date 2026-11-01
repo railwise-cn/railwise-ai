@@ -1,16 +1,18 @@
 const { readFileSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 const asar = require('@electron/asar')
+const { validateMermaidInputs, VERSIONS, sha256 } = require('./build-markdown-rendering.cjs')
 
 const PACKAGES = { katex: '0.16.46', mermaid: '11.16.1', 'markdown-it-footnote': '4.0.0' }
 const ASSETS = [
   'node_modules/katex/dist/katex.min.css',
   'node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2',
-  'node_modules/mermaid/dist/mermaid.min.js',
+  'out/markdown-rendering/mermaid.js',
+  'out/markdown-rendering/mermaid-build.json',
   'node_modules/markdown-it-footnote/index.mjs',
   'node_modules/markdown-it-footnote/dist/index.cjs.js'
 ]
-const NOTICES = ['NOTICE.md', 'KaTeX-LICENSE.txt', 'Mermaid-LICENSE.txt', 'markdown-it-footnote-LICENSE.txt']
+const NOTICES = ['NOTICE.md', 'KaTeX-LICENSE.txt', 'Mermaid-LICENSE.txt', 'DOMPurify-LICENSE.txt', 'markdown-it-footnote-LICENSE.txt']
 
 function verifyPackagedMarkdownRendering(resourcesDirectory) {
   const archive = join(resourcesDirectory, 'app.asar')
@@ -32,6 +34,13 @@ function verifyPackagedMarkdownRendering(resourcesDirectory) {
     readAsset(`node_modules/${name}/LICENSE`)
   }
   for (const asset of ASSETS) readAsset(asset)
+  const bundle = readAsset('out/markdown-rendering/mermaid.js')
+  const report = JSON.parse(readAsset('out/markdown-rendering/mermaid-build.json').toString('utf8'))
+  if (report.schemaVersion !== 1 || report.entry !== 'mermaid/dist/mermaid.core.mjs'
+    || JSON.stringify(report.versions) !== JSON.stringify(VERSIONS)
+    || report.bytes !== bundle.length || report.sha256 !== sha256(bundle)) throw new Error('[markdown-rendering] Offline Mermaid provenance mismatch.')
+  validateMermaidInputs(report.inputs)
+  if (asar.listPackage(archive).some(name => /\/node_modules\/mermaid\/dist\//.test(name))) throw new Error('[markdown-rendering] Unreviewed upstream Mermaid browser assets remain packaged.')
   for (const notice of NOTICES) {
     const content = readFileSync(join(resourcesDirectory, 'third-party', 'markdown-rendering', notice))
     if (!content.length) throw new Error(`[markdown-rendering] Empty notice: ${notice}`)

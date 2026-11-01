@@ -109,7 +109,9 @@ export async function renderWriteMermaidDiagrams(sources: readonly string[]): Pr
   })
   if (!valid.length) return results
 
-  const script = (await readBundledDependencyAsset('mermaid/dist/mermaid.min.js')).toString('utf8')
+  // Use the core ESM bundle built against our reviewed dependency tree. The
+  // upstream UMD embeds older sanitizer/math copies independently of npm locks.
+  const script = (await readFile(join(app.getAppPath(), 'out/markdown-rendering/mermaid.js'))).toString('utf8')
   const window = new BrowserWindow({
     show: false,
     width: 1_200,

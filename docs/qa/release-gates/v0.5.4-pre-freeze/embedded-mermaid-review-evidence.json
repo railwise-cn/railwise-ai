@@ -1,0 +1,53 @@
+{
+  "reviewType": "independent AI source/security review; not installed package acceptance",
+  "cwd": "/private/tmp/railwise-release-0.5.4-20261101",
+  "version": "0.5.4",
+  "sourceHead": "db75a1fd2f48c6ba6878c81b67daec5191929362",
+  "recordedAt": "2026-11-01T14:29:35.581Z",
+  "bundle": {
+    "bytes": 3454991,
+    "sha256": "4247d8d3e825d1ff43a3cd2a54d226ce0a07545ef074c53c92d8769058c620d4",
+    "versions": {
+      "mermaid": "11.16.1",
+      "dompurify": "3.4.17",
+      "katex": "0.16.46"
+    },
+    "inputCount": 2040,
+    "selectedInputs": {
+      "node_modules/dompurify/dist/purify.es.mjs": {
+        "bytes": 85820,
+        "sha256": "60c5d5ccbb466de3de3ba863461a92bf134f8c156cef7992da43e0f659bc5cbd"
+      },
+      "node_modules/katex/dist/katex.mjs": {
+        "bytes": 601147,
+        "sha256": "241d0d27c94278bbafaa7dd855bdd04400172ee3fda874aa2df45ac330784687"
+      },
+      "node_modules/mermaid/dist/chunks/mermaid.core/chunk-ZIRB5QZD.mjs": {
+        "bytes": 93306,
+        "sha256": "d42ba504dce7190757d74d7cf079dc3fcaa35f42de993962b0104dc03e522972"
+      },
+      "node_modules/mermaid/dist/mermaid.core.mjs": {
+        "bytes": 52501,
+        "sha256": "ff6d60db40996debd295b31bb6624b593623b7829a952e22199982bd5ed8a152"
+      }
+    },
+    "allRecordedInputHashesMatch": true
+  },
+  "sourceHashes": {
+    "package.json": "7761eb16a17ae08ee09ff25cde7d36f3b6349b9a52d0278cdb066accaa1acf8e",
+    "package-lock.json": "91d522ae4da5d49bea49f15dfba40dc692ea898d915e1d81b4cb47337dcf54fc",
+    "electron-builder.cjs": "6e286034f356e767e62b8269b3f64f8df13c0bf658c1c167d407cb1f7b689f81",
+    "scripts/build-markdown-rendering.cjs": "9a5f53836b9e0e02786e9f320437596c151cd7d03e850e515063f21d1494fcd1",
+    "scripts/build-markdown-rendering.test.cjs": "7aab4c8e30a6c6208cec6fa3d6fc4e16b382110ddc8f203a9f4ba3210fff8f05",
+    "scripts/verify-packaged-markdown-rendering.cjs": "9733cbc36abf6b6d5f2cda29f5d4cb731482f5026e0fd797173608841d917946",
+    "scripts/verify-packaged-markdown-rendering.test.cjs": "9dfea5cbc1dd0e5796b896b23f418da24c727f7843fc22e758fa93a59813fe76",
+    "scripts/verify-build-freshness.cjs": "0ea110d22208418745a5908d758e9acc00d7b5dee5681bd3825bf1af1f86fb5f",
+    "scripts/verify-document-dependencies.mjs": "10a4ebe1f0a31e33360d02c2c55d26f458b56e19dc22439b9f19c9516b9410be",
+    "scripts/postinstall.cjs": "e3b78431ccf6a0b13fabf145ab2361467752bc141867baee59912a9d8790fa8c",
+    "src/main/services/write-advanced-renderer.ts": "5f8a50662d43961620bc9a863904344f460eb213ef57d648af5d1288d35b72ec",
+    "src/shared/write-mermaid-policy.ts": "36dbff138561c6456db3ca30ea12376fcadafc87e01a672dc174dcd4c0208115",
+    "src/shared/write-advanced-markdown.ts": "5d62932861b83fd750eff393a74d246504d3c562c3bb9016fe714acba18967a4",
+    "src/asset/markdown-rendering/NOTICE.md": "a00ab7c6ddfd92640228e9906efe60c899817fbee9eb135fd220cb079dc6b638",
+    "src/asset/markdown-rendering/DOMPurify-LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  }
+}

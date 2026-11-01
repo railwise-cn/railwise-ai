@@ -247,11 +247,14 @@ report, a passing status string, or an unrelated successful run fails this gate.
    screenshots, checklist, signing/notarization diagnostics and findings. A
    separately identified candidate bundle cannot close this public-identity
    package gate.
-5. For 0.5.3, dispatch `frozen-release-updater-acceptance.yml` on protected main
+5. Dispatch `frozen-release-updater-acceptance.yml` on protected main
    with the exact `reviewedBuild` JSON as its `reviewed_build` input. It consumes
    the frozen target ZIP and official pinned 0.5.2 baseline through a temporary
    default-trust HTTPS feed, performs the native updater install/restart and
-   verifies historical-data readback. Retain `frozen-updater.json`,
+   verifies historical-data readback. The target version comes from the trusted
+   checked-out source `package.json`; the publication verifier independently
+   binds both machine and native reports to the manifest's exact version.
+   Retain `frozen-updater.json`,
    `native-updater.json` and the seed/readback reports. The installed target ASAR
    must equal the frozen ZIP's ASAR and the UI-reviewed installation. A
    same-source version probe, mocked updater or manual download does not replace

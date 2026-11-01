@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   native-macos:
-    name: Official 0.5.2 to exact frozen 0.5.3 native updater
+    name: Official 0.5.2 to exact frozen public package native updater
     runs-on: macos-15
     timeout-minutes: 65
     steps:
@@ -54,8 +54,9 @@ jobs:
           import { writeFileSync } from 'node:fs'
           import { join } from 'node:path'
           import { validateReviewedBuild } from './scripts/verify-reviewed-release-artifacts.mjs'
+          import { readFrozenSourceVersion } from './scripts/frozen-release-version.mjs'
           const build = JSON.parse(process.env.REVIEWED_BUILD_JSON)
-          validateReviewedBuild(build, { version: '0.5.3', sourceHead: build.sourceHead })
+          validateReviewedBuild(build, { version: readFrozenSourceVersion(), sourceHead: process.env.GITHUB_SHA })
           writeFileSync(join(process.env.RUNNER_TEMP, 'frozen-reviewed-build.json'), JSON.stringify(build), { mode: 0o600, flag: 'wx' })
           NODE
       - name: Run default-trust HTTPS download, Squirrel install and historical data readback

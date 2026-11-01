@@ -1,0 +1,33 @@
+{
+  "root": "/private/tmp/railwise-release-0.5.4-20261101",
+  "scope": "Release-control implementation and focused tests only. No commit, push, workflow dispatch, tag, release, feed or public-page mutation performed.",
+  "tests": {
+    "frozenAcceptance": {
+      "passed": 42,
+      "failed": 0,
+      "log": "/private/tmp/railwise-release-0.5.4-frozen-tests.log"
+    },
+    "releaseGate": {
+      "passed": 284,
+      "failed": 0,
+      "log": "/private/tmp/railwise-release-0.5.4-gate-tests.log"
+    },
+    "eslint": "passed for all 10 changed owned MJS scripts",
+    "gitDiffCheck": "passed"
+  },
+  "sha256": {
+    ".github/workflows/frozen-release-updater-acceptance.yml": "f1b1169e66eeee1fef69e000ad5eae8dd0b79a3bdf3ddcad402a0754ecbfc1cd",
+    "scripts/frozen-release-version.mjs": "69ee4952a2a2e8d02ced48e2da12039cff37578b9c95770a0d4bc97d1a5b3619",
+    "scripts/frozen-release-updater-data.mjs": "f87bcec7597ec100e71156891bc3d3fa3d80dc6c9d896d5c7371c5b8dea50070",
+    "scripts/frozen-release-updater-feed.mjs": "5ef3c0352f023b384f08146f2f60fce5338ba54b232d5be1d96fadd3b3a61c2f",
+    "scripts/frozen-release-updater-service-contract.mjs": "bf37fd440fac01ba4a26a1d6adc030f11306b2edb267afcbf76612cf08a2d654",
+    "scripts/run-frozen-release-updater-acceptance.mjs": "49a8b090bd139c987df90487265cb93588cd93377838166ce3b41590cdd8ee3a",
+    "scripts/verify-frozen-updater-evidence.mjs": "5de30c8381cac8bf88a3bad948b1fc8dbbed2c546406787759ff3957b585211b",
+    "scripts/verify-release-approval.mjs": "cf3aa2a1dee501450751c19f5ba14a96736c9cd1b58751c15322286e0b44a540",
+    "scripts/frozen-release-updater-acceptance.test.mjs": "60397bea1b8f5d64c98cf54fbcce41cabdedaebefbcd7e5fcc2e0c9e71c505af",
+    "scripts/verify-frozen-updater-evidence.test.mjs": "18510971c23799e79ed76a2c9798ad41545593555874f8461d60f055c1aa56d2",
+    "scripts/release-gate.test.mjs": "e320fdebdaca6d21a9ca8df907867a2acda3095e4e205b1397d1464ec2afcccb",
+    "docs/release/stable-release-gate.md": "9efa6d6f4d485c26fa210a540aa6a662cfbd646549662bce58c90ab55e7f3490",
+    "docs/qa/release-gates/README.md": "300ddd7f8f0a280fd309f940ee6c93940c5a87cdcf1be3ffbe5febea6331b811"
+  }
+}

@@ -10,8 +10,9 @@
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
-    "dev": "npm run prepare:electron && npm run build:runtime && electron-vite dev",
-    "build": "npm run build:runtime && electron-vite build",
+    "dev": "npm run prepare:electron && npm run build:runtime && npm run build:markdown-rendering && electron-vite dev",
+    "build": "npm run build:runtime && npm run build:markdown-rendering && electron-vite build",
+    "build:markdown-rendering": "node ./scripts/build-markdown-rendering.cjs",
     "build:runtime": "node ./scripts/ensure-runtime-install.cjs && npm --prefix kun run build",
     "build:markitdown-sidecar": "node ./scripts/build-markitdown-sidecar.mjs",
     "lint": "eslint .",
@@ -71,12 +72,12 @@
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.0",
     "@larksuiteoapi/node-sdk": "^1.71.1",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@smithy/node-http-handler": "4.7.6",
     "@tencent-weixin/openclaw-weixin": "2.4.3",
     "@xmldom/xmldom": "^0.9.12",
     "@xyflow/react": "^12.11.2",
-    "axios": "^1.16.0",
+    "axios": "^1.20.0",
     "better-sqlite3": "^12.11.1",
     "bindings": "^1.5.0",
     "diff": "^9.0.0",
@@ -89,7 +90,7 @@
     "jszip": "^3.10.1",
     "katex": "0.16.46",
     "lucide-react": "^0.544.0",
-    "markdown-it": "^14.2.0",
+    "markdown-it": "^14.3.3",
     "markdown-it-footnote": "4.0.0",
     "mermaid": "11.16.1",
     "openclaw": "file:vendor/openclaw-shim",
@@ -135,13 +136,13 @@
     "vitest": "^4.1.7"
   },
   "overrides": {
-    "body-parser": "^2.3.0",
-    "fast-uri": "3.1.5",
-    "js-yaml": "4.3.1",
-    "hono": "4.13.1",
-    "@hono/node-server": "2.1.0",
-    "dompurify": "3.4.13",
-    "ip-address": "10.5.0",
+    "body-parser": "2.4.0",
+    "fast-uri": "3.1.9",
+    "js-yaml": "4.3.2",
+    "hono": "4.13.11",
+    "@hono/node-server": "2.1.3",
+    "dompurify": "3.4.17",
+    "ip-address": "10.7.4",
     "docx": {
       "nanoid": "5.1.16"
     },
@@ -152,8 +153,11 @@
       "mermaid": "11.16.1"
     },
     "mermaid": {
-      "dompurify": "3.4.13"
-    }
+      "dompurify": "3.4.17"
+    },
+    "follow-redirects": "1.16.2",
+    "proxy-addr": "2.0.8",
+    "qs": "6.16.1"
   },
   "author": "WorkWise Contributors",
   "homepage": "https://github.com/railwise-cn/railwise-ai",

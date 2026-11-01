@@ -581,10 +581,16 @@ jobs:
 
       - name: Build signed macOS packages
         if: steps.signing.outputs.enabled == 'true'
+        env:
+          # Local Markdown/PPTX renderer bundling exceeds Node's default heap.
+          # Limit this override to the build process; it is never app configuration.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: node scripts/with-mac-signing-keychain.mjs npm run dist:mac:signed
 
       - name: Build unsigned macOS packages
         if: steps.signing.outputs.enabled != 'true'
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run dist:mac
 
       - name: Verify MarkItDown is packaged in both macOS applications
@@ -670,6 +676,8 @@ jobs:
         run: npm run test:managed-tools:live
 
       - name: Build Windows installer
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run dist:win
 
       - name: Verify MarkItDown is packaged in the Windows application
