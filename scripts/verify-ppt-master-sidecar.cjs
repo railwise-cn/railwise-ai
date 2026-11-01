@@ -41,6 +41,9 @@ function invoke(request) {
   const result = spawnSync(executable, [], {
     input: JSON.stringify(request),
     encoding: 'utf8',
+    env: targetPlatform === 'win32'
+      ? { ...process.env, PYTHONIOENCODING: 'cp1252' }
+      : process.env,
     maxBuffer: 8 * 1024 * 1024,
     timeout: 90_000,
     windowsHide: true

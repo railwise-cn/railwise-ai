@@ -406,7 +406,7 @@ def main() -> int:
     request = json.loads(raw.decode("utf-8"))
     if not isinstance(request, dict):
         raise ValueError("request must be an object")
-    print(json.dumps(run(request), ensure_ascii=False))
+    print(json.dumps(run(request), ensure_ascii=True))
     return 0
 
 
@@ -414,5 +414,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as error:  # return a stable protocol error, not a traceback
-        print(json.dumps({"ok": False, "code": "document_parse_failed", "message": str(error)}, ensure_ascii=False))
+        print(json.dumps({"ok": False, "code": "document_parse_failed", "message": str(error)}, ensure_ascii=True))
         raise SystemExit(2)
