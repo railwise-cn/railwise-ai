@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { WriteSelectionRange } from '../components/write/WriteMarkdownEditor'
+import type { DocumentComment } from '@shared/write-document'
 import {
   applyWriteInlineEditReplacement,
   buildWriteInlineEditCompletionRequest,
   buildWriteInlineEditDraft,
-  resolveWriteInlineEditScope
+  resolveWriteInlineEditScope,
+  resolveWriteCommentEditSelection
 } from './inline-edit'
 
 function selectionRange(content: string, selected: string): WriteSelectionRange {
@@ -24,6 +26,23 @@ function selectionRange(content: string, selected: string): WriteSelectionRange 
 }
 
 describe('write inline edit helpers', () => {
+  it('uses exact source offsets for comment edits and rejects stale, missing, or cross-document anchors', () => {
+    const content = '# 合成\n\nSame words. **目标😀** Same words.\n'
+    const from = content.indexOf('目标😀')
+    const item: DocumentComment = { id: 'c1', path: '/tmp/docs/test.md', text: 'Use formal language.', anchor: { from, to: from + '目标😀'.length, text: '目标😀' }, status: 'open', createdAt: '', updatedAt: '' }
+    const range = resolveWriteCommentEditSelection(content, item.path, item)!
+    expect(range).toMatchObject({ from, to: item.anchor.to, text: '目标😀', startLine: 3, charCount: 4 })
+    expect(buildWriteInlineEditDraft(content, range, item.text).scope.text).toBe('目标😀')
+    expect(resolveWriteCommentEditSelection(content, '/tmp/docs/other.md', item)).toBeNull()
+    expect(resolveWriteCommentEditSelection(content.replace('目标😀', '目标'), item.path, item)).toBeNull()
+    expect(resolveWriteCommentEditSelection('Inserted. ' + content, item.path, item)).toBeNull()
+    for (const anchor of [undefined, { from: 0, to: 0, text: '' }, { from: -1, to: 4, text: 'Same' }, { from: 1.5, to: 5, text: 'Same' }, { from: 0, to: content.length + 1, text: content }]) {
+      expect(resolveWriteCommentEditSelection(content, item.path, { ...item, anchor } as DocumentComment)).toBeNull()
+    }
+    const duplicate = { ...item, anchor: { from: 0, to: 11, text: 'Same words.' } }
+    expect(resolveWriteCommentEditSelection(content, item.path, duplicate)).toBeNull()
+  })
+
   it('keeps a short selected phrase as the exact edit scope', () => {
     const content = [
       '# Draft',

@@ -6,6 +6,7 @@ import {
   DEFAULT_IMAGE_GENERATION_PROTOCOL,
   DEFAULT_MODEL_ENDPOINT_FORMAT,
   DEFAULT_MODEL_PROVIDER_ID,
+  DEFAULT_MANAGED_RUNTIME_MODEL,
   CUSTOM_IMAGE_GENERATION_PROVIDER_ID,
   type AppSettingsV1,
   type ImageGenerationProtocol,
@@ -191,7 +192,7 @@ export function resolveProviderModelId(provider: ModelProviderProfileV1, model: 
   }
   const normalized = trimmed.toLowerCase()
   return normalized === 'deepseek-chat' || normalized === 'deepseek-reasoner'
-    ? 'deepseek-v4-flash'
+    ? DEFAULT_MANAGED_RUNTIME_MODEL
     : trimmed
 }
 

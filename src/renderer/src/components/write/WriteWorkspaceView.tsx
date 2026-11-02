@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { WriteExportFormat } from '@shared/write-export'
+import type { DocumentComment } from '@shared/write-document'
 import {
   BUILTIN_TEMPLATE_IDS,
   mergeBuiltinAndUserTemplates,
@@ -33,7 +34,8 @@ import { getWriteRenderSafety } from '../../write/write-render-safety'
 import {
   applyWriteInlineEditReplacement,
   buildWriteInlineEditCompletionRequest,
-  buildWriteInlineEditDraft
+  buildWriteInlineEditDraft,
+  resolveWriteCommentEditSelection
 } from '../../write/inline-edit'
 import type { AgnesImageSize } from '@shared/agnes-image'
 import { createWriteRecentEdit } from '../../write/recent-edits'
@@ -195,6 +197,7 @@ export function WriteWorkspaceView({
   const [inlineAgentValue, setInlineAgentValue] = useState('')
   const [inlineAgentOpen, setInlineAgentOpen] = useState(false)
   const [inlineEditInFlight, setInlineEditInFlight] = useState(false)
+  const inlineEditInFlightRef = useRef(false)
   const [pendingAiEdit, setPendingAiEdit] = useState<PendingWriteAiEdit | null>(null)
   const [aiReviewError, setAiReviewError] = useState<string | null>(null)
   const [infographicInFlight, setInfographicInFlight] = useState(false)
@@ -382,20 +385,20 @@ export function WriteWorkspaceView({
     setInput(input.trim() ? `${input.trim()}\n\n${trimmed}` : trimmed)
   }
 
-  const submitInlineEdit = async (prompt: string, documentAction?: 'append' | 'replace'): Promise<void> => {
+  const submitInlineEdit = async (prompt: string, documentAction?: 'append' | 'replace', comment?: DocumentComment): Promise<boolean> => {
     const trimmed = prompt.trim()
-    if (!trimmed || !workspaceReady || !activeFilePath || inlineEditInFlight) return
+    if (!trimmed || !workspaceReady || !activeFilePath || inlineEditInFlightRef.current) return false
     if (renderSafety.readOnly) {
       setFileError(t('writeReadOnlySaveDisabled'))
-      return
+      return false
     }
-    if (!documentAction && selection.ranges.length !== 1) {
+    if (!documentAction && !comment && selection.ranges.length !== 1) {
       setFileError(t(selection.ranges.length > 1 ? 'writeInlineEditMultiSelection' : 'writeInlineEditNoSelection'))
-      return
+      return false
     }
     if (typeof window.workwise?.requestWriteInlineCompletion !== 'function') {
       setFileError(t('writeInlineEditUnavailable'))
-      return
+      return false
     }
 
     // In rich mode the inline edit operates on the markdown projection: the
@@ -404,6 +407,15 @@ export function WriteWorkspaceView({
     const richHandle = richModeActive ? richHandleRef.current : null
     const richProjectionText = richHandle?.getProjectionText() ?? null
     const editContent = richProjectionText ?? fileContent
+    const latest = useWriteWorkspaceStore.getState()
+    const commentRange = comment ? resolveWriteCommentEditSelection(editContent, activeFilePath, comment) : null
+    if (comment && (!commentRange || latest.workspaceRoot !== workspaceRoot || latest.activeFilePath !== activeFilePath ||
+      latest.activeFileKind !== 'text' || latest.fileContent !== editContent || latest.fileTruncated || latest.documentConflict)) {
+      if (latest.workspaceRoot === workspaceRoot && latest.activeFilePath === activeFilePath) {
+        setFileError(uiLabel('批注原文已变化或不可用，请重新选择原文并添加批注。', 'The comment anchor changed or is unavailable. Select the text and add a new comment.'))
+      }
+      return false
+    }
 
     const scopeRange = documentAction ? {
       from: documentAction === 'append' ? editContent.length : 0,
@@ -411,7 +423,7 @@ export function WriteWorkspaceView({
       text: documentAction === 'append' ? '' : editContent,
       charCount: documentAction === 'append' ? 0 : editContent.length,
       startLine: 1, startColumn: 1, endLine: editContent.split('\n').length, endColumn: 1
-    } : selection.ranges[0]
+    } : commentRange ?? selection.ranges[0]
     const draft = buildWriteInlineEditDraft(editContent, scopeRange, trimmed, {
       workspaceRoot,
       currentFilePath: activeFilePath,
@@ -420,28 +432,41 @@ export function WriteWorkspaceView({
       recentEdits
     })
 
+    inlineEditInFlightRef.current = true
     setInlineEditInFlight(true)
+    setFileError(null)
     try {
       const result = await window.workwise.requestWriteInlineCompletion(
         buildWriteInlineEditCompletionRequest(draft.request)
       )
       if (!result.ok) {
-        setFileError(t('writeInlineEditFailed', { message: result.message }))
-        return
+        const current = useWriteWorkspaceStore.getState()
+        if (current.workspaceRoot === workspaceRoot && current.activeFilePath === activeFilePath) setFileError(t('writeInlineEditFailed', { message: result.message }))
+        return false
+      }
+      const current = useWriteWorkspaceStore.getState()
+      if (current.workspaceRoot !== workspaceRoot || current.activeFilePath !== activeFilePath ||
+        current.activeFileKind !== 'text' || current.fileContent !== editContent || current.fileTruncated || current.documentConflict) {
+        if (current.workspaceRoot === workspaceRoot && current.activeFilePath === activeFilePath) setFileError(t('writeInlineEditChanged'))
+        return false
       }
       const replacement = result.action?.kind === 'edit'
         ? result.action.replacement
         : result.completion
 
       setAiReviewError(null)
-      setPendingAiEdit({ path: activeFilePath, instruction: trimmed, scope: draft.scope, replacement, sourceContent: editContent })
+      setPendingAiEdit({ workspaceRoot, path: activeFilePath, instruction: trimmed, scope: draft.scope, replacement, sourceContent: editContent })
       setInlineAgentValue('')
       setInlineAgentOpen(false)
+      return true
     } catch (error) {
-      setFileError(t('writeInlineEditFailed', {
-        message: error instanceof Error ? error.message : String(error)
-      }))
+      const current = useWriteWorkspaceStore.getState()
+      if (current.workspaceRoot === workspaceRoot && current.activeFilePath === activeFilePath) {
+        setFileError(t('writeInlineEditFailed', { message: error instanceof Error ? error.message : String(error) }))
+      }
+      return false
     } finally {
+      inlineEditInFlightRef.current = false
       setInlineEditInFlight(false)
     }
   }
@@ -450,13 +475,14 @@ export function WriteWorkspaceView({
     if (!pendingAiEdit) return
     const latest = useWriteWorkspaceStore.getState()
     const { path, instruction, scope, replacement } = pendingAiEdit
-    if (latest.activeFilePath !== path || latest.activeFileKind !== 'text') {
+    if (latest.workspaceRoot !== pendingAiEdit.workspaceRoot || latest.activeFilePath !== path || latest.activeFileKind !== 'text' || latest.documentConflict) {
       setAiReviewError(t('writeInlineEditChanged'))
       return
     }
     const handle = richModeActive ? richHandleRef.current : null
     const content = handle?.getProjectionText() ?? latest.fileContent
-    if (content !== pendingAiEdit.sourceContent || content.slice(scope.from, scope.to) !== scope.text || renderSafety.readOnly) {
+    const latestSafety = getWriteRenderSafety({ isMarkdown: isMarkdownFile(path), contentLength: latest.fileContent.length, fileSize: latest.fileSize, truncated: latest.fileTruncated })
+    if (content !== pendingAiEdit.sourceContent || content.slice(scope.from, scope.to) !== scope.text || latestSafety.readOnly) {
       setAiReviewError(t('writeInlineEditChanged'))
       return
     }
@@ -1109,7 +1135,13 @@ export function WriteWorkspaceView({
               selection={selection} readOnly={renderSafety.readOnly} saveRevision={saveRevision}
               onChange={setFileContent}
               onOpenFile={(path) => void useWriteWorkspaceStore.getState().openFile(workspaceRoot, path)}
-              onAskAssistant={setAssistantPrompt}
+              aiEditBusy={inlineEditInFlight}
+              onReviewComment={async (comment) => {
+                const prompt = uiLabel('根据这条本地批注修改所选原文，不修改其他内容。只返回修改后的选区：', 'Revise the selected original text using this local comment without changing other content. Return only the revised selection:')
+                if (!await submitInlineEdit(`${prompt}\n\n${comment.text}`, undefined, comment)) {
+                  throw new Error(useWriteWorkspaceStore.getState().fileError || t('writeInlineEditChanged'))
+                }
+              }}
               onBeforeRestore={async () => {
                 if (!await flushSave(workspaceRoot)) return null
                 return useWriteWorkspaceStore.getState().documentRevision

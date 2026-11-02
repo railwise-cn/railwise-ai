@@ -91,7 +91,7 @@ Keep Markdown/MDX files in your local workspace and use a document workflow:
 - Search local titles, text, and paths; edit YAML properties and writing stages; inspect broken links, backlinks, document relations, snapshot differences, and local comments.
 - Select text for AI rewriting, shortening, expansion, or terminology changes, or draft from workspace sources. Review the proposed difference before accepting it. Manual AI actions remain available when automatic suggestions are off.
 - Preserve your draft when an external edit conflicts. Partially loaded large files are read-only to protect the original.
-- Export HTML, PDF, DOC, or DOCX. Math, footnotes, and diagrams use the same local rendering rules; complex Word equations may use an image fallback. DOCX templates let you customize document styles. Check facts, sources, pagination, and layout before delivery.
+- Export HTML, PDF, or DOCX. Math, footnotes, and diagrams use the same local rendering rules; complex Word equations may use an image fallback. DOCX templates let you customize document styles. Check facts, sources, pagination, and layout before delivery.
 - Attach PDF and Office tender sources directly in Write, then start the bundled Tender Master workflow without switching to Code.
 
 Read more: [Write and document export](https://kb.railwise.cn/products/workwise/write-export/).

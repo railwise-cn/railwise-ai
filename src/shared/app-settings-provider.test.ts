@@ -3,6 +3,7 @@ import {
   DEFAULT_AGNES_BASE_URL,
   DEFAULT_AGNES_PROVIDER_ID,
   DEFAULT_AGNES_TEXT_MODEL,
+  DEFAULT_MANAGED_RUNTIME_MODEL,
   defaultClawSettings,
   defaultKeyboardShortcuts,
   defaultManagedRuntimeSettings,
@@ -114,8 +115,14 @@ describe('model provider settings', () => {
   it('migrates retired DeepSeek aliases without changing third-party models', () => {
     const deepseekSettings = settings()
     deepseekSettings.agents.kun.providerId = 'deepseek'
-    deepseekSettings.agents.kun.model = 'deepseek-reasoner'
-    expect(resolveManagedRuntimeSettings(deepseekSettings).model).toBe('deepseek-v4-flash')
+    for (const alias of ['deepseek-chat', 'deepseek-reasoner', '  DEEPSEEK-REASONER  ']) {
+      deepseekSettings.agents.kun.model = alias
+      expect(resolveManagedRuntimeSettings(deepseekSettings).model).toBe(DEFAULT_MANAGED_RUNTIME_MODEL)
+    }
+    for (const explicit of ['deepseek-v4-flash', 'deepseek-v4-pro', 'custom-model']) {
+      deepseekSettings.agents.kun.model = explicit
+      expect(resolveManagedRuntimeSettings(deepseekSettings).model).toBe(explicit)
+    }
 
     const customSettings = settings()
     customSettings.agents.kun.model = 'deepseek-reasoner'

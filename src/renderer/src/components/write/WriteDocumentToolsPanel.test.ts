@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../../i18n'
 import { WriteDocumentToolsPanel, replaceDocumentFrontmatter } from './WriteDocumentToolsPanel'
 import { WriteAiReviewDialog } from './WriteAiReviewDialog'
-import type { DocumentSemantics } from '@shared/write-document'
+import type { DocumentComment, DocumentSemantics } from '@shared/write-document'
 
 let container: HTMLDivElement
 let root: Root
@@ -21,7 +21,7 @@ function props(): ComponentProps<typeof WriteDocumentToolsPanel> {
   return {
     workspaceRoot: '/tmp/docs', path, content: '---\ntitle: Original\n---\n# Body\n',
     selection: { text: 'Body', charCount: 4, ranges: [{ from: 25, to: 29, text: 'Body', charCount: 4, startLine: 4, endLine: 4, startColumn: 3, endColumn: 6 }] },
-    readOnly: false, saveRevision: 0, onChange: vi.fn(), onOpenFile: vi.fn(), onAskAssistant: vi.fn(),
+    readOnly: false, saveRevision: 0, onChange: vi.fn(), onOpenFile: vi.fn(), onReviewComment: vi.fn(async () => undefined), aiEditBusy: false,
     onBeforeRestore: vi.fn(async () => ({ fingerprint: 'baseline', size: 4, modifiedAt: 1 })), onRestored: vi.fn(async () => true)
   }
 }
@@ -90,7 +90,7 @@ describe('document workbench review tools', () => {
   it('shows AI diff without applying a change until Accept is clicked', async () => {
     const onApply = vi.fn(); const onClose = vi.fn()
     await act(async () => root.render(createElement(WriteAiReviewDialog, {
-      edit: { path, instruction: 'Polish', replacement: 'New\n', sourceContent: 'Old\n', scope: { kind: 'selection', from: 0, to: 4, text: 'Old\n', selectedText: 'Old\n', startLine: 1, startColumn: 1, endLine: 1, endColumn: 4 } },
+      edit: { workspaceRoot: '/tmp/docs', path, instruction: 'Polish', replacement: 'New\n', sourceContent: 'Old\n', scope: { kind: 'selection', from: 0, to: 4, text: 'Old\n', selectedText: 'Old\n', startLine: 1, startColumn: 1, endLine: 1, endColumn: 4 } },
       error: null, onApply, onClose
     })))
     expect(container.textContent).toContain('Old')
@@ -98,6 +98,45 @@ describe('document workbench review tools', () => {
     expect(onApply).not.toHaveBeenCalled()
     await act(async () => button('接受修改').click())
     expect(onApply).toHaveBeenCalledOnce()
+  })
+
+  it('requests a reviewed comment proposal, keeps the comment on failure and disables duplicate/read-only requests', async () => {
+    const next = props()
+    const item: DocumentComment = { id: 'comment-1', path, text: 'Make the report clearer.', anchor: { from: 25, to: 29, text: 'Body' }, status: 'open', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' }
+    let reject: (reason: Error) => void = () => undefined
+    next.onReviewComment = vi.fn(() => new Promise<void>((_resolve, rejectRequest) => { reject = rejectRequest }))
+    const update = vi.fn()
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { listDocumentComments: vi.fn(async () => [item]), updateDocumentComment: update } })
+    await act(async () => root.render(createElement(WriteDocumentToolsPanel, next)))
+    await act(async () => button('批注').click())
+    await act(async () => button('生成修改建议').click())
+    expect(next.onReviewComment).toHaveBeenCalledExactlyOnceWith(item)
+    expect(button('生成修改建议').disabled).toBe(true)
+    expect(next.onChange).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+    await act(async () => reject(new Error('The comment anchor changed.')))
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('anchor changed')
+    expect(container.textContent).toContain(item.text)
+    expect(button('生成修改建议').disabled).toBe(false)
+    await act(async () => root.render(createElement(WriteDocumentToolsPanel, { ...next, readOnly: true })))
+    expect(button('生成修改建议').disabled).toBe(true)
+    await act(async () => root.render(createElement(WriteDocumentToolsPanel, { ...next, aiEditBusy: true })))
+    expect(button('生成修改建议').disabled).toBe(true)
+  })
+
+  it('does not close or add an old request error to a newly opened panel', async () => {
+    const next = props()
+    const item: DocumentComment = { id: 'c1', path, text: 'Synthetic comment.', anchor: { from: 25, to: 29, text: 'Body' }, status: 'open', createdAt: '', updatedAt: '' }
+    let complete: () => void = () => undefined
+    next.onReviewComment = vi.fn(() => new Promise<void>((resolve) => { complete = resolve }))
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { listDocumentComments: vi.fn(async () => [item]), getDocumentSemantics: vi.fn(async () => frontmatter) } })
+    await act(async () => root.render(createElement(WriteDocumentToolsPanel, next)))
+    await act(async () => button('批注').click())
+    await act(async () => button('生成修改建议').click())
+    await act(async () => button('属性').click())
+    await act(async () => complete())
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('YAML')
+    expect(container.querySelector('[role="alert"]')).toBeNull()
   })
 
   it('restores history against the reviewed baseline, without accepting a fresh unseen disk revision', async () => {
