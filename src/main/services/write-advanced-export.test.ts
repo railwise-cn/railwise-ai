@@ -111,6 +111,17 @@ describe('advanced Markdown export semantics', () => {
       expect(body.match(/<w:footnoteReference w:id="1"\/>/g)).toHaveLength(1)
       expect(body.match(/NOTEREF RailWiseFootnote1/g)).toHaveLength(2)
       expect(body).toContain('w:name="RailWiseFootnote1"')
+      const xml = new DOMParser().parseFromString(body, 'application/xml')
+      const starts = Array.from(xml.getElementsByTagName('w:bookmarkStart'))
+      const ids = starts.map((node) => node.getAttribute('w:id'))
+      expect(starts).toHaveLength(2)
+      expect(new Set(ids).size).toBe(2)
+      expect(starts.map((node) => node.getAttribute('w:name'))).toEqual(expect.arrayContaining([
+        'RailWiseFootnote1', expect.stringMatching(/^RailWiseHeading/)
+      ]))
+      // A heading can enclose a note reference; both must share one allocator
+      // while each start still has exactly one corresponding end.
+      expect(Array.from(xml.getElementsByTagName('w:bookmarkEnd')).map((node) => node.getAttribute('w:id')).sort()).toEqual([...ids].sort())
     }
   })
 
