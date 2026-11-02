@@ -315,7 +315,7 @@ export function ProvidersSettingsSection({ ctx }: { ctx: Record<string, any> }):
                   <textarea
                     className="min-h-24 w-full min-w-0 resize-y rounded-xl border border-ds-border bg-ds-card px-3 py-2 font-mono text-[12.5px] font-normal text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30"
                     value={activeProvider.models.join('\n')}
-                    placeholder="deepseek-flash&#10;deepseek-v4-pro"
+                    placeholder="deepseek-flash"
                     onChange={(e) => updateModelProvider(activeProvider.id, {
                       models: e.target.value.split('\n').map((item) => item.trim()).filter(Boolean)
                     })}

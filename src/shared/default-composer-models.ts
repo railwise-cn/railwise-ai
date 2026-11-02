@@ -1,18 +1,16 @@
-/** When upstream `GET /v1/models` fails, offer these ids in the composer (matches TUI picker + common IDs). */
+/** When upstream `GET /v1/models` fails, offer the current DeepSeek V4.1 Flash id in the composer. */
 export const DEFAULT_COMPOSER_MODEL_IDS = [
   'auto',
-  'deepseek-flash',
-  'deepseek-v4-pro',
-  'deepseek-v4-flash',
-  'deepseek-v4-flash-vision-exp'
+  'deepseek-flash'
 ] as const
 
 /**
  * Legacy DeepSeek ids remain accepted by the Runtime as configuration aliases,
- * but they are retired product names and must not appear in user pickers.
+ * but they are compatibility identifiers and must not appear in user pickers.
  */
 export const RETIRED_COMPOSER_MODEL_IDS = new Set(['deepseek-chat', 'deepseek-reasoner'])
 
 export function isVisibleComposerModelId(modelId: string): boolean {
-  return !RETIRED_COMPOSER_MODEL_IDS.has(modelId.trim().toLowerCase())
+  const normalized = modelId.trim().toLowerCase()
+  return !RETIRED_COMPOSER_MODEL_IDS.has(normalized) && !normalized.startsWith('deepseek-v4-')
 }

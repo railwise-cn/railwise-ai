@@ -108,18 +108,43 @@ export function parseDesignatedRequirement(result) {
   return [...requirements][0]
 }
 
-export function verifyBundle(app, head, version, progress) {
+/**
+ * Verify a candidate bundle at a trust boundary.
+ *
+ * A notarized app's stapled ticket is present on the signed ZIP/DMG before
+ * Squirrel installation. Squirrel.Mac may unpack the ZIP without retaining
+ * the stapled ticket even though the code signature and Gatekeeper assessment
+ * remain valid. Callers must explicitly opt into that post-install boundary;
+ * pre-update package checks stay fail-closed on stapler failures.
+ */
+export function verifyBundle(app, head, version, progress, { allowNativeInstallStapleLoss = false } = {}) {
   const run = (command, args) => execute(command, args, progress)
   const info = JSON.parse(run('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents/Info.plist')]))
   validateBundleIdentity(info, head, version)
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app])
-  run('/usr/bin/xcrun', ['stapler', 'validate', app])
+  const staple = boundedCommand('/usr/bin/xcrun', ['stapler', 'validate', app], {
+    progress,
+    allowedExitCodes: allowNativeInstallStapleLoss ? [0, 68] : [0]
+  })
   run('/usr/sbin/spctl', ['--assess', '--type', 'execute', app])
   validatePrivateUpdateMetadata(readFileSync(join(app, 'Contents/Resources/app-update.yml'), 'utf8'), head)
   packagedAsar._internals.verifyPackagedSourceHead(join(app, 'Contents/Resources/app.asar'), head)
   const identity = boundedCommand('/usr/bin/codesign', ['-d', '-r-', app], { progress })
   const requirement = parseDesignatedRequirement(identity)
-  return { bundleId: info.CFBundleIdentifier, version, designatedRequirement: requirement }
+  if (staple.status !== 0 && !allowNativeInstallStapleLoss) {
+    throw new Error('Candidate stapled notarization validation failed before native installation.')
+  }
+  return {
+    bundleId: info.CFBundleIdentifier,
+    version,
+    signature: 'verified',
+    stapledNotarization: staple.status === 0 ? 'verified' : 'gatekeeper-verified-after-native-install',
+    stapleValidation: staple.status === 0
+      ? { status: 'verified', exitCode: 0 }
+      : { status: 'unavailable-after-native-install', exitCode: staple.status, reason: 'squirrel-install-stapled-ticket-boundary' },
+    gatekeeper: 'accepted',
+    designatedRequirement: requirement
+  }
 }
 
 async function sha256(path) {
@@ -203,7 +228,7 @@ async function main() {
     ], env, progress)
     if (feed.requests.manifest < 1 || feed.requests.zip < 1 || feed.requests.bytesServed === 0) throw new Error('Native updater did not fetch the real private manifest and ZIP.')
     const installed = join(root, 'Applications', basename(targetApp))
-    verifyBundle(installed, head, targetVersion, progress)
+    report.installedIdentity = verifyBundle(installed, head, targetVersion, progress, { allowNativeInstallStapleLoss: true })
     const installedHash = await sha256(join(installed, 'Contents/Resources/app.asar'))
     if (installedHash !== report.targetAsarSha256) throw new Error('Relaunched package differs from the signed target.')
     if (readFileSync(sentinelPath, 'utf8') !== sentinel) throw new Error('Isolated data sentinel changed during native installation.')

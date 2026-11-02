@@ -423,6 +423,29 @@ test('updater reports must bind the real official baseline, frozen bytes and com
   })
 })
 
+test('updater evidence may record the Squirrel stapled-ticket boundary only after signature and Gatekeeper checks', t => {
+  const f = releaseFixture(t)
+  f.machineReport.installedIdentity = {
+    ...f.machineReport.installedIdentity,
+    stapledNotarization: 'gatekeeper-verified-after-native-install',
+    stapleValidation: {
+      status: 'unavailable-after-native-install',
+      exitCode: 68,
+      reason: 'squirrel-install-stapled-ticket-boundary',
+    },
+  }
+  f.recordEvidence()
+  assert.doesNotThrow(() => f.verify(f.tagRelease()))
+
+  const rejected = releaseFixture(t)
+  rejected.machineReport.installedIdentity = {
+    ...rejected.machineReport.installedIdentity,
+    stapledNotarization: 'unverified',
+  }
+  rejected.recordEvidence()
+  assert.throws(() => rejected.verify(rejected.tagRelease()), /notarization boundary is missing/)
+})
+
 test('the installed UI review must identify its application ASAR hash', t => {
   const f = releaseFixture(t)
   delete f.manifest.package.identity.asarSha256

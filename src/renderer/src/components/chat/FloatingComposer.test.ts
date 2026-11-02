@@ -707,8 +707,8 @@ describe('FloatingComposer capability controls', () => {
         busy: true,
         runtimeReady: true,
         hasActiveThread: true,
-        composerModel: 'deepseek-v4-pro',
-        composerPickList: ['deepseek-v4-pro'],
+        composerModel: 'deepseek-flash',
+        composerPickList: ['deepseek-flash'],
         onComposerModelChange: () => undefined,
         queuedMessages: [],
         onRemoveQueuedMessage: () => undefined,
@@ -719,7 +719,7 @@ describe('FloatingComposer capability controls', () => {
       })
     )
 
-    expect(html).toContain('deepseek-v4-pro')
+    expect(html).toContain('deepseek-flash')
     expect(html).toContain('Stop')
     expect(html).not.toContain('Stop and discard')
     expect(html).not.toContain('lucide-trash-2')
@@ -732,8 +732,8 @@ describe('FloatingComposer capability controls', () => {
       createElement(FloatingComposerModelPicker, {
         compact: false,
         mode: 'select',
-        composerModel: 'deepseek-v4-pro',
-        composerPickList: ['auto', 'deepseek-v4-flash', 'deepseek-v4-pro'],
+        composerModel: 'deepseek-flash',
+        composerPickList: ['auto', 'deepseek-flash'],
         canChangeModel: true,
         composerReasoningEffort: 'max',
         onComposerReasoningEffortChange: () => undefined,
@@ -741,7 +741,7 @@ describe('FloatingComposer capability controls', () => {
       })
     )
 
-    expect(html).toContain('deepseek-v4-pro')
+    expect(html).toContain('deepseek-flash')
     expect(html).toContain('Ultra')
     expect(html).toContain('Model and reasoning settings')
     expect(html).not.toContain('>Auto<')
@@ -754,8 +754,8 @@ describe('FloatingComposer capability controls', () => {
       createElement(FloatingComposerModelPicker, {
         compact: true,
         mode: 'combobox',
-        composerModel: 'deepseek-v4-flash',
-        composerPickList: ['auto', 'deepseek-v4-flash', 'deepseek-v4-pro'],
+        composerModel: 'deepseek-flash',
+        composerPickList: ['auto', 'deepseek-flash'],
         canChangeModel: true,
         composerReasoningEffort: 'high',
         onComposerReasoningEffortChange: () => undefined,
@@ -763,7 +763,7 @@ describe('FloatingComposer capability controls', () => {
       })
     )
 
-    expect(html).toContain('deepseek-v4-flash')
+    expect(html).toContain('deepseek-flash')
     expect(html).toContain('High')
     expect(html).toContain('Model and reasoning settings')
     expect(html).toContain('aria-haspopup="menu"')

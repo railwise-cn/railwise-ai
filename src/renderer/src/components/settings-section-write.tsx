@@ -8,6 +8,7 @@ import {
   defaultModelProviderSettings,
   resolveWriteInlineCompletionProviderId
 } from '@shared/app-settings'
+import { isVisibleComposerModelId } from '@shared/default-composer-models'
 import type { WriteKnowledgeBaseStatus } from '@shared/workwise-api'
 import { ExternalLink, PencilLine, RefreshCw } from 'lucide-react'
 import {
@@ -251,19 +252,19 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                         }}
                       />
                       <datalist id="write-inline-completion-model-options">
-                        {[...new Set([...writeInlineProviderModels, ...WRITE_INLINE_COMPLETION_MODEL_IDS])].map((model) => (
+                        {[...new Set([...writeInlineProviderModels, ...WRITE_INLINE_COMPLETION_MODEL_IDS])]
+                          .filter(isVisibleComposerModelId)
+                          .map((model) => (
                           <option
                             key={model}
                             value={model}
                             label={
                               model === DEFAULT_WRITE_INLINE_COMPLETION_MODEL
                                 ? t('writeInlineCompletionModelFlash')
-                                : model === 'deepseek-v4-pro'
-                                  ? t('writeInlineCompletionModelPro')
-                                  : model
+                                : model
                             }
                           />
-                        ))}
+                          ))}
                       </datalist>
                       <p className="mt-2 text-[12px] text-ds-muted">
                         {writeInlineModelInherited

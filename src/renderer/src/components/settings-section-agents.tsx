@@ -171,7 +171,7 @@ function normalizeModelId(model: string | undefined): string {
 function knownModelContextProfile(input: string | undefined): { modelLabel: string } | null {
   const normalized = normalizeModelId(input)
   if (!normalized) return null
-  const match = ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner']
+  const match = ['deepseek-flash']
     .find((modelId) => normalized === modelId || normalized.endsWith(`/${modelId}`))
   return match ? { modelLabel: match } : null
 }

@@ -1642,7 +1642,7 @@
   "clawHelpCommandHelp": "显示这份命令帮助",
   "clawHelpCommandNew": "清空当前飞书 / Lark 连接的对话",
   "clawHelpCommandModelAuto": "切换到 auto 模型",
-  "clawHelpCommandModelPro": "切换到 deepseek-v4-pro",
+  "clawHelpCommandModelPro": "切换到 DeepSeek V4.1 Pro 兼容模型",
   "clawHelpCommandModelFlash": "切换到 deepseek-flash",
   "clawHelpCommandModelShow": "查看当前模型",
   "clawTimelineInbound": "来自 {{source}}",
