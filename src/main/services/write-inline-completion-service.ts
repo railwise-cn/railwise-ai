@@ -31,6 +31,12 @@ import {
 } from './write-knowledge-service'
 
 const INLINE_COMPLETION_TIMEOUT_MS = 12_000
+// Explicit document edits can replace or expand a complete paragraph/document.
+// Their output budget must not inherit the small, latency-oriented ghost-text
+// preferences. Keep both output and request duration bounded independently.
+const DOCUMENT_EDIT_TIMEOUT_MS = 120_000
+const DOCUMENT_EDIT_MIN_OUTPUT_TOKENS = 4_096
+const DOCUMENT_EDIT_MAX_OUTPUT_TOKENS = 16_384
 const KNOWLEDGE_LOOKUP_BUDGET_MS = 1_500
 const MAX_INLINE_COMPLETION_DEBUG_ENTRIES = 120
 const MAX_DEBUG_TEXT_CHARS = 80_000
@@ -39,6 +45,7 @@ const OUTPUT_ACTION_MARKERS = ['SHORT', 'LONG', 'EDIT'] as const
 
 type ChatCompletionResponse = {
   choices?: Array<{
+    finish_reason?: string | null
     message?: {
       content?: string | Array<{ type?: string; text?: string }>
     }
@@ -47,11 +54,15 @@ type ChatCompletionResponse = {
 }
 
 type ResponsesApiResponse = {
+  status?: string | null
+  incomplete_details?: unknown
+  error?: unknown
   output_text?: string
   output?: Array<Record<string, unknown>>
 }
 
 type AnthropicMessageResponse = {
+  stop_reason?: string | null
   content?: Array<Record<string, unknown>>
 }
 
@@ -549,25 +560,56 @@ function buildProviderRequestBody(input: {
 
 function providerTextFromResponse(
   responseText: string,
-  format: WriteInlineProviderResponseFormat = 'chat_completions'
-): string {
+  format: WriteInlineProviderResponseFormat = 'chat_completions',
+  requireComplete = false
+): { text: string; completed: boolean } {
   let parsed: ChatCompletionResponse | ResponsesApiResponse | AnthropicMessageResponse
   try {
     parsed = JSON.parse(responseText) as ChatCompletionResponse | ResponsesApiResponse | AnthropicMessageResponse
   } catch {
     throw new Error('Inline completion provider returned non-JSON data.')
   }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Inline completion provider returned an invalid response.')
+  }
+  const completed = requireComplete ? assertProviderResponseComplete(parsed, format) : false
   if (format === 'responses') {
-    return textFromResponsesPayload(parsed as ResponsesApiResponse)
+    return { text: textFromResponsesPayload(parsed as ResponsesApiResponse), completed }
   }
   if (format === 'messages') {
-    return textFromAnthropicPayload(parsed as AnthropicMessageResponse)
+    return { text: textFromAnthropicPayload(parsed as AnthropicMessageResponse), completed }
   }
   const chatPayload = parsed as ChatCompletionResponse
   const firstChoice = chatPayload.choices?.[0]
-  if (typeof firstChoice?.text === 'string') return firstChoice.text
+  if (typeof firstChoice?.text === 'string') return { text: firstChoice.text, completed }
   const first = firstChoice?.message?.content
-  return flattenMessageContent(first)
+  return { text: flattenMessageContent(first), completed }
+}
+
+function assertProviderResponseComplete(
+  payload: ChatCompletionResponse | ResponsesApiResponse | AnthropicMessageResponse,
+  format: WriteInlineProviderResponseFormat
+): boolean {
+  // Missing metadata remains compatible with local OpenAI-compatible servers.
+  // An explicit unfinished/filtered/tool response must never become a document
+  // replacement, even if its partial text contains a syntactically closed block.
+  if (format === 'responses') {
+    const response = payload as ResponsesApiResponse
+    if (response.error || response.incomplete_details ||
+      (response.status !== undefined && response.status !== 'completed') ||
+      response.output?.some((item) => item.status !== undefined && item.status !== 'completed')) {
+      throw new Error('AI edit response is incomplete. Please try again; the document was not changed.')
+    }
+    return response.status === 'completed'
+  }
+  const reason = format === 'messages'
+    ? (payload as AnthropicMessageResponse).stop_reason
+    : (payload as ChatCompletionResponse).choices?.[0]?.finish_reason
+  const completedReasons = format === 'messages' ? ['end_turn', 'stop_sequence'] : ['stop']
+  if (reason !== undefined && !completedReasons.includes(String(reason))) {
+    throw new Error('AI edit response is incomplete. Please try again; the document was not changed.')
+  }
+  return reason !== undefined
 }
 
 function textFromResponsesPayload(payload: ResponsesApiResponse): string {
@@ -633,13 +675,25 @@ function actionFromJsonValue(
   if (!value || typeof value !== 'object') return null
   const record = value as Record<string, unknown>
   const rawKind = String(record.kind ?? record.action ?? record.type ?? '').trim().toLowerCase()
-  const text = String(record.text ?? record.completion ?? record.insert ?? record.replacement ?? record.edit ?? '')
+  const rawText = record.text ?? record.completion ?? record.insert ?? record.replacement ?? record.edit
+  if (['short', 'completion', 'insert', 'long', 'edit', 'replacement', 'replace'].includes(rawKind) &&
+    typeof rawText !== 'string') {
+    throw new Error('Incomplete AI action protocol: replacement text is missing.')
+  }
+  const text = typeof rawText === 'string' ? rawText : ''
   if (rawKind === 'short' || rawKind === 'completion' || rawKind === 'insert') return completionAction(text, 'short')
   if (rawKind === 'long') return completionAction(text, 'long')
   if (rawKind === 'edit' || rawKind === 'replacement' || rawKind === 'replace') {
     return editAction(text, options.editTarget)
   }
   return null
+}
+
+function containsJsonAction(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsJsonAction)
+  if (!value || typeof value !== 'object') return false
+  return ['kind', 'action', 'type'].some((key) => key in value) ||
+    Object.values(value).some(containsJsonAction)
 }
 
 function containsInputBoundaryEcho(text: string): boolean {
@@ -651,16 +705,18 @@ function parseMarkedActionBlock(
   text: string,
   options: { editTarget?: WriteInlineActionEditTarget }
 ): WriteInlineCompletionAction | null {
+  const hasMarker = /<<<[ \t]*(?:SHORT|LONG|EDIT)\b/i.test(text)
+  if (!hasMarker) return null
   for (const marker of OUTPUT_ACTION_MARKERS) {
     const exact = new RegExp(`^<<<[ \\t]*${marker}[ \\t]*\\n([\\s\\S]*?)\\n?>>>$`, 'i').exec(text)
-    const embedded = exact ?? new RegExp(`<<<[ \\t]*${marker}[ \\t]*\\n([\\s\\S]*?)\\n?>>>`, 'i').exec(text)
-    if (!embedded) continue
-    const body = trimMarkerPadding(embedded[1])
+    if (!exact || /<<<[ \t]*(?:SHORT|LONG|EDIT)\b/i.test(exact[1]) ||
+      /(?:^|\n)[ \t]*>>>[ \t]*(?:\n|$)/.test(exact[1])) continue
+    const body = trimMarkerPadding(exact[1])
     if (marker === 'SHORT') return completionAction(body, 'short')
     if (marker === 'LONG') return completionAction(body, 'long')
     return editAction(body, options.editTarget)
   }
-  return null
+  throw new Error('Incomplete or malformed AI action protocol. Please generate the edit again.')
 }
 
 export function parseWriteInlineAction(
@@ -668,6 +724,7 @@ export function parseWriteInlineAction(
   options: {
     fallbackKind?: WriteInlineCompletionAction['kind']
     editTarget?: WriteInlineActionEditTarget
+    requireStructured?: boolean
   } = {}
 ): WriteInlineCompletionAction {
   const fallbackKind = options.fallbackKind ?? 'short'
@@ -685,32 +742,42 @@ export function parseWriteInlineAction(
       : completionAction('', fallbackKind === 'long' ? 'long' : 'short')
   }
 
-  const marked = parseMarkedActionBlock(trimmed, { editTarget: options.editTarget })
+  const protocolText = cleanCompletionText(trimmed).trim()
+  const marked = parseMarkedActionBlock(protocolText, { editTarget: options.editTarget })
   if (marked) return marked
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown
-    const action = actionFromJsonValue(parsed, { editTarget: options.editTarget })
-    if (action) return action
-  } catch {
-    /* XML/plain-text fallbacks below. */
+  if (/<<</.test(protocolText) || /(?:^|\n)[ \t]*>>>[ \t]*(?:\n|$)/.test(protocolText)) {
+    throw new Error('Incomplete or malformed AI action protocol. Please generate the edit again.')
   }
 
-  const short = trimmed.match(/^<short(?:\s[^>]*)?>([\s\S]*?)<\/short>$/i) ??
-    trimmed.match(/<short(?:\s[^>]*)?>([\s\S]*?)<\/short>/i)
-  if (short) return completionAction(short[1], 'short')
+  let jsonValue: unknown
+  try {
+    jsonValue = JSON.parse(protocolText) as unknown
+  } catch {
+    const jsonStart = protocolText.replace(/^```(?:json)?[ \t]*\n/i, '')
+    // An unfinished object may stop in its very first key or put explanatory
+    // fields before the action. Never treat that JSON-shaped protocol as prose.
+    if (/^```json\b/i.test(protocolText) || /^(?:\[\s*)*\{\s*["']/.test(jsonStart)) {
+      throw new Error('Incomplete or malformed AI action protocol. Please generate the edit again.')
+    }
+  }
+  const jsonAction = actionFromJsonValue(jsonValue, { editTarget: options.editTarget })
+  if (jsonAction) return jsonAction
+  if (containsJsonAction(jsonValue)) {
+    throw new Error('Incomplete or malformed AI action protocol. Please generate the edit again.')
+  }
 
-  const long = trimmed.match(/^<long(?:\s[^>]*)?>([\s\S]*?)<\/long>$/i) ??
-    trimmed.match(/<long(?:\s[^>]*)?>([\s\S]*?)<\/long>/i)
-  if (long) return completionAction(long[1], 'long')
-
-  const completion = trimmed.match(/^<completion(?:\s[^>]*)?>([\s\S]*?)<\/completion>$/i) ??
-    trimmed.match(/<completion(?:\s[^>]*)?>([\s\S]*?)<\/completion>/i)
-  if (completion) return completionAction(completion[1], fallbackKind === 'long' ? 'long' : 'short')
-
-  const edit = trimmed.match(/^<edit(?:\s[^>]*)?>([\s\S]*?)<\/edit>$/i) ??
-    trimmed.match(/<edit(?:\s[^>]*)?>([\s\S]*?)<\/edit>/i)
-  if (edit) return editAction(edit[1], options.editTarget)
+  const xml = protocolText.match(/^<(short|long|completion|edit)(?:\s[^>]*)?>([\s\S]*?)<\/\1>$/i)
+  if (xml && !/<\/?(?:short|long|completion|edit)(?:\s|>|$)/i.test(xml[2])) {
+    const kind = xml[1].toLowerCase()
+    if (kind === 'edit') return editAction(xml[2], options.editTarget)
+    return completionAction(xml[2], kind === 'long' || (kind === 'completion' && fallbackKind === 'long') ? 'long' : 'short')
+  }
+  if (/<\/?(?:short|long|completion|edit)(?:\s|>|$)/i.test(protocolText)) {
+    throw new Error('Incomplete or malformed AI action protocol. Please generate the edit again.')
+  }
+  if (options.requireStructured) {
+    throw new Error('AI edit response has no complete action protocol. Please generate the edit again.')
+  }
 
   const labeledCompletion = trimmed.match(/^(?:completion|insert)[:：]\s*([\s\S]*)$/i)
   if (labeledCompletion) return completionAction(labeledCompletion[1], fallbackKind === 'long' ? 'long' : 'short')
@@ -732,9 +799,28 @@ export function extractWriteInlineAction(
     fallbackKind?: WriteInlineCompletionAction['kind']
     editTarget?: WriteInlineActionEditTarget
     responseFormat?: WriteInlineProviderResponseFormat
+    requireComplete?: boolean
   } = {}
 ): WriteInlineCompletionAction {
-  return parseWriteInlineAction(providerTextFromResponse(responseText, options.responseFormat), options)
+  const requireComplete = options.requireComplete ?? (options.fallbackKind === 'edit' || Boolean(options.editTarget))
+  const { text, completed } = providerTextFromResponse(responseText, options.responseFormat, requireComplete)
+  if (requireComplete && !text.trim()) {
+    throw new Error('AI edit response has no complete replacement text. Please try again.')
+  }
+  if (requireComplete && containsInputBoundaryEcho(text)) {
+    throw new Error('AI edit response contains echoed input protocol. Please generate the edit again.')
+  }
+  const action = parseWriteInlineAction(text, { ...options, requireStructured: requireComplete && !completed })
+  // A provider may choose EDIT for a background request as well. Validate the
+  // actual replacement even when the caller expected ordinary ghost text.
+  if (!requireComplete && action.kind === 'edit') {
+    const editResponse = providerTextFromResponse(responseText, options.responseFormat, true)
+    return parseWriteInlineAction(editResponse.text, {
+      ...options,
+      requireStructured: !editResponse.completed
+    })
+  }
+  return action
 }
 
 export async function requestWriteInlineCompletion(
@@ -776,7 +862,12 @@ export async function requestWriteInlineCompletion(
   const url = useFimCompletions
     ? upstreamDeepSeekFimCompletionsUrl(baseUrl)
     : compatibleModelEndpointUrl(baseUrl, endpointFormat)
-  const maxTokens = mode === 'long' || mode === 'edit' || actionMayEdit
+  const maxTokens = explicitEdit
+    ? Math.min(DOCUMENT_EDIT_MAX_OUTPUT_TOKENS, Math.max(
+        DOCUMENT_EDIT_MIN_OUTPUT_TOKENS,
+        Math.ceil((request.editCandidate?.original.length ?? 0) * 4 + 1_024)
+      ))
+    : mode === 'long' || mode === 'edit' || actionMayEdit
     ? settings.write.inlineCompletion.longMaxTokens || settings.write.inlineCompletion.maxTokens || DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS
     : settings.write.inlineCompletion.maxTokens || DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS
   const [retrieval, knowledge] = await Promise.all([
@@ -809,6 +900,7 @@ export async function requestWriteInlineCompletion(
     suffixChars: request.suffix.length
   }
 
+  let responseText = ''
   try {
     const body = buildProviderRequestBody({
       responseFormat,
@@ -822,9 +914,10 @@ export async function requestWriteInlineCompletion(
       method: 'POST',
       headers: buildProviderHeaders(apiKey, responseFormat),
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(INLINE_COMPLETION_TIMEOUT_MS)
+      signal: AbortSignal.timeout(explicitEdit ? DOCUMENT_EDIT_TIMEOUT_MS : INLINE_COMPLETION_TIMEOUT_MS)
     })
     const text = await response.text()
+    responseText = text
     if (!response.ok) {
       appendInlineCompletionDebugEntry({
         ...debugBase,
@@ -844,6 +937,7 @@ export async function requestWriteInlineCompletion(
     const action = extractWriteInlineAction(text, {
       fallbackKind: mode,
       responseFormat,
+      requireComplete: useChatCompletions,
       editTarget: request.editCandidate
         ? {
             from: request.editCandidate.from,
@@ -878,9 +972,9 @@ export async function requestWriteInlineCompletion(
       ...debugBase,
       durationMs: Date.now() - startedAt,
       ok: false,
-      rawResponse: '',
+      rawResponse: responseText,
       completion: '',
-      responseChars: 0,
+      responseChars: responseText.length,
       errorMessage: error instanceof Error ? error.message : String(error)
     })
     return {
