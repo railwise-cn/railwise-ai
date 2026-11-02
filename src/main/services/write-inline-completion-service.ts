@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import MarkdownIt from 'markdown-it'
 import {
   DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS,
   modelEndpointPath,
@@ -42,6 +43,7 @@ const MAX_INLINE_COMPLETION_DEBUG_ENTRIES = 120
 const MAX_DEBUG_TEXT_CHARS = 80_000
 const INPUT_BOUNDARY_MARKERS = ['PREFIX', 'SUFFIX', 'EDIT_SCOPE'] as const
 const OUTPUT_ACTION_MARKERS = ['SHORT', 'LONG', 'EDIT'] as const
+const editMarkdownParser = new MarkdownIt('commonmark')
 
 type ChatCompletionResponse = {
   choices?: Array<{
@@ -701,6 +703,24 @@ function containsInputBoundaryEcho(text: string): boolean {
     text.includes('Return only the text to insert at the cursor.')
 }
 
+function stripTrailingEmptyAtxHeading(markdown: string): string {
+  const lines = markdown.split('\n')
+  let headingIndex = lines.length - 1
+  while (headingIndex >= 0 && /^[ \t]*$/.test(lines[headingIndex])) headingIndex -= 1
+  if (headingIndex < 0 || !/^ {0,3}#{1,6}(?:[ \t]+#+)?[ \t]*$/.test(lines[headingIndex])) {
+    return markdown
+  }
+
+  // A trailing ## inside an unfinished code/HTML block is literal text.
+  // Only remove a heading when the Markdown parser confirms a top-level node.
+  const tokens = editMarkdownParser.parse(markdown, {})
+  const [opening, content, closing] = tokens.slice(-3)
+  if (opening?.type !== 'heading_open' || opening.level !== 0 || opening.map?.[0] !== headingIndex ||
+    content?.type !== 'inline' || content.content.trim() || closing?.type !== 'heading_close') return markdown
+
+  return lines.slice(0, headingIndex).join('\n').replace(/\n+$/, '')
+}
+
 function parseMarkedActionBlock(
   text: string,
   options: { editTarget?: WriteInlineActionEditTarget }
@@ -714,7 +734,7 @@ function parseMarkedActionBlock(
     const body = trimMarkerPadding(exact[1])
     if (marker === 'SHORT') return completionAction(body, 'short')
     if (marker === 'LONG') return completionAction(body, 'long')
-    return editAction(body, options.editTarget)
+    return editAction(stripTrailingEmptyAtxHeading(body), options.editTarget)
   }
   throw new Error('Incomplete or malformed AI action protocol. Please generate the edit again.')
 }
