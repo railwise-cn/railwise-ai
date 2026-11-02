@@ -259,6 +259,29 @@ describe('requestWriteInlineCompletion', () => {
     expect(listWriteInlineCompletionDebugEntries()[0]).toMatchObject({ ok: true, mode: 'edit' })
   })
 
+  it('cleans the reproduced DeepSeek edit tail in the returned proposal and parsed debug output', async () => {
+    const replacement = '下一周期按每日一次的频率开展观测，发现异常时复核原始记录。'
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      model: 'deepseek-flash',
+      choices: [{ finish_reason: 'stop', message: { content: `<<<EDIT\n${replacement}\n\n## \n>>>` } }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const original = '下一周期继续观测。'
+    const request: WriteInlineCompletionRequest = {
+      ...createRequest(), mode: 'edit',
+      editCandidate: {
+        kind: 'selection', from: 0, to: original.length,
+        startLine: 1, startColumn: 1, endLine: 1, endColumn: original.length + 1,
+        original, selectedText: original
+      }
+    }
+
+    const result = await requestWriteInlineCompletion(createSettings({ retrievalEnabled: false }), request)
+
+    expect(result).toMatchObject({ ok: true, completion: replacement, action: { kind: 'edit', replacement } })
+    expect(listWriteInlineCompletionDebugEntries()[0]).toMatchObject({ ok: true, completion: replacement })
+  })
+
   it('still requires an API key for a manual edit when automatic suggestions are disabled', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -717,6 +740,45 @@ describe('parseWriteInlineAction', () => {
       to: 21,
       original: 'WorkWise',
       scopeKind: 'selection'
+    })
+  })
+
+  it('removes only a trailing empty ATX heading from marked edits', () => {
+    const editTarget = {
+      from: 9,
+      to: 21,
+      original: 'WorkWise',
+      scopeKind: 'selection' as const
+    }
+
+    expect(parseWriteInlineAction('<<<EDIT\nUpdated paragraph.\n\n##\n>>>', { editTarget })).toMatchObject({
+      kind: 'edit',
+      replacement: 'Updated paragraph.'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\nText\n## Valid heading ###\n>>>', { editTarget })).toMatchObject({
+      replacement: 'Text\n## Valid heading ###'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\nText\n##\nMore text\n>>>', { editTarget })).toMatchObject({
+      replacement: 'Text\n##\nMore text'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\n```md\n##\n>>>', { editTarget })).toMatchObject({
+      replacement: '```md\n##'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\n~~~md\n##\n~~~\n##\n>>>', { editTarget })).toMatchObject({
+      replacement: '~~~md\n##\n~~~'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\nText\n#######\n>>>', { editTarget })).toMatchObject({
+      replacement: 'Text\n#######'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\n<!-- literal Markdown\n##\n>>>', { editTarget })).toMatchObject({
+      replacement: '<!-- literal Markdown\n##'
+    })
+    expect(parseWriteInlineAction('<<<EDIT\n<pre>\n##\n>>>', { editTarget })).toMatchObject({
+      replacement: '<pre>\n##'
+    })
+    expect(parseWriteInlineAction('<<<LONG\nText\n##\n>>>')).toEqual({ kind: 'long', text: 'Text\n##' })
+    expect(parseWriteInlineAction(JSON.stringify({ kind: 'edit', replacement: 'Text\n##' }), { editTarget })).toMatchObject({
+      replacement: 'Text\n##'
     })
   })
 
