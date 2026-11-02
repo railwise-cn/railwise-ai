@@ -117,8 +117,6 @@ export function ClawStepContent({ ctx }: { ctx: Record<string, any> }): ReactEle
                           >
                             <option value="auto">auto</option>
                             <option value="deepseek-flash">deepseek-flash</option>
-                            <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-                            <option value="deepseek-v4-flash">deepseek-v4-flash</option>
                           </select>
                         </label>
                         <label className="block min-w-0">

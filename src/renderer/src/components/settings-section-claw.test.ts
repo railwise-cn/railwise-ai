@@ -140,7 +140,8 @@ describe('ClawSettingsSection', () => {
     expect(html).toContain('Personality')
     expect(html).toContain('Reply rules')
     expect(html).toContain('Start with the conclusion.')
-    expect(html).toContain('<option value="deepseek-v4-pro"')
+    expect(html).toContain('<option value="deepseek-flash"')
+    expect(html).not.toContain('<option value="deepseek-v4-pro"')
   })
 
   it('labels a WeChat phone agent as WeChat instead of Feishu / Lark', () => {

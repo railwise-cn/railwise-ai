@@ -510,7 +510,7 @@ describe('AgentsSettingsSection WorkWise Runtime diagnostics smoke', () => {
     const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx: baseCtx() }))
 
     expect(html).toContain('Current model context policy')
-    expect(html).toContain('deepseek-v4-pro')
+    expect(html).toContain('deepseek-flash')
     expect(html).toContain('Built-in model config')
     expect(html).toContain('1,000,000')
     expect(html).toContain('980,000')

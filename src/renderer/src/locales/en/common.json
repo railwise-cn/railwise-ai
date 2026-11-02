@@ -1642,7 +1642,7 @@
   "clawHelpCommandHelp": "Show this command help",
   "clawHelpCommandNew": "Clear the current conversation for the active Feishu / Lark connection",
   "clawHelpCommandModelAuto": "Switch to the auto model",
-  "clawHelpCommandModelPro": "Switch to deepseek-v4-pro",
+  "clawHelpCommandModelPro": "Switch to the DeepSeek V4.1 Pro compatibility model",
   "clawHelpCommandModelFlash": "Switch to deepseek-flash",
   "clawHelpCommandModelShow": "Show the current model",
   "clawTimelineInbound": "From {{source}}",

@@ -200,7 +200,7 @@ export function ClawSettingsSection({ ctx }: { ctx: ClawSettingsContext }): Reac
                       value={channel.model}
                       onChange={(e) => updateChannel(form, update, channel.id, { model: e.target.value as ClawModel })}
                     >
-                      {CLAW_MODEL_IDS.map((model) => (
+                      {CLAW_MODEL_IDS.filter((model) => !model.startsWith('deepseek-v4-')).map((model) => (
                         <option key={model} value={model}>{model}</option>
                       ))}
                     </select>
