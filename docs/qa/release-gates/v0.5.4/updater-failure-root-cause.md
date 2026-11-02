@@ -17,7 +17,7 @@ The baseline DMG was downloaded, copied into the isolated profile, and passed si
 3. target app deep/strict `codesign` verification passed;
 4. target app `xcrun stapler validate` failed with exit code `68`.
 
-The recorded `spctl --status` and `spctl --assess --type execute` checks belong to the baseline app and passed. The report contains no `targetIdentity`, target `spctl` assessment, target ZIP hash, native harness report, tunnel, or Squirrel steps. The target stapler failure is therefore **before Squirrel installation**. No updater round-trip was attempted.
+The recorded `spctl --assess --type execute` check belongs to the baseline app and passed. The old harness did not record `spctl --status`, so this report does not prove Gatekeeper was enabled. It contains no `targetIdentity`, target `spctl` assessment, target ZIP hash, native harness report, tunnel, or Squirrel steps. The target stapler failure is therefore **before Squirrel installation**. No updater round-trip was attempted.
 
 ## Technical assessment
 
