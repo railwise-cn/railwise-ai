@@ -183,6 +183,25 @@ describe('upstream model picker list', () => {
     }
   })
 
+  it('keeps custom provider ids when the active runtime uses official DeepSeek', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'workwise-models-'))
+    const mixed = settings(dataDir, 'deepseek-flash')
+    mixed.agents.kun.providerId = 'deepseek'
+    const provider = mixed.provider.providers.find((item) => item.id === 'custom-provider')!
+    provider.models = ['deepseek-v4-pro', 'deepseek-chat']
+    await writeFile(join(dataDir, 'config.json'), JSON.stringify({ models: { profiles: {} } }))
+
+    const result = await fetchUpstreamModelIds(mixed, '')
+    expect(result).toMatchObject({ ok: true })
+    if (result.ok) {
+      expect(result.modelIds).toEqual(expect.arrayContaining(['deepseek-v4-pro', 'deepseek-chat']))
+      expect(result.modelGroups?.find((group) => group.providerId === 'custom-provider')?.modelIds)
+        .toEqual(['deepseek-chat', 'deepseek-v4-pro'])
+      expect(result.modelGroups?.find((group) => group.providerId === 'deepseek')?.modelIds)
+        .toEqual(['deepseek-flash'])
+    }
+  })
+
   it('marks models returned by the active third-party catalog as discovered', async () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'workwise-models-'))
     const custom = settings(dataDir, 'custom-provider-model')

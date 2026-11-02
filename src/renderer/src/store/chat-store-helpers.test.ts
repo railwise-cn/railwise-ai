@@ -87,10 +87,14 @@ describe('chat-store Claw helpers', () => {
       'deepseek-reasoner',
       'deepseek-v4-pro',
       'custom-model'
+    ], [
+      { providerId: 'deepseek', modelIds: ['deepseek-flash'] },
+      { providerId: 'custom-provider', modelIds: ['deepseek-v4-pro', 'custom-model'] }
     ])).toEqual([
       'auto',
       'custom-model',
-      'deepseek-flash'
+      'deepseek-flash',
+      'deepseek-v4-pro'
     ])
   })
 

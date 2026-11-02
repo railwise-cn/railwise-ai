@@ -70,6 +70,14 @@ const FLOATING_SUBMENU_MIN_HEIGHT = 80
 const FLOATING_SUBMENU_MAX_HEIGHT = 320
 const UNGROUPED_MODEL_PROVIDER_ID = '__composer_models__'
 
+function isVisibleForProviderGroups(
+  modelId: string,
+  groups: readonly ModelProviderModelGroup[]
+): boolean {
+  return groups.some((group) => group.modelIds.includes(modelId)) ||
+    isVisibleComposerModelId(modelId)
+}
+
 export function FloatingComposerModelPicker({
   compact,
   mode,
@@ -92,25 +100,34 @@ export function FloatingComposerModelPicker({
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
   const [menuPlacement, setMenuPlacement] = useState<FloatingMenuPlacement | null>(null)
   const [submenuPlacement, setSubmenuPlacement] = useState<FloatingSubmenuPlacement | null>(null)
+  const currentModel = composerModel.trim()
+  const currentProviderId = composerProviderId
   const modelOptions = useMemo(() => {
     const ordered = new Set<string>()
     for (const id of composerPickList) {
       const normalized = id.trim()
-      if (normalized && isVisibleComposerModelId(normalized)) ordered.add(normalized)
+      if (normalized && isVisibleForProviderGroups(normalized, composerModelGroups)) ordered.add(normalized)
     }
-    const current = composerModel.trim()
-    if (current && isVisibleComposerModelId(current)) ordered.add(current)
+    if (currentModel) ordered.add(currentModel)
     return [...ordered]
-  }, [composerModel, composerPickList])
+  }, [composerModelGroups, composerPickList, currentModel])
   const providerMenuGroups = useMemo<ComposerModelMenuGroup[]>(() => {
     const seen = new Set<string>()
-    const groups = composerModelGroups
+    // Provider groups have already been filtered by the main process using
+    // each provider's URL. Never apply official DeepSeek rules to custom groups.
+    const sourceGroups = composerModelGroups.map((group) => ({ ...group, modelIds: [...group.modelIds] }))
+    if (currentProviderId && currentModel && currentModel !== 'auto') {
+      const group = sourceGroups.find((item) => item.providerId === currentProviderId)
+      if (group) group.modelIds.push(currentModel)
+      else sourceGroups.push({ providerId: currentProviderId, label: currentProviderId, modelIds: [currentModel] })
+    }
+    const groups = sourceGroups
       .map((group) => {
         const groupSeen = new Set<string>()
         const ids = group.modelIds
           .map((id) => id.trim())
           .filter((id) => {
-            if (!id || !isVisibleComposerModelId(id) || groupSeen.has(id)) return false
+            if (!id || groupSeen.has(id)) return false
             groupSeen.add(id)
             seen.add(id)
             return true
@@ -131,18 +148,17 @@ export function FloatingComposerModelPicker({
       })
     }
     return groups
-  }, [composerModelGroups, modelOptions, t])
+  }, [composerModelGroups, currentModel, currentProviderId, modelOptions, t])
   const reasoningEnabled = Boolean(onComposerReasoningEffortChange)
   const currentReasoning = normalizeComposerReasoningEffort(composerReasoningEffort)
   const currentReasoningLabel = t(reasoningLabelKey(currentReasoning))
-  const currentModel = composerModel.trim()
-  const visibleCurrentModel = isVisibleComposerModelId(currentModel) ? currentModel : ''
+  const visibleCurrentModel = currentModel
   const providerLabel = composerProviderId ? composerModelGroups.find(group => group.providerId === composerProviderId)?.label || composerProviderId : ''
   const modelLabel = [providerLabel, fullModelLabel(visibleCurrentModel, t('autoLabel'))].filter(Boolean).join(' / ')
   const controlsTitle = reasoningEnabled
     ? `${modelLabel} / ${currentReasoningLabel}`
     : modelLabel
-  const selectedProviderId = composerProviderId ?? null
+  const selectedProviderId = currentProviderId ?? null
   const activeProviderGroup =
     providerMenuGroups.find((group) => group.providerId === activeProviderId) ?? null
   const comboboxWidthClass = stretch

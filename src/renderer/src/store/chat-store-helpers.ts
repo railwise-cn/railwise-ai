@@ -115,7 +115,11 @@ export function forgetCodeWorkspaceRoot(
   return next
 }
 
-export function mergeComposerPickList(upstreamOk: boolean, upstreamIds: string[]): string[] {
+export function mergeComposerPickList(
+  upstreamOk: boolean,
+  upstreamIds: string[],
+  modelGroups: readonly { providerId: string; modelIds: string[] }[] = []
+): string[] {
   const ordered = new Set<string>()
   ordered.add('auto')
   for (const id of DEFAULT_COMPOSER_MODEL_IDS) {
@@ -124,7 +128,12 @@ export function mergeComposerPickList(upstreamOk: boolean, upstreamIds: string[]
   if (upstreamOk) {
     for (const id of upstreamIds) {
       const normalized = id.trim()
-      if (normalized && isVisibleComposerModelId(normalized)) ordered.add(normalized)
+      if (!normalized) continue
+      // Main already filters the official catalog by provider URL. Keep every
+      // grouped identity so compatible providers can expose the same model IDs.
+      const visible = modelGroups.some((group) => group.modelIds.includes(normalized)) ||
+        isVisibleComposerModelId(normalized)
+      if (visible) ordered.add(normalized)
     }
   }
   const tail = [...ordered].filter((id) => id !== 'auto').sort((a, b) => a.localeCompare(b))
