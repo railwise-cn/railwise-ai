@@ -116,9 +116,7 @@ export async function readConfiguredKunModelIds(settings: AppSettingsV1): Promis
     ...modelIdsFromProfiles(objectValue(contextCompaction.modelProfiles)),
     ...modelIdsFromProfiles(objectValue(models.profiles))
   ])
-  return isOfficialDeepSeekBaseUrl(runtime.baseUrl)
-    ? configured.filter((id) => isVisibleComposerModelId(id))
-    : configured
+  return visibleConfiguredModelIds(settings, configured)
 }
 
 function modelListOrError(
@@ -260,6 +258,7 @@ function visibleConfiguredModelIds(settings: AppSettingsV1, ids: readonly string
   )
   return ids.filter((id) => {
     const normalized = id.trim().toLowerCase()
+    if (explicitlyConfiguredByCompatibleProvider.has(normalized)) return true
     if (officialRuntime && !isVisibleComposerModelId(id)) return false
     return !RETIRED_DEEPSEEK_MODEL_IDS.has(normalized) ||
       explicitlyConfiguredByCompatibleProvider.has(normalized)

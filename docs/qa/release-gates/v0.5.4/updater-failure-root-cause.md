@@ -10,25 +10,19 @@ This is a read-only AI root-cause review of the failed private updater run. It i
 - Preserved machine report: `/private/tmp/railwise-054-acceptance/updater-failed-41390447292/frozen-updater.json`
 - Result: `failed`; no public feed, tag, release, or production state was changed.
 
-The baseline DMG and target ZIP were downloaded, extracted, signed/notarized, and checked before the updater process. The updater then reached the native install boundary. The final retained operation sequence was:
+The baseline DMG was downloaded, copied into the isolated profile, and passed signature, stapler, and Gatekeeper checks. The target public ZIP was downloaded and unpacked for a preflight check. The final retained sequence was:
 
 1. target ZIP extracted with `ditto`;
-2. installed target `Info.plist` read;
-3. installed target deep/strict `codesign` verification passed;
-4. installed target `xcrun stapler validate` failed with exit code `68`.
+2. target app `Info.plist` read;
+3. target app deep/strict `codesign` verification passed;
+4. target app `xcrun stapler validate` failed with exit code `68`.
 
-No `native-updater.json` was produced, so download, relaunch, data preservation, and the full updater round-trip are not certified by this run.
+The recorded `spctl --assess --type execute` check belongs to the baseline app and passed. The old harness did not record `spctl --status`, so this report does not prove Gatekeeper was enabled. It contains no `targetIdentity`, target `spctl` assessment, target ZIP hash, native harness report, tunnel, or Squirrel steps. The target stapler failure is therefore **before Squirrel installation**. No updater round-trip was attempted.
 
 ## Technical assessment
 
-`electron-updater` 6.8.9 uses `MacUpdater` and Squirrel.Mac on macOS. It downloads a ZIP, serves it through a localhost proxy, and asks the native Electron updater to install it. Squirrel.Mac unarchives the ZIP with `/usr/bin/ditto -x -k --keepParent`.
-
-The failure occurred after the installed app passed code-signature verification and only when validating the stapled notarization ticket. The most likely class of cause is loss or invalidation of the stapled ticket during the Squirrel/ditto ZIP installation path. This is consistent with the boundary and does not establish that the JavaScript or packaged ASAR content is corrupt.
-
-The exact changed metadata was not retained: the harness failed before writing `native-updater.json` and removed its isolated temporary root during cleanup. Therefore the run cannot distinguish ticket metadata loss from a runner-side stapler service failure. The evidence must remain classified as an updater gate failure.
-
-The acceptance harness now treats the boundary explicitly. It still requires `stapler validate` to pass for the signed baseline and target packages before installation. After Squirrel installation it records a `gatekeeper-verified-after-native-install` identity when deep code-signature verification and Gatekeeper assessment pass but `stapler validate` returns exit 68. This status is diagnostic evidence of the Squirrel stapled-ticket boundary; it is not presented as a surviving stapled ticket and does not weaken pre-install notarization checks.
+This run does not establish a Squirrel, ditto post-install, ticket-loss, or Gatekeeper cause. The target app had passed code-signature verification but `stapler validate` failed before Gatekeeper was checked on that target. The target diagnostic streams and temporary extracted bundle were not retained, so the precise stapler rejection and its bundle metadata cannot be reconstructed from this run.
 
 ## Required next step
 
-The next run still requires normal PR/CI review and a fresh frozen build. It must pass the native updater, target relaunch, user-data sentinel, exact ASAR hash, and post-update signature/Gatekeeper checks. The post-update stapler result must be retained as a structured boundary record, and any result other than exit 68 at this boundary remains a failure. Do not publish Stable from the original failed run.
+Keep `stapler validate` strict at baseline, target-ZIP preflight, and post-update boundaries. For each bundle, record an explicit boundary name, sanitized `codesign`, verbose `stapler validate`, `spctl --status`, and verbose Gatekeeper assessment output before cleanup. Acceptance must require Gatekeeper enabled, an accepted assessment, source `Notarized Developer ID`, and successful stapler validation; diagnostics never turn a trust failure into success. Then rerun the exact updater flow on a fresh frozen build. Do not publish Stable from the original failed run.

@@ -2,10 +2,13 @@ import { spawn, spawnSync } from 'node:child_process'
 import { basename } from 'node:path'
 
 export function boundedCommand(command, args, options = {}) {
-  const { timeoutMs = basename(command) === 'security' ? 20_000 : 120_000, progress = () => {}, allowedExitCodes = [0], ...spawnOptions } = options
+  const { timeoutMs = basename(command) === 'security' ? 20_000 : 120_000, progress = () => {}, allowedExitCodes = [0], onResult = () => {}, ...spawnOptions } = options
   const label = `${basename(command)}${basename(command) === 'security' ? ` ${args[0]}` : ''}`
   progress({ operation: label, status: 'started', timeoutMs })
   const result = spawnSync(command, args, { encoding: 'utf8', ...spawnOptions, timeout: timeoutMs, killSignal: 'SIGKILL' })
+  // Callers collecting package trust diagnostics need both streams even when
+  // the command fails. The callback must redact before persisting its output.
+  onResult(result)
   const timedOut = result.error?.code === 'ETIMEDOUT'
   progress({ operation: label, status: timedOut ? 'timed-out' : result.error || !allowedExitCodes.includes(result.status) ? 'failed' : 'completed', exitCode: result.status, signal: result.signal })
   if (result.error || !allowedExitCodes.includes(result.status)) {

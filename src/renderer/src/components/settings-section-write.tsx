@@ -6,6 +6,7 @@ import {
   DEFAULT_MODEL_PROVIDER_ID,
   WRITE_INLINE_COMPLETION_MODEL_IDS,
   defaultModelProviderSettings,
+  isOfficialDeepSeekBaseUrl,
   resolveWriteInlineCompletionProviderId
 } from '@shared/app-settings'
 import { isVisibleComposerModelId } from '@shared/default-composer-models'
@@ -252,8 +253,10 @@ export function WriteSettingsSection({ ctx }: { ctx: Record<string, any> }): Rea
                         }}
                       />
                       <datalist id="write-inline-completion-model-options">
-                        {[...new Set([...writeInlineProviderModels, ...WRITE_INLINE_COMPLETION_MODEL_IDS])]
-                          .filter(isVisibleComposerModelId)
+                        {[...new Set([
+                          ...writeInlineProviderModels.filter((model: string) => !isOfficialDeepSeekBaseUrl(effectiveWriteProvider?.baseUrl ?? '') || isVisibleComposerModelId(model)),
+                          ...WRITE_INLINE_COMPLETION_MODEL_IDS.filter(isVisibleComposerModelId)
+                        ])]
                           .map((model) => (
                           <option
                             key={model}

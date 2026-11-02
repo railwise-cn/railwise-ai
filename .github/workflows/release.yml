@@ -1146,3 +1146,15 @@ jobs:
 
       - name: Verify final candidate DMGs
         run: node scripts/verify-mac-release-artifacts.cjs candidate-installers --dmg-only arm64 x64
+
+      # The updater consumes ZIPs, whereas the three-client download bundle
+      # contains only installers. Exercise the transferred updater archives on
+      # this fresh runner as well as on the original packaging runner.
+      - name: Download frozen macOS updater packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-mac
+          path: frozen-mac-packages
+
+      - name: Verify transferred macOS updater packages
+        run: node scripts/verify-mac-release-artifacts.cjs frozen-mac-packages arm64 x64

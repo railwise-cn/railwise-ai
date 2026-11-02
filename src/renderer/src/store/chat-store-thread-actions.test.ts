@@ -92,6 +92,17 @@ describe('chat-store-thread-actions queued messages', () => {
     vi.restoreAllMocks()
   })
 
+  it('preserves the saved legacy model and provider identity shown by the picker', async () => {
+    const { actions, state } = buildHarness()
+    state.composerModel = 'deepseek-v4-pro'
+    state.composerProviderId = 'deepseek'
+
+    expect(await actions.sendMessage('saved selection', 'agent')).toBe(true)
+    expect(state.queuedMessages).toMatchObject([
+      { text: 'saved selection', model: 'deepseek-v4-pro', providerId: 'deepseek' }
+    ])
+  })
+
   it('passes the composer provider identity to the review action', async () => {
     const reviewThread = vi.fn(async () => ({ threadId: 'thr_existing', turnId: 'turn_review', reviewItemId: 'review_item' }))
     registryMock.getProvider.mockReturnValue({ reviewThread, subscribeThreadEvents: vi.fn(async () => undefined) })

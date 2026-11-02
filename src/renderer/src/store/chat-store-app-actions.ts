@@ -10,7 +10,11 @@ type CreateAppActionsOptions = {
   i18n: typeof i18next
   persistComposerModel: (model: string) => void
   readStoredComposerModel: (allowedIds: readonly string[]) => string
-  mergeComposerPickList: (upstreamOk: boolean, upstreamIds: string[]) => string[]
+  mergeComposerPickList: (
+    upstreamOk: boolean,
+    upstreamIds: string[],
+    modelGroups?: readonly { providerId: string; modelIds: string[] }[]
+  ) => string[]
   getComposerModelLoadPromise: () => Promise<void> | null
   setComposerModelLoadPromise: (promise: Promise<void> | null) => void
   applyTheme: (theme: AppSettingsV1['theme']) => void
@@ -70,7 +74,7 @@ export function createAppActions(options: CreateAppActionsOptions): Pick<
       if (typeof window.workwise === 'undefined') return
       const task = (async () => {
         const res = await window.workwise.fetchUpstreamModels()
-        const pick = mergeComposerPickList(res.ok, res.ok ? res.modelIds : [])
+        const pick = mergeComposerPickList(res.ok, res.ok ? res.modelIds : [], res.ok ? res.modelGroups ?? [] : [])
         const groups = res.ok ? res.modelGroups ?? [] : []
         const allowed = new Set(pick)
         set((state) => {

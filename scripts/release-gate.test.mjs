@@ -14,6 +14,7 @@ import './verify-reviewed-release-artifacts.test.mjs'
 import './verify-frozen-updater-evidence.test.mjs'
 import './release-promotion-recovery.test.mjs'
 import './release-build-memory.test.mjs'
+import './macos-updater-trust.test.mjs'
 import './build-markdown-rendering.test.cjs'
 import './verify-packaged-markdown-rendering.test.cjs'
 import './verify-markdown-packaging-filesets.test.cjs'
@@ -78,7 +79,7 @@ function releaseFixture(t, packageVersion = '0.5.3', version = '0.5.3') {
   }
   // These synthetic unit reports mirror the existing runner schema. They are
   // temporary fixtures only and must never be copied into release evidence.
-  const identity = version => ({ version, bundleId: PUBLIC_IDENTITY.bundleId, signature: 'verified', stapledNotarization: 'verified', gatekeeper: 'accepted', designatedRequirement: 'designated => synthetic-unit-fixture' })
+  const identity = version => ({ version, bundleId: PUBLIC_IDENTITY.bundleId, signature: 'verified', stapledNotarization: 'verified', gatekeeper: 'accepted', gatekeeperAssessments: 'enabled', gatekeeperSource: 'Notarized Developer ID', designatedRequirement: 'designated => synthetic-unit-fixture' })
   const serviceIdentity = seed => ({ schemaVersion: 1, packageVersion: seed ? '0.5.2' : version, packageSourceHead: seed ? null : reviewedSourceHead,
     serviceSourceHead: reviewedSourceHead, asarSha256: (seed ? 'f' : 'e').repeat(64), layout: seed ? 'source-compatibility' : 'asar-unpacked',
     serviceTreeSha256: 'a'.repeat(64),
@@ -272,7 +273,7 @@ test('independent release-control review covers frozen evidence and recovery dep
     '.github/workflows/frozen-release-updater-acceptance.yml',
     'scripts/verify-reviewed-release-artifacts.mjs', 'scripts/verify-frozen-updater-evidence.mjs',
     'scripts/run-frozen-release-updater-acceptance.mjs', 'scripts/frozen-release-updater-data.mjs',
-    'scripts/frozen-release-updater-feed.mjs', 'scripts/updater-acceptance-process.mjs',
+    'scripts/frozen-release-updater-feed.mjs', 'scripts/updater-acceptance-process.mjs', 'scripts/macos-updater-trust.mjs',
     'scripts/release-promotion-recovery.mjs',
   ]) {
     const rule = rules.find(([pattern]) => pattern.endsWith('*') ? path.startsWith(pattern.slice(0, -1)) : path === pattern)
@@ -423,27 +424,20 @@ test('updater reports must bind the real official baseline, frozen bytes and com
   })
 })
 
-test('updater evidence may record the Squirrel stapled-ticket boundary only after signature and Gatekeeper checks', t => {
+test('updater evidence requires enabled Gatekeeper and notarized Developer ID at every boundary', t => {
   const f = releaseFixture(t)
-  f.machineReport.installedIdentity = {
-    ...f.machineReport.installedIdentity,
-    stapledNotarization: 'gatekeeper-verified-after-native-install',
-    stapleValidation: {
-      status: 'unavailable-after-native-install',
-      exitCode: 68,
-      reason: 'squirrel-install-stapled-ticket-boundary',
-    },
-  }
   f.recordEvidence()
   assert.doesNotThrow(() => f.verify(f.tagRelease()))
 
-  const rejected = releaseFixture(t)
-  rejected.machineReport.installedIdentity = {
-    ...rejected.machineReport.installedIdentity,
-    stapledNotarization: 'unverified',
-  }
-  rejected.recordEvidence()
-  assert.throws(() => rejected.verify(rejected.tagRelease()), /notarization boundary is missing/)
+  const disabled = releaseFixture(t)
+  disabled.machineReport.targetIdentity.gatekeeperAssessments = 'disabled'
+  disabled.recordEvidence()
+  assert.throws(() => disabled.verify(disabled.tagRelease()), /targetIdentity Gatekeeper status mismatch/)
+
+  const nonNotarized = releaseFixture(t)
+  nonNotarized.machineReport.installedIdentity.gatekeeperSource = 'Developer ID'
+  nonNotarized.recordEvidence()
+  assert.throws(() => nonNotarized.verify(nonNotarized.tagRelease()), /installedIdentity Gatekeeper source mismatch/)
 })
 
 test('the installed UI review must identify its application ASAR hash', t => {

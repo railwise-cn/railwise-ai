@@ -10,6 +10,7 @@ scripts/verify-release-approval.mjs @railwise-cn
 scripts/verify-reviewed-release-artifacts* @railwise-cn
 scripts/verify-frozen-updater-evidence* @railwise-cn
 scripts/run-frozen-release-updater-acceptance.mjs @railwise-cn
+scripts/macos-updater-trust* @railwise-cn
 scripts/frozen-release-updater-* @railwise-cn
 scripts/updater-acceptance-process.mjs @railwise-cn
 scripts/release-promotion-recovery* @railwise-cn
