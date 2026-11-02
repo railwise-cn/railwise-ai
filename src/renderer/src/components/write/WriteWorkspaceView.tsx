@@ -482,7 +482,7 @@ export function WriteWorkspaceView({
     const handle = richModeActive ? richHandleRef.current : null
     const content = handle?.getProjectionText() ?? latest.fileContent
     const latestSafety = getWriteRenderSafety({ isMarkdown: isMarkdownFile(path), contentLength: latest.fileContent.length, fileSize: latest.fileSize, truncated: latest.fileTruncated })
-    if (content !== pendingAiEdit.sourceContent || content.slice(scope.from, scope.to) !== scope.text || latestSafety.readOnly) {
+    if (latest.fileContent !== pendingAiEdit.sourceContent || content !== pendingAiEdit.sourceContent || content.slice(scope.from, scope.to) !== scope.text || latestSafety.readOnly) {
       setAiReviewError(t('writeInlineEditChanged'))
       return
     }

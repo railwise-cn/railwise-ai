@@ -3,6 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DocumentComment } from '@shared/write-document'
+import type { WriteRichEditorHandle } from '../../write/tiptap/WriteRichEditor'
 import i18n from '../../i18n'
 import { useWriteWorkspaceStore } from '../../write/write-workspace-store'
 import { WriteWorkspaceView } from './WriteWorkspaceView'
@@ -11,7 +12,13 @@ vi.mock('../../store/chat-store', () => ({ useChatStore: (selector: (state: unkn
 vi.mock('../../agent/runtime-client', () => ({ rendererRuntimeClient: {} }))
 vi.mock('../engineering/SurveyDraftEditorNotice', () => ({ SurveyDraftEditorNotice: () => null }))
 vi.mock('./WriteWorkspaceToolbar', () => ({ WriteWorkspaceToolbar: () => null }))
-vi.mock('./WriteWorkspaceDocumentPane', () => ({ WriteWorkspaceDocumentPane: () => null }))
+const richEditor = vi.hoisted(() => ({ projection: null as string | null, apply: vi.fn(() => true) }))
+vi.mock('./WriteWorkspaceDocumentPane', () => ({ WriteWorkspaceDocumentPane: ({ richModeActive, richHandleRef }: { richModeActive: boolean; richHandleRef: { current: WriteRichEditorHandle | null } }) => {
+  richHandleRef.current = richModeActive && richEditor.projection !== null
+    ? { getProjectionText: () => richEditor.projection!, applyProjectedReplacement: richEditor.apply }
+    : null
+  return null
+} }))
 vi.mock('./WriteDocumentTabs', () => ({ WriteDocumentTabs: () => null }))
 vi.mock('./WriteDocumentSearchPanel', () => ({ WriteDocumentSearchPanel: () => null }))
 vi.mock('./WriteDocumentAiActions', () => ({ WriteDocumentAiActions: () => null }))
@@ -44,6 +51,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('zh')
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   request.mockReset(); setInput.mockReset()
+  richEditor.projection = null; richEditor.apply.mockClear()
   request.mockResolvedValue({ ok: true, completion: 'Formal target text.', action: { kind: 'edit', replacement: 'Formal target text.' } })
   useWriteWorkspaceStore.setState({
     ...useWriteWorkspaceStore.getInitialState(), workspaceRoot: '/tmp/synthetic-comments', rootDirectory: '/tmp/synthetic-comments',
@@ -125,6 +133,22 @@ describe('comment to document AI review', () => {
     await act(async () => button('生成修改建议').click())
     expect(request).not.toHaveBeenCalled()
     expect(useWriteWorkspaceStore.getState().fileContent).toBe(content)
+  })
+
+  it('rejects acceptance when the rich projection lags behind a newer store document', async () => {
+    richEditor.projection = content
+    useWriteWorkspaceStore.setState({ previewMode: 'rich' })
+    await openComments()
+    await act(async () => button('生成修改建议').click())
+    expect(container.textContent).toContain('审阅 AI 修改')
+    const external = content + '\nExternal update before rich projection synchronization.\n'
+    await act(async () => useWriteWorkspaceStore.setState({ fileContent: external }))
+    expect(richEditor.projection).toBe(content)
+    expect(useWriteWorkspaceStore.getState().fileContent).toBe(external)
+    await act(async () => button('接受修改').click())
+    expect(container.textContent).toContain('选区附近的内容已经变化')
+    expect(richEditor.apply).not.toHaveBeenCalled()
+    expect(useWriteWorkspaceStore.getState().fileContent).toBe(external)
   })
 
   it('drops completion after a file switch without leaking the old error into the new document', async () => {
