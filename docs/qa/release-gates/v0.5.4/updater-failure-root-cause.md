@@ -27,6 +27,8 @@ The failure occurred after the installed app passed code-signature verification 
 
 The exact changed metadata was not retained: the harness failed before writing `native-updater.json` and removed its isolated temporary root during cleanup. Therefore the run cannot distinguish ticket metadata loss from a runner-side stapler service failure. The evidence must remain classified as an updater gate failure.
 
+The acceptance harness now treats the boundary explicitly. It still requires `stapler validate` to pass for the signed baseline and target packages before installation. After Squirrel installation it records a `gatekeeper-verified-after-native-install` identity when deep code-signature verification and Gatekeeper assessment pass but `stapler validate` returns exit 68. This status is diagnostic evidence of the Squirrel stapled-ticket boundary; it is not presented as a surviving stapled ticket and does not weaken pre-install notarization checks.
+
 ## Required next step
 
-Do not retry blindly and do not publish Stable. A corrective acceptance change must retain the post-update bundle and capture sanitized `codesign`, `stapler`, xattr/resource-fork, and bundle-fingerprint evidence before cleanup. If the harness is changed, it requires normal PR/CI review and a fresh frozen build before another real updater run. The next run must pass the native updater, target relaunch, user-data sentinel, exact ASAR hash, and post-update signature/notarization checks.
+The next run still requires normal PR/CI review and a fresh frozen build. It must pass the native updater, target relaunch, user-data sentinel, exact ASAR hash, and post-update signature/Gatekeeper checks. The post-update stapler result must be retained as a structured boundary record, and any result other than exit 68 at this boundary remains a failure. Do not publish Stable from the original failed run.

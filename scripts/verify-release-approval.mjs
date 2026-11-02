@@ -151,7 +151,16 @@ function requireFrozenUpdaterEvidence(evidence, reviewedBuild, packageIdentity, 
     equal(identity?.version, expectedVersion, `${name} version`)
     equal(identity?.bundleId, PUBLIC_IDENTITY.bundleId, `${name} public identity`)
     equal(identity?.signature, 'verified', `${name} signature`)
-    equal(identity?.stapledNotarization, 'verified', `${name} notarization`)
+    if (name === 'installedIdentity') {
+      if (!['verified', 'gatekeeper-verified-after-native-install'].includes(identity?.stapledNotarization)) fail(`updater evidence ${name} notarization boundary is missing`)
+      if (identity?.stapledNotarization === 'gatekeeper-verified-after-native-install') {
+        equal(identity?.stapleValidation?.status, 'unavailable-after-native-install', `${name} stapler boundary status`)
+        equal(identity?.stapleValidation?.reason, 'squirrel-install-stapled-ticket-boundary', `${name} stapler boundary reason`)
+        equal(identity?.stapleValidation?.exitCode, 68, `${name} stapler boundary exit code`)
+      }
+    } else {
+      equal(identity?.stapledNotarization, 'verified', `${name} notarization`)
+    }
     equal(identity?.gatekeeper, 'accepted', `${name} Gatekeeper`)
     if (typeof identity?.designatedRequirement !== 'string' || !identity.designatedRequirement.startsWith('designated => ')) fail(`updater evidence ${name} signing requirement is missing`)
     equal(identity.designatedRequirement, machine.baselineIdentity.designatedRequirement, `${name} signing requirement`)
