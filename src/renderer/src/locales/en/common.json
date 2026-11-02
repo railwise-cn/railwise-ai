@@ -4238,7 +4238,7 @@
   "pluginUpdateFull": "Complete update required",
   "pluginUpdateUnavailable": "Source unavailable",
   "pluginUpdateDiagnosis": "Update diagnosis",
-  "pluginUpdateFullReason": "Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.",
+  "pluginUpdateFullReason": "Runtime or source changed. Install the new package version to update its files.",
   "writeStartOutlinePrompt": "Prepare an expandable Markdown outline for the stated goal, audience and materials. Mark missing facts for confirmation.",
   "writeStartClarifyPrompt": "No goal has been supplied. Ask three key clarification questions first.",
   "writeStartDraftPrompt": "Draft the full document for this brief. Mark missing information and do not invent data or references.",
