@@ -75,6 +75,7 @@ jobs:
           src/main/services/office-archive-security.test.ts
           src/main/services/workspace-preview-service.test.ts
           src/main/services/bounded-response.test.ts
+          src/main/services/write-export-link.test.ts
       - name: Run plugin Windows security tests
         run: >-
           npm test -- --run

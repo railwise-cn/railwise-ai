@@ -10,6 +10,9 @@ const MAX_RENDER_MS = 20_000
 const MAX_RENDER_WIDTH = 2_000
 const MAX_RENDER_HEIGHT = 2_400
 
+/** Rasterization size is independent of the final document's logical font size. */
+export const WRITE_MATH_RASTER_FONT_SIZE_PX = 30
+
 export type WriteRenderedDiagram = {
   svg: string
   png: Buffer
@@ -79,7 +82,7 @@ export async function renderWriteMathImage(source: string, display: boolean): Pr
     window.webContents.on('will-redirect', (event) => event.preventDefault())
     await window.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; font-src data:; img-src data:; object-src \'none\'; connect-src \'none\'"></head><body></body></html>'))
     const size = await withRenderDeadline(window.webContents.executeJavaScript(`(async()=>{
-      const style=document.createElement('style');style.textContent=${JSON.stringify(css + '\nbody{margin:0;background:white}#formula{display:inline-block;padding:8px;font-size:30px}.katex-display{margin:0}')};document.head.append(style);
+      const style=document.createElement('style');style.textContent=${JSON.stringify(css + `\nbody{margin:0;background:white}#formula{display:inline-block;padding:8px;font-size:${WRITE_MATH_RASTER_FONT_SIZE_PX}px}.katex-display{margin:0}`)};document.head.append(style);
       const formula=document.createElement('div');formula.id='formula';formula.innerHTML=${JSON.stringify(markup)};document.body.append(formula);
       await document.fonts.ready;
       const box=formula.getBoundingClientRect();return{width:Math.ceil(box.width),height:Math.ceil(box.height)};

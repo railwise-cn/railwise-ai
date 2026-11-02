@@ -25,6 +25,7 @@ import { parseMarkdownFrontmatter } from './write-document-service'
 import { readWriteImageResource } from './write-image-resource'
 import { resolveExportTemplate } from './write-docx-styles'
 import { loadWriteMathExportCss, renderWriteMermaidDiagrams } from './write-advanced-renderer'
+import { assignWriteExportHeadings, resolveWriteExportLink } from './write-export-link'
 import {
   legacyConverterRoot,
   legacyMarkdownConverterPath,
@@ -414,21 +415,43 @@ function renderPlainTextFragment(content: string): string {
   )
 }
 
-async function renderMarkdownFragment(content: string, sourcePath: string): Promise<string> {
+async function renderMarkdownFragment(content: string, sourcePath: string, workspaceRoot?: string): Promise<string> {
   const markdown = createWriteMarkdownIt({ html: false, linkify: false })
-  const link = markdown.renderer.rules.link_open ?? ((tokens, index, options, _env, renderer) => renderer.renderToken(tokens, index, options))
-  markdown.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
-    const href = tokens[index].attrGet('href')
-    if (href && !href.startsWith('#')) tokens[index].attrSet('href', resolveWriteMarkdownResource(href, sourcePath) ?? href)
-    return link(tokens, index, options, env, renderer)
+  const env = {}
+  const tokens = markdown.parse(content, env)
+  const headings = assignWriteExportHeadings(tokens)
+  for (const token of tokens) {
+    if (token.type === 'heading_open') {
+      const heading = headings.get(token.attrGet('id') ?? '')
+      if (heading) token.attrSet('id', heading.htmlId)
+    }
   }
+  const prepareLinks = async (items: typeof tokens): Promise<void> => {
+    for (const token of items) {
+      if (token.type === 'link_open') {
+        let href = await resolveWriteExportLink({ href: token.attrGet('href') ?? '', sourcePath, workspaceRoot })
+        let fragmentExists = true
+        if (href?.startsWith('#')) {
+          try {
+            const heading = headings.get(decodeURIComponent(href.slice(1)))
+            fragmentExists = !!heading
+            if (heading) href = `#${encodeURI(heading.htmlId)}`
+          } catch { fragmentExists = false }
+        }
+        if (href && fragmentExists) token.attrSet('href', href)
+        else token.attrs = token.attrs?.filter(([name]) => name !== 'href') ?? null
+      }
+      if (token.children) await prepareLinks(token.children)
+    }
+  }
+  await prepareLinks(tokens)
   const image = markdown.renderer.rules.image!
   markdown.renderer.rules.image = (tokens, index, options, env, renderer) => {
     const src = tokens[index].attrGet('src') ?? ''
     tokens[index].attrSet('src', /^https?:\/\//i.test(src) || /^data:/i.test(src) ? '' : resolveWriteMarkdownResource(src, sourcePath) ?? '')
     return image(tokens, index, options, env, renderer)
   }
-  let fragment = markdown.render(content)
+  let fragment = markdown.renderer.render(tokens, markdown.options, env)
   const placeholders = [...fragment.matchAll(/<div class="write-mermaid" data-write-mermaid="([^"]*)"><pre>[\s\S]*?<\/pre><\/div>/g)]
   if (placeholders.length) {
     const sources = placeholders.map((match) => decodeURIComponent(match[1]))
@@ -451,7 +474,7 @@ export async function buildWriteClipboardHtmlFragment(options: {
 }): Promise<string> {
   const frontmatter = parseMarkdownFrontmatter(options.content)
   const fragment = isMarkdownFile(options.sourcePath)
-    ? await renderMarkdownFragment(frontmatter.endOffset ? frontmatter.body : options.content, options.sourcePath)
+    ? await renderMarkdownFragment(frontmatter.endOffset ? frontmatter.body : options.content, options.sourcePath, options.workspaceRoot)
     : renderPlainTextFragment(options.content)
   const body = await inlineLocalImagesInHtml(fragment, options.sourcePath, options.workspaceRoot)
   const mathStyles = body.includes('class="katex"') ? `<style>${await loadWriteMathExportCss()}</style>` : ''
