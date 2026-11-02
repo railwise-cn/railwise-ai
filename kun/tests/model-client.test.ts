@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DeepseekCompatModelClient } from '../src/adapters/model/deepseek-compat-model-client.js'
+import { estimateDeepseekCost } from '../src/adapters/model/deepseek-pricing.js'
 import {
   makeAssistantReasoningItem,
   makeAssistantTextItem,
@@ -251,10 +252,24 @@ describe('DeepseekCompatModelClient', () => {
     expect(sentBodies[0]?.model).toBe('deepseek-v4-pro')
   })
 
-  it('migrates retired DeepSeek aliases only on the official host', async () => {
+  it.each([
+    ['https://api.deepseek.com', 'deepseek-chat', 'deepseek-flash'],
+    ['https://api.deepseek.com/v1', 'deepseek-reasoner', 'deepseek-flash'],
+    ['https://api.deepseek.com', ' DEEPSEEK-CHAT ', 'deepseek-flash'],
+    ['https://foo.deepseek.com/v1', 'deepseek-chat', 'deepseek-chat'],
+    ['https://api.deepseek.com.example.org/v1', 'deepseek-reasoner', 'deepseek-reasoner'],
+    ['http://api.deepseek.com/v1', 'deepseek-chat', 'deepseek-chat'],
+    ['https://example.com/v1', 'deepseek-chat', 'deepseek-chat'],
+    ['https://example.com/v1', 'deepseek-reasoner', 'deepseek-reasoner'],
+    ['https://api.deepseek.com', 'deepseek-v4-pro', 'deepseek-v4-pro'],
+    ['https://api.deepseek.com', 'deepseek-v4-flash', 'deepseek-v4-flash'],
+    ['https://api.deepseek.com', 'deepseek-v4-flash-vision-exp', 'deepseek-v4-flash-vision-exp'],
+    ['https://api.deepseek.com', 'custom-model', 'custom-model'],
+    ['https://api.deepseek.com', 'provider/deepseek-chat', 'provider/deepseek-chat']
+  ])('resolves live model %s / %s to %s without mutating saved configuration', async (baseUrl, selected, expected) => {
     const response = {
       id: 'alias',
-      model: 'deepseek-v4-flash',
+      model: expected,
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'done' } }]
     }
     const sentModels: string[] = []
@@ -265,20 +280,21 @@ describe('DeepseekCompatModelClient', () => {
         headers: { 'content-type': 'application/json' }
       })
     }
-    for (const baseUrl of ['https://api.deepseek.com', 'https://example.com/v1']) {
+    for (const useRequestOverride of [false, true]) {
+      const config = { baseUrl, apiKey: 'k', model: useRequestOverride ? 'other-configured-model' : selected, fetchImpl, nonStreaming: true }
       const client = new DeepseekCompatModelClient({
-        baseUrl,
-        apiKey: 'k',
-        model: 'deepseek-chat',
-        fetchImpl,
-        nonStreaming: true
+        ...config
       })
-      for await (const _chunk of client.stream(buildRequest(new AbortController().signal))) {
+      const request = buildRequest(new AbortController().signal)
+      request.model = useRequestOverride ? selected : ''
+      for await (const _chunk of client.stream(request)) {
         // drain
       }
+      expect(config.model).toBe(useRequestOverride ? 'other-configured-model' : selected)
+      expect(client.model).toBe(useRequestOverride ? 'other-configured-model' : expected)
     }
 
-    expect(sentModels).toEqual(['deepseek-v4-flash', 'deepseek-chat'])
+    expect(sentModels).toEqual([expected, expected])
   })
 
   it('builds chat completions URLs for base URLs with and without version segments', async () => {
@@ -1170,8 +1186,9 @@ describe('DeepseekCompatModelClient', () => {
     expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.cacheHitTokens : 0).toBe(930)
     expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.cacheMissTokens : 0).toBe(70)
     expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.cacheHitRate : 0).toBeCloseTo(0.93)
-    expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.costUsd : 0).toBeCloseTo(0.000015204)
-    expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.costCny : 0).toBeCloseTo(0.0001086)
+    const expectedCost = estimateDeepseekCost({ model: 'deepseek-flash', providerHost: 'https://api.deepseek.com', cacheHitTokens: 930, cacheMissTokens: 70, outputTokens: 10 })!
+    expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.costUsd : 0).toBeCloseTo(expectedCost.costUsd)
+    expect(usageChunk && usageChunk.kind === 'usage' ? usageChunk.usage.costCny : 0).toBeCloseTo(expectedCost.costCny)
   })
 
   it('sends tools in a canonical order for a stable cache prefix', async () => {
