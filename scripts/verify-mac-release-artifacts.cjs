@@ -57,7 +57,7 @@ function verifyApp(appPath, expectedArch, expectedVersion, label) {
   run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
   verifyMacRuntimeEntitlements(appPath)
   run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath])
-  run('xcrun', ['stapler', 'validate', appPath])
+  run('xcrun', ['stapler', 'validate', '-v', appPath])
   console.log(`Verified signed and notarized macOS app: ${label}`)
 }
 
