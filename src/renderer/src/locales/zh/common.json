@@ -2811,6 +2811,7 @@
   "writeUntitledDraft": "未命名草稿",
   "writeSaveFile": "保存文件",
   "writeExport": "导出",
+  "writeMoreActions": "更多操作",
   "writeCopyRichText": "复制为在线文档",
   "writeCopyRichTextSuccess": "已复制，可粘贴到飞书、语雀、Notion 或 Google Docs。",
   "writeCopyRichTextFailed": "复制富文本失败：{{message}}",

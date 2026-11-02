@@ -2811,6 +2811,7 @@
   "writeUntitledDraft": "Untitled draft",
   "writeSaveFile": "Save file",
   "writeExport": "Export",
+  "writeMoreActions": "More actions",
   "writeCopyRichText": "Copy for online docs",
   "writeCopyRichTextSuccess": "Copied. Paste it into Feishu, Yuque, Notion, or Google Docs.",
   "writeCopyRichTextFailed": "Could not copy rich text: {{message}}",
