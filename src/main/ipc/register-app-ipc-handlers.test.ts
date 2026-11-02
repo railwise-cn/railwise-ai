@@ -104,6 +104,142 @@ describe('registerAppIpcHandlers', () => {
     vi.clearAllMocks()
   })
 
+  it('keeps the same workspace-watch IPC subscription across atomic saves and later deletion', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const { atomicWriteFile } = await import('../services/durable-file')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-watch-ipc-')))
+    const path = join(root, 'draft.md')
+    writeFileSync(path, 'initial')
+    const sender = { id: 901, isDestroyed: () => false, send: vi.fn(), once: vi.fn() }
+    registerAppIpcHandlers(registerOptions())
+    const result = await handlers.get('file:watch-workspace')?.({ sender }, { workspaceRoot: root, path }) as { ok: boolean; watchId: string; path: string; content: string }
+    try {
+      expect(result).toMatchObject({ ok: true, path, content: 'initial' })
+      const changed = (content: string): void => expect(sender.send).toHaveBeenCalledWith('file:workspace-changed', expect.objectContaining({
+        ok: true, watchId: result.watchId, workspaceRoot: root, path, content, truncated: false
+      }))
+      await atomicWriteFile(path, 'atomic save')
+      await vi.waitFor(() => changed('atomic save'), { timeout: 3_000, interval: 10 })
+      writeFileSync(path, 'external after atomic save')
+      await vi.waitFor(() => changed('external after atomic save'), { timeout: 3_000, interval: 10 })
+      rmSync(path)
+      await vi.waitFor(() => expect(sender.send).toHaveBeenCalledWith('file:workspace-changed', expect.objectContaining({
+        ok: false, watchId: result.watchId, workspaceRoot: root, path, message: expect.any(String)
+      })), { timeout: 3_000, interval: 10 })
+      await expect(handlers.get('file:unwatch-workspace')?.({ sender }, result.watchId)).resolves.toBe(true)
+      const notifications = sender.send.mock.calls.length
+      writeFileSync(path, 'recreated after unwatch')
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      expect(sender.send).toHaveBeenCalledTimes(notifications)
+    } finally {
+      if (result?.watchId) await handlers.get('file:unwatch-workspace')?.({ sender }, result.watchId)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it.each([false, true])('rereads after watch setup when a replacement becomes its baseline (early event: %s)', async (earlyEvent) => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const service = await import('../services/workspace-file-watch-service')
+    const start = service.startWorkspaceFileWatch
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-watch-initial-')))
+    const path = join(root, 'draft.md')
+    writeFileSync(path, 'old initial read')
+    const sender = { id: 902, isDestroyed: () => false, send: vi.fn(), once: vi.fn() }
+    const setup = vi.spyOn(service, 'startWorkspaceFileWatch').mockImplementationOnce(async (options) => {
+      writeFileSync(path, 'replacement before watcher baseline')
+      if (earlyEvent) options.onChange()
+      return start(options)
+    })
+    registerAppIpcHandlers(registerOptions())
+    let watchId = ''
+    try {
+      const result = await handlers.get('file:watch-workspace')?.({ sender }, { workspaceRoot: root, path }) as { ok: boolean; watchId: string; content: string }
+      watchId = result.watchId
+      expect(result).toMatchObject({ ok: true, content: 'replacement before watcher baseline' })
+      expect(sender.send).not.toHaveBeenCalled()
+    } finally {
+      setup.mockRestore()
+      if (watchId) await handlers.get('file:unwatch-workspace')?.({ sender }, watchId)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('retries an initial snapshot invalidated by a newer event without emitting before the watch ID is returned', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const service = await import('../services/workspace-file-watch-service')
+    const files = await import('../services/workspace-service')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-watch-init-retry-')))
+    const path = join(root, 'draft.md')
+    writeFileSync(path, 'initial')
+    const sender = { id: 903, isDestroyed: () => false, send: vi.fn(), once: vi.fn() }
+    let changed = (): void => undefined
+    const close = vi.fn()
+    const setup = vi.spyOn(service, 'startWorkspaceFileWatch').mockImplementationOnce(async (options) => {
+      changed = options.onChange
+      return { close }
+    })
+    const read = files.readWorkspaceFile
+    let reads = 0
+    let snapshotReady = (): void => undefined
+    const started = new Promise<void>((resolve) => { snapshotReady = resolve })
+    let finishSnapshot = (_value: Awaited<ReturnType<typeof read>>): void => undefined
+    const held = new Promise<Awaited<ReturnType<typeof read>>>((resolve) => { finishSnapshot = resolve })
+    const snapshot = vi.spyOn(files, 'readWorkspaceFile').mockImplementation(async (payload) => {
+      const result = await read(payload)
+      reads += 1
+      if (reads === 2) { snapshotReady(); return held }
+      return result
+    })
+    registerAppIpcHandlers(registerOptions())
+    let watchId = ''
+    try {
+      const pending = handlers.get('file:watch-workspace')!({ sender }, { workspaceRoot: root, path })
+      await started
+      writeFileSync(path, 'newer during setup snapshot')
+      changed()
+      finishSnapshot({ ok: true, path, content: 'stale setup snapshot', size: 20, truncated: false })
+      const result = await pending as { ok: boolean; watchId: string; content: string }
+      watchId = result.watchId
+      expect(result).toMatchObject({ ok: true, content: 'newer during setup snapshot' })
+      expect(reads).toBe(3)
+      expect(sender.send).not.toHaveBeenCalled()
+    } finally {
+      snapshot.mockRestore(); setup.mockRestore()
+      if (watchId) await handlers.get('file:unwatch-workspace')?.({ sender }, watchId)
+      rmSync(root, { recursive: true, force: true })
+    }
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('disposes a watch closed by its sender during the registered initial read', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const service = await import('../services/workspace-file-watch-service')
+    const files = await import('../services/workspace-service')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-watch-init-close-')))
+    const path = join(root, 'draft.md')
+    writeFileSync(path, 'initial')
+    let destroy = (): void => undefined
+    const sender = { id: 904, isDestroyed: vi.fn(() => false), send: vi.fn(), once: vi.fn((_name: string, callback: () => void) => { destroy = callback }) }
+    const close = vi.fn()
+    const setup = vi.spyOn(service, 'startWorkspaceFileWatch').mockResolvedValueOnce({ close })
+    const read = files.readWorkspaceFile
+    let reads = 0
+    const snapshot = vi.spyOn(files, 'readWorkspaceFile').mockImplementation(async (payload) => {
+      const result = await read(payload)
+      if (++reads === 2) { sender.isDestroyed.mockReturnValue(true); destroy() }
+      return result
+    })
+    registerAppIpcHandlers(registerOptions())
+    try {
+      await expect(handlers.get('file:watch-workspace')?.({ sender }, { workspaceRoot: root, path })).resolves.toMatchObject({ ok: false })
+      expect(close).toHaveBeenCalledOnce()
+      expect(sender.send).not.toHaveBeenCalled()
+    } finally {
+      snapshot.mockRestore(); setup.mockRestore()
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('forwards valid Survey draft requests through the desktop runtime handler', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const response = { ok: true, status: 200, body: '{"drafts":[]}' }

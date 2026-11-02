@@ -332,6 +332,7 @@ export function initialState(): Pick<
   | 'fileLoading'
   | 'saveStatus'
   | 'saveRevision'
+  | 'guiUpdateInstallPending'
   | 'selection'
   | 'quotedSelections'
   | 'recentEdits'
@@ -361,6 +362,7 @@ export function initialState(): Pick<
     fileLoading: false,
     saveStatus: 'saved',
     saveRevision: 0,
+    guiUpdateInstallPending: false,
     selection: emptySelection(),
     quotedSelections: [],
     recentEdits: []

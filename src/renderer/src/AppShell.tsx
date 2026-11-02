@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { useChatStore } from './store/chat-store'
 import { supportsDesktopTitleBar, WindowsTitleBar } from './components/WindowsTitleBar'
+import { registerWriteGuiUpdateSaveGuard } from './write/write-gui-update-save-guard'
+import { registerDesignGuiUpdateSaveGuard } from './design/design-workspace-safety'
 
 const Workbench = lazy(() =>
   import('./components/Workbench').then((module) => ({ default: module.Workbench }))
@@ -19,6 +21,9 @@ function RouteFallback(): React.ReactElement {
 }
 
 export default function AppShell(): React.ReactElement {
+  // Settings replaces Workbench, so updater protection belongs above both routes.
+  useEffect(() => registerWriteGuiUpdateSaveGuard(), [])
+  useEffect(() => registerDesignGuiUpdateSaveGuard(), [])
   const route = useChatStore((s) => s.route)
   const boot = useChatStore((s) => s.boot)
   const initialSetupOpen = useChatStore((s) => s.initialSetupOpen)

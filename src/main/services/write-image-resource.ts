@@ -29,8 +29,9 @@ export async function readWriteImageResource(input: {
     let candidate: string
     if (/^file:/i.test(src)) candidate = fileURLToPath(src)
     else {
-      if (/^[a-z][a-z\d+.-]*:/i.test(src) || /[?#]/.test(src)) return null
+      if (/^[a-z][a-z\d+.-]*:/i.test(src) || /[?#]/.test(src) || /%(?:2f|5c)/i.test(src)) return null
       const decoded = decodeURIComponent(src)
+      if (/^[a-z][a-z\d+.-]*:/i.test(decoded) || decoded.startsWith('//') || /\\|\p{Cc}/u.test(decoded)) return null
       candidate = isAbsolute(decoded) ? decoded : resolve(dirname(input.sourcePath), decoded)
     }
     const rootInput = input.workspaceRoot || dirname(input.sourcePath)

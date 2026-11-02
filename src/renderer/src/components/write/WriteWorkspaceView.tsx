@@ -40,7 +40,6 @@ import {
 import type { AgnesImageSize } from '@shared/agnes-image'
 import { createWriteRecentEdit } from '../../write/recent-edits'
 import { startWriteWorkspaceFileWatch } from '../../write/write-file-watch'
-import { registerGuiUpdateSaveHandler } from '../../lib/gui-update-install-preflight'
 import type { WriteRichEditorHandle } from '../../write/tiptap/WriteRichEditor'
 import { useWriteSplitScrollSync } from './use-write-split-scroll-sync'
 import { WriteAgnesImageDialog } from './WriteAgnesImageDialog'
@@ -113,6 +112,7 @@ export function WriteWorkspaceView({
     fileLoading,
     saveStatus,
     saveRevision,
+    guiUpdateInstallPending,
     previewMode,
     assistantOpen,
     selection,
@@ -159,6 +159,7 @@ export function WriteWorkspaceView({
       fileLoading: s.fileLoading,
       saveStatus: s.saveStatus,
       saveRevision: s.saveRevision,
+      guiUpdateInstallPending: s.guiUpdateInstallPending,
       previewMode: s.previewMode,
       assistantOpen: s.assistantOpen,
       selection: s.selection,
@@ -225,6 +226,7 @@ export function WriteWorkspaceView({
     fileSize,
     truncated: fileTruncated
   })
+  renderSafety.readOnly ||= guiUpdateInstallPending
   const debouncedPreviewContent = useDebouncedValue(fileContent, writePreviewDebounceMs(fileContent.length))
   const saveLabel = activeFileIsImage
     ? t('writeImagePreview')
@@ -475,7 +477,7 @@ export function WriteWorkspaceView({
     if (!pendingAiEdit) return
     const latest = useWriteWorkspaceStore.getState()
     const { path, instruction, scope, replacement } = pendingAiEdit
-    if (latest.workspaceRoot !== pendingAiEdit.workspaceRoot || latest.activeFilePath !== path || latest.activeFileKind !== 'text' || latest.documentConflict) {
+    if (latest.workspaceRoot !== pendingAiEdit.workspaceRoot || latest.activeFilePath !== path || latest.activeFileKind !== 'text' || latest.documentConflict || latest.guiUpdateInstallPending) {
       setAiReviewError(t('writeInlineEditChanged'))
       return
     }
@@ -960,12 +962,6 @@ export function WriteWorkspaceView({
     void useWriteWorkspaceStore.getState().flushSave(workspaceRoot)
   }, [workspaceRoot])
 
-  useEffect(() => registerGuiUpdateSaveHandler('Write', async () => {
-    if (!workspaceRoot.trim()) return true
-    await useWriteWorkspaceStore.getState().flushSave(workspaceRoot)
-    return useWriteWorkspaceStore.getState().saveStatus !== 'error'
-  }), [workspaceRoot])
-
   useEffect(() => {
     if (!activeFilePath || !workspaceRoot.trim() || (!activeFileIsText && !activeFileIsImage)) return
     if (
@@ -1143,10 +1139,13 @@ export function WriteWorkspaceView({
                 }
               }}
               onBeforeRestore={async () => {
+                const current = useWriteWorkspaceStore.getState()
+                if (current.workspaceRoot !== workspaceRoot || current.activeFilePath !== activeFilePath || current.fileContent !== fileContent || current.guiUpdateInstallPending) return null
                 if (!await flushSave(workspaceRoot)) return null
-                return useWriteWorkspaceStore.getState().documentRevision
+                const saved = useWriteWorkspaceStore.getState()
+                return saved.workspaceRoot === workspaceRoot && saved.activeFilePath === activeFilePath && saved.fileContent === fileContent ? saved.documentRevision : null
               }}
-              onRestored={() => syncActiveFileFromDisk(workspaceRoot, { force: true, animate: false })}
+              onRestoreHistory={(id, content, historyContent) => useWriteWorkspaceStore.getState().restoreHistoryEntry({ workspaceRoot, path: activeFilePath, id, content, historyContent })}
             />
             </div>
           ) : null}

@@ -20,7 +20,7 @@ type Props = {
   onReviewComment: (comment: DocumentComment) => Promise<void>
   aiEditBusy: boolean
   onBeforeRestore: () => Promise<DocumentRevision | null>
-  onRestored: () => Promise<boolean>
+  onRestoreHistory: (id: string, content: string, historyContent: string) => Promise<boolean>
 }
 
 export function replaceDocumentFrontmatter(content: string, raw: string): string {
@@ -32,7 +32,7 @@ export function replaceDocumentFrontmatter(content: string, raw: string): string
 const buttonClass = 'rounded-lg border border-ds-border px-3 py-1.5 text-[12px] text-ds-ink transition hover:bg-ds-hover disabled:opacity-40'
 const fieldClass = 'w-full rounded-lg border border-ds-border bg-ds-panel px-3 py-2 text-[12px] text-ds-ink outline-none focus:border-accent'
 
-export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selection, readOnly, saveRevision, onChange, onOpenFile, onReviewComment, aiEditBusy, onBeforeRestore, onRestored }: Props): ReactElement {
+export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selection, readOnly, saveRevision, onChange, onOpenFile, onReviewComment, aiEditBusy, onBeforeRestore, onRestoreHistory }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const zh = i18n.language.startsWith('zh')
   const label = (cn: string, en: string): string => zh ? cn : en
@@ -188,16 +188,18 @@ export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selectio
               {tool === 'history' ? (
                 <div className="space-y-3">
                   <p className="text-[12px] text-ds-muted">{label('每次保存保留本地快照。恢复会新增历史记录，后续版本仍保留。', 'Saves keep local snapshots. Restoring adds a history entry and preserves later versions.')}</p>
-                  <div className="max-h-40 space-y-1 overflow-auto">{history.length ? history.map((entry) => <button key={entry.id} type="button" disabled={busy} className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-[12px] ${selectedHistory?.id === entry.id ? 'border-accent text-accent' : 'border-ds-border-muted text-ds-ink hover:bg-ds-hover'}`} onClick={() => void run(async () => setSelectedHistory(await window.workwise.getDocumentHistoryEntry({ workspaceRoot, path, id: entry.id })))}><span>{new Date(entry.createdAt).toLocaleString()}</span><span className="text-ds-faint">{entry.source} · {entry.revision.size} B</span></button>) : <p className="py-4 text-[12px] text-ds-faint">{label('首次保存后即可查看历史。', 'History appears after your first save.')}</p>}</div>
+                  <div className="max-h-40 space-y-1 overflow-auto">{history.length ? history.map((entry) => <button key={entry.id} type="button" disabled={busy} className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-[12px] ${selectedHistory?.id === entry.id ? 'border-accent text-accent' : 'border-ds-border-muted text-ds-ink hover:bg-ds-hover'}`} onClick={() => void run(async () => {
+                    const epoch = panelEpoch.current
+                    const selected = await window.workwise.getDocumentHistoryEntry({ workspaceRoot, path, id: entry.id })
+                    if (epoch === panelEpoch.current && selected.path === path) setSelectedHistory(selected)
+                  })}><span>{new Date(entry.createdAt).toLocaleString()}</span><span className="text-ds-faint">{entry.source} · {entry.revision.size} B</span></button>) : <p className="py-4 text-[12px] text-ds-faint">{label('首次保存后即可查看历史。', 'History appears after your first save.')}</p>}</div>
                   {historyTotal > history.length ? <p className="text-[11px] text-ds-faint">{label(`显示最近 ${history.length} 条，共 ${historyTotal} 条；全部记录均保留在本地。`, `Showing the latest ${history.length} of ${historyTotal} entries. All records remain on disk.`)}</p> : null}
                   {selectedHistory ? <>
                     <div className="max-h-60 overflow-auto rounded-xl border border-ds-border-muted p-3 font-mono text-[11px] leading-5">{diffLines(content, selectedHistory.content).map((part, index) => <pre key={index} className={`whitespace-pre-wrap break-words ${part.added ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200' : part.removed ? 'bg-red-500/10 text-red-700 dark:text-red-200' : 'text-ds-muted'}`}>{part.added ? '+ ' : part.removed ? '− ' : '  '}{part.value}</pre>)}</div>
                     <button type="button" className={buttonClass} disabled={readOnly || busy} onClick={() => void run(async () => {
-                      const expectedRevision = await onBeforeRestore()
-                      if (!expectedRevision) throw new Error(label('请先解决当前文档的保存冲突。', 'Resolve the current save conflict first.'))
-                      const restored = await window.workwise.restoreDocumentHistory({ path, workspaceRoot, id: selectedHistory.id, expectedRevision })
-                      if (!restored.ok) throw new Error('message' in restored ? restored.message : label('恢复时检测到外部修改，请重新查看历史。', 'The file changed during restore. Refresh history and try again.'))
-                      await onRestored(); setSelectedHistory(null); setRefresh((value) => value + 1)
+                      const epoch = panelEpoch.current
+                      if (!await onRestoreHistory(selectedHistory.id, content, selectedHistory.content)) throw new Error(label('文档已变化或存在保存冲突，已保留当前内容，请重新查看历史。', 'The document changed or has a save conflict. Your content was kept. Review history again.'))
+                      if (epoch === panelEpoch.current) { setSelectedHistory(null); setRefresh((value) => value + 1) }
                     })}>{label('恢复此版本', 'Restore this version')}</button>
                   </> : null}
                 </div>

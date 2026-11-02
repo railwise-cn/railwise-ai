@@ -66,10 +66,16 @@ export function resolveWriteMarkdownResourcePath(
 ): string | undefined {
   if (!src?.trim() || !filePath) return undefined
   const value = src.trim()
-  if (isExplicitWriteResourceUrl(value) || value.startsWith('#')) return undefined
-  const [pathname, suffix = ''] = value.split(/([?#].*)/, 2)
+  if (isExplicitWriteResourceUrl(value) || /[?#\\]|\p{Cc}/u.test(value) || value.startsWith('//')) return undefined
+  // Markdown parsers URL-encode image destinations. Decode once before resolving
+  // the filesystem path, then writePathToFileUrl will encode it for transport.
+  // Encoded separators are ambiguous across URL/filesystem implementations.
+  if (/%(?:2f|5c)/i.test(value)) return undefined
+  let pathname: string
+  try { pathname = decodeURIComponent(value) } catch { return undefined }
+  if (!pathname || isExplicitWriteResourceUrl(pathname) || /\\|\p{Cc}/u.test(pathname) || pathname.startsWith('//')) return undefined
   const baseDir = dirnamePortable(filePath)
-  if (!baseDir || suffix) return undefined
+  if (!baseDir) return undefined
   const resolved = pathname.startsWith('/')
     ? normalizeJoinedPath(pathname)
     : normalizeJoinedPath(`${baseDir}/${pathname}`)

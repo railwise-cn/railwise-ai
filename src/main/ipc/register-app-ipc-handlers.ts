@@ -1,10 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell, type WebContents } from 'electron'
 import brand from '../../shared/product-brand.json'
-import { watch, type FSWatcher } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { startWorkspaceFileWatch, type WorkspaceFileWatch } from '../services/workspace-file-watch-service'
 import { z } from 'zod'
 import {
   type AppSettingsPatch,
@@ -266,11 +266,13 @@ function stableGitIpcReason(error: unknown): 'workspace_not_allowed' | 'error' {
 }
 
 type WorkspaceFileWatchRecord = {
-  watcher: FSWatcher
+  watcher: WorkspaceFileWatch
   sender: WebContents
   path: string
   workspaceRoot: string
   timer: ReturnType<typeof setTimeout> | null
+  changeVersion: number
+  initializing: boolean
 }
 
 type RegisterAppIpcHandlersOptions = {
@@ -761,6 +763,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   const emitWorkspaceFileChange = async (watchId: string): Promise<void> => {
     const record = workspaceFileWatchers.get(watchId)
     if (!record) return
+    const changeVersion = record.changeVersion
     const changedAt = new Date().toISOString()
     try {
       const result = await readWorkspaceFile({
@@ -768,7 +771,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         workspaceRoot: record.workspaceRoot
       })
       const latest = workspaceFileWatchers.get(watchId)
-      if (!latest || latest.sender.isDestroyed()) return
+      if (latest !== record || latest.changeVersion !== changeVersion || latest.sender.isDestroyed()) return
       if (result.ok) {
         latest.sender.send('file:workspace-changed', {
           ok: true,
@@ -792,7 +795,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       })
     } catch (error) {
       const latest = workspaceFileWatchers.get(watchId)
-      if (!latest || latest.sender.isDestroyed()) return
+      if (latest !== record || latest.changeVersion !== changeVersion || latest.sender.isDestroyed()) return
       latest.sender.send('file:workspace-changed', {
         ok: false,
         watchId,
@@ -807,6 +810,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   const scheduleWorkspaceFileChange = (watchId: string): void => {
     const record = workspaceFileWatchers.get(watchId)
     if (!record) return
+    record.changeVersion += 1
+    if (record.initializing) return
     if (record.timer) clearTimeout(record.timer)
     record.timer = setTimeout(() => {
       const latest = workspaceFileWatchers.get(watchId)
@@ -2002,6 +2007,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     let initialContent: string
     let initialSize: number
     let initialTruncated: boolean
+    let watchingImage = false
     if (initial.ok) {
       watchedPath = initial.path
       initialContent = initial.content
@@ -2014,21 +2020,68 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       initialContent = ''
       initialSize = initialImage.size
       initialTruncated = false
+      watchingImage = true
     }
 
     const watchId = randomUUID()
+    let earlyChanges = 0
+    let registered = false
     try {
-      const watcher = watch(watchedPath, { persistent: false }, () => {
-        scheduleWorkspaceFileChange(watchId)
+      const watcher = await startWorkspaceFileWatch({
+        path: watchedPath,
+        onChange: () => {
+          if (!registered) earlyChanges += 1
+          else scheduleWorkspaceFileChange(watchId)
+        },
+        onError: (error) => logError('workspace-watch', 'Native directory watcher unavailable; retaining pathname polling.', {
+          watchId,
+          message: error.message
+        })
       })
-      workspaceFileWatchers.set(watchId, {
+      if (event.sender.isDestroyed()) { watcher.close(); return { ok: false as const, message: 'Window was closed.' } }
+      const record: WorkspaceFileWatchRecord = {
         watcher,
         sender: event.sender,
         path: watchedPath,
         workspaceRoot: request.workspaceRoot,
-        timer: null
-      })
+        timer: null,
+        changeVersion: earlyChanges,
+        initializing: true
+      }
+      workspaceFileWatchers.set(watchId, record)
+      registered = true
       event.sender.once('destroyed', () => disposeWorkspaceFileWatchesForSender(event.sender))
+      // The first file read precedes async watcher setup. Re-read after registration
+      // so a replacement that became the watcher's initial baseline is not lost.
+      // Do not emit before the renderer receives its watchId; concurrent events
+      // invalidate this read and require another authoritative snapshot instead.
+      let initialized = false
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const changeVersion = record.changeVersion
+        const current = watchingImage
+          ? await readWorkspaceImage({ path: watchedPath, workspaceRoot: request.workspaceRoot })
+          : await readWorkspaceFile({ path: watchedPath, workspaceRoot: request.workspaceRoot })
+        if (workspaceFileWatchers.get(watchId) !== record || event.sender.isDestroyed()) {
+          disposeWorkspaceFileWatch(watchId)
+          return { ok: false as const, message: 'Window was closed.' }
+        }
+        if (record.changeVersion !== changeVersion) continue
+        if (!current.ok) { disposeWorkspaceFileWatch(watchId); return current }
+        if (current.path !== watchedPath) {
+          disposeWorkspaceFileWatch(watchId)
+          return { ok: false as const, message: 'File location changed while starting the watcher. Please reopen it.' }
+        }
+        initialContent = 'content' in current ? current.content : ''
+        initialSize = current.size
+        initialTruncated = 'truncated' in current ? current.truncated : false
+        initialized = true
+        break
+      }
+      if (!initialized) {
+        disposeWorkspaceFileWatch(watchId)
+        return { ok: false as const, message: 'File is changing while starting the watcher. Please retry.' }
+      }
+      record.initializing = false
       return {
         ok: true as const,
         watchId,
@@ -2039,6 +2092,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         startedAt: new Date().toISOString()
       }
     } catch (error) {
+      disposeWorkspaceFileWatch(watchId)
       return {
         ok: false as const,
         message: error instanceof Error ? error.message : String(error)
