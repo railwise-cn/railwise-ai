@@ -1984,7 +1984,14 @@ function isThinkingProducerModel(model: string | undefined): boolean {
 }
 
 function resolveDeepSeekModelId(model: string, baseUrl: string): string {
-  if (!isDeepSeekHost(baseUrl)) return model
+  let officialApiHost = false
+  try {
+    const url = new URL(baseUrl)
+    officialApiHost = url.protocol === 'https:' && url.hostname.toLowerCase() === 'api.deepseek.com'
+  } catch {
+    return model
+  }
+  if (!officialApiHost) return model
   const normalized = normalizeModelId(model)
   if (normalized === 'deepseek-chat' || normalized === 'deepseek-reasoner') {
     return 'deepseek-flash'
