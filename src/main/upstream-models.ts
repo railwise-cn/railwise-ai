@@ -9,7 +9,7 @@ import {
   resolveManagedRuntimeSettings,
   type AppSettingsV1
 } from '../shared/app-settings'
-import { DEFAULT_COMPOSER_MODEL_IDS } from '../shared/default-composer-models'
+import { DEFAULT_COMPOSER_MODEL_IDS, isVisibleComposerModelId } from '../shared/default-composer-models'
 import type { ModelProviderModelGroup } from '../shared/workwise-api'
 import { upstreamOpenAiModelsUrl } from '../shared/openai-compat-url'
 
@@ -111,11 +111,14 @@ export async function readConfiguredKunModelIds(settings: AppSettingsV1): Promis
   const root = objectValue(parsed)
   const models = objectValue(root.models)
   const contextCompaction = objectValue(root.contextCompaction)
-  return mergeModelIds([
+  const configured = mergeModelIds([
     ...ids,
     ...modelIdsFromProfiles(objectValue(contextCompaction.modelProfiles)),
     ...modelIdsFromProfiles(objectValue(models.profiles))
   ])
+  return isOfficialDeepSeekBaseUrl(runtime.baseUrl)
+    ? configured.filter((id) => isVisibleComposerModelId(id))
+    : configured
 }
 
 function modelListOrError(
@@ -245,10 +248,11 @@ function collectModelProfileAliases(
 
 function visibleProviderModelIds(baseUrl: string, ids: readonly string[]): string[] {
   if (!isOfficialDeepSeekBaseUrl(baseUrl)) return sortComposerModelIds(ids)
-  return sortComposerModelIds(ids).filter((id) => !RETIRED_DEEPSEEK_MODEL_IDS.has(id.toLowerCase()))
+  return sortComposerModelIds(ids).filter((id) => isVisibleComposerModelId(id) && !RETIRED_DEEPSEEK_MODEL_IDS.has(id.toLowerCase()))
 }
 
 function visibleConfiguredModelIds(settings: AppSettingsV1, ids: readonly string[]): string[] {
+  const officialRuntime = isOfficialDeepSeekBaseUrl(resolveManagedRuntimeSettings(settings).baseUrl)
   const explicitlyConfiguredByCompatibleProvider = new Set(
     getModelProviderSettings(settings).providers
       .filter((provider) => !isOfficialDeepSeekBaseUrl(provider.baseUrl))
@@ -256,6 +260,7 @@ function visibleConfiguredModelIds(settings: AppSettingsV1, ids: readonly string
   )
   return ids.filter((id) => {
     const normalized = id.trim().toLowerCase()
+    if (officialRuntime && !isVisibleComposerModelId(id)) return false
     return !RETIRED_DEEPSEEK_MODEL_IDS.has(normalized) ||
       explicitlyConfiguredByCompatibleProvider.has(normalized)
   })

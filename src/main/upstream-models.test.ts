@@ -83,8 +83,7 @@ describe('upstream model picker list', () => {
 
     expect(ids).toEqual(expect.arrayContaining([
       'auto',
-      'deepseek-v4-pro',
-      'deepseek-v4-flash',
+      'deepseek-flash',
       'settings-model',
       'legacy-model',
       'custom-model',
@@ -125,10 +124,7 @@ describe('upstream model picker list', () => {
       ]))
       const deepseek = result.modelGroups?.find((group) => group.providerId === 'deepseek')
       expect(deepseek?.modelIds).toEqual([
-        'deepseek-flash',
-        'deepseek-v4-flash',
-        'deepseek-v4-flash-vision-exp',
-        'deepseek-v4-pro'
+        'deepseek-flash'
       ])
     }
   })
@@ -155,22 +151,16 @@ describe('upstream model picker list', () => {
           'auto',
           'agnes-2.0-flash',
           'custom-provider-model',
-          'deepseek-flash',
-          'deepseek-v4-flash',
-          'deepseek-v4-flash-vision-exp',
-          'deepseek-v4-pro'
+          'deepseek-flash'
         ])
         expect(result.modelIds).not.toContain('deepseek-chat')
         expect(result.modelIds).not.toContain('deepseek-reasoner')
         expect(result.modelGroups?.find((group) => group.providerId === 'deepseek')?.modelIds)
           .toEqual([
-            'deepseek-flash',
-            'deepseek-v4-flash',
-            'deepseek-v4-flash-vision-exp',
-            'deepseek-v4-pro'
+            'deepseek-flash'
           ])
         expect(result.modelGroups?.find((group) => group.providerId === 'deepseek')?.discoveredModelIds)
-          .toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
+          .toBeUndefined()
       }
     } finally {
       globalThis.fetch = originalFetch
