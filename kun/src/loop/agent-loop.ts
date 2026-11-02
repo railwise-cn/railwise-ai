@@ -888,11 +888,11 @@ export class AgentLoop {
       providerId: turn?.providerId,
       candidates: [turn?.model, thread?.agentProfile?.model, thread?.model, this.opts.model.model]
     })
+    const model = this.opts.model.resolveModelId?.(modelRoute.model, turn?.providerId) ?? modelRoute.model
     await this.recordPipelineStage(threadId, turnId, 'input_routed', {
-      model: modelRoute.model,
+      model,
       ...(modelRoute.reasoningEffort ? { reasoningEffort: modelRoute.reasoningEffort } : {})
     })
-    const model = modelRoute.model
     const modelCapabilities = this.opts.modelCapabilities?.(model) ?? modelCapabilitiesForModel(model)
     const attachments = await this.resolveAttachments({
       attachmentIds: turn?.attachmentIds ?? [],

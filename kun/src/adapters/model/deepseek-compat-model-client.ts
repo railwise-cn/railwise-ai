@@ -168,9 +168,13 @@ export class DeepseekCompatModelClient implements ModelClient {
   private readonly fetchImpl: typeof fetch
 
   constructor(config: DeepseekCompatConfig) {
-    this.config = config
-    this.model = config.model
+    this.model = resolveDeepSeekModelId(config.model, config.baseUrl)
+    this.config = { ...config, model: this.model }
     this.fetchImpl = config.fetchImpl ?? fetch
+  }
+
+  resolveModelId(model: string): string {
+    return resolveDeepSeekModelId(model.trim() || this.model, this.config.baseUrl)
   }
 
   /**
@@ -181,7 +185,11 @@ export class DeepseekCompatModelClient implements ModelClient {
   async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
     const toolNames = createToolWireNameCodec(request)
     const wireRequest = encodeModelRequestToolNames(request, toolNames)
-    for await (const chunk of this.streamWithWireToolNames(wireRequest)) {
+    // Keep parsing/usage estimates bound to this request's actual model even
+    // when concurrent turns override the configured default.
+    const model = this.resolveModelId(request.model)
+    const requestClient = model === this.model ? this : new DeepseekCompatModelClient({ ...this.config, model })
+    for await (const chunk of requestClient.streamWithWireToolNames({ ...wireRequest, model })) {
       yield decodeModelStreamToolName(chunk, toolNames)
     }
   }
@@ -1975,7 +1983,7 @@ function resolveDeepSeekModelId(model: string, baseUrl: string): string {
   if (!isDeepSeekHost(baseUrl)) return model
   const normalized = normalizeModelId(model)
   if (normalized === 'deepseek-chat' || normalized === 'deepseek-reasoner') {
-    return 'deepseek-v4-flash'
+    return 'deepseek-flash'
   }
   return model
 }

@@ -89,5 +89,7 @@ export type ModelToolSpec = {
 export interface ModelClient {
   readonly provider: string
   readonly model: string
+  /** Resolve a live request alias before capability checks; persisted IDs remain unchanged. */
+  resolveModelId?(model: string, providerId?: string): string
   stream(request: ModelRequest): AsyncIterable<ModelStreamChunk>
 }
