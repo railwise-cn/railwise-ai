@@ -192,7 +192,7 @@ async function main() {
     // Verify the app actually copied from the DMG, not merely the adjacent
     // unpacked build directory. Keep generic legacy harness runs dependency-free.
     const { verifyBundle } = await import('./run-private-macos-updater-acceptance.mjs')
-    verifyBundle(executable, candidateHead, baseVersion, progress)
+    verifyBundle(executable, candidateHead, baseVersion, progress, 'candidate-baseline-dmg-copy')
   }
   const logPath = join(dirname(reportPath), `${basename(reportPath, '.json')}.log`)
   const log = openSync(logPath, 'a')

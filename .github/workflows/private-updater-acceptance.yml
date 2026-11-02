@@ -32,7 +32,7 @@ jobs:
           cache-dependency-path: sidecars/markitdown/requirements.lock
       - run: npm ci
       - name: Check private transport and isolation guards
-        run: node --test scripts/private-updater-acceptance.test.mjs
+        run: node --test scripts/private-updater-acceptance.test.mjs scripts/macos-updater-trust.test.mjs
       - name: Preflight actual Electron HTTPS certificate pinning
         timeout-minutes: 3
         run: node scripts/run-private-updater-tls-preflight.mjs --evidence-dir="${RUNNER_TEMP}/private-updater-evidence"

@@ -13,6 +13,7 @@ import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, validateReviewed
 import { hashFile, startFrozenReleaseFeed } from './frozen-release-updater-feed.mjs'
 import { assertRetainedFiles, snapshotFiles } from './frozen-release-updater-data.mjs'
 import { boundedCommand } from './updater-acceptance-process.mjs'
+import { verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
@@ -113,40 +114,16 @@ export function validatePublicBundle(info, metadata, updater, version, head) {
   }
 }
 
-/**
- * Verify a public bundle at a trust boundary.
- *
- * The signed target ZIP/DMG must carry a valid stapled ticket before update.
- * Squirrel.Mac can lose that ticket while unpacking the ZIP even when the
- * installed code signature and Gatekeeper assessment remain valid. The
- * post-update caller opts into this known boundary and records it explicitly;
- * package verification remains fail-closed by default.
- */
-function verifyBundle(app, version, head, run, { allowNativeInstallStapleLoss = false } = {}) {
+function verifyBundle(app, version, head, run, { boundary, record } = {}) {
   const resources = join(app, 'Contents/Resources')
   const info = JSON.parse(run('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents/Info.plist')]).stdout)
   const metadata = JSON.parse(require('@electron/asar').extractFile(join(resources, 'app.asar'), 'package.json').toString('utf8'))
   validatePublicBundle(info, metadata, parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')), version, head)
-  run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app])
-  const staple = run('/usr/bin/xcrun', ['stapler', 'validate', app], {
-    allowedExitCodes: allowNativeInstallStapleLoss ? [0, 68] : [0]
-  })
-  run('/usr/sbin/spctl', ['--assess', '--type', 'execute', app])
+  const trust = verifyMacosUpdaterTrust(app, { boundary, run, record })
   const signed = run('/usr/bin/codesign', ['-d', '-r-', app])
   const requirements = [...new Set(`${signed.stdout}\n${signed.stderr}`.split(/\r?\n/).filter(line => line.startsWith('designated => ')))]
   if (requirements.length !== 1) throw new Error('Public designated requirement is unavailable or ambiguous.')
-  if (staple.status !== 0 && !allowNativeInstallStapleLoss) throw new Error('Public stapled notarization validation failed before native installation.')
-  return {
-    version,
-    bundleId: info.CFBundleIdentifier,
-    signature: 'verified',
-    stapledNotarization: staple.status === 0 ? 'verified' : 'gatekeeper-verified-after-native-install',
-    stapleValidation: staple.status === 0
-      ? { status: 'verified', exitCode: 0 }
-      : { status: 'unavailable-after-native-install', exitCode: staple.status, reason: 'squirrel-install-stapled-ticket-boundary' },
-    gatekeeper: 'accepted',
-    designatedRequirement: requirements[0]
-  }
+  return { version, bundleId: info.CFBundleIdentifier, ...trust, designatedRequirement: requirements[0] }
 }
 
 export function validateNativeReport(report, arch, targetVersion) {
@@ -486,14 +463,14 @@ export async function main() {
     await downloadPinned(`https://github.com/${RELEASE_REPOSITORY}/releases/download/v${BASE_VERSION}/${pin.name}`, baselineDmg, pin)
     report.baselineAsset = { tag: 'v0.5.2', ...pin }
     const baseline = installBaseline(baselineDmg, root, run)
-    report.baselineIdentity = verifyBundle(baseline, BASE_VERSION, undefined, run)
+    report.baselineIdentity = verifyBundle(baseline, BASE_VERSION, undefined, run, { boundary: 'baseline-dmg-copy', record: progress })
     const targetZip = join(verified, `WorkWise-${targetVersion}-mac-${process.arch}.zip`)
     const targetRoot = join(root, 'target'); mkdirSync(targetRoot)
     const zipEntries = run('/usr/bin/unzip', ['-Z1', targetZip], { maxBuffer: 20 * 1024 * 1024 }).stdout.trim().split(/\r?\n/)
     if (zipEntries.some(name => !/^(?:RailWise AI\.app|__MACOSX)(?:\/|$)/.test(name) || name.split('/').includes('..'))) throw new Error('Target ZIP has entries outside its public app bundle.')
     run('/usr/bin/ditto', ['-x', '-k', targetZip, targetRoot])
     const target = join(targetRoot, 'RailWise AI.app')
-    report.targetIdentity = verifyBundle(target, targetVersion, build.sourceHead, run)
+    report.targetIdentity = verifyBundle(target, targetVersion, build.sourceHead, run, { boundary: 'target-zip-preflight', record: progress })
     equal(report.targetIdentity.designatedRequirement, report.baselineIdentity.designatedRequirement, 'Baseline/target signing requirement')
     report.targetZipSha256 = await hashFile(targetZip)
     report.targetAsarSha256 = await hashFile(join(target, 'Contents/Resources/app.asar'))
@@ -532,7 +509,7 @@ export async function main() {
     const nativeRoots = readdirSync(join(root, 'native-temp')).filter(name => /^workwise-native-updater-/.test(name))
     equal(nativeRoots.length, 1, 'Owned native installation count')
     const installed = join(root, 'native-temp', nativeRoots[0], 'Applications/RailWise AI.app')
-    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run, { allowNativeInstallStapleLoss: true })
+    report.installedIdentity = verifyBundle(installed, targetVersion, build.sourceHead, run, { boundary: 'native-installed-target', record: progress })
     report.installedAsarSha256 = await hashFile(join(installed, 'Contents/Resources/app.asar'))
     equal(report.installedAsarSha256, report.targetAsarSha256, 'Installed/exact frozen ZIP ASAR')
     equal(readFileSync(join(paths.profile, 'frozen-release-sentinel.json')).toString(), beforeSentinel.toString(), 'Independent user-data sentinel')
