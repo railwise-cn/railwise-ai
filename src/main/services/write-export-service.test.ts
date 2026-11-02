@@ -70,7 +70,7 @@ describe('write-export-service helpers', () => {
       content: '# Heading\n\n![Cover](./cover.png)\n\n[Notes](./notes.md)'
     })
 
-    expect(html).toContain('<h1>Heading</h1>')
+    expect(html).toContain('<h1 id="heading">Heading</h1>')
     expect(html).toContain('src="data:image/png;base64,')
     expect(html).toContain(`href="${pathToFileURL(join(workspaceRoot, 'notes.md')).href}"`)
     expect(html).toContain('<html lang="zh-CN">')
@@ -84,7 +84,7 @@ describe('write-export-service helpers', () => {
     })
 
     expect(html).toContain('<article class="markdown-body">')
-    expect(html).toContain('<h1>Heading</h1>')
+    expect(html).toContain('<h1 id="heading">Heading</h1>')
     expect(html).toContain('<strong>Bold</strong>')
     expect(html).toContain('type="checkbox"')
     expect(html).toContain('<table>')

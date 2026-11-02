@@ -9,6 +9,7 @@ import {
   FootnoteReferenceRun,
   HeadingLevel,
   ImageRun,
+  InternalHyperlink,
   LevelFormat,
   Packer,
   Paragraph,
@@ -43,6 +44,7 @@ import { readWriteImageResource } from './write-image-resource'
 import { createWriteMarkdownIt } from '../../shared/write-advanced-markdown'
 import { buildWriteMathOmml } from './write-math-omml'
 import { writeMathImageTransformation } from './write-math-image-layout'
+import { assignWriteExportHeadings, resolveWriteExportLink } from './write-export-link'
 import { renderWriteMathImage, renderWriteMermaidDiagrams, type WriteRenderedDiagram } from './write-advanced-renderer'
 
 type InlineToken = {
@@ -51,6 +53,7 @@ type InlineToken = {
   content: string
   children?: InlineToken[]
   attrGet?: (name: string) => string | null
+  attrSet?: (name: string, value: string) => void
   meta?: { id?: number; subId?: number; label?: string; checked?: boolean } | null
 }
 
@@ -176,7 +179,8 @@ type WriteDocxRenderContext = {
   workspaceRoot?: string
   diagrams: Map<string, WriteRenderedDiagram | null>
   footnoteReferences: Set<number>
-  nextBookmarkId: () => number
+  headingBookmarks: Map<string, string>
+  nextBookmarkId: ReturnType<typeof bookmarkUniqueNumericIdGen>
 }
 
 /**
@@ -415,12 +419,15 @@ async function parseInlineTokens(tokens: InlineToken[], sourcePath: string): Pro
     } else if (token.type === 'link_close') {
       flush()
       if (state.link) {
-        const href = state.link.href.trim()
-        if (/^(https?:|mailto:)/i.test(href)) {
-          output.push(new ExternalHyperlink({ link: href, children: state.link.children }))
-        } else {
-          output.push(...state.link.children)
+        const context = writeDocxRenderContext.getStore()
+        const href = await resolveWriteExportLink({ href: state.link.href, sourcePath, workspaceRoot: context?.workspaceRoot })
+        let bookmark: string | undefined
+        if (href?.startsWith('#')) {
+          try { bookmark = context?.headingBookmarks.get(decodeURIComponent(href.slice(1))) } catch { /* Invalid fragments remain text. */ }
         }
+        if (bookmark) output.push(new InternalHyperlink({ anchor: bookmark, children: state.link.children }))
+        else if (href && !href.startsWith('#')) output.push(new ExternalHyperlink({ link: href, children: state.link.children }))
+        else output.push(...state.link.children)
         state.link = null
       }
     } else if (token.type === 'image') {
@@ -700,6 +707,7 @@ export async function buildDocxFromMarkdown(options: {
       workspaceRoot: options.workspaceRoot,
       diagrams: new Map(),
       footnoteReferences: new Set(),
+      headingBookmarks: new Map(),
       nextBookmarkId: bookmarkUniqueNumericIdGen()
     },
     () => buildDocxFromMarkdownInner(options)
@@ -719,7 +727,7 @@ async function renderDocxBlocks(tokens: MarkdownToken[], sourcePath: string): Pr
       const headingStyle = templateStyle(headingType)
       const headingRunOpts = headingStyle ? elementStyleToRunOptions(headingStyle) : undefined
       const headingParaOpts = headingStyle ? elementStyleToParagraphOptions(headingStyle) : undefined
-      const hasAdvancedInline = inlineToken.children?.some((child) => child.type === 'math_inline' || child.type === 'footnote_ref')
+      const hasAdvancedInline = inlineToken.children?.some((child) => ['math_inline', 'footnote_ref', 'link_open'].includes(child.type))
       const context = writeDocxRenderContext.getStore()
       const headingChildren = hasAdvancedInline && context
         ? await writeDocxRenderContext.run({ ...context, inlineElementType: headingType }, () => parseInlineTokens(inlineToken.children!, sourcePath))
@@ -729,8 +737,13 @@ async function renderDocxBlocks(tokens: MarkdownToken[], sourcePath: string): Pr
           color: headingRunOpts?.color ?? '0F172A',
           font: headingRunOpts?.font
         }, headingType)]
+      const bookmarkName = context?.headingBookmarks.get(token.attrGet?.('id') ?? '')
+      const bookmarkId = bookmarkName ? context!.nextBookmarkId() : undefined
+      const bookmarkedChildren = bookmarkName && bookmarkId !== undefined
+        ? [new BookmarkStart(bookmarkName, bookmarkId), ...headingChildren, new BookmarkEnd(bookmarkId)]
+        : headingChildren
       children.push(
-        paragraph(headingChildren, {
+        paragraph(bookmarkedChildren, {
           heading: headingLevel(token.tag),
           spacing: headingParaOpts?.spacing ?? { before: token.tag === 'h1' ? 200 : 160, after: 120, line: 300, lineRule: 'auto' },
           alignment: headingParaOpts?.alignment,
@@ -871,6 +884,7 @@ async function buildDocxFromMarkdownInner(options: {
   const tokens = md.parse(preprocessMarkdown(DOCUMENT_EXTENSIONS.has(extname(options.sourcePath).toLowerCase()) && parsed.endOffset ? parsed.body : options.content), {}) as MarkdownToken[]
   const diagramSources = tokens.filter((token) => token.type === 'fence' && (token.info ?? '').trim().split(/\s+/)[0].toLowerCase() === 'mermaid').map((token) => token.content)
   const context = writeDocxRenderContext.getStore()!
+  context.headingBookmarks = new Map([...assignWriteExportHeadings(tokens)].map(([slug, heading]) => [slug, heading.bookmark]))
   context.diagrams = await renderWriteMermaidDiagrams(diagramSources)
   const footnoteStart = tokens.findIndex((token) => token.type === 'footnote_block_open')
   const children = await renderDocxBlocks(footnoteStart === -1 ? tokens : tokens.slice(0, footnoteStart), options.sourcePath)
