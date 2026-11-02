@@ -1,6 +1,9 @@
 import {
   AlignmentType,
   BorderStyle,
+  BookmarkEnd,
+  BookmarkStart,
+  bookmarkUniqueNumericIdGen,
   Document,
   ExternalHyperlink,
   FootnoteReferenceRun,
@@ -10,6 +13,7 @@ import {
   Packer,
   Paragraph,
   ShadingType,
+  SimpleField,
   Table,
   TableCell,
   TableRow,
@@ -19,6 +23,8 @@ import {
   type IRunOptions
 } from 'docx'
 import hljs from 'highlight.js'
+import JSZip from 'jszip'
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { basename, extname } from 'node:path'
 import {
@@ -36,6 +42,7 @@ import { parseMarkdownFrontmatter } from './write-document-service'
 import { readWriteImageResource } from './write-image-resource'
 import { createWriteMarkdownIt } from '../../shared/write-advanced-markdown'
 import { buildWriteMathOmml } from './write-math-omml'
+import { writeMathImageTransformation } from './write-math-image-layout'
 import { renderWriteMathImage, renderWriteMermaidDiagrams, type WriteRenderedDiagram } from './write-advanced-renderer'
 
 type InlineToken = {
@@ -168,6 +175,8 @@ type WriteDocxRenderContext = {
   inlineElementType: ExportElementType
   workspaceRoot?: string
   diagrams: Map<string, WriteRenderedDiagram | null>
+  footnoteReferences: Set<number>
+  nextBookmarkId: () => number
 }
 
 /**
@@ -381,7 +390,25 @@ async function parseInlineTokens(tokens: InlineToken[], sourcePath: string): Pro
     } else if (token.type === 'footnote_ref') {
       flush()
       const id = token.meta?.id
-      if (Number.isInteger(id) && id! >= 0) push(new FootnoteReferenceRun(id! + 1))
+      if (Number.isInteger(id) && id! >= 0) {
+        const noteId = id! + 1
+        const bookmark = `RailWiseFootnote${noteId}`
+        const seen = writeDocxRenderContext.getStore()!.footnoteReferences
+        if (seen.has(noteId)) {
+          // Some Word-compatible renderers renumber duplicated native note
+          // references independently. A repeated Markdown citation points to
+          // the original note through an explicit cross-reference instead.
+          const reference = new SimpleField(`NOTEREF ${bookmark} \\h \\f`)
+          reference.addChildElement(textRun(String(noteId), { style: 'FootnoteReference', superScript: true }))
+          push(reference)
+        } else {
+          seen.add(noteId)
+          const bookmarkId = writeDocxRenderContext.getStore()!.nextBookmarkId()
+          push(new BookmarkStart(bookmark, bookmarkId))
+          push(new FootnoteReferenceRun(noteId))
+          push(new BookmarkEnd(bookmarkId))
+        }
+      }
     } else if (token.type === 'link_open') {
       flush()
       state.link = { href: token.attrGet?.('href') ?? '', children: [] }
@@ -649,8 +676,8 @@ async function buildMathRun(source: string, display: boolean): Promise<any> {
   if (editable) return editable
   const image = await renderWriteMathImage(source, display)
   if (image) {
-    const scale = Math.min(1, (display ? 560 : 300) / image.width)
-    return new ImageRun({ type: 'png', data: image.png, transformation: { width: Math.max(1, Math.round(image.width * scale)), height: Math.max(1, Math.round(image.height * scale)) }, altText: { title: source, description: source, name: 'Mathematical formula' } })
+    const fontSizePt = templateStyle(display ? 'p' : currentInlineElementType())?.fontSize ?? 11
+    return new ImageRun({ type: 'png', data: image.png, transformation: writeMathImageTransformation(image, fontSizePt, display), altText: { title: source, description: source, name: 'Mathematical formula' } })
   }
   return textRun(`[公式无法排版：${source}]`, { color: '9B1C1C' })
 }
@@ -671,7 +698,9 @@ export async function buildDocxFromMarkdown(options: {
       template: options.template ?? resolveExportTemplate(undefined),
       inlineElementType: 'p',
       workspaceRoot: options.workspaceRoot,
-      diagrams: new Map()
+      diagrams: new Map(),
+      footnoteReferences: new Set(),
+      nextBookmarkId: bookmarkUniqueNumericIdGen()
     },
     () => buildDocxFromMarkdownInner(options)
   )
@@ -861,6 +890,7 @@ async function buildDocxFromMarkdownInner(options: {
   const doc = new Document({
     creator: 'WorkWise',
     title: options.title || basename(options.sourcePath),
+    features: { updateFields: true },
     footnotes,
     numbering: {
       config: [
@@ -897,5 +927,21 @@ async function buildDocxFromMarkdownInner(options: {
     ]
   })
 
-  return Packer.toBuffer(doc)
+  const archive = await JSZip.loadAsync(await Packer.toBuffer(doc))
+  const notesPart = archive.file('word/footnotes.xml')
+  if (notesPart) {
+    const xml = new DOMParser().parseFromString(await notesPart.async('string'), 'application/xml')
+    // docx 9.x prepends an automatic note mark to every footnote, including
+    // its separator entries. Those special entries contain only separators,
+    // not numbered content; remove the spurious marks without changing notes.
+    for (const note of Array.from(xml.getElementsByTagName('w:footnote'))) {
+      if (!['separator', 'continuationSeparator'].includes(note.getAttribute('w:type') ?? '')) continue
+      for (const mark of Array.from(note.getElementsByTagName('w:footnoteRef'))) {
+        const run = mark.parentNode
+        if (run?.nodeName === 'w:r') run.parentNode?.removeChild(run)
+      }
+    }
+    archive.file('word/footnotes.xml', new XMLSerializer().serializeToString(xml))
+  }
+  return archive.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 }
