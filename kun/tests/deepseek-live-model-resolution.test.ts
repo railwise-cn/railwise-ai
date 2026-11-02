@@ -57,7 +57,9 @@ describe('live DeepSeek model identity across request, capability and usage', ()
       { id: 'official', baseUrl: official, apiKey: 'synthetic', model: alias, endpointFormat: 'chat_completions' as const },
       { id: 'third-party', baseUrl: 'https://example.com/v1', apiKey: 'synthetic', model: alias, endpointFormat: 'chat_completions' as const }
     ]
-    const router = new ProviderRoutingModelClient(new DeepseekCompatModelClient({ ...routes[1] }), routes)
+    const router = new ProviderRoutingModelClient(new DeepseekCompatModelClient({ ...routes[1], model: 'deepseek-v4-pro' }), routes)
+    expect(router.resolveDefaultModelId('official')).toBe('deepseek-flash')
+    expect(router.resolveDefaultModelId('third-party')).toBe('deepseek-chat')
     const capabilityIds: string[] = []
     const harness = makeHarness(router, { modelCapabilities: model => {
       capabilityIds.push(model)

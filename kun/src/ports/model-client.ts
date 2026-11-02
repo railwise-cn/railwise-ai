@@ -91,5 +91,7 @@ export interface ModelClient {
   readonly model: string
   /** Resolve a live request alias before capability checks; persisted IDs remain unchanged. */
   resolveModelId?(model: string, providerId?: string): string
+  /** Resolve the configured default for a selected provider route. */
+  resolveDefaultModelId?(providerId?: string): string
   stream(request: ModelRequest): AsyncIterable<ModelStreamChunk>
 }

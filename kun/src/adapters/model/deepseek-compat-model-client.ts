@@ -177,6 +177,10 @@ export class DeepseekCompatModelClient implements ModelClient {
     return resolveDeepSeekModelId(model.trim() || this.model, this.config.baseUrl)
   }
 
+  resolveDefaultModelId(): string {
+    return this.model
+  }
+
   /**
    * Streams the model response for a turn. Each yielded chunk is one
    * of the kinds defined by `ModelStreamChunk`. The stream respects

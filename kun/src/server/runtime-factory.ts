@@ -543,7 +543,7 @@ export async function createKunServeRuntime(
   flowService.startSchedules()
   const capabilities = buildRuntimeCapabilityManifest({
     config: options.capabilities,
-    model: modelCapabilitiesForModel(options.model, modelProfiles),
+    model: modelCapabilitiesForModel(defaultModelClient.model, modelProfiles),
     mcp: {
       configuredServers: Object.keys(options.capabilities?.mcp.servers ?? {}).length,
       connectedServers: mcpProviders.connectedServers,
@@ -722,7 +722,7 @@ export async function createKunServeRuntime(
       port: options.port,
       configPath: options.configPath,
       dataDir: options.dataDir,
-      model: options.model,
+      model: defaultModelClient.model,
       endpointFormat: options.endpointFormat ?? DEFAULT_MODEL_ENDPOINT_FORMAT,
       approvalPolicy: options.approvalPolicy,
       sandboxMode: options.sandboxMode,

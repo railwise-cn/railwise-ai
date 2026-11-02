@@ -36,6 +36,13 @@ export class ProviderRoutingModelClient implements ModelClient {
     return client.resolveModelId?.(model, providerId) ?? model
   }
 
+  resolveDefaultModelId(providerId?: string): string {
+    const route = providerId ? this.routes.get(providerId) : undefined
+    if (providerId && !route) throw unavailableModelProvider(providerId)
+    const client = route ? new DeepseekCompatModelClient(route) : this.fallback
+    return client.resolveDefaultModelId?.(providerId) ?? client.model
+  }
+
   async *stream(request: ModelRequest): AsyncIterable<ModelStreamChunk> {
     const providerId = request.providerId
     const route = providerId ? this.routes.get(providerId) : undefined
