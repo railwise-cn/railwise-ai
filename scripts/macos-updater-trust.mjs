@@ -27,6 +27,24 @@ export function validateGatekeeperEvidence(status, assessment) {
   return { gatekeeper: 'accepted', gatekeeperAssessments: 'enabled', gatekeeperSource: 'Notarized Developer ID' }
 }
 
+export function captureMacosTrustEnvironment({ run, record = () => {} }) {
+  const diagnostics = [
+    ['/usr/bin/sw_vers', [], 'macos-version'],
+    ['/usr/bin/xcode-select', ['-p'], 'xcode-selection'],
+    ['/usr/bin/xcodebuild', ['-version'], 'xcode-version'],
+    ['/usr/bin/xcrun', ['--find', 'stapler'], 'stapler-location'],
+  ]
+  for (const [command, args, label] of diagnostics) {
+    run(command, args, {
+      allowedExitCodes: Array.from({ length: 256 }, (_, code) => code),
+      onResult: result => record({ operation: 'trust-runner-environment', command: label,
+        status: result.error || result.status !== 0 ? 'failed' : 'recorded', exitCode: result.status,
+        stdout: sanitizeTrustOutput(result.stdout), stderr: sanitizeTrustOutput(result.stderr),
+      }),
+    })
+  }
+}
+
 // Boundary labels and diagnostic streams are retained before an exception can
 // stop the harness. A failed command never becomes a successful trust result.
 export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {} }) {

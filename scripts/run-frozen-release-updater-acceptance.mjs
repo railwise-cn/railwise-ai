@@ -13,7 +13,7 @@ import { PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW, validateReviewed
 import { hashFile, startFrozenReleaseFeed } from './frozen-release-updater-feed.mjs'
 import { assertRetainedFiles, snapshotFiles } from './frozen-release-updater-data.mjs'
 import { boundedCommand } from './updater-acceptance-process.mjs'
-import { verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
+import { captureMacosTrustEnvironment, verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
@@ -450,6 +450,7 @@ export async function main() {
   persist()
   try {
     if (!['arm64', 'x64'].includes(process.arch)) throw new Error('Unsupported runner architecture.')
+    captureMacosTrustEnvironment({ run, record: progress })
     assertFreshProfile(home)
     const build = JSON.parse(readFileSync(resolve(argument('build-file')), 'utf8'))
     validateUpdaterBuildProvenance(provenance, build)

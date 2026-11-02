@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { sanitizeTrustOutput, validateGatekeeperEvidence, verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
+import { captureMacosTrustEnvironment, sanitizeTrustOutput, validateGatekeeperEvidence, verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
 
 const enabled = { status: 0, stdout: '', stderr: 'assessments enabled\n' }
 const accepted = { status: 0, stdout: '', stderr: 'accepted\nsource=Notarized Developer ID\n' }
@@ -12,6 +12,23 @@ test('trust diagnostic streams redact credential values and every URL before ret
   const output = sanitizeTrustOutput('ticket error https://apple.example/path?key=private test-token-123 /private-' + 'f'.repeat(64) + '/', { API_KEY: 'test-token-123' })
   assert.doesNotMatch(output, /apple\.example|private test-token|f{64}/)
   assert.match(output, /ticket error/)
+})
+
+test('runner diagnostics retain macOS/Xcode/stapler identities with both streams', () => {
+  const events = []; const calls = []
+  captureMacosTrustEnvironment({
+    run: (command, args, options) => {
+      calls.push([command, ...args])
+      const result = { status: 0, stdout: 'tool-version\n', stderr: 'diagnostic\n' }
+      options.onResult(result)
+      return result
+    },
+    record: event => events.push(event),
+  })
+  assert.deepEqual(events.map(event => event.command), ['macos-version', 'xcode-selection', 'xcode-version', 'stapler-location'])
+  assert.ok(calls.some(call => call[0] === '/usr/bin/sw_vers'))
+  assert.ok(calls.some(call => call[0] === '/usr/bin/xcodebuild'))
+  assert.equal(events.every(event => event.stdout === 'tool-version\n' && event.stderr === 'diagnostic\n'), true)
 })
 
 function fakeRunner({ staplerExit = 0, gatekeeperStatus = enabled, assessment = accepted } = {}) {

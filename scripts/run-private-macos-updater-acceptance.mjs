@@ -8,7 +8,7 @@ import { parse } from 'yaml'
 import { startPrivateUpdaterFeed } from './private-updater-feed.mjs'
 import packagedAsar from './verify-packaged-asar.cjs'
 import { boundedCommand, boundedProcess } from './updater-acceptance-process.mjs'
-import { verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
+import { captureMacosTrustEnvironment, verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
 
 const BASE_VERSION = '0.0.0'
 const scriptRoot = dirname(fileURLToPath(import.meta.url))
@@ -159,6 +159,7 @@ async function main() {
   let feed
   let ownedUpdaterCache
   try {
+    captureMacosTrustEnvironment({ run: (command, args, options = {}) => boundedCommand(command, args, { progress, ...options }), record: progress })
     const appDirectory = process.arch === 'arm64' ? 'mac-arm64' : 'mac'
     const baseApp = soleFile(join(baseDist, appDirectory), name => name.endsWith('.app'))
     const targetApp = soleFile(join(targetDist, appDirectory), name => name.endsWith('.app'))
