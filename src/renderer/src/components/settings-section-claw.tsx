@@ -7,6 +7,7 @@ import {
   type ClawImChannelV1,
   type ClawModel
 } from '@shared/app-settings'
+import { isVisibleComposerModelId } from '@shared/default-composer-models'
 import { SettingsCard, SettingRow, Toggle } from './settings-controls'
 
 type ClawSettingsContext = {
@@ -200,7 +201,7 @@ export function ClawSettingsSection({ ctx }: { ctx: ClawSettingsContext }): Reac
                       value={channel.model}
                       onChange={(e) => updateChannel(form, update, channel.id, { model: e.target.value as ClawModel })}
                     >
-                      {CLAW_MODEL_IDS.filter((model) => !model.startsWith('deepseek-v4-')).map((model) => (
+                      {CLAW_MODEL_IDS.filter(isVisibleComposerModelId).map((model) => (
                         <option key={model} value={model}>{model}</option>
                       ))}
                     </select>
