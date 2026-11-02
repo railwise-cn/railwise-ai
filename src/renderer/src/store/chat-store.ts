@@ -103,6 +103,7 @@ import {
 import { createNavigationActions } from './chat-store-navigation-actions'
 import { createThreadActions } from './chat-store-thread-actions'
 import { createMaintenanceActions } from './chat-store-maintenance-actions'
+import { protectDesignNavigation } from './design-navigation-safety'
 
 export type { AppRoute, SettingsRouteSection } from './chat-store-types'
 export { CLAW_COMPOSER_MODEL_IDS } from './chat-store-helpers'
@@ -118,7 +119,9 @@ const sseAbortRef = {
 }
 let composerModelLoadPromise: Promise<void> | null = null
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((rawSet, get) => {
+  const set = protectDesignNavigation(rawSet, get)
+  return ({
   route: 'chat',
   flowFilter: 'all',
   settingsReturnRoute: 'chat',
@@ -212,4 +215,5 @@ export const useChatStore = create<ChatState>((set, get) => ({
   ...createThreadActions({ set, get, sseAbortRef }),
 
   ...createMaintenanceActions({ set, get, sseAbortRef })
-}))
+  })
+})

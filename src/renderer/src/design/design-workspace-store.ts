@@ -39,6 +39,9 @@ export type DesignTool = 'select' | DesignElementType
 export type DesignSaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 export type DesignWorkspaceState = {
+  workspaceRoot: string
+  nativeDirty: boolean
+  guiUpdateInstallPending: boolean
   document: DesignDocumentV1 | null
   activePageId: string | null
   selectedElementIds: string[]
@@ -394,7 +397,11 @@ function applyCanvasOperations(
   return { page: nextPage, selectedIds }
 }
 
-export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) => {
+export const useDesignWorkspaceStore = create<DesignWorkspaceState>((rawSet, get) => {
+  const set = (partial: Partial<DesignWorkspaceState> | ((state: DesignWorkspaceState) => Partial<DesignWorkspaceState>)): void => {
+    if (get().guiUpdateInstallPending) return
+    rawSet(partial)
+  }
   const commitBeforeChange = (): void => {
     const { document, history } = get()
     if (!document) return
@@ -419,6 +426,9 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
   }
 
   return {
+    workspaceRoot: '',
+    nativeDirty: false,
+    guiUpdateInstallPending: false,
     document: null,
     activePageId: null,
     selectedElementIds: [],
@@ -434,6 +444,7 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
       const document = createDesignDocument(options)
       set({
         document,
+        nativeDirty: false,
         activePageId: document.pages[0]?.id ?? null,
         selectedElementIds: [],
         activeTool: 'select',
@@ -448,6 +459,7 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
 
     closeDocument: () => set({
       document: null,
+      nativeDirty: false,
       activePageId: null,
       selectedElementIds: [],
       activeTool: 'select',
@@ -465,6 +477,7 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
       const requestedPage = options?.activePageId
       set({
         document,
+        nativeDirty: false,
         activePageId: document.pages.some((page) => page.id === requestedPage)
           ? requestedPage!
           : document.pages[0]?.id ?? null,
@@ -749,6 +762,9 @@ export const useDesignWorkspaceStore = create<DesignWorkspaceState>((set, get) =
         documentId: command.documentId,
         revision: document?.revision ?? 0,
         appliedOperations: 0
+      }
+      if (get().guiUpdateInstallPending) {
+        return { ...base, ok: false, code: 'document_unavailable', message: 'Design is read-only while installing an update.' }
       }
       if (
         !document ||

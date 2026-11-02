@@ -128,8 +128,9 @@ function PreviewContent({ content, isMarkdown, filePath, workspaceRoot, onOpenDo
     }
     if (/^(?:https?:\/\/|mailto:)/i.test(href)) { void window.workwise?.openExternal?.(href)?.catch(() => undefined); return }
     if (!filePath || !workspaceRoot || !onOpenDocument) return
-    let target: string | undefined
-    try { target = resolveWriteMarkdownResourcePath(decodeURIComponent(href.split('#')[0]), filePath) } catch { return }
+    // Strip URL suffixes before the resolver decodes the destination exactly
+    // once. Encoded #, ? and % characters belong to the actual filename.
+    const target = resolveWriteMarkdownResourcePath(href.split(/[?#]/, 1)[0], filePath)
     if (target) void window.workwise.resolveWorkspaceFile({ path: target, workspaceRoot }).then((result) => { if (result.ok) onOpenDocument(result.path) }).catch(() => undefined)
   }} />
 }

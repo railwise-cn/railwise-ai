@@ -62,6 +62,8 @@ export type WriteWorkspaceState = {
   saveStatus: WriteSaveStatus
   /** Monotonic revision of the last successfully persisted active file. */
   saveRevision: number
+  /** Editing is paused between the final updater validation and installer handoff. */
+  guiUpdateInstallPending: boolean
   previewMode: WritePreviewMode
   assistantOpen: boolean
   assistantModel: string
@@ -98,6 +100,7 @@ export type WriteWorkspaceState = {
   ) => Promise<boolean>
   syncActiveImageFromDisk: (workspaceRoot: string, path?: string) => Promise<boolean>
   flushSave: (workspaceRoot: string) => Promise<boolean>
+  restoreHistoryEntry: (input: { workspaceRoot: string; path: string; id: string; content: string; historyContent: string }) => Promise<boolean>
   createFile: (workspaceRoot: string, path: string, content?: string) => Promise<string | null>
   createDirectory: (workspaceRoot: string, path: string) => Promise<string | null>
   renameEntry: (workspaceRoot: string, path: string, newName: string, targetDirectory?: string) => Promise<string | null>

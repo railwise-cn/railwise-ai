@@ -130,7 +130,7 @@ export function PptxEditorAdapter(props: PptxEditorAdapterProps): ReactElement {
     const loaded = await loadPresentation(new Uint8Array(bytes).buffer, { limits: LIMITS, allowExternalImages: false })
     try { assertNativePptxRoundTrip(expected, loaded.slides) } finally { revokeBlobUrls(loaded.blobUrls); loaded.handler.dispose() }
   }, [])
-  const persistBytes = useCallback(async (bytes: Uint8Array): Promise<void> => {
+  const persistBytes = useCallback(async (bytes: Uint8Array, editRevision = revisionCounter.current): Promise<void> => {
     const current = revisionRef.current
     if (!current) throw new Error(t('designPptxNativeSourceUnavailable'))
     markSave('saving')
@@ -138,7 +138,7 @@ export function PptxEditorAdapter(props: PptxEditorAdapterProps): ReactElement {
     const saved = await window.workwise.saveDesignPptxRevision({ workspaceRoot, documentId, expectedSha256: current.sha256, bytes })
     if (!saved.ok || !saved.revision) throw new Error(saved.message || t('designPptxNativeSaveFailed'))
     revisionRef.current = saved.revision
-    markSave('saved')
+    markSave(revisionCounter.current === editRevision ? 'saved' : 'dirty')
   }, [documentId, markSave, t, validateBytes, workspaceRoot])
 
   useEffect(() => {
@@ -198,7 +198,9 @@ export function PptxEditorAdapter(props: PptxEditorAdapterProps): ReactElement {
           }
         },
         onSlideChange: (index) => { callbacks.current.onActiveSlideChange?.(index); syncReference() },
-        onDirtyChange: (dirty) => { if (mounted) markSave(dirty ? 'dirty' : 'saved') },
+        onDirtyChange: (dirty) => {
+          if (mounted && (dirty || (saveStateRef.current !== 'saving' && !savePromise.current))) markSave(dirty ? 'dirty' : 'saved')
+        },
         onError: (error) => { if (mounted) { setMessage(error); markSave('error') } },
         storage: { save: async (bytes: Uint8Array) => { try { await persistBytes(bytes) } catch (error) { markSave('error'); throw error } } }
       } satisfies PptxViewerOptions)
@@ -242,8 +244,13 @@ export function PptxEditorAdapter(props: PptxEditorAdapterProps): ReactElement {
     if (savePromise.current) return savePromise.current
     const viewer = editorRef.current
     if (!viewer || nativeState !== 'ready') return false
+    const editRevision = revisionCounter.current
     const pending = (async () => {
-      try { setMessage(null); markSave('saving'); await persistBytes(await viewer.save()); return true } catch (error) {
+      try {
+        setMessage(null); markSave('saving')
+        await persistBytes(await viewer.save(), editRevision)
+        return saveStateRef.current === 'saved' && !viewer.isDirty()
+      } catch (error) {
         markSave('error'); setMessage(error instanceof Error ? error.message : String(error)); return false
       } finally { savePromise.current = null }
     })()
@@ -298,7 +305,7 @@ export function PptxEditorAdapter(props: PptxEditorAdapterProps): ReactElement {
       getCurrentSlide: () => viewer.getCurrentSlide(), goToSlide: (index) => viewer.goToSlide(index),
       addSlide: () => viewer.addSlide(viewer.getCurrentSlide()), moveSlide: (from, to) => viewer.moveSlide(from, to),
       deleteCurrentSlide: () => viewer.deleteSlides([viewer.getCurrentSlide()]), undo: () => viewer.undo(), redo: () => viewer.redo(),
-      isDirty: () => saveStateRef.current !== 'saved' || viewer.isDirty()
+      isDirty: () => Boolean(savePromise.current) || saveStateRef.current !== 'saved' || viewer.isDirty()
     })
   }, [captureImage, exportImage, exportPptx, nativeState, save])
   const getSnapshot = useCallback(async (): Promise<NativePptxSnapshot> => {

@@ -93,6 +93,25 @@ describe('PPTX native workspace', () => {
     expect(api.saveDesignPptxRevision).not.toHaveBeenCalled()
     expect(container.textContent).toContain('round-trip changed')
   })
+  it('keeps native edits dirty when another edit arrives during a held persistence request', async () => {
+    const api = mockApi(); mockViewer()
+    let resolveSave!: (value: unknown) => void
+    api.saveDesignPptxRevision.mockImplementation(() => new Promise((done) => { resolveSave = done }))
+    let controller: NativePptxController | null = null
+    await act(async () => root.render(createElement(PptxEditorAdapter, props({ onControllerReady: (value) => { controller = value } })))); await settle()
+    let pending!: Promise<boolean>
+    await act(async () => { pending = controller!.save(); await Promise.resolve() })
+    await settle()
+    const options = createPptxViewerMock.mock.calls[0][1]
+    expect(controller!.isDirty()).toBe(true)
+    // A viewer reset-to-clean callback during serialization is not persistence.
+    await act(async () => options.onDirtyChange(false))
+    expect(controller!.isDirty()).toBe(true)
+    await act(async () => { options.onChange(); options.onDirtyChange(true) })
+    await act(async () => resolveSave({ ok: true, revision: { kind: 'edited', sha256: 'b'.repeat(64), byteSize: 40 } }))
+    await expect(pending).resolves.toBe(false)
+    expect(controller!.isDirty()).toBe(true)
+  })
   it('opens the immutable original in a separate readonly viewer and synchronizes by source identity', async () => {
     const api = mockApi(); const viewer = mockViewer()
     await act(async () => root.render(createElement(PptxEditorAdapter, props())))

@@ -11,6 +11,7 @@ import {
   writeFile
 } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 import { relocateDocumentSidecars } from './write-document-service'
 import { readWriteImageResource } from './write-image-resource'
 import { invalidateWriteDocumentIndex } from './write-document-index'
@@ -141,7 +142,10 @@ export async function readWorkspaceImage(
 ): Promise<WorkspaceImageReadResult> {
   try {
     if (payload.workspaceRoot?.trim()) {
-      const resource = await readWriteImageResource({ src: payload.path, sourcePath: join(payload.workspaceRoot, '.railwise-image-source.md'), workspaceRoot: payload.workspaceRoot })
+      // This IPC receives a filesystem path, while the shared image reader takes
+      // a Markdown URL. Encode the path first so literal %, # and ? stay literal.
+      const src = pathToFileURL(resolve(payload.workspaceRoot, payload.path)).href
+      const resource = await readWriteImageResource({ src, sourcePath: join(payload.workspaceRoot, '.railwise-image-source.md'), workspaceRoot: payload.workspaceRoot })
       if (!resource) return { ok: false, message: 'This image cannot be previewed. Use a local workspace image without active SVG content or symbolic links.' }
       return { ok: true, path: resource.path, dataUrl: `data:${resource.mimeType};base64,${resource.data.toString('base64')}`, mimeType: resource.mimeType, size: resource.data.length }
     }

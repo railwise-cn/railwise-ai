@@ -44,4 +44,20 @@ describe('GUI update install preflight', () => {
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Tender Flow'))
     expect(window.workwise.installGuiUpdate).toHaveBeenCalledWith({ confirmActiveWork: true })
   })
+
+  it('validates synchronously again after freezing editors and releases them when installation fails', async () => {
+    const calls: string[] = []
+    const unlock = vi.fn(() => calls.push('unlock'))
+    const release = registerGuiUpdateSaveHandler('guarded-test', async () => true, {
+      isReady: () => { calls.push('ready'); return true },
+      beginHandoff: () => { calls.push('freeze'); return unlock }
+    })
+    vi.mocked(window.workwise.installGuiUpdate).mockImplementation(async () => {
+      calls.push('install')
+      return { ok: false, currentVersion: '0.5.4', message: 'Synthetic failure' }
+    })
+    await expect(preflightAndInstallGuiUpdate()).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual(['ready', 'freeze', 'ready', 'install', 'unlock'])
+    release()
+  })
 })

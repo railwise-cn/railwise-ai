@@ -1,11 +1,13 @@
 # 0.5.4 release blockers
 
-Status: pending strict acceptance fixes, a fresh exact-package freeze and package acceptance.
+Status: document-safety corrections are under source review. A fresh exact-package freeze and complete package acceptance are still required.
 
 1. The frozen public package from run `41352323901` cannot be reused after the DeepSeek picker correction. Its renderer still exposed `deepseek-v4-*` options.
-2. PR #77 merged the initial DeepSeek correction. PR #78 restores strict updater verification and preserves displayed/submitted saved model identities and third-party provider models. Required CI and a new signed/notarized freeze remain necessary.
+2. PRs #77 and #78 corrected DeepSeek V4.1 selection and retained strict updater verification. PR #83 corrected a trailing empty Markdown heading in reviewed AI edits. Required CI passed for that source; it is not package acceptance.
 3. The trusted updater run `41390447292` failed during target ZIP preflight before Squirrel installation: target codesign passed, but target `xcrun stapler validate` exited 68. Target Gatekeeper was not checked, no updater round-trip was attempted, and no native updater report was produced. The failure is retained in `/private/tmp/railwise-054-acceptance/updater-failed-41390447292/`.
 4. Repository write access through the maintainer's `gh` session is restored. Freeze run `41404402960` was cancelled after independent review found unsupported relaxation of the notarization gate. It must not be reused. No public tag, release, Stable feed or download-page operation has been performed.
-5. Complete the new package's installed CUA inspection, real-model writing review, strict native updater round-trip and separate AI review before public publication. The old local profile-protection session was restored and its original Login Items state was verified; its evidence is not acceptance of a new package.
+5. Private freeze `41537519192`, source `5b0c8c7c279b2c153d1cf0a84d3430e897110843`, was cancelled after source review identified document-safety defects. Its single continuation worker observed cancellation and stopped before updater dispatch. Neither its incomplete stability run nor any earlier package may be reused as final acceptance.
+6. The current correction covers history-restore races, update handoff while Write or Design has unsaved work, file watching after atomic replacement and during registration, table-first/empty DOCX footnotes, inert HTML source preservation, and single decoding of local image/document URLs. These changes retain Markdown files, append-only history, existing IPC readers, user configuration and credential references. They remove no plugin or user data and require no user migration.
+7. Complete the new package's installed CUA inspection, real-model writing review, strict native updater round-trip and separate AI review before public publication. The old local profile-protection session was restored and its original Login Items state was verified; its evidence is not acceptance of a new package.
 
-The product version remains 0.5.4. No public release approval is inferred from the successful local lint, focused tests, or build.
+The product version remains 0.5.4. The user has authorized publishing 0.5.4, but that authorization does not replace the outstanding package gates. No public tag, Release, Stable feed or official download-page operation has been performed.

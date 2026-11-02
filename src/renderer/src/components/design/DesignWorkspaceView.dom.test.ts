@@ -4,6 +4,7 @@ import { act, createElement, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDesignDocument } from '@shared/design-document'
+import type { DesignDocumentSaveResult } from '@shared/design-workspace'
 import i18n from '../../i18n'
 import { useDesignWorkspaceStore } from '../../design/design-workspace-store'
 import { DesignWorkspaceView } from './DesignWorkspaceView'
@@ -39,7 +40,7 @@ function buttonWithText(text: string): HTMLButtonElement {
 
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  nativeSave.mockClear()
+  nativeSave.mockReset().mockImplementation(async () => { nativeDirty.value = false; return true })
   nativeDirty.value = false
   await i18n.changeLanguage('en')
   const document = createDesignDocument({ name: 'QA board' })
@@ -110,6 +111,25 @@ afterEach(async () => {
 })
 
 describe('DesignWorkspaceView export delivery', () => {
+  it.each(['new-document', 'saved-document'] as const)('does not replace a new draft after saving an older revision for %s', async (branch) => {
+    let resolveSave!: (result: DesignDocumentSaveResult) => void
+    vi.mocked(window.workwise.saveDesignDocument).mockImplementation(() => new Promise((done) => { resolveSave = done }))
+    await act(async () => useDesignWorkspaceStore.getState().addDefaultElement('text'))
+    const submitted = useDesignWorkspaceStore.getState().document!
+    if (branch === 'new-document') {
+      await act(async () => { window.dispatchEvent(new CustomEvent('workwise:design-new-document')) })
+      await act(async () => buttonWithText(i18n.t('common:designCreate')).click())
+    } else {
+      await act(async () => { window.dispatchEvent(new CustomEvent('workwise:design-open-document', { detail: { documentId: 'other-synthetic-document' } })) })
+    }
+    expect(window.workwise.saveDesignDocument).toHaveBeenCalledOnce()
+    await act(async () => useDesignWorkspaceStore.getState().addDefaultElement('rect'))
+    await act(async () => resolveSave({ ok: true, document: submitted, revision: submitted.revision }))
+    expect(useDesignWorkspaceStore.getState().document!.id).toBe(submitted.id)
+    expect(useDesignWorkspaceStore.getState().document!.pages[0].elements).toHaveLength(2)
+    expect(window.workwise.loadDesignDocument).toHaveBeenCalledOnce()
+  })
+
   it('closes the current document after saving native PPTX changes', async () => {
     const deck = createDesignDocument({ name: 'Native deck' })
     deck.documentKind = 'pptx'

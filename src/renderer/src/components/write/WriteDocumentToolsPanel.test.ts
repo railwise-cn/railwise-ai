@@ -22,7 +22,7 @@ function props(): ComponentProps<typeof WriteDocumentToolsPanel> {
     workspaceRoot: '/tmp/docs', path, content: '---\ntitle: Original\n---\n# Body\n',
     selection: { text: 'Body', charCount: 4, ranges: [{ from: 25, to: 29, text: 'Body', charCount: 4, startLine: 4, endLine: 4, startColumn: 3, endColumn: 6 }] },
     readOnly: false, saveRevision: 0, onChange: vi.fn(), onOpenFile: vi.fn(), onReviewComment: vi.fn(async () => undefined), aiEditBusy: false,
-    onBeforeRestore: vi.fn(async () => ({ fingerprint: 'baseline', size: 4, modifiedAt: 1 })), onRestored: vi.fn(async () => true)
+    onBeforeRestore: vi.fn(async () => ({ fingerprint: 'baseline', size: 4, modifiedAt: 1 })), onRestoreHistory: vi.fn(async () => true)
   }
 }
 
@@ -139,7 +139,7 @@ describe('document workbench review tools', () => {
     expect(container.querySelector('[role="alert"]')).toBeNull()
   })
 
-  it('restores history against the reviewed baseline, without accepting a fresh unseen disk revision', async () => {
+  it('delegates restoration with the reviewed current and history content', async () => {
     const next = props()
     const revision = { fingerprint: 'baseline', size: 4, modifiedAt: 1 }
     const entry = { id: 'old-id', path, revision, content: 'Previous\n', createdAt: '2026-11-01T00:00:00Z', source: 'user' }
@@ -155,8 +155,27 @@ describe('document workbench review tools', () => {
     await act(async () => entryButton.click())
     await act(async () => button('恢复此版本').click())
     expect(readFresh).not.toHaveBeenCalled()
-    expect(restore).toHaveBeenCalledWith({ workspaceRoot: '/tmp/docs', path, id: 'old-id', expectedRevision: revision })
-    expect(next.onRestored).toHaveBeenCalledOnce()
+    expect(restore).not.toHaveBeenCalled()
+    expect(next.onRestoreHistory).toHaveBeenCalledWith('old-id', next.content, 'Previous\n')
+  })
+
+  it('does not put a late history selection into a newly opened document panel', async () => {
+    const next = props()
+    let complete!: (entry: unknown) => void
+    const revision = { fingerprint: 'baseline', size: 4, modifiedAt: 1 }
+    const entry = { id: 'old-id', path, revision, content: 'Old document history', createdAt: '2026-11-01T00:00:00Z', source: 'user' }
+    Object.defineProperty(window, 'workwise', { configurable: true, value: {
+      listDocumentHistory: vi.fn(async () => ({ entries: [entry], total: 1, truncated: false, limit: 200 })),
+      getDocumentHistoryEntry: vi.fn(() => new Promise((resolve) => { complete = resolve }))
+    } })
+    await act(async () => root.render(createElement(WriteDocumentToolsPanel, next)))
+    await act(async () => button('历史').click())
+    await act(async () => button('4 B').click())
+    await act(async () => root.render(createElement(WriteDocumentToolsPanel, { ...next, path: '/tmp/docs/other.md', content: 'Other document' })))
+    await act(async () => button('历史').click())
+    await act(async () => complete(entry))
+    expect(container.textContent).not.toContain('Old document history')
+    expect([...container.querySelectorAll('button')].some((item) => item.textContent === '恢复此版本')).toBe(false)
   })
 
   it('does not remove an unclosed metadata block when adding properties', () => {

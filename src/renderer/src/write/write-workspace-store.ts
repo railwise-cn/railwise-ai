@@ -15,6 +15,7 @@ import type { WriteWorkspaceState } from './write-workspace-store-types'
 import { createWriteSettingsActions } from './write-workspace-settings-actions'
 import { createWriteFileActions } from './write-workspace-file-actions'
 import { readWriteDocument } from './write-document-reader'
+import type { DocumentRevision, DocumentSnapshot } from '@shared/write-document'
 import { writeBrowserStorageItem } from '../lib/browser-storage'
 import {
   WRITE_ASSISTANT_MODEL_KEY,
@@ -41,9 +42,19 @@ let lastSavedContent = ''
 let baselineEpoch = 0
 let externalReadRequest = 0
 let pendingSave: Promise<boolean> | null = null
+let pendingRestore: { workspaceRoot: string; path: string } | null = null
+
+function sameRevision(left: DocumentRevision | null, right: DocumentRevision | null): boolean {
+  return left?.fingerprint === right?.fingerprint && left?.size === right?.size && left?.modifiedAt === right?.modifiedAt
+}
 
 function cancelExternalSyncAnimation(): void {
   // External snapshots always commit atomically. Never animate the authoritative buffer.
+}
+
+export function isWriteWorkspaceReadyForUpdate(): boolean {
+  const state = useWriteWorkspaceStore.getState()
+  return !pendingSave && !pendingRestore && state.saveStatus === 'saved' && !state.documentConflict && !state.fileLoading
 }
 
 
@@ -96,6 +107,7 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
   }),
 
   setFileContent: (content) => {
+    if (get().guiUpdateInstallPending) return
     cancelExternalSyncAnimation()
     set((state) => ({
       fileContent: content,
@@ -105,6 +117,7 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
 
   syncActiveFileFromDisk: async (workspaceRoot, options = {}) => {
     const snapshot = get()
+    if (snapshot.guiUpdateInstallPending || (pendingRestore?.workspaceRoot === snapshot.workspaceRoot && pendingRestore.path === snapshot.activeFilePath)) return false
     const force = options.force === true
     if (!snapshot.activeFilePath) return false
     if (snapshot.activeFileKind !== 'text') return false
@@ -228,6 +241,8 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
   },
 
   flushSave: async (workspaceRoot) => {
+    const current = get()
+    if (current.guiUpdateInstallPending || (pendingRestore?.workspaceRoot === current.workspaceRoot && pendingRestore.path === current.activeFilePath)) return false
     // Queue writes so every checked save uses the preceding write's revision.
     if (pendingSave) {
       const saved = await pendingSave
@@ -299,6 +314,89 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
     try { return await operation } finally { if (pendingSave === operation) pendingSave = null }
   },
 
+  restoreHistoryEntry: async (input) => {
+    const identityMatches = (): boolean => {
+      const state = get()
+      return state.workspaceRoot === input.workspaceRoot && state.activeFilePath === input.path && state.activeFileKind === 'text'
+    }
+    const canStart = (): boolean => identityMatches() && get().fileContent === input.content && !get().fileTruncated &&
+      !get().documentConflict && !get().guiUpdateInstallPending
+    if (pendingRestore || !canStart()) return false
+    if (!await get().flushSave(input.workspaceRoot) || !canStart()) return false
+    const baseline = get()
+    if (!baseline.documentBaselineKnown || !baseline.documentRevision || baseline.saveStatus !== 'saved') return false
+    const revision = baseline.documentRevision
+    // Reads begun before this restore must not rebaseline or replace its source.
+    externalReadRequest += 1
+    const epoch = ++baselineEpoch
+    const transaction = { workspaceRoot: input.workspaceRoot, path: input.path }
+    pendingRestore = transaction
+    const unchanged = (): boolean => canStart() && epoch === baselineEpoch && sameRevision(get().documentRevision, revision)
+    const preserveDraft = (snapshot: DocumentSnapshot | null, message: string): void => {
+      if (!identityMatches()) return
+      const latest = get()
+      set({
+        saveStatus: 'error', fileError: message,
+        documentConflict: {
+          path: input.path, expectedRevision: revision, currentRevision: snapshot?.revision ?? null,
+          currentContent: snapshot?.content ?? null, attemptedContent: latest.fileContent
+        }
+      })
+    }
+    let restoreSucceeded = false
+    let committedSnapshot: DocumentSnapshot | null = null
+    try {
+      // The selected history entry and its reviewed document baseline stay bound
+      // through saving, restoring and the authoritative completion read.
+      if (!unchanged()) return false
+      const result = await window.workwise.restoreDocumentHistory({
+        workspaceRoot: input.workspaceRoot, path: input.path, id: input.id, expectedRevision: revision
+      })
+      if (!identityMatches()) return false
+      if (!result.ok) {
+        if ('conflict' in result) {
+          set({ saveStatus: 'error', fileError: '恢复时检测到外部修改，已保留当前内容，请查看冲突。',
+            documentConflict: { ...result.conflict, attemptedContent: get().fileContent } })
+        } else set({ fileError: result.message })
+        return false
+      }
+      restoreSucceeded = true
+      if (result.snapshot.path === input.path) committedSnapshot = result.snapshot
+      if (result.snapshot.path !== input.path) throw new Error('历史恢复返回了不同的文档路径。')
+      let snapshot: DocumentSnapshot
+      try {
+        snapshot = await window.workwise.readDocumentSnapshot({ workspaceRoot: input.workspaceRoot, path: input.path })
+      } catch (error) {
+        preserveDraft(result.snapshot, '历史已恢复，但无法核对磁盘内容；已保留当前编辑，请重新读取并处理冲突。')
+        throw error
+      }
+      if (!identityMatches()) return false
+      if (snapshot.path !== input.path) throw new Error('历史恢复核对返回了不同的文档路径。')
+      if (!unchanged() || result.snapshot.content !== input.historyContent || snapshot.content !== result.snapshot.content || !sameRevision(snapshot.revision, result.snapshot.revision)) {
+        preserveDraft(snapshot, '恢复期间文档已有新编辑，已保留当前编辑和恢复后的磁盘内容，请查看冲突。')
+        return false
+      }
+      // Never reread whichever document happens to be active at completion.
+      // No await follows the final transaction check and this atomic state update.
+      lastSavedContent = snapshot.content
+      baselineEpoch += 1
+      externalReadRequest += 1
+      set((state) => ({
+        fileContent: snapshot.content, fileSize: snapshot.revision.size, fileTruncated: false,
+        documentRevision: snapshot.revision, documentBaselineKnown: true, documentConflict: null,
+        saveStatus: 'saved', fileError: null, selection: emptySelection(), saveRevision: state.saveRevision + 1
+      }))
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (restoreSucceeded) preserveDraft(committedSnapshot, `历史已恢复，但核对失败；已保留当前编辑并停止自动保存：${message}`)
+      else if (identityMatches()) set({ fileError: message })
+      return false
+    } finally {
+      if (pendingRestore === transaction) pendingRestore = null
+    }
+  },
+
   setFileError: (message) => {
     set({ fileError: message })
   },
@@ -352,6 +450,7 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
   clearQuotedSelections: () => set({ quotedSelections: [] }),
 
   resetWorkspace: () => {
+    if (get().guiUpdateInstallPending) return
     cancelExternalSyncAnimation()
     lastSavedContent = ''
     baselineEpoch += 1

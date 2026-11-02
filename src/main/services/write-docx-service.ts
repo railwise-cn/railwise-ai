@@ -21,6 +21,7 @@ import {
   TextRun,
   UnderlineType,
   WidthType,
+  type IPropertiesOptions,
   type IRunOptions
 } from 'docx'
 import hljs from 'highlight.js'
@@ -303,6 +304,7 @@ function nextTextChar(tokens: InlineToken[], index: number): string | null {
 async function parseInlineTokens(tokens: InlineToken[], sourcePath: string): Promise<any[]> {
   const output: any[] = []
   let buffer = ''
+  const underlineTags: boolean[] = []
   const state: InlineState = {
     bold: false,
     italics: false,
@@ -364,14 +366,21 @@ async function parseInlineTokens(tokens: InlineToken[], sourcePath: string): Pro
       flush()
       state.strike = false
     } else if (token.type === 'html_inline') {
-      if (/<u\b/i.test(token.content)) {
+      if (/^<u\s*>$/i.test(token.content)) {
         flush()
+        underlineTags.push(true)
         state.underline = true
-      }
-      if (/<\/u>/i.test(token.content)) {
-        flush()
-        state.underline = false
-      }
+      } else if (/^<u(?:\s|>)/i.test(token.content) && !/\/\s*>$/.test(token.content)) {
+        // An attributed HTML tag is literal source. Track its matching close so
+        // it cannot consume the close of an enclosing supported underline tag.
+        underlineTags.push(false)
+        buffer += token.content
+      } else if (underlineTags.length && /^<\/u\s*>$/i.test(token.content)) {
+        if (underlineTags.pop()) {
+          flush()
+          state.underline = underlineTags.includes(true)
+        } else buffer += token.content
+      } else buffer += token.content
     } else if (token.type === 'code_inline') {
       flush()
       // 行内代码：从模板的 code 元素读取字体，保留灰底着色
@@ -721,6 +730,12 @@ async function renderDocxBlocks(tokens: MarkdownToken[], sourcePath: string): Pr
 
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i]
+    if (token.type === 'html_block') {
+      // Unsupported HTML remains visible source, just as in the safe preview.
+      // Highlighting creates text runs only; tags, links and resources stay inert.
+      children.push(paragraph(highlightedCodeRuns(token.content.replace(/\n$/, ''), 'html'), {}, 'code'))
+      continue
+    }
     if (token.type === 'heading_open') {
       const inlineToken = tokens[i + 1]
       const headingType = headingElementType(token.tag)
@@ -875,6 +890,15 @@ async function renderDocxBlocks(tokens: MarkdownToken[], sourcePath: string): Pr
   return children
 }
 
+type NativeFootnoteBlocks = [Paragraph, ...Array<Paragraph | Table>]
+
+function normalizeNativeFootnoteBlocks(blocks: Array<Paragraph | Table>): NativeFootnoteBlocks {
+  const [first, ...rest] = blocks
+  // docx prepends its native note mark to the first Paragraph. Tables are valid
+  // subsequent footnote blocks, and even an empty note needs that mark carrier.
+  return first instanceof Paragraph ? [first, ...rest] : [paragraph([], {}, 'p'), ...blocks]
+}
+
 async function buildDocxFromMarkdownInner(options: {
   sourcePath: string
   content: string
@@ -888,7 +912,7 @@ async function buildDocxFromMarkdownInner(options: {
   context.diagrams = await renderWriteMermaidDiagrams(diagramSources)
   const footnoteStart = tokens.findIndex((token) => token.type === 'footnote_block_open')
   const children = await renderDocxBlocks(footnoteStart === -1 ? tokens : tokens.slice(0, footnoteStart), options.sourcePath)
-  const footnotes: Record<string, { children: Paragraph[] }> = {}
+  const footnotes: Record<string, { children: NativeFootnoteBlocks }> = {}
   if (footnoteStart !== -1) {
     for (let index = footnoteStart + 1; index < tokens.length; index += 1) {
       const token = tokens[index]
@@ -896,7 +920,7 @@ async function buildDocxFromMarkdownInner(options: {
       const end = tokens.findIndex((candidate, cursor) => cursor > index && candidate.type === 'footnote_close')
       if (end === -1) break
       const body = tokens.slice(index + 1, end).filter((candidate) => candidate.type !== 'footnote_anchor')
-      footnotes[String(token.meta!.id! + 1)] = { children: await renderDocxBlocks(body, options.sourcePath) as Paragraph[] }
+      footnotes[String(token.meta!.id! + 1)] = { children: normalizeNativeFootnoteBlocks(await renderDocxBlocks(body, options.sourcePath)) }
       index = end
     }
   }
@@ -905,7 +929,10 @@ async function buildDocxFromMarkdownInner(options: {
     creator: 'WorkWise',
     title: options.title || basename(options.sourcePath),
     features: { updateFields: true },
-    footnotes,
+    // docx 9.x types restrict all blocks to Paragraph, although its serializer
+    // supports tables after the first Paragraph. Normalize that runtime contract
+    // above and keep this library type adaptation at the constructor boundary.
+    footnotes: footnotes as unknown as IPropertiesOptions['footnotes'],
     numbering: {
       config: [
         {

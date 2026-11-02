@@ -65,7 +65,7 @@ import {
   revealGeneratedWorkspaceFile,
   saveGeneratedWorkspaceFileAs
 } from '../../lib/generated-file-actions'
-import { registerGuiUpdateSaveHandler } from '../../lib/gui-update-install-preflight'
+import { registerDesignSaveSession, trackDesignSave } from '../../design/design-workspace-safety'
 import { surveyDraftSelection, clearSurveyDraftSelection } from '../../agent/survey-collaboration-client'
 import { SurveyDraftEditorNotice } from '../engineering/SurveyDraftEditorNotice'
 
@@ -273,6 +273,8 @@ export function DesignWorkspaceView({
   const nativeControllerRef = useRef<NativePptxController | null>(null)
   const [nativeDirty, setNativeDirty] = useState(false)
   const [closingDocument, setClosingDocument] = useState(false)
+  const pendingOperationRef = useRef(false)
+  pendingOperationRef.current = restoring || importing || importingImage || closingDocument || exporting !== null
   const nativeDiagnostics = useMemo<DesignImportDiagnostic[]>(() => {
     const report = document?.pptx?.importReport
     if (!report) return document?.importReport?.diagnostics ?? []
@@ -288,6 +290,10 @@ export function DesignWorkspaceView({
   }, [document?.pptx?.importReport, document?.importReport?.diagnostics])
   const handleNativeController = useCallback((controller: NativePptxController | null) => {
     nativeControllerRef.current = controller
+  }, [])
+  const handleNativeDirty = useCallback((dirty: boolean) => {
+    useDesignWorkspaceStore.setState({ nativeDirty: dirty })
+    setNativeDirty(dirty)
   }, [])
 
   useEffect(() => {
@@ -321,19 +327,22 @@ export function DesignWorkspaceView({
     }
   }, [t, workspaceRoot])
 
-  const flushDesignSave = useCallback((): Promise<boolean> => {
+  const flushDesignSave = useCallback((): Promise<boolean> => trackDesignSave(() => {
     const operation = saveQueueRef.current
       .catch(() => false)
       .then(async () => {
         const native = nativeControllerRef.current
         if (native?.isDirty() && !(await native.save())) return false
+        if (native?.isDirty()) return false
         const state = useDesignWorkspaceStore.getState()
+        if (state.nativeDirty) return false
         const currentDocument = state.document
         const currentPageId = state.activePageId
-        if (!workspaceRoot || !currentDocument || !currentPageId) return true
+        if (!currentDocument) return true
+        if (!workspaceRoot || state.workspaceRoot !== workspaceRoot || !currentPageId) return false
         if (
           state.persistedRevision !== null &&
-          state.persistedRevision === currentDocument.revision
+          state.persistedRevision === currentDocument.revision && state.saveState !== 'error'
         ) {
           return true
         }
@@ -367,11 +376,14 @@ export function DesignWorkspaceView({
           ].sort((left, right) => right.updatedAt - left.updatedAt)
         })
         window.dispatchEvent(new CustomEvent('workwise:design-documents-changed'))
-        return true
+        const latest = useDesignWorkspaceStore.getState()
+        return latest.workspaceRoot === workspaceRoot && latest.document?.id === currentDocument.id &&
+          latest.document.revision === latest.persistedRevision && latest.saveState === 'saved' &&
+          !latest.nativeDirty && !nativeControllerRef.current?.isDirty()
       })
     saveQueueRef.current = operation
     return operation
-  }, [t, workspaceRoot])
+  }), [t, workspaceRoot])
 
   const handleCloseDocument = useCallback(async (): Promise<void> => {
     if (closingDocument) return
@@ -393,7 +405,11 @@ export function DesignWorkspaceView({
     }
   }, [closeDocument, closingDocument, flushDesignSave, t, workspaceRoot])
 
-  useEffect(() => registerGuiUpdateSaveHandler('Design', flushDesignSave), [flushDesignSave])
+  useEffect(() => registerDesignSaveSession({
+    flush: flushDesignSave,
+    isNativeDirty: () => Boolean(nativeControllerRef.current?.isDirty()),
+    isBusy: () => pendingOperationRef.current
+  }), [flushDesignSave])
 
   useEffect(() => {
     if (!nativeDirty) return
@@ -459,11 +475,17 @@ export function DesignWorkspaceView({
 
   useEffect(() => {
     canvasCommandScopeRef.current += 1
-    closeDocument()
     setSavedDocuments([])
     processedCanvasCommandsRef.current.clear()
     enqueuedCanvasCommandsRef.current.clear()
     canvasCommandSaveRetriesRef.current.clear()
+    const retained = useDesignWorkspaceStore.getState()
+    if (retained.workspaceRoot === workspaceRoot && retained.document) {
+      void refreshSavedDocuments().catch(() => undefined)
+      return () => { restoreGenerationRef.current += 1 }
+    }
+    useDesignWorkspaceStore.setState({ workspaceRoot })
+    closeDocument()
     if (!workspaceRoot) return
     void refreshSavedDocuments().catch((error) => {
       setOperationNotice({
@@ -1500,7 +1522,7 @@ export function DesignWorkspaceView({
                 referencePreview={activePage?.fidelityImageAssetId ? assetDataUrls[activePage.fidelityImageAssetId] : undefined}
                 onUseCanvas={() => setNewDocDialogOpen(true)}
                 onControllerReady={handleNativeController}
-                onDirtyChange={setNativeDirty}
+                onDirtyChange={handleNativeDirty}
               >
                 <div className="flex h-full items-center justify-center p-6 text-sm text-ds-muted">
                   {t('designPptxNativeFallbackNotice')}
