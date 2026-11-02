@@ -1,5 +1,6 @@
 import type { WriteInlineCompletionRequest } from '@shared/write-inline-completion'
 import type { WriteInlineEditRequest, WriteInlineEditScopeKind } from '@shared/write-inline-edit'
+import type { DocumentComment } from '@shared/write-document'
 import type { WriteSelectionRange } from '../components/write/WriteMarkdownEditor'
 import type { WriteRecentEdit } from './recent-edits'
 import { recentEditsForInlineEdit } from './recent-edits'
@@ -88,6 +89,22 @@ function lineColumnForOffset(content: string, offset: number): { line: number; c
     line: lineBreaks + 1,
     column: point - lastBreak
   }
+}
+
+/** Comment anchors are exact source coordinates, never a text-search fallback. */
+export function resolveWriteCommentEditSelection(
+  content: string,
+  currentFilePath: string,
+  comment: DocumentComment
+): WriteSelectionRange | null {
+  if (!comment.anchor) return null
+  const { from, to, text } = comment.anchor
+  if (comment.path !== currentFilePath || typeof text !== 'string' || !text.trim() || !Number.isSafeInteger(from) ||
+    !Number.isSafeInteger(to) || from < 0 || to <= from || to > content.length ||
+    content.slice(from, to) !== text) return null
+  const start = lineColumnForOffset(content, from)
+  const end = lineColumnForOffset(content, to - 1)
+  return { from, to, text, charCount: text.length, startLine: start.line, startColumn: start.column, endLine: end.line, endColumn: end.column }
 }
 
 function previousNonEmptyLine(lines: LineSpan[], lineIndex: number): string {

@@ -17,13 +17,14 @@
 | 新安装、未配置的主 Agent / Write / Runtime 默认 | 保持 `deepseek-flash`，明确显示 V4.1 Flash | 原默认 ID 已正确，补齐说明 | 不写入正式用户配置 | 无 |
 | `auto` 的复杂、长任务与失败回退曾选择 V4 Pro | 所有任务使用 `deepseek-flash`，保留分类思考强度 | 用户要求当前默认统一 V4.1 | 历史对话和已记录模型不重写 | 无 |
 | 自动分类器返回旧 Pro 或 Flash 建议 | 归一为 `deepseek-flash`，保留有效思考强度 | 不能让旧建议改变当前默认 | 仅影响新 `auto` 回合 | 无 |
+| 官方 DeepSeek 端点上的退休 `deepseek-chat` / `deepseek-reasoner` 别名 | 解析为当前默认 `deepseek-flash` | 退休别名迁移不能重新选择旧默认 V4 Flash | 仅影响请求解析，不重写已保存 ID、凭据、历史或工作区；第三方端点及显式 `deepseek-v4-*` / 自定义 ID 保留 | 无；需要显式旧型号时保留原配置 |
 | 明确保存的 Pro、旧 Flash、第三方或自定义模型 | 原样保留；跳过默认路由 | 明确选择不是未配置默认 | 不批量替换配置、会话或定时任务 | 如需切换，选择 `deepseek-flash` |
 | `/model pro`、旧模型类型与能力画像 | 保留兼容读取和显式选择 | 官方仍提供 Pro，保留已有工作流 | 不删除旧配置或历史费用 | 无 |
 | 插件、MCP、Skill、凭据和工作区文件 | 全部保留 | 仅调整模型默认路由及说明 | 无删除、替换或凭据迁移 | 无 |
 
 ## 改动与验证边界
 
-- 桌面与 Runtime 新安装默认值此前已是 `deepseek-flash`，本次实际行为修正集中在自动选模路径。
+- 桌面与 Runtime 新安装默认值此前已是 `deepseek-flash`，行为修正覆盖自动选模与官方端点退休别名的请求解析；显式旧型号和第三方模型继续保留。
 - 当前用户指南、中英文默认说明、README 和配置示例改为 V4.1 Flash；历史验收记录不重写。
 - 回归覆盖旧建议归一、复杂和长提示词回退、AgentLoop 实际请求、显式 Pro / 旧 Flash / 自定义模型与历史线程选择保留。
 - 官方查询的精简证据位于 `evidence/railwise-0.5.4-markdown-advanced-20261101/deepseek-v41-defaults/`，不含凭据值、请求头或完整用户设置。

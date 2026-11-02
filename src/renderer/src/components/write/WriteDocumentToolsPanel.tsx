@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { diffLines } from 'diff'
 import { parseDocument, stringify } from 'yaml'
 import { FileSliders, History, Link2, MessageSquare, X } from 'lucide-react'
@@ -17,7 +17,8 @@ type Props = {
   saveRevision: number
   onChange: (content: string) => void
   onOpenFile: (path: string) => void
-  onAskAssistant: (prompt: string) => void
+  onReviewComment: (comment: DocumentComment) => Promise<void>
+  aiEditBusy: boolean
   onBeforeRestore: () => Promise<DocumentRevision | null>
   onRestored: () => Promise<boolean>
 }
@@ -31,7 +32,7 @@ export function replaceDocumentFrontmatter(content: string, raw: string): string
 const buttonClass = 'rounded-lg border border-ds-border px-3 py-1.5 text-[12px] text-ds-ink transition hover:bg-ds-hover disabled:opacity-40'
 const fieldClass = 'w-full rounded-lg border border-ds-border bg-ds-panel px-3 py-2 text-[12px] text-ds-ink outline-none focus:border-accent'
 
-export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selection, readOnly, saveRevision, onChange, onOpenFile, onAskAssistant, onBeforeRestore, onRestored }: Props): ReactElement {
+export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selection, readOnly, saveRevision, onChange, onOpenFile, onReviewComment, aiEditBusy, onBeforeRestore, onRestored }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const zh = i18n.language.startsWith('zh')
   const label = (cn: string, en: string): string => zh ? cn : en
@@ -47,10 +48,13 @@ export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selectio
   const [error, setError] = useState<string | null>(null)
   const [selectedHistory, setSelectedHistory] = useState<DocumentHistoryEntry | null>(null)
   const [refresh, setRefresh] = useState(0)
+  const panelEpoch = useRef(0)
+  const runningEpoch = useRef<number | null>(null)
   const historyRevision = tool === 'history' ? saveRevision : 0
   useWriteDialogFocus(Boolean(tool), 'write-document-tools-title', () => setTool(null))
 
-  useEffect(() => { setTool(null); setSelectedHistory(null); setError(null); setComment('') }, [path])
+  useLayoutEffect(() => { panelEpoch.current += 1 }, [tool, path, workspaceRoot])
+  useEffect(() => { setTool(null); setSelectedHistory(null); setError(null); setComment(''); setBusy(false) }, [path, workspaceRoot])
   useEffect(() => {
     if (!tool) return
     let cancelled = false
@@ -78,10 +82,14 @@ export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selectio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, path, workspaceRoot, historyRevision, refresh])
 
-  const run = async (action: () => Promise<void>): Promise<void> => {
+  const run = async (action: () => Promise<void>, closeOnSuccess = false): Promise<void> => {
+    const epoch = panelEpoch.current
+    if (runningEpoch.current === epoch) return
+    runningEpoch.current = epoch
     setBusy(true); setError(null)
-    try { await action() } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
-    finally { setBusy(false) }
+    try { await action(); if (closeOnSuccess && epoch === panelEpoch.current) setTool(null) }
+    catch (cause) { if (epoch === panelEpoch.current) setError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { if (epoch === panelEpoch.current) { runningEpoch.current = null; setBusy(false) } }
   }
 
   const applyFrontmatter = (): void => {
@@ -132,7 +140,7 @@ export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selectio
             </div>
             <div className="mt-1 truncate text-[11px] text-ds-faint">{path}</div>
             <div className="mt-4 min-h-0 flex-1 overflow-auto">
-              {busy ? <p className="py-4 text-[12px] text-ds-muted">{label('读取中…', 'Loading…')}</p> : null}
+              {busy ? <p role="status" className="py-4 text-[12px] text-ds-muted">{aiEditBusy ? label('正在生成修改建议…', 'Generating a suggestion…') : label('读取中…', 'Loading…')}</p> : null}
               {error ? <p role="alert" className="mb-3 whitespace-pre-wrap text-[12px] text-red-600 dark:text-red-300">{error}</p> : null}
               {tool === 'properties' ? (
                 <div className="space-y-3">
@@ -209,7 +217,7 @@ export function WriteDocumentToolsPanel({ workspaceRoot, path, content, selectio
                     <div className="text-[10px] text-ds-faint">{new Date(item.createdAt).toLocaleString()} · {item.status === 'resolved' ? label('已解决', 'Resolved') : label('待处理', 'Open')}</div>
                     {item.anchor.text ? <blockquote className="mt-2 max-h-20 overflow-auto border-l-2 border-ds-border pl-2 text-[11px] text-ds-faint">{item.anchor.text}{content.slice(item.anchor.from, item.anchor.to) !== item.anchor.text ? <span className="ml-2 text-amber-700 dark:text-amber-200">{label('原文已变化', 'Anchor changed')}</span> : null}</blockquote> : null}
                     <p className="mt-2 whitespace-pre-wrap text-[12px] leading-5 text-ds-ink">{item.text}</p>
-                    <div className="mt-3 flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={() => void run(async () => { await window.workwise.updateDocumentComment({ path, workspaceRoot, id: item.id, status: item.status === 'open' ? 'resolved' : 'open' }); setRefresh((value) => value + 1) })}>{item.status === 'open' ? label('解决', 'Resolve') : label('重新打开', 'Reopen')}</button><button type="button" className={buttonClass} onClick={() => { onAskAssistant(`${label('请根据这条批注提出修改建议，并在写入前提供差异审阅：', 'Propose changes for this comment and provide a diff before writing:')}\n\n@${path}\n\n${item.anchor.text}\n\n${item.text}`); setTool(null) }}>{label('加入 AI 写作队列', 'Send to AI writing')}</button></div>
+                    <div className="mt-3 flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={() => void run(async () => { await window.workwise.updateDocumentComment({ path, workspaceRoot, id: item.id, status: item.status === 'open' ? 'resolved' : 'open' }); setRefresh((value) => value + 1) })}>{item.status === 'open' ? label('解决', 'Resolve') : label('重新打开', 'Reopen')}</button><button type="button" className={buttonClass} disabled={busy || aiEditBusy || readOnly} onClick={() => void run(() => onReviewComment(item), true)}>{label('生成修改建议', 'Suggest changes')}</button></div>
                   </article>)}
                 </div>
               ) : null}

@@ -5,6 +5,7 @@ import type { WriteInlineEditResolvedScope } from '../../write/inline-edit'
 import { useWriteDialogFocus } from './use-write-dialog-focus'
 
 export type PendingWriteAiEdit = {
+  workspaceRoot: string
   path: string
   instruction: string
   scope: WriteInlineEditResolvedScope

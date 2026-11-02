@@ -906,7 +906,7 @@ describe('write inline completion runtime config', () => {
   it('falls back to the kun model when write keeps the default inline model', () => {
     const state = settings()
     state.agents.kun.model = 'deepseek-chat'
-    expect(resolveWriteInlineCompletionModel(state)).toBe('deepseek-v4-flash')
+    expect(resolveWriteInlineCompletionModel(state)).toBe('deepseek-flash')
   })
 
   it('keeps an explicit flash override when write disables inheritance', () => {
@@ -951,6 +951,6 @@ describe('write inline completion runtime config', () => {
     delete legacyInlineCompletion.inheritModel
     state.write.inlineCompletion = legacyInlineCompletion as AppSettingsV1['write']['inlineCompletion']
 
-    expect(resolveWriteInlineCompletionModel(state)).toBe('deepseek-v4-flash')
+    expect(resolveWriteInlineCompletionModel(state)).toBe('deepseek-flash')
   })
 })
