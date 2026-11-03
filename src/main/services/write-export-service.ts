@@ -223,6 +223,19 @@ const EXPORT_CSS = `
   .markdown-body h1,
   .markdown-body h2,
   .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6,
   .markdown-body img,
   .markdown-body table,
   .markdown-body pre {

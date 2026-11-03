@@ -42,6 +42,15 @@ describe('advanced Markdown export semantics', () => {
     expect(html).not.toContain('<script')
   })
 
+  it('keeps Markdown headings with the following content in paginated exports', async () => {
+    const html = await buildWriteExportHtmlDocument({
+      sourcePath: join(root, 'pagination.md'),
+      content: '## Matrix, cases and calculus\n\n$$\n\\mathbf{C}=\\begin{bmatrix}1&0\\\\0&2\\end{bmatrix}\n$$'
+    })
+
+    expect(html).toMatch(/\.markdown-body h1,\s*\.markdown-body h2,\s*\.markdown-body h3,\s*\.markdown-body h4,\s*\.markdown-body h5,\s*\.markdown-body h6\s*\{\s*break-after:\s*avoid-page;\s*page-break-after:\s*avoid;/)
+  })
+
   it('writes editable OMML fractions, roots, matrix rows, scripts and limits', async () => {
     const content = '结果 $x_1^2+\\frac{a}{b}$。\n\n$$\\sqrt{x}+\\sum_{i=1}^{n}i+\\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}$$'
     const zip = await JSZip.loadAsync(await buildDocxFromMarkdown({ sourcePath: join(root, 'formula.md'), content }))
