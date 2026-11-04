@@ -24,6 +24,15 @@ function splitMermaidStatements(source: string): string[] {
       else if (character === '"') inDoubleQuotedText = false
       continue
     }
+    if (delimiters.length === 0 && character === '%' && source[index + 1] === '%') {
+      const newline = source.indexOf('\n', index)
+      const end = newline < 0 ? source.length : newline
+      statements.push(source.slice(start, index))
+      if (newline < 0) return statements
+      start = newline + 1
+      index = end
+      continue
+    }
     if (character === '"') {
       inDoubleQuotedText = true
       continue

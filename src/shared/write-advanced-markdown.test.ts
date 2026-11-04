@@ -72,6 +72,8 @@ describe('shared passive Mermaid policy', () => {
       'flowchart LR; click A openWindow; B-->C',
       'flowchart LR; click A callbackName "tooltip"; B-->C',
       '%% local-only diagram\ngraph LR\nclick A openWindow',
+      '%% " comment\nflowchart LR\nclick A openWindow',
+      '%% [ comment\nflowchart LR\nclick A openWindow',
       'graph LR\nA[<img src="//bad.test">]',
       'graph LR\nA@{img: "../secret.png"}',
       'graph LR\nstyle A fill:url(//bad.test)',
