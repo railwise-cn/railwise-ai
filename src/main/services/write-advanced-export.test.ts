@@ -76,7 +76,9 @@ describe('advanced Markdown export semantics', () => {
     expect(body).toContain('w:instr="NOTEREF RailWiseFootnote1 \\h \\f \\* MERGEFORMAT"')
     expect(body).toContain('w:name="RailWiseFootnote1"')
     expect(body).toContain('<w:vertAlign w:val="superscript"/>')
-    expect(body).toContain('<w:t>1</w:t>')
+    const xml = new DOMParser().parseFromString(body, 'application/xml')
+    const repeatField = xml.getElementsByTagName('w:fldSimple')[0]
+    expect(repeatField?.getElementsByTagName('w:t')[0]?.textContent).toBe('1')
     expect(await zip.file('word/settings.xml')!.async('string')).not.toContain('<w:updateFields')
     expect(body).not.toContain('复核依据')
     expect(notes).toContain('复核依据')
