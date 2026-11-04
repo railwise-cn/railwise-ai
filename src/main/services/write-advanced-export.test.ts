@@ -73,9 +73,13 @@ describe('advanced Markdown export semantics', () => {
     const body = await zip.file('word/document.xml')!.async('string')
     const notes = await zip.file('word/footnotes.xml')!.async('string')
     expect(body.match(/<w:footnoteReference w:id="1"\/>/g)).toHaveLength(1)
-    expect(body).toContain('w:instr="NOTEREF RailWiseFootnote1 \\h \\f"')
+    expect(body).toContain('w:instr="NOTEREF RailWiseFootnote1 \\h \\f \\* MERGEFORMAT"')
     expect(body).toContain('w:name="RailWiseFootnote1"')
     expect(body).toContain('<w:vertAlign w:val="superscript"/>')
+    const xml = new DOMParser().parseFromString(body, 'application/xml')
+    const repeatField = xml.getElementsByTagName('w:fldSimple')[0]
+    expect(repeatField?.getElementsByTagName('w:t')[0]?.textContent).toBe('1')
+    expect(await zip.file('word/settings.xml')!.async('string')).not.toContain('<w:updateFields')
     expect(body).not.toContain('复核依据')
     expect(notes).toContain('复核依据')
     expect(notes).toContain('第二段说明')
@@ -90,10 +94,10 @@ describe('advanced Markdown export semantics', () => {
     const notes = new DOMParser().parseFromString(await zip.file('word/footnotes.xml')!.async('string'), 'application/xml')
     const refs = Array.from(body.getElementsByTagName('w:footnoteReference')).map((node) => node.getAttribute('w:id'))
     expect(refs).toEqual(['1', '2', '3'])
-    const fields = Array.from(body.getElementsByTagName('w:fldSimple'))
-    expect(fields).toHaveLength(2)
-    for (const field of fields) {
-      expect(field.getAttribute('w:instr')).toBe('NOTEREF RailWiseFootnote1 \\h \\f')
+    const repeatFields = Array.from(body.getElementsByTagName('w:fldSimple'))
+    expect(repeatFields).toHaveLength(2)
+    for (const field of repeatFields) {
+      expect(field.getAttribute('w:instr')).toBe('NOTEREF RailWiseFootnote1 \\h \\f \\* MERGEFORMAT')
       expect(field.getElementsByTagName('w:t')[0]?.textContent).toBe('1')
       expect(field.getElementsByTagName('w:vertAlign')[0]?.getAttribute('w:val')).toBe('superscript')
     }
@@ -107,7 +111,7 @@ describe('advanced Markdown export semantics', () => {
     for (const note of Array.from(notes.getElementsByTagName('w:footnote'))) {
       expect(note.getElementsByTagName('w:footnoteRef').length).toBe(note.hasAttribute('w:type') ? 0 : 1)
     }
-    expect(await zip.file('word/settings.xml')!.async('string')).toContain('<w:updateFields/>')
+    expect(await zip.file('word/settings.xml')!.async('string')).not.toContain('<w:updateFields')
   })
 
   it('shares footnote targets across paragraphs, heading text and table cells without leaking between exports', async () => {
@@ -118,9 +122,14 @@ describe('advanced Markdown export semantics', () => {
     }))
     for (const body of outputs) {
       expect(body.match(/<w:footnoteReference w:id="1"\/>/g)).toHaveLength(1)
-      expect(body.match(/NOTEREF RailWiseFootnote1/g)).toHaveLength(2)
       expect(body).toContain('w:name="RailWiseFootnote1"')
       const xml = new DOMParser().parseFromString(body, 'application/xml')
+      const repeatFields = Array.from(xml.getElementsByTagName('w:fldSimple'))
+      expect(repeatFields).toHaveLength(2)
+      expect(repeatFields.map((field) => field.getAttribute('w:instr'))).toEqual([
+        'NOTEREF RailWiseFootnote1 \\h \\f \\* MERGEFORMAT',
+        'NOTEREF RailWiseFootnote1 \\h \\f \\* MERGEFORMAT'
+      ])
       const starts = Array.from(xml.getElementsByTagName('w:bookmarkStart'))
       const ids = starts.map((node) => node.getAttribute('w:id'))
       expect(starts).toHaveLength(2)

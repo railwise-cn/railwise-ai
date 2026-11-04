@@ -35,3 +35,52 @@ describe('preview local document link routing', () => {
     expect(onOpenDocument).toHaveBeenCalledExactlyOnceWith(path)
   })
 })
+
+describe('advanced Markdown preview hydration', () => {
+  it('hydrates Mermaid fences mounted through the preview component', async () => {
+    const renderWriteMermaidPreview = vi.fn(async () => ({
+      ok: true,
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50"><text x="2" y="10">Survey</text></svg>',
+      width: 100,
+      height: 50
+    }))
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { renderWriteMermaidPreview } })
+
+    await act(async () => root.render(createElement(WriteMarkdownPreview, {
+      content: '# Diagram\n\n```mermaid\ngraph LR\nA[Survey] --> B[Report]\n```',
+      isMarkdown: true
+    })))
+    await vi.waitFor(() => expect(container.querySelector('img[data-write-diagram-image]')).not.toBeNull())
+
+    expect(renderWriteMermaidPreview).toHaveBeenCalledExactlyOnceWith({ source: 'graph LR\nA[Survey] --> B[Report]\n' })
+    expect(container.querySelector<HTMLImageElement>('img[data-write-diagram-image]')?.alt).toBe('Mermaid diagram')
+    expect(container.querySelector('[data-write-mermaid] pre')).toBeNull()
+    expect(container.querySelector('[data-write-mermaid] [role="status"]')).toBeNull()
+  })
+
+  it('ignores a Mermaid response after React replaces the preview document', async () => {
+    const responses: Array<(result: { ok: true; svg: string; width: number; height: number }) => void> = []
+    const renderWriteMermaidPreview = vi.fn(() => new Promise<{ ok: true; svg: string; width: number; height: number }>((resolve) => responses.push(resolve)))
+    Object.defineProperty(window, 'workwise', { configurable: true, value: { renderWriteMermaidPreview } })
+
+    await act(async () => root.render(createElement(WriteMarkdownPreview, {
+      content: '```mermaid\ngraph LR\nA[Old] --> B[Diagram]\n```',
+      isMarkdown: true
+    })))
+    expect(renderWriteMermaidPreview).toHaveBeenCalledTimes(1)
+
+    await act(async () => root.render(createElement(WriteMarkdownPreview, {
+      content: '# New document',
+      isMarkdown: true
+    })))
+    await act(async () => responses[0]({
+      ok: true,
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Old</text></svg>',
+      width: 100,
+      height: 50
+    }))
+
+    expect(container.textContent).toContain('New document')
+    expect(container.querySelector('img[data-write-diagram-image]')).toBeNull()
+  })
+})
