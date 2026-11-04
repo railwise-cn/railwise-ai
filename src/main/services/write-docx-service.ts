@@ -408,10 +408,9 @@ async function parseInlineTokens(tokens: InlineToken[], sourcePath: string): Pro
         const bookmark = `RailWiseFootnote${noteId}`
         const seen = writeDocxRenderContext.getStore()!.footnoteReferences
         if (seen.has(noteId)) {
-          // Some Word-compatible renderers renumber duplicated native note
-          // references independently. A repeated Markdown citation points to
-          // the original note through an explicit cross-reference instead.
-          const reference = new SimpleField(`NOTEREF ${bookmark} \\h \\f`)
+          // Keep repeat citations tied to the native note so manual field updates
+          // follow note renumbering without updating every field when Word opens.
+          const reference = new SimpleField(`NOTEREF ${bookmark} \\h \\f \\* MERGEFORMAT`)
           reference.addChildElement(textRun(String(noteId), { style: 'FootnoteReference', superScript: true }))
           push(reference)
         } else {
@@ -928,7 +927,6 @@ async function buildDocxFromMarkdownInner(options: {
   const doc = new Document({
     creator: 'WorkWise',
     title: options.title || basename(options.sourcePath),
-    features: { updateFields: true },
     // docx 9.x types restrict all blocks to Paragraph, although its serializer
     // supports tables after the first Paragraph. Normalize that runtime contract
     // above and keep this library type adaptation at the constructor boundary.
