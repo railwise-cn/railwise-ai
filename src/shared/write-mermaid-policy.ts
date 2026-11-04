@@ -3,14 +3,61 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 export const WRITE_MERMAID_MAX_LENGTH = 30000
 
 const UNSAFE_MERMAID_SOURCE_PATTERNS = [
-  /%%\s*\{|^\s*---|<\/?[A-Za-z!]|@\{|(?:https?|data|javascript|file):|url\s*\(|@import|\\(?:75|72|6c)/im,
-  /^[ \t]*(?:click|link)[ \t]+\S+[ \t]+(?:callback\b|call\b|href\b|["'])/im
+  /%%\s*\{|^\s*---|<\/?[A-Za-z!]|@\{|(?:https?|data|javascript|file):|url\s*\(|@import|\\(?:75|72|6c)/im
 ]
+
+const FLOWCHART_EDGE_START = /^(?:[-=~]|[ox](?:--|-\.))/i
+
+function splitMermaidStatements(source: string): string[] {
+  const statements: string[] = []
+  const delimiters: string[] = []
+  let start = 0
+  let inDoubleQuotedText = false
+  let escaped = false
+
+  // Mermaid flowcharts use newlines and semicolons between statements. Keep separators inside labels intact.
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index]
+    if (inDoubleQuotedText) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') inDoubleQuotedText = false
+      continue
+    }
+    if (character === '"') {
+      inDoubleQuotedText = true
+      continue
+    }
+    if (character === '[' || character === '(' || character === '{') delimiters.push(character)
+    else if (character === ']' || character === ')' || character === '}') {
+      const expected = character === ']' ? '[' : character === ')' ? '(' : '{'
+      if (delimiters.at(-1) === expected) delimiters.pop()
+    } else if (delimiters.length === 0 && (character === ';' || character === '\n')) {
+      statements.push(source.slice(start, index))
+      start = index + 1
+    }
+  }
+  statements.push(source.slice(start))
+  return statements
+}
+
+function hasUnsafeFlowchartInteraction(source: string): boolean {
+  const statements = splitMermaidStatements(source)
+  const first = statements.find((statement) => statement.trim() && !/^\s*%%/.test(statement))?.trim() ?? ''
+  if (!/^(?:flowchart|graph)\b/i.test(first)) return false
+
+  return statements.some((statement) => {
+    const directive = /^(?:click|link)[ \t]+(\S+)(?:[ \t]+([\s\S]*))?$/i.exec(statement.trim())
+    if (!directive) return false
+    const [, nodeOrEdge, action = ''] = directive
+    return !FLOWCHART_EDGE_START.test(nodeOrEdge) && Boolean(action.trim()) && !FLOWCHART_EDGE_START.test(action.trimStart())
+  })
+}
 
 export function validateWriteMermaidSource(source: string): { ok: true } | { ok: false; message: string } {
   if (!source.trim()) return { ok: false, message: 'Diagram source is empty.' }
   if (source.length > WRITE_MERMAID_MAX_LENGTH || source.split('\n').length > 1000) return { ok: false, message: 'Diagram exceeds the local rendering limit.' }
-  if (UNSAFE_MERMAID_SOURCE_PATTERNS.some((pattern) => pattern.test(source))) return { ok: false, message: 'Diagram links, HTML, images and configuration directives are disabled.' }
+  if (UNSAFE_MERMAID_SOURCE_PATTERNS.some((pattern) => pattern.test(source)) || hasUnsafeFlowchartInteraction(source)) return { ok: false, message: 'Diagram links, HTML, images and configuration directives are disabled.' }
   return { ok: true }
 }
 

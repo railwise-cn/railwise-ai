@@ -53,6 +53,9 @@ describe('shared passive Mermaid policy', () => {
     expect(validateWriteMermaidSource('flowchart LR\nA[Image sensor: click callback href] --> B[Report]').ok).toBe(true)
     expect(validateWriteMermaidSource('sequenceDiagram\nAlice->>Bob: image click callback href').ok).toBe(true)
     expect(validateWriteMermaidSource('flowchart LR\nclick --> B[Report]').ok).toBe(true)
+    expect(validateWriteMermaidSource('flowchart LR\nclick A --> B[Report]').ok).toBe(true)
+    expect(validateWriteMermaidSource('flowchart LR\nclick A o-- B[Report]').ok).toBe(true)
+    expect(validateWriteMermaidSource('flowchart LR; A["Image; click callback href"]-->B').ok).toBe(true)
   })
 
   it('rejects network, configuration and active-language features', () => {
@@ -60,10 +63,15 @@ describe('shared passive Mermaid policy', () => {
     for (const source of [
       '%%{init: { securityLevel: "loose" }}%%\ngraph LR\nA-->B',
       'graph LR\nclick A "https://bad.test"',
+      'graph LR\nclick A openWindow',
+      'graph LR\nclick A callbackName "tooltip"',
       'graph LR\nclick A callback handler',
       'graph LR\nclick A call handler()',
       'graph LR\nclick A href "relative-target"',
       'graph LR\nlink A "relative-target"',
+      'flowchart LR; click A openWindow; B-->C',
+      'flowchart LR; click A callbackName "tooltip"; B-->C',
+      '%% local-only diagram\ngraph LR\nclick A openWindow',
       'graph LR\nA[<img src="//bad.test">]',
       'graph LR\nA@{img: "../secret.png"}',
       'graph LR\nstyle A fill:url(//bad.test)',
