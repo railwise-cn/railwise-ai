@@ -2,10 +2,15 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 
 export const WRITE_MERMAID_MAX_LENGTH = 30000
 
+const UNSAFE_MERMAID_SOURCE_PATTERNS = [
+  /%%\s*\{|^\s*---|<\/?[A-Za-z!]|@\{|(?:https?|data|javascript|file):|url\s*\(|@import|\\(?:75|72|6c)/im,
+  /^[ \t]*(?:click|link)[ \t]+\S+[ \t]+(?:callback\b|call\b|href\b|["'])/im
+]
+
 export function validateWriteMermaidSource(source: string): { ok: true } | { ok: false; message: string } {
   if (!source.trim()) return { ok: false, message: 'Diagram source is empty.' }
   if (source.length > WRITE_MERMAID_MAX_LENGTH || source.split('\n').length > 1000) return { ok: false, message: 'Diagram exceeds the local rendering limit.' }
-  if (/%%\s*\{|^\s*---|<\/?[A-Za-z!]|\b(?:click|callback|href|image)\b|@\{|(?:https?|data|javascript|file):|url\s*\(|@import|\\(?:75|72|6c)/im.test(source)) return { ok: false, message: 'Diagram links, HTML, images and configuration directives are disabled.' }
+  if (UNSAFE_MERMAID_SOURCE_PATTERNS.some((pattern) => pattern.test(source))) return { ok: false, message: 'Diagram links, HTML, images and configuration directives are disabled.' }
   return { ok: true }
 }
 

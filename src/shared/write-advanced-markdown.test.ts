@@ -49,11 +49,21 @@ describe('shared advanced Markdown semantics', () => {
 })
 
 describe('shared passive Mermaid policy', () => {
-  it('allows local diagrams and rejects network, configuration and active-language features', () => {
+  it('allows ordinary labels containing words that resemble disabled directives', () => {
+    expect(validateWriteMermaidSource('flowchart LR\nA[Image sensor: click callback href] --> B[Report]').ok).toBe(true)
+    expect(validateWriteMermaidSource('sequenceDiagram\nAlice->>Bob: image click callback href').ok).toBe(true)
+    expect(validateWriteMermaidSource('flowchart LR\nclick --> B[Report]').ok).toBe(true)
+  })
+
+  it('rejects network, configuration and active-language features', () => {
     expect(validateWriteMermaidSource('sequenceDiagram\nAlice->>Bob: Hello').ok).toBe(true)
     for (const source of [
       '%%{init: { securityLevel: "loose" }}%%\ngraph LR\nA-->B',
       'graph LR\nclick A "https://bad.test"',
+      'graph LR\nclick A callback handler',
+      'graph LR\nclick A call handler()',
+      'graph LR\nclick A href "relative-target"',
+      'graph LR\nlink A "relative-target"',
       'graph LR\nA[<img src="//bad.test">]',
       'graph LR\nA@{img: "../secret.png"}',
       'graph LR\nstyle A fill:url(//bad.test)',
