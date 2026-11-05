@@ -15,7 +15,7 @@ import { assertRetainedFiles, snapshotFiles } from './frozen-release-updater-dat
 import { boundedCommand } from './updater-acceptance-process.mjs'
 import { captureMacosTrustEnvironment, verifyMacosUpdaterTrust } from './macos-updater-trust.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
-import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptRoot = dirname(fileURLToPath(import.meta.url))
@@ -23,10 +23,7 @@ const BASE_VERSION = FROZEN_BASE_VERSION
 const FROZEN_MANIFEST_READINESS_TIMEOUT_MS = 5 * 60_000
 const FROZEN_UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`
 const UPDATE_URL = 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
-export const BASELINE_PINS = Object.freeze({
-  arm64: { name: 'WorkWise-0.5.2-mac-Apple-Silicon.dmg', size: 301766076, sha256: '09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0', assetId: 612608487 },
-  x64: { name: 'WorkWise-0.5.2-mac-Intel.dmg', size: 306711696, sha256: '8368322a563871e00e6e9ac99b661bf0ee120a20d48f8ebd3e105209cdba20d4', assetId: 612608490 }
-})
+export const BASELINE_PINS = FROZEN_BASELINE_PINS
 export const CLOUDFLARED_PINS = Object.freeze({
   version: '2026.10.0',
   arm64: { name: 'cloudflared-darwin-arm64.tgz', size: 19809074, sha256: 'a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70' },
@@ -462,7 +459,7 @@ export async function main() {
     verifyReviewedBuildSource(build, { version: targetVersion, sourceHead: build.sourceHead })
     const pin = BASELINE_PINS[process.arch]; const baselineDmg = join(root, pin.name)
     await downloadPinned(`https://github.com/${RELEASE_REPOSITORY}/releases/download/v${BASE_VERSION}/${pin.name}`, baselineDmg, pin)
-    report.baselineAsset = { tag: 'v0.5.2', ...pin }
+    report.baselineAsset = { tag: `v${BASE_VERSION}`, ...pin }
     const baseline = installBaseline(baselineDmg, root, run)
     report.baselineIdentity = verifyBundle(baseline, BASE_VERSION, undefined, run, { boundary: 'baseline-dmg-copy', record: progress })
     const targetZip = join(verified, `WorkWise-${targetVersion}-mac-${process.arch}.zip`)

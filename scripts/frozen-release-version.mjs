@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
 
-// Historical acceptance always starts with these immutable official bytes.
-export const FROZEN_BASE_VERSION = '0.5.2'
+// The native updater gate starts from the latest published stable release.
+export const FROZEN_BASE_VERSION = '0.5.3'
+export const FROZEN_BASELINE_PINS = Object.freeze({
+  arm64: { name: 'WorkWise-0.5.3-mac-Apple-Silicon.dmg', size: 301352326, sha256: '6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e', assetId: 630646810 },
+  x64: { name: 'WorkWise-0.5.3-mac-Intel.dmg', size: 306907651, sha256: '59613948518d9622d21063bff98aba2d78714d797f773b353bea313995975560', assetId: 630646813 },
+})
 
 export function validateFrozenTargetVersion(version) {
   if (typeof version !== 'string' || version !== version.trim() || !/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(version)) {

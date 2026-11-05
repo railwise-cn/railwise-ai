@@ -29,7 +29,7 @@ export function resolveFixtureService({ app, mode, compatibilityRoot }) {
     if (candidate.present.some(Boolean) && !candidate.present.every(Boolean)) throw new Error(`Incomplete packaged Survey services (${candidate.layout}).`)
   }
   if (mode === 'seed') {
-    // The 0.5.2 service API predates the datum declaration in this fixture.
+    // The baseline service API predates the datum declaration in this fixture.
     // Seed through frozen-source services and the baseline package's SQLite ABI.
     if (!compatibilityRoot || !SERVICE_MODULES.every(name => existsSync(join(compatibilityRoot, name)))) throw new Error('Baseline compatibility services must be built before acceptance.')
     return { root: compatibilityRoot, layout: 'source-compatibility', serviceSource: 'source-bound-compatibility-service' }
@@ -187,7 +187,7 @@ async function main() {
   try {
     if (mode === 'seed') {
       if (engineering.listProjects().length || survey.listNetworks().length) throw new Error('Refusing to seed an existing professional data store.')
-      const project = engineering.createProject({ name: 'Synthetic 0.5.2 update compatibility', workspace, taskType: 'control-network', unit: 'm', expectedRevision: 0, idempotencyKey: 'frozen-updater-project' })
+      const project = engineering.createProject({ name: `Synthetic ${FROZEN_BASE_VERSION} update compatibility`, workspace, taskType: 'control-network', unit: 'm', expectedRevision: 0, idempotencyKey: 'frozen-updater-project' })
       // The baseline Electron process and SQLite ABI are real; service provenance is recorded separately.
       const source = Buffer.from('1.000,1,1\nA,50.000000,150.000000\nB,150.000000,50.000000\nC,120.710678,120.710678\nS1\nA,L,0\nB,L,270.00000\nB,S,100.000\nC,L,315.00000\nC,S,100.000\n')
       const network = await survey.importNetwork({ projectId: project.id, expectedRevision: project.revision, idempotencyKey: 'frozen-updater-import', networkType: 'plane-control', name: 'synthetic.in2', dataBase64: source.toString('base64'), referenceDeclaration: { coordinateSystem: 'SYNTHETIC-LOCAL-GRID', verticalDatum: 'SYNTHETIC-LOCAL-BENCHMARK' } })
@@ -221,7 +221,7 @@ async function main() {
     assertRetainedFiles(baseline.files.data, files.data); assertRetainedFiles(baseline.files.workspace, files.workspace)
   }
   writeFileSync(reportPath, JSON.stringify({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: identity.sourceSha256,
-    serviceSource, serviceIdentity, scope: 'Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official 0.5.2 Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary 0.5.2 schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution.' }) + '\n', { mode: 0o600 })
+    serviceSource, serviceIdentity, scope: `Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official ${FROZEN_BASE_VERSION} Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary ${FROZEN_BASE_VERSION} schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution.` }) + '\n', { mode: 0o600 })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(`[updater-data] ${error.message}`); process.exitCode = 1 })

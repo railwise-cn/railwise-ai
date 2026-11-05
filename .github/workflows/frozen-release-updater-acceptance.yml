@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   native-macos:
-    name: Official 0.5.2 to exact frozen public package native updater
+    name: Official 0.5.3 to exact frozen public package native updater
     runs-on: macos-15
     timeout-minutes: 65
     steps:

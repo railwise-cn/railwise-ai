@@ -22,7 +22,7 @@ separate bundle identity or a local rebuild cannot substitute for the final
 public-identity package.
 
 Complete and record installed-package signature/notarization, computer-use UI
-inspection, the functional checklist, the official 0.5.2-to-frozen-target native
+inspection, the functional checklist, the official latest-stable-to-frozen-target native
 updater round trip, and the independent senior-engineer AI review. The updater
 reports must come from the trusted
 `frozen-release-updater-acceptance.yml` workflow on the same frozen main source.
