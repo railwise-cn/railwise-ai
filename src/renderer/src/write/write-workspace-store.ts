@@ -35,6 +35,7 @@ import {
   writeJoinPath,
   writeRelativeToWorkspace
 } from './write-workspace-store-helpers'
+import { normalizeComposerModelForProvider } from '@shared/default-composer-models'
 export type { WriteActiveFileKind, WritePreviewMode, WriteSaveStatus, WriteWorkspaceState } from './write-workspace-store-types'
 export { writeBasenameFromPath, writeDirnameFromPath, writeJoinPath, writeRelativeToWorkspace } from './write-workspace-store-helpers'
 
@@ -412,7 +413,7 @@ export const useWriteWorkspaceStore = create<WriteWorkspaceState>((set, get) => 
   },
 
   setAssistantModel: (model, providerId) => {
-    const normalized = model.trim()
+    const normalized = normalizeComposerModelForProvider(model, providerId)
     writeBrowserStorageItem(WRITE_ASSISTANT_MODEL_KEY, normalized)
     writeBrowserStorageItem(WRITE_ASSISTANT_SELECTION_KEY, JSON.stringify({ version: 1, model: normalized, providerId }))
     set({ assistantModel: normalized, assistantProviderId: providerId })

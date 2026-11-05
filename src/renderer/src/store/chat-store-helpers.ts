@@ -1,7 +1,9 @@
 import type { ChatBlock, NormalizedThread } from '../agent/types'
 import {
   DEFAULT_COMPOSER_MODEL_IDS,
-  isVisibleComposerModelId
+  isVisibleComposerModelId,
+  isVisibleComposerModelIdForProvider,
+  normalizeComposerModelForProvider
 } from '@shared/default-composer-models'
 import {
   CLAW_MANAGED_INSTRUCTIONS_HEADING,
@@ -49,12 +51,15 @@ export function readStoredComposerSelection(): { model: string; providerId?: str
     if (!raw) return null
     const value = JSON.parse(raw)
     if (value?.version !== 1 || typeof value.model !== 'string' || (value.providerId !== undefined && (typeof value.providerId !== 'string' || !value.providerId.trim()))) return null
-    return { model: value.model, ...(value.providerId ? { providerId: value.providerId } : {}) }
+    const providerId = value.providerId ? value.providerId : undefined
+    const model = normalizeComposerModelForProvider(value.model, providerId)
+    return { model, ...(providerId ? { providerId } : {}) }
   } catch { return null }
 }
 
 export function persistComposerSelection(model: string, providerId?: string): void {
-  writeBrowserStorageItem(COMPOSER_SELECTION_STORAGE_KEY, JSON.stringify({ version: 1, model, ...(providerId ? { providerId } : {}) }))
+  const normalized = normalizeComposerModelForProvider(model, providerId)
+  writeBrowserStorageItem(COMPOSER_SELECTION_STORAGE_KEY, JSON.stringify({ version: 1, model: normalized, ...(providerId ? { providerId } : {}) }))
 }
 
 export function compactCodeWorkspaceRoots(workspaceRoots: readonly (string | undefined | null)[]): string[] {
@@ -131,8 +136,9 @@ export function mergeComposerPickList(
       if (!normalized) continue
       // Main already filters the official catalog by provider URL. Keep every
       // grouped identity so compatible providers can expose the same model IDs.
-      const visible = modelGroups.some((group) => group.modelIds.includes(normalized)) ||
-        isVisibleComposerModelId(normalized)
+      const visible = modelGroups.some((group) =>
+        group.modelIds.includes(normalized) && isVisibleComposerModelIdForProvider(normalized, group.providerId)
+      ) || isVisibleComposerModelId(normalized)
       if (visible) ordered.add(normalized)
     }
   }
