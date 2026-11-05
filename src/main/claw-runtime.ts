@@ -43,8 +43,11 @@ import {
   CLAW_MODEL_IDS,
   DEFAULT_CLAW_MODEL,
   buildClawRuntimePrompt,
+  getManagedRuntimeSettings,
+  normalizeClawModel,
   parseClawUserPromptForDisplay
 } from '../shared/app-settings'
+import { isVisibleComposerModelIdForProvider } from '../shared/default-composer-models'
 import { parseClawCommand } from '../shared/claw-commands'
 import { readLegacyWebhookSecret } from './compat/legacy-http'
 import {
@@ -316,6 +319,12 @@ function currentImModel(settings: AppSettingsV1, channel?: ClawImChannelV1): str
 }
 
 function imCommandHelpText(settings: AppSettingsV1): string {
+  const models = CLAW_MODEL_IDS.filter((model) => isVisibleComposerModelIdForProvider(
+    model,
+    getManagedRuntimeSettings(settings).providerId || undefined
+  ))
+  const commandModels = models.map((model) => model === 'deepseek-flash' ? 'flash' : model)
+  const command = `/model ${commandModels.join('|')}`
   if (isChineseLocale(settings)) {
     return [
       'Claw IM 命令：',
@@ -323,7 +332,7 @@ function imCommandHelpText(settings: AppSettingsV1): string {
       '- `/status`：查看当前连接状态',
       '- `/new`：当前 IM 连接开启新话题',
       '- `/model`：查看当前模型',
-      '- `/model auto|pro|flash`：切换当前 IM 连接模型',
+      `- \`${command}\`：切换当前 IM 连接模型`,
       '也支持 `-new`、`-help`、`-model flash` 这种写法。'
     ].join('\n')
   }
@@ -333,16 +342,20 @@ function imCommandHelpText(settings: AppSettingsV1): string {
     '- `/status`: show the current connection status',
     '- `/new`: start a new topic for this IM connection',
     '- `/model`: show the current model',
-    '- `/model auto|pro|flash`: switch this IM connection model',
+    `- \`${command}\`: switch this IM connection model`,
     '`-new`, `-help`, and `-model flash` are supported too.'
   ].join('\n')
 }
 
 function imModelCommandHint(settings: AppSettingsV1): string {
-  const ids = CLAW_MODEL_IDS.join(', ')
+  const providerId = getManagedRuntimeSettings(settings).providerId || undefined
+  const models = CLAW_MODEL_IDS.filter((model) => isVisibleComposerModelIdForProvider(model, providerId))
+  const ids = models.join(', ')
+  const commandModels = models.map((model) => model === 'deepseek-flash' ? 'flash' : model)
+  const command = `/model ${commandModels.join('|')}`
   return isChineseLocale(settings)
-    ? `可使用 /model auto、/model pro 或 /model flash。可用模型：${ids}。`
-    : `Use /model auto, /model pro, or /model flash. Available models: ${ids}.`
+    ? `可使用 ${command}。可用模型：${ids}。`
+    : `Use ${command}. Available models: ${ids}.`
 }
 
 function imModelCurrentText(settings: AppSettingsV1, model: string): string {
@@ -1474,8 +1487,12 @@ export class ClawRuntime {
     if (command.kind === 'showModel') return imModelCurrentText(settings, currentImModel(settings, input.channel))
     if (command.kind === 'invalidModel') return imModelCommandHint(settings)
     if (command.kind === 'model') {
-      await this.setIncomingImModel(input.channel, command.model)
-      return imModelChangedText(settings, command.model)
+      const model = normalizeClawModel(
+        command.model,
+        getManagedRuntimeSettings(settings).providerId || undefined
+      )
+      await this.setIncomingImModel(input.channel, model)
+      return imModelChangedText(settings, model)
     }
     if (command.kind === 'clear') {
       await this.resetIncomingImThread({

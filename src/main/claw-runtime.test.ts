@@ -3206,7 +3206,7 @@ describe('ClawRuntime', () => {
       chatType: 'p2p',
       mentionedBot: false,
       mentionAll: false,
-      content: '-model flash',
+      content: '-model deepseek-v4-pro',
       rawContentType: 'text',
       mentions: []
     })
@@ -3262,6 +3262,9 @@ describe('ClawRuntime', () => {
       ok: true,
       reply: expect.stringContaining('Claw IM commands:')
     })
+    expect(JSON.parse(responseBody).reply).toContain('/model auto|flash')
+    expect(JSON.parse(responseBody).reply).not.toContain('/model pro')
+    expect(JSON.parse(responseBody).reply).not.toContain('deepseek-v4-')
     expect(createScheduledTaskFromText).not.toHaveBeenCalled()
     expect(runtimeRequest).not.toHaveBeenCalled()
   })

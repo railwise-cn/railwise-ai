@@ -67,12 +67,31 @@ describe('detectClawScheduledTaskRequest endpoint formats', () => {
     expect(calls[0]).toMatchObject({
       url: 'https://model.example/v1/responses',
       body: {
-        model: 'deepseek-v4-flash',
+        model: 'deepseek-flash',
         input: 'remind me tomorrow to stretch',
         max_output_tokens: 300,
         text: { format: { type: 'json_object' } }
       }
     })
+  })
+
+  it('preserves a legacy-looking model id for a custom provider', async () => {
+    const calls: Array<{ body: Record<string, unknown> }> = []
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      calls.push({ body: JSON.parse(String(init.body ?? '{}')) })
+      return new Response(JSON.stringify({ output_text: '{"shouldCreateTask":false}' }), { status: 200 })
+    })
+    const customSettings = settings('responses')
+    customSettings.agents.kun.providerId = 'custom-provider'
+
+    await detectClawScheduledTaskRequest(
+      customSettings,
+      'remind me tomorrow to stretch',
+      'deepseek-v4-pro',
+      new Date('2026-06-09T12:00:00+08:00')
+    )
+
+    expect(calls[0].body.model).toBe('deepseek-v4-pro')
   })
 
   it('uses Messages API shape and headers for reminder extraction', async () => {

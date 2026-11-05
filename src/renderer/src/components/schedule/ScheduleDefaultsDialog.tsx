@@ -2,8 +2,9 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import {
-  SCHEDULE_MODEL_IDS,
   mergeScheduleSettings,
+  normalizeScheduleModelForProvider,
+  scheduleModelOptionsForProvider,
   type ScheduleSettingsV1
 } from '@shared/app-settings'
 
@@ -16,11 +17,13 @@ function splitLooseList(value: string): string[] {
 
 export function ScheduleDefaultsDialog({
   schedule,
+  providerId,
   onClose,
   onSave,
   t
 }: {
   schedule: ScheduleSettingsV1
+  providerId?: string
   onClose: () => void
   onSave: (patch: Parameters<typeof mergeScheduleSettings>[1]) => Promise<void>
   t: (key: string, values?: Record<string, unknown>) => string
@@ -33,6 +36,8 @@ export function ScheduleDefaultsDialog({
     defaultNames: schedule.skills.defaultNames.join(', '),
     extraDirs: schedule.skills.extraDirs.join('\n')
   })
+  const selectedModel = normalizeScheduleModelForProvider(draft.model, providerId)
+  const modelOptions = scheduleModelOptionsForProvider(selectedModel, providerId)
 
   const update = (patch: Partial<typeof draft>): void => {
     setDraft((current) => ({ ...current, ...patch }))
@@ -95,11 +100,11 @@ export function ScheduleDefaultsDialog({
           <label className="flex flex-col gap-2 text-[13px] font-medium text-ds-ink">
             {t('scheduleModel')}
             <select
-              value={draft.model}
+              value={selectedModel}
               onChange={(event) => update({ model: event.target.value })}
               className="w-full rounded-xl border border-ds-border bg-ds-main/60 px-3 py-2 text-[14px] text-ds-ink outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/25"
             >
-              {SCHEDULE_MODEL_IDS.map((model) => (
+              {modelOptions.map((model) => (
                 <option key={model} value={model}>{model}</option>
               ))}
             </select>

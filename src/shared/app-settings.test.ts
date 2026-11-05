@@ -21,10 +21,12 @@ import {
   isManagedRuntimeInsecure,
   migrateLegacyAppSettings,
   normalizeAppSettings,
+  normalizeClawSettings,
   normalizeNotificationSettings,
   shouldShowTerminalNotification,
   parseClawUserPromptForDisplay,
   normalizeScheduleSettings,
+  scheduleModelOptionsForProvider,
   resolveManagedRuntimeSettings,
   resolveWriteInlineCompletionApiKey,
   resolveWriteInlineCompletionBaseUrl,
@@ -788,6 +790,68 @@ describe('schedule settings', () => {
 })
 
 describe('claw runtime prompts', () => {
+  it('applies provider-aware model migration when normalizing app settings', () => {
+    const official = settings()
+    official.agents.kun.providerId = 'deepseek'
+    official.schedule.model = 'deepseek-v4-pro'
+    official.claw.im.model = 'deepseek-v4-pro'
+    official.claw.channels = [{ ...clawChannel('feishu', 'primary'), model: 'deepseek-v4-flash' }]
+
+    const migrated = normalizeAppSettings(official)
+    expect(migrated.schedule.model).toBe('deepseek-flash')
+    expect(migrated.claw.im.model).toBe('deepseek-flash')
+    expect(migrated.claw.channels[0].model).toBe('deepseek-flash')
+
+    const custom = settings()
+    custom.agents.kun.providerId = 'custom-provider'
+    custom.schedule.model = 'deepseek-v4-pro'
+    custom.claw.im.model = 'deepseek-v4-pro'
+    custom.claw.channels = [{ ...clawChannel('feishu', 'primary'), model: 'deepseek-v4-flash' }]
+
+    const preserved = normalizeAppSettings(custom)
+    expect(preserved.schedule.model).toBe('deepseek-v4-pro')
+    expect(preserved.claw.im.model).toBe('deepseek-v4-pro')
+    expect(preserved.claw.channels[0].model).toBe('deepseek-v4-flash')
+  })
+
+  it('migrates retired DeepSeek schedule and Claw models only for the built-in provider', () => {
+    const oldTask = { model: 'deepseek-v4-flash' } as never
+    const customTask = { model: 'custom-schedule-model' } as never
+    const officialSchedule = mergeScheduleSettings(defaultScheduleSettings(), {
+      model: 'deepseek-v4-pro',
+      tasks: [oldTask]
+    }, 'deepseek')
+    const customSchedule = mergeScheduleSettings(defaultScheduleSettings(), {
+      model: 'deepseek-v4-pro',
+      tasks: [oldTask, customTask]
+    }, 'custom-provider')
+    const oldChannel = { ...clawChannel('feishu', 'primary'), model: 'deepseek-v4-flash' as const }
+    const officialClaw = normalizeClawSettings({
+      im: { model: 'deepseek-v4-pro' },
+      channels: [oldChannel]
+    }, 'deepseek')
+    const customClaw = normalizeClawSettings({
+      im: { model: 'deepseek-v4-pro' },
+      channels: [oldChannel]
+    }, 'custom-provider')
+
+    expect(officialSchedule.model).toBe('deepseek-flash')
+    expect(officialSchedule.tasks[0].model).toBe('deepseek-flash')
+    expect(customSchedule.model).toBe('deepseek-v4-pro')
+    expect(customSchedule.tasks.map((task) => task.model)).toEqual([
+      'deepseek-v4-flash',
+      'custom-schedule-model'
+    ])
+    expect(officialClaw.im.model).toBe('deepseek-flash')
+    expect(officialClaw.channels[0].model).toBe('deepseek-flash')
+    expect(customClaw.im.model).toBe('deepseek-v4-pro')
+    expect(customClaw.channels[0].model).toBe('deepseek-v4-flash')
+    expect(scheduleModelOptionsForProvider('deepseek-v4-pro', 'deepseek'))
+      .toEqual(['auto', 'deepseek-flash'])
+    expect(scheduleModelOptionsForProvider('custom-schedule-model', 'custom-provider'))
+      .toEqual(['custom-schedule-model', 'auto', 'deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'])
+  })
+
   it('does not duplicate default Schedule MCP tool instructions in managed prompts', () => {
     const state = settings()
     state.claw.channels = [{

@@ -1,5 +1,5 @@
 import type { AppSettingsPatch, AppSettingsV1 } from '../shared/app-settings'
-import { mergeClawSettings } from '../shared/app-settings'
+import { getManagedRuntimeSettings, mergeClawSettings, mergeManagedRuntimeSettings } from '../shared/app-settings'
 import {
   type ImCredentialService,
   protectImChannelCredentials,
@@ -36,13 +36,21 @@ export async function applySettingsApplicationTransaction(
     try {
       saved = await input.store.patchPrepared(async (current) => {
         previous = current
+        const runtime = mergeManagedRuntimeSettings(
+          getManagedRuntimeSettings(current),
+          input.partial.agents?.kun
+        )
         return input.partial.claw?.channels && input.credentialService
           ? {
               ...input.partial,
               claw: {
                 ...input.partial.claw,
                 channels: await protectImChannelCredentials(
-                  mergeClawSettings(current.claw, input.partial.claw).channels,
+                  mergeClawSettings(
+                    current.claw,
+                    input.partial.claw,
+                    runtime.providerId || undefined
+                  ).channels,
                   input.credentialService,
                   {
                     requirePersistent: true,

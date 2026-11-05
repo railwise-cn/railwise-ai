@@ -40,6 +40,7 @@ export function normalizeAppSettings(settings: AppSettingsV1): AppSettingsV1 {
     guiUpdate?: Partial<GuiUpdateConfigV1>
   }
   const runtime = getManagedRuntimeSettings(maybeSettings)
+  const providerId = runtime.providerId || undefined
   return {
     ...migrated,
     schema: 'workwise.settings',
@@ -72,8 +73,8 @@ export function normalizeAppSettings(settings: AppSettingsV1): AppSettingsV1 {
     appBehavior: normalizeAppBehaviorSettings(maybeSettings.appBehavior),
     keyboardShortcuts: normalizeKeyboardShortcuts(maybeSettings.keyboardShortcuts),
     write: normalizeWriteSettings(maybeSettings.write),
-    claw: normalizeClawSettings(maybeSettings.claw),
-    schedule: normalizeScheduleSettings(maybeSettings.schedule),
+    claw: normalizeClawSettings(maybeSettings.claw, providerId),
+    schedule: normalizeScheduleSettings(maybeSettings.schedule, providerId),
     guiUpdate: {
       channel: normalizeGuiUpdateChannel(
         maybeSettings.guiUpdate?.channel ?? DEFAULT_GUI_UPDATE_CHANNEL

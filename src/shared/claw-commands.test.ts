@@ -9,7 +9,7 @@ describe('parseClawCommand', () => {
   })
 })
 
-it('selects the current Flash model while retaining the explicit legacy command', () => {
+it('parses current Flash and legacy model aliases for provider-aware migration', () => {
   expect(parseClawCommand('/model flash')).toEqual({ kind: 'model', model: 'deepseek-flash' })
   expect(parseClawCommand('/model deepseek-flash')).toEqual({ kind: 'model', model: 'deepseek-flash' })
   expect(parseClawCommand('/model deepseek-v4-flash')).toEqual({ kind: 'model', model: 'deepseek-v4-flash' })

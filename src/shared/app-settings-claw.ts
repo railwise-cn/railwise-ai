@@ -95,7 +95,7 @@ export function defaultClawSettings(): ClawSettingsV1 {
   }
 }
 
-export function normalizeClawSettings(input: ClawSettingsPatchV1 | undefined): ClawSettingsV1 {
+export function normalizeClawSettings(input: ClawSettingsPatchV1 | undefined, providerId?: string): ClawSettingsV1 {
   const defaults = defaultClawSettings()
   const source = input ?? {}
   const skills = source.skills ?? defaults.skills
@@ -132,7 +132,7 @@ export function normalizeClawSettings(input: ClawSettingsPatchV1 | undefined): C
         weixinBridgeUrl || legacyOpenClawGatewayUrl || defaults.im.weixinBridgeUrl
       ),
       workspaceRoot: typeof im.workspaceRoot === 'string' ? im.workspaceRoot.trim() : '',
-      model: typeof im.model === 'string' && im.model.trim() ? im.model.trim() : DEFAULT_CLAW_MODEL,
+      model: normalizeClawModel(im.model, providerId),
       mode: normalizeRunMode(im.mode),
       responseTimeoutMs: normalizePositiveInteger(im.responseTimeoutMs, defaults.im.responseTimeoutMs, 5_000, 600_000)
     },
@@ -151,7 +151,7 @@ export function normalizeClawSettings(input: ClawSettingsPatchV1 | undefined): C
             provider,
             label,
             enabled: normalizeBoolean(raw.enabled, true),
-            model: normalizeClawModel(raw.model),
+            model: normalizeClawModel(raw.model, providerId),
             threadId,
             workspaceRoot: typeof raw.workspaceRoot === 'string' ? raw.workspaceRoot.trim() : '',
             agentProfile: {
@@ -174,16 +174,17 @@ export function normalizeClawSettings(input: ClawSettingsPatchV1 | undefined): C
           }
         }),
     tasks: Array.isArray(source.tasks)
-      ? source.tasks.map((task, index) => normalizeScheduledTask(task as Partial<ClawTaskV1>, index, now))
+      ? source.tasks.map((task, index) => normalizeScheduledTask(task as Partial<ClawTaskV1>, index, now, providerId))
       : []
   }
 }
 
 export function mergeClawSettings(
   current: ClawSettingsV1,
-  patch: ClawSettingsPatchV1 | undefined
+  patch: ClawSettingsPatchV1 | undefined,
+  providerId?: string
 ): ClawSettingsV1 {
-  if (!patch) return normalizeClawSettings(current)
+  if (!patch) return normalizeClawSettings(current, providerId)
   return normalizeClawSettings({
     ...current,
     ...patch,
@@ -197,5 +198,5 @@ export function mergeClawSettings(
     },
     channels: patch.channels ?? current.channels,
     tasks: patch.tasks ?? current.tasks
-  })
+  }, providerId)
 }

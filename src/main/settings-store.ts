@@ -307,13 +307,16 @@ const defaultSettings = (workwiseHome: string): WorkWiseSettingsV2 => ({
 function buildMergedSettings(parsed: Partial<AppSettingsV1>, workwiseHome: string): WorkWiseSettingsV2 {
   const migrated = migrateLegacyAppSettings(parsed)
   const defaults = defaultSettings(workwiseHome)
+  const runtime = mergeManagedRuntimeSettings(
+    getManagedRuntimeSettings(defaults),
+    migrated.agents?.kun
+  )
+  const providerId = runtime.providerId || undefined
   return normalizeStoredSettings({
     ...defaults,
     ...migrated,
     provider: mergeModelProviderSettings(defaults.provider, migrated.provider),
-    agents: kunSettingsEnvelope(
-      mergeManagedRuntimeSettings(getManagedRuntimeSettings(defaults), migrated.agents?.kun)
-    ),
+    agents: kunSettingsEnvelope(runtime),
     log: { ...defaults.log, ...migrated.log },
     notifications: mergeNotificationSettings(defaults.notifications, migrated.notifications),
     appBehavior: normalizeAppBehaviorSettings({
@@ -322,8 +325,8 @@ function buildMergedSettings(parsed: Partial<AppSettingsV1>, workwiseHome: strin
     }),
     keyboardShortcuts: normalizeKeyboardShortcuts(migrated.keyboardShortcuts),
     write: mergeWriteSettings(defaults.write, migrated.write),
-    claw: mergeClawSettings(defaults.claw, migrated.claw),
-    schedule: mergeScheduleSettings(defaults.schedule, migrated.schedule),
+    claw: mergeClawSettings(defaults.claw, migrated.claw, providerId),
+    schedule: mergeScheduleSettings(defaults.schedule, migrated.schedule, providerId),
     guiUpdate: { ...defaults.guiUpdate, ...migrated.guiUpdate },
     conversation: { ...defaults.conversation, ...migrated.conversation },
     documents: {
@@ -581,6 +584,11 @@ export class JsonSettingsStore {
         documents: documentsPatch,
         ...restPatch
       } = partial
+      const runtime = mergeManagedRuntimeSettings(
+        getManagedRuntimeSettings(cur),
+        agentsPatch?.kun
+      )
+      const providerId = runtime.providerId || undefined
       const next = normalizeStoredSettings({
         ...applyManagedRuntimePatch(cur, agentsPatch?.kun),
         ...restPatch,
@@ -601,8 +609,8 @@ export class JsonSettingsStore {
           }
         }),
         write: mergeWriteSettings(cur.write, partial.write),
-        claw: mergeClawSettings(cur.claw, partial.claw),
-        schedule: mergeScheduleSettings(cur.schedule, partial.schedule),
+        claw: mergeClawSettings(cur.claw, partial.claw, providerId),
+        schedule: mergeScheduleSettings(cur.schedule, partial.schedule, providerId),
         guiUpdate: { ...cur.guiUpdate, ...(partial.guiUpdate ?? {}) },
         conversation: { ...cur.conversation, ...(conversationPatch ?? {}) },
         documents: {
