@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import type { ClawImChannelV1 } from '../shared/app-settings'
+import type { ClawImChannelV1, ScheduledTaskV1 } from '../shared/app-settings'
 import { ImCredentialService } from './services/im-credential-service'
 import { applySettingsApplicationTransaction } from './settings-application-transaction'
 import { JsonSettingsStore } from './settings-store'
@@ -59,7 +59,7 @@ describe('applySettingsApplicationTransaction', () => {
         storage: 'safe-storage'
       }
     })
-    const scheduledTask = (id: string, model: string) => ({
+    const scheduledTask = (id: string, model: string): ScheduledTaskV1 => ({
       id,
       title: id,
       enabled: true,
