@@ -8,9 +8,25 @@ import type { FlowWebhookSecurity } from './webhook-security.js'
 export class FlowRuntimeService {
   readonly executor: FlowExecutor
   private scheduleTimer?: ReturnType<typeof setInterval>
-  constructor(readonly repository: FlowRepository, readonly registry: FlowNodeRegistryEntryV1[], adapters: ConstructorParameters<typeof FlowExecutor>[1], nowIso?: () => string, readonly webhooks?: FlowWebhookSecurity) {
+  constructor(readonly repository: FlowRepository, readonly registry: FlowNodeRegistryEntryV1[], adapters: ConstructorParameters<typeof FlowExecutor>[1], nowIso?: () => string, readonly webhooks?: FlowWebhookSecurity, defaultModelProviderId = 'deepseek') {
     this.executor = new FlowExecutor(repository, adapters, nowIso)
     this.executor.reconcileStartup()
+    this.migrateRetiredLegacyScheduleModels(defaultModelProviderId)
+  }
+  private migrateRetiredLegacyScheduleModels(providerId: string): void {
+    if (providerId !== 'deepseek') return
+    const raw = this.repository.getMigration('schedule-to-flow-v1')
+    if (!raw || typeof raw !== 'object') return
+    const migration = raw as Partial<ScheduleMigrationRecord>
+    const tasks = Array.isArray(migration.compatibilityTasks) ? migration.compatibilityTasks : []
+    for (const task of tasks) {
+      if (task.model !== 'deepseek-v4-pro' && task.model !== 'deepseek-v4-flash') continue
+      this.updateLegacySchedule(task.id, {
+        ...task,
+        model: 'deepseek-flash',
+        updatedAt: new Date().toISOString()
+      })
+    }
   }
   list() { return this.repository.list() }
   get(id: string) { return this.repository.get(id) }

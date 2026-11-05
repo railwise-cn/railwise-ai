@@ -92,6 +92,7 @@ function createStore(initial: AppSettingsV1) {
       }
       return current
     }),
+    replace: (next: AppSettingsV1) => { current = next },
     read: () => current
   }
 }
@@ -659,5 +660,37 @@ describe('ScheduleRuntime', () => {
       ['/v1/legacy-schedules', 'GET'],
       ['/v1/legacy-schedules/task-1', 'PUT']
     ])
+  })
+
+  it('restores a legacy Flow model when the provider changes during migration', async () => {
+    const task = makeTask({ model: 'deepseek-v4-pro' }); let savedTask = task
+    let finishFirstUpdate!: () => void
+    let firstUpdateStarted!: () => void
+    const firstUpdateStartedPromise = new Promise<void>((resolve) => { firstUpdateStarted = resolve })
+    const firstUpdateGate = new Promise<void>((resolve) => { finishFirstUpdate = resolve })
+    let updateCount = 0
+    const runtimeRequest = vi.fn(async (_settings: AppSettingsV1, path: string, init: { method?: string; body?: string }) => {
+      if (path === '/v1/legacy-schedules' && init.method === 'GET') return { ok: true, status: 200, body: JSON.stringify({ tasks: [savedTask] }) }
+      if (init.method === 'PUT') {
+        updateCount += 1
+        const update = JSON.parse(init.body!) as ScheduledTaskV1
+        if (updateCount === 1) {
+          firstUpdateStarted()
+          await firstUpdateGate
+        }
+        savedTask = update
+        return { ok: true, status: 200, body: JSON.stringify({ task: savedTask }) }
+      }
+      return { ok: false, status: 404, body: 'not found' }
+    })
+    const { runtime, store } = createRuntime(settingsWith([task], { enabled: false }), runtimeRequest)
+    const listing = runtime.listTasks()
+    await firstUpdateStartedPromise
+    store.replace(settingsWith([task], { enabled: false }, 'custom-provider'))
+    finishFirstUpdate()
+
+    await expect(listing).resolves.toMatchObject([{ model: 'deepseek-v4-pro' }])
+    expect(updateCount).toBe(2)
+    expect(savedTask.model).toBe('deepseek-v4-pro')
   })
 })

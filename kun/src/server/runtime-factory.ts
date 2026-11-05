@@ -466,7 +466,8 @@ export async function createKunServeRuntime(
       }
     }),
     nowIso,
-    new FlowWebhookSecurity(flowRepository, flowSecretStore)
+    new FlowWebhookSecurity(flowRepository, flowSecretStore),
+    options.defaultModelProviderId
   )
   const memoryStore = options.capabilities?.memory.enabled
     ? new FileMemoryStore({

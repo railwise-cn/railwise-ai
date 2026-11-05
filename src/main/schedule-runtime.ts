@@ -305,22 +305,30 @@ export class ScheduleRuntime {
       const parsed = parseJsonObject(result.body)
       const tasks = Array.isArray(parsed?.tasks) ? parsed.tasks as ScheduledTaskV1[] : []
       for (let index = 0; index < tasks.length; index += 1) {
-        const task = tasks[index]
-        const writeSettings = await this.deps.store.load()
-        const writeProviderId = getManagedRuntimeSettings(writeSettings).providerId || undefined
-        const model = normalizeScheduleModelForProvider(task.model, writeProviderId)
-        if (model === task.model) continue
-        const migrated: ScheduledTaskV1 = { ...task, model, updatedAt: new Date().toISOString() }
-        const updated = await this.deps.runtimeRequest(
-          writeSettings,
-          `/v1/legacy-schedules/${encodeURIComponent(task.id)}`,
-          { method: 'PUT', body: JSON.stringify(migrated) }
-        )
-        if (!updated.ok) throw new Error(runtimeErrorMessage(updated, 'Failed to migrate a legacy schedule model.'))
-        const saved = parseJsonObject(updated.body)?.task
-        tasks[index] = saved && typeof saved === 'object' && !Array.isArray(saved)
-          ? saved as ScheduledTaskV1
-          : migrated
+        const originalTask = tasks[index]
+        let currentTask = originalTask
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const writeSettings = await this.deps.store.load()
+          const writeProviderId = getManagedRuntimeSettings(writeSettings).providerId || undefined
+          const model = normalizeScheduleModelForProvider(originalTask.model, writeProviderId)
+          if (model === currentTask.model) break
+          const migrated: ScheduledTaskV1 = { ...currentTask, model, updatedAt: new Date().toISOString() }
+          const updated = await this.deps.runtimeRequest(
+            writeSettings,
+            `/v1/legacy-schedules/${encodeURIComponent(originalTask.id)}`,
+            { method: 'PUT', body: JSON.stringify(migrated) }
+          )
+          if (!updated.ok) throw new Error(runtimeErrorMessage(updated, 'Failed to migrate a legacy schedule model.'))
+          const saved = parseJsonObject(updated.body)?.task
+          currentTask = saved && typeof saved === 'object' && !Array.isArray(saved)
+            ? saved as ScheduledTaskV1
+            : migrated
+          const latestSettings = await this.deps.store.load()
+          const latestProviderId = getManagedRuntimeSettings(latestSettings).providerId || undefined
+          if (latestProviderId === writeProviderId) break
+          if (attempt === 2) throw new Error('Provider changed repeatedly while migrating a legacy schedule model.')
+        }
+        tasks[index] = currentTask
       }
       return tasks
     })
