@@ -148,24 +148,33 @@ describe('Flow repository and executor', () => {
       undefined,
       'custom-provider'
     )
-    const task = {
-      id: 'scheduled-model', title: 'Legacy model', enabled: true, prompt: 'Run', workspaceRoot: '/workspace',
-      model: 'deepseek-v4-pro', reasoningEffort: 'medium', mode: 'agent',
+    const task = (id: string, model: string) => ({
+      id, title: 'Legacy model', enabled: true, prompt: 'Run', workspaceRoot: '/workspace',
+      model, reasoningEffort: 'medium', mode: 'agent',
       schedule: { kind: 'daily', everyMinutes: 60, timeOfDay: '09:00', atTime: '' },
       createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
       lastRunAt: '', nextRunAt: '2026-01-01T00:00:00.000Z', lastStatus: 'idle', lastMessage: '', lastThreadId: ''
-    }
-    customProviderService.migrateLegacySchedules([task])
-    expect(customProviderService.listLegacySchedules()[0]?.model).toBe('deepseek-v4-pro')
+    })
+    const tasks = [
+      task('scheduled-model', 'deepseek-v4-pro'),
+      task('scheduled-chat-alias', 'deepseek-chat'),
+      task('scheduled-reasoner-alias', 'deepseek-reasoner')
+    ]
+    customProviderService.migrateLegacySchedules(tasks)
+    expect(customProviderService.listLegacySchedules().map((item) => item.model))
+      .toEqual(['deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner'])
     customProviderService.shutdown()
 
     repository = new FlowRepository(path)
     const builtInProviderService = new FlowRuntimeService(repository, buildFlowNodeRegistry(), buildCoreFlowAdapters())
-    expect(builtInProviderService.listLegacySchedules()[0]?.model).toBe('deepseek-flash')
-    expect(builtInProviderService.get('flow_schedule_scheduled-model')?.nodes.find((item) => item.id === 'agent')?.config.model)
-      .toBe('deepseek-flash')
+    expect(builtInProviderService.listLegacySchedules().map((item) => item.model))
+      .toEqual(['deepseek-flash', 'deepseek-flash', 'deepseek-flash'])
+    for (const item of tasks) {
+      expect(builtInProviderService.get(`flow_schedule_${item.id}`)?.nodes.find((node) => node.id === 'agent')?.config.model)
+        .toBe('deepseek-flash')
+    }
     expect((repository.getMigration('schedule-to-flow-v1') as { readOnlyBackup: Array<{ model: string }> }).readOnlyBackup)
-      .toMatchObject([{ model: 'deepseek-v4-pro' }])
+      .toMatchObject([{ model: 'deepseek-v4-pro' }, { model: 'deepseek-chat' }, { model: 'deepseek-reasoner' }])
     builtInProviderService.shutdown()
   })
   it('reconciles crashed runs and blocks restart recovery for non-resumable nodes', async () => {

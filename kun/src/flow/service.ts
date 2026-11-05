@@ -20,7 +20,7 @@ export class FlowRuntimeService {
     const migration = raw as Partial<ScheduleMigrationRecord>
     const tasks = Array.isArray(migration.compatibilityTasks) ? migration.compatibilityTasks : []
     for (const task of tasks) {
-      if (task.model !== 'deepseek-v4-pro' && task.model !== 'deepseek-v4-flash') continue
+      if (!isRetiredBuiltInDeepSeekModel(task.model)) continue
       this.updateLegacySchedule(task.id, {
         ...task,
         model: 'deepseek-flash',
@@ -128,6 +128,10 @@ export type LegacyScheduledTaskInput = {
   id: string; title: string; enabled: boolean; prompt: string; workspaceRoot: string; model: string; reasoningEffort: string; mode: string
   schedule: { kind: string; everyMinutes: number; timeOfDay: string; atTime: string }
   createdAt: string; updatedAt: string; lastRunAt: string; nextRunAt: string; lastStatus: string; lastMessage: string; lastThreadId: string
+}
+function isRetiredBuiltInDeepSeekModel(model: string): boolean {
+  const normalized = model.trim().toLowerCase()
+  return normalized === 'deepseek-chat' || normalized === 'deepseek-reasoner' || normalized.startsWith('deepseek-v4-')
 }
 type ScheduleMigrationRecord = { version: 1; migratedAt: string; mappings: Array<{ taskId: string; flowId: string }>; compatibilityTasks: LegacyScheduledTaskInput[]; readOnlyBackup: LegacyScheduledTaskInput[]; archivedMappings: Array<{ taskId: string; flowId: string }> }
 
