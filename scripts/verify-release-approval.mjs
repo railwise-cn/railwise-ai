@@ -18,6 +18,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { PUBLIC_IDENTITY, validateReviewedBuild, verifyReviewedBuildSource } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, validateUpdaterEvidenceRun, verifyRemoteUpdaterEvidence } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
+import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS } from './frozen-release-version.mjs'
 
 const ROOT = process.cwd()
 
@@ -132,21 +133,19 @@ function requireFrozenUpdaterEvidence(evidence, reviewedBuild, packageIdentity, 
   equal(machine.status, 'passed', 'machine status')
   equal(machine.platform, 'darwin', 'machine platform')
   if (!['arm64', 'x64'].includes(machine.arch)) fail('updater evidence must identify a supported native macOS architecture')
-  equal(machine.baseVersion, '0.5.2', 'official baseline version')
+  equal(machine.baseVersion, FROZEN_BASE_VERSION, 'official baseline version')
   equal(machine.targetVersion, version, 'frozen target version')
   for (const key of ['productionTouched', 'systemTrustModified', 'officialFeedsModified', 'publicReleasePerformed']) equal(machine[key], false, key)
   if (machine.failure) fail('updater evidence retains an acceptance or cleanup failure')
   equal(machine.reviewedBuild, reviewedBuild, 'reviewed build run, attempt, source and artifacts')
 
-  const baselinePin = machine.arch === 'arm64'
-    ? { name: 'WorkWise-0.5.2-mac-Apple-Silicon.dmg', size: 301766076, sha256: '09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0', assetId: 612608487 }
-    : { name: 'WorkWise-0.5.2-mac-Intel.dmg', size: 306711696, sha256: '8368322a563871e00e6e9ac99b661bf0ee120a20d48f8ebd3e105209cdba20d4', assetId: 612608490 }
-  equal(machine.baselineAsset, { tag: 'v0.5.2', ...baselinePin }, 'pinned official installer')
+  const baselinePin = FROZEN_BASELINE_PINS[machine.arch]
+  equal(machine.baselineAsset, { tag: `v${FROZEN_BASE_VERSION}`, ...baselinePin }, 'pinned official installer')
   const zip = reviewedBuild.files.find(file => file.name === `WorkWise-${version}-mac-${machine.arch}.zip`)
   const manifest = reviewedBuild.files.find(file => file.name === 'latest-mac.yml')
   equal(machine.targetZipSha256, zip?.sha256, 'exact frozen updater ZIP')
   equal(machine.frozenManifestSha256, manifest?.sha256, 'exact frozen update manifest')
-  for (const [name, expectedVersion] of [['baselineIdentity', '0.5.2'], ['targetIdentity', version], ['installedIdentity', version]]) {
+  for (const [name, expectedVersion] of [['baselineIdentity', FROZEN_BASE_VERSION], ['targetIdentity', version], ['installedIdentity', version]]) {
     const identity = machine[name]
     equal(identity?.version, expectedVersion, `${name} version`)
     equal(identity?.bundleId, PUBLIC_IDENTITY.bundleId, `${name} public identity`)
@@ -185,12 +184,12 @@ function requireFrozenUpdaterEvidence(evidence, reviewedBuild, packageIdentity, 
   equal(native.status, 'passed', 'native status')
   equal(native.platform, machine.platform, 'native platform')
   equal(native.arch, machine.arch, 'native architecture')
-  equal(native.baseVersion, '0.5.2', 'native official baseline')
+  equal(native.baseVersion, FROZEN_BASE_VERSION, 'native official baseline')
   equal(native.targetVersion, version, 'native frozen target')
   equal(native.browserOpened, false, 'native path without browser fallback')
   equal(native.userDataPreserved, true, 'native user-data preservation')
   equal(native.stages?.map(stage => stage.name), ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved'], 'complete native stages')
-  equal(native.stages.at(-1).detail, '0.5.2', 'strict historical nonce proof')
+  equal(native.stages.at(-1).detail, FROZEN_BASE_VERSION, 'strict historical nonce proof')
   if (native.failure) fail('native updater evidence retains a failure')
   equal(reportSha256(nativeBytes), machine.nativeReportSha256, 'retained native report digest')
   const run = validateUpdaterEvidenceRun(evidence.workflowRun, machine, reviewedBuild.sourceHead, version)

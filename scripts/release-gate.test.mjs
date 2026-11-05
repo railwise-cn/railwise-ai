@@ -9,6 +9,7 @@ import { parse } from 'yaml'
 import { verifyReleaseApproval } from './verify-release-approval.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF } from './verify-frozen-updater-evidence.mjs'
+import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS } from './frozen-release-version.mjs'
 // Keep the existing npm run test:release-gate entry point covering byte/provenance gates.
 import './verify-reviewed-release-artifacts.test.mjs'
 import './verify-frozen-updater-evidence.test.mjs'
@@ -29,7 +30,7 @@ const websiteWorkflowSource = readFileSync(new URL('../.github/workflows/deploy-
 const websiteWorkflow = parse(websiteWorkflowSource)
 const verifierPath = fileURLToPath(new URL('./verify-release-approval.mjs', import.meta.url))
 
-function releaseFixture(t, packageVersion = '0.5.3', version = '0.5.3') {
+function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4') {
   const root = mkdtempSync(join(tmpdir(), 'railwise-release-gate-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
@@ -80,7 +81,7 @@ function releaseFixture(t, packageVersion = '0.5.3', version = '0.5.3') {
   // These synthetic unit reports mirror the existing runner schema. They are
   // temporary fixtures only and must never be copied into release evidence.
   const identity = version => ({ version, bundleId: PUBLIC_IDENTITY.bundleId, signature: 'verified', stapledNotarization: 'verified', gatekeeper: 'accepted', gatekeeperAssessments: 'enabled', gatekeeperSource: 'Notarized Developer ID', designatedRequirement: 'designated => synthetic-unit-fixture' })
-  const serviceIdentity = seed => ({ schemaVersion: 1, packageVersion: seed ? '0.5.2' : version, packageSourceHead: seed ? null : reviewedSourceHead,
+  const serviceIdentity = seed => ({ schemaVersion: 1, packageVersion: seed ? FROZEN_BASE_VERSION : version, packageSourceHead: seed ? null : reviewedSourceHead,
     serviceSourceHead: reviewedSourceHead, asarSha256: (seed ? 'f' : 'e').repeat(64), layout: seed ? 'source-compatibility' : 'asar-unpacked',
     serviceTreeSha256: 'a'.repeat(64),
     modules: ['engineering-service', 'survey-service'].map(name => ({ path: `dist/engineering/${name}.js`, sha256: 'b'.repeat(64) })),
@@ -91,13 +92,13 @@ function releaseFixture(t, packageVersion = '0.5.3', version = '0.5.3') {
   const data = mode => ({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: 'd'.repeat(64),
     serviceSource: mode === 'seed' ? 'source-bound-compatibility-service' : 'target-package', serviceIdentity: serviceIdentity(mode === 'seed') })
   const machineReport = {
-    schemaVersion: 1, status: 'passed', baseVersion: '0.5.2', targetVersion: version, platform: 'darwin', arch: 'arm64',
+    schemaVersion: 1, status: 'passed', baseVersion: FROZEN_BASE_VERSION, targetVersion: version, platform: 'darwin', arch: 'arm64',
     productionTouched: false, systemTrustModified: false, officialFeedsModified: false, publicReleasePerformed: false,
     reviewedBuild: structuredClone(manifest.package.reviewedBuild),
     provenance: { repository: RELEASE_REPOSITORY, workflowPath: UPDATER_WORKFLOW, workflowRef: UPDATER_WORKFLOW_REF, workflowSha: reviewedSourceHead,
       sourceHead: reviewedSourceHead, runId: 4321, runAttempt: 1 },
-    baselineAsset: { tag: 'v0.5.2', name: 'WorkWise-0.5.2-mac-Apple-Silicon.dmg', size: 301766076, sha256: '09dae4a270bbf06fb3fc79771eef3faa2afaba43eea9e6696762fa7ba5cf99e0', assetId: 612608487 },
-    baselineIdentity: identity('0.5.2'), targetIdentity: identity(version), installedIdentity: identity(version),
+    baselineAsset: { tag: `v${FROZEN_BASE_VERSION}`, ...FROZEN_BASELINE_PINS.arm64 },
+    baselineIdentity: identity(FROZEN_BASE_VERSION), targetIdentity: identity(version), installedIdentity: identity(version),
     targetZipSha256: 'a'.repeat(64), frozenManifestSha256: 'a'.repeat(64), targetAsarSha256: 'e'.repeat(64), installedAsarSha256: 'e'.repeat(64),
     targetServiceIdentity: serviceIdentity(false),
     strictNonceProbe: { strictProbeRequired: true, nonceSha256: 'f'.repeat(64) }, separateSentinelPreserved: true,
@@ -106,8 +107,8 @@ function releaseFixture(t, packageVersion = '0.5.3', version = '0.5.3') {
     steps: [{ operation: 'real-native-update-and-historical-readback', status: 'completed' }, { operation: 'owned-resource-cleanup', status: 'completed' }],
   }
   const nativeReport = {
-    schemaVersion: 1, status: 'passed', baseVersion: '0.5.2', targetVersion: version, platform: 'darwin', arch: 'arm64', browserOpened: false, userDataPreserved: true,
-    stages: ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved'].map(name => ({ name, detail: name === 'user_data_preserved' ? '0.5.2' : 'synthetic unit fixture' })),
+    schemaVersion: 1, status: 'passed', baseVersion: FROZEN_BASE_VERSION, targetVersion: version, platform: 'darwin', arch: 'arm64', browserOpened: false, userDataPreserved: true,
+    stages: ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved'].map(name => ({ name, detail: name === 'user_data_preserved' ? FROZEN_BASE_VERSION : 'synthetic unit fixture' })),
   }
   const recordEvidence = () => {
     machineReport.nativeReportSha256 = reportSha256(Buffer.from(JSON.stringify(nativeReport)))
@@ -380,7 +381,7 @@ test('the committed updater reports require a matching immutable trusted workflo
 test('updater reports must bind the real official baseline, frozen bytes and completed native path', async t => {
   const changes = {
     oldSameSourceProbe: f => { f.machineReport.baseVersion = '0.0.0' },
-    differentTarget: f => { f.machineReport.targetVersion = '0.5.4' },
+    differentTarget: f => { f.machineReport.targetVersion = '0.5.3' },
     differentBuildRun: f => { f.machineReport.reviewedBuild.runId += 1 },
     differentBuildAttempt: f => { f.machineReport.reviewedBuild.runAttempt += 1 },
     differentSource: f => { f.machineReport.reviewedBuild.sourceHead = 'b'.repeat(40) },
@@ -408,7 +409,7 @@ test('updater reports must bind the real official baseline, frozen bytes and com
     incompleteCleanup: f => { f.machineReport.steps.pop() },
     retainedMachineFailure: f => { f.machineReport.failure = 'Cleanup failed' },
     nativeBaselineWrong: f => { f.nativeReport.baseVersion = '0.0.0' },
-    nativeTargetWrong: f => { f.nativeReport.targetVersion = '0.5.4' },
+    nativeTargetWrong: f => { f.nativeReport.targetVersion = '0.5.3' },
     nativeArchWrong: f => { f.nativeReport.arch = 'x64' },
     browserFallback: f => { f.nativeReport.browserOpened = true },
     userDataLost: f => { f.nativeReport.userDataPreserved = false },
@@ -470,7 +471,7 @@ test('prose or uncommitted substitutions cannot replace tagged native machine re
     f.git('reset', '--', f.manifest.acceptance.updaterRoundTrip.nativeReportPath)
     f.git('commit', '-m', 'missing native machine evidence')
     const head = f.git('rev-parse', 'HEAD')
-    f.git('tag', 'v0.5.3', head)
+    f.git('tag', 'v0.5.4', head)
     f.verify(head, /regular file committed in the exact release tag/)
   })
 })
@@ -496,7 +497,7 @@ test('runtime, build, config and non-QA documentation changes require fresh pack
   for (const path of ['src/runtime.js', 'scripts/package.cjs', 'electron-builder.cjs', 'package.json', '.github/workflows/release.yml', 'docs/qa-lookalike.md', 'docs/reference.md']) {
     await t.test(path, st => {
       const f = releaseFixture(st)
-      f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.3', extra: true }) : 'unreviewed change\n')
+      f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.4', extra: true }) : 'unreviewed change\n')
       f.commit('change after acceptance')
       f.recordEvidence()
       f.verify(f.tagRelease(), /changes after the reviewed package must be limited to docs\/qa evidence/)
@@ -567,7 +568,7 @@ test('merging only acceptance evidence is allowed after the reviewed source', t 
   f.commit('record main evidence')
   f.git('merge', '--no-ff', 'extra-evidence', '-m', 'merge acceptance evidence')
   f.recordEvidence()
-  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.3/)
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.4/)
 })
 
 test('staged evidence and reports absent from the exact tag are rejected', t => {
@@ -578,7 +579,7 @@ test('staged evidence and reports absent from the exact tag are rejected', t => 
   f.git('reset', '--', report)
   f.git('commit', '-m', 'incomplete acceptance evidence')
   const releaseHead = f.git('rev-parse', 'HEAD')
-  f.git('tag', 'v0.5.3', releaseHead)
+  f.git('tag', 'v0.5.4', releaseHead)
   f.git('add', report)
   f.verify(releaseHead, /regular file committed in the exact release tag/)
 })
@@ -603,11 +604,11 @@ test('uncommitted edits cannot replace the tagged manifest', t => {
 })
 
 test('uncommitted edits cannot replace the tagged package version', t => {
-  const f = releaseFixture(t, '0.5.2')
+  const f = releaseFixture(t, '0.5.3')
   f.recordEvidence()
   const releaseHead = f.tagRelease()
-  f.put('package.json', JSON.stringify({ version: '0.5.3' }))
-  f.verify(releaseHead, /package\.json version 0\.5\.2 does not match v0\.5\.3/)
+  f.put('package.json', JSON.stringify({ version: '0.5.4' }))
+  f.verify(releaseHead, /package\.json version 0\.5\.3 does not match v0\.5\.4/)
 })
 
 test('evidence paths reject line breaks before writing workflow outputs', t => {

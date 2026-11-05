@@ -7,10 +7,12 @@ import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { githubApi, RELEASE_REPOSITORY } from './verify-reviewed-release-artifacts.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
+import { FROZEN_BASE_VERSION } from './frozen-release-version.mjs'
 
 export const UPDATER_WORKFLOW = '.github/workflows/frozen-release-updater-acceptance.yml'
 export const UPDATER_WORKFLOW_REF = `${RELEASE_REPOSITORY}/${UPDATER_WORKFLOW}@refs/heads/main`
-const JOB = 'Official 0.5.2 to exact frozen public package native updater'
+export const UPDATER_JOB = `Official ${FROZEN_BASE_VERSION} to exact frozen public package native updater`
+const JOB = UPDATER_JOB
 const RUN_STEP = 'Run default-trust HTTPS download, Squirrel install and historical data readback'
 const RETAIN_STEP = 'Retain durable updater evidence including failures'
 const MAX_ARCHIVE = 20 * 1024 * 1024

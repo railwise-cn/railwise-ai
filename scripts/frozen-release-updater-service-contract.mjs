@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util'
-import { validateFrozenTargetVersion } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 const MODULE_PATHS = ['dist/engineering/engineering-service.js', 'dist/engineering/survey-service.js']
 const REQUIRED_DEPENDENCIES = ['better-sqlite3', 'better-sqlite3-native', 'jszip', 'pdfkit', 'zod']
@@ -62,7 +62,7 @@ export function validateUpdaterServiceEvidence(machine, { sourceHead, version } 
   object(machine, 'machine report')
   sha(sourceHead, 'frozen source', 40)
   if (!['arm64', 'x64'].includes(machine.arch)) fail('machine report must identify a supported native macOS architecture')
-  equal(machine.baseVersion, '0.5.2', 'official baseline version')
+  equal(machine.baseVersion, FROZEN_BASE_VERSION, 'official baseline version')
   equal(machine.targetVersion, version, 'frozen target version')
   sha(machine.targetAsarSha256, 'frozen target ASAR')
   equal(machine.installedAsarSha256, machine.targetAsarSha256, 'installed/frozen ASAR')
@@ -86,7 +86,7 @@ export function validateUpdaterServiceEvidence(machine, { sourceHead, version } 
   object(seed, 'dataSeed')
   if (!['baseline-package', 'source-bound-compatibility-service'].includes(seed.serviceSource)) fail('dataSeed must identify baseline or explicitly source-bound compatibility services')
   validateIdentity(seed.serviceIdentity, 'dataSeed service identity')
-  equal(seed.serviceIdentity.packageVersion, '0.5.2', 'dataSeed package version')
+  equal(seed.serviceIdentity.packageVersion, FROZEN_BASE_VERSION, 'dataSeed package version')
   if (seed.serviceSource === 'source-bound-compatibility-service') {
     equal(seed.serviceIdentity.layout, 'source-compatibility', 'dataSeed compatibility layout')
     equal(seed.serviceIdentity.serviceSourceHead, sourceHead, 'dataSeed compatibility source')

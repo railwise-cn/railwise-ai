@@ -13,7 +13,7 @@ import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './fr
 import { assertHistoricalRowsPreserved, assertRetainedFiles, fixtureServiceIdentity, persistedJsonValue, prepareCompatibilityService, resolveFixtureService, SERVICE_MODULES, snapshotFiles, validateFixtureExecution } from './frozen-release-updater-data.mjs'
 import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
-import { readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 function temporary(t) { const root = mkdtempSync(join(tmpdir(), 'railwise-frozen-updater-test-')); t.after(() => rmSync(root, { recursive: true, force: true })); return root }
 function hostedEnvironment() {
@@ -21,7 +21,7 @@ function hostedEnvironment() {
     GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/frozen-release-updater-acceptance.yml@refs/heads/main`,
     GITHUB_REF: 'refs/heads/main', GITHUB_SHA: 'a'.repeat(40), GITHUB_WORKFLOW_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' }
 }
-function fixture(t, version = '0.5.3') {
+function fixture(t, version = '0.5.4') {
   const root = temporary(t); const zipPath = join(root, `WorkWise-${version}-mac-arm64.zip`); const manifestPath = join(root, 'latest-mac.yml')
   const bytes = Buffer.from('test-only HTTP transport bytes, not a signed application or native updater test')
   writeFileSync(zipPath, bytes)
@@ -119,28 +119,28 @@ test('JSON snapshot equality ignores only non-persisted undefined properties whi
 test('fixture execution binds the real selected executable, target version and frozen source', t => {
   const root = temporary(t); const app = join(root, 'Unit fixture.app'); const executable = join(app, 'Contents/MacOS/RailWise AI')
   mkdirSync(join(app, 'Contents/MacOS'), { recursive: true }); writeFileSync(executable, 'unit fixture executable')
-  const head = 'a'.repeat(40); const metadata = { version: '0.5.3', buildProvenance: { sourceHead: head } }
-  assert.doesNotThrow(() => validateFixtureExecution(app, executable, metadata, 'verify', head, '0.5.3'))
+  const head = 'a'.repeat(40); const metadata = { version: '0.5.4', buildProvenance: { sourceHead: head } }
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, metadata, 'verify', head, '0.5.4'))
   const other = join(root, 'Other executable'); writeFileSync(other, 'unit fixture executable')
-  assert.throws(() => validateFixtureExecution(app, other, metadata, 'verify', head, '0.5.3'), /selected packaged/)
-  assert.throws(() => validateFixtureExecution(app, executable, { ...metadata, version: '0.5.2' }, 'verify', head, '0.5.3'), /version/)
-  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', 'b'.repeat(40), '0.5.3'), /source/)
-  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', undefined, '0.5.3'), /frozen source/)
-  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: '0.5.2' }, 'seed', head, '0.5.3'))
+  assert.throws(() => validateFixtureExecution(app, other, metadata, 'verify', head, '0.5.4'), /selected packaged/)
+  assert.throws(() => validateFixtureExecution(app, executable, { ...metadata, version: FROZEN_BASE_VERSION }, 'verify', head, '0.5.4'), /version/)
+  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', 'b'.repeat(40), '0.5.4'), /source/)
+  assert.throws(() => validateFixtureExecution(app, executable, metadata, 'verify', undefined, '0.5.4'), /frozen source/)
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: FROZEN_BASE_VERSION }, 'seed', head, '0.5.4'))
   const next = { ...metadata, version: '0.5.4' }
   for (const mode of ['verify', 'inspect']) {
     assert.doesNotThrow(() => validateFixtureExecution(app, executable, next, mode, head, '0.5.4'))
-    assert.throws(() => validateFixtureExecution(app, executable, metadata, mode, head, '0.5.4'), /version/)
-    assert.throws(() => validateFixtureExecution(app, executable, next, mode, head, '0.5.3'), /version/)
+    assert.throws(() => validateFixtureExecution(app, executable, { ...metadata, version: FROZEN_BASE_VERSION }, mode, head, '0.5.4'), /version/)
+    assert.throws(() => validateFixtureExecution(app, executable, next, mode, head, '0.5.3'), /newer than the official baseline/)
   }
-  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: '0.5.2' }, 'seed', head, '0.5.4'))
+  assert.doesNotThrow(() => validateFixtureExecution(app, executable, { version: FROZEN_BASE_VERSION }, 'seed', head, '0.5.4'))
   assert.throws(() => validateFixtureExecution(app, executable, next, 'verify', head), /explicit stable/)
 })
 
 test('service identity fails closed when a dependency is missing or resolves outside the bundle', t => {
   const app = join(temporary(t), 'Unit fixture.app'); const root = serviceLayout(app, 'asar-unpacked')
   const selection = resolveFixtureService({ app, mode: 'verify' })
-  const options = { app, selection, metadata: { version: '0.5.3', buildProvenance: { sourceHead: 'a'.repeat(40) } }, sourceHead: 'a'.repeat(40) }
+  const options = { app, selection, metadata: { version: '0.5.4', buildProvenance: { sourceHead: 'a'.repeat(40) } }, sourceHead: 'a'.repeat(40) }
   assert.throws(() => fixtureServiceIdentity(options), /outside its selected package|Cannot find module/)
   const external = temporary(t); mkdirSync(join(external, 'lib'), { recursive: true })
   writeFileSync(join(external, 'package.json'), JSON.stringify({ main: 'lib/index.js' })); writeFileSync(join(external, 'lib/index.js'), 'module.exports = {}')
@@ -158,7 +158,7 @@ test('package identity covers transitive service files and both ESM and CJS depe
   }
   const native = join(root, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node')
   mkdirSync(join(native, '..'), { recursive: true }); writeFileSync(native, 'unit-only fake native bytes; not executable')
-  const options = { app, selection: resolveFixtureService({ app, mode: 'verify' }), metadata: { version: '0.5.3', buildProvenance: { sourceHead: 'a'.repeat(40) } }, sourceHead: 'a'.repeat(40), diskRead: () => Buffer.from('unit-only fake archive bytes') }
+  const options = { app, selection: resolveFixtureService({ app, mode: 'verify' }), metadata: { version: '0.5.4', buildProvenance: { sourceHead: 'a'.repeat(40) } }, sourceHead: 'a'.repeat(40), diskRead: () => Buffer.from('unit-only fake archive bytes') }
   const before = fixtureServiceIdentity(options)
   const zod = before.dependencies.find(item => item.name === 'zod')
   assert.match(zod.path, /zod\/package\.json$/)
@@ -213,22 +213,22 @@ test('existing public, legacy, runtime or updater profiles block acceptance with
 
 test('the exact signed public package identity is preserved across the upgrade', () => {
   const head = 'a'.repeat(40)
-  const info = { CFBundleIdentifier: PUBLIC_IDENTITY.bundleId, CFBundleExecutable: PUBLIC_IDENTITY.productName, CFBundleShortVersionString: '0.5.3' }
-  const metadata = { name: 'workwise', productName: 'RailWise AI', version: '0.5.3', buildHints: { macSigningEnabled: true, notarizationEnabled: true }, buildProvenance: { sourceHead: head }, updateChannel: 'stable' }
+  const info = { CFBundleIdentifier: PUBLIC_IDENTITY.bundleId, CFBundleExecutable: PUBLIC_IDENTITY.productName, CFBundleShortVersionString: '0.5.4' }
+  const metadata = { name: 'workwise', productName: 'RailWise AI', version: '0.5.4', buildHints: { macSigningEnabled: true, notarizationEnabled: true }, buildProvenance: { sourceHead: head }, updateChannel: 'stable' }
   const updater = { provider: 'generic', url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', updaterCacheDirName: 'workwise-updater' }
-  assert.doesNotThrow(() => validatePublicBundle(info, metadata, updater, '0.5.3', head))
-  for (const patch of [{ CFBundleIdentifier: PUBLIC_IDENTITY.bundleId + '.candidate' }, { CFBundleExecutable: 'RailWise AI Candidate' }, { CFBundleShortVersionString: '0.5.2' }]) assert.throws(() => validatePublicBundle({ ...info, ...patch }, metadata, updater, '0.5.3', head))
-  for (const patch of [{ name: 'workwise-private' }, { productName: 'WorkWise' }, { buildProvenance: { sourceHead: 'b'.repeat(40) } }, { buildHints: { macSigningEnabled: false, notarizationEnabled: true } }, { updateChannel: 'frontier' }]) assert.throws(() => validatePublicBundle(info, { ...metadata, ...patch }, updater, '0.5.3', head))
-  for (const patch of [{ url: 'https://127.0.0.1/' }, { updaterCacheDirName: 'candidate-cache' }, { provider: 'github' }]) assert.throws(() => validatePublicBundle(info, metadata, { ...updater, ...patch }, '0.5.3', head))
+  assert.doesNotThrow(() => validatePublicBundle(info, metadata, updater, '0.5.4', head))
+  for (const patch of [{ CFBundleIdentifier: PUBLIC_IDENTITY.bundleId + '.candidate' }, { CFBundleExecutable: 'RailWise AI Candidate' }, { CFBundleShortVersionString: FROZEN_BASE_VERSION }]) assert.throws(() => validatePublicBundle({ ...info, ...patch }, metadata, updater, '0.5.4', head))
+  for (const patch of [{ name: 'workwise-private' }, { productName: 'WorkWise' }, { buildProvenance: { sourceHead: 'b'.repeat(40) } }, { buildHints: { macSigningEnabled: false, notarizationEnabled: true } }, { updateChannel: 'frontier' }]) assert.throws(() => validatePublicBundle(info, { ...metadata, ...patch }, updater, '0.5.4', head))
+  for (const patch of [{ url: 'https://127.0.0.1/' }, { updaterCacheDirName: 'candidate-cache' }, { provider: 'github' }]) assert.throws(() => validatePublicBundle(info, metadata, { ...updater, ...patch }, '0.5.4', head))
 })
 
-test('reviewed build inputs require immutable artifact IDs/digests and the exact 0.5.3 file set', () => {
+test('reviewed build inputs require immutable artifact IDs/digests and the exact 0.5.4 file set', () => {
   const head = 'a'.repeat(40)
   const build = { repository: RELEASE_REPOSITORY, workflowPath: '.github/workflows/release.yml', sourceHead: head, runId: 123, runAttempt: 1, publicIdentity: PUBLIC_IDENTITY,
-    artifacts: [{ name: 'release-mac', id: 321, digest: `sha256:${'b'.repeat(64)}` }, { name: 'release-win', id: 322, digest: `sha256:${'c'.repeat(64)}` }], files: expectedReleaseFiles('0.5.3').map(file => ({ ...file, size: 1, sha256: 'd'.repeat(64) })) }
-  assert.doesNotThrow(() => validateReviewedBuild(build, { version: '0.5.3', sourceHead: head }))
-  for (const modify of [b => { b.artifacts[0].id = -1 }, b => { delete b.artifacts[0].digest }, b => { b.files[0].name = 'WorkWise-0.5.2-mac-arm64.dmg' }, b => { b.workflowPath = '.github/workflows/attacker.yml' }]) {
-    const copy = structuredClone(build); modify(copy); assert.throws(() => validateReviewedBuild(copy, { version: '0.5.3', sourceHead: head }))
+    artifacts: [{ name: 'release-mac', id: 321, digest: `sha256:${'b'.repeat(64)}` }, { name: 'release-win', id: 322, digest: `sha256:${'c'.repeat(64)}` }], files: expectedReleaseFiles('0.5.4').map(file => ({ ...file, size: 1, sha256: 'd'.repeat(64) })) }
+  assert.doesNotThrow(() => validateReviewedBuild(build, { version: '0.5.4', sourceHead: head }))
+  for (const modify of [b => { b.artifacts[0].id = -1 }, b => { delete b.artifacts[0].digest }, b => { b.files[0].name = 'WorkWise-0.5.3-mac-arm64.dmg' }, b => { b.workflowPath = '.github/workflows/attacker.yml' }]) {
+    const copy = structuredClone(build); modify(copy); assert.throws(() => validateReviewedBuild(copy, { version: '0.5.4', sourceHead: head }))
   }
 })
 
@@ -250,9 +250,10 @@ test('0.5.4 reviewed bytes and native public identity bind to an independently e
   assert.throws(() => validateReviewedBuild(build, { version: sourceVersion, sourceHead: head }))
 })
 
-test('stable targets retain the pinned historical baseline and reject ambiguous versions', () => {
-  for (const version of ['0.5.3', '0.5.4', '0.6.0', '1.0.0']) assert.equal(validateFrozenTargetVersion(version), version)
-  for (const version of [undefined, null, 504, '', '0.5.2', '0.5.1', '0.0.0', '00.5.4', '0.05.4', '0.5.04', 'v0.5.4', '0.5.4-beta.1', '0.5.4+build', '0.5.4\n', '9007199254740992.0.0']) {
+test('stable targets must advance from the latest published baseline and reject ambiguous versions', () => {
+  assert.equal(FROZEN_BASE_VERSION, '0.5.3')
+  for (const version of ['0.5.4', '0.6.0', '1.0.0']) assert.equal(validateFrozenTargetVersion(version), version)
+  for (const version of [undefined, null, 504, '', '0.5.3', '0.5.2', '0.5.1', '0.0.0', '00.5.4', '0.05.4', '0.5.04', 'v0.5.4', '0.5.4-beta.1', '0.5.4+build', '0.5.4\n', '9007199254740992.0.0']) {
     assert.throws(() => validateFrozenTargetVersion(version))
   }
   assert.equal(readFrozenSourceVersion(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version)
@@ -292,7 +293,7 @@ test('0.5.4 frozen feed serves the exact target bytes and refuses a different ma
   assert.equal((await request(url + 'WorkWise-0.5.3-mac-arm64.zip')).status, 404)
   f.manifest.version = '0.5.3'; f.save()
   await assert.rejects(validateFrozenFeed(f.options), /manifest version/)
-  await assert.rejects(validateFrozenFeed({ ...f.options, version: '0.5.3' }), /filename/)
+  await assert.rejects(validateFrozenFeed({ ...f.options, version: '0.5.3' }), /newer than the official baseline/)
 })
 
 test('frozen feed rejects wrong versions, duplicate assets, hash/size changes and links', async t => {
@@ -531,12 +532,12 @@ test('native evidence retention rejects unreadable or linked reports before crea
 
 test('native round trip requires the real six stages and strict nonce verification', () => {
   const names = ['base_started', 'update_available', 'download_completed', 'install_requested', 'target_relaunched', 'user_data_preserved']
-  const report = { schemaVersion: 1, status: 'passed', platform: 'darwin', arch: 'arm64', baseVersion: '0.5.2', targetVersion: '0.5.3', browserOpened: false, userDataPreserved: true, stages: names.map(name => ({ name, detail: name === 'user_data_preserved' ? '0.5.2' : undefined })) }
-  assert.doesNotThrow(() => validateNativeReport(report, 'arm64', '0.5.3'))
-  for (const patch of [{ status: 'failed' }, { baseVersion: '0.0.0' }, { browserOpened: true }, { userDataPreserved: false }, { stages: report.stages.slice(1) }, { stages: report.stages.map(s => s.name === 'user_data_preserved' ? { ...s, detail: 'legacy-state:0.5.2' } : s) }]) assert.throws(() => validateNativeReport({ ...report, ...patch }, 'arm64', '0.5.3'))
+  const report = { schemaVersion: 1, status: 'passed', platform: 'darwin', arch: 'arm64', baseVersion: FROZEN_BASE_VERSION, targetVersion: '0.5.4', browserOpened: false, userDataPreserved: true, stages: names.map(name => ({ name, detail: name === 'user_data_preserved' ? FROZEN_BASE_VERSION : undefined })) }
+  assert.doesNotThrow(() => validateNativeReport(report, 'arm64', '0.5.4'))
+  for (const patch of [{ status: 'failed' }, { baseVersion: '0.5.2' }, { browserOpened: true }, { userDataPreserved: false }, { stages: report.stages.slice(1) }, { stages: report.stages.map(s => s.name === 'user_data_preserved' ? { ...s, detail: 'legacy-state:0.5.3' } : s) }]) assert.throws(() => validateNativeReport({ ...report, ...patch }, 'arm64', '0.5.4'))
   const next = { ...report, targetVersion: '0.5.4' }
   assert.doesNotThrow(() => validateNativeReport(next, 'arm64', '0.5.4'))
-  assert.throws(() => validateNativeReport(report, 'arm64', '0.5.4'), /target/)
+  assert.throws(() => validateNativeReport(report, 'arm64', '0.5.3'), /target/)
   assert.throws(() => validateNativeReport(next, 'arm64', '0.5.3'), /target/)
   assert.throws(() => validateNativeReport(next, 'arm64'), /explicit stable/)
 })

@@ -5,16 +5,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { RELEASE_REPOSITORY } from './verify-reviewed-release-artifacts.mjs'
-import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF, validateUpdaterEvidenceRun, verifyUpdaterEvidenceArchive, verifyUpdaterEvidenceSource } from './verify-frozen-updater-evidence.mjs'
+import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS } from './frozen-release-version.mjs'
+import { reportSha256, UPDATER_JOB, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF, validateUpdaterEvidenceRun, verifyUpdaterEvidenceArchive, verifyUpdaterEvidenceSource } from './verify-frozen-updater-evidence.mjs'
 import { validateUpdaterServiceEvidence } from './frozen-release-updater-service-contract.mjs'
 
 // Synthetic contract fixtures only; these are never package acceptance records.
-function serviceIdentity(sourceHead, { version = '0.5.3', layout = 'asar-unpacked', asarSha256 = 'e'.repeat(64) } = {}) {
+function serviceIdentity(sourceHead, { version = '0.5.4', layout = 'asar-unpacked', asarSha256 = 'e'.repeat(64) } = {}) {
   const compatibility = layout === 'source-compatibility'
   const dependencyRoot = compatibility ? 'node_modules' : `app.${layout === 'asar' ? 'asar' : 'asar.unpacked'}/kun/node_modules`
   return {
-    schemaVersion: 1, packageVersion: version, packageSourceHead: version === '0.5.2' ? null : sourceHead, asarSha256, layout,
-    serviceSourceHead: compatibility || version !== '0.5.2' ? sourceHead : null,
+    schemaVersion: 1, packageVersion: version, packageSourceHead: version === FROZEN_BASE_VERSION ? null : sourceHead, asarSha256, layout,
+    serviceSourceHead: compatibility || version !== FROZEN_BASE_VERSION ? sourceHead : null,
     serviceTreeSha256: 'a'.repeat(64),
     modules: ['engineering-service', 'survey-service'].map(name => ({ path: `dist/engineering/${name}.js`, sha256: 'b'.repeat(64) })),
     dependencies: ['better-sqlite3', 'better-sqlite3-native', 'jszip', 'pdfkit', 'zod'].map(name => ({ name,
@@ -23,16 +24,16 @@ function serviceIdentity(sourceHead, { version = '0.5.3', layout = 'asar-unpacke
   }
 }
 
-function serviceEvidence(sourceHead, version = '0.5.3') {
+function serviceEvidence(sourceHead, version = '0.5.4') {
   const target = serviceIdentity(sourceHead, { version })
-  return { baseVersion: '0.5.2', targetVersion: version, targetAsarSha256: target.asarSha256, installedAsarSha256: target.asarSha256,
+  return { baseVersion: FROZEN_BASE_VERSION, targetVersion: version, targetAsarSha256: target.asarSha256, installedAsarSha256: target.asarSha256,
     targetServiceIdentity: target,
-    dataSeed: { serviceSource: 'source-bound-compatibility-service', serviceIdentity: serviceIdentity(sourceHead, { version: '0.5.2', layout: 'source-compatibility', asarSha256: 'f'.repeat(64) }) },
+    dataSeed: { serviceSource: 'source-bound-compatibility-service', serviceIdentity: serviceIdentity(sourceHead, { version: FROZEN_BASE_VERSION, layout: 'source-compatibility', asarSha256: 'f'.repeat(64) }) },
     dataReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) },
     dataRestartReadback: { serviceSource: 'target-package', serviceIdentity: structuredClone(target) } }
 }
 
-function fixture(t, version = '0.5.3') {
+function fixture(t, version = '0.5.4') {
   const sourceHead = 'a'.repeat(40)
   const run = { repository: RELEASE_REPOSITORY, workflowPath: UPDATER_WORKFLOW, sourceHead, runId: 4321, runAttempt: 2,
     artifact: { id: 91, name: 'frozen-updater-arm64-4321', digest: `sha256:${'b'.repeat(64)}` } }
@@ -41,7 +42,7 @@ function fixture(t, version = '0.5.3') {
     workflowRef: UPDATER_WORKFLOW_REF, workflowSha: sourceHead, sourceHead, runId: run.runId, runAttempt: run.runAttempt } }
   const machineBytes = Buffer.from(JSON.stringify(machine) + '\n')
   const root = `repos/${RELEASE_REPOSITORY}`
-  const job = { name: 'Official 0.5.2 to exact frozen public package native updater', conclusion: 'success', steps: [
+  const job = { name: UPDATER_JOB, conclusion: 'success', steps: [
     { name: 'Run default-trust HTTPS download, Squirrel install and historical data readback', conclusion: 'success' },
     { name: 'Retain durable updater evidence including failures', conclusion: 'success' },
   ] }
@@ -80,11 +81,23 @@ function fixture(t, version = '0.5.3') {
 
 test('updater report provenance binds the exact freeze, run and retained native bytes', t => {
   const f = fixture(t)
-  assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), f.run)
+  assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), f.run)
   assert.equal(verifyUpdaterEvidenceSource(f.run, f.api), f.run)
   assert.equal(Object.hasOwn(f.actual, 'workflow_ref'), false)
   assert.equal(Object.hasOwn(f.artifact.workflow_run, 'run_attempt'), false)
   verifyUpdaterEvidenceArchive({ ...f, archive: f.archive() })
+})
+
+test('updater evidence pins the published 0.5.3 baseline assets for each native architecture', () => {
+  assert.equal(FROZEN_BASE_VERSION, '0.5.3')
+  assert.deepEqual(FROZEN_BASELINE_PINS.arm64, {
+    name: 'WorkWise-0.5.3-mac-Apple-Silicon.dmg', size: 301352326,
+    sha256: '6b12d991bee1853f93ab13e37aee8cf9759ea17642252bf7e11fa11ea0b37c6e', assetId: 630646810,
+  })
+  assert.deepEqual(FROZEN_BASELINE_PINS.x64, {
+    name: 'WorkWise-0.5.3-mac-Intel.dmg', size: 306907651,
+    sha256: '59613948518d9622d21063bff98aba2d78714d797f773b353bea313995975560', assetId: 630646813,
+  })
 })
 
 test('0.5.4 native provenance requires the independently expected manifest target', t => {
@@ -92,7 +105,7 @@ test('0.5.4 native provenance requires the independently expected manifest targe
   assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), f.run)
   assert.equal(verifyUpdaterEvidenceSource(f.run, f.api), f.run)
   verifyUpdaterEvidenceArchive({ ...f, archive: f.archive() })
-  assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /target version mismatch/)
+  assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.5'), /target version mismatch/)
   assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead), /explicit stable/)
   assert.throws(() => validateUpdaterServiceEvidence(f.machine, { sourceHead: f.sourceHead }), /explicit stable/)
   // Coherent older target identities and readbacks cannot choose the expected
@@ -179,24 +192,24 @@ test('successful workflow jobs can span multiple API pages', t => {
 test('both real native architectures use their exact report architecture in the artifact name', t => {
   for (const arch of ['arm64', 'x64']) {
     const f = fixture(t); f.machine.arch = arch; f.run.artifact.name = `frozen-updater-${arch}-${f.run.runId}`
-    assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), f.run)
+    assert.equal(validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), f.run)
     f.run.artifact.name = `frozen-updater-${arch === 'arm64' ? 'x64' : 'arm64'}-${f.run.runId}`
-    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /artifact name mismatch/)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), /artifact name mismatch/)
   }
   for (const arch of [undefined, 'ARM64', 'x86', 'unsupported']) {
     const f = fixture(t); f.machine.arch = arch; f.run.artifact.name = `frozen-updater-${arch}-${f.run.runId}`
-    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /supported native macOS architecture/)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), /supported native macOS architecture/)
   }
 })
 
 test('packaged service contracts support both layouts and explicitly labeled baseline compatibility', () => {
   const sourceHead = 'a'.repeat(40)
-  for (const version of ['0.5.3', '0.5.4']) for (const layout of ['asar-unpacked', 'asar']) {
+  for (const version of ['0.5.4']) for (const layout of ['asar-unpacked', 'asar']) {
     const machine = { ...serviceEvidence(sourceHead, version), arch: 'arm64' }
     machine.targetServiceIdentity = serviceIdentity(sourceHead, { layout, version })
     for (const key of ['dataReadback', 'dataRestartReadback']) machine[key].serviceIdentity = structuredClone(machine.targetServiceIdentity)
     assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead, version }), machine)
-    machine.dataSeed = { serviceSource: 'baseline-package', serviceIdentity: serviceIdentity(sourceHead, { version: '0.5.2', layout }) }
+    machine.dataSeed = { serviceSource: 'baseline-package', serviceIdentity: serviceIdentity(sourceHead, { version: FROZEN_BASE_VERSION, layout }) }
     assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead, version }), machine)
     machine.dataSeed.serviceIdentity.packageSourceHead = 'd'.repeat(40)
     machine.dataSeed.serviceIdentity.serviceSourceHead = 'd'.repeat(40)
@@ -232,7 +245,7 @@ test('source fallback, unbound or changed services and unsafe dependency identit
     dependencyOutsidePackage: f => { f.machine.targetServiceIdentity.dependencies[0].path = 'node_modules/better-sqlite3/lib/index.js' },
     dependencyWrongPackage: f => { f.machine.targetServiceIdentity.dependencies[0].path = 'app.asar/kun/node_modules/another-package/index.js' },
     dependencyNotNative: f => { f.machine.targetServiceIdentity.dependencies[1].path = 'app.asar.unpacked/node_modules/better-sqlite3/index.js' },
-    wrongSeedVersion: f => { f.machine.dataSeed.serviceIdentity.packageVersion = '0.5.3' },
+    wrongSeedVersion: f => { f.machine.dataSeed.serviceIdentity.packageVersion = '0.5.2' },
     wrongSeedSource: f => { f.machine.dataSeed.serviceIdentity.serviceSourceHead = 'd'.repeat(40) },
     unboundSeedSource: f => { f.machine.dataSeed.serviceIdentity.serviceSourceHead = null },
     mislabeledSeed: f => { f.machine.dataSeed.serviceSource = 'baseline-package' },
@@ -247,6 +260,6 @@ test('source fallback, unbound or changed services and unsafe dependency identit
   }
   for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
     const f = fixture(st); change(f)
-    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.3'), /updater-service/)
+    assert.throws(() => validateUpdaterEvidenceRun(f.run, f.machine, f.sourceHead, '0.5.4'), /updater-service/)
   })
 })

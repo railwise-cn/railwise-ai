@@ -249,7 +249,7 @@ report, a passing status string, or an unrelated successful run fails this gate.
    package gate.
 5. Dispatch `frozen-release-updater-acceptance.yml` on protected main
    with the exact `reviewedBuild` JSON as its `reviewed_build` input. It consumes
-   the frozen target ZIP and official pinned 0.5.2 baseline through a temporary
+   the frozen target ZIP and official pinned 0.5.3 baseline through a temporary
    default-trust HTTPS feed, performs the native updater install/restart and
    verifies historical-data readback. The target version comes from the trusted
    checked-out source `package.json`; the publication verifier independently
