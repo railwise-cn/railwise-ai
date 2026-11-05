@@ -54,8 +54,10 @@ export function canPersistSettingsWithPort(settings: AppSettingsV1, patch: Setti
 export function mergeSettings(current: AppSettingsV1, patch: SettingsPatch): WorkWiseSettingsV2 {
   const safeCurrent = coerceRendererSettings(current)
   const { agents: agentsPatch, provider: providerPatch, ...restPatch } = patch
+  const runtime = applyManagedRuntimePatch(safeCurrent, agentsPatch?.kun)
+  const providerId = getManagedRuntimeSettings(runtime).providerId || undefined
   return {
-    ...applyManagedRuntimePatch(safeCurrent, agentsPatch?.kun),
+    ...runtime,
     ...restPatch,
     schema: 'workwise.settings',
     version: 2,
@@ -77,8 +79,8 @@ export function mergeSettings(current: AppSettingsV1, patch: SettingsPatch): Wor
       }
     }),
     write: mergeWriteSettings(safeCurrent.write, patch.write),
-    claw: mergeClawSettings(safeCurrent.claw, patch.claw),
-    schedule: mergeScheduleSettings(safeCurrent.schedule, patch.schedule),
+    claw: mergeClawSettings(safeCurrent.claw, patch.claw, providerId),
+    schedule: mergeScheduleSettings(safeCurrent.schedule, patch.schedule, providerId),
     guiUpdate: {
       ...safeCurrent.guiUpdate,
       ...(patch.guiUpdate ?? {})
@@ -129,6 +131,8 @@ export function hasSettingsPatch(patch: AppSettingsPatch): boolean {
 
 export function coerceRendererSettings(settings: AppSettingsV1): WorkWiseSettingsV2 {
   const raw = settings as RendererSettingsShape
+  const runtime = getManagedRuntimeSettings(settings)
+  const providerId = runtime.providerId || undefined
   const theme =
     raw.theme === 'system' || raw.theme === 'light' || raw.theme === 'dark'
       ? raw.theme
@@ -148,7 +152,7 @@ export function coerceRendererSettings(settings: AppSettingsV1): WorkWiseSetting
     theme,
     uiFontScale,
     provider: normalizeModelProviderSettings(raw.provider),
-    agents: kunSettingsEnvelope(mergeManagedRuntimeSettings(defaultManagedRuntimeSettings(), getManagedRuntimeSettings(settings))),
+    agents: kunSettingsEnvelope(mergeManagedRuntimeSettings(defaultManagedRuntimeSettings(), runtime)),
     workspaceRoot: typeof raw.workspaceRoot === 'string' ? raw.workspaceRoot : DEFAULT_WORKSPACE_ROOT,
     log: {
       enabled: raw.log?.enabled !== false,
@@ -161,8 +165,8 @@ export function coerceRendererSettings(settings: AppSettingsV1): WorkWiseSetting
     appBehavior: normalizeAppBehaviorSettings(raw.appBehavior),
     keyboardShortcuts: normalizeKeyboardShortcuts(raw.keyboardShortcuts),
     write: normalizeWriteSettings(raw.write),
-    claw: normalizeClawSettings(raw.claw),
-    schedule: normalizeScheduleSettings(raw.schedule),
+    claw: normalizeClawSettings(raw.claw, providerId),
+    schedule: normalizeScheduleSettings(raw.schedule, providerId),
     guiUpdate: {
       channel: normalizeGuiUpdateChannel(raw.guiUpdate?.channel ?? DEFAULT_GUI_UPDATE_CHANNEL)
     },

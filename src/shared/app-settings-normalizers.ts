@@ -8,6 +8,7 @@ import {
   type ScheduleReasoningEffort,
   type ScheduleTaskStatus
 } from './app-settings-types'
+import { normalizeComposerModelForProvider } from './default-composer-models'
 
 export function normalizeDeepseekBaseUrl(baseUrl: string | null | undefined): string {
   const trimmed = typeof baseUrl === 'string' ? baseUrl.trim() : ''
@@ -46,12 +47,15 @@ export function normalizeImProvider(value: unknown): ClawImProvider {
   return value === 'weixin' ? 'weixin' : 'feishu'
 }
 
-export function normalizeClawModel(value: unknown): ClawModel {
-  return value === 'deepseek-flash' || value === 'deepseek-v4-pro' || value === 'deepseek-v4-flash' ? value : 'auto'
+export function normalizeClawModel(value: unknown, providerId?: string): ClawModel {
+  if (value !== 'auto' && value !== 'deepseek-flash' && value !== 'deepseek-v4-pro' && value !== 'deepseek-v4-flash') {
+    return 'auto'
+  }
+  return normalizeComposerModelForProvider(value, providerId) as ClawModel
 }
 
-export function normalizeScheduleModel(value: unknown): ScheduleModel {
-  return normalizeClawModel(value)
+export function normalizeScheduleModel(value: unknown, providerId?: string): ScheduleModel {
+  return normalizeClawModel(value, providerId)
 }
 
 export function normalizeScheduleReasoningEffort(value: unknown): ScheduleReasoningEffort {

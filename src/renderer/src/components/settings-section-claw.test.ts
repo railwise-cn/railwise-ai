@@ -144,6 +144,27 @@ describe('ClawSettingsSection', () => {
     expect(html).not.toContain('<option value="deepseek-v4-pro"')
   })
 
+  it('keeps legacy-looking model ids visible for a custom provider', () => {
+    const form = buildSettings()
+    form.agents.kun.providerId = 'custom-provider'
+    const html = renderToStaticMarkup(
+      createElement(ClawSettingsSection, {
+        ctx: {
+          t,
+          form,
+          update: vi.fn(),
+          selectControlClass: 'select-control',
+          pickClawWorkspace: async () => undefined,
+          resetClawWorkspaceToDefault: () => undefined,
+          clawWorkspacePickerError: null
+        }
+      })
+    )
+
+    expect(html).toContain('<option value="deepseek-v4-pro"')
+    expect(html).toContain('<option value="deepseek-v4-flash"')
+  })
+
   it('labels a WeChat phone agent as WeChat instead of Feishu / Lark', () => {
     const html = renderToStaticMarkup(
       createElement(ClawSettingsSection, {

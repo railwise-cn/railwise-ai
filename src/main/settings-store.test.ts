@@ -224,6 +224,39 @@ describe('JsonSettingsStore', () => {
     expect(await readFile(join(loaded.write.defaultWorkspaceRoot, 'welcome.md'), 'utf8')).toContain('Welcome to Write')
   })
 
+  it('migrates saved scheduled and Claw models only for the built-in DeepSeek provider', async () => {
+    const loadSettings = async (providerId: string) => {
+      const userDataDir = await mkdtemp(join(tmpdir(), 'workwise-settings-model-migration-'))
+      await writeFile(join(userDataDir, 'workwise-settings.json'), JSON.stringify({
+        schema: 'workwise.settings',
+        version: 2,
+        revision: 0,
+        agents: { kun: { providerId } },
+        schedule: {
+          model: 'deepseek-v4-pro',
+          tasks: [{ model: 'deepseek-v4-flash' }]
+        },
+        claw: {
+          im: { model: 'deepseek-v4-pro' },
+          channels: [{ id: 'channel-1', provider: 'feishu', model: 'deepseek-v4-flash' }]
+        }
+      }), 'utf8')
+      return new JsonSettingsStore(userDataDir, { workwiseHome: join(userDataDir, '.workwise') }).load()
+    }
+
+    const official = await loadSettings('deepseek')
+    expect(official.schedule.model).toBe('deepseek-flash')
+    expect(official.schedule.tasks[0].model).toBe('deepseek-flash')
+    expect(official.claw.im.model).toBe('deepseek-flash')
+    expect(official.claw.channels[0].model).toBe('deepseek-flash')
+
+    const custom = await loadSettings('custom-provider')
+    expect(custom.schedule.model).toBe('deepseek-v4-pro')
+    expect(custom.schedule.tasks[0].model).toBe('deepseek-v4-flash')
+    expect(custom.claw.im.model).toBe('deepseek-v4-pro')
+    expect(custom.claw.channels[0].model).toBe('deepseek-v4-flash')
+  })
+
   it('localizes the default welcome document for a Chinese first launch', async () => {
     const userDataDir = await mkdtemp(join(tmpdir(), 'workwise-settings-zh-welcome-'))
     const writeRoot = join(userDataDir, 'write')

@@ -59,7 +59,7 @@ The final candidate passed the full two-hour stability gate and all three client
 
 ## DeepSeek V4.1
 
-The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`; automatic mode uses the same model for every task and adjusts thinking effort. Existing explicit model selections remain unchanged. Version 0.5.1 includes the automatic-routing and fallback fixes while preserving explicit saved model choices.
+The default model is DeepSeek V4.1-Flash, using the official ID `deepseek-flash`; automatic mode uses the same model for every task and adjusts thinking effort. Retired selections in scheduled tasks and Claw IM migrate to the current Flash model for the built-in DeepSeek provider; custom-provider model IDs remain unchanged.
 
 On September 20, 2026, real official-service calls through the product adapter passed conversation, JSON output, declared function-name/argument return and synthetic-image recognition checks. The function check did not execute a tool. These checks do not replace acceptance of the complete packaged AI conversation, approval, tool and vision workflows.
 

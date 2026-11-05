@@ -1,4 +1,4 @@
-import { mkdtemp, readdir } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -44,6 +44,65 @@ function feishuChannel(
 }
 
 describe('applySettingsApplicationTransaction', () => {
+  it('normalizes saved schedule models when switching providers and protects channel credentials', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'workwise-settings-provider-switch-'))
+    const userData = join(root, 'user-data')
+    const store = new JsonSettingsStore(userData, {
+      workwiseHome: join(root, 'home', '.workwise')
+    })
+    const service = new ImCredentialService({
+      root: join(root, 'credentials'),
+      encryption: {
+        available: () => true,
+        encrypt: (value) => Buffer.from(value, 'utf8'),
+        decrypt: (value) => value.toString('utf8'),
+        storage: 'safe-storage'
+      }
+    })
+    const scheduledTask = (id: string, model: string) => ({
+      id,
+      title: id,
+      enabled: true,
+      prompt: 'Run task',
+      workspaceRoot: '/tmp/workspace',
+      model,
+      reasoningEffort: 'medium',
+      mode: 'agent',
+      schedule: { kind: 'manual' as const, everyMinutes: 60, timeOfDay: '09:00', atTime: '' },
+      createdAt: '2026-08-21T00:00:00.000Z',
+      updatedAt: '2026-08-21T00:00:00.000Z',
+      lastRunAt: '',
+      nextRunAt: '',
+      lastStatus: 'idle' as const,
+      lastMessage: '',
+      lastThreadId: ''
+    })
+    await store.patch({
+      agents: { kun: { providerId: 'custom-provider' } },
+      schedule: {
+        model: 'deepseek-v4-pro',
+        tasks: [scheduledTask('retired', 'deepseek-v4-flash'), scheduledTask('custom', 'custom-model')]
+      }
+    })
+
+    const saved = await applySettingsApplicationTransaction({
+      store,
+      credentialService: service,
+      partial: {
+        agents: { kun: { providerId: '' } },
+        claw: { channels: [feishuChannel(undefined, 'provider-switch-secret')] }
+      }
+    })
+
+    expect(saved.schedule.model).toBe('deepseek-flash')
+    expect(saved.schedule.tasks.map((task) => task.model)).toEqual(['deepseek-flash', 'custom-model'])
+    const channel = saved.claw.channels[0]!
+    expect(channel.platformCredential).not.toHaveProperty('appSecret')
+    await expect(service.resolve(channel.credentialRef!)).resolves.toBe('provider-switch-secret')
+    const persistedSettings = await readFile(join(userData, 'workwise-settings.json'), 'utf8')
+    expect(persistedSettings).not.toContain('provider-switch-secret')
+  })
+
   it('keeps the committed replacement when old credential cleanup reports an error', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-settings-cleanup-failure-'))
     const store = new JsonSettingsStore(join(root, 'user-data'), {

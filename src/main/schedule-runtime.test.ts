@@ -8,6 +8,7 @@ import {
   defaultModelProviderSettings,
   defaultScheduleSettings,
   defaultWriteSettings,
+  getManagedRuntimeSettings,
   mergeScheduleSettings,
   type AppSettingsPatch,
   type AppSettingsV1,
@@ -46,7 +47,8 @@ function makeTask(patch: Partial<ScheduledTaskV1> = {}): ScheduledTaskV1 {
 
 function settingsWith(
   tasks: ScheduledTaskV1[] = [],
-  schedulePatch: AppSettingsPatch['schedule'] = {}
+  schedulePatch: AppSettingsPatch['schedule'] = {},
+  providerId = ''
 ): AppSettingsV1 {
   return {
     version: 1,
@@ -55,10 +57,7 @@ function settingsWith(
     uiFontScale: 'small',
     provider: defaultModelProviderSettings(),
     agents: {
-      kun: {
-        ...defaultManagedRuntimeSettings(),
-        apiKey: 'test-key'
-      }
+      kun: { ...defaultManagedRuntimeSettings(), apiKey: 'test-key', providerId }
     },
     workspaceRoot: '/tmp/workspace',
     log: { enabled: true, retentionDays: 7 },
@@ -71,7 +70,7 @@ function settingsWith(
       enabled: true,
       tasks,
       ...schedulePatch
-    }),
+    }, providerId || undefined),
     guiUpdate: { channel: 'stable' },
     codePromptPrefix: ''
   }
@@ -84,7 +83,11 @@ function createStore(initial: AppSettingsV1) {
     patch: vi.fn(async (partial: AppSettingsPatch) => {
       current = {
         ...current,
-        schedule: mergeScheduleSettings(current.schedule, partial.schedule),
+        schedule: mergeScheduleSettings(
+          current.schedule,
+          partial.schedule,
+          getManagedRuntimeSettings(current).providerId || undefined
+        ),
         claw: current.claw
       }
       return current
@@ -215,7 +218,7 @@ describe('ScheduleRuntime', () => {
     expect(store.read().schedule.tasks[0]).toMatchObject({
       title: 'Ship review reminder',
       workspaceRoot: '/tmp/schedule',
-      model: 'deepseek-v4-flash',
+      model: 'deepseek-flash',
       mode: 'plan',
       schedule: { kind: 'at', atTime: future }
     })
@@ -223,7 +226,9 @@ describe('ScheduleRuntime', () => {
   })
 
   it('starts a WorkWise Runtime thread with a Schedule title and records running status', async () => {
-    const task = makeTask({ reasoningEffort: 'max' })
+    const task = makeTask({ reasoningEffort: 'max', model: 'deepseek-v4-pro' })
+    const initial = settingsWith([task])
+    initial.schedule.tasks[0].model = 'deepseek-v4-pro'
     const runtimeRequest = vi.fn(async (_settings, path, init) => {
       if (path === '/v1/threads') {
         return { ok: true, status: 200, body: JSON.stringify({ id: 'thr_1' }) }
@@ -236,7 +241,7 @@ describe('ScheduleRuntime', () => {
       }
       throw new Error(`unexpected path ${path}`)
     })
-    const { runtime, store } = createRuntime(settingsWith([task]), runtimeRequest)
+    const { runtime, store } = createRuntime(initial, runtimeRequest)
     ;(runtime as unknown as { monitorTaskTurn: () => void }).monitorTaskTurn = vi.fn()
 
     await expect(runtime.runTask(task.id)).resolves.toMatchObject({
@@ -254,11 +259,11 @@ describe('ScheduleRuntime', () => {
     expect(JSON.parse(String(createRequest))).toMatchObject({
       title: '[Scheduled task] Task',
       workspace: '/tmp/workspace',
-      model: 'auto',
+      model: 'deepseek-flash',
       mode: 'agent'
     })
     expect(JSON.parse(String(turnRequest))).toMatchObject({
-      model: 'auto',
+      model: 'deepseek-flash',
       reasoningEffort: 'max',
       // Headless turn: a user_input request would hang until timeout.
       disableUserInput: true
@@ -268,6 +273,26 @@ describe('ScheduleRuntime', () => {
       lastThreadId: 'thr_1',
       lastMessage: 'Started'
     })
+  })
+
+  it('keeps an explicit model id when a custom provider runs a scheduled task', async () => {
+    const task = makeTask({ model: 'deepseek-v4-pro' })
+    const initial = settingsWith([task], {}, 'custom-provider')
+    const { runtime } = createRuntime(initial)
+    const runPrompt = vi.spyOn(runtime as unknown as {
+      runPrompt: (settings: AppSettingsV1, options: Record<string, unknown>) => Promise<{
+        ok: boolean
+        threadId: string
+        turnId: string
+      }>
+    }, 'runPrompt').mockResolvedValue({ ok: true, threadId: 'thr_custom', turnId: 'turn_custom' })
+    ;(runtime as unknown as { monitorTaskTurn: () => void }).monitorTaskTurn = vi.fn()
+
+    await expect(runtime.runTask(task.id)).resolves.toMatchObject({ ok: true, threadId: 'thr_custom' })
+    expect(runPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ agents: expect.any(Object) }),
+      expect.objectContaining({ model: 'deepseek-v4-pro' })
+    )
   })
 
   it('reads assistant text from the real WorkWise Runtime thread detail shape', async () => {
@@ -573,9 +598,11 @@ describe('ScheduleRuntime', () => {
     expect(powerSaveBlocker.stop).toHaveBeenCalledWith(1)
   })
 
-  it('forwards legacy schedule CRUD and manual runs to migrated Flow APIs', async () => {
-    const task = makeTask(); let tasks = [task]
+  it('migrates legacy Flow schedule models before listing or running them', async () => {
+    const task = makeTask({ model: 'deepseek-v4-pro' }); let tasks = [task]
+    const calls: string[] = []
     const runtimeRequest = vi.fn(async (_settings: AppSettingsV1, path: string, init: { method?: string; body?: string }) => {
+      calls.push(`${init.method} ${path}`)
       if (path === '/v1/legacy-schedules' && init.method === 'GET') return { ok: true, status: 200, body: JSON.stringify({ tasks }) }
       if (path === '/v1/legacy-schedules' && init.method === 'POST') { const created = JSON.parse(init.body!) as ScheduledTaskV1; tasks.push(created); return { ok: true, status: 201, body: JSON.stringify({ task: created }) } }
       if (path.endsWith('/run')) return { ok: true, status: 202, body: JSON.stringify({ run: { id: 'flow-run-1' } }) }
@@ -584,12 +611,53 @@ describe('ScheduleRuntime', () => {
       return { ok: false, status: 404, body: 'not found' }
     })
     const { runtime, store } = createRuntime(settingsWith([task], { enabled: false }), runtimeRequest)
-    expect(await runtime.listTasks()).toEqual([task]); expect(await runtime.runTask(task.id)).toMatchObject({ ok: true, threadId: 'flow-run-1' })
-    expect((await runtime.updateTaskById(task.id, { title: 'Updated' }))?.title).toBe('Updated')
-    const created = makeTask({ id: 'task-2' }); expect((await runtime.createTask(created)).id).toBe('task-2')
+    expect(await runtime.listTasks()).toMatchObject([{ id: task.id, model: 'deepseek-flash' }])
+    expect(await runtime.runTask(task.id)).toMatchObject({ ok: true, threadId: 'flow-run-1' })
+    expect(calls.indexOf('PUT /v1/legacy-schedules/task-1'))
+      .toBeLessThan(calls.indexOf('POST /v1/legacy-schedules/task-1/run'))
+    const updated = await runtime.updateTaskById(task.id, { title: 'Updated', model: 'deepseek-v4-pro' })
+    expect(updated).toMatchObject({ title: 'Updated', model: 'deepseek-flash' })
+    const updateBody = runtimeRequest.mock.calls.find((call) => call[2].method === 'PUT')?.[2].body
+    expect(JSON.parse(String(updateBody)).model).toBe('deepseek-flash')
+    const created = makeTask({ id: 'task-2', model: 'deepseek-v4-pro' })
+    expect((await runtime.createTask(created)).model).toBe('deepseek-flash')
     expect(await runtime.deleteTaskById(task.id)).toBe(true); expect(store.patch).not.toHaveBeenCalled()
     expect(runtimeRequest.mock.calls.map((call) => [call[1], call[2].method])).toEqual(expect.arrayContaining([
       ['/v1/legacy-schedules', 'GET'], ['/v1/legacy-schedules', 'POST'], ['/v1/legacy-schedules/task-1/run', 'POST'], ['/v1/legacy-schedules/task-1', 'PUT'], ['/v1/legacy-schedules/task-1', 'DELETE']
     ]))
+  })
+
+  it('preserves legacy Flow model ids for a custom provider', async () => {
+    const task = makeTask({ model: 'deepseek-v4-pro' }); let tasks = [task]
+    const runtimeRequest = vi.fn(async (_settings: AppSettingsV1, path: string, init: { method?: string }) => {
+      if (path === '/v1/legacy-schedules' && init.method === 'GET') return { ok: true, status: 200, body: JSON.stringify({ tasks }) }
+      if (path.endsWith('/run')) return { ok: true, status: 202, body: JSON.stringify({ run: { id: 'flow-run-custom' } }) }
+      return { ok: false, status: 404, body: 'not found' }
+    })
+    const { runtime } = createRuntime(settingsWith([task], { enabled: false }, 'custom-provider'), runtimeRequest)
+
+    expect(await runtime.listTasks()).toEqual([task])
+    expect(await runtime.runTask(task.id)).toMatchObject({ ok: true, threadId: 'flow-run-custom' })
+    expect(runtimeRequest.mock.calls.some(([, , init]) => init.method === 'PUT')).toBe(false)
+  })
+
+  it('starts legacy Flow model migration during runtime sync', async () => {
+    const task = makeTask({ model: 'deepseek-v4-flash' }); let savedTask = task
+    const runtimeRequest = vi.fn(async (_settings: AppSettingsV1, path: string, init: { method?: string; body?: string }) => {
+      if (path === '/v1/legacy-schedules' && init.method === 'GET') return { ok: true, status: 200, body: JSON.stringify({ tasks: [savedTask] }) }
+      if (init.method === 'PUT') {
+        savedTask = JSON.parse(init.body!) as ScheduledTaskV1
+        return { ok: true, status: 200, body: JSON.stringify({ task: savedTask }) }
+      }
+      return { ok: false, status: 404, body: 'not found' }
+    })
+    const { runtime } = createRuntime(settingsWith([task], { enabled: false }), runtimeRequest)
+
+    runtime.sync(settingsWith([task], { enabled: false }))
+    await expect(runtime.listTasks()).resolves.toMatchObject([{ model: 'deepseek-flash' }])
+    expect(runtimeRequest.mock.calls.map(([, path, init]) => [path, init.method])).toEqual([
+      ['/v1/legacy-schedules', 'GET'],
+      ['/v1/legacy-schedules/task-1', 'PUT']
+    ])
   })
 })

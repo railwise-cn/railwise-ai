@@ -1,10 +1,12 @@
 import {
   DEFAULT_SCHEDULE_INTERNAL_PORT,
   DEFAULT_SCHEDULE_MODEL,
+  SCHEDULE_MODEL_IDS,
   type ScheduleSettingsPatchV1,
   type ScheduleSettingsV1,
   type ScheduledTaskV1
 } from './app-settings-types'
+import { isVisibleComposerModelIdForProvider } from './default-composer-models'
 import {
   compactStrings,
   normalizeAtTime,
@@ -16,11 +18,24 @@ import {
   normalizeStatus,
   normalizeTimeOfDay
 } from './app-settings-normalizers'
+import { normalizeComposerModelForProvider } from './default-composer-models'
+
+export function normalizeScheduleModelForProvider(value: unknown, providerId?: string): string {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  return raw ? normalizeComposerModelForProvider(raw, providerId) : DEFAULT_SCHEDULE_MODEL
+}
+
+export function scheduleModelOptionsForProvider(value: unknown, providerId?: string): string[] {
+  const selected = normalizeScheduleModelForProvider(value, providerId)
+  const options = SCHEDULE_MODEL_IDS.filter((model) => isVisibleComposerModelIdForProvider(model, providerId))
+  return options.includes(selected as (typeof options)[number]) ? options : [selected, ...options]
+}
 
 export function normalizeScheduledTask(
   task: Partial<ScheduledTaskV1>,
   index: number,
-  now: string
+  now: string,
+  providerId?: string
 ): ScheduledTaskV1 {
   const schedule = task.schedule
   return {
@@ -29,7 +44,7 @@ export function normalizeScheduledTask(
     enabled: normalizeBoolean(task.enabled, true),
     prompt: typeof task.prompt === 'string' ? task.prompt : '',
     workspaceRoot: typeof task.workspaceRoot === 'string' ? task.workspaceRoot.trim() : '',
-    model: typeof task.model === 'string' && task.model.trim() ? task.model.trim() : DEFAULT_SCHEDULE_MODEL,
+    model: normalizeScheduleModelForProvider(task.model, providerId),
     reasoningEffort: normalizeScheduleReasoningEffort(task.reasoningEffort),
     mode: normalizeRunMode(task.mode),
     schedule: {
@@ -69,7 +84,8 @@ export function defaultScheduleSettings(): ScheduleSettingsV1 {
 }
 
 export function normalizeScheduleSettings(
-  input: ScheduleSettingsPatchV1 | undefined
+  input: ScheduleSettingsPatchV1 | undefined,
+  providerId?: string
 ): ScheduleSettingsV1 {
   const defaults = defaultScheduleSettings()
   const source = input ?? {}
@@ -80,7 +96,7 @@ export function normalizeScheduleSettings(
     enabled: normalizeBoolean(source.enabled, defaults.enabled),
     defaultWorkspaceRoot:
       typeof source.defaultWorkspaceRoot === 'string' ? source.defaultWorkspaceRoot.trim() : '',
-    model: typeof source.model === 'string' && source.model.trim() ? source.model.trim() : DEFAULT_SCHEDULE_MODEL,
+    model: normalizeScheduleModelForProvider(source.model, providerId),
     mode: normalizeRunMode(source.mode),
     promptPrefix: typeof source.promptPrefix === 'string' ? source.promptPrefix : '',
     skills: {
@@ -93,16 +109,17 @@ export function normalizeScheduleSettings(
       secret: typeof internal.secret === 'string' ? internal.secret.trim() : ''
     },
     tasks: Array.isArray(source.tasks)
-      ? source.tasks.map((task, index) => normalizeScheduledTask(task as Partial<ScheduledTaskV1>, index, now))
+      ? source.tasks.map((task, index) => normalizeScheduledTask(task as Partial<ScheduledTaskV1>, index, now, providerId))
       : []
   }
 }
 
 export function mergeScheduleSettings(
   current: ScheduleSettingsV1,
-  patch: ScheduleSettingsPatchV1 | undefined
+  patch: ScheduleSettingsPatchV1 | undefined,
+  providerId?: string
 ): ScheduleSettingsV1 {
-  if (!patch) return normalizeScheduleSettings(current)
+  if (!patch) return normalizeScheduleSettings(current, providerId)
   return normalizeScheduleSettings({
     ...current,
     ...patch,
@@ -115,5 +132,5 @@ export function mergeScheduleSettings(
       ...(patch.internal ?? {})
     },
     tasks: patch.tasks ?? current.tasks
-  })
+  }, providerId)
 }

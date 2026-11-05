@@ -1,13 +1,14 @@
 import type { ReactElement } from 'react'
 import {
   CLAW_MODEL_IDS,
+  getManagedRuntimeSettings,
   type AppSettingsPatch,
   type AppSettingsV1,
   type ClawImAgentProfileV1,
   type ClawImChannelV1,
   type ClawModel
 } from '@shared/app-settings'
-import { isVisibleComposerModelId } from '@shared/default-composer-models'
+import { isVisibleComposerModelIdForProvider } from '@shared/default-composer-models'
 import { SettingsCard, SettingRow, Toggle } from './settings-controls'
 
 type ClawSettingsContext = {
@@ -201,7 +202,10 @@ export function ClawSettingsSection({ ctx }: { ctx: ClawSettingsContext }): Reac
                       value={channel.model}
                       onChange={(e) => updateChannel(form, update, channel.id, { model: e.target.value as ClawModel })}
                     >
-                      {CLAW_MODEL_IDS.filter(isVisibleComposerModelId).map((model) => (
+                      {CLAW_MODEL_IDS.filter((model) => isVisibleComposerModelIdForProvider(
+                        model,
+                        getManagedRuntimeSettings(form).providerId
+                      )).map((model) => (
                         <option key={model} value={model}>{model}</option>
                       ))}
                     </select>

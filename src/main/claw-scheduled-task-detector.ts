@@ -3,6 +3,7 @@ import {
   DEFAULT_SCHEDULE_MODEL,
   DEFAULT_SCHEDULE_REASONING_EFFORT,
   modelEndpointPath,
+  normalizeScheduleModelForProvider,
   resolveManagedRuntimeSettings
 } from '../shared/app-settings'
 
@@ -292,7 +293,7 @@ export async function detectClawScheduledTaskRequest(
     baseUrl: runtime.baseUrl,
     apiKey,
     endpointFormat: runtime.endpointFormat,
-    model: detectionModel(modelHint),
+    model: detectionModel(normalizeScheduleModelForProvider(modelHint, runtime.providerId)),
     systemPrompt: buildDetectionPrompt(now),
     sourceText
   })

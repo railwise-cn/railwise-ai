@@ -13,6 +13,8 @@ import type {
 import {
   DEFAULT_SCHEDULE_MODEL,
   buildScheduleRuntimePrompt,
+  getManagedRuntimeSettings,
+  normalizeScheduleModelForProvider,
   normalizeScheduleReasoningEffort
 } from '../shared/app-settings'
 import { readLegacyWebhookSecret } from './compat/legacy-http'
@@ -63,6 +65,8 @@ export class ScheduleRuntime {
   private serverKey = ''
   private runningTaskIds = new Set<string>()
   private powerSaveBlockerId: number | null = null
+  private legacyScheduleModelMigrations = new Map<string, Promise<ScheduledTaskV1[]>>()
+  private legacyScheduleModelMigrationQueue: Promise<void> = Promise.resolve()
 
   constructor(deps: ScheduleRuntimeDeps) {
     this.deps = deps
@@ -73,6 +77,13 @@ export class ScheduleRuntime {
     this.startScheduler()
     this.syncPowerSaveBlocker(settings)
     void this.ensureNextRuns(settings)
+    if (this.usesFlowCompatibility(settings)) {
+      void this.listFlowCompatibleTasks(settings).catch((error) => {
+        this.deps.logError('schedule-task', 'Failed to migrate legacy Flow model selections', {
+          message: error instanceof Error ? error.message : String(error)
+        })
+      })
+    }
   }
 
   stop(): void {
@@ -100,6 +111,7 @@ export class ScheduleRuntime {
   async runTask(taskId: string): Promise<ScheduleRunResult> {
     const settings = await this.deps.store.load()
     if (this.usesFlowCompatibility(settings)) {
+      await this.listFlowCompatibleTasks(settings)
       const result = await this.deps.runtimeRequest(settings, `/v1/legacy-schedules/${encodeURIComponent(taskId)}/run`, { method: 'POST', body: '{}' })
       if (!result.ok) return { ok: false, message: runtimeErrorMessage(result, 'Failed to run migrated Flow.') }
       const parsed = parseJsonObject(result.body); const run = nestedRecord(parsed?.run); const runId = asString(run.id)
@@ -116,16 +128,20 @@ export class ScheduleRuntime {
   ): Promise<ScheduleTaskFromTextResult> {
     const settings = await this.deps.store.load()
     try {
+      const model = normalizeScheduleModelForProvider(
+        options.modelHint?.trim() || settings.schedule.model || DEFAULT_SCHEDULE_MODEL,
+        getManagedRuntimeSettings(settings).providerId
+      )
       const request = await detectClawScheduledTaskRequest(
         settings,
         text,
-        options.modelHint?.trim() || settings.schedule.model || DEFAULT_SCHEDULE_MODEL
+        model
       )
       if (!request) return { kind: 'noop' }
       const task = buildScheduledTaskFromDetectedRequest({
         request,
         workspaceRoot: options.workspaceRoot?.trim() || this.resolveDefaultWorkspaceRoot(settings),
-        model: options.modelHint?.trim() || settings.schedule.model || DEFAULT_SCHEDULE_MODEL,
+        model,
         mode: options.mode ?? settings.schedule.mode,
         id: randomUUID()
       })
@@ -147,17 +163,19 @@ export class ScheduleRuntime {
   async listTasks(): Promise<ScheduledTaskV1[]> {
     const settings = await this.deps.store.load()
     if (this.usesFlowCompatibility(settings)) {
-      const result = await this.deps.runtimeRequest(settings, '/v1/legacy-schedules', { method: 'GET' })
-      if (!result.ok) throw new Error(runtimeErrorMessage(result, 'Failed to list migrated schedules.'))
-      const parsed = parseJsonObject(result.body); return Array.isArray(parsed?.tasks) ? parsed.tasks as ScheduledTaskV1[] : []
+      return this.listFlowCompatibleTasks(settings)
     }
     return settings.schedule.tasks
   }
 
   async createTask(task: ScheduledTaskV1): Promise<ScheduledTaskV1> {
     const settings = await this.deps.store.load()
+    const normalizedTask = {
+      ...task,
+      model: normalizeScheduleModelForProvider(task.model, getManagedRuntimeSettings(settings).providerId)
+    }
     if (this.usesFlowCompatibility(settings)) {
-      const result = await this.deps.runtimeRequest(settings, '/v1/legacy-schedules', { method: 'POST', body: JSON.stringify(task) })
+      const result = await this.deps.runtimeRequest(settings, '/v1/legacy-schedules', { method: 'POST', body: JSON.stringify(normalizedTask) })
       if (!result.ok) throw new Error(runtimeErrorMessage(result, 'Failed to create migrated schedule.'))
       const parsed = parseJsonObject(result.body); const saved = parsed?.task
       if (!saved || typeof saved !== 'object' || Array.isArray(saved)) throw new Error('Runtime did not return the migrated schedule.')
@@ -166,11 +184,11 @@ export class ScheduleRuntime {
     const saved = await this.deps.store.patch({
       schedule: {
         enabled: true,
-        tasks: [...settings.schedule.tasks, task]
+        tasks: [...settings.schedule.tasks, normalizedTask]
       }
     })
     this.sync(saved)
-    return saved.schedule.tasks.find((item) => item.id === task.id) ?? task
+    return saved.schedule.tasks.find((item) => item.id === task.id) ?? normalizedTask
   }
 
   async createTaskFromInput(input: {
@@ -223,6 +241,10 @@ export class ScheduleRuntime {
     const nextTask: ScheduledTaskV1 = {
       ...task,
       ...patch,
+      model: normalizeScheduleModelForProvider(
+        patch.model ?? task.model,
+        getManagedRuntimeSettings(settings).providerId
+      ),
       schedule: patch.schedule ? { ...task.schedule, ...patch.schedule } : task.schedule,
       ...(shouldRecomputeNextRun ? { nextRunAt: '' } : {}),
       updatedAt: now
@@ -269,6 +291,49 @@ export class ScheduleRuntime {
   }
 
   private usesFlowCompatibility(settings: AppSettingsV1): boolean { return settings.schedule.enabled === false && settings.schedule.tasks.length > 0 }
+
+  private async listFlowCompatibleTasks(settings: AppSettingsV1): Promise<ScheduledTaskV1[]> {
+    const providerId = getManagedRuntimeSettings(settings).providerId || undefined
+    const migrationKey = providerId || 'deepseek'
+    const activeMigration = this.legacyScheduleModelMigrations.get(migrationKey)
+    if (activeMigration) return activeMigration
+
+    const migration = this.legacyScheduleModelMigrationQueue.then(async (): Promise<ScheduledTaskV1[]> => {
+      const currentSettings = await this.deps.store.load()
+      const result = await this.deps.runtimeRequest(currentSettings, '/v1/legacy-schedules', { method: 'GET' })
+      if (!result.ok) throw new Error(runtimeErrorMessage(result, 'Failed to list migrated schedules.'))
+      const parsed = parseJsonObject(result.body)
+      const tasks = Array.isArray(parsed?.tasks) ? parsed.tasks as ScheduledTaskV1[] : []
+      for (let index = 0; index < tasks.length; index += 1) {
+        const task = tasks[index]
+        const writeSettings = await this.deps.store.load()
+        const writeProviderId = getManagedRuntimeSettings(writeSettings).providerId || undefined
+        const model = normalizeScheduleModelForProvider(task.model, writeProviderId)
+        if (model === task.model) continue
+        const migrated: ScheduledTaskV1 = { ...task, model, updatedAt: new Date().toISOString() }
+        const updated = await this.deps.runtimeRequest(
+          writeSettings,
+          `/v1/legacy-schedules/${encodeURIComponent(task.id)}`,
+          { method: 'PUT', body: JSON.stringify(migrated) }
+        )
+        if (!updated.ok) throw new Error(runtimeErrorMessage(updated, 'Failed to migrate a legacy schedule model.'))
+        const saved = parseJsonObject(updated.body)?.task
+        tasks[index] = saved && typeof saved === 'object' && !Array.isArray(saved)
+          ? saved as ScheduledTaskV1
+          : migrated
+      }
+      return tasks
+    })
+    this.legacyScheduleModelMigrations.set(migrationKey, migration)
+    this.legacyScheduleModelMigrationQueue = migration.then(() => undefined, () => undefined)
+    try {
+      return await migration
+    } finally {
+      if (this.legacyScheduleModelMigrations.get(migrationKey) === migration) {
+        this.legacyScheduleModelMigrations.delete(migrationKey)
+      }
+    }
+  }
 
   private async tick(): Promise<void> {
     const settings = await this.deps.store.load()
@@ -365,7 +430,7 @@ export class ScheduleRuntime {
         prompt: task.prompt,
         title: scheduledThreadTitle(task.title),
         workspaceRoot: task.workspaceRoot || this.resolveDefaultWorkspaceRoot(settings),
-        model: task.model,
+        model: normalizeScheduleModelForProvider(task.model, getManagedRuntimeSettings(settings).providerId),
         reasoningEffort: task.reasoningEffort,
         mode: task.mode,
         waitForResult: false,

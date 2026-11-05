@@ -23,9 +23,11 @@ import {
 import {
   DEFAULT_SCHEDULE_MODEL,
   DEFAULT_SCHEDULE_REASONING_EFFORT,
-  SCHEDULE_MODEL_IDS,
+  getManagedRuntimeSettings,
   mergeScheduleSettings,
+  normalizeScheduleModelForProvider,
   normalizeScheduleSettings,
+  scheduleModelOptionsForProvider,
   type AppSettingsV1,
   type ScheduleKind,
   type ScheduleReasoningEffort,
@@ -246,14 +248,15 @@ export function ScheduleTasksView({
     return () => window.clearInterval(id)
   }, [load])
 
-  const schedule = settings ? normalizeScheduleSettings(settings.schedule) : null
+  const providerId = settings ? getManagedRuntimeSettings(settings).providerId || undefined : undefined
+  const schedule = settings ? normalizeScheduleSettings(settings.schedule, providerId) : null
   const tasks = schedule?.tasks ?? EMPTY_SCHEDULE_TASKS
   const runningTaskIds = useMemo(() => new Set(status?.runningTaskIds ?? []), [status])
   const visibleTasks = useMemo(() => filterScheduledTasks(tasks, filter), [filter, tasks])
 
   const persistSchedule = async (patch: Parameters<typeof mergeScheduleSettings>[1]): Promise<void> => {
     if (!settings) return
-    const nextSchedule = mergeScheduleSettings(settings.schedule, patch)
+    const nextSchedule = mergeScheduleSettings(settings.schedule, patch, providerId)
     setSettings({ ...settings, schedule: nextSchedule })
     const saved = await rendererRuntimeClient.setSettings({ schedule: nextSchedule })
     setSettings(saved)
@@ -620,6 +623,7 @@ export function ScheduleTasksView({
       {dialog ? (
         <ScheduleTaskDialog
           dialog={dialog}
+          providerId={providerId}
           error={dialogError}
           onClose={() => setDialog(null)}
           onDraftChange={(draft) => setDialog((current) => current ? { ...current, draft } : current)}
@@ -633,6 +637,7 @@ export function ScheduleTasksView({
       {settingsDialogOpen && schedule ? (
         <ScheduleDefaultsDialog
           schedule={schedule}
+          providerId={providerId}
           onClose={() => setSettingsDialogOpen(false)}
           onSave={async (patch) => {
             await persistSchedule(patch)
@@ -647,6 +652,7 @@ export function ScheduleTasksView({
 
 function ScheduleTaskDialog({
   dialog,
+  providerId,
   error,
   onClose,
   onDraftChange,
@@ -656,6 +662,7 @@ function ScheduleTaskDialog({
   t
 }: {
   dialog: TaskDialogState
+  providerId?: string
   error: string | null
   onClose: () => void
   onDraftChange: (draft: ScheduledTaskV1) => void
@@ -673,6 +680,8 @@ function ScheduleTaskDialog({
   }
   const promptCount = draft.prompt.length
   const title = dialog.mode === 'create' ? t('scheduleCreateTask') : t('scheduleEditTask')
+  const selectedModel = normalizeScheduleModelForProvider(draft.model, providerId)
+  const modelOptions = scheduleModelOptionsForProvider(selectedModel, providerId)
 
   return (
     <div
@@ -754,11 +763,11 @@ function ScheduleTaskDialog({
                 <label className="grid gap-2">
                   <FieldLabel required>{t('scheduleModel')}</FieldLabel>
                   <select
-                    value={draft.model}
+                    value={selectedModel}
                     onChange={(event) => updateDraft({ model: event.target.value })}
                     className="h-10 w-full rounded-xl border border-ds-border bg-ds-main/55 px-3 text-[14px] text-ds-ink outline-none transition focus:border-accent/45 focus:ring-2 focus:ring-accent/15"
                   >
-                    {SCHEDULE_MODEL_IDS.map((model) => (
+                    {modelOptions.map((model) => (
                       <option key={model} value={model}>{model}</option>
                     ))}
                   </select>
