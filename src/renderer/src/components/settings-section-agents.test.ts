@@ -74,6 +74,7 @@ const labels: Record<string, string> = {
   kunDataDirDesc: 'Data dir description',
   kunModel: 'Model',
   kunModelDesc: 'Model description',
+  deepseekV41FlashModelLabel: 'DeepSeek V4.1 Flash',
   kunTokenEconomy: 'Token-saving mode',
   kunTokenEconomyDesc: 'Token-saving mode description',
   kunTokenEconomySavings: 'Saved {{tokens}} / {{cost}}',
@@ -506,7 +507,7 @@ describe('AgentsSettingsSection WorkWise Runtime diagnostics smoke', () => {
     expect(html).toContain('Pure JSONL file storage')
   })
 
-  it('shows DeepSeek V4 model compaction thresholds from the model profile', () => {
+  it('shows DeepSeek V4.1 Flash model compaction thresholds from the model profile', () => {
     const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx: baseCtx() }))
 
     expect(html).toContain('Current model context policy')
@@ -516,6 +517,51 @@ describe('AgentsSettingsSection WorkWise Runtime diagnostics smoke', () => {
     expect(html).toContain('980,000')
     expect(html).toContain('990,000')
     expect(html).toContain('Fallback compaction thresholds')
+  })
+
+  it('hides legacy DeepSeek IDs from assistant choices without rewriting provider config', () => {
+    const provider = defaultModelProviderSettings()
+    const configuredModels = ['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-pro']
+    const ctx = baseCtx()
+    const providerSettings = {
+      ...provider,
+      providers: provider.providers.map((item) => item.id === DEFAULT_MODEL_PROVIDER_ID
+        ? { ...item, models: configuredModels }
+        : item)
+    }
+    ctx.form = { ...ctx.form as Record<string, unknown>, provider: providerSettings }
+    ctx.kun = { ...defaultManagedRuntimeSettings(), model: 'deepseek-flash' }
+
+    const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx }))
+    const options = html.match(/<datalist id="kun-model-options">([\s\S]*?)<\/datalist>/)?.[1] ?? ''
+
+    expect(options).toContain('value="deepseek-flash"')
+    expect(options).toContain('label="DeepSeek V4.1 Flash"')
+    expect(options).not.toContain('deepseek-v4-')
+    expect(providerSettings.providers.find((item) => item.id === DEFAULT_MODEL_PROVIDER_ID)?.models).toEqual(configuredModels)
+  })
+
+  it('preserves custom-provider model choices with legacy-looking IDs', () => {
+    const provider = defaultModelProviderSettings()
+    const customProvider = {
+      id: 'custom-provider-v4',
+      name: 'Custom Provider',
+      apiKey: '',
+      baseUrl: 'https://api.example.com/v1',
+      endpointFormat: 'chat_completions',
+      models: ['deepseek-v4-flash']
+    } satisfies ModelProviderProfileV1
+    const ctx = baseCtx()
+    ctx.form = {
+      ...ctx.form as Record<string, unknown>,
+      provider: { ...provider, providers: [...provider.providers, customProvider] }
+    }
+    ctx.kun = { ...defaultManagedRuntimeSettings(), providerId: customProvider.id, model: 'deepseek-v4-flash' }
+
+    const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx }))
+    const options = html.match(/<datalist id="kun-model-options">([\s\S]*?)<\/datalist>/)?.[1] ?? ''
+
+    expect(options).toContain('value="deepseek-v4-flash"')
   })
 
   it('renders MCP, Skill, web, attachment, and memory diagnostics', () => {

@@ -13,10 +13,12 @@ import {
   DEFAULT_WRITE_INLINE_COMPLETION_MODEL,
   DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS,
   DEFAULT_MANAGED_RUNTIME_DATA_DIR,
+  DEFAULT_MANAGED_RUNTIME_MODEL,
   WRITE_INLINE_COMPLETION_MODEL_IDS,
   defaultModelProviderSettings,
   isManagedRuntimeInsecure,
 } from '@shared/app-settings'
+import { isVisibleComposerModelIdForProvider } from '@shared/default-composer-models'
 import type { GuiUpdateChannel } from '@shared/gui-update'
 import type { SkillRootId } from '../lib/skill-root-preference'
 import { Ban, CheckCircle2, ChevronDown, FolderOpen, Loader2, RefreshCw, Settings, Trash2 } from 'lucide-react'
@@ -493,6 +495,9 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
   const activeProviderId = kun.providerId?.trim() || DEFAULT_MODEL_PROVIDER_ID
   const activeProvider = modelProviders.find((item) => item.id === activeProviderId) ?? modelProviders[0]
   const activeProviderModels = activeProvider?.models ?? []
+  const visibleActiveProviderModels = activeProviderModels.filter((model) =>
+    isVisibleComposerModelIdForProvider(model, activeProvider?.id)
+  )
   const selectKunProvider = (providerId: string): void => {
     const nextProvider = modelProviders.find((item) => item.id === providerId) ?? activeProvider
     const nextModel = nextProvider?.models.includes(kun.model)
@@ -557,8 +562,14 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                           onChange={(e) => updateKun({ model: e.target.value })}
                         />
                         <datalist id="kun-model-options">
-                          {activeProviderModels.map((model) => (
-                            <option key={model} value={model} />
+                          {visibleActiveProviderModels.map((model) => (
+                            <option
+                              key={model}
+                              value={model}
+                              label={activeProvider?.id === DEFAULT_MODEL_PROVIDER_ID && model === DEFAULT_MANAGED_RUNTIME_MODEL
+                                ? t('deepseekV41FlashModelLabel')
+                                : model}
+                            />
                           ))}
                         </datalist>
                       </div>
