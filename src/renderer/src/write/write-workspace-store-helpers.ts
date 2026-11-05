@@ -19,6 +19,7 @@ import {
   type WriteSettingsV1
 } from '@shared/app-settings'
 import type { WorkspaceEntry } from '@shared/workspace-file'
+import { normalizeComposerModelForProvider } from '@shared/default-composer-models'
 import { isWriteImageFilePath, isWriteWorkspaceEntry, isWriteWorkspaceFilePath } from '@shared/write-text-file'
 import i18n from '../i18n'
 import type { WriteEditorSelectionState } from '../components/write/WriteMarkdownEditor'
@@ -52,14 +53,21 @@ export function readStoredAssistantOpen(): boolean {
 export function readStoredAssistantModel(): string {
   const selection = readStoredAssistantSelection()
   if (selection) return selection.model
-  return readBrowserStorageItem(WRITE_ASSISTANT_MODEL_KEY)?.trim() || DEFAULT_WRITE_ASSISTANT_MODEL
+  return normalizeComposerModelForProvider(
+    readBrowserStorageItem(WRITE_ASSISTANT_MODEL_KEY)?.trim() || DEFAULT_WRITE_ASSISTANT_MODEL
+  )
 }
 
 export function readStoredAssistantSelection(): { model: string; providerId?: string } | null {
   try {
     const value = JSON.parse(readBrowserStorageItem(WRITE_ASSISTANT_SELECTION_KEY) || 'null')
-    return value?.version === 1 && typeof value.model === 'string' &&
-      (value.providerId === undefined || typeof value.providerId === 'string') ? value : null
+    if (value?.version !== 1 || typeof value.model !== 'string' ||
+      (value.providerId !== undefined && typeof value.providerId !== 'string')) return null
+    const providerId = typeof value.providerId === 'string' && value.providerId.trim()
+      ? value.providerId.trim()
+      : undefined
+    const model = normalizeComposerModelForProvider(value.model, providerId)
+    return { model, ...(providerId ? { providerId } : {}) }
   } catch { return null }
 }
 

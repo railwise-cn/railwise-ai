@@ -98,6 +98,16 @@ describe('chat-store Claw helpers', () => {
     ])
   })
 
+  it('does not reintroduce retired ids from the official DeepSeek group', () => {
+    expect(mergeComposerPickList(true, [
+      'deepseek-v4-pro',
+      'deepseek-flash',
+      'custom-model'
+    ], [
+      { providerId: 'deepseek', modelIds: ['deepseek-v4-pro', 'deepseek-flash'] }
+    ])).toEqual(['auto', 'custom-model', 'deepseek-flash'])
+  })
+
   it('compacts code workspace roots while excluding write, temporary, and Claw roots', () => {
     expect(
       compactCodeWorkspaceRoots([

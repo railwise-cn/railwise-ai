@@ -41,7 +41,7 @@ describe('provider-aware composer selection', () => {
     expect(select).toHaveBeenLastCalledWith('shared-model', 'b')
   })
 
-  it('shows and marks a saved retired model instead of displaying Auto', async () => {
+  it('migrates a saved official retired model to the current DeepSeek model', async () => {
     const select = vi.fn()
     await act(async () => root.render(createElement(FloatingComposerModelPicker, {
       compact: false, mode: 'select', composerModel: 'deepseek-v4-pro', composerProviderId: 'deepseek',
@@ -52,17 +52,17 @@ describe('provider-aware composer selection', () => {
       ]
     })))
 
-    expect(container.textContent).toContain('DeepSeek / deepseek-v4-pro')
+    expect(container.textContent).toContain('DeepSeek / deepseek-flash')
     await act(async () => container.querySelector('button')!.click())
     await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] button')]
       .find(button => button.textContent?.includes('DeepSeek'))!.click())
     const officialMenu = document.querySelector('[role="menu"][aria-label="DeepSeek"]')!
-    expect(officialMenu.textContent).toContain('deepseek-v4-pro')
+    expect(officialMenu.textContent).toContain('deepseek-flash')
     expect(officialMenu.querySelector('.lucide-check')).not.toBeNull()
     expect(officialMenu.textContent).not.toContain('deepseek-v4-flash')
     await act(async () => [...officialMenu.querySelectorAll<HTMLButtonElement>('button')]
-      .find(button => button.textContent?.includes('deepseek-v4-pro'))!.click())
-    expect(select).toHaveBeenLastCalledWith('deepseek-v4-pro', 'deepseek')
+      .find(button => button.textContent?.includes('deepseek-flash'))!.click())
+    expect(select).toHaveBeenLastCalledWith('deepseek-flash', 'deepseek')
   })
 
   it('keeps a retired-looking id selectable under a custom provider', async () => {

@@ -10,7 +10,11 @@ import { createPortal } from 'react-dom'
 import { Brain, Check, ChevronDown, ChevronRight, Gauge } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ModelProviderModelGroup } from '@shared/workwise-api'
-import { isVisibleComposerModelId } from '@shared/default-composer-models'
+import {
+  isVisibleComposerModelId,
+  isVisibleComposerModelIdForProvider,
+  normalizeComposerModelForProvider
+} from '@shared/default-composer-models'
 
 export type ComposerReasoningEffort = 'low' | 'medium' | 'high' | 'max'
 
@@ -74,7 +78,7 @@ function isVisibleForProviderGroups(
   modelId: string,
   groups: readonly ModelProviderModelGroup[]
 ): boolean {
-  return groups.some((group) => group.modelIds.includes(modelId)) ||
+  return groups.some((group) => group.modelIds.includes(modelId) && isVisibleComposerModelIdForProvider(modelId, group.providerId)) ||
     isVisibleComposerModelId(modelId)
 }
 
@@ -100,8 +104,8 @@ export function FloatingComposerModelPicker({
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
   const [menuPlacement, setMenuPlacement] = useState<FloatingMenuPlacement | null>(null)
   const [submenuPlacement, setSubmenuPlacement] = useState<FloatingSubmenuPlacement | null>(null)
-  const currentModel = composerModel.trim()
   const currentProviderId = composerProviderId
+  const currentModel = normalizeComposerModelForProvider(composerModel, currentProviderId)
   const modelOptions = useMemo(() => {
     const ordered = new Set<string>()
     for (const id of composerPickList) {
@@ -115,7 +119,10 @@ export function FloatingComposerModelPicker({
     const seen = new Set<string>()
     // Provider groups have already been filtered by the main process using
     // each provider's URL. Never apply official DeepSeek rules to custom groups.
-    const sourceGroups = composerModelGroups.map((group) => ({ ...group, modelIds: [...group.modelIds] }))
+    const sourceGroups = composerModelGroups.map((group) => ({
+      ...group,
+      modelIds: group.modelIds.filter((id) => isVisibleComposerModelIdForProvider(id, group.providerId))
+    }))
     if (currentProviderId && currentModel && currentModel !== 'auto') {
       const group = sourceGroups.find((item) => item.providerId === currentProviderId)
       if (group) group.modelIds.push(currentModel)
