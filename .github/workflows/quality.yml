@@ -34,6 +34,8 @@ jobs:
       - run: npm run verify:document-licenses
       - run: npm run lint
       - run: npm run typecheck
+      - name: Prepare checksummed Electron runtime
+        run: npm run prepare:electron
       - run: npm test
       - name: Verify Stable release workflow gates
         run: npm run test:release-gate
