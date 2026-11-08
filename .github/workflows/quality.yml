@@ -19,6 +19,8 @@ jobs:
   quality:
     name: OpenSpec, brand, lint, type, test, build
     runs-on: ubuntu-latest
+    env:
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,6 +36,8 @@ jobs:
       - run: npm run verify:document-licenses
       - run: npm run lint
       - run: npm run typecheck
+      - name: Prepare checksummed Electron runtime
+        run: npm run prepare:electron
       - run: npm test
       - name: Verify Stable release workflow gates
         run: npm run test:release-gate
@@ -93,6 +97,8 @@ jobs:
   electron-smoke:
     name: Electron production smoke
     runs-on: ubuntu-latest
+    env:
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

@@ -17,9 +17,9 @@ if (!function_exists('rw_workwise_manifest')) {
             // JSON file is authoritative when present, but an outdated fallback
             // would make an unavailable or malformed manifest advertise an old
             // release on the public page.
-            'version' => '0.5.3',
-            'publishedAt' => '2026-10-11',
-            'releaseUrl' => 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.3',
+            'version' => '0.5.4',
+            'publishedAt' => '2026-11-08',
+            'releaseUrl' => 'https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.4',
             'repositoryUrl' => 'https://github.com/railwise-cn/railwise-ai',
             'platforms' => [],
             'docs' => [],
