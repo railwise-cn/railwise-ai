@@ -1,0 +1,82 @@
+{
+  "repository": "railwise-cn/railwise-ai",
+  "workflowPath": ".github/workflows/release.yml",
+  "sourceHead": "31b23359374a2eca56fd3112d586d91bde876d4e",
+  "runId": 42083127424,
+  "runAttempt": 1,
+  "publicIdentity": {
+    "bundleId": "com.wangjiawei508.workgpt",
+    "packageName": "workwise",
+    "productName": "RailWise AI"
+  },
+  "artifacts": [
+    {
+      "name": "release-mac",
+      "id": 13454050416,
+      "digest": "sha256:55da81a76fbd96fdb4cb6aec42ce3c5a9620763b9a5ef4682f2ae516cb8db8db"
+    },
+    {
+      "name": "release-win",
+      "id": 13450484610,
+      "digest": "sha256:fab4e2e424d01eb4b9471508861d378284b6ffba15ef7deec33640a2f113916d"
+    }
+  ],
+  "files": [
+    {
+      "name": "WorkWise-0.5.4-mac-arm64.dmg",
+      "platform": "darwin-arm64",
+      "artifact": "release-mac",
+      "size": 352281074,
+      "sha256": "ad766839b02f3b7ae5a290641715b3075cdd46caf08ef9ed92b0d21dfe11b21d"
+    },
+    {
+      "name": "WorkWise-0.5.4-mac-arm64.zip",
+      "platform": "darwin-arm64",
+      "artifact": "release-mac",
+      "size": 358868764,
+      "sha256": "75e5af4c9fa5832aa3c78e98bf9a851cf316ad92658e3db0e0078264e27828b0"
+    },
+    {
+      "name": "WorkWise-0.5.4-mac-x64.dmg",
+      "platform": "darwin-x64",
+      "artifact": "release-mac",
+      "size": 360548688,
+      "sha256": "b58822e31f7029801521db6371e6b12d1f7204b1d6b8581b5be7cac7d1743563"
+    },
+    {
+      "name": "WorkWise-0.5.4-mac-x64.zip",
+      "platform": "darwin-x64",
+      "artifact": "release-mac",
+      "size": 367435905,
+      "sha256": "011d36a0368a8804e3b9aa0e6fed498c4fc4c62e43ca4c8e86ea47bdea53a184"
+    },
+    {
+      "name": "latest-mac.yml",
+      "platform": "darwin",
+      "artifact": "release-mac",
+      "size": 824,
+      "sha256": "259bd1cc97a19ed151306ddb87e7cf45c3c32828810c2c6f272b413d5e0eddf6"
+    },
+    {
+      "name": "WorkWise-0.5.4-win-x64.exe",
+      "platform": "win32-x64",
+      "artifact": "release-win",
+      "size": 293407849,
+      "sha256": "a90204159b8d33d7977babee1ecf6247e73a2e23dcd2cf3fd16af98b4f1ae5ac"
+    },
+    {
+      "name": "WorkWise-0.5.4-win-x64.exe.blockmap",
+      "platform": "win32-x64",
+      "artifact": "release-win",
+      "size": 300251,
+      "sha256": "434cf3831529b68f89ce69fe4cfb6d5aaf31ba41f7e47f7045331f3994ba2095"
+    },
+    {
+      "name": "latest.yml",
+      "platform": "win32-x64",
+      "artifact": "release-win",
+      "size": 349,
+      "sha256": "cd3447f64fc69eacd02ebda11ae2267b1ff6b386e7df4f35198e7ef7e74010a1"
+    }
+  ]
+}
