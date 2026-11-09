@@ -2,7 +2,7 @@
 import publication from './release-publication.cjs'
 
 import { createHash } from 'node:crypto'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
+import { closeSync, createReadStream, existsSync, openSync, readFileSync, readSync, statSync } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -37,6 +37,7 @@ function usage() {
   node scripts/deploy-website-release.mjs stage --source DIR --tag vX.Y.Z --channel stable|frontier --release-prefix workwise[/acceptance/RUN_ID] --deploy-id ID [--transport scp|r2]
   node scripts/deploy-website-release.mjs promote --tag vX.Y.Z --channel stable|frontier --release-prefix workwise[/acceptance/RUN_ID] --deploy-id ID
   node scripts/deploy-website-release.mjs verify-public --source DIR --tag vX.Y.Z --channel stable|frontier --release-prefix workwise[/acceptance/RUN_ID] --target release|latest [--metadata-cache strict|deferred]
+  node scripts/deploy-website-release.mjs verify-compatibility --source DIR --channel stable|frontier
   node scripts/deploy-website-release.mjs verify-metadata-cache --channel stable|frontier --release-prefix workwise[/acceptance/RUN_ID]
   node scripts/deploy-website-release.mjs cleanup-acceptance --run-id RUN_ID
 
@@ -917,6 +918,50 @@ async function verifyPublic(flags) {
   if (!localLatest) throw new Error('latest.json hash verification failed.')
 }
 
+async function verifyCompatibility(sourceDir, publicBase, channel) {
+  const prefix = publication.policy.storageNamespace
+  const urlBase = `${publicBase}/${prefix}/channels/${channel}/latest/`
+  const checksumSource = readFileSync(resolve(sourceDir, 'SHA256SUMS.txt'), 'utf8')
+  for (const line of checksumSource.split(/\r?\n/).filter(Boolean)) {
+    const match = line.match(/^([a-f0-9]{64})\s+\*?([^/\\]+)$/i)
+    if (!match) throw new Error(`Invalid checksum line: ${line}`)
+    const name = match[2]
+    const filePath = resolve(sourceDir, name)
+    const size = statSync(filePath).size
+    if (!size) throw new Error(`Compatibility asset is empty: ${name}`)
+    const ranges = [[0, Math.min(size - 1, 1023)], [Math.max(0, size - 1024), size - 1]]
+    const fd = openSync(filePath, 'r')
+    try {
+      for (const [start, end] of ranges) {
+        const expected = Buffer.alloc(end - start + 1)
+        if (readSync(fd, expected, 0, expected.length, start) !== expected.length) throw new Error(`Cannot read compatibility asset: ${name}`)
+        const response = await fetch(new URL(encodeURIComponent(name), urlBase), { headers: { Range: `bytes=${start}-${end}` }, redirect: 'follow' })
+        if (response.status !== 206 || response.headers.get('content-range') !== `bytes ${start}-${end}/${size}` || !Buffer.from(await response.arrayBuffer()).equals(expected)) {
+          throw new Error(`Legacy download differs from verified asset: ${name}`)
+        }
+      }
+    } finally {
+      closeSync(fd)
+    }
+  }
+  for (const name of ['latest.json', 'latest.yml', 'latest-mac.yml']) {
+    const response = await fetch(new URL(name, urlBase), { redirect: 'follow', cache: 'no-store' })
+    if (!response.ok || !Buffer.from(await response.arrayBuffer()).equals(readFileSync(resolve(sourceDir, name)))) {
+      throw new Error(`Legacy metadata differs from verified asset: ${name}`)
+    }
+  }
+  await verifyMetadataCacheAt(urlBase)
+  console.log('Verified legacy updater metadata and download ranges.')
+}
+
+async function verifyCompatibilityCommand(flags) {
+  const sourceDir = resolve(requireFlag(flags, 'source'))
+  const channel = normalizeChannel(requireFlag(flags, 'channel'))
+  const publicBase = String(process.env.WORKWISE_PUBLIC_BASE_URL || 'https://www.railwise.cn/downloads').trim().replace(/\/+$/, '')
+  if (!publicBase.startsWith('https://')) throw new Error('Public verification requires HTTPS.')
+  return verifyCompatibility(sourceDir, publicBase, channel)
+}
+
 function assertMetadataCacheHeaders(headers, name) {
   const cacheControl = headers.get('cache-control') || ''
   const maxAges = [...cacheControl.matchAll(/max-age\s*=\s*(\d+)/gi)].map((match) => Number(match[1]))
@@ -987,6 +1032,7 @@ async function main() {
   if (command === 'stage') return stageRelease(flags)
   if (command === 'promote') return promoteRelease(flags)
   if (command === 'verify-public') return verifyPublic(flags)
+  if (command === 'verify-compatibility') return verifyCompatibilityCommand(flags)
   if (command === 'verify-metadata-cache') return verifyMetadataCache(flags)
   if (command === 'cleanup-acceptance') return cleanupAcceptance(flags)
   throw new Error(`Unknown command: ${command}`)
@@ -1008,6 +1054,7 @@ export const _internals = {
   normalizeTransport,
   assertMetadataCacheHeaders,
   verifyMetadataRange,
+  verifyCompatibility,
   normalizeReleasePrefix,
   r2StagingPrefix,
   normalizeWebsiteRoot,

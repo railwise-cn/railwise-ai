@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import YAML from 'yaml'
 import { capturePromotionState, commitPublication, markPromotionStarted, mergeRecoveryFile, preparePromotionStart, publicationState, recoverPromotion, trustedAttempt, verifyArchivePointers, verifyDraftRelease, verifyPublishedInstallers } from './release-promotion-recovery.mjs'
@@ -217,6 +220,8 @@ test('publication prepares verified draft bytes before promotion, with failure r
   const downloads = steps[index('Verify GitHub Release downloads')].run
   assert.match(downloads, /cmp "public-release-assets\/\$\{file\}" "downloaded-release\/\$\{file\}"/)
   assert.ok(index('Verify promoted official updater feed') > promotion)
+  assert.match(steps[index('Verify official immutable HTTPS downloads')].run, /--release-prefix railwise-ai/)
+  assert.match(steps[index('Verify promoted official updater feed')].run, /--release-prefix railwise-ai[\s\S]+verify-compatibility/)
   assert.ok(index('Publish GitHub Release') > index('Verify promoted official updater feed'))
   assert.match(steps[index('Publish GitHub Release')].run, /release-promotion-recovery\.mjs publish[\s\S]+--result=/)
   const recovery = steps[index('Restore the previous official pointers if this promotion attempt fails')]
@@ -238,6 +243,41 @@ test('publication prepares verified draft bytes before promotion, with failure r
   const page = YAML.parse(readFileSync(new URL('../.github/workflows/deploy-workwise-product-page.yml', import.meta.url), 'utf8'))
   assert.match(page.concurrency.group, /production-release-public/)
   assert.equal(page.concurrency['cancel-in-progress'], false)
+})
+
+test('legacy updater verification checks metadata, cache policy, and both ends of each asset', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'railwise-legacy-feed-'))
+  const originalFetch = globalThis.fetch
+  t.after(() => { globalThis.fetch = originalFetch; rmSync(dir, { recursive: true, force: true }) })
+  const files = {
+    'RailWise-AI-0.5.5-mac-arm64.zip': Buffer.alloc(3000, 0x52),
+    'latest.json': Buffer.from('{"version":"0.5.5"}'),
+    'latest.yml': Buffer.from('version: 0.5.5\n'),
+    'latest-mac.yml': Buffer.from('version: 0.5.5\n')
+  }
+  for (const [name, bytes] of Object.entries(files)) writeFileSync(join(dir, name), bytes)
+  const assetName = 'RailWise-AI-0.5.5-mac-arm64.zip'
+  writeFileSync(join(dir, 'SHA256SUMS.txt'), `${createHash('sha256').update(files[assetName]).digest('hex')}  ${assetName}\n`)
+  let corruptTail = false
+  globalThis.fetch = async (url, options = {}) => {
+    assert.match(String(url), /\/downloads\/workwise\/channels\/stable\/latest\//)
+    const name = decodeURIComponent(new URL(url).pathname.split('/').at(-1))
+    const bytes = files[name]
+    assert.ok(bytes)
+    const headers = { 'cache-control': 'no-cache', etag: '"fixture"', 'last-modified': 'Mon, 09 Nov 2026 00:00:00 GMT' }
+    if (options.method === 'HEAD') return new Response(null, { status: 200, headers })
+    const range = options.headers?.Range?.match(/^bytes=(\d+)-(\d+)$/)
+    if (range) {
+      const start = Number(range[1]); const end = Number(range[2])
+      const result = Buffer.from(bytes.subarray(start, end + 1))
+      if (corruptTail && name === assetName && end === bytes.length - 1) result[0] ^= 1
+      return new Response(result, { status: 206, headers: { ...headers, 'content-range': `bytes ${start}-${end}/${bytes.length}` } })
+    }
+    return new Response(bytes, { status: 200, headers })
+  }
+  await website.verifyCompatibility(dir, 'https://www.railwise.cn/downloads', 'stable')
+  corruptTail = true
+  await assert.rejects(website.verifyCompatibility(dir, 'https://www.railwise.cn/downloads', 'stable'), /Legacy download differs/)
 })
 test('website transactional promotion retains the selected archive instead of pruning it', async () => {
   assert.match(website.PROMOTE_SCRIPT, /if \[\[ "\$6" != skip-retention \]\]; then\npython3 - "\$channel_dir\/releases"/)
