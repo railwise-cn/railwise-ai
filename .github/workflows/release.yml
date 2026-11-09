@@ -965,7 +965,7 @@ jobs:
             --source website-release-assets \
             --tag "${TAG_NAME}" \
             --channel stable \
-            --release-prefix workwise \
+            --release-prefix railwise-ai \
             --target release
 
       - name: Upload website update channel artifact
@@ -1109,8 +1109,11 @@ jobs:
             --source website-release-assets \
             --tag "${TAG_NAME}" \
             --channel stable \
-            --release-prefix workwise \
+            --release-prefix railwise-ai \
             --target latest
+          node ./scripts/deploy-website-release.mjs verify-compatibility \
+            --source website-release-assets \
+            --channel stable
 
       - name: Publish GitHub Release
         run: node scripts/release-promotion-recovery.mjs publish --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json" --result="${RUNNER_TEMP}/official-promotion-result.json"

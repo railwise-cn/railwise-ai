@@ -445,7 +445,7 @@ describe('R2 release delivery gates', () => {
 
   it('keeps website cache repair scoped, backed up, and validated before reload', () => {
     const repair = readFileSync('scripts/repair-website-cache.mjs', 'utf8')
-    expect(repair).toContain('WorkWise updater metadata cache policy v2 begin')
+    expect(repair).toContain('WorkWise updater metadata cache policy v3 begin')
     expect(repair).toContain('validateDiagnostics')
     expect(repair).toContain('Remote cache inspection returned incomplete diagnostics')
     expect(repair).toContain('apply=blocked_missing_python3')
@@ -459,9 +459,10 @@ describe('R2 release delivery gates', () => {
     expect(repair).toContain('target_server_name_count')
     expect(repair).toContain('legacy_cache_rule_count')
     expect(repair).toContain("target_host in match.group(1).split()")
-    expect(repair).toContain('location = /downloads/workwise/channels/stable/latest/latest.json')
-    expect(repair).toContain('location = /downloads/workwise/channels/frontier/latest/latest-mac.yml')
-    expect(repair).toContain('location ^~ /downloads/workwise/acceptance/')
+    expect(repair).toContain("for namespace in ('workwise', 'railwise-ai')")
+    expect(repair).toContain("for channel in ('stable', 'frontier')")
+    expect(repair).toContain("for name in ('latest.json', 'latest.yml', 'latest-mac.yml')")
+    expect(repair).toContain("cache_location('^~', '/downloads/workwise/acceptance/')")
     expect(repair).not.toContain("target_host = 'railwise.cn'")
     expect(repair).toContain('workwise-cache-backup')
     expect(repair).toContain('backup="$server_file.workwise-cache-backup.')

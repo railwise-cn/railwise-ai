@@ -607,7 +607,7 @@ PY
   exit 0
 fi
 
-marker='# WorkWise updater metadata cache policy v2 begin'
+marker='# WorkWise updater metadata cache policy v3 begin'
 rule_count="$(server_run grep -F -c "$marker" "$server_file" || true)"
 legacy_rule_count="$(server_run grep -E -c '^[[:space:]]*# WorkWise updater metadata cache policy[[:space:]]*$' "$server_file" || true)"
 target_server_name_count="$(server_run grep -Ei -c 'server_name[^;]*[[:space:]]www[.]railwise[.]cn([[:space:]]|;)' "$server_file" || true)"
@@ -624,16 +624,12 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 6
 fi
 
-if [[ "$rule_count" == 1 && "$legacy_rule_count" == 0 ]]; then
-  printf '%s\n' 'apply=already_present'
-else
-  backup="$server_file.workwise-cache-backup.$(date -u +%Y%m%dT%H%M%SZ)"
-  config_temp="$server_file.workwise-cache-edit.$$"
-  edit_file="$(mktemp)"
-  trap 'rm -f -- "$dump" "$edit_file"' EXIT
-  server_run cp -p -- "$server_file" "$backup"
-  server_run cat "$server_file" >"$edit_file"
-  python3 - "$edit_file" <<'PY'
+backup="$server_file.workwise-cache-backup.$(date -u +%Y%m%dT%H%M%SZ)"
+config_temp="$server_file.workwise-cache-edit.$$"
+edit_file="$(mktemp)"
+trap 'rm -f -- "$dump" "$edit_file"' EXIT
+server_run cat "$server_file" >"$edit_file"
+python3 - "$edit_file" <<'PY'
 import pathlib
 import re
 import sys
@@ -680,19 +676,27 @@ def closing_brace(source, opening):
 server_close = closing_brace(text, server_open)
 server_body = text[server_open + 1:server_close]
 
-begin_marker = '# WorkWise updater metadata cache policy v2 begin'
-end_marker = '# WorkWise updater metadata cache policy v2 end'
-while begin_marker in server_body:
-    begin = server_body.index(begin_marker)
-    end = server_body.find(end_marker, begin)
-    if end < 0:
-        raise SystemExit('managed cache policy end marker was not found')
-    end = server_body.find('\n', end)
-    server_body = server_body[:begin] + server_body[len(server_body) if end < 0 else end + 1:]
+for version in ('v2', 'v3'):
+    begin_marker = f'# WorkWise updater metadata cache policy {version} begin'
+    end_marker = f'# WorkWise updater metadata cache policy {version} end'
+    if server_body.count(begin_marker) != server_body.count(end_marker):
+        raise SystemExit('managed cache policy markers do not match')
+    while begin_marker in server_body:
+        begin = server_body.index(begin_marker)
+        end = server_body.find(end_marker, begin)
+        if end < 0:
+            raise SystemExit('managed cache policy end marker was not found')
+        begin = server_body.rfind('\n', 0, begin) + 1
+        if server_body[:begin] == '\n':
+            begin = 0
+        end = server_body.find('\n', end)
+        server_body = server_body[:begin] + server_body[len(server_body) if end < 0 else end + 1:]
 
-legacy_marker = '# WorkWise updater metadata cache policy'
-while legacy_marker in server_body:
-    marker_index = server_body.index(legacy_marker)
+if re.search(r'(?m)^\s*# WorkWise updater metadata cache policy v\d+ (?:begin|end)\s*$', server_body):
+    raise SystemExit('unsupported managed cache policy version')
+legacy_marker = re.compile(r'(?m)^[ \t]*# WorkWise updater metadata cache policy[ \t]*$')
+while legacy_match := legacy_marker.search(server_body):
+    marker_index = legacy_match.start()
     location = re.search(r'(?m)^\s*location\b[^\{]*\{', server_body[marker_index:])
     if location is None:
         raise SystemExit('legacy managed cache location was not found')
@@ -704,79 +708,48 @@ while legacy_marker in server_body:
     marker_line_start = server_body.rfind('\n', 0, marker_index) + 1
     server_body = server_body[:marker_line_start] + server_body[len(server_body) if end < 0 else end + 1:]
 
-location = '''
-    # WorkWise updater metadata cache policy v2 begin
-    location = /downloads/workwise/channels/stable/latest/latest.json {
+def cache_location(modifier, uri):
+    return f'''    location {modifier} {uri} {{
         expires off;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         add_header Pragma "no-cache" always;
         add_header X-Content-Type-Options "nosniff" always;
         try_files $uri =404;
-    }
-    location = /downloads/workwise/channels/stable/latest/latest.yml {
-        expires off;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
-    }
-    location = /downloads/workwise/channels/stable/latest/latest-mac.yml {
-        expires off;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
-    }
-    location = /downloads/workwise/channels/frontier/latest/latest.json {
-        expires off;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
-    }
-    location = /downloads/workwise/channels/frontier/latest/latest.yml {
-        expires off;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
-    }
-    location = /downloads/workwise/channels/frontier/latest/latest-mac.yml {
-        expires off;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
-    }
-    location ^~ /downloads/workwise/acceptance/ {
-        expires off;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        try_files $uri =404;
-    }
-    # WorkWise updater metadata cache policy v2 end
+    }}
 '''
+
+location = '\n    # WorkWise updater metadata cache policy v3 begin\n'
+for namespace in ('workwise', 'railwise-ai'):
+    for channel in ('stable', 'frontier'):
+        for name in ('latest.json', 'latest.yml', 'latest-mac.yml'):
+            location += cache_location('=', f'/downloads/{namespace}/channels/{channel}/latest/{name}')
+location += cache_location('^~', '/downloads/workwise/acceptance/')
+location += '    # WorkWise updater metadata cache policy v3 end\n'
 path.write_text(text[:server_open + 1] + location + server_body + text[server_close:])
 PY
-  server_run cp -p -- "$server_file" "$config_temp"
-  server_write_file "$config_temp" <"$edit_file"
-  server_run mv -f -- "$config_temp" "$server_file"
-  if ! server_run "$nginx_bin" -t; then
-    server_run cp -p -- "$backup" "$server_file"
-    server_run "$nginx_bin" -t
-    printf 'apply=rolled_back\nbackup=%s\n' "$(basename "$backup")"
-    exit 5
-  fi
-  if ! server_run "$nginx_bin" -s reload; then
-    server_run cp -p -- "$backup" "$server_file"
-    server_run "$nginx_bin" -t
-    server_run "$nginx_bin" -s reload
-    printf 'apply=rolled_back_reload_failed\nbackup=%s\n' "$(basename "$backup")"
-    exit 7
-  fi
-  printf 'apply=applied\nbackup=%s\n' "$(basename "$backup")"
+server_run cp -p -- "$server_file" "$config_temp"
+server_write_file "$config_temp" <"$edit_file"
+if server_run cmp -s -- "$server_file" "$config_temp"; then
+  server_run rm -f -- "$config_temp"
+  printf '%s\n' 'apply=already_present'
+  exit 0
 fi
+server_run cp -p -- "$server_file" "$backup"
+server_run mv -f -- "$config_temp" "$server_file"
+if ! server_run "$nginx_bin" -t; then
+  server_run cp -p -- "$backup" "$server_file"
+  server_run "$nginx_bin" -t
+  printf 'apply=rolled_back\nbackup=%s\n' "$(basename "$backup")"
+  exit 5
+fi
+if ! server_run "$nginx_bin" -s reload; then
+  server_run cp -p -- "$backup" "$server_file"
+  server_run "$nginx_bin" -t
+  server_run "$nginx_bin" -s reload
+  printf 'apply=rolled_back_reload_failed\nbackup=%s\n' "$(basename "$backup")"
+  exit 7
+fi
+printf 'apply=applied\nbackup=%s\n' "$(basename "$backup")"
 `
 
 const rawDiagnostics = runRemote(readSshConfig())

@@ -31,14 +31,15 @@
 
 - [x] 5.1 Centralize branded artifact naming and generate a source-linked publication manifest.
 - [x] 5.2 Wire packaging, collection, feeds, checks, GitHub/R2/website and recovery to publication data.
-- [x] 5.3 Serve canonical railwise-ai downloads with legacy workwise update compatibility.
+- [ ] 5.3 Serve canonical railwise-ai downloads with legacy workwise update compatibility; verify both public routes after the next release.
 - [x] 5.4 Fix visible default names, prompts, new export metadata and diagnostic filenames.
 - [x] 5.5 Expand brand regression checks with explicit data/identity/history/license exceptions.
+- [x] 5.6 Verify canonical downloads and legacy updater ranges/metadata before publication; migrate the canonical metadata cache rules with rollback.
 
 ## 6. Migration and acceptance
 
 - [x] 6.1 Document actual compatibility/migration behavior and backed-up state, including old userData roots.
 - [x] 6.2 Run focused fault/integration tests, typechecks, required CI and production build.
 - [x] 6.3 Record fixed synthetic scenarios and actual configured-model results without invented metrics.
-- [x] 6.4 Install the exact package; verify identity/signature/notarization and primary Chinese UI. Exact run `42588564428` installed `RailWise-AI-0.5.5` and verified the macOS bundle identity, Developer ID signature, stapled notarization ticket, Gatekeeper assessment, and primary Chinese task UI; Windows installation, product metadata, shortcuts, uninstall and profile preservation passed, with the installer and executable explicitly recorded as `NotSigned` because no Windows signing certificate is configured.
-- [x] 6.5 Run one real 0.5.4-to-exact-package updater smoke for renamed artifact delivery. Exact run `42588564428` completed the native Squirrel update from `0.5.4` to `0.5.5`, including download, install, relaunch, and user-data preservation; the frozen updater evidence is retained at `/private/tmp/railwise-next-exact-42588564428/updater-evidence/`.
+- [ ] 6.4 Install the exact package from the final release source and verify identity/signature/notarization and primary Chinese UI. Run `42601576315` installed and verified the macOS identity and signature, but Chinese UI navigation was not confirmed; Windows installation passed with Authenticode explicitly `NotSigned`.
+- [ ] 6.5 Run one real 0.5.4-to-exact-package updater smoke for the final release source. Run `42601576315` passed for source `51d40fdb363a9eacdcc532b4d27b1848698b9b05`; the subsequent release workflow changes need source-bound acceptance.
