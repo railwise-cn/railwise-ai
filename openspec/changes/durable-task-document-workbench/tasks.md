@@ -31,7 +31,7 @@
 
 - [x] 5.1 Centralize branded artifact naming and generate a source-linked publication manifest.
 - [x] 5.2 Wire packaging, collection, feeds, checks, GitHub/R2/website and recovery to publication data.
-- [ ] 5.3 Serve canonical railwise-ai downloads with legacy workwise update compatibility; verify both public routes after the next release.
+- [x] 5.3 Serve canonical railwise-ai downloads with legacy workwise update compatibility. Published v0.5.5 through run `42637737565`; canonical immutable/latest full-file hashes, legacy metadata and first/last Range samples, GitHub installers, Stable and product page passed. Post-publication evidence: `docs/qa/release-gates/v0.5.5/public-verification.json` (74 checks).
 - [x] 5.4 Fix visible default names, prompts, new export metadata and diagnostic filenames.
 - [x] 5.5 Expand brand regression checks with explicit data/identity/history/license exceptions.
 - [x] 5.6 Verify canonical downloads and legacy updater ranges/metadata before publication; migrate the canonical metadata cache rules with rollback.

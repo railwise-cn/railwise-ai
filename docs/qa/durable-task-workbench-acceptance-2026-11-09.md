@@ -1,6 +1,6 @@
 # 持续任务与品牌统一：实施及验收记录
 
-本记录对应 `codex/durable-task-document-workbench`。完成情况以生产装配入口、故障回归和实际交付为依据；历史阶段的未完成项保留原始记录，当前精确包验收见文末。
+本记录对应 `codex/durable-task-document-workbench`。完成情况以生产装配入口、故障回归和实际交付为依据；历史阶段的未完成项保留原始记录，最终精确包验收及正式发布结果见文末。v0.5.5 已发布，OpenSpec 28 项实施任务均已闭环；Windows 未签名、Intel 未在本机执行 UI 验收的限制仍保留。
 
 ## 已接入的生产路径
 
@@ -120,3 +120,42 @@ Windows x64 精确安装验收通过，安装包名为 `RailWise-AI-0.5.5-win-x6
 缓存修复 run `42624902162` 在任何步骤执行前被生产环境的标签限定
 规则拒绝，服务器没有被该 run 修改。后续通过正式版本标签执行，
 不放宽生产环境保护规则。
+
+### 正式发布及最后闭环（v0.5.5）
+
+2026-11-09 UTC，正式发布 run `42637737565` attempt 1 成功完成。
+GitHub v0.5.5 于 `2026-11-09T15:27:45Z` 发布，`releases/latest` 返回
+v0.5.5，非草稿、非预发行。产品页、R2 Stable 与官网 Stable 均已推进；
+发布事务原始回执为 `status=published`、`restored=[]`，未执行回滚。
+证据 PR #95 已合并。此前失败、旧候选及其原始回执继续保留。
+
+发布后的只读复核于同日完成，74 项检查全部通过：三份更新元数据
+在 canonical/legacy 路径逐字节一致、版本为 0.5.5，缓存头为
+`no-cache, no-store, must-revalidate`，单字节 Range 正确；八个制品
+的新旧入口首尾 Range 样本、总长度一致。官网产品页、下载清单及 GitHub
+三个安装包的名称、大小、SHA-256 一致。canonical 不可变路径及 latest
+的全文件 SHA-256/Range 验证来自本次正式工作流的成功原始日志；本机
+复核没有再次下载整套安装包，legacy 范围检查仍只表示取样验证。
+
+公开安装包现在为 `RailWise-AI-0.5.5-mac-Apple-Silicon.dmg`、
+`RailWise-AI-0.5.5-mac-Intel.dmg` 和 `RailWise-AI-0.5.5-win-x64.exe`。
+其字节与最终精确构建一致。发布清单的 `sourceHead=f809b3b2` 指向
+发布标签和包外验收提交，实际安装包源码仍为 `02165b64`；新版 macOS
+更新元数据只按公开安装包名重写，849 bytes / SHA-256
+`5cbe8b8c24f5e9bce6fd926b152759c3e3725ea9c66cce3754f539a5a55e51a6`，
+还原文件名后与精确构建的 839-byte 元数据摘要一致。
+
+公开入口：
+
+- Release：<https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.5>
+- 产品页：<https://www.railwise.cn/products/railwise-ai/>
+- 新下载源：<https://www.railwise.cn/downloads/railwise-ai/channels/stable/latest/latest.json>
+- 兼容更新源：<https://www.railwise.cn/downloads/workwise/channels/stable/latest/latest.json>
+
+机器记录、HTTP 原始头/内容、核对结果和原始工作流日志定位保存于
+`release-gates/v0.5.5/public-verification.json`；实际发行清单及事务结果
+分别为 `publication-manifest.json` 和 `official-promotion-result.json`。
+官网仓库内的产品数据已由同一发行清单生成并与线上数据逐字节比对，
+避免后续部署回退到旧版下载信息。OpenSpec 5.3 已完成，28 项实施任务
+全部勾选；Windows Authenticode `NotSigned`、Intel 无本机 UI 验证等
+已知限制未改为通过。
