@@ -34,6 +34,9 @@ const allowedFiles = [
   // QA evidence must preserve exact legacy identifiers (for example the
   // historical bundle id) so release-gate records remain auditable.
   /^docs\/qa\/evidence\//,
+  // The durable-workbench acceptance record preserves the exact compatibility
+  // bundle identity for the reviewed package; it is evidence, not product copy.
+  /^docs\/qa\/durable-task-workbench-acceptance-2026-11-09\.md$/,
   /^website\/products\/screenshots\/workwise\/release-[0-9]+-screenshots\.json$/,
   /^src\/main\/compat\//,
   /^src\/main\/legacy-data-migration(?:\.test)?\.ts$/,

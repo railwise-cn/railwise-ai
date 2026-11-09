@@ -1,6 +1,6 @@
 # 持续任务与品牌统一：实施及验收记录
 
-本记录对应 `codex/durable-task-document-workbench`。完成情况以生产装配入口、故障回归和实际交付为依据；尚未执行的发行验收单独列出。
+本记录对应 `codex/durable-task-document-workbench`。完成情况以生产装配入口、故障回归和实际交付为依据；历史阶段的未完成项保留原始记录，当前精确包验收见文末。
 
 ## 已接入的生产路径
 
@@ -81,3 +81,19 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 修正版私有构建 run `42581502074` attempt 1 未产包：macOS 下载 Electron、Windows 真实 managed-tool 预检下载分别遇到上游 HTTP 504。已保留原始日志，仅通过 Actions rerun-failed 复用同源码及成功 sidecar，attempt 2 重跑失败构建和依赖验收；未重发新的冻结、未重放任何已执行 Squirrel 更新。
 
 2f305dac 的 Quality run `42582161082` 三项全绿：应用 Linux 4,091 通过/9 跳过，KUN 3,306 通过/22 跳过，Windows 安全与 Electron production smoke 通过。修正版构建 attempt 2 仍在 GitHub Electron 下载阶段遇到 504，没有安装包或 updater 执行。发行工作流已采用 Quality 相同的 Electron 镜像；仍使用锁定 npm 包内的校验和，未启用远端校验和或跳过签名/公证。Electron及发行聚焦 31 项通过；后续必须验证新工作流实际生成的精确包。
+
+### 当前源码的精确包验收（run 42588564428）
+
+本节只记录提交 `47a9c932fb686761dfd2b89193f241fb38298cb9` 绑定的私有候选，不表示已创建公开 Release、tag、Stable 指针或官网部署。Release 工作流 run `42588564428` 成功，`productionTouched=false`、`publicReleasePerformed=false`。
+
+macOS Apple Silicon 精确包为 `RailWise-AI-0.5.5-mac-arm64.dmg`，大小 `352483557` bytes，SHA-256 `1055ba1b5d49be9c0e297c4d17f0e0d0dd4a98021e1f1c55d8b79f3308080de7`。Actions runner 的冻结更新验收确认 0.5.4 基线和 0.5.5 目标均为 bundle ID `com.wangjiawei508.workgpt`、Developer ID `R35G7F4A9U`，签名和 stapled 公证票据通过；Gatekeeper assessments 已启用并返回 `accepted` / `source=Notarized Developer ID`。目标 ZIP 成员 `RailWise-AI-0.5.5-mac-arm64.zip` SHA-256 为 `8cabbd2e6017e429add620e1390ad92a8a6d9f4f4c0e3bedaa824738ffe3da8e`，安装后 `app.asar` SHA-256 为 `8cac28cc28f34cca1afc6cae151230d3aa8afa037c251425a942fcbb3cd67291`。macOS 制品外层 Actions artifact digest 没有做整包独立下载复核；已对选定 ZIP 成员执行 CRC、大小和 SHA-256 校验，不能把该限制表述为整包 digest 已验证。
+
+Windows x64 精确安装验收通过，安装包名为 `RailWise-AI-0.5.5-win-x64.exe`，产品版本、PE 产品名、安装目录、桌面/开始菜单快捷方式和卸载项均为 `RailWise AI`，profile 哨兵在安装前后保持一致，安装后清理通过。Windows installer 与安装后的 executable 均为 `NotSigned`，当前没有配置 Authenticode 证书；这是已知发布风险，不能写成 Windows 签名通过。证据文件为 `windows-install-evidence/windows-install-smoke.json`。
+
+真实 updater smoke 使用官方 v0.5.4 基线和本次精确包：`native-updater.json` 与 `frozen-updater.json` 均为 `status=passed`。流程实际完成发现更新、下载、安装、重启，目标版本为 0.5.5；用户数据回读保持，`verify-data.json` 与 `verify-restart-data.json` 通过。该结果绑定同一源码、制品和 run，旧 run 的 CloudKit 网络失败记录仍保留，不以本次结果覆盖历史证据。
+
+### 当前精确包内任务工作台与中文 UI
+
+在隔离 profile 的真实候选应用中，以中文、浅色、任务工作台路径完成生产入口验收：普通任务列表和详情只显示根任务及业务目标，Session/Worker/Thread/Turn 技术 ID 不出现在普通界面；成果、来源、验证状态和交付说明可见。状态查询通过 `coordinateTaskCommand(... intent: "status")` 返回本地 snapshot，未创建 Turn、未调用模型且任务 revision 不变；新任务不会取消既有任务，补充输入按任务归属送达，暂停后的输入只入队。聚合任务 SSE 从持久事件回放，未发现重复事件。候选文档真实审阅显示来源和正文差异，先外部修改目标文件时接受请求返回结构化版本冲突，重新比较后接受成功；冲突内容保留在 `.railwise-preserved` 文件，历史记录已生成。
+
+以上是精确包的生产 UI/Runtime 操作结果，不等同于全语言、全主题或全窗口矩阵。原始安装、更新、身份和回执文件保存在 `/private/tmp/railwise-next-exact-42588564428`；本节不把私有候选证据当作公开发行批准。

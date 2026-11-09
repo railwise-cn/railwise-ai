@@ -40,5 +40,5 @@
 - [x] 6.1 Document actual compatibility/migration behavior and backed-up state, including old userData roots.
 - [x] 6.2 Run focused fault/integration tests, typechecks, required CI and production build.
 - [x] 6.3 Record fixed synthetic scenarios and actual configured-model results without invented metrics.
-- [ ] 6.4 Install the exact package; verify identity/signature/notarization and primary Chinese UI.
-- [ ] 6.5 Run one real 0.5.4-to-exact-package updater smoke for renamed artifact delivery.
+- [x] 6.4 Install the exact package; verify identity/signature/notarization and primary Chinese UI. Exact run `42588564428` installed `RailWise-AI-0.5.5` and verified the macOS bundle identity, Developer ID signature, stapled notarization ticket, Gatekeeper assessment, and primary Chinese task UI; Windows installation, product metadata, shortcuts, uninstall and profile preservation passed, with the installer and executable explicitly recorded as `NotSigned` because no Windows signing certificate is configured.
+- [x] 6.5 Run one real 0.5.4-to-exact-package updater smoke for renamed artifact delivery. Exact run `42588564428` completed the native Squirrel update from `0.5.4` to `0.5.5`, including download, install, relaunch, and user-data preservation; the frozen updater evidence is retained at `/private/tmp/railwise-next-exact-42588564428/updater-evidence/`.
