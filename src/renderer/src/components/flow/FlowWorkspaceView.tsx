@@ -104,6 +104,11 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
   const visibleFlows = useMemo(() => flows.filter((flow) => flowMatchesFilter(flow, filter)), [filter, flows])
   const load = useCallback(async () => { setBusy('loading'); try { const result = await runtimeJson<{ flows: FlowDefinition[]; registry: RegistryEntry[] }>('/v1/flows'); setFlows(result.flows); setRegistry(result.registry); const filtered = result.flows.filter((flow) => flowMatchesFilter(flow, filter)); const selected = filtered.find((flow) => flow.id === activeIdRef.current) ?? filtered[0] ?? null; activeIdRef.current = selected?.id ?? null; setActiveId(selected?.id ?? null); setDraft(selected); setError(null) } catch (reason) { setError(message(reason)) } finally { setBusy(null) } }, [filter])
   useEffect(() => {
+    const requested = takeRequestedFlow()
+    if (requested?.flowId) {
+      activeIdRef.current = requested.flowId
+      setSelectedRunId(requested.flowRunId ?? null)
+    }
     const selection = surveyDraftSelection()
     if (selection?.kind === 'flow') {
       activeIdRef.current = selection.flowId
@@ -111,6 +116,18 @@ export function FlowWorkspaceView({ leftSidebarCollapsed, onToggleLeftSidebar, f
       clearSurveyDraftSelection()
     }
     void load()
+  }, [load])
+  useEffect(() => {
+    const open = (event: Event): void => {
+      const reference = (event as CustomEvent<FlowReference>).detail
+      takeRequestedFlow()
+      if (!reference.flowId) return
+      activeIdRef.current = reference.flowId
+      setSelectedRunId(reference.flowRunId ?? null)
+      void load()
+    }
+    window.addEventListener('railwise:open-flow', open)
+    return () => window.removeEventListener('railwise:open-flow', open)
   }, [load])
   useEffect(() => {
     let current = true
@@ -234,3 +251,4 @@ function EmptyState({ onCreate }: { onCreate: () => void }): ReactElement { retu
 async function runtimeJson<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> { const response = await window.workwise.runtimeRequest(path, method, body === undefined ? undefined : JSON.stringify(body)); if (!response.ok) { let value: { message?: string } = {}; try { value = JSON.parse(response.body) } catch { /* empty */ } throw new Error(value.message ?? `Runtime request failed (${response.status})`) } return JSON.parse(response.body) as T }
 function message(value: unknown): string { return value instanceof Error ? value.message : String(value) }
 function groupRegistry(registry: RegistryEntry[]): Array<[string, RegistryEntry[]]> { const groups = new Map<string, RegistryEntry[]>(); for (const entry of registry) groups.set(entry.category, [...(groups.get(entry.category) ?? []), entry]); return [...groups.entries()] }
+import { takeRequestedFlow, type FlowReference } from '../../store/flow-navigation'

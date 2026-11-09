@@ -901,7 +901,7 @@ describe('claw runtime prompts', () => {
     const prompt = buildClawRuntimePrompt(state, '请创建一个 TXT 并作为附件发送', { channel: state.claw.channels[0] })
 
     expect(prompt).toContain('create the deliverable inside the current workspace')
-    expect(prompt).toContain('WorkWise main process')
+    expect(prompt).toContain('RailWise AI main process')
     expect(prompt).toContain('Do not search for, call, or implement Feishu, Lark, or WeChat sending APIs')
     expect(prompt).toContain('do not claim attachments are unsupported')
   })

@@ -10,6 +10,7 @@ export async function listMemories(store: MemoryStore | undefined, request: Requ
   return jsonResponse({
     memories: await store.list({
       workspace: url.searchParams.get('workspace') ?? undefined,
+      project: url.searchParams.get('project') ?? undefined,
       includeDeleted: url.searchParams.get('include_deleted') === 'true'
     })
   })
@@ -21,7 +22,11 @@ export async function createMemory(store: MemoryStore | undefined, request: Requ
   if (!body.ok) return body.response
   const parsed = MemoryCreateRequest.safeParse(body.value)
   if (!parsed.success) return ERRORS.validation('invalid memory create body', parsed.error.issues)
-  return jsonResponse({ memory: await store.create(parsed.data) }, 201)
+  try {
+    return jsonResponse({ memory: await store.create(parsed.data) }, 201)
+  } catch (error) {
+    return ERRORS.validation(errorMessage(error))
+  }
 }
 
 export async function updateMemory(store: MemoryStore | undefined, id: string, request: Request): Promise<JsonResponse | Response> {

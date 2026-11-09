@@ -4,6 +4,7 @@ const { createReadStream } = require('node:fs')
 const { readdir, readFile, stat, writeFile } = require('node:fs/promises')
 const { basename, join, resolve } = require('node:path')
 const productBrand = require('../src/shared/product-brand.json')
+const { parseArtifactName, readPublicationManifest } = require('./release-publication.cjs')
 
 function usage() {
   console.error(`Usage:
@@ -135,9 +136,9 @@ async function listChecksumTargets(distDir) {
   const entries = await readdir(distDir)
   return entries
     .filter((name) =>
-      /^WorkWise-.+/.test(name) ||
+      Boolean(parseArtifactName(name)) ||
       /^latest(?:-mac)?\.yml$/.test(name) ||
-      name === 'latest.json'
+      name === 'latest.json' || name === 'publication-manifest.json'
     )
     .sort()
 }
@@ -221,6 +222,13 @@ async function main() {
   if (entries.has('latest.yml')) await assertUpdateFile(distDir, 'latest.yml')
   if (entries.has('latest-mac.yml')) await assertUpdateFile(distDir, 'latest-mac.yml')
   if (entries.has('latest.json')) await assertLatestJson(distDir)
+  if (entries.has('publication-manifest.json')) {
+    const manifest = readPublicationManifest(join(distDir, 'publication-manifest.json'))
+    for (const file of manifest.files) {
+      const path = join(distDir, file.name)
+      if ((await fileInfo(path)).size !== file.size || await hashFile(path, 'sha256', 'hex') !== file.sha256 || await hashFile(path, 'sha512', 'base64') !== file.sha512) throw new Error(`Publication asset mismatch: ${file.name}`)
+    }
+  }
   if (!entries.has('latest.yml') && !entries.has('latest-mac.yml')) {
     throw new Error(`No latest.yml or latest-mac.yml found in ${distDir}.`)
   }

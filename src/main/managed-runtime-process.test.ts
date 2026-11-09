@@ -116,7 +116,7 @@ describe('startManagedRuntimeChild', () => {
     expect(logText).toContain('WORKWISE_RUNTIME_READY')
     expect(logText).not.toContain('KUN_READY')
     expect(logText).not.toContain('kun runtime')
-    expect(logText).toContain('WorkWise Runtime listening')
+    expect(logText).toContain('RailWise AI Runtime listening')
     expect(logText).toContain('[runtime pid=')
     expect(logText).toContain('ready marker received on port 8899')
     expect(logText).not.toContain('managed-runtime-test-flow-key')
@@ -248,7 +248,7 @@ describe('startManagedRuntimeChild', () => {
       createSettings(script),
       { autoInstallBundledAgentPack: false }
     )).rejects.toThrow(
-      /WorkWise Runtime exited during startup with code 23[\s\S]*bind failed on port 8899/
+      /RailWise AI Runtime exited during startup with code 23[\s\S]*bind failed on port 8899/
     )
     expect(module.isManagedRuntimeChildRunning()).toBe(false)
     await module.stopManagedRuntimeChildAndWait()

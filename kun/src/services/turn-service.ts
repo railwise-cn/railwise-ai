@@ -150,6 +150,19 @@ export class TurnService {
     }
   }
 
+  /** Conversation receipts are durable history, not model execution Turns. */
+  async recordCommandExchange(input: {threadId:string;commandId:string;userText:string;assistantText:string;createdAt:string}): Promise<void> {
+    const turnId=`command_${input.commandId}`
+    const existing = new Set((await this.deps.sessionStore.loadItems(input.threadId)).map(item=>item.id))
+    const recorded = new Set((await this.deps.sessionStore.loadEventsSince(input.threadId,0)).filter(event=>event.kind==='item_created').map(event=>'itemId' in event?event.itemId:undefined))
+    const items = [makeUserItem({id:`item_${turnId}_user`,turnId,threadId:input.threadId,text:input.userText}),makeAssistantTextItem({id:`item_${turnId}_receipt`,turnId,threadId:input.threadId,text:input.assistantText,status:'completed'})]
+    for(const value of items) {
+      const item={...value,createdAt:input.createdAt,finishedAt:input.createdAt}
+      if (!existing.has(item.id)) await this.deps.sessionStore.appendItem(input.threadId,item)
+      if (!recorded.has(item.id)) await this.deps.events.record({kind:'item_created',threadId:input.threadId,turnId,itemId:item.id,item})
+    }
+  }
+
   private async recordCompletedTurnInternal(input: {
     threadId: string
     userText: string
@@ -406,6 +419,7 @@ export class TurnService {
       this.deps.tasks?.ensureTask({
         thread,
         turnId,
+        ...(this.deps.tasks.activeTask(thread.id)?.activeTurnId === sourceTurn.id ? {continuationTaskId:this.deps.tasks.activeTask(thread.id)!.id} : {}),
         // This is internal task metadata only. The model receives the
         // persisted structured ui_action item, never this label as a user
         // message or turn prompt.
@@ -431,6 +445,7 @@ export class TurnService {
   }): Promise<StartTurnResponse> {
     const thread = await this.deps.threadStore.get(input.threadId)
     if (!thread) throw new Error(`thread not found: ${input.threadId}`)
+    if (input.request.taskIntent === 'status') throw Object.assign(new Error('Use task-commands status to read a task without starting a Turn.'), { code: 'task_intent_required' })
     const idempotencyKey = input.request.idempotencyKey?.trim()
     if (idempotencyKey) {
       const existing = thread.turns.find((turn) => turn.idempotencyKey === idempotencyKey)
@@ -553,8 +568,13 @@ export class TurnService {
     }
   }
 
-  async steerTurn(input: { threadId: string; turnId: string; text: string }): Promise<void> {
-    this.deps.steering.enqueue(input.turnId, input.text)
+  async steerTurn(input: { threadId: string; turnId: string; text: string; inputId?: string }): Promise<void> {
+    const thread = await this.deps.threadStore.get(input.threadId)
+    const turn = thread?.turns.find(candidate => candidate.id === input.turnId)
+    if (!turn || turn.status !== 'running') {
+      throw Object.assign(new Error('turn is no longer accepting steering'), { code: 'invalid_state' })
+    }
+    this.deps.steering.enqueueEntry(input.turnId, input.text, input.inputId)
     await this.deps.events.record({
       kind: 'turn_steered',
       threadId: input.threadId,
@@ -574,7 +594,7 @@ export class TurnService {
           this.deps.userInputGate?.resolve(pending.id, { status: 'cancelled' })
         }
       }
-      this.deps.steering.clear()
+      this.deps.steering.clear(input.turnId)
       this.inflightTurns.delete(input.turnId)
       this.deps.inflight.end(input.turnId)
       this.deps.tasks?.cancel(input.threadId, '用户取消了任务。')
@@ -684,7 +704,7 @@ export class TurnService {
     try {
     this.inflightTurns.delete(input.turnId)
     this.deps.inflight.end(input.turnId)
-    this.deps.steering.clear()
+    this.deps.steering.clear(input.turnId)
     await this.finalizePersistedOpenItems(input.threadId, input.turnId, input.status)
     await this.upsertThread(input.threadId, (current) => {
       const next = current.turns.map((t) => {
@@ -862,7 +882,7 @@ export class TurnService {
     this.rememberTerminalTurn(turnId)
     this.inflightTurns.delete(turnId)
     this.deps.inflight.end(turnId)
-    this.deps.steering.clear()
+    this.deps.steering.clear(turnId)
     try {
       await this.upsertThread(threadId, (current) => {
         const turns = current.turns.map((turn) =>

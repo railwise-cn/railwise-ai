@@ -232,7 +232,7 @@ describe('plugin package formats', () => {
     expect(prepared.package.permissions.map((permission) => permission.kind)).toEqual(
       expect.arrayContaining(['network', 'credentials'])
     )
-    expect(prepared.warnings).toContain('Codex App Connector metadata is preserved but cannot run in WorkWise.')
+    expect(prepared.warnings).toContain('Codex App Connector metadata is preserved but cannot run in RailWise AI.')
     expect(prepared.compatibility).toEqual({ workwiseCompatible: true, reasons: [] })
   })
 

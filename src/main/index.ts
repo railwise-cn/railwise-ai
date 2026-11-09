@@ -152,7 +152,7 @@ import {
 } from '../shared/window-appearance'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-// 品牌升级为 WorkWise Runtime 后仍保留旧 AppUserModelId:它必须和 electron-builder
+// 品牌升级为 RailWise AI Runtime 后仍保留旧 AppUserModelId:它必须和 electron-builder
 // 的 appId 一致才能让 Windows 通知 / 任务栏分组在升级前后连续,而
 // appId 因为 NSIS 升级 GUID 与 macOS 更新签名校验的原因永远不改。
 const APP_USER_MODEL_ID = 'com.wangjiawei508.workgpt'
@@ -853,7 +853,7 @@ function queueRuntimeSettingsApply(prev: AppSettingsV1, next: AppSettingsV1): vo
       await restartManagedRuntimeForSettingsChange(anchor, current)
     })
     .catch((error: unknown) => {
-      logWarn('settings-apply', 'Failed to apply WorkWise Runtime runtime settings in background', {
+      logWarn('settings-apply', 'Failed to apply RailWise AI Runtime runtime settings in background', {
         message: error instanceof Error ? error.message : String(error)
       })
     })
@@ -877,7 +877,7 @@ function queueRuntimeMcpConfigApply(settings: AppSettingsV1): void {
       await restartManagedRuntimeForMcpConfigChange(current)
     })
     .catch((error: unknown) => {
-      logWarn('mcp-config', 'Failed to apply WorkWise Runtime MCP config change in background', {
+      logWarn('mcp-config', 'Failed to apply RailWise AI Runtime MCP config change in background', {
         message: error instanceof Error ? error.message : String(error)
       })
     })
@@ -897,7 +897,7 @@ async function waitForQueuedRuntimeSettingsApply(): Promise<void> {
 
 /**
  * Build a stable fingerprint of the settings that affect the
- * WorkWise Runtime runtime so that `ensureRuntime` can debounce on real
+ * RailWise AI Runtime runtime so that `ensureRuntime` can debounce on real
  * state instead of on a single in-flight promise. Without this,
  * a fresh call that arrives while a failing ensure is still pending
  * would re-throw the old error.
@@ -971,7 +971,7 @@ async function ensureManagedRuntime(settings: AppSettingsV1): Promise<void> {
   if (!started) {
     throw runtimeJsonError(
       'runtime_unhealthy',
-      'WorkWise Runtime did not become healthy after launch.'
+      'RailWise AI Runtime did not become healthy after launch.'
     )
   }
 
@@ -1090,7 +1090,7 @@ function createWindow(options: { suppressInitialShow?: boolean } = {}): void {
 }
 
 /**
- * Stable equality for the WorkWise Runtime runtime settings. Most fields are flat,
+ * Stable equality for the RailWise AI Runtime runtime settings. Most fields are flat,
  * but GUI-managed capability options can be nested, so compare values
  * structurally while still surviving future field additions.
  */
@@ -1158,10 +1158,10 @@ async function restartManagedRuntimeForSettingsChange(
     await adapter.ensureRunning(next)
     const healthy = await waitForRuntimeHealth(next, 20_000)
     if (!healthy) {
-      console.warn('[workwise] WorkWise Runtime restart did not become healthy after settings change')
+      console.warn('[workwise] RailWise AI Runtime restart did not become healthy after settings change')
     }
   } catch (e) {
-    console.warn('[workwise] WorkWise Runtime restart failed after settings change:', e)
+    console.warn('[workwise] RailWise AI Runtime restart failed after settings change:', e)
   }
 }
 
@@ -1179,10 +1179,10 @@ async function restartManagedRuntimeForMcpConfigChange(settings: AppSettingsV1):
     await adapter.ensureRunning(settings)
     const healthy = await waitForRuntimeHealth(settings, 20_000)
     if (!healthy) {
-      console.warn('[workwise] WorkWise Runtime restart did not become healthy after MCP config change')
+      console.warn('[workwise] RailWise AI Runtime restart did not become healthy after MCP config change')
     }
   } catch (e) {
-    console.warn('[workwise] WorkWise Runtime restart failed after MCP config change:', e)
+    console.warn('[workwise] RailWise AI Runtime restart failed after MCP config change:', e)
   }
 }
 
@@ -1192,14 +1192,14 @@ async function waitForManagedRuntimeReadyBeforeStop(
 ): Promise<void> {
   const healthy = await waitForRuntimeHealth(settings, 20_000)
   if (!healthy) {
-    logWarn(source, 'WorkWise Runtime did not become healthy before a managed restart; stopping it anyway')
+    logWarn(source, 'RailWise AI Runtime did not become healthy before a managed restart; stopping it anyway')
     return
   }
   const idle = await waitForRuntimeTurnsIdle({ settings })
   if (idle === 'timeout') {
-    logWarn(source, 'WorkWise Runtime still has running turns after waiting; stopping it anyway')
+    logWarn(source, 'RailWise AI Runtime still has running turns after waiting; stopping it anyway')
   } else if (idle === 'unavailable') {
-    logWarn(source, 'Could not verify WorkWise Runtime turn idleness before a managed restart; stopping it anyway')
+    logWarn(source, 'Could not verify RailWise AI Runtime turn idleness before a managed restart; stopping it anyway')
   }
 }
 
@@ -1591,7 +1591,7 @@ app.whenReady().then(async () => {
   if (resolveConfiguredApiKey(initial)) {
     setTimeout(() => {
       void managedRuntimeAdapter.resolveExecutable(initial).catch((err) => {
-        console.warn('[workwise] prewarm WorkWise Runtime binary:', err)
+        console.warn('[workwise] prewarm RailWise AI Runtime binary:', err)
       })
     }, 1500)
   }
@@ -1619,7 +1619,7 @@ app.whenReady().then(async () => {
       .finally(() => app.exit(1))
     return
   }
-  dialog.showErrorBox('WorkWise Runtime failed to start', message)
+  dialog.showErrorBox('RailWise AI Runtime failed to start', message)
   app.quit()
 })
 }
@@ -1630,7 +1630,7 @@ if (!runningImCredentialHelper) {
     isQuitting = true
     void stopManagedRuntimesForQuit()
       .catch((error) => {
-        console.warn('[workwise] failed to stop WorkWise Runtime runtime:', error)
+        console.warn('[workwise] failed to stop RailWise AI Runtime runtime:', error)
         managedRuntimesStoppedForQuit = true
       })
       .finally(() => app.quit())
@@ -1642,7 +1642,7 @@ if (!runningImCredentialHelper) {
     event.preventDefault()
     void stopManagedRuntimesForQuit()
       .catch((error) => {
-        console.warn('[workwise] failed to stop WorkWise Runtime runtime:', error)
+        console.warn('[workwise] failed to stop RailWise AI Runtime runtime:', error)
         managedRuntimesStoppedForQuit = true
       })
       .finally(() => {

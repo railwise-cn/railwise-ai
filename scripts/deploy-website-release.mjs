@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import publication from './release-publication.cjs'
 
 import { createHash } from 'node:crypto'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
@@ -115,17 +116,10 @@ function r2StagingPrefix(releasePrefix, deployId) {
 }
 
 function normalizeReleasePrefix(value) {
-  const prefix = String(value || '').trim().replace(/^\/+|\/+$/g, '')
-  if (prefix === 'workwise') return { prefix, relative: '', acceptanceRunId: '' }
-  const acceptance = prefix.match(/^workwise\/acceptance\/([1-9]\d*)$/)
-  if (!acceptance) {
-    throw new Error('Release prefix must be workwise or workwise/acceptance/<positive-run-id>.')
-  }
-  return {
-    prefix,
-    relative: `acceptance/${acceptance[1]}`,
-    acceptanceRunId: acceptance[1]
-  }
+  try {
+    const { prefix, relative, acceptanceRunId } = publication.namespace(value)
+    return { prefix, relative, acceptanceRunId }
+  } catch { throw new Error('Release prefix must be a recognized namespace or an exact acceptance run.') }
 }
 
 function normalizeWebsiteRoot(value) {
@@ -425,7 +419,7 @@ def download_part(job):
     for attempt in range(4):
         try:
             request = urllib.request.Request(url, headers={
-                'User-Agent': 'WorkWise-release-delivery/1',
+                'User-Agent': 'RailWise-AI-release-delivery/1',
                 'Range': f'bytes={start}-{end}',
             })
             with urllib.request.urlopen(request, timeout=120) as response, part.open('wb') as output:
@@ -744,6 +738,24 @@ fi
 printf '%s\n' "$target"
 `
 
+function ensurePublicDownloadAlias(config) {
+  const canonical = publication.policy.downloadNamespace
+  const legacy = publication.policy.storageNamespace
+  const script = `set -euo pipefail
+root="$1"
+parent="$(dirname "$root")"
+canonical="$parent/$2"
+legacy="$parent/$3"
+test "$root" = "$legacy"
+if test -e "$canonical" || test -L "$canonical"; then
+  test "$(readlink -f "$canonical")" = "$(readlink -f "$legacy")" || { echo "Refusing to replace an unrelated public download directory" >&2; exit 1; }
+else
+  ln -s "$3" "$canonical"
+fi
+`
+  runRemote(config, script, [config.root, canonical, legacy])
+}
+
 async function stageRelease(flags) {
   const sourceDir = resolve(requireFlag(flags, 'source'))
   const tag = normalizeTag(requireFlag(flags, 'tag'))
@@ -759,6 +771,7 @@ async function stageRelease(flags) {
   }
   await validateSourceDirectory(sourceDir, tag)
   const config = readSshConfig()
+  if (!releasePrefix.acceptanceRunId) ensurePublicDownloadAlias(config)
   const output = runRemote(config, INIT_STAGE_SCRIPT, [
     config.root,
     releasePrefix.relative,
@@ -819,6 +832,7 @@ function promoteRelease(flags) {
     throw new Error('Acceptance deploy id must include its GitHub run id.')
   }
   const config = readSshConfig()
+  if (!releasePrefix.acceptanceRunId) ensurePublicDownloadAlias(config)
   process.stdout.write(runRemote(config, PROMOTE_SCRIPT, [
     config.root,
     releasePrefix.relative,

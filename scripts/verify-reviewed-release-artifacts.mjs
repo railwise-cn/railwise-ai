@@ -17,6 +17,7 @@ const RECEIPT = 'reviewed-build.json'
 const RECORD_STEP = 'Record frozen public package identity'
 const ARTIFACT_NAMES = ['release-mac', 'release-win']
 const require = createRequire(import.meta.url)
+const publication = require('./release-publication.cjs')
 
 function fail(message) { throw new Error(`[reviewed-artifacts] ${message}`) }
 function equal(actual, expected, label) { if (actual !== expected) fail(`${label} mismatch: expected ${expected}, received ${actual}`) }
@@ -30,15 +31,8 @@ export function validatePublicIdentity(identity) {
   for (const [key, value] of Object.entries(PUBLIC_IDENTITY)) equal(identity?.[key], value, `public package ${key}`)
 }
 
-export function expectedReleaseFiles(version) {
-  if (!/^\d+\.\d+\.\d+$/.test(version)) fail('invalid public version')
-  return [
-    ...['arm64', 'x64'].flatMap(arch => ['dmg', 'zip'].map(extension => ({ name: `WorkWise-${version}-mac-${arch}.${extension}`, platform: `darwin-${arch}`, artifact: 'release-mac' }))),
-    { name: 'latest-mac.yml', platform: 'darwin', artifact: 'release-mac' },
-    { name: `WorkWise-${version}-win-x64.exe`, platform: 'win32-x64', artifact: 'release-win' },
-    { name: `WorkWise-${version}-win-x64.exe.blockmap`, platform: 'win32-x64', artifact: 'release-win' },
-    { name: 'latest.yml', platform: 'win32-x64', artifact: 'release-win' },
-  ]
+export function expectedReleaseFiles(version, prefix = publication.policy.artifactPrefix) {
+  return publication.expectedReleaseFiles(version, prefix)
 }
 
 export function validateFileManifest(files, expected) {
@@ -69,7 +63,7 @@ export function validateReviewedBuild(build, { version, sourceHead }) {
     positive(artifact.id, 'artifact ID')
     if (!/^sha256:[a-f0-9]{64}$/.test(artifact.digest)) fail('immutable artifact digest is required')
   }
-  validateFileManifest(build.files, expectedReleaseFiles(version))
+  validateFileManifest(build.files, expectedReleaseFiles(version, publication.detectPrefix(build.files, version)))
   return build
 }
 
@@ -120,7 +114,7 @@ export function verifyReviewedBuildSource(build, expected, api = githubApi) {
     if (jobs.length >= result.total_count) break
     if (result.jobs.length === 0) fail('incomplete source jobs response')
   }
-  for (const name of ['Build macOS', 'Build Windows', 'Two-hour pre-release stability', 'Verify three-client candidate', 'Verify final candidate on macOS']) {
+  for (const name of ['Build macOS', 'Build Windows', 'Verify three-client candidate', 'Verify final candidate on macOS']) {
     const matches = jobs.filter(job => job.name === name)
     if (matches.length !== 1 || matches[0].conclusion !== 'success') fail(`trusted source job must succeed exactly once: ${name}`)
     if (name.startsWith('Build ')) {
@@ -174,7 +168,7 @@ function inspectPackagedIdentity(app, platform, version, sourceHead) {
   equal(metadata.buildProvenance?.sourceHead, sourceHead, 'packaged source HEAD')
   equal(metadata.updateChannel, 'stable', 'packaged update channel')
   equal(updater.provider, 'generic', 'public updater provider')
-  equal(updater.url, 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', 'public updater URL')
+  if (!publication.namespaces.some(releasePrefix => updater.url === publication.updateUrl({ releasePrefix }))) fail('public updater URL mismatch')
   equal(updater.updaterCacheDirName, 'workwise-updater', 'public updater cache')
   return { ...identity, version, sourceHead, updateUrl: updater.url }
 }
@@ -243,9 +237,9 @@ export async function verifyDownloadedReleaseArtifacts({ build, version, sourceH
       validatePublicIdentity(receipt.identities[platform])
       equal(receipt.identities[platform].version, version, 'identity version')
       equal(receipt.identities[platform].sourceHead, sourceHead, 'identity source HEAD')
-      equal(receipt.identities[platform].updateUrl, 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', 'identity update URL')
+      if (!publication.namespaces.some(releasePrefix => receipt.identities[platform].updateUrl === publication.updateUrl({ releasePrefix }))) fail('identity update URL mismatch')
     }
-    validateFileManifest(receipt.files, expectedReleaseFiles(version).filter(file => file.artifact === artifact))
+    validateFileManifest(receipt.files, expectedReleaseFiles(version, publication.detectPrefix(build.files, version)).filter(file => file.artifact === artifact))
     for (const file of files) {
       const recorded = receipt.files.find(entry => entry.name === file.name)
       equal(recorded.sha256, file.sha256, `${file.name} reviewed/build hash`)

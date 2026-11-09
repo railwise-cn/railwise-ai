@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { FlowRepository } from './repository.js'
@@ -41,6 +41,14 @@ export class FlowWebhookSecurity {
   }
 
   async verify(triggerId: string, request: Request): Promise<{ flowId: string; nodeId: string; input: unknown }> {
+    const verified = await this.verifyForReceipt(triggerId, request)
+    this.repository.pruneNonces(this.now() - REPLAY_WINDOW_MS)
+    if (!this.repository.rememberNonce(triggerId, verified.nonce, verified.acceptedAt)) throw webhookError('webhook_replay', 'Webhook nonce was already used')
+    return { flowId: verified.flowId, nodeId: verified.nodeId, input: verified.input }
+  }
+
+  /** Authentication alone must not consume a nonce before the inbox commit. */
+  async verifyForReceipt(triggerId: string, request: Request): Promise<{ flowId: string; nodeId: string; input: unknown; nonce: string; fingerprint: string; acceptedAt: number }> {
     const contentLength = Number(request.headers.get('content-length') ?? 0)
     if (contentLength > MAX_BODY_BYTES) throw webhookError('webhook_body_limit', 'Webhook request exceeds 1 MiB')
     const body = Buffer.from(await request.arrayBuffer()); if (body.length > MAX_BODY_BYTES) throw webhookError('webhook_body_limit', 'Webhook request exceeds 1 MiB')
@@ -53,10 +61,8 @@ export class FlowWebhookSecurity {
     const secret = await this.secrets.get(reference.safeStorageKey); if (!secret) throw webhookError('webhook_credential_missing', 'Webhook credential is unavailable')
     const expected = createHmac('sha256', secret).update(timestampText).update('.').update(nonce).update('.').update(body).digest(); const supplied = /^[a-f0-9]{64}$/i.test(signatureText) ? Buffer.from(signatureText, 'hex') : Buffer.alloc(0)
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw webhookError('webhook_signature_invalid', 'Webhook signature is invalid')
-    this.repository.pruneNonces(this.now() - REPLAY_WINDOW_MS)
-    if (!this.repository.rememberNonce(triggerId, nonce, this.now())) throw webhookError('webhook_replay', 'Webhook nonce was already used')
     let input: unknown; try { input = body.length ? JSON.parse(body.toString('utf8')) : {} } catch { input = { body: body.toString('utf8') } }
-    return { flowId: state.flowId, nodeId: state.nodeId, input }
+    return { flowId: state.flowId, nodeId: state.nodeId, input, nonce, fingerprint: createHash('sha256').update(triggerId).update('.').update(timestampText).update('.').update(nonce).update('.').update(body).digest('hex'), acceptedAt: this.now() }
   }
 
   private enforceRate(triggerId: string): void { const cutoff = this.now() - 60_000; const recent = (this.rates.get(triggerId) ?? []).filter((time) => time > cutoff); if (recent.length >= RATE_LIMIT) throw webhookError('webhook_rate_limit', 'Webhook rate limit exceeded'); recent.push(this.now()); this.rates.set(triggerId, recent) }

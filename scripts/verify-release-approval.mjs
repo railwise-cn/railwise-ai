@@ -141,7 +141,7 @@ function requireFrozenUpdaterEvidence(evidence, reviewedBuild, packageIdentity, 
 
   const baselinePin = FROZEN_BASELINE_PINS[machine.arch]
   equal(machine.baselineAsset, { tag: `v${FROZEN_BASE_VERSION}`, ...baselinePin }, 'pinned official installer')
-  const zip = reviewedBuild.files.find(file => file.name === `WorkWise-${version}-mac-${machine.arch}.zip`)
+  const zip = reviewedBuild.files.find(file => file.name.endsWith(`-${version}-mac-${machine.arch}.zip`))
   const manifest = reviewedBuild.files.find(file => file.name === 'latest-mac.yml')
   equal(machine.targetZipSha256, zip?.sha256, 'exact frozen updater ZIP')
   equal(machine.frozenManifestSha256, manifest?.sha256, 'exact frozen update manifest')

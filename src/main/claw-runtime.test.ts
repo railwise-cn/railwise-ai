@@ -1421,7 +1421,7 @@ describe('ClawRuntime', () => {
       })).resolves.toMatchObject({
         ok: false,
         reason: 'authorization_required',
-        message: '任务正在等待授权，尚未完成。请在 WorkWise 中处理授权后重试。'
+        message: '任务正在等待授权，尚未完成。请在 RailWise AI 中处理授权后重试。'
       })
 
       await expect(runWithDetail({
@@ -1430,7 +1430,7 @@ describe('ClawRuntime', () => {
       })).resolves.toMatchObject({
         ok: false,
         reason: 'user_input_required',
-        message: '任务正在等待补充信息，尚未完成。请在 WorkWise 中处理后重试。'
+        message: '任务正在等待补充信息，尚未完成。请在 RailWise AI 中处理后重试。'
       })
     } finally {
       vi.useRealTimers()
@@ -3968,7 +3968,7 @@ describe('ClawRuntime', () => {
     expect(send).toHaveBeenCalledTimes(2)
     const welcomeCall = send.mock.calls[0] as unknown as [string, { markdown?: string }, Record<string, unknown>]
     expect(welcomeCall[0]).toBe('oc_chat_a')
-    expect(welcomeCall[1].markdown).toContain('WorkWise Runtime')
+    expect(welcomeCall[1].markdown).toContain('RailWise AI Runtime')
     expect(welcomeCall[1].markdown).toContain('`/new`')
     expect(welcomeCall[1].markdown).toContain('`/model`')
     expect(welcomeCall[2]).toEqual({})
@@ -4169,7 +4169,7 @@ describe('ClawRuntime', () => {
     }).handleWebhook(req, res)
 
     const reply = String(JSON.parse(responseBody).reply)
-    expect(reply).toContain('WorkWise Runtime')
+    expect(reply).toContain('RailWise AI Runtime')
     expect(reply).toContain('`/new`')
     expect(reply.endsWith('hello from GUI')).toBe(true)
     expect(current().claw.channels[0].welcomeSentAt).toBeTruthy()

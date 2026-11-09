@@ -22,7 +22,7 @@ const progress = createEvidenceReporter(join(evidence, 'tls-preflight.json'), re
 let feed
 try {
   const { certificate, key, certificateSha256 } = createPrivateCertificate(root)
-  const zipPath = join(root, 'WorkWise-Candidate-aaaaaaaaaaaa-0.5.0-mac-arm64.zip')
+  const zipPath = join(root, 'RailWise-AI-Candidate-aaaaaaaaaaaa-0.5.0-mac-arm64.zip')
   const expectedBytes = 'private transport preflight; not an application package'
   writeFileSync(zipPath, expectedBytes)
   feed = await startPrivateUpdaterFeed({ cert: certificate, key, zipPath, version: '0.5.0' })

@@ -218,7 +218,9 @@ export function registerRuntimeSseIpc(options: {
 }): void {
   const { ipcMain, store, ensureRuntime, logError } = options
   ipcMain.handle('runtime:sse:start', async (event, args: unknown) => {
-    const request = sseStartPayloadSchema.parse(args)
+    const parsedRequest = sseStartPayloadSchema.parse(args)
+    if (parsedRequest.scope === 'thread' && !parsedRequest.threadId) throw new Error('A thread stream requires threadId.')
+    const request = { ...parsedRequest, threadId: parsedRequest.threadId ?? '@tasks' }
     const s = await store.load()
     await ensureRuntime(s)
     const requestedId = request.streamId?.trim() ?? ''
@@ -286,8 +288,9 @@ export function registerRuntimeSseIpc(options: {
       let reconnectDelayMs = SSE_RECONNECT_BASE_MS
       try {
         while (!state.stoppedByClient && !ac.signal.aborted) {
-          const url = new URL(`${base}${runtimeThreadEventsPath(request.threadId)}`)
+          const url = new URL(`${base}${request.scope === 'tasks' ? '/v1/tasks/stream' : runtimeThreadEventsPath(request.threadId)}`)
           url.searchParams.set('since_seq', String(nextSinceSeq))
+          if (request.scope === 'tasks') headers['Last-Event-ID'] = String(nextSinceSeq)
           const requestHeaders = { ...headers }
           if (nextSinceSeq > 0) {
             requestHeaders['Last-Event-ID'] = String(nextSinceSeq)

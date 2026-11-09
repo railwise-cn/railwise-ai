@@ -74,7 +74,7 @@ test('a frozen exact installer/update file set is copied without changing bytes'
 
 test('file tampering, set mismatches and unsafe filesystem entries fail before output', async t => {
   const changes = {
-    missing: f => rmSync(join(f.downloads, 'release-win', `WorkWise-${version}-win-x64.exe.blockmap`)),
+    missing: f => rmSync(join(f.downloads, 'release-win', expectedReleaseFiles(version).find(file => file.name.endsWith('.blockmap')).name)),
     extra: f => writeFileSync(join(f.downloads, 'release-win', 'secret.txt'), 'unexpected'),
     nested: f => mkdirSync(join(f.downloads, 'release-win', 'nested')),
     hash: f => writeFileSync(join(f.downloads, 'release-win', 'latest.yml'), 'x'.repeat('latest.yml'.length)),
@@ -153,6 +153,17 @@ test('source provenance requires successful trusted workflow and immutable artif
   assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
 })
 
+test('optional stability may be skipped without inventing a successful job', t => {
+  const f = fixture(t); const g = githubFixture(f.build)
+  const stability = g.jobs.find(job => job.name === 'Two-hour pre-release stability')
+  stability.conclusion = 'skipped'
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
+  assert.equal(stability.conclusion, 'skipped')
+  g.jobs.splice(g.jobs.indexOf(stability), 1)
+  g.responses[`${g.root}/actions/runs/${f.build.runId}/attempts/${f.build.runAttempt}/jobs?per_page=100&page=1`].total_count = g.jobs.length
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
+})
+
 test('a freeze at the current protected main head uses the real identical comparison shape', t => {
   const f = fixture(t); const g = githubFixture(f.build)
   g.branch.commit.sha = sourceHead
@@ -182,7 +193,6 @@ test('wrong repository, workflow, source, attempt, failed runs and arbitrary art
     inProgress: g => { g.run.status = 'in_progress' },
     failed: g => { g.run.conclusion = 'failure' },
     rerun: g => { g.run.run_attempt += 1 },
-    skippedStability: g => { g.jobs.find(job => job.name === 'Two-hour pre-release stability').conclusion = 'skipped' },
     ordinaryCandidate: g => { g.jobs[0].steps[0].conclusion = 'skipped' },
     duplicateBuildJob: g => g.jobs.push({ ...g.jobs[0] }),
     artifactId: g => { g.artifacts[0].id += 1 },

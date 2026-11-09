@@ -129,7 +129,7 @@ async function managedUvLaunch(
   if (runtime.managedRuntime !== 'uv') throw new Error('Managed MCPB runtime metadata is invalid.')
   const executable = runtime.executable?.replaceAll('\\', '/').split('/').at(-1)?.toLowerCase()
   if (executable !== 'uv' && executable !== 'uv.exe') {
-    throw new Error('Managed MCPB runtime must use the WorkWise uv executable.')
+    throw new Error('Managed MCPB runtime must use the RailWise AI uv executable.')
   }
   const originalArgs = runtime.args ?? []
   if (originalArgs[0] !== 'run' || originalArgs.length < 2) {

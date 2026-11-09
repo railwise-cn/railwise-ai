@@ -477,6 +477,30 @@ describe('app-ipc-schemas', () => {
     }).path).toBe('/v1/threads/thr_1/agent')
   })
 
+  it('allows the durable task workspace endpoints with bounded query keys', () => {
+    const task = '/v1/tasks/task_1'
+    const template = '/v1/task-templates/research-document'
+    for (const request of [
+      { path: '/v1/tasks?workspaceRoot=%2Fworkspace&search=report&limit=100&offset=0', method: 'GET' },
+      { path: `${task}/pause`, method: 'POST', body: '{}' },
+      { path: `${task}/inputs`, method: 'GET' },
+      { path: `${task}/inputs`, method: 'POST', body: '{}' },
+      { path: `${task}/events?afterSequence=2`, method: 'GET' },
+      { path: '/v1/inbox?workspaceRoot=%2Fworkspace', method: 'GET' },
+      { path: '/v1/task-templates', method: 'GET' },
+      { path: `${template}/start`, method: 'POST', body: '{}' },
+      { path: `${template}/save`, method: 'POST', body: '{}' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(true)
+    for (const request of [
+      { path: `${task}/pause`, method: 'GET' },
+      { path: `${task}/inputs?search=unexpected`, method: 'GET' },
+      { path: `${task}/events?unexpected=1`, method: 'GET' },
+      { path: '/v1/inbox?limit=1', method: 'GET' },
+      { path: `${template}/start`, method: 'GET' },
+      { path: '/v1/task-templates/../start', method: 'POST', body: '{}' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
+
   it('allows scoped quality evidence requests but rejects forged outcomes, mutable plans and unbounded reads', () => {
     const base = '/v1/engineering/projects/project_1'
     const plan = { manifestId: 'manifest_1', expectedProjectRevision: 2, idempotencyKey: 'freeze-plan-1', requiredEvidence: [{ id: 'report', title: 'Retain report bytes', memberId: 'output-1' }] }

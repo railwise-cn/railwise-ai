@@ -1,4 +1,5 @@
 const productBrand = require('./src/shared/product-brand.json')
+const publication = require('./scripts/release-publication.cjs')
 const { existsSync, readFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { verifyCandidateSourceTree } = require('./scripts/candidate-source-provenance.cjs')
@@ -107,7 +108,7 @@ const updateChannel = isCandidateBuild ? 'frontier' : requestedUpdateChannel
 const configuredPublicBaseUrl = (process.env.WORKWISE_PUBLIC_BASE_URL || 'https://www.railwise.cn/downloads')
   .trim()
   .replace(/\/+$/, '')
-const releasePrefix = (process.env.WORKWISE_RELEASE_PREFIX || 'workwise')
+const releasePrefix = (process.env.WORKWISE_RELEASE_PREFIX || publication.policy.storageNamespace)
   .trim()
   .replace(/^\/+|\/+$/g, '')
 const explicitUpdateUrl = (process.env.WORKWISE_UPDATE_URL || '').trim()
@@ -266,8 +267,8 @@ const builderConfig = {
     }
   ],
   artifactName: isCandidateBuild
-    ? `WorkWise-Candidate-${candidateSourceHead.slice(0, 12)}-${artifactVersion}-\${os}-\${arch}.\${ext}`
-    : `WorkWise-${artifactVersion}-\${os}-\${arch}.\${ext}`,
+    ? `${publication.policy.artifactPrefix}-Candidate-${candidateSourceHead.slice(0, 12)}-${artifactVersion}-\${os}-\${arch}.\${ext}`
+    : `${publication.policy.artifactPrefix}-${artifactVersion}-\${os}-\${arch}.\${ext}`,
   publish: packagedUpdateProvider === 'github'
     ? [
         {

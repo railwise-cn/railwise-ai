@@ -150,7 +150,7 @@ function truncateValue(
     if (Buffer.byteLength(value, 'utf8') <= maxBytes) return value
     state.changed = true
     state.count += 1
-    return `${sliceUtf8(value, maxBytes)}\n...[truncated by WorkWise tool argument repair]`
+    return `${sliceUtf8(value, maxBytes)}\n...[truncated by RailWise AI tool argument repair]`
   }
   if (Array.isArray(value)) return value.map((item) => truncateValue(item, maxBytes, state))
   if (!isPlainObject(value)) return value

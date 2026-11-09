@@ -11,9 +11,9 @@ import { test } from 'node:test'
 import { parse, stringify } from 'yaml'
 import { parseByteRange, startFrozenReleaseFeed, validateFrozenFeed } from './frozen-release-updater-feed.mjs'
 import { assertHistoricalRowsPreserved, assertRetainedFiles, fixtureServiceIdentity, persistedJsonValue, prepareCompatibilityService, resolveFixtureService, SERVICE_MODULES, snapshotFiles, validateFixtureExecution } from './frozen-release-updater-data.mjs'
-import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
+import { BASELINE_PINS, CLOUDFLARED_PINS, assertFreshProfile, downloadPinned, productPaths, requireExactPackageRunner, requireFrozenRunner, retainNativeUpdaterReport, sanitizeRetainedText, stopOwnedApplications, validateNativeReport, validatePublicBundle, validateTunnelUrl, validateUpdaterBuildProvenance, verifyExactPackageArtifacts, waitForFrozenManifest, waitForTunnelConnection } from './run-frozen-release-updater-acceptance.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, validateReviewedBuild } from './verify-reviewed-release-artifacts.mjs'
-import { FROZEN_BASE_VERSION, readFrozenSourceVersion, validateFrozenTargetVersion } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, readFrozenSourceVersion, resolveUpdaterBaseline, validateFrozenTargetVersion } from './frozen-release-version.mjs'
 
 function temporary(t) { const root = mkdtempSync(join(tmpdir(), 'railwise-frozen-updater-test-')); t.after(() => rmSync(root, { recursive: true, force: true })); return root }
 function hostedEnvironment() {
@@ -257,6 +257,47 @@ test('stable targets must advance from the latest published baseline and reject 
     assert.throws(() => validateFrozenTargetVersion(version))
   }
   assert.equal(readFrozenSourceVersion(), JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version)
+})
+
+test('new smoke selects the exact official 0.5.4 installers while retaining historical baseline evidence', () => {
+  const baseline = resolveUpdaterBaseline('0.5.4')
+  assert.equal(baseline.pins.arm64.sha256, 'ad766839b02f3b7ae5a290641715b3075cdd46caf08ef9ed92b0d21dfe11b21d')
+  assert.equal(baseline.pins.x64.sha256, 'b58822e31f7029801521db6371e6b12d1f7204b1d6b8581b5be7cac7d1743563')
+  assert.deepEqual(resolveUpdaterBaseline('0.5.3').pins, BASELINE_PINS)
+  assert.equal(validateFrozenTargetVersion('0.5.5', baseline.version), '0.5.5')
+  for (const target of ['0.5.4', '0.5.3']) assert.throws(() => validateFrozenTargetVersion(target, baseline.version))
+  for (const version of ['0.5.2', '0.5.9', 'v0.5.4']) assert.throws(() => resolveUpdaterBaseline(version))
+  for (const patch of [{ name: 'RailWise-AI-0.5.4-win-x64.exe' }, { name: 'WorkWise-0.5.4-mac-Intel.dmg' }, { name: 'WorkWise-0.5.5-mac-Apple-Silicon.dmg' }, { sha256: 'not-a-hash' }, { size: 0 }]) {
+    const manifest = { versions: { '0.5.4': { 'darwin-arm64': { ...baseline.pins.arm64, ...patch }, 'darwin-x64': baseline.pins.x64 } } }
+    assert.throws(() => resolveUpdaterBaseline('0.5.4', manifest), /installer pin/)
+  }
+})
+
+test('private exact-package smoke accepts its release branch without authorizing reviewed-main provenance', () => {
+  const env = { ...hostedEnvironment(), GITHUB_REF: 'refs/heads/codex/example', GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/release.yml@refs/heads/codex/example` }
+  assert.equal(requireExactPackageRunner(env, 'darwin', '/runner/home').mode, 'private-exact-package-smoke')
+  assert.throws(() => requireFrozenRunner(env, 'darwin', '/runner/home'))
+  for (const patch of [{ GITHUB_REF: 'refs/tags/v0.5.5' }, { GITHUB_WORKFLOW_REF: `${RELEASE_REPOSITORY}/.github/workflows/other.yml@refs/heads/codex/example` }, { GITHUB_WORKFLOW_SHA: 'f'.repeat(40) }, { GITHUB_REPOSITORY: 'other/repo' }, { RUNNER_ENVIRONMENT: 'self-hosted' }, { WORKWISE_UPDATE_URL: 'https://example.invalid' }]) {
+    assert.throws(() => requireExactPackageRunner({ ...env, ...patch }, 'darwin', '/runner/home'))
+  }
+})
+
+test('private exact-package input verifies both Mac architectures and the manifest before launch', async t => {
+  const root = temporary(t)
+  const files = expectedReleaseFiles('0.5.5').filter(file => file.artifact === 'release-mac')
+  assert.equal(files.length, 5)
+  for (const file of files) writeFileSync(join(root, file.name), `test artifact ${file.name}`)
+  const verified = await verifyExactPackageArtifacts(root, '0.5.5')
+  assert.equal(verified.length, 5)
+  assert.deepEqual(verified.map(file => file.name), files.map(file => file.name))
+  for (const file of verified) assert.equal(file.sha256, createHash('sha256').update(readFileSync(join(root, file.name))).digest('hex'))
+  rmSync(join(root, files[0].name))
+  await assert.rejects(verifyExactPackageArtifacts(root, '0.5.5'), /ENOENT/)
+  writeFileSync(join(root, files[0].name), '')
+  await assert.rejects(verifyExactPackageArtifacts(root, '0.5.5'), /nonempty regular/)
+  rmSync(join(root, files[0].name))
+  symlinkSync(files[1].name, join(root, files[0].name))
+  await assert.rejects(verifyExactPackageArtifacts(root, '0.5.5'), /nonempty regular/)
 })
 
 test('workflow input execution binds reviewed bytes to the checked-out source version and GitHub SHA', t => {
@@ -540,6 +581,10 @@ test('native round trip requires the real six stages and strict nonce verificati
   assert.throws(() => validateNativeReport(report, 'arm64', '0.5.3'), /target/)
   assert.throws(() => validateNativeReport(next, 'arm64', '0.5.3'), /target/)
   assert.throws(() => validateNativeReport(next, 'arm64'), /explicit stable/)
+  const latest = { ...report, baseVersion: '0.5.4', targetVersion: '0.5.5', stages: report.stages.map(stage => stage.name === 'user_data_preserved' ? { ...stage, detail: '0.5.4' } : stage) }
+  assert.doesNotThrow(() => validateNativeReport(latest, 'arm64', '0.5.5', '0.5.4'))
+  assert.throws(() => validateNativeReport(latest, 'arm64', '0.5.5'))
+  assert.throws(() => validateNativeReport({ ...latest, stages: report.stages }, 'arm64', '0.5.5', '0.5.4'))
 })
 
 test('native updater cleanup waits for owned applications after SIGTERM', async t => {

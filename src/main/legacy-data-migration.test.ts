@@ -1,4 +1,5 @@
-import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,6 +8,7 @@ import {
   migrateLegacyUserDataDir,
   rewriteLegacyPathsInSettingsFile,
   runLegacyDataImport,
+  verifyImportedUserData,
   USER_DATA_MIGRATION_MARKER
 } from './legacy-data-migration'
 
@@ -51,6 +53,68 @@ describe('legacy data import', () => {
 
     expect(migrateLegacyUserDataDir({ userDataPath: target }).migrated).toBe(false)
     expect(await readFile(join(target, 'current.txt'), 'utf8')).toBe('current')
+  })
+
+  it.each(['WorkWise', 'workwise', 'RailWise AI', 'RailWise-AI', 'Railwise AI', 'railwise-ai'])('recognizes %s profiles and verifies copied file hashes without changing their source', async name => {
+    const appData = await makeTempRoot()
+    const source = join(appData, name)
+    const target = join(appData, 'CurrentProfile')
+    const settings = '{"schema":"workwise.settings","version":2,"revision":4}'
+    await mkdir(join(source, 'credentials'), { recursive: true })
+    await writeFile(join(source, 'workwise-settings.json'), settings)
+    await writeFile(join(source, 'credentials', 'reference.json'), '{"credentialRef":"local-only"}')
+    const result = migrateLegacyUserDataDir({ userDataPath: target })
+    expect(result.outcome).toBe('imported')
+    expect(result.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: 'workwise-settings.json', sha256: createHash('sha256').update(settings).digest('hex') })]))
+    expect(verifyImportedUserData(target)).toBe(true)
+    expect(await readFile(join(source, 'workwise-settings.json'), 'utf8')).toBe(settings)
+    await writeFile(join(target, 'workwise-settings.json'), 'changed by user')
+    expect(verifyImportedUserData(target)).toBe(false)
+  })
+
+  it('reports multiple valid profile sources without selecting, merging or copying either one', async () => {
+    const appData = await makeTempRoot()
+    for (const name of ['WorkWise', 'RailWise AI']) {
+      await mkdir(join(appData, name))
+      await writeFile(join(appData, name, 'workwise-settings.json'), JSON.stringify({ version: 1, workspaceRoot: name }))
+    }
+    const target = join(appData, 'CurrentProfile')
+    const logs: unknown[] = []
+    const result = migrateLegacyUserDataDir({ userDataPath: target, log: (...args) => logs.push(args) })
+    expect(result).toMatchObject({ migrated: false, outcome: 'conflict', conflictPaths: expect.arrayContaining([join(appData, 'WorkWise'), join(appData, 'RailWise AI')]) })
+    expect(await readdir(appData)).not.toContain('CurrentProfile')
+    expect(logs).toHaveLength(1)
+    expect(await readFile(join(appData, 'WorkWise', 'workwise-settings.json'), 'utf8')).toContain('WorkWise')
+  })
+
+  it('ignores empty, cache-only and malformed sources and keeps a verified previous migration receipt', async () => {
+    const appData = await makeTempRoot()
+    for (const name of ['WorkGPT', 'Kun']) await mkdir(join(appData, name))
+    await writeFile(join(appData, 'WorkGPT', 'workgpt-settings.json'), '{ invalid')
+    await writeFile(join(appData, 'Kun', 'cache.bin'), 'cache')
+    const source = join(appData, 'RailWise AI')
+    await mkdir(source)
+    await writeFile(join(source, 'workwise-settings.json'), '{"version":1}')
+    await writeFile(join(appData, 'outside.txt'), 'outside content stays outside')
+    await symlink(join(appData, 'outside.txt'), join(source, 'external-reference'))
+    await writeFile(join(source, USER_DATA_MIGRATION_MARKER), '{"historical":true}')
+    const target = join(appData, 'CurrentProfile')
+    expect(migrateLegacyUserDataDir({ userDataPath: target }).outcome).toBe('imported')
+    expect(verifyImportedUserData(target)).toBe(true)
+    expect((await lstat(join(target, 'external-reference'))).isSymbolicLink()).toBe(true)
+    expect((await readdir(target)).includes('outside.txt')).toBe(false)
+    expect(JSON.parse(await readFile(join(target, USER_DATA_MIGRATION_MARKER), 'utf8')).previousMarker).toBe('{"historical":true}')
+  })
+
+  it('deduplicates profile aliases without following external content during import', async () => {
+    const appData = await makeTempRoot()
+    const source = join(appData, 'WorkWise')
+    await mkdir(source)
+    await writeFile(join(source, 'workwise-settings.json'), '{"version":1}')
+    await symlink(source, join(appData, 'RailWise AI'), 'dir')
+    const target = join(appData, 'CurrentProfile')
+    expect(migrateLegacyUserDataDir({ userDataPath: target }).outcome).toBe('imported')
+    expect(verifyImportedUserData(target)).toBe(true)
   })
 
   it('copies known home data to WorkWise paths and preserves every source', async () => {

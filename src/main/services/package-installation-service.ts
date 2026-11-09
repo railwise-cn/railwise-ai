@@ -1015,7 +1015,7 @@ export class PackageInstallationService {
       throw new Error('Package review is stale; permissions and provenance must be reviewed again.')
     }
     if (item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') {
-      throw new Error('Package is not available for a direct WorkWise installation.')
+      throw new Error('Package is not available for a direct RailWise AI installation.')
     }
     if (evaluateMarketplaceLicense(item.license).disposition !== 'direct-mirror') {
       throw new Error('Package license is not approved for direct installation.')

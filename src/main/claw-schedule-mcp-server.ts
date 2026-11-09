@@ -78,8 +78,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
   const registerListTool = (name: string): void => {
     server.registerTool(name, {
       description: name.startsWith('claw_')
-        ? 'Legacy alias. List scheduled tasks managed by the currently running WorkWise Runtime app.'
-        : 'List scheduled tasks managed by the currently running WorkWise Runtime app.'
+        ? 'Legacy alias. List scheduled tasks managed by the currently running RailWise AI Runtime app.'
+        : 'List scheduled tasks managed by the currently running RailWise AI Runtime app.'
     }, async () => {
       try {
         const result = await postJson(options, '/schedule/internal/list', {})
@@ -101,8 +101,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
   const registerCreateTool = (name: string): void => {
     server.registerTool(name, {
       description: name.startsWith('claw_')
-        ? 'Legacy alias. Create a scheduled task in WorkWise Runtime. Supports one-time (`at`), daily, or interval schedules.'
-        : 'Create a scheduled task in WorkWise Runtime. Supports one-time (`at`), daily, or interval schedules.',
+        ? 'Legacy alias. Create a scheduled task in RailWise AI Runtime. Supports one-time (`at`), daily, or interval schedules.'
+        : 'Create a scheduled task in RailWise AI Runtime. Supports one-time (`at`), daily, or interval schedules.',
       inputSchema: {
         title: z.string().min(1).describe('Short task title shown in the GUI'),
         prompt: z.string().min(1).describe('The prompt/instruction the agent should run at schedule time'),
@@ -151,8 +151,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
   const registerUpdateTool = (name: string): void => {
     server.registerTool(name, {
       description: name.startsWith('claw_')
-        ? 'Legacy alias. Update an existing WorkWise Runtime scheduled task.'
-        : 'Update an existing WorkWise Runtime scheduled task.',
+        ? 'Legacy alias. Update an existing RailWise AI Runtime scheduled task.'
+        : 'Update an existing RailWise AI Runtime scheduled task.',
       inputSchema: {
         task_id: z.string().min(1).describe('Task id returned by gui_schedule_list or gui_schedule_create'),
         title: z.string().optional(),
@@ -210,8 +210,8 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
   const registerDeleteTool = (name: string): void => {
     server.registerTool(name, {
       description: name.startsWith('claw_')
-        ? 'Legacy alias. Delete a scheduled task from WorkWise Runtime.'
-        : 'Delete a scheduled task from WorkWise Runtime.',
+        ? 'Legacy alias. Delete a scheduled task from RailWise AI Runtime.'
+        : 'Delete a scheduled task from RailWise AI Runtime.',
       inputSchema: {
         task_id: z.string().min(1).describe('Task id returned by gui_schedule_list or gui_schedule_create')
       }
@@ -228,7 +228,7 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
   registerDeleteTool('gui_schedule_delete')
 
   // The `gui_plan_create` MCP tool has been retired in favour of the
-  // native WorkWise Runtime `create_plan` tool. See RETIRED_CLAW_GUI_PLAN_TOOL_NAMES
+  // native RailWise AI Runtime `create_plan` tool. See RETIRED_CLAW_GUI_PLAN_TOOL_NAMES
   // for the list of removed tool names.
 
   const transport = new StdioServerTransport()

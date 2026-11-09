@@ -1,24 +1,20 @@
 # WorkWise Delivery Rules
 
-## Release gate
+## Release checks
 
-- Single-maintainer publication mode is explicitly authorized. The current maintainer may review and merge changes after the required checks pass, and publish approved releases after package acceptance passes; no second GitHub maintainer, human PR/CODEOWNER approval, or production-environment reviewer is required. Keep PR-based merging, strict required CI, administrator enforcement, tag protection, and the production tag deployment policy.
-- Do not change the public version, create or move a Git tag, publish or edit a GitHub Release, promote a stable or frontier feed, or update the official download page without explicit user approval naming the exact version and action.
-- CI success, unit tests, a successful build, or a green GitHub Action is necessary evidence but is never release approval.
-- Candidate builds must use a private, isolated feed and must never be promoted to `stable` or advertised as an official release.
-- Before requesting release approval, install the final packaged application locally and record: package version, signature/notarization result, screenshots of the reviewed UI, a functional checklist, and a real updater round-trip report.
-- Before any public release operation, complete and record a computer-use inspection of the installed package UI and required functions, plus a separate senior-engineer-mode AI review. The review must identify the exact package version and preserve screenshots, a functional checklist, and findings. In single-maintainer mode, this AI review is an internal quality gate and does not need to be a GitHub approval; the user must still explicitly approve the exact public version and action.
-- Agent review may simulate the combined perspective of an experienced engineering-survey practitioner, software engineer, and product designer for product/software acceptance. It must be labeled as AI review and must never be represented as licensed vendor/SUC interoperability evidence, a real professional signature, or a real human approval.
-- A failed or incomplete local acceptance test blocks release. Do not replace it with a mocked updater test or a manual website download.
+- The current maintainer may review, merge, and publish in single-maintainer mode.
+- Run required CI, focused tests, and a production build for the change. For a distributed package, install the exact package and verify its version, bundle identity, signature, and notarization when applicable.
+- When the release changes the updater or introduces a new updater path, run one real updater smoke test against the exact package and record the result.
+- Do not make repeated private freezes, full UI matrices, screenshot archives, exhaustive checklists, or separate AI reviews mandatory unless the change specifically requires them.
 
 ## Compatibility and migration
 
 - Never silently delete an existing plugin, MCP configuration, Skill, credential reference, or user data during a catalog migration.
-- Any plugin removal, replacement, license restriction, or default-state change requires a migration matrix showing the old item, new status, reason, data-preservation behavior, and user action.
+- Any plugin removal, replacement, license restriction, or default-state change requires a migration note covering the old item, new status, reason, data preservation, and user action.
 - Keep legacy IPC/config readers as migration compatibility until the replacement has been exercised against real user data.
 
 ## UI acceptance
 
 - Glass material is limited to approved window chrome, startup UI, and transient overlays. Work surfaces and navigation content must remain readable and opaque enough for scanning.
-- A visual change is not complete until the installed packaged application has been inspected with computer-use tooling at the supported themes, languages, and window sizes, and a separate senior-engineer-mode AI agent has reviewed the workflow and evidence. Archive screenshots, a functional checklist, accessibility findings, and defects. The user does not need to perform routine UI/functional acceptance; retain explicit user approval only for consequential public release actions.
-- For Survey acceptance, the agent reviewer should combine engineering-survey practice, numerical/reporting semantics, software quality, and product-design judgment. Clearly mark simulated expertise as AI review; it does not certify regulatory conformity, vendor compatibility, professional signoff, or production acceptance that requires external evidence.
+- For a visual change, inspect the packaged application on the primary supported language, theme, and window size affected by the change, and record any defects. Testing every language/theme/size combination and preserving a screenshot archive is optional unless the change is specifically about responsive or visual coverage.
+- Any simulated engineering or domain review must be labeled as AI review and must not be represented as licensed, regulatory, vendor, or human professional sign-off.

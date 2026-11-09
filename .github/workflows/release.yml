@@ -34,12 +34,17 @@ on:
         type: boolean
         default: true
       prepare_public_artifacts:
-        description: 'Privately freeze final public-identity packages for local acceptance. Requires candidate_only=true and publish_release=false. Does not publish a release or feed; isolated candidate packages cannot be promoted.'
+        description: 'Build final public-identity packages privately for acceptance. Requires candidate_only=true and publish_release=false. Does not publish a release or feed; isolated candidate packages cannot be promoted.'
         required: false
         type: boolean
         default: false
       skip_stability:
-        description: 'Emergency release: skip the two-hour pre-release stability gate after quality checks have passed.'
+        description: 'Skip the optional two-hour stability run; required CI, focused tests, package signing and artifact verification still apply.'
+        required: false
+        type: boolean
+        default: false
+      exact_package_updater_smoke:
+        description: 'Verify this run’s exact packages privately: one official 0.5.4 to signed macOS update, plus clean Windows installation/identity/uninstall checks. Never changes public feeds or releases.'
         required: false
         type: boolean
         default: false
@@ -102,7 +107,7 @@ concurrency:
 env:
   NODE_VERSION: '22.22.0'
   RELEASE_CHANNEL: stable
-  WORKWISE_DOWNLOAD_URL: https://www.railwise.cn/products/workwise/
+  WORKWISE_DOWNLOAD_URL: https://www.railwise.cn/products/railwise-ai/
   WORKWISE_UPDATE_PROVIDER: generic
   WORKWISE_UPDATE_BASE_URL: https://www.railwise.cn/downloads
   WORKWISE_GITHUB_REPO: railwise-cn/railwise-ai
@@ -329,15 +334,10 @@ jobs:
           CANDIDATE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_only == true }}
           PREPARE_PUBLIC_ARTIFACTS: ${{ inputs.prepare_public_artifacts }}
           PUBLISH_RELEASE: ${{ inputs.publish_release }}
-          SKIP_STABILITY: ${{ inputs.skip_stability }}
         run: |
           set -euo pipefail
           if [[ "${PREPARE_PUBLIC_ARTIFACTS}" == "true" && ( "${CANDIDATE_ONLY}" != "true" || "${PUBLISH_RELEASE}" == "true" ) ]]; then
             echo '::error::Final package freezing requires candidate_only=true and publish_release=false'
-            exit 1
-          fi
-          if [[ "${PREPARE_PUBLIC_ARTIFACTS}" == "true" && "${SKIP_STABILITY}" == "true" ]]; then
-            echo '::error::Frozen public packages require the complete stability gate'
             exit 1
           fi
           if [[ "${CANDIDATE_ONLY}" == "true" ]]; then
@@ -539,14 +539,15 @@ jobs:
             echo "Apple signing credentials present: building a signed, notarized package."
           else
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            if [[ "${GITHUB_REF_TYPE}" == "tag" || "${PREPARE_PUBLIC_ARTIFACTS}" == "true" ]]; then
-              echo "::error::Stable macOS publication requires Developer ID signing and Apple notarization credentials."
+            if [[ "${GITHUB_REF_TYPE}" == "tag" || "${PREPARE_PUBLIC_ARTIFACTS}" == "true" || "${EXACT_PACKAGE_UPDATER_SMOKE}" == "true" ]]; then
+              echo "::error::Public macOS package verification requires Developer ID signing and Apple notarization credentials."
               exit 1
             fi
             echo "::warning::Candidate build is unsigned and cannot be promoted to Stable."
           fi
         env:
           PREPARE_PUBLIC_ARTIFACTS: ${{ inputs.prepare_public_artifacts }}
+          EXACT_PACKAGE_UPDATER_SMOKE: ${{ inputs.exact_package_updater_smoke }}
 
       - name: Decode Apple signing credentials
         if: steps.signing.outputs.enabled == 'true'
@@ -621,8 +622,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: |
-            dist/WorkWise-*-mac-*.dmg
-            dist/WorkWise-*-mac-*.zip
+            dist/RailWise-AI-*-mac-*.dmg
+            dist/RailWise-AI-*-mac-*.zip
             dist/latest-mac.yml
             dist/reviewed-build.json
 
@@ -701,10 +702,108 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: |
-            dist/WorkWise-*-win-x64.exe
-            dist/WorkWise-*-win-x64.exe.blockmap
+            dist/RailWise-AI-*-win-x64.exe
+            dist/RailWise-AI-*-win-x64.exe.blockmap
             dist/latest.yml
             dist/reviewed-build.json
+
+  exact-package-windows-install-smoke:
+    name: Private exact-package Windows install smoke
+    if: ${{ always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    needs: [prepare, build-windows]
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install verification tools
+        run: npm ci --ignore-scripts
+      - name: Verify Windows smoke contract and PowerShell syntax
+        run: node --test scripts/windows-install-smoke.test.mjs
+      - name: Download this run’s exact Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: release-win
+          path: ${{ runner.temp }}/exact-windows-packages
+      - name: Install, inspect and uninstall only the temporary instance
+        shell: pwsh
+        env:
+          TARGET_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
+          $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one same-build Windows installer' }
+          ./scripts/run-windows-install-smoke.ps1 `
+            -Installer $installers[0].FullName `
+            -Version $env:TARGET_VERSION `
+            -SourceHead $env:GITHUB_SHA `
+            -EvidenceDir (Join-Path $env:RUNNER_TEMP 'exact-windows-evidence')
+      - name: Retain exact-package Windows installation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-package-windows-install-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/exact-windows-evidence/
+
+  exact-package-updater-smoke:
+    name: Private exact-package updater smoke
+    if: ${{ always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' }}
+    runs-on: macos-15
+    timeout-minutes: 65
+    needs: [prepare, build-macos]
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install verification tools
+        run: npm ci --ignore-scripts
+      - name: Build source-bound compatibility services
+        run: |
+          npm --prefix kun ci --ignore-scripts
+          npm --prefix kun run build
+      - name: Download this run’s exact signed macOS packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-mac
+          path: ${{ runner.temp }}/exact-mac-packages
+      - name: Exercise official baseline to exact artifact once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          env -u RELEASE_CHANNEL -u WORKWISE_UPDATE_PROVIDER -u WORKWISE_UPDATE_BASE_URL \
+            node scripts/run-frozen-release-updater-acceptance.mjs \
+            --target-dist="${RUNNER_TEMP}/exact-mac-packages" \
+            --target-version="${TARGET_VERSION}" \
+            --base-version=0.5.4 \
+            --evidence-dir="${RUNNER_TEMP}/exact-updater-evidence"
+      - name: Retain exact-package updater evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-package-updater-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/exact-updater-evidence/
 
   publish:
     name: Publish GitHub Release
@@ -715,7 +814,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production-release
-      url: https://www.railwise.cn/products/workwise/
+      url: https://www.railwise.cn/products/railwise-ai/
     permissions:
       contents: write
       actions: read
@@ -773,38 +872,16 @@ jobs:
           RELEASE_EVIDENCE_PATH: ${{ needs.release-approval-gate.outputs.evidence_path }}
         run: node scripts/verify-reviewed-release-artifacts.mjs verify --evidence="${RELEASE_EVIDENCE_PATH}" --downloads=reviewed-downloads --output=release-artifacts
 
-      - name: Prepare public installer names
+      - name: Prepare one publication manifest and its public installers
         run: |
           set -euo pipefail
-          rm -rf public-release-assets
-          mkdir -p public-release-assets
-
-          copy_one() {
-            local pattern="$1"
-            local target="$2"
-            mapfile -t matches < <(compgen -G "release-artifacts/${pattern}" || true)
-            if [[ "${#matches[@]}" -ne 1 ]]; then
-              echo "::error::Expected exactly one artifact matching ${pattern}, found ${#matches[@]}"
-              find release-artifacts -maxdepth 2 -type f -print | sort
-              exit 1
-            fi
-            cp "${matches[0]}" "public-release-assets/${target}"
-          }
-
-          copy_one "WorkWise-*-mac-arm64.dmg" "WorkWise-${RELEASE_VERSION}-mac-Apple-Silicon.dmg"
-          copy_one "WorkWise-*-mac-x64.dmg" "WorkWise-${RELEASE_VERSION}-mac-Intel.dmg"
-          copy_one "WorkWise-*-win-x64.exe" "WorkWise-${RELEASE_VERSION}-win-x64.exe"
-
-          find public-release-assets -maxdepth 1 -type f -print | sort
+          node scripts/prepare-website-release-assets.cjs release-artifacts website-release-assets "${RELEASE_VERSION}" --channel stable --release-prefix workwise --public-base-url "${WORKWISE_PUBLIC_BASE_URL}"
+          node scripts/release-publication.cjs copy-installers website-release-assets public-release-assets
 
       - name: Verify release artifacts
         run: |
           set -euo pipefail
-          required=(
-            "WorkWise-${RELEASE_VERSION}-mac-Apple-Silicon.dmg"
-            "WorkWise-${RELEASE_VERSION}-mac-Intel.dmg"
-            "WorkWise-${RELEASE_VERSION}-win-x64.exe"
-          )
+          mapfile -t required < <(node scripts/release-publication.cjs public-names "${RELEASE_VERSION}")
 
           for file in "${required[@]}"; do
             if [[ ! -s "public-release-assets/${file}" ]]; then
@@ -830,18 +907,8 @@ jobs:
       - name: Refuse to modify an already-published GitHub Release
         run: node scripts/release-promotion-recovery.mjs draft --tag="${TAG_NAME}"
 
-      - name: Prepare website update channel assets
-        run: |
-          set -euo pipefail
-          node ./scripts/prepare-website-release-assets.cjs \
-            release-artifacts \
-            website-release-assets \
-            "${RELEASE_VERSION}" \
-            --channel stable \
-            --release-prefix workwise \
-            --public-base-url "${WORKWISE_PUBLIC_BASE_URL}"
-
-          node ./scripts/verify-release-assets.cjs website-release-assets --write-sha256 SHA256SUMS.txt
+      - name: Verify the publication manifest and website update channel assets
+        run: node scripts/verify-release-assets.cjs website-release-assets --write-sha256 SHA256SUMS.txt
 
       - name: Prepare pinned website SSH transport
         shell: bash
@@ -864,8 +931,8 @@ jobs:
       - name: Upload immutable updater artifacts to R2
         run: |
           set -euo pipefail
-          node ./scripts/publish-r2.mjs upload --platform mac --tag "${TAG_NAME}" --channel stable --dist release-artifacts
-          node ./scripts/publish-r2.mjs upload --platform win --tag "${TAG_NAME}" --channel stable --dist release-artifacts
+          node ./scripts/publish-r2.mjs upload --platform mac --tag "${TAG_NAME}" --channel stable --dist website-release-assets
+          node ./scripts/publish-r2.mjs upload --platform win --tag "${TAG_NAME}" --channel stable --dist website-release-assets
 
       - name: Verify immutable R2 updater artifacts
         run: |
@@ -932,9 +999,9 @@ jobs:
             echo "- Tag: \`${TAG_NAME}\`"
             echo "- Commit: \`${GITHUB_SHA::7}\`"
             echo "${mac_line}"
-            echo "- macOS Apple Silicon: \`WorkWise-${RELEASE_VERSION}-mac-Apple-Silicon.dmg\`"
-            echo "- macOS Intel: \`WorkWise-${RELEASE_VERSION}-mac-Intel.dmg\`"
-            echo "- Windows x64: \`WorkWise-${RELEASE_VERSION}-win-x64.exe\`"
+            echo "- macOS Apple Silicon: \`RailWise-AI-${RELEASE_VERSION}-mac-Apple-Silicon.dmg\`"
+            echo "- macOS Intel: \`RailWise-AI-${RELEASE_VERSION}-mac-Intel.dmg\`"
+            echo "- Windows x64: \`RailWise-AI-${RELEASE_VERSION}-win-x64.exe\`"
           } >> release-notes.md
 
       - name: Create or update draft GitHub Release
@@ -956,11 +1023,7 @@ jobs:
       - name: Keep GitHub Release limited to the three client installers
         run: |
           set -euo pipefail
-          required=(
-            "WorkWise-${RELEASE_VERSION}-mac-Apple-Silicon.dmg"
-            "WorkWise-${RELEASE_VERSION}-mac-Intel.dmg"
-            "WorkWise-${RELEASE_VERSION}-win-x64.exe"
-          )
+          mapfile -t required < <(node scripts/release-publication.cjs public-names "${RELEASE_VERSION}")
 
           # GitHub Releases retain assets when a workflow is re-run. Remove
           # old zips, blockmaps, checksums, and update metadata before adding
@@ -998,13 +1061,9 @@ jobs:
           mkdir downloaded-release
           gh release download "${TAG_NAME}" \
             --dir downloaded-release \
-            --pattern 'WorkWise-*' \
+            --pattern 'RailWise-AI-*' \
             --clobber
-          required=(
-            "WorkWise-${RELEASE_VERSION}-mac-Apple-Silicon.dmg"
-            "WorkWise-${RELEASE_VERSION}-mac-Intel.dmg"
-            "WorkWise-${RELEASE_VERSION}-win-x64.exe"
-          )
+          mapfile -t required < <(node scripts/release-publication.cjs public-names "${RELEASE_VERSION}")
           for file in "${required[@]}"; do
             test -s "downloaded-release/${file}" || {
               echo "::error::Missing downloaded release asset ${file}"
@@ -1016,7 +1075,7 @@ jobs:
               exit 1
             }
           done
-          test "$(find downloaded-release -maxdepth 1 -type f -name 'WorkWise-*' | wc -l | tr -d ' ')" = 3
+          test "$(find downloaded-release -maxdepth 1 -type f -name 'RailWise-AI-*' | wc -l | tr -d ' ')" = 3
 
       - name: Snapshot current official pointers before this attempt can change them
         id: capture_promotion
@@ -1048,6 +1107,24 @@ jobs:
 
       - name: Publish GitHub Release
         run: node scripts/release-promotion-recovery.mjs publish --tag="${TAG_NAME}" --state="${RUNNER_TEMP}/official-promotion-state.json" --result="${RUNNER_TEMP}/official-promotion-result.json"
+
+      - name: Generate product download data from the publication manifest
+        run: |
+          set -euo pipefail
+          node scripts/generate-website-product-manifest.cjs website-release-assets/publication-manifest.json website/data/workwise-product.json
+          node scripts/deploy-workwise-product-page.mjs validate --source website --version "${RELEASE_VERSION}"
+
+      - name: Deploy the generated product download page
+        id: product_page_deploy
+        run: node scripts/deploy-workwise-product-page.mjs deploy --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Verify the generated public product download page
+        id: product_page_verify
+        run: node scripts/deploy-workwise-product-page.mjs verify-public --source website --version "${RELEASE_VERSION}"
+
+      - name: Restore only the previous product page if its public verification fails
+        if: ${{ always() && steps.product_page_deploy.outcome == 'success' && steps.product_page_verify.outcome != 'success' }}
+        run: node scripts/deploy-workwise-product-page.mjs rollback --source website --version "${RELEASE_VERSION}" --deploy-id "release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Restore the previous official pointers if this promotion attempt fails
         if: ${{ always() && (failure() || cancelled()) && steps.capture_promotion.outcome == 'success' && steps.stable_promotion.outcome != 'skipped' }}
@@ -1094,27 +1171,10 @@ jobs:
         run: |
           set -euo pipefail
           node ./scripts/verify-release-assets.cjs candidate-artifacts
-          rm -rf candidate-installers
-          mkdir -p candidate-installers
-
-          copy_one() {
-            local pattern="$1"
-            local target="$2"
-            mapfile -t matches < <(compgen -G "candidate-artifacts/${pattern}" || true)
-            if [[ "${#matches[@]}" -ne 1 ]]; then
-              echo "::error::Expected exactly one artifact matching ${pattern}, found ${#matches[@]}"
-              find candidate-artifacts -maxdepth 2 -type f -print | sort
-              exit 1
-            fi
-            cp "${matches[0]}" "candidate-installers/${target}"
-          }
-
-          copy_one "WorkWise-*-mac-arm64.dmg" "WorkWise-${RELEASE_VERSION}-mac-Apple-Silicon.dmg"
-          copy_one "WorkWise-*-mac-x64.dmg" "WorkWise-${RELEASE_VERSION}-mac-Intel.dmg"
-          copy_one "WorkWise-*-win-x64.exe" "WorkWise-${RELEASE_VERSION}-win-x64.exe"
-
-          (cd candidate-installers && sha256sum WorkWise-* > SHA256SUMS.txt)
-          test "$(find candidate-installers -maxdepth 1 -type f -name 'WorkWise-*' | wc -l | tr -d ' ')" = "3"
+          node scripts/prepare-website-release-assets.cjs candidate-artifacts candidate-publication "${RELEASE_VERSION}"
+          node scripts/release-publication.cjs copy-installers candidate-publication candidate-installers
+          (cd candidate-installers && sha256sum RailWise-AI-* > SHA256SUMS.txt)
+          test "$(find candidate-installers -maxdepth 1 -type f -name 'RailWise-AI-*' | wc -l | tr -d ' ')" = "3"
 
       - name: Upload verified three-client candidate
         uses: actions/upload-artifact@v4

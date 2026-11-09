@@ -1,3 +1,4 @@
+import publication from './release-publication.cjs'
 import { createHash, randomBytes } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
@@ -9,7 +10,7 @@ import { stringify } from 'yaml'
 export async function startPrivateUpdaterFeed({ key, cert, zipPath, version }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid private target version.')
   const filename = basename(zipPath)
-  if (!/^WorkWise-Candidate-[a-f0-9]{12}-[\d.]+-mac-(arm64|x64)\.zip$/.test(filename)) {
+  if (!publication.parseArtifactName(filename)?.candidateSourceHead || !filename.endsWith('.zip')) {
     throw new Error('Private updater accepts only an isolated candidate ZIP.')
   }
   const file = await stat(zipPath)

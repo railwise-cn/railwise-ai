@@ -38,7 +38,7 @@ Commands:
 
 Common options:
   --config <path>            JSON config file
-  --data-dir <path>          Root directory for WorkWise Runtime data
+  --data-dir <path>          Root directory for RailWise AI Runtime data
   --workspace <path>         Workspace root for run/chat/exec
   --model <model>            Model id
   --approval-policy <p>      on-request | untrusted | never | auto | suggest

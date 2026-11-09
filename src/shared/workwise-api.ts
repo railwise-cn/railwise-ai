@@ -149,6 +149,12 @@ import type {
   RuntimeSpanV1,
   TaskRunListQuery,
   TaskRunV1,
+  TaskInputV1,
+  TaskEventV1,
+  TaskAttentionV1,
+  TaskTemplateV1,
+  TaskTemplateId,
+  TaskTemplateStartV1,
   WorkspacePreviewResultV1
 } from './agent-workbench'
 
@@ -367,16 +373,32 @@ export type WorkWiseApi = {
   windowAppearance: WindowAppearanceV1
   onWindowAppearanceChanged: (handler: (appearance: WindowAppearanceV1) => void) => () => void
   onApplicationMenuAction: (handler: (action: ApplicationMenuAction) => void) => () => void
+  onNotificationOpenTask: (handler:(taskId:string)=>void) => ()=>void
+  onNotificationOpenFlow: (handler:(reference:{flowId?:string;flowRunId:string})=>void) => ()=>void
+  notifyTask: (payload: {key:string;taskId?:string;flowId?:string;flowRunId?:string;kind:'attention'|'artifact';title:string;body:string}) => Promise<{shown:boolean}>
   onNotificationOpenThread: (handler: (threadId: string) => void) => () => void
   getSettings: () => Promise<WorkWiseSettingsV2>
   setSettings: (partial: AppSettingsPatch, expectedRevision?: number) => Promise<WorkWiseSettingsV2>
   runtimeRequest: (path: string, method?: string, body?: string) => Promise<RuntimeRequestResult>
   cancelOperation: (request: CancelOperationRequest) => Promise<CancelOperationResult>
+  coordinateTaskCommand: (request: import('./task-command').TaskCommandRequest) => Promise<import('./task-command').TaskCommandResult>
   getTaskRun: (taskId: string) => Promise<TaskRunV1 | null>
+  readDocumentCandidate: (payload: import('./document-delivery').CandidateReviewRequest) => Promise<import('./document-delivery').DocumentCandidateReview>
+  decideDocumentCandidate: (payload: import('./document-delivery').CandidateDecisionRequest) => Promise<import('./document-delivery').CandidateDecisionResult>
+  listTaskPage: (query?: import('./agent-workbench').TaskPageQuery) => Promise<import('./agent-workbench').TaskRunPage>
+  startTaskSse: (sinceSeq: number, streamId?: string) => Promise<{streamId:string}>
   listTaskRuns: (query?: TaskRunListQuery) => Promise<TaskRunV1[]>
   resumeTask: (taskId: string, request: RevisionTaskAction) => Promise<{ task: TaskRunV1; turn: unknown }>
   retryTask: (taskId: string, request: RevisionTaskAction) => Promise<{ task: TaskRunV1; turn: unknown }>
   cancelTask: (taskId: string, request: RevisionTaskAction) => Promise<TaskRunV1>
+  pauseTask: (taskId: string, request: RevisionTaskAction) => Promise<TaskRunV1>
+  listTaskInputs: (taskId: string) => Promise<TaskInputV1[]>
+  appendTaskInput: (taskId: string, request: RevisionTaskAction & { text: string; kind?: TaskInputV1['kind'] }) => Promise<{ input: TaskInputV1; task: TaskRunV1 }>
+  listTaskEvents: (taskId: string, afterSequence?: number) => Promise<TaskEventV1[]>
+  listTaskInbox: (workspaceRoot?: string) => Promise<TaskAttentionV1[]>
+  listTaskTemplates: () => Promise<{ templates: TaskTemplateV1[] }>
+  startTaskTemplate: (templateId: TaskTemplateId, request: TaskTemplateStartV1) => Promise<{ threadId: string; taskId?: string; flowId?: string; flowRunId?: string }>
+  saveTaskTemplate: (templateId: TaskTemplateId, request: Omit<TaskTemplateStartV1, 'idempotencyKey'> & { name?: string }) => Promise<{ flow: unknown }>
   getTaskDiagnostics: (taskId: string) => Promise<{
     schema: 'workwise.task-diagnostics'
     version: 1

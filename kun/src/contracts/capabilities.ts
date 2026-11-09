@@ -185,7 +185,8 @@ export type AttachmentsCapabilityConfig = z.infer<typeof AttachmentsCapabilityCo
 
 export const MemoryCapabilityConfig = CapabilityToggleConfig.extend({
   scopes: z.array(z.enum(['user', 'workspace', 'project'])).default(['user', 'workspace', 'project']),
-  maxInjectedRecords: z.number().int().positive().default(8)
+  maxInjectedRecords: z.number().int().positive().default(8),
+  experienceCandidatesEnabled: z.boolean().default(false)
 }).strict()
 export type MemoryCapabilityConfig = z.infer<typeof MemoryCapabilityConfig>
 

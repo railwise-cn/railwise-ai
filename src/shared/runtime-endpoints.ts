@@ -126,6 +126,14 @@ export const RUNTIME_TASK_RESUME_TEMPLATE = '/v1/tasks/{id}/resume'
 export const RUNTIME_TASK_RETRY_TEMPLATE = '/v1/tasks/{id}/retry'
 export const RUNTIME_TASK_CANCEL_TEMPLATE = '/v1/tasks/{id}/cancel'
 export const RUNTIME_TASK_DIAGNOSTICS_TEMPLATE = '/v1/tasks/{id}/diagnostics'
+export const RUNTIME_TASK_PAUSE_TEMPLATE = '/v1/tasks/{id}/pause'
+export const RUNTIME_TASK_INPUTS_TEMPLATE = '/v1/tasks/{id}/inputs'
+export const RUNTIME_TASK_EVENTS_TEMPLATE = '/v1/tasks/{id}/events'
+export const RUNTIME_TASK_SUMMARY_TEMPLATE = '/v1/tasks/summary'
+export const RUNTIME_INBOX_TEMPLATE = '/v1/inbox'
+export const RUNTIME_TASK_TEMPLATES_TEMPLATE = '/v1/task-templates'
+export const RUNTIME_TASK_TEMPLATE_START_TEMPLATE = '/v1/task-templates/{id}/start'
+export const RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE = '/v1/task-templates/{id}/save'
 export function runtimeTaskPath(taskId: string): string {
   return `/v1/tasks/${encodeURIComponent(taskId)}`
 }
@@ -140,6 +148,21 @@ export function runtimeTaskCancelPath(taskId: string): string {
 }
 export function runtimeTaskDiagnosticsPath(taskId: string): string {
   return `${runtimeTaskPath(taskId)}/diagnostics`
+}
+export function runtimeTaskPausePath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/pause`
+}
+export function runtimeTaskInputsPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/inputs`
+}
+export function runtimeTaskEventsPath(taskId: string): string {
+  return `${runtimeTaskPath(taskId)}/events`
+}
+export function runtimeTaskTemplateStartPath(templateId: string): string {
+  return `/v1/task-templates/${encodeURIComponent(templateId)}/start`
+}
+export function runtimeTaskTemplateSavePath(templateId: string): string {
+  return `/v1/task-templates/${encodeURIComponent(templateId)}/save`
 }
 
 export const RUNTIME_SHELL_SESSIONS_PATH = '/v1/shell-sessions'

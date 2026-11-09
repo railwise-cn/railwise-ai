@@ -96,7 +96,7 @@ export type SettingsRouteSection =
   | 'shortcuts'
   | 'claw'
   | 'help'
-export type AppRoute = 'chat' | 'write' | 'design' | 'flow' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'engineering'
+export type AppRoute = 'chat' | 'write' | 'design' | 'flow' | 'tasks' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'engineering'
 export type PluginHostRoute = 'chat' | 'claw'
 
 /**

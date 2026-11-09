@@ -128,7 +128,7 @@ async function fetchLatestRelease(repo: string): Promise<ReleaseInfo> {
     const apiResponse = await systemFetch(`https://api.github.com/repos/${repo}/releases/latest`, {
       headers: {
         Accept: 'application/vnd.github+json',
-        'User-Agent': 'WorkWise',
+        'User-Agent': 'RailWise AI',
         'X-GitHub-Api-Version': '2022-11-28'
       },
       signal: AbortSignal.timeout(30_000)
@@ -156,7 +156,7 @@ async function fetchLatestRelease(repo: string): Promise<ReleaseInfo> {
   let response: Response
   try {
     response = await systemFetch(`https://github.com/${repo}/releases/latest`, {
-      headers: { Accept: 'text/html', 'User-Agent': 'WorkWise' },
+      headers: { Accept: 'text/html', 'User-Agent': 'RailWise AI' },
       redirect: 'follow',
       signal: AbortSignal.timeout(30_000)
     })
@@ -217,7 +217,7 @@ async function download(
   for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
     try {
       const response = await systemFetch(url, {
-        headers: { 'User-Agent': 'WorkWise' },
+        headers: { 'User-Agent': 'RailWise AI' },
         signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
       })
       if (!response.ok) {

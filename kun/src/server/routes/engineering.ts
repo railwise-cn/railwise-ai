@@ -249,7 +249,7 @@ export function engineeringCapabilities(service: SurveyService | undefined): Jso
     { id: 'tender-master', label: '标书编制', category: 'documents', skillIds: ['tender-master', 'bidding-knowledge'], toolIds: ['standard_query'], available, ...(available ? {} : { reason: 'skill runtime unavailable' }) },
     { id: 'standards', label: '规范与知识库', category: 'standards', skillIds: ['standard-reference'], toolIds: ['standard_query', 'tool_norm_cite'], available, ...(available ? {} : { reason: 'skill runtime unavailable' }) }
   ]
-  return jsonResponse({ schemaVersion: 1, product: { name: 'WorkWise Survey', subtitle: '工程测量工作台 · 测绘专业 AI Agent' }, capabilities })
+  return jsonResponse({ schemaVersion: 1, product: { name: 'RailWise Survey', subtitle: '工程测量工作台 · 测绘专业 AI Agent' }, capabilities })
 }
 
 export function skillsCatalog(): JsonResponse {

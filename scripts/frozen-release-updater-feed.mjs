@@ -1,3 +1,4 @@
+import publication from './release-publication.cjs'
 import { createHash, randomBytes } from 'node:crypto'
 import { createReadStream, lstatSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -15,7 +16,7 @@ export async function validateFrozenFeed({ zipPath, manifestPath, version, arch 
   validateFrozenTargetVersion(version)
   if (!['arm64', 'x64'].includes(arch)) throw new Error('Only frozen native macOS packages are supported.')
   const filename = basename(zipPath)
-  if (filename !== `WorkWise-${version}-mac-${arch}.zip`) throw new Error('Unexpected public ZIP filename.')
+  if (!publication.prefixes.some(prefix => filename === publication.artifactName({ version, platform: 'mac', arch, format: 'zip', prefix }))) throw new Error('Unexpected public ZIP filename.')
   for (const path of [zipPath, manifestPath]) {
     const entry = lstatSync(path)
     if (!entry.isFile() || entry.isSymbolicLink()) throw new Error('Frozen feed assets must be regular files.')
@@ -26,7 +27,7 @@ export async function validateFrozenFeed({ zipPath, manifestPath, version, arch 
   const entries = manifest.files.filter(entry => entry.url === filename)
   if (entries.length !== 1 || entries[0].size !== lstatSync(zipPath).size
     || entries[0].sha512 !== await hashFile(zipPath, 'sha512', 'base64')) throw new Error('Frozen update manifest does not match the exact ZIP bytes.')
-  if (manifest.files.some(entry => !new RegExp(`^WorkWise-${version.replaceAll('.', '\\.')}\\-mac-(arm64|x64)\\.(zip|dmg)$`).test(entry.url))) {
+  if (manifest.files.some(entry => { const parsed = publication.parseArtifactName(entry.url); return !parsed || parsed.candidateSourceHead || parsed.version !== version || parsed.platform !== 'mac' || parsed.blockmap || !['zip', 'dmg'].includes(parsed.format) })) {
     throw new Error('Frozen manifest contains an unexpected asset URL.')
   }
   return { filename, size: entries[0].size, manifestBytes, manifestSha256: createHash('sha256').update(manifestBytes).digest('hex') }

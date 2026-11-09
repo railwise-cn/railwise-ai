@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import type { CapacityManager } from '../services/capacity-manager.js'
 import type { ModelClient, ModelRequest, ModelStreamChunk, ModelToolSpec } from '../ports/model-client.js'
 import type {
   ToolHost,
@@ -9,6 +11,7 @@ import type {
   ToolProviderKind
 } from '../ports/tool-host.js'
 import type { ModelCapabilityMetadata } from '../contracts/capabilities.js'
+import type { CapacityPermit } from '../services/capacity-manager.js'
 import { DEFAULT_APPROVAL_POLICY, DEFAULT_SANDBOX_MODE } from '../contracts/policy.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { SessionStore } from '../ports/session-store.js'
@@ -439,6 +442,7 @@ export type AgentLoopOptions = {
     relativePath: string
     markdown: string
   }) => Promise<void>
+  capacityManager?: CapacityManager
   tasks?: TaskController
   spanService?: RuntimeSpanService
   workspaceReferences?: Pick<WorkspaceReferenceService, 'validateReferences'>
@@ -457,6 +461,7 @@ export type AgentLoopOptions = {
  * cancellable through the AbortSignal returned by `getAbortController`.
  */
 export class AgentLoop {
+  private readonly activeRuns = new Map<string, Promise<'completed' | 'failed' | 'aborted'>>()
   private readonly opts: AgentLoopOptions
   private readonly workspaceReferences: Pick<WorkspaceReferenceService, 'validateReferences'>
   private readonly autoModelRoutes = new Map<string, AutoModelRouteSelection>()
@@ -486,7 +491,18 @@ export class AgentLoop {
    * (completed, failed, or aborted). All errors are caught and
    * surfaced through the `error` runtime event.
    */
-  async runTurn(threadId: string, turnId: string): Promise<'completed' | 'failed' | 'aborted'> {
+  runTurn(threadId: string, turnId: string): Promise<'completed' | 'failed' | 'aborted'> {
+    const key = `${threadId}:${turnId}`
+    const existing = this.activeRuns.get(key)
+    if (existing) return existing
+    const running = this.executeRunTurn(threadId, turnId).finally(() => this.activeRuns.delete(key))
+    this.activeRuns.set(key, running)
+    return running
+  }
+
+  async awaitIdle(): Promise<void> { await Promise.allSettled([...this.activeRuns.values()]) }
+
+  private async executeRunTurn(threadId: string, turnId: string): Promise<'completed' | 'failed' | 'aborted'> {
     const signal = this.opts.turns.getAbortController(turnId)
     if (!signal) {
       await this.failTurn(threadId, turnId, 'no abort controller for turn')
@@ -497,6 +513,7 @@ export class AgentLoop {
       return 'aborted'
     }
     let goalTimer: GoalElapsedTimer | null = null
+    const unregisterExecutionAbort=this.opts.tasks?.registerExecutionAbort(turnId,reason=>this.opts.turns.abortTurn(turnId,reason))
     const turnTimeout = setTimeout(() => {
       this.opts.turns.abortTurn(turnId, 'turn_total_timeout')
     }, RUNTIME_RESOURCE_LIMITS_V1.turnTotalMs)
@@ -509,10 +526,10 @@ export class AgentLoop {
       }
       this.webToolFailureGuards.set(turnId, new WebToolFailureGuard())
       await this.recordPipelineStage(threadId, turnId, 'pre_start')
-      await this.drainSteering(threadId, turnId, signal)
       await this.recordPipelineStage(threadId, turnId, 'post_start')
       for (;;) {
         this.opts.tasks?.beginAttempt(threadId, turnId)
+        await this.drainSteering(threadId, turnId, signal)
         let outcome: TaskAttemptOutcome
         try {
           outcome = await this.loop(threadId, turnId, signal)
@@ -622,7 +639,7 @@ export class AgentLoop {
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error)
       // Best-effort enrichment so the renderer can show "what failed where"
-      // instead of the bare "WorkWise turn failed" string. See issue #26.
+      // instead of the bare "RailWise AI turn failed" string. See issue #26.
       const modelInfo = this.opts.model && 'config' in this.opts.model
         ? (this.opts.model as { config: { model?: string; baseUrl?: string } }).config
         : undefined
@@ -632,7 +649,7 @@ export class AgentLoop {
         ? (error.stack?.split('\n').slice(0, 3).join(' | ') ?? '')
         : ''
       const message = [
-        '[WorkWise turn failed]',
+        '[RailWise AI turn failed]',
         `turn=${turnId}`,
         `thread=${threadId}`,
         `model=${modelName}`,
@@ -643,7 +660,9 @@ export class AgentLoop {
       await this.failTurn(threadId, turnId, message)
       return 'failed'
     } finally {
+      unregisterExecutionAbort?.()
       clearTimeout(turnTimeout)
+      this.opts.tasks?.endRun(turnId)
       this.opts.approvalGate.expireTurn(turnId, 'turn_finished')
       await this.finishGoalElapsedTimer(threadId, goalTimer)
       this.autoModelRoutes.delete(autoModelRouteKey(threadId, turnId))
@@ -727,23 +746,31 @@ export class AgentLoop {
   }
 
   private async drainSteering(threadId: string, turnId: string, signal: AbortSignal): Promise<void> {
-    const pending = this.opts.steering.drain()
-    if (pending.length === 0) return
-    for (const text of pending) {
-      const item: TurnItem = {
-        id: this.opts.ids.next('item_steered'),
-        turnId,
-        threadId,
-        role: 'user',
-        status: 'completed',
-        createdAt: this.opts.nowIso(),
-        finishedAt: this.opts.nowIso(),
-        kind: 'user_message',
-        text
-      }
+    if (signal.aborted) return
+    const deliveries = this.opts.tasks?.pendingDeliveries(threadId, turnId) ?? []
+    const durableIds = new Set(deliveries.map(entry => entry.input.id))
+    const hints = this.opts.steering.drainEntries(turnId).filter(entry => !entry.inputId || !durableIds.has(entry.inputId))
+    const entries = [...deliveries.map(entry => ({ text: entry.input.text, inputId: entry.input.id, itemId: entry.delivery.messageItemId,attachmentIds:entry.input.attachmentIds,workspaceReferences:entry.input.workspaceReferences })),
+      ...hints.filter(entry => !entry.inputId).map(entry => ({ ...entry, itemId: this.opts.ids.next('item_steered'),attachmentIds:undefined,workspaceReferences:undefined }))]
+    if (!entries.length) return
+    // Stable IDs bridge the JSONL/SQLite boundary. appendItem flushes before resolving.
+    const persisted = await this.opts.sessionStore.loadItems(threadId)
+    const present = new Set(persisted.map(item => item.id))
+    for (const entry of entries) {
+      if (present.has(entry.itemId)) continue
+      const item: TurnItem = { id: entry.itemId, turnId, threadId, role: 'user', status: 'completed', createdAt: this.opts.nowIso(), finishedAt: this.opts.nowIso(), kind: 'user_message', text: entry.text,attachmentIds:entry.attachmentIds,workspaceReferences:entry.workspaceReferences }
       await this.opts.turns.applyItem(threadId, item)
+      present.add(item.id)
     }
-    void signal
+    if (deliveries.length) {
+      const items = await this.opts.sessionStore.loadItems(threadId)
+      const ids = new Set(deliveries.map(entry => entry.delivery.messageItemId))
+      const included = items.filter(item => ids.has(item.id))
+      if (included.length !== deliveries.length) throw new Error('task input history was not durably persisted')
+      const hash = createHash('sha256').update(JSON.stringify(included)).digest('hex')
+      this.opts.tasks?.markInputsDelivered(turnId, deliveries.map(entry => entry.delivery), included.at(-1)!.id, hash)
+      this.opts.tasks?.acknowledgeInputs(turnId, deliveries.map(entry => entry.delivery), included.at(-1)!.id, hash)
+    }
   }
 
   private async loop(
@@ -829,10 +856,13 @@ export class AgentLoop {
       this.opts.threadStore.get(threadId),
       this.opts.turns.getTurn(threadId, turnId)
     ])
-    const workspaceReferences = turn?.workspaceReferences?.length
+    const userItems = (turn?.items ?? []).filter((item):item is Extract<TurnItem,{kind:'user_message'}>=>item.kind==='user_message')
+    const requestedReferences = [...new Map([...(turn?.workspaceReferences ?? []),...userItems.flatMap(item=>item.workspaceReferences ?? [])].map(reference=>[`${reference.kind}:${reference.path}`,reference])).values()]
+    const requestedAttachmentIds = [...new Set([...(turn?.attachmentIds ?? []),...userItems.flatMap(item=>item.attachmentIds ?? [])])]
+    const workspaceReferences = requestedReferences.length
       ? await this.workspaceReferences.validateReferences(
           thread?.workspace ?? '',
-          turn.workspaceReferences
+          requestedReferences
         )
       : []
     await this.recordPipelineStage(threadId, turnId, 'input_received', { stepIndex })
@@ -901,7 +931,7 @@ export class AgentLoop {
     })
     const modelCapabilities = this.opts.modelCapabilities?.(model) ?? modelCapabilitiesForModel(model)
     const attachments = await this.resolveAttachments({
-      attachmentIds: turn?.attachmentIds ?? [],
+      attachmentIds: requestedAttachmentIds,
       threadId,
       workspace: thread?.workspace ?? '',
       modelCapabilities,
@@ -933,7 +963,8 @@ export class AgentLoop {
       : []
     const memories = await this.retrieveMemories({
       prompt: turn?.prompt ?? '',
-      workspace: thread?.workspace ?? ''
+      workspace: thread?.workspace ?? '',
+      project: thread?.projectId
     })
     const engineeringTurn = thread?.domain === 'engineering'
     const engineeringPolicy = engineeringTurn && thread?.projectId
@@ -1143,7 +1174,7 @@ export class AgentLoop {
       toolCount: request.tools.length,
       ...(request.requiredToolName ? { requiredToolName: request.requiredToolName } : {}),
       ...attachmentRequestPipelineDetails({
-        attachmentIds: turn?.attachmentIds ?? [],
+        attachmentIds: requestedAttachmentIds,
         imageAttachments: attachments.imageAttachments,
         modelCapabilities
       })
@@ -1165,8 +1196,18 @@ export class AgentLoop {
         attributes: { stepIndex, toolCount: request.tools.length }
       })
     }
+    const budgetScope = this.opts.tasks?.workBudget(turnId)
+    const modelPermit = await this.opts.capacityManager?.acquire({ id: `model:${turnId}:${stepIndex}`, rootTaskId: budgetScope?.rootTaskId, serialRoot: budgetScope?.serialRoot, workspaceRoot: activeTask?.workspaceRoot, resources: { model: 1, worker: 1 } }, signal)
+    const modelToken = this.opts.tasks?.tokenForTurn(turnId)
+    const modelRequestId = `model:${turnId}:${modelToken?.executionId ?? 'chat'}:${stepIndex}`
+    let finishWork: (() => void) | undefined
+    let workTimer: ReturnType<typeof setTimeout> | undefined
     try {
+      finishWork = this.opts.tasks?.beginWork(turnId, modelRequestId, 'model')
+      const remainingMs = this.opts.tasks?.workBudget(turnId)?.remainingMs
+      if (remainingMs !== undefined) { workTimer = setTimeout(() => this.opts.turns.abortTurn(turnId, 'execution_budget_exhausted'), Math.max(1, remainingMs)); workTimer.unref?.() }
       for await (const chunk of this.opts.model.stream(request)) {
+        if (modelToken) this.opts.tasks?.assertToken(modelToken)
         if (signal.aborted) {
           if (modelSpanId) this.opts.spanService?.finish(modelSpanId, { status: 'cancelled' })
           return 'aborted'
@@ -1285,6 +1326,7 @@ export class AgentLoop {
             (chunk.usage.cacheHitRate ?? 0) > 0
           this.recordPromptPressure(threadId, request.model, chunk.usage.promptTokens)
           const usage = this.opts.usage.record(threadId, chunk.usage)
+          this.opts.tasks?.recordCost(turnId, modelRequestId, chunk.usage.costUsd)
           await this.opts.events.record({
             kind: 'usage',
             threadId,
@@ -1321,6 +1363,10 @@ export class AgentLoop {
         })
       }
       throw error
+    } finally {
+      if (workTimer) clearTimeout(workTimer)
+      finishWork?.()
+      modelPermit?.release()
     }
     if (modelSpanId) {
       this.opts.spanService?.finish(modelSpanId, {
@@ -1835,8 +1881,14 @@ export class AgentLoop {
             }
           })
         }
+        const operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call)
+        if (operation?.prior) return operation.prior
         try {
-          const result = await this.opts.toolHost.execute(input.call, input.context, async (item) => {
+          const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(operation ? {
+            assertExecution: () => this.opts.tasks?.assertToken(operation.token),
+            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {beginExecutionWork:()=>this.opts.tasks?.beginWork(input.turnId,`tool-work:${operation.token.executionId}:${input.call.callId}`,'tool')} : {})
+          } : {}) }, async (item) => {
+            if (operation) this.opts.tasks?.assertToken(operation.token)
             const existing = await this.opts.turns.updateItem(input.threadId, item.id, {
               output: item.kind === 'tool_result' ? item.output : undefined,
               isError: item.kind === 'tool_result' ? item.isError : undefined,
@@ -1845,6 +1897,8 @@ export class AgentLoop {
             if (existing) return
             await this.opts.turns.applyItem(input.threadId, item)
           })
+          if (operation) this.opts.tasks?.finishToolOperation(operation.token, operation.key, result)
+          if (operation) this.opts.tasks?.assertToken(operation.token)
           const isError = result.item.kind === 'tool_result' && result.item.isError === true
           if (spanId) {
             this.opts.spanService?.finish(spanId, {
@@ -1855,6 +1909,7 @@ export class AgentLoop {
           }
           return result
         } catch (error) {
+          if (operation) this.opts.tasks?.finishToolOperation(operation.token, operation.key)
           if (input.context.abortSignal.aborted || !this.isRecoverableToolDispatchError(error)) {
             if (spanId) {
               this.opts.spanService?.finish(spanId, {
@@ -2205,6 +2260,10 @@ export class AgentLoop {
     const timeout = setTimeout(() => controller.abort(), timeoutMs)
     input.signal.addEventListener('abort', onAbort, { once: true })
     let fallbackRecorded = false
+    let summaryPermit: CapacityPermit | undefined
+    let finishSummaryWork: (() => void) | undefined
+    const summaryToken = this.opts.tasks?.tokenForTurn(input.turnId)
+    const summaryRequestId = `compaction:${input.turnId}:${summaryToken?.executionId ?? 'chat'}:${this.opts.ids.next('summary')}`
     const recordFallback = async (message: string): Promise<void> => {
       if (fallbackRecorded || input.signal.aborted) return
       fallbackRecorded = true
@@ -2229,6 +2288,9 @@ export class AgentLoop {
         })
       })
       let text = ''
+      const scope = this.opts.tasks?.workBudget(input.turnId)
+      summaryPermit = await this.opts.capacityManager?.acquire({ id:summaryRequestId,rootTaskId:scope?.rootTaskId,serialRoot:scope?.serialRoot,resources:{model:1,worker:1} },controller.signal)
+      finishSummaryWork = this.opts.tasks?.beginWork(input.turnId,summaryRequestId,'compaction')
       for await (const chunk of this.opts.model.stream({
         threadId: input.threadId,
         turnId: input.turnId,
@@ -2250,6 +2312,7 @@ export class AgentLoop {
         reasoningEffort: 'off',
         abortSignal: controller.signal
       })) {
+        if (summaryToken) this.opts.tasks?.assertToken(summaryToken)
         if (input.signal.aborted) return undefined
         if (controller.signal.aborted) {
           await recordFallback(
@@ -2259,6 +2322,7 @@ export class AgentLoop {
         }
         if (chunk.kind === 'assistant_text_delta') text += chunk.text
         if (chunk.kind === 'usage') {
+          this.opts.tasks?.recordCost(input.turnId,summaryRequestId,chunk.usage.costUsd)
           const usage = this.opts.usage.record(input.threadId, chunk.usage)
           await this.opts.events.record({
             kind: 'usage',
@@ -2289,6 +2353,8 @@ export class AgentLoop {
       await recordFallback(`${reason}; using heuristic summary.`)
       return undefined
     } finally {
+      finishSummaryWork?.()
+      summaryPermit?.release()
       clearTimeout(timeout)
       input.signal.removeEventListener('abort', onAbort)
     }
@@ -2617,11 +2683,13 @@ export class AgentLoop {
   private async retrieveMemories(input: {
     prompt: string
     workspace: string
+    project?: string
   }) {
     if (!this.opts.memoryStore) return []
     const memories = await this.opts.memoryStore.retrieve({
       query: input.prompt,
       workspace: input.workspace,
+      project: input.project,
       limit: 8
     })
     this.opts.memoryStore.setLastInjected(memories.map((memory) => memory.id))
@@ -2631,7 +2699,7 @@ export class AgentLoop {
   /** Convenience factory for tests: builds a loop with sensible defaults. */
   static defaultPrefix(): ImmutablePrefix {
     return createImmutablePrefix({
-      systemPrompt: 'You are WorkWise, a careful and helpful assistant.',
+      systemPrompt: 'You are RailWise AI, a careful and helpful assistant.',
       pinnedConstraints: ['user: preserve recent turns', 'project: keep responses concise']
     })
   }
@@ -2803,7 +2871,7 @@ function agentProfileInstruction(profile: {
   systemPrompt: string
 }): string {
   return [
-    `[WorkWise Agent profile: ${profile.id}]`,
+    `[RailWise AI Agent profile: ${profile.id}]`,
     `Name: ${profile.name}. Role: ${profile.role}.`,
     profile.systemPrompt
   ].join('\n')
@@ -2859,8 +2927,8 @@ function buildToolCatalogDriftMessage(toolCatalog: {
   const sample = toolCatalog.toolNames.slice(0, 12).join(', ')
   const suffix = toolCatalog.toolNames.length > 12 ? `, +${toolCatalog.toolNames.length - 12} more` : ''
   const policy = changeKind === 'additive'
-    ? 'Only additive tool changes are allowed in-place; WorkWise will continue with the refreshed tool list.'
-    : 'Non-additive tool changes can invalidate prompt-cache assumptions; WorkWise stopped this turn. Start a new thread after editing, removing, or reordering tool schemas.'
+    ? 'Only additive tool changes are allowed in-place; RailWise AI will continue with the refreshed tool list.'
+    : 'Non-additive tool changes can invalidate prompt-cache assumptions; RailWise AI stopped this turn. Start a new thread after editing, removing, or reordering tool schemas.'
   return [
     `Tool catalog changed for this thread (${toolCatalog.toolCount} tools, fingerprint ${toolCatalog.fingerprint}).`,
     policy,
@@ -2881,7 +2949,7 @@ function buildModelCompactionPrompt(input: {
     Math.max(1_024, input.maxBytes)
   )
   return [
-    'Summarize the following WorkWise conversation history for a context fold.',
+    'Summarize the following RailWise AI conversation history for a context fold.',
     'Preserve user goals, requirements, decisions, files touched, tool outcomes, errors, constraints, active/pinned skills, and unresolved next steps.',
     'Do not invent facts. Do not include generic advice. Prefer concise bullets grouped by topic.',
     '',

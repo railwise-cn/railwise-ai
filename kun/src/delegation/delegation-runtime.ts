@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { SubagentsCapabilityConfig } from '../contracts/capabilities.js'
@@ -6,6 +6,21 @@ import type { RuntimeEventRecorder } from '../services/runtime-event-recorder.js
 import type { UsageSnapshot } from '../contracts/usage.js'
 import type { TaskRunRepository } from '../services/task-run-repository.js'
 import type { RuntimeSpanService } from '../services/runtime-span-service.js'
+import { atomicWriteFile } from '../adapters/file/atomic-write.js'
+import { canonicalWorkspace } from '../memory/memory-store.js'
+import { relative } from 'node:path'
+import type { CapacityManager } from '../services/capacity-manager.js'
+import type { TaskContextRuntime } from '../services/task-context-runtime.js'
+import type { TaskController } from '../services/task-controller.js'
+import { inspectProcess, processIdentity } from '../services/process-identity.js'
+
+const ChildHandoff = z.object({
+  summary: z.string(),
+  evidenceItemIds: z.array(z.string()),
+  completedOperationIds: z.array(z.string()),
+  pendingOperationIds: z.array(z.string()),
+  status: z.enum(['completed', 'failed', 'aborted'])
+}).strict()
 
 const ChildRunUsage = z.object({
   promptTokens: z.number().int().nonnegative().default(0),
@@ -40,6 +55,12 @@ export const ChildRunRecord = z.object({
   attempt: z.number().int().nonnegative().default(0),
   maxDurationMs: z.number().int().positive().default(10 * 60 * 1000),
   summary: z.string().optional(),
+  sessionRef: z.string().optional(),
+  stagingDirectory: z.string().optional(),
+  handoff: ChildHandoff.optional(),
+  executionMs: z.number().nonnegative().optional(),
+  ownerPid: z.number().int().positive().optional(),
+  ownerStartedAt: z.string().optional(),
   error: z.string().optional(),
   usage: ChildRunUsage.default({ promptTokens: 0, completionTokens: 0, totalTokens: 0 }),
   createdAt: z.string(),
@@ -56,8 +77,9 @@ export type ChildRunExecutor = (input: {
   prompt: string
   workspace?: string
   model?: string
+  recovering?: boolean
   signal: AbortSignal
-}) => Promise<{ summary: string; usage?: ChildRunRecord['usage'] }>
+}) => Promise<{ summary: string; usage?: ChildRunRecord['usage']; sessionRef?: string; handoff?: z.infer<typeof ChildHandoff> }>
 
 export type ChildRunAggregate = {
   key: string
@@ -83,9 +105,7 @@ export class FileDelegationStore {
   async upsert(record: ChildRunRecord): Promise<void> {
     await mkdir(this.rootDir, { recursive: true })
     const target = this.recordPath(record.id)
-    const temp = `${target}.${process.pid}.${Date.now()}.tmp`
-    await writeFile(temp, JSON.stringify(record, null, 2), { encoding: 'utf8', flag: 'wx' })
-    await rename(temp, target)
+    await atomicWriteFile(target, JSON.stringify(record, null, 2))
   }
 
   async get(childId: string): Promise<ChildRunRecord | null> {
@@ -133,6 +153,9 @@ export class DelegationRuntime {
     recordExternalUsage?: (threadId: string, usage: UsageSnapshot) => void
     taskRepository?: TaskRunRepository
     spanService?: RuntimeSpanService
+    capacityManager?: CapacityManager
+    taskContextRuntime?: TaskContextRuntime
+    taskController?: TaskController
   }) {}
 
   async runChild(input: {
@@ -165,6 +188,13 @@ export class DelegationRuntime {
     const existing = await this.options.store.list(input.parentThreadId)
     if (existing.length >= this.options.config.maxChildRuns) throw new Error('delegation child-run budget exhausted')
     const now = this.now()
+    const parent = this.options.taskRepository?.findActiveByThread(input.parentThreadId)
+    if (parent && ['paused', 'cancelled', 'completed', 'failed'].includes(parent.status)) throw new Error('parent task is not accepting child assignments')
+    const workspace = input.workspace?.trim() || parent?.workspaceRoot
+    if (parent && workspace) {
+      const subpath = relative(canonicalWorkspace(parent.workspaceRoot), canonicalWorkspace(workspace))
+      if (subpath.startsWith('..') || subpath.startsWith('/') || /^[a-zA-Z]:/.test(subpath)) throw new Error('child workspace is outside parent task authority')
+    }
     const id = this.options.idGenerator?.() ?? `child_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
     let record = ChildRunRecord.parse({
       id,
@@ -172,11 +202,11 @@ export class DelegationRuntime {
       parentTurnId: input.parentTurnId,
       label: input.label,
       prompt: input.prompt,
-      workspace: input.workspace,
+      workspace,
       model: input.model,
       status: 'queued',
       executionMode: input.executionMode ?? 'foreground',
-      maxDurationMs: input.maxDurationMs ?? 10 * 60 * 1000,
+      maxDurationMs: Math.min(input.maxDurationMs ?? 10 * 60 * 1000, parent?.budget.maxDurationMs ?? Infinity),
       createdAt: now,
       updatedAt: now
     })
@@ -225,19 +255,28 @@ export class DelegationRuntime {
   }
 
   async recoverInterrupted(): Promise<ChildRunRecord[]> {
-    const candidates = (await this.options.store.list())
+    const records = await this.options.store.list()
+    // The child JSON record may have committed before the shared task transaction.
+    // Reconcile its verified terminal observation instead of re-running the child.
+    for (const record of records) if (['completed', 'failed', 'aborted'].includes(record.status)) this.finishLinkedTask(record)
+    const candidates = records
       .filter((record) => record.status === 'queued' || record.status === 'running')
     const recovered: ChildRunRecord[] = []
     for (const candidate of candidates) {
+      const ownership = childOwnerState(candidate)
+      if (this.activeChildren.has(candidate.id) || ownership === 'alive') continue
+      const parent = candidate.parentTaskId ? this.options.taskRepository?.get(candidate.parentTaskId) : undefined
+      if (parent && ['paused', 'cancelled', 'completed', 'failed'].includes(parent.status)) continue
       const interrupted = ChildRunRecord.parse({
         ...candidate,
         status: 'interrupted',
-        error: 'application restarted while the child task was running',
+        error: ownership === 'unknown' ? 'child_operation_outcome_unknown: original process identity is unavailable; inspect before resuming' : 'application restarted while the child task was running',
         updatedAt: this.now(),
         revision: candidate.revision + 1
       })
       await this.options.store.upsert(interrupted)
       await this.recordChildEvent(interrupted)
+      if (ownership === 'unknown') { this.finishLinkedTask(interrupted); recovered.push(interrupted); continue }
       const restarted = await this.restartChild(interrupted)
       recovered.push(restarted)
     }
@@ -257,6 +296,11 @@ export class DelegationRuntime {
 
   abortAll(reason = 'application_exit'): void {
     for (const active of this.activeChildren.values()) active.controller.abort(new Error(reason))
+  }
+
+  /** Shutdown waits for cancellation receipts and child file/session writes before databases close. */
+  async awaitIdle(): Promise<void> {
+    await Promise.allSettled([...this.activeChildren.values()].map(active => active.promise))
   }
 
   abortParent(parentThreadId: string, reason = 'parent_task_cancelled'): number {
@@ -293,22 +337,44 @@ export class DelegationRuntime {
   }
 
   private async executeChild(recordInput: ChildRunRecord, signal: AbortSignal, recovering = false): Promise<ChildRunRecord> {
+    const parentTask = recordInput.parentTaskId ? this.options.taskRepository?.get(recordInput.parentTaskId) : undefined
+    const rootTaskId = parentTask?.rootTaskId ?? parentTask?.id
     let record = ChildRunRecord.parse({
       ...recordInput,
       status: 'running',
       attempt: recordInput.attempt + 1,
       updatedAt: this.now(),
       revision: recordInput.revision + 1
+      ,ownerPid: process.pid
+      ,ownerStartedAt: processIdentity()?.fingerprint
     })
-    await this.options.store.upsert(record)
-    this.markLinkedTaskRunning(record)
-    await this.recordChildEvent(record)
+    // The production AgentLoop reserves a worker only while a model executes.
+    // Keeping an outer child permit would deadlock a foreground child at capacity
+    // and would retain capacity during human/tool waits. Bare legacy executors
+    // retain their existing bounded worker reservation.
+    const permit = !this.options.taskController ? await this.options.capacityManager?.acquire({ id: `child:${recordInput.id}`, rootTaskId, workspaceRoot: recordInput.workspace, resources: { worker: 1 } }, signal) : undefined
+    try {
+      if (parentTask && rootTaskId && this.options.taskRepository) {
+        const root = this.options.taskRepository.get(rootTaskId) ?? parentTask
+        const used = this.options.taskRepository.execution.usedExecutionMs(rootTaskId, Date.now())
+        if ((root.budget.version === 2 && used >= (root.budget.maxExecutionMs ?? root.budget.maxDurationMs)) || (root.budget.maxCostUsd && this.options.taskRepository.execution.usedCost(rootTaskId) >= root.budget.maxCostUsd)) throw new Error('root task execution or cost budget exhausted')
+        if (!this.options.taskController) this.options.taskRepository.execution.beginWork(`child:${recordInput.id}`, rootTaskId, 'child', Date.now())
+      }
+      await this.options.store.upsert(record)
+      this.markLinkedTaskRunning(record)
+      await this.recordChildEvent(record)
+    } catch (error) {
+      permit?.release()
+      if (rootTaskId && !this.options.taskController) this.options.taskRepository?.execution.finishWork(`child:${recordInput.id}`, Date.now())
+      throw error
+    }
     this.active += 1
     const timeout = setTimeout(() => {
       const active = this.activeChildren.get(record.id)
       active?.controller.abort(new Error('child task duration budget exhausted'))
-    }, record.maxDurationMs)
+    }, Math.max(1, record.maxDurationMs - (record.executionMs ?? 0)))
     timeout.unref?.()
+    const startedAt = Date.now()
     try {
       const executor: ChildRunExecutor = this.options.executor ?? defaultExecutor
       const result = await executor({
@@ -321,6 +387,7 @@ export class DelegationRuntime {
           : record.prompt,
         workspace: record.workspace,
         model: record.model,
+        recovering,
         signal
       })
       record = ChildRunRecord.parse({
@@ -328,6 +395,11 @@ export class DelegationRuntime {
         status: 'completed',
         summary: result.summary,
         usage: result.usage ?? record.usage,
+        sessionRef: result.sessionRef ?? record.sessionRef,
+        handoff: result.handoff ?? record.handoff,
+        executionMs: (record.executionMs ?? 0) + Date.now() - startedAt,
+        ownerPid: undefined,
+        ownerStartedAt: undefined,
         updatedAt: this.now(),
         revision: record.revision + 1
       })
@@ -344,8 +416,11 @@ export class DelegationRuntime {
     } catch (error) {
       record = ChildRunRecord.parse({
         ...record,
-        status: signal.aborted ? 'aborted' : 'failed',
+        status: signal.aborted ? 'aborted' : (error as { code?: string })?.code === 'child_operation_outcome_unknown' ? 'interrupted' : 'failed',
         error: errorMessage(error),
+        executionMs: (record.executionMs ?? 0) + Date.now() - startedAt,
+        ownerPid: undefined,
+        ownerStartedAt: undefined,
         updatedAt: this.now(),
         revision: record.revision + 1
       })
@@ -360,6 +435,11 @@ export class DelegationRuntime {
     } finally {
       clearTimeout(timeout)
       this.active -= 1
+      permit?.release()
+      if (rootTaskId && this.options.taskRepository && !this.options.taskController) {
+        this.options.taskRepository.execution.finishWork(`child:${recordInput.id}`, Date.now())
+        if (record.usage.costUsd !== undefined) this.options.taskRepository.execution.recordCost(rootTaskId, `child:${record.id}:${record.attempt}`, record.usage.costUsd)
+      }
     }
   }
 
@@ -380,11 +460,12 @@ export class DelegationRuntime {
 
   private async recordChildEvent(record: ChildRunRecord): Promise<void> {
     await this.options.events?.record({
-      kind: record.status === 'completed' ? 'turn_completed' : record.status === 'failed' ? 'turn_failed' : record.status === 'aborted' ? 'turn_aborted' : 'turn_started',
+      kind: record.status === 'completed' ? 'turn_completed' : record.status === 'failed' ? 'turn_failed' : record.status === 'aborted' ? 'turn_aborted' : record.status === 'interrupted' ? 'turn_failed' : 'turn_started',
       threadId: record.parentThreadId,
       turnId: record.parentTurnId,
       status: record.status,
       text: record.summary ?? record.error,
+      ...(record.status === 'interrupted' ? { code: 'child_operation_outcome_unknown' } : {}),
       child: {
         parentThreadId: record.parentThreadId,
         parentTurnId: record.parentTurnId,
@@ -418,6 +499,8 @@ export class DelegationRuntime {
       id: taskId,
       threadId: record.id,
       parentTaskId: parent.id,
+      rootTaskId: parent.rootTaskId ?? parent.id,
+      visibility: 'internal',
       childTaskIds: [],
       workspaceRoot: record.workspace ?? parent.workspaceRoot,
       repositoryRoot: parent.repositoryRoot,
@@ -431,7 +514,8 @@ export class DelegationRuntime {
       },
       agentId: record.label?.trim() || 'general',
       model: record.model ?? parent.model,
-      budget: { maxAttempts: 3, maxDurationMs: record.maxDurationMs },
+      authority: parent.authority ? { ...parent.authority, source: 'inherited', workspaceRoot: record.workspace ?? parent.workspaceRoot } : undefined,
+      budget: { maxAttempts: Math.min(3, parent.budget.maxAttempts), maxDurationMs: record.maxDurationMs, ...(parent.budget.version === 2 ? { version: 2, maxExecutionMs: Math.min(record.maxDurationMs, parent.budget.maxExecutionMs ?? parent.budget.maxDurationMs) } : {}) },
       attempts: 0,
       replans: 0,
       noProgressCount: 0,
@@ -473,6 +557,9 @@ export class DelegationRuntime {
         updatedAt: this.now()
       }))
     }
+    const child = repository.get(taskId)!
+    const session = repository.execution.ensureSession(child, this.now())
+    this.options.taskContextRuntime?.createAssignment(parent, child, session.id)
     return ChildRunRecord.parse({ ...record, taskId, parentTaskId: parent.id })
   }
 
@@ -493,10 +580,20 @@ export class DelegationRuntime {
   }
 
   private finishLinkedTask(record: ChildRunRecord): void {
+    if (!this.options.taskRepository) return
+    this.options.taskRepository.transact(() => this.finishLinkedTaskTransaction(record))
+  }
+
+  private finishLinkedTaskTransaction(record: ChildRunRecord): void {
     const repository = this.options.taskRepository
     if (!repository || !record.taskId) return
     const task = repository.get(record.taskId)
-    if (!task || ['completed', 'failed', 'cancelled'].includes(task.status)) return
+    if (!task) return
+    if (['completed', 'failed', 'cancelled'].includes(task.status)) { this.saveHandoff(record); return }
+    if (record.status === 'interrupted') {
+      repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', stalledReason: record.error, updatedAt: this.now() }))
+      return
+    }
     const terminalStatus = record.status === 'completed'
       ? 'completed'
       : record.status === 'aborted' ? 'cancelled' : 'failed'
@@ -532,7 +629,28 @@ export class DelegationRuntime {
       createdAt: finishedAt,
       revision: updated.revision
     })
+    this.saveHandoff(record)
   }
+
+  private saveHandoff(record: ChildRunRecord): void {
+    if (!record.taskId) return
+    this.options.taskContextRuntime?.finishAssignment(record.taskId, {
+      conclusion: record.summary ?? record.error ?? '',
+      evidence: record.handoff?.evidenceItemIds ?? [],
+      completedOperationIds: record.handoff?.completedOperationIds ?? [],
+      remaining: record.handoff?.pendingOperationIds ?? [],
+      blockers: record.error ? [record.error] : [],
+      success: record.status === 'completed'
+    })
+    this.options.taskContextRuntime?.flushHandoffs()
+  }
+}
+
+function childOwnerState(record: ChildRunRecord): 'alive' | 'exited' | 'unknown' {
+  if (record.status === 'queued' && record.attempt === 0 && !record.ownerPid) return 'exited'
+  if (!record.ownerPid || !record.ownerStartedAt) return 'unknown'
+  if (!/^(?:darwin:|linux:|win32:)/.test(record.ownerStartedAt)) return 'unknown'
+  return inspectProcess({ pid: record.ownerPid, fingerprint: record.ownerStartedAt })
 }
 
 function toUsageSnapshot(usage: ChildRunRecord['usage']): UsageSnapshot {

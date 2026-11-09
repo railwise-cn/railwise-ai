@@ -157,7 +157,7 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
   (Join-Path $Root 'dist\mac'), `
   (Join-Path $Root 'dist\mac-arm64')
 Remove-Item -Force -ErrorAction SilentlyContinue `
-  (Join-Path $Root 'dist\WorkWise-*'), `
+  (Join-Path $Root 'dist\RailWise-AI-*'), `
   (Join-Path $Root 'dist\latest*.yml'), `
   (Join-Path $Root 'dist\*.blockmap')
 
@@ -177,7 +177,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $DistDir = Join-Path $Root 'dist'
 $AssetSpecs = @(
-  @{ Label = 'Windows exe'; Filter = 'WorkWise-*-win-x64.exe' }
+  @{ Label = 'Windows exe'; Filter = 'RailWise-AI-*-win-x64.exe' }
 )
 
 $Assets = @()

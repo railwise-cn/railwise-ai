@@ -1,10 +1,10 @@
-# Agent Runtime Notes
+# RailWise AI Runtime Notes
 
-The WorkWise Agent Runtime desktop app has one live agent runtime: the bundled **WorkWise Agent Runtime** runtime.
+The RailWise AI desktop app has one live agent runtime: the bundled **RailWise AI Runtime** (KUN).
 
 Do not add a second live provider, provider switcher, runtime diagnostics panel,
 or legacy CodeWhale/Reasonix process path. Code, Write, and Connect phone all
-enter the same WorkWise Agent Runtime HTTP/SSE boundary. Connect phone still uses the internal
+enter the same RailWise AI Runtime HTTP/SSE boundary. Connect phone still uses the internal
 `claw` name in code for compatibility.
 
 ## Allowed Extension Path
@@ -13,8 +13,8 @@ enter the same WorkWise Agent Runtime HTTP/SSE boundary. Connect phone still use
 2. Add agent behavior in `kun/src/loop/`, `kun/src/services/`, or a
    new port/adapter under `kun/src/ports/` and `kun/src/adapters/`.
 3. Add HTTP endpoints under `kun/src/server/routes/`.
-4. Map the endpoint/event in `src/renderer/src/agent/kun-runtime.ts` and
-   `src/renderer/src/agent/kun-mapper.ts`.
+4. Map the endpoint/event in `src/renderer/src/agent/managed-runtime.ts` and
+   `src/renderer/src/agent/runtime-mapper.ts`.
 5. Add settings only under `agents.kun`.
 
 ## Forbidden Paths
@@ -50,19 +50,19 @@ npm run build
 
 Manual smoke:
 
-- Code can create a WorkWise Agent Runtime thread, stream a reply, approve/deny tools, and
+- Code can create a RailWise AI Runtime thread, stream a reply, approve/deny tools, and
   interrupt a turn.
-- CodeWhale parity endpoints still work through WorkWise Agent Runtime: thread search/archive
+- CodeWhale parity endpoints still work through RailWise AI Runtime: thread search/archive
   filters, fork, session resume, request_user_input submit/cancel, and usage.
 - Cache telemetry uses DeepSeek native `prompt_cache_hit_tokens` /
-  `prompt_cache_miss_tokens`; hot WorkWise Agent Runtime turns should stay above 90% cache
+  `prompt_cache_miss_tokens`; hot RailWise AI Runtime turns should stay above 90% cache
   hit after the stable prefix is warm.
 - Immutable prefix drift and malformed tool-call/tool-result history must be
   caught before a request reaches DeepSeek.
 - Write can open the workspace, request inline completion, and use selected-text
   assistant actions.
-- Connect phone can save settings and run a manual task through a WorkWise Agent Runtime thread.
-- Settings -> Agents shows only WorkWise Agent Runtime.
+- Connect phone can save settings and run a manual task through a RailWise AI Runtime thread.
+- Settings -> Agents shows only RailWise AI Runtime.
 
 The full plan is in
 [`docs/runtime-architecture.md`](./runtime-architecture.md).

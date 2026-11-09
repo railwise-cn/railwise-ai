@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import publication from './release-publication.cjs'
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -75,11 +76,8 @@ function validateSource(sourceDirectory, version, includeCanonical = false) {
     throw new Error('Manifest Release URL does not match the requested version.')
   }
 
-  const expectedFiles = [
-    `WorkWise-${version}-mac-Apple-Silicon.dmg`,
-    `WorkWise-${version}-mac-Intel.dmg`,
-    `WorkWise-${version}-win-x64.exe`
-  ]
+  const prefix = publication.detectPrefix((manifest.platforms || []).map(item => item.file), version)
+  const expectedFiles = publication.publicInstallers(version, prefix).map(file => file.name)
   const platforms = Array.isArray(manifest.platforms) ? manifest.platforms : []
   if (platforms.length !== expectedFiles.length) throw new Error('Website manifest must expose exactly three installers.')
   for (const name of expectedFiles) {

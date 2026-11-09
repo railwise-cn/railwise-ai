@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
+import { LEGACY_USER_DATA_DIR_NAMES, isRecognizedSettingsText } from './legacy-data-migration'
 import {
   atomicWriteFile,
   backupFileIfPresent,
@@ -54,7 +55,7 @@ export function resolveWorkwiseHome(
 
 const SETTINGS_FILE_NAME = 'workwise-settings.json'
 const COMPATIBLE_SETTINGS_FILE_NAMES = ['workgpt-settings.json', 'kun-settings.json', 'deepseek-gui-settings.json'] as const
-const COMPATIBLE_USER_DATA_DIR_NAMES = ['workgpt', 'WORKGPT', 'Kun', 'deepseek-gui', 'DeepSeek GUI'] as const
+const COMPATIBLE_USER_DATA_DIR_NAMES = LEGACY_USER_DATA_DIR_NAMES
 const WELCOME_MARKDOWN_EN = `# Welcome to Write
 
 This is your default writing workspace.
@@ -63,7 +64,7 @@ This is your default writing workspace.
 - Select text in the editor and ask the writing assistant about it.
 - Switch between source, live, split, and preview modes from the top bar.
 `
-const WELCOME_MARKDOWN_ZH = `# 欢迎使用 WorkWise 写作台
+const WELCOME_MARKDOWN_ZH = `# 欢迎使用 RailWise AI 写作台
 
 这是你的默认写作空间。
 
@@ -443,6 +444,14 @@ export class SettingsRevisionConflictError extends Error {
   }
 }
 
+export class LegacySettingsSourceConflictError extends Error {
+  readonly code = 'legacy_profile_conflict'
+  constructor(readonly sourcePaths: string[]) {
+    super(`检测到多个可用的历史资料目录，请先选择要导入的资料；所有原件已保留：${sourcePaths.join('、')}`)
+    this.name = 'LegacySettingsSourceConflictError'
+  }
+}
+
 async function readSettingsFileWithCompatibility(
   currentPath: string
 ): Promise<{ raw: string, sourcePath: string } | null> {
@@ -455,19 +464,24 @@ async function readSettingsFileWithCompatibility(
     if (!isErrnoException(error) || error.code !== 'ENOENT') throw error
   }
 
+  const sources = new Map<string, { raw: string; sourcePath: string }>()
   for (const candidatePath of compatibleSettingsPaths(currentPath)) {
     try {
-      return {
-        raw: await readFile(candidatePath, 'utf8'),
-        sourcePath: candidatePath
-      }
+      const raw = await readFile(candidatePath, 'utf8')
+      // A legacy filename in the active profile is authoritative, even if it
+      // needs the existing invalid-JSON recovery. Only sibling profiles compete.
+      if (dirname(candidatePath) === dirname(currentPath)) return { raw, sourcePath: candidatePath }
+      if (!isRecognizedSettingsText(raw)) continue
+      const info = await stat(dirname(candidatePath))
+      const identity = `${info.dev}:${info.ino}`
+      if (!sources.has(identity)) sources.set(identity, { raw, sourcePath: candidatePath })
     } catch (error) {
       if (isErrnoException(error) && error.code === 'ENOENT') continue
       throw error
     }
   }
-
-  return null
+  if (sources.size > 1) throw new LegacySettingsSourceConflictError([...sources.values()].map(source => dirname(source.sourcePath)))
+  return [...sources.values()][0] || null
 }
 
 export class JsonSettingsStore {
@@ -497,6 +511,7 @@ export class JsonSettingsStore {
       raw = loaded.raw
       sourcePath = loaded.sourcePath
     } catch (error) {
+      if (error instanceof LegacySettingsSourceConflictError) throw error
       const message = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to read settings file ${sourcePath}: ${message}`, { cause: error })
     }

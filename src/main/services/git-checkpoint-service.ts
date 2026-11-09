@@ -307,7 +307,7 @@ export class GitCheckpointService {
     const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
     const safeTask = stored.checkpoint.taskId.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40)
     const rescueRef = `workwise/rescue/${stamp}-${safeTask}`
-    const commit = (await runGit(stored.checkpoint.repositoryRoot, ['stash', 'create', `WorkWise rescue ${stored.checkpoint.taskId}`]))
+    const commit = (await runGit(stored.checkpoint.repositoryRoot, ['stash', 'create', `RailWise AI rescue ${stored.checkpoint.taskId}`]))
       .trim()
     if (!commit) return undefined
     await runGit(stored.checkpoint.repositoryRoot, ['update-ref', `refs/${rescueRef}`, commit])

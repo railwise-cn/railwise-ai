@@ -96,7 +96,7 @@ copy_mac_arch_artifacts() {
   local files=()
 
   shopt -s nullglob
-  files=("${output_dir}"/WorkWise-*-mac-"${arch}".*)
+  files=("${output_dir}"/RailWise-AI-*-mac-"${arch}".*)
   shopt -u nullglob
 
   [[ ${#files[@]} -gt 0 ]] || die "No macOS ${arch} artifacts found in ${output_dir}"
@@ -251,12 +251,12 @@ collect_optional() {
   done
 }
 
-# artifactName: WorkWise-${version}-mac-${arch}.dmg|zip
-collect "macOS arm64 dmg" "dist/WorkWise-*-mac-arm64.dmg"
-collect "macOS x64 dmg" "dist/WorkWise-*-mac-x64.dmg"
-collect "macOS arm64 zip" "dist/WorkWise-*-mac-arm64.zip"
-collect "macOS x64 zip" "dist/WorkWise-*-mac-x64.zip"
-collect_optional "macOS blockmap" "dist/WorkWise-*-mac-*.zip.blockmap"
+# artifactName: RailWise-AI-${version}-mac-${arch}.dmg|zip
+collect "macOS arm64 dmg" "dist/RailWise-AI-*-mac-arm64.dmg"
+collect "macOS x64 dmg" "dist/RailWise-AI-*-mac-x64.dmg"
+collect "macOS arm64 zip" "dist/RailWise-AI-*-mac-arm64.zip"
+collect "macOS x64 zip" "dist/RailWise-AI-*-mac-x64.zip"
+collect_optional "macOS blockmap" "dist/RailWise-AI-*-mac-*.zip.blockmap"
 
 upload_github_assets() {
   local tag="$1"

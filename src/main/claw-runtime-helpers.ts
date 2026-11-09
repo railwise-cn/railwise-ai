@@ -150,7 +150,7 @@ export function formatFeishuMirrorText(text: string, direction: 'user' | 'assist
   const trimmed = text.trim()
   if (direction === 'user') {
     return {
-      markdown: `**From WorkWise Runtime**\n\n> ${trimmed.replace(/\n/g, '\n> ')}`
+      markdown: `**From RailWise AI Runtime**\n\n> ${trimmed.replace(/\n/g, '\n> ')}`
     }
   }
   return { markdown: trimmed || '(empty reply)' }

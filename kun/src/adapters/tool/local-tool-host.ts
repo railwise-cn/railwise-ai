@@ -197,7 +197,9 @@ export class LocalToolHost implements ToolHost {
     }
     let result: Awaited<ReturnType<LocalTool['execute']>>
     try {
-      result = await tool.execute(activeCall.arguments, context, async (update) => {
+      context.assertExecution?.()
+      const finishWork = context.beginExecutionWork?.()
+      try { result = await tool.execute(activeCall.arguments, context, async (update) => {
         if (!onUpdate) return
         const partialItem = makeToolResultItem({
           id: `item_${activeCall.callId}`,
@@ -211,7 +213,7 @@ export class LocalToolHost implements ToolHost {
           status: 'running'
         })
         await onUpdate(partialItem)
-      })
+      }) } finally { finishWork?.() }
     } catch (error) {
       // A tool blowing up (an MCP server returning a protocol error, a
       // provider bug) is feedback for the model, not a reason to kill the

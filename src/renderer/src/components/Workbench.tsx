@@ -1,3 +1,4 @@
+import { requestTaskDetail } from '../store/task-live-store'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -168,6 +169,7 @@ const registerBuiltinWorkbenchView = <Module,>(
 }
 registerBuiltinWorkbenchView('plugins', 10, 'plugins', () => import('./PluginMarketplaceView'))
 registerBuiltinWorkbenchView('flow', 20, 'flow', () => import('./flow/FlowWorkspaceView'))
+registerBuiltinWorkbenchView('tasks', 15, 'tasks', () => import('./tasks/TaskWorkspaceView'))
 registerBuiltinWorkbenchView('schedule', 30, 'schedule', () => import('./schedule/ScheduleTasksView'))
 registerBuiltinWorkbenchView('design', 40, 'design', () => import('./design/DesignWorkspaceView'))
 registerBuiltinWorkbenchView('engineering', 50, 'engineering', () => import('./engineering/EngineeringWorkspaceView'))
@@ -443,8 +445,6 @@ export function Workbench(): ReactElement {
   const [composerExecutionApplying, setComposerExecutionApplying] = useState(false)
   const [conversationViewMode, setConversationViewMode] =
     useState<ConversationViewMode>('concise')
-  const [taskConversationViewMode, setTaskConversationViewMode] =
-    useState<ConversationViewMode | null>(null)
   const [attachmentUploadBusy, setAttachmentUploadBusy] = useState(false)
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [writeAttachmentUploadBusy, setWriteAttachmentUploadBusy] = useState(false)
@@ -1872,6 +1872,15 @@ export function Workbench(): ReactElement {
     })
   }, [])
 
+  useEffect(()=>{
+    if(typeof window.workwise.onNotificationOpenTask!=='function')return
+    return window.workwise.onNotificationOpenTask(taskId=>{requestTaskDetail(taskId);setRoute('tasks')})
+  },[setRoute])
+  useEffect(()=>{
+    if(typeof window.workwise.onNotificationOpenFlow!=='function')return
+    return window.workwise.onNotificationOpenFlow(reference=>{requestFlowDetail(reference);openFlow()})
+  },[openFlow])
+
   const startNewChat = (): void => {
     if (activeSddDraft) dismissActiveSddDraft({ closeAssistant: true })
     setConnectPhoneSidebarOpen(false)
@@ -1914,6 +1923,11 @@ export function Workbench(): ReactElement {
   const openFlowView = (): void => {
     setConnectPhoneSidebarOpen(false)
     openFlow()
+  }
+
+  const openTasksView = (): void => {
+    setConnectPhoneSidebarOpen(false)
+    setRoute('tasks')
   }
 
   const openDesignView = (): void => {
@@ -2151,6 +2165,17 @@ export function Workbench(): ReactElement {
   }
 
   const workbenchViewRenderers: Record<string, (module: unknown) => ReactElement | null> = {
+    tasks: (module) => {
+      const View = (module as typeof import('./tasks/TaskWorkspaceView')).TaskWorkspaceView
+      return <View workspaceRoot={workspaceRoot} runtimeReady={runtimeConnection === 'ready'} leftSidebarCollapsed={leftSidebarCollapsed} onToggleLeftSidebar={toggleLeftSidebar} onOpenThread={openThread} onOpenArtifact={async (task, path) => {
+        if (/\.(?:md|mdx|markdown)$/i.test(path)) {
+          await useWriteWorkspaceStore.getState().openFile(task.workspaceRoot, path)
+          setRoute('write')
+        } else {
+          window.dispatchEvent(new CustomEvent('kun:workspace-file-preview', { detail: { workspaceRoot: task.workspaceRoot, path } }))
+        }
+      }} onOpenFlow={(flowId, flowRunId) => { requestFlowDetail({flowId,flowRunId}); openFlow() }} />
+    },
     plugins: (module) => {
       const View = (module as typeof import('./PluginMarketplaceView')).PluginMarketplaceView
       return (
@@ -2208,6 +2233,7 @@ export function Workbench(): ReactElement {
                 onOpenPlugins={openPluginsView}
                 onScheduleOpen={openScheduleView}
                 onFlowOpen={openFlowView}
+                onTasksOpen={openTasksView}
                 onDesignOpen={openDesignView}
                 onNewRequirement={() => void startNewSddRequirement()}
                 onOpenSettings={(section) => openSettings(section)}
@@ -2243,6 +2269,7 @@ export function Workbench(): ReactElement {
               onToggleFocusMode={toggleFocusMode}
               onScheduleOpen={openScheduleView}
               onFlowOpen={openFlowView}
+              onTasksOpen={openTasksView}
               onDesignOpen={openDesignView}
               onEngineeringOpen={openEngineeringMode}
               onToggleSidebar={toggleLeftSidebar}
@@ -2353,11 +2380,10 @@ export function Workbench(): ReactElement {
             <TaskRunStatusBar
               threadId={activeThreadId}
               runtimeReady={runtimeConnection === 'ready'}
-              globalViewMode={conversationViewMode}
-              onViewModeOverride={setTaskConversationViewMode}
+              onOpenTasks={openTasksView}
             />
             <MessageTimeline
-              viewMode={taskConversationViewMode ?? conversationViewMode}
+              viewMode={conversationViewMode}
               blocks={timelineBlocks}
               liveReasoning={timelineLiveReasoning}
               live={timelineLiveAssistant}
@@ -2468,3 +2494,4 @@ export function Workbench(): ReactElement {
     </div>
   )
 }
+import { requestFlowDetail } from '../store/flow-navigation'

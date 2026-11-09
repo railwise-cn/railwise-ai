@@ -36,7 +36,7 @@ describe('tool call dispatch repair', () => {
       { transcript: 'a'.repeat(32) },
       { maxStringBytes: 8 }
     )
-    expect(String(repaired.arguments.transcript)).toContain('[truncated by WorkWise tool argument repair]')
+    expect(String(repaired.arguments.transcript)).toContain('[truncated by RailWise AI tool argument repair]')
     expect(repaired.notes).toEqual(['truncated 1 oversized argument string(s)'])
 
     const preserved = repairDispatchToolArguments(

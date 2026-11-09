@@ -151,7 +151,7 @@ async function nativeTransport(input: {
       headers: {
         Host: input.url.host,
         'Accept-Encoding': 'identity',
-        'User-Agent': 'WorkWise/0.2.5'
+        'User-Agent': 'RailWise AI/0.2.5'
       },
       lookup: (_hostname, _options, callback) => callback(null, input.address, input.family)
     }, (response) => {

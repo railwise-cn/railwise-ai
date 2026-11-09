@@ -313,9 +313,9 @@ async function runPortablePptxExport(input: PptMasterExportRunnerInput): Promise
 
   const pptx = new PptxGenJS()
   pptx.layout = input.format === 'ppt43' ? 'LAYOUT_4X3' : 'LAYOUT_WIDE'
-  pptx.author = 'WorkWise PPT Master'
-  pptx.company = 'WorkWise'
-  pptx.subject = 'WorkWise presentation export'
+  pptx.author = 'RailWise AI PPT Master'
+  pptx.company = 'RailWise AI'
+  pptx.subject = 'RailWise AI presentation export'
   pptx.title = basename(input.outputPath, '.pptx')
   const width = input.format === 'ppt43' ? 10 : 13.333
   const height = 7.5

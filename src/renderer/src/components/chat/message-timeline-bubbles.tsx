@@ -261,11 +261,6 @@ function metaStringArray(meta: Record<string, unknown> | undefined, key: string)
   return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
 }
 
-function metaString(meta: Record<string, unknown> | undefined, key: string): string | undefined {
-  const value = meta?.[key]
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined
-}
-
 function metaAttachmentReferences(meta: RuntimeDisclosureMetadata | undefined): AttachmentReference[] {
   const value = meta?.attachments
   if (!Array.isArray(value)) return []
@@ -943,9 +938,7 @@ function RuntimeMetaChips({
   const childLabel =
     !professionalSurface && typeof child?.childLabel === 'string' && child.childLabel.trim()
       ? child.childLabel.trim()
-      : !professionalSurface && typeof child?.childId === 'string'
-        ? child.childId
-        : ''
+      : ''
   if (
     (hideAttachments || attachmentIds.length === 0) &&
     activeSkillIds.length === 0 &&
@@ -1625,9 +1618,6 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
 
   const exitCode = readNumber(block.meta, 'exit_code')
   const durationMs = readNumber(block.meta, 'duration_ms')
-  const sessionId = metaString(block.meta, 'session_id')
-  const sessionStatus = metaString(block.meta, 'status')
-
   const hasDetail = !!(block.detail && block.detail.trim().length > 0)
   const patchText = block.toolKind === 'file_change' ? extractUnifiedDiffText(block.detail) : undefined
   const canExpand = hasDetail || block.status === 'running'
@@ -1664,11 +1654,6 @@ function ToolEntry({ block, nested = false }: { block: ToolBlock; nested?: boole
                 }`}
               >
                 exit {exitCode}
-              </span>
-            ) : null}
-            {sessionId ? (
-              <span className="rounded-full bg-ds-card px-2 py-0.5 text-[11px] font-mono text-ds-muted" title={sessionId}>
-                {sessionStatus === 'running' ? t('inspectorStatusRunning') : sessionStatus || 'session'} {sessionId.slice(0, 12)}
               </span>
             ) : null}
             {typeof durationMs === 'number' ? (

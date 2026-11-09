@@ -505,7 +505,7 @@ async function loadSkillSummary(
       ...(source?.type === 'github'
         ? { updateSource: `https://github.com/${source.owner}/${source.repo}` }
         : source?.type === 'bundled'
-          ? { updateSource: 'WorkWise bundled assets' }
+          ? { updateSource: 'RailWise AI bundled assets' }
           : { updateSource: 'Local folder' }),
       root,
       entryPath,
@@ -527,7 +527,7 @@ async function loadSkillSummary(
     ...(source?.type === 'github'
       ? { updateSource: `https://github.com/${source.owner}/${source.repo}` }
       : source?.type === 'bundled'
-        ? { updateSource: 'WorkWise bundled assets' }
+        ? { updateSource: 'RailWise AI bundled assets' }
         : { updateSource: 'Local folder' }),
     root,
     entryPath,
@@ -796,7 +796,7 @@ async function downloadGithubFile(
   }
   const bytes = await fetchGithubBytes(downloadUrl, token
     ? { ...githubHeaders(), Accept: 'application/vnd.github.raw+json' }
-    : { 'User-Agent': 'WorkWise' })
+    : { 'User-Agent': 'RailWise AI' })
   if (bytes.length > SKILL_PACKAGE_LIMITS.maxFileBytes) {
     throw new Error(`GitHub Skill file exceeds 1 MiB: ${entryPath}.`)
   }
@@ -872,7 +872,7 @@ function githubHeaders(): Record<string, string> {
   const token = githubToken()
   return {
     Accept: 'application/vnd.github+json',
-    'User-Agent': 'WorkWise',
+    'User-Agent': 'RailWise AI',
     ...(token ? { Authorization: `Bearer ${token}` } : {})
   }
 }
@@ -890,7 +890,7 @@ async function githubResponseError(response: Response): Promise<Error> {
     /* ignore body read failures */
   }
   const privateHint = response.status === 401 || response.status === 403 || response.status === 404
-    ? ' If this is a private repository, set GITHUB_TOKEN or GH_TOKEN before launching WorkWise.'
+    ? ' If this is a private repository, set GITHUB_TOKEN or GH_TOKEN before launching RailWise AI.'
     : ''
   return new Error(`GitHub request failed (${response.status} ${response.statusText}).${privateHint}${detail}`)
 }

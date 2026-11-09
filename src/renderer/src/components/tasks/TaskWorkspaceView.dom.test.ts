@@ -1,0 +1,185 @@
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TaskAttentionV1, TaskRunV1 } from '@shared/agent-workbench'
+import i18n from '../../i18n'
+import { TaskWorkspaceView, filterWorkspaceTasks, groupWorkspaceTasks, taskGroupProgress } from './TaskWorkspaceView'
+import { resetTaskStateForTests, refreshTaskState } from '../../store/task-live-store'
+
+const now = '2026-11-09T01:00:00.000Z'
+function task(id: string, status: TaskRunV1['status'], goal = id): TaskRunV1 {
+  return {
+    id, threadId: `thread-${id}`, childTaskIds: [], workspaceRoot: '/workspace', goal, status,
+    acceptance: { kind: 'answer', requiredNodeKinds: [], requireFinalResponse: true, requireActionableArtifactCard: false },
+    agentId: 'default', budget: { maxAttempts: 8, maxDurationMs: 1800000 }, attempts: 1, replans: 0, noProgressCount: 0,
+    nodes: [], artifacts: [], revision: 1, createdAt: now, updatedAt: now
+  }
+}
+const approval: TaskAttentionV1 = {
+  id: 'attention-approval', ownerKind: 'task', ownerId: 't2', taskId: 't2', threadId: 'thread-t2',
+  kind: 'approval', title: 'Publish report', message: 'Send the reviewed report to the selected destination?', status: 'pending',
+  revision: 0, createdAt: now, updatedAt: now, requestId: 'approval-1'
+}
+
+describe('task filtering', () => {
+  it('keeps paused tasks visible and derives counts from the exact same filter as the list', () => {
+    const tasks = [task('t1', 'running', 'Monthly monitoring'), task('t2', 'running', 'Tender'), task('t3', 'paused', 'Research'), task('t4', 'completed', 'Completed')]
+    expect(filterWorkspaceTasks(tasks, [approval], 'ongoing').map(item => item.id)).toEqual(['t1', 't3'])
+    expect(filterWorkspaceTasks(tasks, [approval], 'attention').map(item => item.id)).toEqual(['t2'])
+    expect(filterWorkspaceTasks(tasks, [approval], 'completed').map(item => item.id)).toEqual(['t4'])
+    expect(filterWorkspaceTasks(tasks, [approval], 'all', 'monitoring').map(item => item.id)).toEqual(['t1'])
+  })
+
+  it('keeps child runs under one root task and promotes child attention to the root', () => {
+    const root = task('root', 'running', 'Prepare report')
+    const child = {
+      ...task('child', 'waiting_user', 'Check source data'),
+      parentTaskId: root.id,
+      rootTaskId: root.id,
+      nodes: [{ id: 'child-node', taskId: 'child', kind: 'execute' as const, title: 'Check', status: 'completed' as const, dependsOn: [], attempt: 1, maxAttempts: 2, idempotencyKey: 'child-node', evidence: [], revision: 1 }]
+    }
+    const groups = groupWorkspaceTasks([root, child])
+    expect(groups).toHaveLength(1)
+    expect(groups[0].root.id).toBe('root')
+    expect(groups[0].children.map(item => item.id)).toEqual(['child'])
+    expect(taskGroupProgress(groups[0])).toEqual({ completed: 1, total: 1 })
+    expect(filterWorkspaceTasks([root, child], [], 'ongoing')).toEqual([])
+    expect(filterWorkspaceTasks([root, child], [], 'attention').map(item => item.id)).toEqual(['root'])
+  })
+})
+
+let container: HTMLDivElement
+let root: Root
+let tasks: TaskRunV1[]
+let inbox: TaskAttentionV1[]
+const onOpenThread = vi.fn()
+const onOpenArtifact = vi.fn()
+
+async function settle(): Promise<void> {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+}
+async function input(element: HTMLTextAreaElement | HTMLInputElement, value: string): Promise<void> {
+  await act(async () => {
+    const prototype = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(element, value)
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+async function click(label: string): Promise<void> {
+  const button = [...container.querySelectorAll('button')].find(item => item.textContent?.includes(label))
+  expect(button, label).toBeTruthy()
+  await act(async () => button!.click())
+  await settle()
+}
+
+beforeEach(async () => {
+  resetTaskStateForTests()
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  await i18n.changeLanguage('en')
+  tasks = [task('t1', 'running', 'Monthly report'), task('t2', 'waiting_approval', 'Tender document')]
+  inbox = [approval]
+  onOpenThread.mockClear()
+  onOpenArtifact.mockClear()
+  Object.defineProperty(window, 'workwise', {
+    configurable: true,
+    value: {
+      listTaskPage: vi.fn(async () => ({ items: tasks, relatedTasks: [], attention: inbox, total: tasks.length, counts: { all: tasks.length }, snapshotId: 'snapshot', expiresAt: now, eventWatermark: 0 })),
+      startTaskSse: vi.fn(async () => ({ streamId: 'tasks' })),
+      stopSse: vi.fn(async () => undefined),
+      onSseEvent: vi.fn(() => () => undefined),
+      onSseEnd: vi.fn(() => () => undefined),
+      onSseError: vi.fn(() => () => undefined),
+      notifyTask: vi.fn(async () => undefined),
+      listTaskRuns: vi.fn(async () => tasks),
+      listTaskInbox: vi.fn(async () => inbox),
+      listTaskTemplates: vi.fn(async () => ({ templates: [{ id: 'research-document', name: 'Research', description: 'Research docs', stages: [], outputs: [], requiredInputs: [] }] })),
+      listTaskInputs: vi.fn(async () => []),
+      listTaskEvents: vi.fn(async () => []),
+      appendTaskInput: vi.fn(async (_id: string, request: { text: string }) => ({ input: { id: 'input1', text: request.text }, task: tasks[0] })),
+      pauseTask: vi.fn(async () => { tasks = [{ ...tasks[0], status: 'paused', revision: 2 }, tasks[1]]; return tasks[0] }),
+      resumeTask: vi.fn(async () => ({ task: tasks[0], turn: {} })),
+      retryTask: vi.fn(), cancelTask: vi.fn(),
+      runtimeRequest: vi.fn(async () => { inbox = []; return { ok: true, status: 200, body: '{}' } }),
+      startTaskTemplate: vi.fn(async () => ({ threadId: 'thread-new', taskId: 'new' })),
+      saveTaskTemplate: vi.fn(async () => ({ flow: {} }))
+    }
+  })
+  container = document.createElement('div')
+  document.body.append(container)
+  root = createRoot(container)
+  await act(async () => root.render(createElement(TaskWorkspaceView, {
+    workspaceRoot: '/workspace', runtimeReady: true, leftSidebarCollapsed: false,
+    onToggleLeftSidebar: vi.fn(), onOpenThread, onOpenArtifact
+  })))
+  await settle()
+  await settle()
+})
+
+afterEach(async () => {
+  await act(async () => root.unmount())
+  container.remove()
+  Reflect.deleteProperty(window, 'workwise')
+  vi.restoreAllMocks()
+})
+
+describe('TaskWorkspaceView', () => {
+  it('keeps hidden execution threads out of attention conversation navigation',async()=>{
+    tasks=[{...task('t1','waiting_approval','Review draft'),visibility:'task'}]
+    inbox=[{...approval,id:'hidden-attention',ownerId:'t1',taskId:'t1',threadId:'thread-t1'}]
+    await act(async()=>{await refreshTaskState()})
+    await click('Needs you')
+    expect(container.textContent).not.toContain('Open conversation')
+    expect(container.textContent).not.toContain('thread-t1')
+  })
+
+  it('includes workspace Flow attention and acts through the original Flow decision API', async () => {
+    inbox = [{ id: 'flow-attention', ownerKind: 'flow', ownerId: 'run1', flowId: 'flow1', flowRunId: 'run1', nodeId: 'review', workspaceRoot: '/workspace', kind: 'approval', title: 'Review workflow report', message: 'Review the candidate', status: 'pending', revision: 0, createdAt: now, updatedAt: now, payload: { action: 'review_flow' } }]
+    await act(async () => { await refreshTaskState() })
+    await click('Needs you')
+    expect(container.textContent).toContain('Review workflow report')
+    const cards = [...container.querySelectorAll('div')].filter(element => element.querySelector('h4')?.textContent === 'Review workflow report')
+    const card = cards.at(-1)!
+    const allow = [...card.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Allow this action')!
+    await act(async () => allow.click())
+    expect(window.workwise.runtimeRequest).toHaveBeenCalledWith('/v1/flow-runs/decision', 'POST', JSON.stringify({ runId: 'run1', nodeId: 'review', decision: 'approve' }))
+  })
+
+  it('persists a supplement on the selected task and pauses it without creating a replacement thread', async () => {
+    expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('Monthly report')
+    await input(container.querySelector<HTMLTextAreaElement>('#task-supplement')!, 'Add risk analysis')
+    await click('Save and send to task')
+    expect(window.workwise.appendTaskInput).toHaveBeenCalledWith('t1', expect.objectContaining({ text: 'Add risk analysis', kind: 'supplement', expectedRevision: 1, idempotencyKey: expect.any(String) }))
+    await click('Pause')
+    expect(window.workwise.pauseTask).toHaveBeenCalledWith('t1', expect.objectContaining({ expectedRevision: 1 }))
+    expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('Resume')
+    expect(onOpenThread).not.toHaveBeenCalled()
+  })
+
+  it('shows pending decisions and resolves them through the original approval API', async () => {
+    const button = [...container.querySelectorAll<HTMLButtonElement>('nav[aria-label="Task filters"] button')].find(item => item.textContent?.includes('Needs you'))!
+    await act(async () => button.click())
+    await settle()
+    expect(container.querySelector('[aria-label="Task details"]')?.textContent).toContain('Publish report')
+    await click('Allow this action')
+    expect(window.workwise.runtimeRequest).toHaveBeenCalledWith('/v1/approvals/approval-1', 'POST', JSON.stringify({ decision: 'allow' }))
+  })
+
+  it('starts a configured template and preserves its goal and source paths', async () => {
+    await click('Research and documents')
+    const dialog = container.querySelector('[role="dialog"]')!
+    const fields = dialog.querySelectorAll<HTMLTextAreaElement>('textarea')
+    await input(fields[0], 'Compare maintenance options')
+    await input(fields[1], 'sources/a.md\nsources/b.md')
+    await click('Start task')
+    expect(window.workwise.startTaskTemplate).toHaveBeenCalledWith('research-document', expect.objectContaining({ workspaceRoot: '/workspace', goal: 'Compare maintenance options', sourcePaths: ['sources/a.md', 'sources/b.md'], idempotencyKey: expect.any(String) }))
+  })
+})
+
+it('projects a successful retry under the stable root without showing old failure as attention', () => {
+ const failed=task('failed','failed','Original goal')
+ const retry={...task('retry','completed','Original goal'),rootTaskId:'failed',retryOfTaskId:'failed',createdAt:'2026-11-09T02:00:00.000Z'}
+ expect(filterWorkspaceTasks([failed,retry],[],'attention')).toEqual([])
+ expect(filterWorkspaceTasks([failed,retry],[],'completed').map(task=>task.id)).toEqual(['failed'])
+ expect(groupWorkspaceTasks([failed,retry])).toHaveLength(1)
+})

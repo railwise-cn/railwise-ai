@@ -93,7 +93,8 @@ describe('configured provider identity over real HTTP', () => {
     const thread = await runtime.threadService.create({ workspace: root, model: 'thread-specific-model', mode: 'agent' })
     for (const providerId of ['b', 'a']) {
       const started = await runtime.turnService.startTurn({ threadId: thread.id, request: { prompt: 'What is 2+3?', model: 'shared-model', providerId, reasoningEffort: 'off' } })
-      expect(await runtime.runTurn(thread.id, started.turnId)).toBe('completed')
+      const outcome=await runtime.runTurn(thread.id, started.turnId)
+      expect(outcome,JSON.stringify(await runtime.turnService.getTurn(thread.id,started.turnId))).toBe('completed')
       expect(await runtime.turnService.getTurn(thread.id, started.turnId)).toMatchObject({ providerId, model: 'shared-model', reasoningEffort: 'off' })
     }
     expect(a.requests).toHaveLength(1); expect(b.requests).toHaveLength(1)

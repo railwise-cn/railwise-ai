@@ -56,6 +56,7 @@ type Props = {
   onScheduleOpen: () => void
   onFlowOpen: () => void
   onDesignOpen: () => void
+  onTasksOpen?: () => void
   onEngineeringOpen: () => void
   onToggleSidebar: () => void
 }
@@ -88,6 +89,7 @@ export function Sidebar({
   onScheduleOpen,
   onFlowOpen,
   onDesignOpen,
+  onTasksOpen,
   onEngineeringOpen,
   onToggleSidebar
 }: Props): ReactElement {
@@ -153,6 +155,7 @@ export function Sidebar({
           onScheduleOpen={onScheduleOpen}
           onFlowOpen={onFlowOpen}
           onDesignOpen={onDesignOpen}
+          onTasksOpen={onTasksOpen}
         />
 
         <div className="mx-2 my-2 border-t border-[var(--ds-sidebar-divider)]" />

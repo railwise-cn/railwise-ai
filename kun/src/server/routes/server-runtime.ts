@@ -1,3 +1,8 @@
+import type { TaskViewService } from '../../services/task-view-service.js'
+import type { TaskControlService } from '../../services/task-control-service.js'
+import type { TaskCoordinator } from '../../services/task-coordinator.js'
+import type { TaskContextRuntime } from '../../services/task-context-runtime.js'
+import type { CapacityManager } from '../../services/capacity-manager.js'
 import type { SurveyCollaborationService } from '../../engineering/survey-collaboration.js'
 import type { SurveyQualityAssessmentService } from '../../engineering/survey-quality-assessment.js'
 import type { SurveyQualityWorkflowService } from '../../engineering/survey-quality-workflow.js'
@@ -64,6 +69,11 @@ export type ServerRuntime = {
   threadService: ThreadService
   turnService: TurnService
   uiActionService?: UiActionService
+  taskViewService?: TaskViewService
+  taskCoordinator?: TaskCoordinator
+  taskControlService?:TaskControlService
+  taskContextRuntime?: TaskContextRuntime
+  capacityManager?: CapacityManager
   taskController?: TaskController
   taskRepository?: TaskRunRepository
   spanService?: RuntimeSpanService

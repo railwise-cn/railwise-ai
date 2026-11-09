@@ -280,3 +280,55 @@ npm run build
    “暂无用量”，而显示 token、回合、缓存命中等指标。
 7. 线程搜索、归档视图、fork、resume session、request_user_input 回答/取消
    都能通过 WorkWise Agent Runtime HTTP 路径完成。
+
+## 持续任务与文档交付工作台
+
+本节补充下一版任务工作台的持久化合同。现有 KUN 运行时仍是唯一运行时；聊天、Write、Flow 和任务工作台共用本地 HTTP/SSE 边界。
+
+### 任务恢复与幂等
+
+- `TaskRun` 是长期目标的权威记录，Flow 通过 `flowId`/`flowRunId` 关联但不取代 Flow 自己的节点状态。
+- 任务输入、人工待办、操作回执和 outbox 写入 `tasks.sqlite3`；Flow 数据继续写入 `flow.sqlite`，不假设跨库原子事务。
+- 输入先持久化再消费；相同幂等键重放返回原输入，不同内容复用同键返回冲突。
+- 所有任务变更携带期望 revision；外部动作结果不明时标记 `outcome_unknown`，确认前不得盲目重放。
+- 恢复同时检查租约、进程身份和持久回执；lock 文件或等待超时本身不构成重启依据。
+
+### 人工介入与子任务
+
+审批和用户问题持久化为 Inbox 项目。回答先落库，再由活跃 gate 或持久 outbox 唤醒任务；重启后会创建带已保存回答的继续回合。暂停或取消的任务不会因为迟到回答自行恢复。
+
+子任务会话保存在运行时数据目录，权限取父任务授权与子任务需求的交集，包含工作区、工具、MCP、外部目标和预算；交接包记录结论、证据、成果、已完成操作和剩余事项。
+
+### 工程文档交付
+
+内置模板为监测报告、招投标技术文件和通用研究与文档。Flow 节点 `railwise.task_delivery` 启动或恢复持久 `TaskRun`，通过固定的隐藏执行 thread 关联同一交付任务。等待期间协调器只检查本地持久状态，不请求模型；只有 `verifyTaskDelivery` 核验草稿、来源、适用的 DOCX/PDF 和监测图表后，才把任务结果交回原 Flow。
+
+文档交付 profile 使用明确的只读资料工具清单（`read`、`ls`、`find`、`grep` 和附件分节读取），加上 `read_delivery_sources`、`propose_document`、`export_document`、`analyze_delivery_monitoring` 与 `read_task_context`。它不会因为 Runtime 新增工具而自动获得 Shell、普通文件写入、MCP、Flow 或外发能力。该限制用于新建的内置模板执行，不改写用户已有 Agent profile。
+
+`propose_document` 把 Markdown 写入 `.workwise/delivery-candidates/<taskId>/`，以独占创建保留已有文件。旁置 `.sources.json` 记录候选哈希、目标基线、来源哈希和 `contextBundleId`；来源在读取后发生变化时拒绝生成，要求重新读取受影响资料。图片链接按候选位置重写，现有本地图片须在授权工作区内，并纳入来源校验。任务界面展示来源和正文差异；接受候选通过主进程文档服务再次校验候选及目标版本，保留替换前内容并追加文档历史。冲突和结果不明不等于已提交。
+
+候选同时记录 `sections`（稳定 ID、标题、级别、行范围、来源路径）与每个来源支持的章节。`source_refs.sections` 可以指定唯一标题或 section ID；省略时保守关联全部章节。标题解析支持 ATX/Setext，排除 frontmatter 和 fenced code。局部重生成使用 `base_candidate_path`、`expected_candidate_hash` 与 `section_patches`，写入新的候选路径，记录递增版本和被替代候选的路径/哈希。补丁替换章节正文，保留原标题、子标题结构及未选区域的原始字节；同名标题需用稳定 ID，父子重叠补丁会拒绝。结构重排需生成整篇新候选。
+
+来源更新只能在重新读取实际新版本、且补丁覆盖该来源全部受影响章节时纳入新候选；未受影响内容和其他来源版本保持。目标正文在此过程中完全不写入，原候选的目标基线也不能悄悄改成外部新版本。完成校验仅要求显式替代链末端的候选导出成功，旧候选和旧操作回执仍保留。
+
+已结束任务的局部重生成可在新的隐藏执行任务中引用同一授权工作区内的旧候选；必须给出旧文件精确哈希，且 namespace 与元数据中的旧任务一致。新候选写入新任务 namespace 的对应相对目录；需要保留的局部图片按字节哈希核验后复制到新 namespace，避免改写未选正文的相对链接。显式 `source_refs` 只替换所选章节的来源依赖，未选章节仍保留旧来源；无法核验的旧来源不会自动变成新版本。
+
+`analyze_delivery_monitoring` 把用户 CSV/XLSX/JSON 和项目 JSON 交给现有确定性工程服务，完成导入、校验、统计及 SVG 图表。阈值、单位、规范版本等业务条件仅来自用户资料。模型组织解释，不生成测值或专业签署。
+
+`export_document` 通过主进程临时开启的 loopback capability bridge 调用写作工作台现有 DOCX、HTML 和 Electron PDF 渲染器。桥的随机 bearer 只传给本轮受管 Runtime，不保存到用户设置。产物写到 `.workwise/delivery-exports/<taskId>/`，每种格式单独记录哈希、大小及操作回执。重放先核验已生成文件；丢失 HTTP 回包时只查询持久回执，不能重新 POST 渲染。桥不可用、部分失败或结果待核实均保留草稿和待办，不显示全部交付完成。
+
+### 来源事件、待办与上下文
+
+Webhook 验签通过后，将 nonce、请求指纹、固定 Flow 发布版本、原始事件、queued run 和派发 outbox 在 `flow.sqlite` 的同一事务内提交。Schedule 的本次 `dueAt` 事件与下一次时间也在同一事务内提交；保留现有逾期调度语义。Task 消费成功后再确认 Flow outbox，跨库重复投递通过稳定事件及执行实例标识去重。
+
+独立 Flow 的审批或断点会生成带 `flowId`、`flowRunId`、`nodeId` 和工作区的持久 Attention，通过 Flow outbox 投影到任务 Inbox。消费方只接受更新的 Flow revision，旧 pending 事件不能重新打开已处理事项。取消等待中的 Flow 会持久取消；同一审批节点的不同执行 occurrence 使用不同操作键，保留既有决定回执。审批与继续仍调用原 Flow 服务，不把它伪装成 Agent Turn。
+
+`TaskContextRepository` 复用任务仓储的 SQLite 连接和事务；来源投递、TaskInput、订阅消费和交接 outbox 可在任务库内一并提交。来源规则先筛选，明确拒绝或仅记录的事件不唤醒模型。重叠订阅按“事件＋目标 ExecutionSession”合并，暂停任务只收件，不恢复执行。
+
+模型执行前保存实际上下文的 `ContextBundle`。文档来源只来自成功的内容读取和确定性分析输入；目录列举、文件属性及生成物路径不会被当作已读证据。读取工具返回实际字节 SHA-256；后续检查保留该读版本，比较当前文件，不能把新文件哈希冒充模型已读版本。来源变化或消失会把相关 bundle 标为过期。大内容保存在带哈希的本机对象中；`read_task_context` 只能读取当前任务 bundle，复核范围与完整性，并按有界偏移返回内容。具体请求投影保留不可变前缀与工具协议结构，不把来源内容当作新增授权。
+
+### 记忆与迁移
+
+中文记忆检索使用本地分词和字符片段回退；无确定项目归属的记忆保留为“待关联”，不自动注入其他项目。经验候选默认关闭并需审阅。
+
+任务数据库迁移是增量的，迁移前备份为 `tasks.sqlite3.pre-durable-v1.bak`；Flow 数据库沿用 `flow.sqlite.before-delivery-v1.sqlite` 备份名。旧 `.workwise`、插件、MCP、Skill、凭据引用、工作区路径、`activeFilePath` 和旧 IPC 继续可读。

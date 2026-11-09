@@ -32,6 +32,14 @@ import {
   RUNTIME_TASK_RETRY_TEMPLATE,
   RUNTIME_TASK_CANCEL_TEMPLATE,
   RUNTIME_TASK_DIAGNOSTICS_TEMPLATE,
+  RUNTIME_TASK_PAUSE_TEMPLATE,
+  RUNTIME_TASK_INPUTS_TEMPLATE,
+  RUNTIME_TASK_EVENTS_TEMPLATE,
+  RUNTIME_TASK_SUMMARY_TEMPLATE,
+  RUNTIME_INBOX_TEMPLATE,
+  RUNTIME_TASK_TEMPLATES_TEMPLATE,
+  RUNTIME_TASK_TEMPLATE_START_TEMPLATE,
+  RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE,
   RUNTIME_SHELL_SESSIONS_TEMPLATE,
   RUNTIME_SHELL_SESSION_TERMINATE_TEMPLATE,
   RUNTIME_THREADS_TEMPLATE,
@@ -281,12 +289,20 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_INFO_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TOOLS_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_SKILLS_TEMPLATE, ['GET']),
-  compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET'], ['threadId', 'workspaceRoot', 'status', 'limit', 'offset', 'search']),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TASK_RESUME_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_RETRY_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_CANCEL_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_DIAGNOSTICS_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASK_PAUSE_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_TASK_INPUTS_TEMPLATE, ['GET', 'POST'], []),
+  compileEndpoint(RUNTIME_TASK_EVENTS_TEMPLATE, ['GET'], ['afterSequence']),
+  compileEndpoint(RUNTIME_TASK_SUMMARY_TEMPLATE, ['GET'], ['workspaceRoot', 'search', 'threadId']),
+  compileEndpoint(RUNTIME_INBOX_TEMPLATE, ['GET'], ['workspaceRoot']),
+  compileEndpoint(RUNTIME_TASK_TEMPLATES_TEMPLATE, ['GET'], []),
+  compileEndpoint(RUNTIME_TASK_TEMPLATE_START_TEMPLATE, ['POST'], []),
+  compileEndpoint(RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_SHELL_SESSIONS_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_SHELL_SESSION_TERMINATE_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ATTACHMENTS_TEMPLATE, ['POST']),
@@ -1237,6 +1253,12 @@ export const checkedDocumentWritePayloadSchema = z.object({
   source: z.enum(['user', 'agent', 'external', 'restore']).optional()
 }).strict()
 
+export const documentCandidateReadPayloadSchema = documentReadPayloadSchema.extend({ targetPath: defaultPathSchema.optional() }).strict()
+export const documentCandidateDecisionPayloadSchema = documentCandidateReadPayloadSchema.extend({
+  decision: z.enum(['accept','reject']), idempotencyKey: trimmedString(256),
+  candidateRevision: documentRevisionSchema, expectedRevision: documentRevisionSchema.nullable()
+}).strict()
+
 export const documentHistoryPayloadSchema = documentReadPayloadSchema.extend({
   id: z.string().regex(/^\d{13}-[a-f0-9-]{36}$/)
 }).strict()
@@ -1678,11 +1700,17 @@ export const clawImInstallPollPayloadSchema = z
 
 export const sseStartPayloadSchema = z
   .object({
-    threadId: trimmedString(MAX_ID_LENGTH),
+    scope: z.enum(['thread','tasks']).default('thread'),
+    threadId: optionalTrimmedString(MAX_ID_LENGTH),
     sinceSeq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
     streamId: optionalTrimmedString(MAX_ID_LENGTH)
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.scope === 'thread' && !value.threadId) {
+      context.addIssue({ code: 'custom', path: ['threadId'], message: 'A thread stream requires a threadId.' })
+    }
+  })
 
 export const streamIdSchema = trimmedString(MAX_ID_LENGTH)
 

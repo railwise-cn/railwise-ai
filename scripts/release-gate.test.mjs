@@ -20,6 +20,7 @@ import './build-markdown-rendering.test.cjs'
 import './verify-packaged-markdown-rendering.test.cjs'
 import './verify-markdown-packaging-filesets.test.cjs'
 import './dependency-artifact-policy.test.cjs'
+import './windows-install-smoke.test.mjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')
@@ -225,6 +226,52 @@ test('only an explicit private final-package build records public-identity recei
     assert.match(build.env.WORKWISE_UPDATE_URL, /inputs\.prepare_public_artifacts != true/)
     assert.match(build.steps.find(step => /Upload .*installer/.test(step.name))?.with.path, /reviewed-build\.json/)
   }
+})
+
+test('public-identity builds allow optional stability to be skipped', () => {
+  const prepare = jobs.prepare.steps.find(step => step.id === 'version')
+  assert.doesNotMatch(prepare.run, /SKIP_STABILITY|require the complete stability gate/)
+  for (const name of ['build-document-sidecars', 'build-macos', 'build-windows', 'verify-candidate']) {
+    assert.match(jobs[name].if, /inputs\.skip_stability == true/)
+  }
+})
+
+test('private exact updater smoke consumes this run’s package once without a rebuild or publication', () => {
+  assert.equal(input('exact_package_updater_smoke').default, false)
+  const smoke = jobs['exact-package-updater-smoke']
+  assert.deepEqual(smoke.needs, ['prepare', 'build-macos'])
+  assert.match(smoke.if, /inputs\.exact_package_updater_smoke == true/)
+  assert.match(smoke.if, /inputs\.publish_release != true/)
+  assert.match(smoke.if, /inputs\.candidate_only != true/)
+  const download = smoke.steps.find(step => /actions\/download-artifact@/.test(step.uses ?? ''))
+  assert.equal(download.with.name, 'release-mac')
+  assert.equal(download.with['run-id'], undefined, 'artifact must belong to this run')
+  const launch = smoke.steps.find(step => /--target-dist=/.test(step.run ?? ''))
+  assert.match(launch.run, /--base-version=0\.5\.4/)
+  assert.match(launch.run, /--target-version="\$\{TARGET_VERSION\}"/)
+  assert.doesNotMatch(JSON.stringify(smoke), /npm run dist|electron-builder|publish-r2|gh release|deploy-website-release|REVIEWED_BUILD_JSON/)
+  const signing = jobs['build-macos'].steps.find(step => step.name === 'Resolve signing mode')
+  assert.equal(signing.env.EXACT_PACKAGE_UPDATER_SMOKE, '${{ inputs.exact_package_updater_smoke }}')
+  assert.match(signing.run, /EXACT_PACKAGE_UPDATER_SMOKE.*true/)
+})
+
+test('private Windows installation smoke inspects this run’s exact EXE without rebuilding or publication', () => {
+  const smoke = jobs['exact-package-windows-install-smoke']
+  assert.deepEqual(smoke.needs, ['prepare', 'build-windows'])
+  assert.equal(smoke['runs-on'], 'windows-2022')
+  assert.match(smoke.if, /inputs\.exact_package_updater_smoke == true/)
+  assert.match(smoke.if, /inputs\.publish_release != true/)
+  assert.match(smoke.if, /inputs\.candidate_only != true/)
+  const download = smoke.steps.find(step => /actions\/download-artifact@/.test(step.uses ?? ''))
+  assert.equal(download.with.name, 'release-win')
+  assert.equal(download.with['run-id'], undefined)
+  const inspect = smoke.steps.find(step => /run-windows-install-smoke\.ps1/.test(step.run ?? ''))
+  assert.equal(inspect.shell, 'pwsh')
+  assert.match(inspect.run, /-SourceHead \$env:GITHUB_SHA/)
+  assert.match(inspect.run, /-Version \$env:TARGET_VERSION/)
+  const evidence = smoke.steps.find(step => /actions\/upload-artifact@/.test(step.uses ?? ''))
+  assert.equal(evidence.if, 'always()')
+  assert.doesNotMatch(JSON.stringify(smoke), /npm run dist|electron-builder|publish-r2|gh release|deploy-website-release/)
 })
 
 test('release source checkout cannot move while stability or acceptance is running', () => {

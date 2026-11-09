@@ -1,5 +1,5 @@
 export const SDD_VERIFY_INTRO =
-  'WorkWise Runtime is asking you to verify an implemented SDD requirement draft against its acceptance criteria.'
+  'RailWise AI Runtime is asking you to verify an implemented SDD requirement draft against its acceptance criteria.'
 
 /**
  * Acceptance-verification turn: the agent checks every requirement block's

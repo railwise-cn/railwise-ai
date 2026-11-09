@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { FlowDefinitionV1, FlowNodeRunV1, FlowNodeV1, FlowRunV1 } from '../contracts/flow.js'
 import { FlowRepository } from './repository.js'
+import { inspectProcess } from '../services/process-identity.js'
 
 export type FlowAdapterContext = { run: FlowRunV1; definition: FlowDefinitionV1; node: FlowNodeV1; input: unknown; signal: AbortSignal }
-export type FlowAdapterResult = { kind: 'output'; output: unknown } | { kind: 'wait'; reason: 'approval' | 'breakpoint'; checkpoint?: unknown }
+export type FlowAdapterResult = { kind: 'output'; output: unknown } | { kind: 'wait'; reason: 'approval' | 'breakpoint' | 'task'; checkpoint?: unknown }
 export type FlowNodeAdapter = (context: FlowAdapterContext) => Promise<FlowAdapterResult>
 type NodeExecutionResult = FlowAdapterResult | { kind: 'error'; error: string; output: unknown }
 
@@ -19,8 +20,20 @@ export class FlowExecutor {
     if (draft.variables.archived === true) throw new Error('Flow is archived')
     const version = this.repository.getVersion(draft.publishedVersionId); if (!version) throw new Error('Published Flow version is missing')
     const run = this.repository.createRun({ flowId, versionId: version.id, input, invocationStack: [...invocationStack, flowId] })
-    void this.execute(run, version.definition)
+    this.dispatchQueued(run.id)
     return run
+  }
+
+  /** Dispatch an already committed source run without creating another run. */
+  dispatchQueued(runId: string): FlowRunV1 {
+    const run = this.repository.getRun(runId)
+    if (!run) throw new Error(`run not found: ${runId}`)
+    if (run.status !== 'queued' || this.active.has(runId)) return run
+    const version = this.repository.getVersion(run.versionId)
+    if (!version || version.flowId !== run.flowId) throw new Error('Accepted Flow version is missing')
+    const claimed = this.repository.claimRun(runId, ['queued'])
+    if (claimed) void this.execute(claimed, version.definition)
+    return this.repository.getRun(runId) ?? run
   }
 
   async testNode(definition: FlowDefinitionV1, nodeId: string, input: unknown): Promise<FlowAdapterResult> {
@@ -31,15 +44,29 @@ export class FlowExecutor {
     return withTimeout(adapter({ run, definition, node, input, signal: controller.signal }), node.policy.timeoutMs, controller)
   }
 
-  cancel(runId: string): boolean { const controller = this.active.get(runId); if (!controller) return false; controller.abort(); return true }
+  cancel(runId: string): boolean {
+    const controller = this.active.get(runId)
+    if (controller) { controller.abort(); return true }
+    return this.repository.transaction(() => {
+      const run = this.repository.getRun(runId)
+      if (!run || !['queued', 'paused', 'interrupted', 'waiting_approval'].includes(run.status)) return false
+      const now = this.nowIso()
+      for (const node of this.repository.listNodeRuns(runId)) if (['paused', 'waiting_approval', 'interrupted'].includes(node.status)) this.repository.saveNodeRun({ ...node, status: 'cancelled', completedAt: now })
+      this.repository.saveRun({ ...run, status: 'cancelled', updatedAt: now, completedAt: now })
+      return true
+    })
+  }
 
   async resume(runId: string): Promise<FlowRunV1> {
+    if (this.active.has(runId)) throw new Error('Flow run is already executing')
     const run = this.repository.getRun(runId); if (!run) throw new Error(`run not found: ${runId}`)
     const version = this.repository.getVersion(run.versionId); if (!version) throw new Error('Flow version not found')
     if (!['paused', 'interrupted', 'waiting_approval', 'failed'].includes(run.status)) throw new Error(`run cannot resume from ${run.status}`)
     if (run.status === 'interrupted' && run.checkpoint?.resumable === false) throw new Error('Flow cannot resume because the interrupted node is not resumable')
-    void this.execute({ ...run, status: 'queued', updatedAt: this.nowIso() }, version.definition)
-    return { ...run, status: 'queued', updatedAt: this.nowIso() }
+    const claimed = this.repository.claimRun(run.id, ['paused', 'interrupted', 'waiting_approval', 'failed'])
+    if (!claimed) throw new Error('Flow run was claimed by another Runtime')
+    void this.execute(claimed, version.definition)
+    return claimed
   }
 
   checkpointActiveRuns(): number {
@@ -55,6 +82,11 @@ export class FlowExecutor {
   reconcileStartup(): number {
     let count = 0
     for (const run of this.repository.listRunsByStatus(['queued', 'running'])) {
+      // A committed source inbox item which has never dispatched is safe to start.
+      // Running nodes must still be reconciled rather than replayed blindly.
+      if (run.status === 'queued' && this.repository.listNodeRuns(run.id).length === 0) continue
+      const owner = run.checkpoint?.executionOwner as { pid?: unknown; fingerprint?: unknown } | undefined
+      if (owner && typeof owner.pid === 'number' && typeof owner.fingerprint === 'string' && inspectProcess({ pid: owner.pid, fingerprint: owner.fingerprint }) === 'alive') continue
       const version = this.repository.getVersion(run.versionId); const running = this.repository.listNodeRuns(run.id).filter((item) => item.status === 'running')
       const resumable = version !== null && running.every((item) => version?.definition.nodes.find((node) => node.id === item.nodeId)?.policy.resumable === true)
       for (const nodeRun of running) this.repository.saveNodeRun({ ...nodeRun, status: 'interrupted', completedAt: this.nowIso() })
@@ -100,7 +132,7 @@ export class FlowExecutor {
           for (let offset = 0; offset < batch.length; offset += 1) {
             const result = results[offset]!; const node = batch[offset]!
             if (result.kind === 'wait') {
-              run = { ...run, status: result.reason === 'approval' ? 'waiting_approval' : 'paused', checkpoint: { nodeId: node.id, reason: result.reason }, updatedAt: this.nowIso() }
+              run = { ...run, status: result.reason === 'approval' ? 'waiting_approval' : 'paused', checkpoint: { ...run.checkpoint, nodeId: node.id, reason: result.reason, ...(result.checkpoint && typeof result.checkpoint === 'object' ? result.checkpoint as Record<string, unknown> : {}) }, updatedAt: this.nowIso() }
               this.repository.saveRun(run); return
             }
             if (result.kind === 'error') { outputs.set(node.id, result.output); failed.add(node.id); completed.add(node.id); continue }

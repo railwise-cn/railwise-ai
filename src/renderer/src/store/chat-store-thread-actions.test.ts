@@ -372,3 +372,35 @@ describe('chat-store-thread-actions recovery', () => {
     expect(state.liveUsageByThreadId.thr_existing).toBeUndefined()
   })
 })
+
+describe('task coordinator before ordinary chat turns', () => {
+  beforeEach(() => {
+    vi.spyOn(rendererRuntimeClient, 'getSettings').mockResolvedValue({ codePromptPrefix: '' } as WorkWiseSettingsV2)
+  })
+  it('answers status locally while busy without queueing, stopping or starting a model turn', async () => {
+    const { actions, state } = buildHarness()
+    const coordinateTaskCommand = vi.fn(async () => ({ kind: 'snapshot', task: { goal: '合成月报', status: 'running' } }))
+    vi.stubGlobal('window', { workwise: { coordinateTaskCommand } })
+    state.composerProviderId = 'default'
+    try {
+      expect(await actions.sendMessage('现在做到哪了')).toBe(true)
+      expect(coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({ threadId: 'thr_existing', intent: 'auto' }))
+      expect(state.queuedMessages).toEqual([])
+      expect(state.busy).toBe(true)
+      expect(state.blocks.at(-1)).toMatchObject({ kind: 'assistant' })
+      expect(state.recoverActiveTurn).not.toHaveBeenCalled()
+    } finally { vi.unstubAllGlobals() }
+  })
+  it('persists a supplement or independent task without cancelling existing work', async () => {
+    const { actions, state } = buildHarness()
+    const coordinateTaskCommand = vi.fn(async () => ({ kind: 'input_queued', task: {}, input: { id: 'input1' } }))
+    vi.stubGlobal('window', { workwise: { coordinateTaskCommand } })
+    state.composerProviderId = 'default'
+    try {
+      expect(await actions.sendMessage('再加一章风险分析')).toBe(true)
+      expect(state.queuedMessages).toEqual([])
+      expect(state.busy).toBe(true)
+      expect(coordinateTaskCommand).toHaveBeenCalledTimes(1)
+    } finally { vi.unstubAllGlobals() }
+  })
+})

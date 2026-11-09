@@ -39,10 +39,10 @@ export function resolveFixtureService({ app, mode, compatibilityRoot }) {
   throw new Error('Target package does not contain both Survey services; source fallback is forbidden.')
 }
 
-export function validateFixtureExecution(app, executable, metadata, mode, sourceHead, targetVersion) {
-  validateFrozenTargetVersion(targetVersion)
+export function validateFixtureExecution(app, executable, metadata, mode, sourceHead, targetVersion, baseVersion = FROZEN_BASE_VERSION) {
+  validateFrozenTargetVersion(targetVersion, baseVersion)
   assert.equal(realpathSync(executable), realpathSync(join(app, 'Contents/MacOS/RailWise AI')), 'Fixture must execute the selected packaged application.')
-  assert.equal(metadata.version, mode === 'seed' ? FROZEN_BASE_VERSION : targetVersion, 'Fixture package version')
+  assert.equal(metadata.version, mode === 'seed' ? baseVersion : targetVersion, 'Fixture package version')
   if (!/^[a-f0-9]{40}$/.test(sourceHead ?? '')) throw new Error('Exact frozen source is required for fixture provenance.')
   if (mode !== 'seed') assert.equal(metadata.buildProvenance?.sourceHead, sourceHead, 'Fixture target source')
 }
@@ -159,8 +159,10 @@ async function main() {
   const mode = argument('mode')
   if (!['seed', 'verify', 'inspect'].includes(mode)) throw new Error('Fixture mode must be seed, verify or inspect.')
   const sourceHead = argument('source-head')
+  const baseVersion = argument('base-version') ?? FROZEN_BASE_VERSION
   const metadata = JSON.parse(readFileSync(join(app, 'Contents/Resources/app.asar/package.json'), 'utf8'))
-  validateFixtureExecution(app, process.execPath, metadata, mode, sourceHead, readFrozenSourceVersion())
+  const targetVersion = argument('target-version') ?? readFrozenSourceVersion(baseVersion)
+  validateFixtureExecution(app, process.execPath, metadata, mode, sourceHead, targetVersion, baseVersion)
   const checkoutRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../kun')
   let selection = resolveFixtureService({ app, mode, compatibilityRoot: mode === 'seed' ? checkoutRoot : undefined })
   if (selection.layout === 'source-compatibility') {
@@ -187,7 +189,7 @@ async function main() {
   try {
     if (mode === 'seed') {
       if (engineering.listProjects().length || survey.listNetworks().length) throw new Error('Refusing to seed an existing professional data store.')
-      const project = engineering.createProject({ name: `Synthetic ${FROZEN_BASE_VERSION} update compatibility`, workspace, taskType: 'control-network', unit: 'm', expectedRevision: 0, idempotencyKey: 'frozen-updater-project' })
+      const project = engineering.createProject({ name: `Synthetic ${baseVersion} update compatibility`, workspace, taskType: 'control-network', unit: 'm', expectedRevision: 0, idempotencyKey: 'frozen-updater-project' })
       // The baseline Electron process and SQLite ABI are real; service provenance is recorded separately.
       const source = Buffer.from('1.000,1,1\nA,50.000000,150.000000\nB,150.000000,50.000000\nC,120.710678,120.710678\nS1\nA,L,0\nB,L,270.00000\nB,S,100.000\nC,L,315.00000\nC,S,100.000\n')
       const network = await survey.importNetwork({ projectId: project.id, expectedRevision: project.revision, idempotencyKey: 'frozen-updater-import', networkType: 'plane-control', name: 'synthetic.in2', dataBase64: source.toString('base64'), referenceDeclaration: { coordinateSystem: 'SYNTHETIC-LOCAL-GRID', verticalDatum: 'SYNTHETIC-LOCAL-BENCHMARK' } })
@@ -221,7 +223,7 @@ async function main() {
     assertRetainedFiles(baseline.files.data, files.data); assertRetainedFiles(baseline.files.workspace, files.workspace)
   }
   writeFileSync(reportPath, JSON.stringify({ schemaVersion: 1, mode, status: 'passed', projects: 1, networks: 1, adjustments: 1, monitoringDatasets: 1, sourceSha256: identity.sourceSha256,
-    serviceSource, serviceIdentity, scope: `Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official ${FROZEN_BASE_VERSION} Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary ${FROZEN_BASE_VERSION} schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution.` }) + '\n', { mode: 0o600 })
+    serviceSource, serviceIdentity, scope: `Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official ${baseVersion} Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary ${baseVersion} schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution.` }) + '\n', { mode: 0o600 })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => { console.error(`[updater-data] ${error.message}`); process.exitCode = 1 })

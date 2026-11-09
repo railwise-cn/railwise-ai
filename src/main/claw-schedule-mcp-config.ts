@@ -200,7 +200,7 @@ async function readJsonFile(path: string): Promise<unknown | null> {
     return JSON.parse(raw) as unknown
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to parse WorkWise Runtime MCP config at ${path}: ${message}`, { cause: error })
+    throw new Error(`Failed to parse RailWise AI Runtime MCP config at ${path}: ${message}`, { cause: error })
   }
 }
 

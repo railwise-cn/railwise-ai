@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { extname, join, relative, sep } from 'node:path'
 
 const root = process.cwd()
-const scanRoots = ['src', 'scripts', '.github', 'docs', 'release']
+const scanRoots = ['src', 'scripts', '.github', 'docs', 'release', 'website']
 const scanFiles = ['README.md', 'README.en.md', 'DESIGN.md', 'DESIGN.zh-CN.md', 'electron-builder.cjs', 'package.json']
 const textExtensions = new Set(['.ts', '.tsx', '.js', '.cjs', '.mjs', '.json', '.md', '.yml', '.yaml', '.sh', '.ps1', '.html', '.css'])
 const forbidden = [
@@ -29,9 +29,12 @@ const allowedFiles = [
   /^FORK_NOTICE\.md$/,
   /^LICENSE(?:\.|$)/,
   /^docs\/PUBLIC_BEHAVIOR_GAP_0\.2\.5\.zh-CN\.md$/,
+  // The release identity migration documents the unchanged historical bundle ID.
+  /^docs\/MIGRATION_RELEASE_IDENTITY\.zh-CN\.md$/,
   // QA evidence must preserve exact legacy identifiers (for example the
   // historical bundle id) so release-gate records remain auditable.
   /^docs\/qa\/evidence\//,
+  /^website\/products\/screenshots\/workwise\/release-[0-9]+-screenshots\.json$/,
   /^src\/main\/compat\//,
   /^src\/main\/legacy-data-migration(?:\.test)?\.ts$/,
   /^src\/main\/settings-store(?:\.test)?\.ts$/,
@@ -110,10 +113,52 @@ for (const absolute of files) {
   }
 }
 
+// Public-facing identities are distinct from compatibility keys. Check only
+// prospective output strings here; legacy readers, old receipts, schemas and
+// third-party provenance retain their exact original identities.
+const publicIdentityFiles = [
+  'src/main/settings-store.ts', 'src/main/services/write-docx-service.ts',
+  'src/main/services/im-health-service.ts', 'src/main/claw-runtime.ts',
+  'src/main/claw-schedule-mcp-server.ts', 'src/main/runtime/managed-runtime-adapter.ts',
+  'src/main/services/write-inline-completion-service.ts',
+  'src/renderer/src/agent/managed-runtime.ts', 'src/main/ipc/register-app-ipc-handlers.ts',
+  'kun/src/prompt/kun-system-prompt.ts', 'kun/src/adapters/tool/ppt-master-tool-provider.ts',
+  'src/shared/app-settings-prompts.ts', 'src/main/claw-schedule-mcp-config.ts'
+]
+const publicCopyFiles = [
+  'src/main/services/git-checkpoint-service.ts', 'src/main/services/pypi-package-materializer.ts',
+  'src/main/services/package-installation-service.ts', 'src/main/services/plugin-package-formats.ts',
+  'src/main/services/managed-tool-service.ts', 'src/main/services/skill-service.ts',
+  'src/main/claw-runtime-helpers.ts', 'src/main/weixin-bridge-runtime.ts',
+  'src/renderer/src/plan/plan-prompts.ts', 'src/renderer/src/sdd/sdd-verify-prompt.ts',
+  'src/renderer/src/sdd/sdd-assistant-prompt.ts', 'src/renderer/src/sdd/sdd-plan-prompt.ts',
+  'src/renderer/src/write/quoted-selection.ts', 'kun/src/loop/tool-call-repair.ts',
+  'kun/src/cli/agent-cli.ts', 'kun/src/adapters/tool/design-tool-provider.ts',
+  'kun/src/network/safe-web-fetch.ts', 'src/main/index.ts',
+  'kun/src/adapters/tool/builtin-read-tool.ts', 'kun/src/adapters/tool/flow-tool-provider.ts',
+  'src/main/services/plugin-activation-service.ts'
+]
+const publicLegacyPatterns = [
+  /(?:Welcome to|欢迎使用) WorkWise/,
+  /(?:creator|displayName|pptx\.(?:author|company|subject))\s*[:=]\s*['"]WorkWise/,
+  /You are WorkWise[, ]/,
+  /(?:live WorkWise (?:IM|WeChat) bridge|The WorkWise main process|WorkWise answers that command)/,
+  /(?:WorkWise Runtime (?:可访问|不可访问)|Failed to parse WorkWise Runtime MCP config)/,
+  /(?:在 WorkWise 中|WorkWise 将自动重试)/,
+  /WorkWise-task-diagnostics-/
+]
+for (const file of [...publicIdentityFiles, ...publicCopyFiles]) {
+  const lines = readFileSync(join(root, file), 'utf8').split(/\r?\n/)
+  for (const [index, line] of lines.entries()) {
+    if (line.trimStart().startsWith('//')) continue
+    if (publicLegacyPatterns.some(pattern => pattern.test(line)) || (publicCopyFiles.includes(file) && /\bWorkWise\b/.test(line))) violations.push(`${file}:${index + 1}: public legacy product identity: ${line.trim()}`)
+  }
+}
+
 if (violations.length > 0) {
-  console.error(`WorkWise brand boundary failed with ${violations.length} violation(s):`)
+  console.error(`RailWise AI brand boundary failed with ${violations.length} violation(s):`)
   for (const violation of violations) console.error(`- ${violation}`)
   process.exit(1)
 }
 
-console.log(`WorkWise brand boundary passed (${files.length} files scanned).`)
+console.log(`RailWise AI brand boundary passed (${files.length} files scanned).`)

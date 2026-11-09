@@ -156,6 +156,19 @@ export function fileOutputPaths(output: unknown): string[] {
   return paths
 }
 
+/** Input paths from read/list/search results never constitute a delivered file. */
+export function declaredFileOutputPaths(item:TurnItem):string[] {
+  if(item.kind!=='tool_result'||item.status!=='completed'||item.isError)return []
+  if(/^(?:read(?:_.*)?|ls|find|grep|search(?:_.*)?|list(?:_.*)?|memory_.*|get_.*)$/.test(item.toolName))return []
+  const output=item.output&&typeof item.output==='object'?item.output as Record<string,unknown>:undefined
+  if(Array.isArray(output?.generatedFiles))return fileOutputPaths({generatedFiles:output.generatedFiles})
+  const mutating=item.toolKind==='file_change'||item.toolKind==='command_execution'||['write','edit','propose_document','export_document','analyze_delivery_monitoring'].includes(item.toolName)
+  if(mutating)return fileOutputPaths(item.output)
+  // Unknown adapters must explicitly declare generated files; a generic `path`
+  // or `files` field can equally describe their inputs and is not sufficient.
+  return []
+}
+
 export function promptRequiresFileDeliverable(prompt: string): boolean {
   const normalized = completionIntentText(prompt)
     .replace(NEGATED_FILE_DELIVERY_PATTERN, ' ')
@@ -214,7 +227,7 @@ export function hasSuccessfulFileDeliverable(
     item.kind === 'tool_result' &&
     item.status === 'completed' &&
     item.isError !== true &&
-    fileOutputPaths(item.output).some(matchesRequiredExtension)
+    declaredFileOutputPaths(item).some(matchesRequiredExtension)
   ) || verifiedShellDeliverablePaths(items, turnId).some(matchesRequiredExtension)
 }
 

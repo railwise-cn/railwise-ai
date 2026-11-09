@@ -270,7 +270,7 @@ export class ImHealthService {
       { id: 'run-id', pass: Boolean(health && health.runId === input.runId), code: 'run_id_mismatch', summary: health?.runId === input.runId ? '当前连接实例与诊断实例一致。' : '当前连接实例已变化，请刷新后重试。' },
       { id: 'credential', pass: input.credentialAvailable, code: 'credential_unavailable', summary: input.credentialAvailable ? '连接凭据可用。' : '连接凭据不可用。' },
       { id: 'bridge', pass: input.bridgeAvailable, code: 'bridge_unavailable', summary: input.bridgeAvailable ? '通信桥可访问。' : '通信桥当前不可访问。' },
-      { id: 'runtime', pass: input.runtimeAvailable, code: 'runtime_unavailable', summary: input.runtimeAvailable ? 'WorkWise Runtime 可访问。' : 'WorkWise Runtime 当前不可访问。' },
+      { id: 'runtime', pass: input.runtimeAvailable, code: 'runtime_unavailable', summary: input.runtimeAvailable ? 'RailWise AI Runtime 可访问。' : 'RailWise AI Runtime 当前不可访问。' },
       { id: 'heartbeat', pass: heartbeatFresh, code: 'heartbeat_stale', summary: heartbeatFresh ? '当前连接具有新鲜心跳。' : '当前连接尚无新鲜心跳。' },
       { id: 'ledger', pass: input.ledgerHealthy, code: 'ledger_unhealthy', summary: input.ledgerHealthy ? '通信账本完整性检查通过。' : '通信账本完整性检查失败。' }
     ]

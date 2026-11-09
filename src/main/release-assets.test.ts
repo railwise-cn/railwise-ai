@@ -63,22 +63,23 @@ describe('GitHub release asset preparation', () => {
     )
 
     expect(readdirSync(output).sort()).toEqual([
-      'WorkWise-0.2.6-mac-Apple-Silicon.dmg',
-      'WorkWise-0.2.6-mac-Intel.dmg',
-      'WorkWise-0.2.6-mac-arm64.zip',
-      'WorkWise-0.2.6-mac-x64.zip',
-      'WorkWise-0.2.6-win-x64.exe',
-      'WorkWise-0.2.6-win-x64.exe.blockmap',
+      'RailWise-AI-0.2.6-mac-Apple-Silicon.dmg',
+      'RailWise-AI-0.2.6-mac-Intel.dmg',
+      'RailWise-AI-0.2.6-mac-arm64.zip',
+      'RailWise-AI-0.2.6-mac-x64.zip',
+      'RailWise-AI-0.2.6-win-x64.exe',
+      'RailWise-AI-0.2.6-win-x64.exe.blockmap',
       'latest-mac.yml',
       'latest.json',
-      'latest.yml'
+      'latest.yml',
+      'publication-manifest.json'
     ])
 
     const macMetadata = readFileSync(join(output, 'latest-mac.yml'), 'utf8')
-    expect(macMetadata).toContain('WorkWise-0.2.6-mac-arm64.zip')
-    expect(macMetadata).toContain('WorkWise-0.2.6-mac-x64.zip')
-    expect(macMetadata).toContain('WorkWise-0.2.6-mac-Apple-Silicon.dmg')
-    expect(macMetadata).toContain('WorkWise-0.2.6-mac-Intel.dmg')
+    expect(macMetadata).toContain('RailWise-AI-0.2.6-mac-arm64.zip')
+    expect(macMetadata).toContain('RailWise-AI-0.2.6-mac-x64.zip')
+    expect(macMetadata).toContain('RailWise-AI-0.2.6-mac-Apple-Silicon.dmg')
+    expect(macMetadata).toContain('RailWise-AI-0.2.6-mac-Intel.dmg')
 
     const latest = JSON.parse(readFileSync(join(output, 'latest.json'), 'utf8'))
     expect(latest).toMatchObject({
@@ -88,8 +89,10 @@ describe('GitHub release asset preparation', () => {
       version: '0.2.6',
       tag: 'v0.2.6',
       generatedAt: '2026-08-02T00:00:00.000Z',
-      updateBaseUrl: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
+      updateBaseUrl: 'https://www.railwise.cn/downloads/railwise-ai/channels/stable/latest/'
     })
-    expect(latest.files).toHaveLength(6)
+    expect(latest.files).toHaveLength(8)
+    expect(latest.files.map((file: { name: string }) => file.name)).toContain('latest-mac.yml')
+    expect(latest.files.map((file: { name: string }) => file.name)).toContain('latest.yml')
   })
 })

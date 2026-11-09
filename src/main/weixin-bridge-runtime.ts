@@ -44,7 +44,7 @@ const WEIXIN_SESSION_EXPIRED_ERRCODE = -14
 // Keep each request below it because the iLink API does not reliably expose
 // an oversized-message error to the caller.
 const WEIXIN_TEXT_CHUNK_LIMIT = 4_000
-const WEIXIN_FAILED_REPLY_TEXT = '任务未完成，WorkWise Runtime 没有产生可交付结果。请稍后重试。'
+const WEIXIN_FAILED_REPLY_TEXT = '任务未完成，RailWise AI Runtime 没有产生可交付结果。请稍后重试。'
 const WEIXIN_WEB_SEARCH_FAILED_REPLY_TEXT =
   '在线搜索连续失败，暂时无法核实最新资讯。本次任务未完成，请稍后重试，或发来可访问的网页链接。'
 const WEIXIN_TIMEOUT_REPLY_TEXT = '任务处理超时，尚未完成。请稍后重试。'
@@ -67,12 +67,12 @@ type JsonRecord = Record<string, unknown>
 
 class WeixinWebhookError extends Error {
   constructor(readonly replyText: string) {
-    super('WorkWise Runtime webhook failed')
+    super('RailWise AI Runtime webhook failed')
   }
 }
 
 class WorkWiseDeliveryLeaseLostError extends Error {
-  constructor(message = 'WorkWise delivery lease is no longer owned by this sender.') {
+  constructor(message = 'RailWise AI delivery lease is no longer owned by this sender.') {
     super(message)
     this.name = 'WorkWiseDeliveryLeaseLostError'
   }
@@ -100,7 +100,7 @@ function buildBoundLoginResult(input: {
     alreadyConnected: true,
     accountId: normalizeAccountId(input.existingAccountId),
     sessionKey: input.sessionKey,
-    message: '已连接过此 WorkWise Runtime，无需重复连接。'
+    message: '已连接过此 RailWise AI Runtime，无需重复连接。'
   }
 }
 
@@ -315,7 +315,7 @@ function readWeixinPackageInfo(): WeixinPackageInfo {
   const packageJson = resolvePackagePath('@tencent-weixin/openclaw-weixin', 'package.json')
   if (!packageJson) {
     throw new Error(
-      'Built-in WeChat login component is missing. Reinstall WorkWise Runtime or rebuild with @tencent-weixin/openclaw-weixin bundled.'
+      'Built-in WeChat login component is missing. Reinstall RailWise AI Runtime or rebuild with @tencent-weixin/openclaw-weixin bundled.'
     )
   }
   const parsed = JSON.parse(readFileSync(packageJson, 'utf8')) as JsonRecord
@@ -338,7 +338,7 @@ function buildBaseInfo(): JsonRecord {
   const info = readWeixinPackageInfo()
   return {
     channel_version: info.version,
-    bot_agent: `WorkWise Runtime/${app.getVersion() || '0.0.0'}`
+    bot_agent: `RailWise AI Runtime/${app.getVersion() || '0.0.0'}`
   }
 }
 
@@ -854,7 +854,7 @@ async function readBridgeConfig(): Promise<JsonRecord> {
 async function prepareBridgeState(port: number): Promise<void> {
   if (!resolveWeixinPluginRoot()) {
     throw new Error(
-      'Built-in WeChat login component is missing. Reinstall WorkWise Runtime or rebuild with @tencent-weixin/openclaw-weixin bundled.'
+      'Built-in WeChat login component is missing. Reinstall RailWise AI Runtime or rebuild with @tencent-weixin/openclaw-weixin bundled.'
     )
   }
   await ensureStateDirs()
@@ -1038,7 +1038,7 @@ async function waitForWeixinLogin(params: JsonRecord): Promise<JsonRecord> {
           sessionKey,
           baseUrl,
           userId,
-          message: '已将此 WorkWise Runtime 连接到微信。'
+          message: '已将此 RailWise AI Runtime 连接到微信。'
         }
       }
     }
@@ -1674,7 +1674,7 @@ async function postToWorkWiseWebhook(message: WeixinMessage, accountId: string):
   const data = await readJsonResponse(res)
   if (!res.ok || data.ok === false) {
     const reply = webhookReplyText(data) || safeWeixinFailureReply(recordString(data, 'message'))
-    logWarn('weixin-bridge', 'WorkWise webhook did not produce a successful result.', {
+    logWarn('weixin-bridge', 'RailWise AI webhook did not produce a successful result.', {
       accountId,
       messageId,
       status: res.status,
@@ -1692,7 +1692,7 @@ async function postToWorkWiseWebhook(message: WeixinMessage, accountId: string):
     if (deliveryLeaseUntil) data.deliveryLeaseUntil = deliveryLeaseUntil
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logWarn('weixin-bridge', 'WorkWise delivery lease could not be acquired.', {
+    logWarn('weixin-bridge', 'RailWise AI delivery lease could not be acquired.', {
       accountId,
       messageId,
       message
@@ -1705,7 +1705,7 @@ async function postToWorkWiseWebhook(message: WeixinMessage, accountId: string):
       reply: safeWeixinFailureReply(message)
     }
   }
-  logInfo('weixin-bridge', `WorkWise webhook completed for WeChat message (accountId=${accountId}, messageId=${messageId}, hasReply=${Boolean(webhookReplyText(data))})`)
+  logInfo('weixin-bridge', `RailWise AI webhook completed for WeChat message (accountId=${accountId}, messageId=${messageId}, hasReply=${Boolean(webhookReplyText(data))})`)
   return data
 }
 
@@ -1723,7 +1723,7 @@ async function reportWorkWiseDelivery(
   if (!deliveryId || !outboundId) return undefined
   if (!leaseRunId) {
     if (phase === 'complete') return undefined
-    throw new Error('WorkWise delivery response did not include a lease owner.')
+    throw new Error('RailWise AI delivery response did not include a lease owner.')
   }
   const settings = await resolveRuntimeContext()
   const receiptUrl = new URL(settings.webhookUrl)
@@ -1749,7 +1749,7 @@ async function reportWorkWiseDelivery(
     if (response.status === 409) {
       throw new WorkWiseDeliveryLeaseLostError()
     }
-    throw new Error(`WorkWise delivery receipt failed with HTTP ${response.status}.`)
+    throw new Error(`RailWise AI delivery receipt failed with HTTP ${response.status}.`)
   }
   const receipt = await readJsonResponse(response)
   return recordString(receipt, 'leaseUntil') || undefined
@@ -1795,7 +1795,7 @@ function startWorkWiseDeliveryLeaseHeartbeat(
     }).catch((error) => {
       if (error instanceof WorkWiseDeliveryLeaseLostError) lost = true
       else markExpired()
-      logWarn('weixin-bridge', 'Failed to renew the WorkWise delivery lease while sending.', {
+      logWarn('weixin-bridge', 'Failed to renew the RailWise AI delivery lease while sending.', {
         message: error instanceof Error ? error.message : String(error)
       })
     })
@@ -1879,7 +1879,7 @@ async function monitorWeixinAccount(accountId: string, signal: AbortSignal): Pro
       const reply = recordString(result, 'reply') || recordString(result, 'text')
       try {
         if (result.deliveryLeaseLost === true) return
-        if (!reply) throw new Error('WorkWise webhook completed without a text reply.')
+        if (!reply) throw new Error('RailWise AI webhook completed without a text reply.')
         const files = webhookGeneratedFiles(result)
         const outboundId = recordString(result, 'outboundId') || undefined
         const deliveryLease = startWorkWiseDeliveryLeaseHeartbeat(result)
@@ -1915,7 +1915,7 @@ async function monitorWeixinAccount(accountId: string, signal: AbortSignal): Pro
       } catch (error) {
         if (error instanceof WorkWiseDeliveryLeaseLostError) return
         await reportWorkWiseDelivery(result, 'complete', false, error instanceof Error ? error.message : String(error)).catch((receiptError) => {
-          logWarn('weixin-bridge', 'Failed to record WeChat delivery failure in the WorkWise ledger.', {
+          logWarn('weixin-bridge', 'Failed to record WeChat delivery failure in the RailWise AI ledger.', {
             accountId: account.accountId,
             message: receiptError instanceof Error ? receiptError.message : String(receiptError)
           })
