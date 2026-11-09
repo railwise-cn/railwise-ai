@@ -54,12 +54,24 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 
 本地验证：应用全套 413 文件、4,082 测试通过（2 文件/3 测试跳过），最新任务 UI 聚焦 9 项通过；KUN 最终全套 238 文件、3,306 测试通过（2 文件/22 测试跳过）。类型检查、lint、OpenSpec 严格验证（13 项）、品牌扫描、文档依赖许可与生产构建通过，构建 freshness 检查覆盖 1,239 项输入。发行清单/门禁及 Windows 安装合同回归通过；本机无法执行的 Windows PowerShell 解析留给 Windows runner。
 
-尚待：最终源码 CI、同一构建精确签名/公证包安装、主要中文任务 UI、Windows 安装属性、正式 0.5.4 到精确下一版的一次真实 updater smoke。新官网路径的配置和校验代码已完成，尚未将下一版官网/Stable/Release 公开部署。历史 v0.5.4 资产不改名。
+最终候选验收以实际安装结果为准。新官网路径的配置和校验代码已完成，尚未将下一版官网/Stable/Release 公开部署。历史 v0.5.4 资产不改名。
 
-提交 8c7d2603 的 Quality CI run `42573343821` 三项均通过：OpenSpec/brand/lint/type/test/build、Windows path/spawn/persistence、Electron production smoke。私有精确包 run `42573336374` 正在执行，公开发布、官网及 Stable 步骤未启用。
+提交 8c7d2603 的 Quality CI run `42573343821` 三项均通过：OpenSpec/brand/lint/type/test/build、Windows path/spawn/persistence、Electron production smoke。包外证据校验器提交 d3f15bbe 的 Quality run `42576854263` 也通过。私有精确包 run `42573336374` 的构建已完成；公开发布、官网及 Stable 步骤未启用。
 
 同一私有 run 的 Windows 实际安装验收已通过，原始制品 `exact-package-windows-install-42573336374` / ID `13655057552`。安装文件为 `RailWise-AI-0.5.5-win-x64.exe`，SHA-256 `aaeed49fff224341f68a472a7ab6f4be0c618f6421c8af200698a9d42fcd532a`，安装 ASAR SHA-256 `2626ae9ea30390f09083782fec2d9d926d879da4b1b15fc5fa4642c6802679aa`。PE 产品名、桌面/开始菜单快捷方式、卸载名均为 RailWise AI；NSIS GUID 保留 `0daef81e-c00a-5e19-aa76-e6b9a68e0938`。临时实例卸载成功，原/新 profile 探针哈希保持一致。Windows 未配置签名证书，installer/executable 原始 Authenticode 均为 NotSigned，不能表述为 Windows 签名通过。
 
 发布校验器后续复核发现仍强制截图/独立 AI 审查和旧私有冻结。已按当前 AGENTS 改为 schema2 当前策略：截图/AI/完整矩阵可选，实际更新路径改变才要求一次真实 updater；精确包源、文件哈希、身份、签名、公证、CI/聚焦测试/构建与受影响包内 UI 仍检查。新 exact-build 来源绑定同仓库真实工作流和不可变制品；旧 schema1 兼容。仅明确列出的包外证据/测试/校验器变更可在同包后追加，任何 app 载荷变化仍要求新包。对应回归 485 通过、1 个非 Windows 解析跳过；没有重新构建或派发私有冻结。
 
 不将私有 Actions 证据称为公开发行批准，不推进公开 tag、Release、官网或 Stable。
+
+### 第一份精确包发现的问题与修正
+
+同次构建 Apple Silicon DMG 为 `RailWise-AI-0.5.5-mac-arm64.dmg`，SHA-256 `81449c83b9b5e98dd12c8d9cdbe0d1be5b1a86d5da216bd479a3336d4f9856c6`。已私有安装，版本 0.5.5、App ID `com.wangjiawei508.workgpt`、源码 8c7d2603、ASAR SHA-256 `9c05dcfd609b4ef6aab4c0f786f81cdbc421643185a89beabd09b9bfe31ff144` 均匹配。deep/strict codesign 与 stapler validate 成功；本机 Gatekeeper assessment 返回 Notarized Developer ID，但系统 assessments disabled，不能将本机结果表述为安全策略开启下的执行验证。Actions 原始 runner 的 Gatekeeper assessments enabled，目标 ZIP 预检及更新后签名检查均通过。
+
+官方 0.5.4 → 该精确 0.5.5 的原生 Squirrel 回执 `native-updater.json` 为 passed，已实际下载、安装、重启并保留 nonce/profile。外层 `frozen-updater.json` 为 failed：更新后只读 `stapler validate` 请求 Apple CloudKit 连接中断（NSURLError -1005，退出码 68）。原始失败回执保留，未改写为 passed。外层后续详细工程数据、配置和再次重启读回尚未执行，不能声称通过。相同签名身份与资源封印的本机应用补充公证复核成功，仅作为独立信任证据，不替代未执行的详细数据检查。
+
+在该精确包的中文、浅色、1280×840 内容区域中实际操作任务页，发现三个缺陷：任务分页的 pagination/filter/cursor 未进入 main IPC 允许合同；协调命令 POST `/v1/task-commands` 也被拒绝；模板任务在列表和详情展示完整执行提示词，且候选审阅缺三个翻译。候选来源/差异/接受操作本身已通过，目标正文和候选 SHA-256 相同。执行会话未出现在普通会话列表。此包不能标为中文 UI 验收通过。
+
+整改补齐实际 preload→main 合同回归（含分页、普通聊天协调、候选重生成）；模板只将用户目标保存为可见 goal，Turn 仍使用完整执行指令；历史模板显示使用保守提取，不改写历史；补齐中英按钮并用真实字典检查任务动态标签。修正涉及应用载荷，必须用修正后的源码重新构建和检查精确包，不能沿用本次失败包作为最终验收。
+
+整改本地验证：preload/main/真实中文 DOM/显示合同聚焦 117 项通过，生产模板装配及恢复 7 项通过，web/node 类型检查、lint、生产构建及 1,240 输入 freshness 通过。公证只读检查现对已观察的精确 CloudKit -1005/exit68 最多尝试 3 次，500/1,000 ms 间隔；保留每次失败，复核同一签名身份和资源封印后才重试，不重放更新器、不接受无效票据。该模块 12 项和现有 updater 57 项回归通过。

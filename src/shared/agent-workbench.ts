@@ -112,6 +112,7 @@ export type TaskRunV1 = {
   workspaceRoot: string
   repositoryRoot?: string
   goal: string
+  templateId?: string
   status: TaskRunStatus
   acceptance: TaskAcceptanceV1
   agentId: string

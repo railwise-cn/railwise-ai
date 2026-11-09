@@ -61,7 +61,7 @@ export function buildTaskDeliveryAdapters(getRuntime: () => ServerRuntime): Map<
     } })
     const task = runtime.taskRepository?.findActiveByThread(threadId)
     if (!task) throw new Error('Delivery task was not persisted')
-    runtime.taskRepository!.update(task.id, task.revision, current => ({ ...current, flowRunId: run.id, flowId: definition.id, templateId, updatedAt: runtime.nowIso() }))
+    runtime.taskRepository!.update(task.id, task.revision, current => ({ ...current, goal: parameters.goal.trim(), flowRunId: run.id, flowId: definition.id, templateId, updatedAt: runtime.nowIso() }))
     repository.transaction(() => {
       repository.finishOperation(ownerId, 'task-start', 'succeeded', { threadId, taskId: task.id, turnId: started.turnId })
       repository.enqueueOutbox(`delivery-task:${ownerId}`, run.id, 'delivery_task', { threadId, taskId: task.id, turnId: started.turnId })

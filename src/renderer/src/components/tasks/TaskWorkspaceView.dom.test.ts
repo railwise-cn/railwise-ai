@@ -124,6 +124,19 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it.each([{ language: 'zh', completed: '已完成', details: '任务详情' }, { language: 'en', completed: 'Completed', details: 'Task details' }])('shows only the user goal for historical completed templates in $language', async ({ language, completed, details }) => {
+    const goal = '总结监测资料，保留待确认项。'
+    tasks = [{ ...task('legacy-template', 'completed', `完成研究与文档任务，持续推进到可审阅成果。\n\n用户目标：${goal}\n\n工作区：/workspace\n\n执行步骤：整理资料\n\n使用 propose_document，source_refs 保存来源；导出 API 仅用于内部执行。`), templateId: 'research-document' }]
+    inbox = []
+    await act(async () => { await i18n.changeLanguage(language); await refreshTaskState() })
+    await click(completed)
+    expect(container.querySelector(`[aria-label="${details}"] h2`)?.textContent).toBe(goal)
+    expect(container.querySelector(`[aria-label="${language === 'zh' ? '任务列表' : 'Task list'}"]`)?.textContent).toContain(goal)
+    expect(container.textContent).not.toContain('propose_document')
+    expect(container.textContent).not.toContain('source_refs')
+    expect(container.textContent).not.toMatch(/taskWorkspace[A-Z]/)
+  })
+
   it('keeps hidden execution threads out of attention conversation navigation',async()=>{
     tasks=[{...task('t1','waiting_approval','Review draft'),visibility:'task'}]
     inbox=[{...approval,id:'hidden-attention',ownerId:'t1',taskId:'t1',threadId:'thread-t1'}]

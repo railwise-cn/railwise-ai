@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -7,6 +7,23 @@ import { captureMacosTrustEnvironment, sanitizeTrustOutput, validateGatekeeperEv
 
 const enabled = { status: 0, stdout: '', stderr: 'assessments enabled\n' }
 const accepted = { status: 0, stdout: '', stderr: 'accepted\nsource=Notarized Developer ID\n' }
+const cdhash = '8747a7e9782b590c95d51545aca9c540e7cc2c23'
+const stapleIdentity = `Props are {\n    cdhash = {length = 20, bytes = 0x${cdhash}};\n    signingId = com.wangjiawei508.workgpt;\n    teamId = R35G7F4A9U;\n}\n`
+const codeIdentity = `Identifier=com.wangjiawei508.workgpt\nCDHash=${cdhash}\nTeamIdentifier=R35G7F4A9U\n`
+const cloudKitFailure = {
+  status: 68, stderr: '', stdout: stapleIdentity + 'Domain is api.apple-cloudkit.com\nResponse is (null)\n'
+    + 'error is Error Domain=NSURLErrorDomain Code=-1005 "The network connection was lost." UserInfo={}\n'
+    + "Size of data is 0\nCloudKit's response is inconsistent with expections: (null)\nThe validate action failed! Error 68.\n",
+}
+const stapleSuccess = { status: 0, stderr: '', stdout: stapleIdentity + 'The validate action worked!\n' }
+
+function signedFixture() {
+  const app = mkdtempSync(join(tmpdir(), 'updater-trust-sealed-'))
+  mkdirSync(join(app, 'Contents/_CodeSignature'), { recursive: true })
+  writeFileSync(join(app, 'Contents/Info.plist'), 'synthetic bundle metadata')
+  writeFileSync(join(app, 'Contents/_CodeSignature/CodeResources'), 'synthetic signed resource seal')
+  return app
+}
 
 test('trust diagnostic streams redact credential values and every URL before retention', () => {
   const output = sanitizeTrustOutput('ticket error https://apple.example/path?key=private test-token-123 /private-' + 'f'.repeat(64) + '/', { API_KEY: 'test-token-123' })
@@ -31,8 +48,9 @@ test('runner diagnostics retain macOS/Xcode/stapler identities with both streams
   assert.equal(events.every(event => event.stdout === 'tool-version\n' && event.stderr === 'diagnostic\n'), true)
 })
 
-function fakeRunner({ staplerExit = 0, gatekeeperStatus = enabled, assessment = accepted } = {}) {
+function fakeRunner({ staplerExit = 0, staplerResults, signatureExit = 0, identityOutput = codeIdentity, gatekeeperStatus = enabled, assessment = accepted } = {}) {
   const calls = []
+  let staplerAttempt = 0
   const run = (command, args, options = {}) => {
     calls.push([command, ...args])
     let result = { status: 0, stdout: '', stderr: '' }
@@ -40,7 +58,13 @@ function fakeRunner({ staplerExit = 0, gatekeeperStatus = enabled, assessment = 
     if (command.endsWith('/xattr') && args[0] === '-px') result.stdout = '616263\n'
     if (args[0] === '--status') result = gatekeeperStatus
     if (args[0] === '--assess') result = assessment
-    if (args[0] === 'stapler') result = { status: staplerExit, stdout: '', stderr: staplerExit ? 'ticket validation failed\n' : 'The ticket is valid.\n' }
+    if (command.endsWith('/codesign') && args[0] === '--verify') result.status = signatureExit
+    if (command.endsWith('/codesign') && args[0] === '--display') result.stderr = identityOutput
+    if (args[0] === 'stapler') {
+      result = staplerResults ? staplerResults[Math.min(staplerAttempt, staplerResults.length - 1)]
+        : { status: staplerExit, stdout: '', stderr: staplerExit ? 'ticket validation failed\n' : 'The ticket is valid.\n' }
+      staplerAttempt += 1
+    }
     options.onResult?.(result)
     if (result.status !== 0 && !(options.allowedExitCodes ?? [0]).includes(result.status)) {
       throw new Error(`${args[0]} failed (${result.status})`)
@@ -101,4 +125,109 @@ test('disabled Gatekeeper is diagnosed without relaxing the package trust checks
     assert.equal(calls.some(call => call.includes('stapler')), true)
     assert.equal(events.find(event => event.command === 'gatekeeper-status').stderr, 'assessments disabled\n')
   } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('CloudKit -1005 retries only stapler, preserves failed attempts, and requires a successful ticket', () => {
+  const app = signedFixture()
+  try {
+    const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure, stapleSuccess] })
+    const events = []; const delays = []
+    const result = verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+      record: event => events.push(event), waitForRetry: ms => delays.push(ms) })
+    assert.equal(result.stapledNotarization, 'verified')
+    assert.deepEqual(delays, [500])
+    assert.deepEqual(events.filter(event => event.command === 'stapler-validate' && event.operation === 'bundle-trust-diagnostic')
+      .map(({ attempt, status, exitCode }) => ({ attempt, status, exitCode })), [
+      { attempt: 1, status: 'failed', exitCode: 68 }, { attempt: 2, status: 'completed', exitCode: 0 },
+    ])
+    assert.match(events.find(event => event.command === 'stapler-validate').stdout, /Code=-1005/)
+    assert.equal(events.filter(event => event.operation === 'bundle-trust-retry-identity' && event.status === 'verified').length, 1)
+    assert.equal(events.filter(event => event.operation === 'bundle-trust-retry-result-identity' && event.status === 'verified').length, 1)
+    assert.equal(calls.filter(call => call.includes('stapler')).length, 2)
+    assert.equal(calls.every(call => ['/usr/bin/xattr', '/usr/sbin/spctl', '/usr/bin/codesign', '/usr/bin/xcrun'].includes(call[0])), true,
+      'read-only trust retry must never invoke the updater, installer, or application')
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('persistent CloudKit transport interruption stops after three recorded attempts', () => {
+  const app = signedFixture()
+  try {
+    const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure] })
+    const events = []; const delays = []
+    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+      record: event => events.push(event), waitForRetry: ms => delays.push(ms) }), /Stapled notarization validation failed.*exit 68/)
+    assert.deepEqual(delays, [500, 1_000])
+    assert.deepEqual(events.filter(event => event.operation === 'bundle-trust-diagnostic' && event.command === 'stapler-validate')
+      .map(event => event.attempt), [1, 2, 3])
+    assert.equal(calls.filter(call => call.includes('stapler')).length, 3)
+    assert.equal(events.some(event => event.operation === 'bundle-trust-boundary' && event.status === 'completed'), false)
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('invalid tickets, server responses, unrelated errors and process failures never retry', () => {
+  const app = signedFixture()
+  try {
+    const failures = [
+      { ...cloudKitFailure, stdout: cloudKitFailure.stdout + 'The ticket is invalid.\n' },
+      { ...cloudKitFailure, stdout: cloudKitFailure.stdout + 'Status Code: 403\n' },
+      { ...cloudKitFailure, stdout: cloudKitFailure.stdout.replace('api.apple-cloudkit.com', 'example.invalid') },
+      { ...cloudKitFailure, stdout: cloudKitFailure.stdout.replace('Code=-1005', 'Code=-1001') },
+      { ...cloudKitFailure, status: 1 },
+      { ...cloudKitFailure, signal: 'SIGTERM' },
+      { ...cloudKitFailure, error: { code: 'ETIMEDOUT' } },
+      { status: 68, stdout: 'Could not validate ticket.\n', stderr: '' },
+    ]
+    for (const failure of failures) {
+      const { run, calls } = fakeRunner({ staplerResults: [failure, stapleSuccess] })
+      const delays = []
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'target-zip-preflight', run,
+        waitForRetry: ms => delays.push(ms) }), /Stapled notarization validation failed/)
+      assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+      assert.deepEqual(delays, [])
+    }
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('a replaced resource seal or code identity prevents the next stapler attempt', () => {
+  for (const mutation of ['resource-seal', 'code-identity']) {
+    const app = signedFixture()
+    try {
+      const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure, stapleSuccess],
+        ...(mutation === 'code-identity' ? { identityOutput: codeIdentity.replace(cdhash, 'f'.repeat(40)) } : {}) })
+      const events = []
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+        record: event => events.push(event), waitForRetry: () => {
+          if (mutation === 'resource-seal') writeFileSync(join(app, 'Contents/_CodeSignature/CodeResources'), 'replaced seal')
+        } }), /sealed identity changed.*before notarization retry/)
+      assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+      assert.equal(events.find(event => event.operation === 'bundle-trust-retry-identity').status, 'failed')
+    } finally { rmSync(app, { recursive: true, force: true }) }
+  }
+})
+
+test('a different bundle returned by a successful retry cannot satisfy the trust boundary', () => {
+  const app = signedFixture()
+  try {
+    const changedBundle = { ...stapleSuccess, stdout: stapleSuccess.stdout.replace(cdhash, 'f'.repeat(40)) }
+    const { run, calls } = fakeRunner({ staplerResults: [cloudKitFailure, changedBundle] })
+    const events = []
+    assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+      record: event => events.push(event), waitForRetry: () => {} }), /sealed identity changed.*during notarization retry/)
+    assert.equal(calls.filter(call => call.includes('stapler')).length, 2)
+    assert.equal(events.find(event => event.operation === 'bundle-trust-retry-result-identity').status, 'failed')
+    assert.equal(events.some(event => event.operation === 'bundle-trust-boundary' && event.status === 'completed'), false)
+  } finally { rmSync(app, { recursive: true, force: true }) }
+})
+
+test('missing identity evidence or failed initial signature cannot enable transport retries', () => {
+  for (const unavailable of ['resource-seal', 'stapler-identity', 'code-signature']) {
+    const app = unavailable === 'resource-seal' ? mkdtempSync(join(tmpdir(), 'updater-trust-no-seal-')) : signedFixture()
+    try {
+      const failure = unavailable === 'stapler-identity' ? { ...cloudKitFailure, stdout: cloudKitFailure.stdout.replace(stapleIdentity, '') } : cloudKitFailure
+      const { run, calls } = fakeRunner({ staplerResults: [failure, stapleSuccess], signatureExit: unavailable === 'code-signature' ? 1 : 0 })
+      assert.throws(() => verifyMacosUpdaterTrust(app, { boundary: 'native-installed-target', run,
+        waitForRetry: () => assert.fail('unverifiable bundle must not schedule a retry') }), /verification failed|validation failed/)
+      assert.equal(calls.filter(call => call.includes('stapler')).length, 1)
+    } finally { rmSync(app, { recursive: true, force: true }) }
+  }
 })

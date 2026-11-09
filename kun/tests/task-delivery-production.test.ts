@@ -138,6 +138,10 @@ describe('task delivery production assembly with synthetic model protocol', () =
       const executionThreadId = `thr_delivery_${createHash('sha256').update(`${flow.id}:delivery`).digest('hex').slice(0, 24)}`
       await expect.poll(() => called, { timeout: 10_000 }).toContain('export_document')
       const executing = runtime.taskRepository!.list({ threadId: executionThreadId, limit: 1 })[0]!
+      expect(executing.goal).toBe('根据固定合成资料交付可审阅草稿')
+      const execution = await runtime.threadService.get(executionThreadId)
+      expect(execution?.turns.find(turn => turn.id === executing.activeTurnId)?.prompt).toContain('source_refs')
+      expect(execution?.turns.find(turn => turn.id === executing.activeTurnId)?.prompt).toContain('propose_document')
       await runtime.runTurn(executionThreadId, executing.activeTurnId!)
       const task = runtime.taskRepository!.get(executing.id)!
       expect(task).toMatchObject({ templateId, flowRunId: flow.id, visibility: 'task', status: 'waiting_user' })

@@ -1,6 +1,56 @@
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
+
+const STAPLER_MAX_ATTEMPTS = 3
+const STAPLER_RETRY_DELAYS_MS = [500, 1_000]
+
+function ticketFileFingerprints(app) {
+  return ['Contents/Info.plist', 'Contents/CodeResources', 'Contents/_CodeSignature/CodeResources'].flatMap(name => {
+    const path = join(app, name)
+    if (!existsSync(path)) return []
+    const stat = lstatSync(path)
+    return stat.isFile() ? [{ path: name, size: stat.size, sha256: createHash('sha256').update(readFileSync(path)).digest('hex') }] : [{ path: name, type: stat.isSymbolicLink() ? 'symlink' : 'other' }]
+  })
+}
+
+function staplerIdentity(result) {
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  const hash = /^\s*cdhash = \{length = (20|32), bytes = 0x([a-f0-9]+)\};\s*$/im.exec(output)
+  const identifier = /^\s*signingId = ([A-Za-z0-9.-]+);\s*$/m.exec(output)?.[1]
+  const team = /^\s*teamId = ([A-Z0-9]{10});\s*$/m.exec(output)?.[1]
+  if (!hash || hash[2].length !== Number(hash[1]) * 2 || !identifier || !team) return undefined
+  return { cdhash: hash[2].toLowerCase(), identifier, team }
+}
+
+function codesignIdentity(result) {
+  if (result.error || result.status !== 0) return undefined
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  const cdhash = /^CDHash=([a-f0-9]{40}|[a-f0-9]{64})\s*$/im.exec(output)?.[1]?.toLowerCase()
+  const identifier = /^Identifier=([A-Za-z0-9.-]+)\s*$/m.exec(output)?.[1]
+  const team = /^TeamIdentifier=([A-Z0-9]{10})\s*$/m.exec(output)?.[1]
+  return cdhash && identifier && team ? { cdhash, identifier, team } : undefined
+}
+
+// Retry only the observed Apple CloudKit transport failure. An invalid/missing
+// ticket, a server response, a process timeout, or another network error stays
+// a hard failure. This retries a read-only query, never the updater operation.
+function isCloudKitConnectionLoss(result) {
+  if (result.error || result.signal || result.status !== 68) return false
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  return /^Domain is api\.apple-cloudkit\.com\s*$/m.test(output)
+    && /^Response is \(null\)\s*$/m.test(output)
+    && /^error is Error Domain=NSURLErrorDomain Code=-1005 "The network connection was lost\."(?:\s|$)/m.test(output)
+    && /^Size of data is 0\s*$/m.test(output)
+    && /^CloudKit's response is inconsistent with expections: \(null\)\s*$/m.test(output)
+    && /^The validate action failed! Error 68\.\s*$/m.test(output)
+    && !/Status Code:|(?:invalid|rejected|revoked|malformed|missing) ticket|ticket (?:is |was )?(?:invalid|rejected|revoked|malformed|missing)/i.test(output)
+}
+
+function waitForTrustRetry(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
 
 export function sanitizeTrustOutput(value, env = process.env) {
   let text = String(value ?? '').slice(-16_000)
@@ -47,25 +97,21 @@ export function captureMacosTrustEnvironment({ run, record = () => {} }) {
 
 // Boundary labels and diagnostic streams are retained before an exception can
 // stop the harness. A failed command never becomes a successful trust result.
-export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {} }) {
+export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {}, waitForRetry = waitForTrustRetry }) {
   if (!/^[a-z][a-z0-9-]{2,80}$/.test(boundary ?? '')) throw new Error('A precise bundle trust boundary is required.')
   record({ operation: 'bundle-trust-boundary', status: 'started', boundary })
-  const execute = (command, args, label, options = {}) => run(command, args, {
+  const execute = (command, args, label, { attempt, ...options } = {}) => run(command, args, {
     ...options,
     onResult: result => record({
       operation: 'bundle-trust-diagnostic', boundary, command: label,
+      ...(attempt ? { attempt, maxAttempts: STAPLER_MAX_ATTEMPTS } : {}),
       status: result.error || result.status !== 0 ? 'failed' : 'completed',
       exitCode: result.status, signal: result.signal ?? null,
       ...(result.error ? { errorCode: result.error.code ?? 'command-error' } : {}),
       stdout: sanitizeTrustOutput(result.stdout), stderr: sanitizeTrustOutput(result.stderr),
     }),
   })
-  const ticketFiles = ['Contents/Info.plist', 'Contents/CodeResources', 'Contents/_CodeSignature/CodeResources'].flatMap(name => {
-    const path = join(app, name)
-    if (!existsSync(path)) return []
-    const stat = lstatSync(path)
-    return stat.isFile() ? [{ path: name, size: stat.size, sha256: createHash('sha256').update(readFileSync(path)).digest('hex') }] : [{ path: name, type: stat.isSymbolicLink() ? 'symlink' : 'other' }]
-  })
+  const ticketFiles = ticketFileFingerprints(app)
   record({ operation: 'bundle-ticket-files', boundary, status: 'recorded', files: ticketFiles })
   // Retain attribute names and value hashes, never raw resource-fork,
   // quarantine or provenance payloads. This is diagnostic only.
@@ -85,11 +131,39 @@ export function verifyMacosUpdaterTrust(app, { boundary, run, record = () => {} 
   const observedExitCodes = Array.from({ length: 256 }, (_, code) => code)
   const gatekeeperStatus = execute('/usr/sbin/spctl', ['--status'], 'gatekeeper-status', { allowedExitCodes: observedExitCodes })
   const signature = execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', app], 'codesign-verify', { allowedExitCodes: observedExitCodes })
-  const staple = execute('/usr/bin/xcrun', ['stapler', 'validate', '-v', app], 'stapler-validate', { allowedExitCodes: observedExitCodes })
+  let staple = execute('/usr/bin/xcrun', ['stapler', 'validate', '-v', app], 'stapler-validate', { allowedExitCodes: observedExitCodes, attempt: 1 })
+  const originalIdentity = staplerIdentity(staple)
+  let gatekeeperEnabled = true
+  try { validateGatekeeperStatus(gatekeeperStatus) } catch { gatekeeperEnabled = false }
+  for (let attempt = 2; attempt <= STAPLER_MAX_ATTEMPTS && isCloudKitConnectionLoss(staple)
+    && !signature.error && signature.status === 0 && gatekeeperEnabled; attempt += 1) {
+    // Without both a signed code identity and its resource seal, fail closed
+    // rather than validating a potentially replaced bundle on another attempt.
+    if (!originalIdentity || !['Contents/Info.plist', 'Contents/_CodeSignature/CodeResources'].every(path => ticketFiles.some(file => file.path === path && file.sha256))) {
+      record({ operation: 'bundle-trust-retry', boundary, command: 'stapler-validate', status: 'declined', reason: 'sealed-identity-unavailable', failedAttempt: attempt - 1 })
+      break
+    }
+    const delayMs = STAPLER_RETRY_DELAYS_MS[attempt - 2]
+    record({ operation: 'bundle-trust-retry', boundary, command: 'stapler-validate', status: 'scheduled',
+      reason: 'apple-cloudkit-connection-lost', failedAttempt: attempt - 1, nextAttempt: attempt, maxAttempts: STAPLER_MAX_ATTEMPTS, delayMs })
+    waitForRetry(delayMs)
+    const files = ticketFileFingerprints(app)
+    const retrySignature = execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', app], 'codesign-retry-verify', { allowedExitCodes: observedExitCodes, attempt })
+    const identity = codesignIdentity(execute('/usr/bin/codesign', ['--display', '--verbose=4', app], 'codesign-retry-identity', { allowedExitCodes: observedExitCodes, attempt }))
+    const unchanged = !retrySignature.error && retrySignature.status === 0
+      && isDeepStrictEqual(files, ticketFiles) && isDeepStrictEqual(identity, originalIdentity)
+    record({ operation: 'bundle-trust-retry-identity', boundary, attempt, status: unchanged ? 'verified' : 'failed', files, identity })
+    if (!unchanged) throw new Error('Bundle sealed identity changed or could not be verified before notarization retry.')
+    staple = execute('/usr/bin/xcrun', ['stapler', 'validate', '-v', app], 'stapler-validate', { allowedExitCodes: observedExitCodes, attempt })
+    const sameResultIdentity = isDeepStrictEqual(staplerIdentity(staple), originalIdentity)
+      && isDeepStrictEqual(ticketFileFingerprints(app), ticketFiles)
+    record({ operation: 'bundle-trust-retry-result-identity', boundary, attempt, status: sameResultIdentity ? 'verified' : 'failed' })
+    if (!sameResultIdentity) throw new Error('Bundle sealed identity changed or was unavailable during notarization retry.')
+  }
   const assessment = execute('/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=4', app], 'gatekeeper-assess', { allowedExitCodes: observedExitCodes })
   validateGatekeeperStatus(gatekeeperStatus)
-  if (signature.status !== 0) throw new Error('Deep code-signature verification failed at the bundle trust boundary.')
-  if (staple.status !== 0) throw new Error(`Stapled notarization validation failed at the bundle trust boundary (exit ${staple.status}).`)
+  if (signature.error || signature.status !== 0) throw new Error('Deep code-signature verification failed at the bundle trust boundary.')
+  if (staple.error || staple.status !== 0) throw new Error(`Stapled notarization validation failed at the bundle trust boundary (exit ${staple.status}).`)
   const gatekeeper = validateGatekeeperEvidence(gatekeeperStatus, assessment)
   record({ operation: 'bundle-trust-boundary', boundary, status: 'completed' })
   return { signature: 'verified', stapledNotarization: 'verified', ...gatekeeper }
