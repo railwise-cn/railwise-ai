@@ -38,7 +38,7 @@
 ## 6. Migration and acceptance
 
 - [x] 6.1 Document actual compatibility/migration behavior and backed-up state, including old userData roots.
-- [ ] 6.2 Run focused fault/integration tests, typechecks, required CI and production build.
+- [x] 6.2 Run focused fault/integration tests, typechecks, required CI and production build.
 - [x] 6.3 Record fixed synthetic scenarios and actual configured-model results without invented metrics.
 - [ ] 6.4 Install the exact package; verify identity/signature/notarization and primary Chinese UI.
 - [ ] 6.5 Run one real 0.5.4-to-exact-package updater smoke for renamed artifact delivery.

@@ -34,10 +34,37 @@
 
 `release.yml` 的 `exact_package_updater_smoke=true` 只消费同一次运行产生的 `release-mac` 制品，不再构建第二份目标包。配合 `candidate_only=false`、`prepare_public_artifacts=false`、`publish_release=false`、`skip_stability=true`，可以在工作分支上构建下一补丁版本的正式应用身份包，完成签名、公证和一次私有更新验收；这些输入不会创建 tag、GitHub Release、官网上传或 Stable 更新。两小时稳定性检查属于可选项，相关 CI、聚焦测试和精确包验证继续执行。
 
-更新基线固定读取正式 v0.5.4 的官方安装包及独立 SHA-256/大小 pin；目标包来自当前运行。helper 会校验两个架构的安装包、更新 ZIP 和元数据存在且为非空普通文件，再验证运行架构目标的源码、版本、签名、公证、签名要求和更新后 ASAR；测试同时读回合成资料与惰性的兼容配置引用。实际 Squirrel 更新使用临时 HTTPS capability feed，结束后保留脱敏原始报告和失败记录。未通过不会自动重试，也不会产生可用于公开提升的 reviewed-build 回执。
+更新基线固定读取正式 v0.5.4 的官方安装包及独立 SHA-256/大小 pin；目标包来自当前运行。helper 会校验两个架构的安装包、更新 ZIP 和元数据存在且为非空普通文件，再验证运行架构目标的源码、版本、签名、公证、签名要求和更新后 ASAR；测试同时读回合成资料与惰性的兼容配置引用。实际 Squirrel 更新使用临时 HTTPS capability feed，结束后保留脱敏原始报告和失败记录。未通过不会自动重试，也不会把私有报告改写成历史 frozen 回执。后续是否可提升，由下面的精确来源、实际验收、正式 tag 和用户授权共同决定；helper 本身不授权发布。
 
 该模式验证重命名制品能被真实更新器安装及数据保留；它不会把私有临时 feed 的结果写成“官网已部署通过”。新旧官网下载入口的一致性仍须在实际暂存/部署后核验。
 
 同一个输入还在干净的 GitHub-hosted Windows runner 上下载本次 `release-win`，校验 EXE 与 `latest.yml` 的大小和 SHA-512，再临时安装这一份 EXE。验收读取安装器及已安装 EXE 的实际版本/产品属性、安装 ASAR 的版本/源码/摘要、原 App ID 派生的 NSIS 卸载 GUID、桌面与开始菜单快捷方式以及卸载展示名称；之后只卸载经过路径和注册表归属复核的本次临时实例，并确认两个合成资料目录的探针保持不变。已有安装身份或快捷方式时直接停止，不卸载或覆盖未知实例。原始失败记录同样保留为 Actions 制品。
 
 Windows Authenticode 记录实际状态：有效签名核验签发身份，未配置 Windows 签名证书时明确记录 `NotSigned` / `windowsSigning: not-configured`；不能将其写成已签名。无效、损坏或无法判定的签名拒绝通过。此 Windows 安装验收不代替主要中文界面的包内人工检查，也不声称覆盖 Windows 更新器往返。
+
+## 当前发行证据策略（schema 2）
+
+`verify-release-approval.mjs` 同时读取历史 schema 1 与新 schema 2。历史完整回执继续可读；截图档案、完整功能清单和独立 AI 审查都不是新发布的默认门槛。如果主动提供这些记录，仍核验其状态和已提交路径，AI 审查须如实标注，不能冒充人工专业签署。
+
+schema 2 保留精确版本用户确认、正式 tag、源码祖先关系、安装包/ASAR 摘要、公开安装身份、适用签名/公证、聚焦测试、生产构建、实际安装检查与相关 CI。视觉变更只要求受影响中文界面的包内检查记录，不要求截图矩阵。`checks.focusedTests`、`checks.productionBuild` 和 `acceptance.installedPackage` 可引用同一份简明验收记录，不需要重复制作多份清单。
+
+新证据的最小字段关系为：
+
+| 字段 | 来源和用途 |
+| --- | --- |
+| `release.previousTag` | 上一正式版本；必须早于目标、在包源码历史中，公开执行时核对其确为已发布正式 GitHub Release |
+| `package.reviewedBuild.mode: exact-build` | 使用同一构建的精确制品，保留既有 `reviewedBuild` 字段名，避免破坏旧读取器 |
+| `reviewedBuild.headRef/workflowRef/workflowSha` | 记录真实工作分支及其 release workflow 身份；API 核对同仓库、完整源码、run/attempt、构建 job 和不可变制品 ID/digest |
+| `reviewedBuild.files` | 两个制品中的八个实际文件及各自大小、SHA-256；下载后逐项复核，不要求补造 `reviewed-build.json` |
+| `checks.requiredCI.workflowRun` | 真实 Quality run 的仓库、workflow、sourceHead、runId、runAttempt；公开执行时核对实际成功结果和质量/类型/测试/生产构建 job |
+| `checks.focusedTests/productionBuild` | `status`、已提交 `path`、对应 `sourceHead`；构建指向包源码，聚焦测试可指向只包含许可的包外修正的后续 commit |
+| `acceptance.installedPackage` | 实际精确包安装记录的 `status/path/sourceHead`；安装证据与包源码和摘要对应 |
+| `acceptance.packagedUI` | 发生视觉变更时记录主要受影响中文界面的实际检查；兼容旧 `uiComputerUse` 名称 |
+
+当源码 `package.json` 版本与构建版本不同，必须显式记录 `package.sourceVersion` 和 `package.buildVersion`；前者匹配未改变的源码清单，后者等于目标发行版本。`package.installedMetadata` 记录实际签名包中的 `version/sourceHead/packageName/productName/asarSha256`，不能用源码版本代替。`package.versionOverride` 记录 `environmentVariable: WORKWISE_APP_VERSION`、实际 `value` 和 `sourceHead`，验证器还读取该源码的 release workflow 与 builder，确认它们已有这个版本覆盖机制。例如本次源版本仍为 0.5.4、构建可为 0.5.5；这不会授权事后改写包源码的 `package.json`，也不代表已经公开发布 0.5.5。
+
+是否需要 updater smoke，根据上一正式 tag 到包源码的真实更新器、公开制品名、下载映射及更新元数据边界变化判断；`updaterPathChanged: false` 不能覆盖检测结果，本次改名属于需要执行一次的范围。普通运行时/文档功能变化没有这类路径变更时不强制 updater。旧 schema 1 若省略 updater 证据，也需提供 `previousTag` 供同样的变更判断。
+
+同次构建的原始 smoke 使用 `acceptance.updaterRoundTrip.mode: exact-build`，引用原始 `machineReportPath/nativeReportPath` 和 `workflowRun`。后者包含同一构建的 `headRef/workflowRef/workflowSha/runId/runAttempt`，以及名为 `exact-package-updater-<runId>` 的制品 ID/digest。验证器保留 `privatePackage` 原貌，比较其五个 macOS 文件与构建声明，核对原始 native 报告摘要、真实 Squirrel 阶段、基线/目标/安装身份与数据保留；再从 API 读取真实 run/job/step/artifact，并下载原制品，逐字节比较已提交报告。不能拿同版本其他 run 的绿色声明替代，也不能把失败报告改成通过。一次真实结果即可，不增加新的冻结。
+
+精确应用源码之后仍只允许证据和明确未入包的发行校验器、测试 harness、迁移文档及 OpenSpec 完成记录变更；允许列表逐路径列出，不能泛化成整个 `scripts/`。应用、依赖、`package.json`、builder、打包 hook 或 workflow 的任何后续变化仍需新包。相关 CI 可以检查这些包外修正的后续源码，验证器同时检查它与包源码、最终 tag 的祖先关系。精确包接受、来源证明和审批仍是独立事实；私有分支构建成功不会自动创建 tag、提升 Stable 或授权公开发布。

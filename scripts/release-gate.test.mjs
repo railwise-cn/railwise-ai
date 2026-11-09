@@ -6,10 +6,10 @@ import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { verifyReleaseApproval } from './verify-release-approval.mjs'
+import { classifyReleaseChanges, verifyReleaseApproval, verifyRequiredCI } from './verify-release-approval.mjs'
 import { expectedReleaseFiles, PUBLIC_IDENTITY, RELEASE_REPOSITORY, RELEASE_WORKFLOW } from './verify-reviewed-release-artifacts.mjs'
 import { reportSha256, UPDATER_WORKFLOW, UPDATER_WORKFLOW_REF } from './verify-frozen-updater-evidence.mjs'
-import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS } from './frozen-release-version.mjs'
+import { FROZEN_BASE_VERSION, FROZEN_BASELINE_PINS, resolveUpdaterBaseline } from './frozen-release-version.mjs'
 // Keep the existing npm run test:release-gate entry point covering byte/provenance gates.
 import './verify-reviewed-release-artifacts.test.mjs'
 import './verify-frozen-updater-evidence.test.mjs'
@@ -21,6 +21,7 @@ import './verify-packaged-markdown-rendering.test.cjs'
 import './verify-markdown-packaging-filesets.test.cjs'
 import './dependency-artifact-policy.test.cjs'
 import './windows-install-smoke.test.mjs'
+import './verify-exact-updater-evidence.test.mjs'
 
 const workflowPath = new URL('../.github/workflows/release.yml', import.meta.url)
 const workflowSource = readFileSync(workflowPath, 'utf8')
@@ -31,7 +32,7 @@ const websiteWorkflowSource = readFileSync(new URL('../.github/workflows/deploy-
 const websiteWorkflow = parse(websiteWorkflowSource)
 const verifierPath = fileURLToPath(new URL('./verify-release-approval.mjs', import.meta.url))
 
-function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4') {
+function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4', options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'railwise-release-gate-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
@@ -49,6 +50,13 @@ function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4') {
   git('config', 'user.email', 'release-test@example.invalid')
   put('package.json', JSON.stringify({ version: packageVersion }))
   put('src/runtime.js', 'export const value = 1\n')
+  for (const [path, contents] of Object.entries(options.sourceFiles ?? {})) put(path, contents)
+  if (options.previousTag) {
+    commit('previous formal source fixture')
+    git('tag', options.previousTag)
+    put('src/runtime.js', 'export const value = 2\n')
+    for (const [path, contents] of Object.entries(options.changedFiles ?? {})) put(path, contents)
+  }
   const reviewedSourceHead = commit('freeze reviewed source')
   const base = `docs/qa/release-gates/v${version}`
   const manifestPath = `${base}.json`
@@ -114,9 +122,9 @@ function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4') {
   const recordEvidence = () => {
     machineReport.nativeReportSha256 = reportSha256(Buffer.from(JSON.stringify(nativeReport)))
     put(manifestPath, JSON.stringify(manifest))
-    for (const path of [manifest.package.screenshots[0], ...Object.values(manifest.acceptance).map(item => item.path)]) put(path, 'test evidence\n')
-    if (manifest.acceptance.updaterRoundTrip.machineReportPath) put(manifest.acceptance.updaterRoundTrip.machineReportPath, JSON.stringify(machineReport))
-    if (manifest.acceptance.updaterRoundTrip.nativeReportPath) put(manifest.acceptance.updaterRoundTrip.nativeReportPath, JSON.stringify(nativeReport))
+    for (const path of [...(manifest.package.screenshots ?? []), ...Object.values(manifest.acceptance).map(item => item.path), ...Object.values(manifest.checks ?? {}).map(item => item.path)].filter(Boolean)) put(path, 'test evidence\n')
+    if (manifest.acceptance.updaterRoundTrip?.machineReportPath) put(manifest.acceptance.updaterRoundTrip.machineReportPath, JSON.stringify(machineReport))
+    if (manifest.acceptance.updaterRoundTrip?.nativeReportPath) put(manifest.acceptance.updaterRoundTrip.nativeReportPath, JSON.stringify(nativeReport))
   }
   const tagRelease = () => {
     const releaseHead = commit('record acceptance evidence')
@@ -663,4 +671,169 @@ test('evidence paths reject line breaks before writing workflow outputs', t => {
   f.manifest.package.screenshots[0] = `${f.base}/overview\nartifact_ids=999.png`
   f.recordEvidence()
   f.verify(f.tagRelease(), /must not contain line breaks/)
+})
+
+function currentPolicyFixture(t, { changedFiles = {}, sourceVersion = '0.5.5', exact = false } = {}) {
+  const version = '0.5.5'
+  const f = releaseFixture(t, sourceVersion, version, { previousTag: 'v0.5.4', changedFiles,
+    sourceFiles: {
+      '.github/workflows/release.yml': 'jobs:\n  build:\n    env:\n      WORKWISE_APP_VERSION: ${{ needs.prepare.outputs.version }}\n',
+      'electron-builder.cjs': 'const releaseAppVersion = process.env.WORKWISE_APP_VERSION; module.exports = { extraMetadata: { version: releaseAppVersion } }\n',
+    } })
+  f.manifest.schemaVersion = 2
+  f.manifest.release.previousTag = 'v0.5.4'
+  delete f.manifest.package.screenshots
+  f.manifest.acceptance = { installedPackage: { status: 'passed', path: `${f.base}/installed-package.md`, sourceHead: f.reviewedSourceHead } }
+  f.manifest.checks = {
+    focusedTests: { status: 'passed', path: `${f.base}/focused-tests.md`, sourceHead: f.reviewedSourceHead },
+    productionBuild: { status: 'passed', path: `${f.base}/production-build.md`, sourceHead: f.reviewedSourceHead },
+    requiredCI: { status: 'passed', workflowRun: { repository: RELEASE_REPOSITORY, workflowPath: '.github/workflows/quality.yml', sourceHead: f.reviewedSourceHead, runId: 777, runAttempt: 1 } },
+  }
+  if (exact) {
+    const headRef = 'refs/heads/codex/package-source'
+    Object.assign(f.manifest.package.reviewedBuild, { mode: 'exact-build', headRef, workflowRef: `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@${headRef}`, workflowSha: f.reviewedSourceHead })
+    Object.assign(f.manifest.package, { sourceVersion, buildVersion: version,
+      installedMetadata: { version, sourceHead: f.reviewedSourceHead, packageName: PUBLIC_IDENTITY.packageName, productName: PUBLIC_IDENTITY.productName, asarSha256: f.manifest.package.identity.asarSha256 },
+      versionOverride: { environmentVariable: 'WORKWISE_APP_VERSION', value: version, sourceHead: f.reviewedSourceHead } })
+  }
+  return f
+}
+
+test('current policy accepts focused checks and exact package inspection without screenshots, AI review or default updater', t => {
+  const f = currentPolicyFixture(t)
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('legacy evidence remains readable without elective screenshot archives or AI review', t => {
+  const f = releaseFixture(t)
+  delete f.manifest.package.screenshots
+  delete f.manifest.acceptance.independentSeniorEngineerReview
+  delete f.manifest.acceptance.functionalChecklist
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.4/)
+})
+
+test('current policy still requires relevant source checks, exact install, identity, signature and notarization', async t => {
+  const mutations = {
+    missingFocused: f => { delete f.manifest.checks.focusedTests },
+    failedBuild: f => { f.manifest.checks.productionBuild.status = 'failed' },
+    wrongCheckSource: f => { f.manifest.checks.focusedTests.sourceHead = 'f'.repeat(40) },
+    missingCI: f => { delete f.manifest.checks.requiredCI },
+    foreignCI: f => { f.manifest.checks.requiredCI.workflowRun.repository = 'fork/repo' },
+    oldCI: f => { f.manifest.checks.requiredCI.workflowRun.sourceHead = 'f'.repeat(40) },
+    noInstall: f => { delete f.manifest.acceptance.installedPackage },
+    wrongInstallSource: f => { f.manifest.acceptance.installedPackage.sourceHead = 'f'.repeat(40) },
+    wrongBundle: f => { f.manifest.package.identity.bundleId = 'new.incompatible.identity' },
+    unsigned: f => { f.manifest.package.signature.status = 'failed' },
+    noNotary: f => { f.manifest.package.notarization.status = 'failed' },
+    missingBaseline: f => { delete f.manifest.release.previousTag },
+  }
+  for (const [name, mutation] of Object.entries(mutations)) await t.test(name, t => {
+    const f = currentPolicyFixture(t); mutation(f); f.recordEvidence()
+    assert.throws(() => f.verify(f.tagRelease()))
+  })
+})
+
+test('updater/download boundary changes require one exact smoke and cannot be waived by false declarations', async t => {
+  for (const path of ['src/main/gui-updater.ts', 'scripts/release-publication.cjs', 'scripts/publish-r2.mjs', 'src/shared/product-brand.json', 'electron-builder.cjs']) await t.test(path, t => {
+    const f = currentPolicyFixture(t, { changedFiles: { [path]: 'changed production updater/download boundary\n' } })
+    f.manifest.release.updaterPathChanged = false
+    f.manifest.acceptance.packagedUI = { status: 'passed', sourceHead: f.reviewedSourceHead, path: `${f.base}/packaged-ui.md` }
+    f.recordEvidence()
+    f.verify(f.tagRelease(), /requires one exact-package updater smoke/)
+  })
+  assert.deepEqual(classifyReleaseChanges(['scripts/verify-release-approval.mjs', 'src/main/gui-updater.test.ts', 'docs/update-notes.md']).updater, [])
+})
+
+test('visual changes require only affected packaged UI inspection, with no screenshot matrix', t => {
+  const f = currentPolicyFixture(t, { changedFiles: { 'src/renderer/src/components/Task.tsx': 'export const Task = () => null\n' } })
+  f.recordEvidence()
+  f.verify(f.tagRelease(), /acceptance\.packagedUI must have status=passed/)
+  f.git('tag', '-d', 'v0.5.5')
+  f.manifest.acceptance.packagedUI = { status: 'passed', sourceHead: f.reviewedSourceHead, path: `${f.base}/packaged-ui.md` }
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('exact build effective version is bound to unchanged source and the existing version override', t => {
+  const f = currentPolicyFixture(t, { sourceVersion: '0.5.4', exact: true })
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('effective version evidence cannot disguise a source-version or installed package mismatch', async t => {
+  const mutations = {
+    sourceVersion: f => { f.manifest.package.sourceVersion = '0.5.3' },
+    effectiveVersion: f => { f.manifest.package.buildVersion = '0.5.6' },
+    installedVersion: f => { f.manifest.package.installedMetadata.version = '0.5.4' },
+    installedSource: f => { f.manifest.package.installedMetadata.sourceHead = 'f'.repeat(40) },
+    installedAsar: f => { f.manifest.package.installedMetadata.asarSha256 = 'f'.repeat(64) },
+    missingOverride: f => { delete f.manifest.package.versionOverride },
+    wrongVariable: f => { f.manifest.package.versionOverride.environmentVariable = 'ARBITRARY_VERSION' },
+  }
+  for (const [name, mutation] of Object.entries(mutations)) await t.test(name, t => {
+    const f = currentPolicyFixture(t, { sourceVersion: '0.5.4', exact: true }); mutation(f); f.recordEvidence()
+    assert.throws(() => f.verify(f.tagRelease()))
+  })
+})
+
+test('package-external policy, test harness and evidence edits can follow the exact package without a second build', t => {
+  const f = currentPolicyFixture(t, { exact: true })
+  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
+  const policyHead = f.commit('record nonshipped policy and evidence harness changes')
+  f.manifest.checks.requiredCI.workflowRun.sourceHead = policyHead
+  f.manifest.checks.focusedTests.sourceHead = policyHead
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('exact build still rejects every later application or packaging edit', async t => {
+  for (const path of ['src/runtime.js', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', '.github/workflows/release.yml']) await t.test(path, t => {
+    const f = currentPolicyFixture(t, { exact: true })
+    f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.5', changed: true }) : 'changed application/build inputs\n')
+    f.commit('change package inputs after build'); f.recordEvidence()
+    f.verify(f.tagRelease(), /changes after the reviewed package/)
+  })
+})
+
+test('current rename release accepts original same-run native smoke without inventing a frozen receipt', t => {
+  const f = currentPolicyFixture(t, { exact: true })
+  f.manifest.release.updaterPathChanged = true
+  const build = f.manifest.package.reviewedBuild
+  f.machineReport.baseVersion = '0.5.4'
+  f.machineReport.baselineIdentity.version = '0.5.4'
+  f.machineReport.baselineAsset = { tag: 'v0.5.4', ...resolveUpdaterBaseline('0.5.4').pins.arm64 }
+  f.machineReport.dataSeed.serviceIdentity.packageVersion = '0.5.4'
+  f.nativeReport.baseVersion = '0.5.4'
+  f.nativeReport.stages.at(-1).detail = '0.5.4'
+  delete f.machineReport.reviewedBuild
+  f.machineReport.privatePackage = { sourceHead: build.sourceHead, artifactRunId: build.runId, artifactName: 'release-mac', files: structuredClone(build.files.filter(file => file.artifact === 'release-mac')) }
+  f.machineReport.provenance = { repository: build.repository, workflowPath: build.workflowPath, workflowRef: build.workflowRef,
+    workflowSha: build.workflowSha, sourceHead: build.sourceHead, runId: build.runId, runAttempt: build.runAttempt, mode: 'private-exact-package-smoke' }
+  f.manifest.acceptance.updaterRoundTrip = { status: 'passed', mode: 'exact-build', path: `${f.base}/native-smoke.md`, machineReportPath: `${f.base}/frozen-updater.json`, nativeReportPath: `${f.base}/native-updater.json`,
+    workflowRun: { repository: build.repository, workflowPath: build.workflowPath, headRef: build.headRef, workflowRef: build.workflowRef,
+      workflowSha: build.workflowSha, sourceHead: build.sourceHead, runId: build.runId, runAttempt: build.runAttempt,
+      artifact: { id: 88, name: `exact-package-updater-${build.runId}`, digest: `sha256:${'d'.repeat(64)}` } } }
+  f.recordEvidence()
+  assert.match(f.verify(f.tagRelease()), /verified v0\.5\.5/)
+})
+
+test('required CI verifies actual API source, repository, run attempt and successful quality job', async t => {
+  const root = `repos/${RELEASE_REPOSITORY}`
+  const sourceHead = 'a'.repeat(40)
+  const run = { repository: RELEASE_REPOSITORY, workflowPath: '.github/workflows/quality.yml', sourceHead, runId: 99, runAttempt: 1 }
+  const fixture = () => {
+    const job = { name: 'OpenSpec, brand, lint, type, test, build', conclusion: 'success' }
+    const actual = { id: 99, run_attempt: 1, path: run.workflowPath, workflow_id: 11, head_sha: sourceHead, repository: { id: 22 }, head_repository: { id: 22 }, status: 'completed', conclusion: 'success' }
+    const jobs = { total_count: 1, jobs: [job] }
+    const responses = { [root]: { id: 22, full_name: RELEASE_REPOSITORY }, [`${root}/actions/workflows/quality.yml`]: { id: 11, path: run.workflowPath }, [`${root}/actions/runs/99`]: actual,
+      [`${root}/actions/runs/99/attempts/1/jobs?per_page=100&page=1`]: jobs }
+    return { actual, job, jobs, api: path => { assert.ok(responses[path], path); return responses[path] } }
+  }
+  const good = fixture()
+  assert.equal(verifyRequiredCI(run, sourceHead, good.api), run)
+  for (const [name, mutate] of Object.entries({ oldSource: f => { f.actual.head_sha = 'b'.repeat(40) }, fork: f => { f.actual.head_repository.id = 23 }, oldAttempt: f => { f.actual.run_attempt = 2 }, failed: f => { f.actual.conclusion = 'failure' }, skippedQuality: f => { f.job.conclusion = 'skipped' }, duplicate: f => { f.jobs.jobs.push(f.job); f.jobs.total_count += 1 } })) await t.test(name, () => {
+    const f = fixture(); mutate(f); assert.throws(() => verifyRequiredCI(run, sourceHead, f.api))
+  })
 })

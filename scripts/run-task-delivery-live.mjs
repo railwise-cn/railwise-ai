@@ -12,13 +12,16 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const option = name => { const at = process.argv.indexOf(name); return at < 0 ? undefined : process.argv[at + 1] }
 const output = option('--output-dir')
 const settingsPath = option('--settings-file')
+const selectedTemplate = option('--template')
+const templateIds = selectedTemplate ? [selectedTemplate] : ['monitoring-report', 'tender-document', 'research-document']
+if(templateIds.some(id=>!['monitoring-report','tender-document','research-document'].includes(id)))throw new Error('Unknown acceptance template')
 if (!output || !settingsPath) throw new Error('Usage: node scripts/run-task-delivery-live.mjs --settings-file <local settings> --output-dir <private evidence directory>')
 const root = resolve(output)
 if (root === repo || root.startsWith(repo + '/')) throw new Error('Live evidence must be outside the repository.')
 await mkdir(root, { recursive: true, mode: 0o700 })
 const source = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
 const diffHash = createHash('sha256').update(execFileSync('git', ['diff', 'HEAD'], { cwd: repo })).digest('hex')
-const report = { schemaVersion: 1, kind: 'actual-model-synthetic-acceptance', source, trackedDiffSha256: diffHash, runtimeEntrySha256:createHash('sha256').update(await readFile(join(repo,'kun/dist/server/runtime-factory.js'))).digest('hex'), modelRequested: 'deepseek-flash', startedAt: new Date().toISOString(), sampleCount: 3, samples: [], requests: [], cost: null, costNote: 'Provider-billed cost is not returned; no estimate substituted.' }
+const report = { schemaVersion: 1, kind: 'actual-model-synthetic-acceptance', source, trackedDiffSha256: diffHash, runtimeEntrySha256:createHash('sha256').update(await readFile(join(repo,'kun/dist/server/runtime-factory.js'))).digest('hex'), modelRequested: 'deepseek-flash', startedAt: new Date().toISOString(), sampleCount: templateIds.length, samples: [], requests: [], cost: null, costNote: 'Provider-billed cost is not returned; no estimate substituted.' }
 const secretFile = join(root, '.export-bridge.json')
 const bridgeEntry = join(root, '.export-bridge.cjs')
 await build({ stdin: { contents: `const {app}=require('electron');const fs=require('node:fs/promises');const {startTaskDocumentExportBridge}=require(${JSON.stringify(join(repo, 'src/main/services/task-document-export-service.ts'))});app.setPath('userData',${JSON.stringify(join(root, 'electron-profile'))});app.on('window-all-closed',()=>{});app.whenReady().then(async()=>{const bridge=await startTaskDocumentExportBridge();await fs.writeFile(${JSON.stringify(secretFile)},JSON.stringify({url:bridge.url,token:bridge.token}),{mode:0o600});});process.on('SIGTERM',()=>app.exit(0));`, resolveDir: repo, loader: 'ts' }, outfile: bridgeEntry, bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'silent' })
@@ -75,7 +78,7 @@ try {
   const { KunCapabilitiesConfig } = await import(pathToFileURL(join(repo, 'kun/dist/contracts/capabilities.js')))
   const { deliveryFlow } = await import(pathToFileURL(join(repo, 'kun/dist/delivery/templates.js')))
   const { verifyTaskDelivery } = await import(pathToFileURL(join(repo, 'kun/dist/delivery/verification.js')))
-  for (const templateId of ['monitoring-report', 'tender-document', 'research-document']) {
+  for (const templateId of templateIds) {
     const workspace = join(root, templateId)
     await mkdir(workspace, { recursive: true })
     await writeFile(join(workspace, 'source.md'), templateId === 'tender-document'
@@ -90,7 +93,8 @@ try {
     const sample = { templateId, startedAt: new Date().toISOString(), elapsedMs: 0, userInterventions: 0, verified: false }
     report.samples.push(sample)
     const started = Date.now()
-    const graph = deliveryFlow(templateId, { workspaceRoot: workspace, sourcePaths: templateId === 'monitoring-report' ? ['data.csv', 'project.json'] : ['source.md'], model: 'deepseek-flash', providerId: provider.id, goal: '使用上述固定合成资料生成600字以内的中文可审阅草稿、来源及待确认项。监测任务必须调用确定性工具并引用返回图表；投标任务必须有响应矩阵。再真实导出 DOCX 和 PDF。无需用户补资料，缺项列入草稿。禁止联网检索、外发或访问工作区外文件；不要编造完成。' }, `live:${templateId}:${report.startedAt}`)
+    const sceneGoal=templateId==='monitoring-report'?'完成监测报告，调用确定性工具并引用返回图表。':templateId==='tender-document'?'完成投标技术响应文件，包含响应矩阵。':'仅研究 source.md 中的两条观察及适用限制，按事实、判断、不确定性组织研究报告，不包含无关工程分析或投标章节。'
+    const graph = deliveryFlow(templateId, { workspaceRoot: workspace, sourcePaths: templateId === 'monitoring-report' ? ['data.csv', 'project.json'] : ['source.md'], model: 'deepseek-flash', providerId: provider.id, goal: `使用上述固定合成资料生成600字以内的中文可审阅草稿、来源及待确认项。${sceneGoal}再真实导出 DOCX 和 PDF。无需用户补资料，缺项列入草稿。禁止联网检索、外发或访问工作区外文件；不要编造完成。` }, `live:${templateId}:${report.startedAt}`)
     runtime.flowService.create(graph)
     if (!runtime.flowService.publish(graph.id).published) throw new Error(`Could not publish synthetic ${templateId} flow`)
     const flow = await runtime.flowService.run(graph.id, {})
@@ -128,7 +132,7 @@ try {
   bridge.kill('SIGTERM')
   await rm(secretFile, { force: true })
   report.finishedAt = new Date().toISOString()
-  report.passed = report.samples.length === 3 && report.samples.every(sample => sample.verified)
+  report.passed = !report.error && report.samples.length === templateIds.length && report.samples.every(sample => sample.verified)
   await writeFile(join(root, 'results.json'), JSON.stringify(report, null, 2))
   if (!report.passed) process.exitCode = 1
   process.stdout.write(`Evidence: ${join(root, 'results.json')}\n`)

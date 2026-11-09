@@ -38,6 +38,14 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 
 前两轮失败未删除：第一轮暴露只读目录枚举误算为来源与合成字段类型错误，第二轮暴露独立测试 Electron 导出桥随最后隐藏窗口关闭而退出；已修复并在第三轮实际运行。后续新增的子任务执行限制、成果发现过滤及章节更新通过聚焦回归独立核验。
 
+### 已提交生产源码复跑
+
+第四轮使用提交 `8c7d2603df3f909245d0ee9a19742b59d13ae9c6`，tracked diff 为 SHA-256 空值；私有原始报告为 `/private/tmp/railwise-next-live-delivery-20261109-r4/results.json`。三任务均 completed、交付核验通过，未发现无效成果，分别用时 100,216、60,771、75,146 ms，场景内人工介入均为 0。44 次请求累计 880,237 tokens；账单成本未提供。监测有确定性 SVG、Markdown/DOCX/PDF，其他两组各有 Markdown/DOCX/PDF。
+
+模型/工具累计执行时间依次为 95,972/1,383、58,741/545、71,867/474 ms；排队 18、14、13 ms，无人工等待。工具成功/失败回执依次为 27/0、13/1、20/1；没有 unknown 回执。PDF 分别为 3、2、2 页，中文与表格已检查；DOCX 默认作者正确。
+
+第四轮研究稿因合成验收目标同时描述三类条件，额外加入无关监测与投标章节，文件通过不等于内容质量完全通过。因此单独收窄研究目标，在同一生产代码下再次实际执行研究样本：仅使用 source.md 的两条观察和适用限制，得到按事实、判断、不确定性组织的研究稿及真实 DOCX/PDF，58,813 ms、10 次请求，样本 completed/verified=true。原始证据保留于 `/private/tmp/railwise-next-live-delivery-20261109-research-r5/results.json`。该轮新加的单模板选择仍受脚本旧的“三样本”总计判断影响，原报告 overall passed=false，未改写原始结果；已修正脚本按实际模板数量及 error 判定，不能将这份单样本原报告称为整体通过。
+
 ## 兼容和回退
 
 迁移及数据保留见 `docs/MIGRATION_DURABLE_TASK_WORKBENCH.zh-CN.md` 和 `docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md`。迁移前使用 SQLite 一致性备份，旧数据不删除。`RAILWISE_TASK_SCHEDULING_DISABLED=1` 停止自动恢复和后台派发，任务记录、成果与普通聊天仍可用；显式执行仍保留 fencing 与回执校验。
@@ -47,5 +55,11 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 本地验证：应用全套 413 文件、4,082 测试通过（2 文件/3 测试跳过），最新任务 UI 聚焦 9 项通过；KUN 最终全套 238 文件、3,306 测试通过（2 文件/22 测试跳过）。类型检查、lint、OpenSpec 严格验证（13 项）、品牌扫描、文档依赖许可与生产构建通过，构建 freshness 检查覆盖 1,239 项输入。发行清单/门禁及 Windows 安装合同回归通过；本机无法执行的 Windows PowerShell 解析留给 Windows runner。
 
 尚待：最终源码 CI、同一构建精确签名/公证包安装、主要中文任务 UI、Windows 安装属性、正式 0.5.4 到精确下一版的一次真实 updater smoke。新官网路径的配置和校验代码已完成，尚未将下一版官网/Stable/Release 公开部署。历史 v0.5.4 资产不改名。
+
+提交 8c7d2603 的 Quality CI run `42573343821` 三项均通过：OpenSpec/brand/lint/type/test/build、Windows path/spawn/persistence、Electron production smoke。私有精确包 run `42573336374` 正在执行，公开发布、官网及 Stable 步骤未启用。
+
+同一私有 run 的 Windows 实际安装验收已通过，原始制品 `exact-package-windows-install-42573336374` / ID `13655057552`。安装文件为 `RailWise-AI-0.5.5-win-x64.exe`，SHA-256 `aaeed49fff224341f68a472a7ab6f4be0c618f6421c8af200698a9d42fcd532a`，安装 ASAR SHA-256 `2626ae9ea30390f09083782fec2d9d926d879da4b1b15fc5fa4642c6802679aa`。PE 产品名、桌面/开始菜单快捷方式、卸载名均为 RailWise AI；NSIS GUID 保留 `0daef81e-c00a-5e19-aa76-e6b9a68e0938`。临时实例卸载成功，原/新 profile 探针哈希保持一致。Windows 未配置签名证书，installer/executable 原始 Authenticode 均为 NotSigned，不能表述为 Windows 签名通过。
+
+发布校验器后续复核发现仍强制截图/独立 AI 审查和旧私有冻结。已按当前 AGENTS 改为 schema2 当前策略：截图/AI/完整矩阵可选，实际更新路径改变才要求一次真实 updater；精确包源、文件哈希、身份、签名、公证、CI/聚焦测试/构建与受影响包内 UI 仍检查。新 exact-build 来源绑定同仓库真实工作流和不可变制品；旧 schema1 兼容。仅明确列出的包外证据/测试/校验器变更可在同包后追加，任何 app 载荷变化仍要求新包。对应回归 485 通过、1 个非 Windows 解析跳过；没有重新构建或派发私有冻结。
 
 不将私有 Actions 证据称为公开发行批准，不推进公开 tag、Release、官网或 Stable。
