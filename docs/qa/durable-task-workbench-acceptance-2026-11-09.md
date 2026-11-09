@@ -77,3 +77,7 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 整改本地验证：preload/main/真实中文 DOM/显示合同聚焦 117 项通过，生产模板装配及恢复 7 项通过，web/node 类型检查、lint、生产构建及 1,240 输入 freshness 通过。公证只读检查现对已观察的精确 CloudKit -1005/exit68 最多尝试 3 次，500/1,000 ms 间隔；保留每次失败，复核同一签名身份和资源封印后才重试，不重放更新器、不接受无效票据。该模块 12 项和现有 updater 57 项回归通过。
 
 修正版提交 2f8330a9 的真实研究复跑整体 passed=true，39,939 ms、8 次 DeepSeek 请求、116,295 tokens（实际返回 deepseek-flash），Markdown/DOCX/PDF 均通过，场景内人工介入 0，成本仍为 null。原始报告 `/private/tmp/railwise-next-live-delivery-2f8330a9-research/results.json` 记录干净源码与实际文件哈希。该提交首轮 Quality 品牌检查因测试夹具及 QA 记录逐字保存的旧 App ID 被误判为公开名称而失败；将合成夹具改为示例 ID、记录引用兼容身份文档，品牌扫描规则未放宽。后续修正仅限不进安装包的测试、证据和来源校验器，继续复用同一次修正版精确构建。
+
+修正版私有构建 run `42581502074` attempt 1 未产包：macOS 下载 Electron、Windows 真实 managed-tool 预检下载分别遇到上游 HTTP 504。已保留原始日志，仅通过 Actions rerun-failed 复用同源码及成功 sidecar，attempt 2 重跑失败构建和依赖验收；未重发新的冻结、未重放任何已执行 Squirrel 更新。
+
+2f305dac 的 Quality run `42582161082` 三项全绿：应用 Linux 4,091 通过/9 跳过，KUN 3,306 通过/22 跳过，Windows 安全与 Electron production smoke 通过。修正版构建 attempt 2 仍在 GitHub Electron 下载阶段遇到 504，没有安装包或 updater 执行。发行工作流已采用 Quality 相同的 Electron 镜像；仍使用锁定 npm 包内的校验和，未启用远端校验和或跳过签名/公证。Electron及发行聚焦 31 项通过；后续必须验证新工作流实际生成的精确包。

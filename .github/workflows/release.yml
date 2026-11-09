@@ -106,6 +106,9 @@ concurrency:
 
 env:
   NODE_VERSION: '22.22.0'
+  # Use the same transport as Quality; prepare:electron verifies the archive
+  # against checksums bundled in the lockfile-pinned Electron npm package.
+  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
   RELEASE_CHANNEL: stable
   WORKWISE_DOWNLOAD_URL: https://www.railwise.cn/products/railwise-ai/
   WORKWISE_UPDATE_PROVIDER: generic
