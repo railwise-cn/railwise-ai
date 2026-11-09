@@ -41,5 +41,5 @@
 - [x] 6.1 Document actual compatibility/migration behavior and backed-up state, including old userData roots.
 - [x] 6.2 Run focused fault/integration tests, typechecks, required CI and production build.
 - [x] 6.3 Record fixed synthetic scenarios and actual configured-model results without invented metrics.
-- [ ] 6.4 Install the exact package from the final release source and verify identity/signature/notarization and primary Chinese UI. Run `42601576315` installed and verified the macOS identity and signature, but Chinese UI navigation was not confirmed; Windows installation passed with Authenticode explicitly `NotSigned`.
-- [ ] 6.5 Run one real 0.5.4-to-exact-package updater smoke for the final release source. Run `42601576315` passed for source `51d40fdb363a9eacdcc532b4d27b1848698b9b05`; the subsequent release workflow changes need source-bound acceptance.
+- [x] 6.4 Install the exact package from final source `02165b64bffe5e24f4a4f50811d22086f1489299` (run `42625022802`); verify macOS identity/signature/application notarization and primary Chinese task UI. Windows installation/metadata/profile retention passed with Authenticode explicitly `NotSigned`; Intel UI was not run locally. Evidence: `docs/qa/release-gates/v0.5.5.json`.
+- [x] 6.5 Run one real official 0.5.4-to-exact-0.5.5 updater smoke for final source `02165b64`. Same-run `42625022802` original machine/native reports both passed, including engineering data and restart readback; production feeds were not touched.

@@ -1,0 +1,145 @@
+{
+  "total_count": 7,
+  "artifacts": [
+    {
+      "id": 13681262821,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY4MTI2MjgyMQ==",
+      "name": "exact-package-updater-42625022802",
+      "size_in_bytes": 34771,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13681262821",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13681262821/zip",
+      "expired": false,
+      "digest": "sha256:003d2da84c0087d42526ba6f0dfa554cf6969ebb39ddb605a24a2622f357f7ba",
+      "created_at": "2026-11-09T14:19:28Z",
+      "updated_at": "2026-11-09T14:19:28Z",
+      "expires_at": "2026-11-16T14:19:27Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    },
+    {
+      "id": 13680563281,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY4MDU2MzI4MQ==",
+      "name": "release-mac",
+      "size_in_bytes": 1429981918,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13680563281",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13680563281/zip",
+      "expired": false,
+      "digest": "sha256:0249458c3b0c56c78f89ca01568f37e0c6b7a92894660b0e255994e69d62d3a2",
+      "created_at": "2026-11-09T14:07:07Z",
+      "updated_at": "2026-11-09T14:07:07Z",
+      "expires_at": "2026-11-16T14:06:14Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    },
+    {
+      "id": 13678708705,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY3ODcwODcwNQ==",
+      "name": "exact-package-windows-install-42625022802",
+      "size_in_bytes": 1767,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678708705",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678708705/zip",
+      "expired": false,
+      "digest": "sha256:d6e579f70190a6e0c46c24c1f8cc86b509ac5b33311310579c6c386ed526d53a",
+      "created_at": "2026-11-09T13:41:10Z",
+      "updated_at": "2026-11-09T13:41:10Z",
+      "expires_at": "2026-11-16T13:41:09Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    },
+    {
+      "id": 13678553432,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY3ODU1MzQzMg==",
+      "name": "release-win",
+      "size_in_bytes": 293445274,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678553432",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678553432/zip",
+      "expired": false,
+      "digest": "sha256:b7ac4b5d4b1e25693d21060433a06e08500fa2ab94013782b3775502b32ef777",
+      "created_at": "2026-11-09T13:37:54Z",
+      "updated_at": "2026-11-09T13:37:54Z",
+      "expires_at": "2026-11-16T13:37:45Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    },
+    {
+      "id": 13678127309,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY3ODEyNzMwOQ==",
+      "name": "markitdown-darwin-arm64",
+      "size_in_bytes": 161382366,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678127309",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678127309/zip",
+      "expired": false,
+      "digest": "sha256:96a51c83c37a8abf1dc7a04a4e814cae06473bbd136ceecffc525ff0f8f5c797",
+      "created_at": "2026-11-09T13:25:50Z",
+      "updated_at": "2026-11-09T13:25:50Z",
+      "expires_at": "2026-11-16T13:25:44Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    },
+    {
+      "id": 13678082632,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY3ODA4MjYzMg==",
+      "name": "markitdown-win32-x64",
+      "size_in_bytes": 79207184,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678082632",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13678082632/zip",
+      "expired": false,
+      "digest": "sha256:e0fa169e64c0eee6ea208c5ef5b7ce5908328b89c8adcc6d86109fa9fdcd561a",
+      "created_at": "2026-11-09T13:25:46Z",
+      "updated_at": "2026-11-09T13:25:46Z",
+      "expires_at": "2026-11-16T13:25:41Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    },
+    {
+      "id": 13677953544,
+      "node_id": "MDg6QXJ0aWZhY3QxMzY3Nzk1MzU0NA==",
+      "name": "markitdown-darwin-x64",
+      "size_in_bytes": 163722283,
+      "url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13677953544",
+      "archive_download_url": "https://api.github.com/repos/railwise-cn/railwise-ai/actions/artifacts/13677953544/zip",
+      "expired": false,
+      "digest": "sha256:4471c075b3357158cc651d881947ad3e50a3a997be0b7c2c6173194ab174074d",
+      "created_at": "2026-11-09T13:28:47Z",
+      "updated_at": "2026-11-09T13:28:47Z",
+      "expires_at": "2026-11-16T13:28:35Z",
+      "workflow_run": {
+        "id": 42625022802,
+        "repository_id": 1268259206,
+        "head_repository_id": 1268259206,
+        "head_branch": "main",
+        "head_sha": "02165b64bffe5e24f4a4f50811d22086f1489299"
+      }
+    }
+  ]
+}
