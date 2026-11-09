@@ -60,6 +60,9 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/run-task-delivery-live.mjs',
   'scripts/macos-updater-trust.test.mjs',
   'docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md',
+  'docs/runtime-architecture.md',
+  'website/products/workwise/index.php',
+  'scripts/workwise-product-public-verification.test.mjs',
   'openspec/changes/durable-task-document-workbench/tasks.md',
 ])
 

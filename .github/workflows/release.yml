@@ -106,9 +106,6 @@ concurrency:
 
 env:
   NODE_VERSION: '22.22.0'
-  # Use the same transport as Quality; prepare:electron verifies the archive
-  # against checksums bundled in the lockfile-pinned Electron npm package.
-  ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
   RELEASE_CHANNEL: stable
   WORKWISE_DOWNLOAD_URL: https://www.railwise.cn/products/railwise-ai/
   WORKWISE_UPDATE_PROVIDER: generic
@@ -494,6 +491,10 @@ jobs:
       # edgesOut crash on macOS runners and is unnecessary after npm ci.
 
       - name: Prepare checksummed Electron runtime
+        env:
+          # Scope the Electron mirror to the verified runtime download only.
+          # electron-builder auxiliary tools use their own GitHub release URLs.
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run prepare:electron
 
       - name: Download Apple Silicon MarkItDown sidecar
@@ -663,6 +664,9 @@ jobs:
         run: npm ci
 
       - name: Prepare checksummed Electron runtime
+        env:
+          # Scope the Electron mirror to the verified runtime download only.
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run prepare:electron
 
       - name: Download Windows MarkItDown sidecar
