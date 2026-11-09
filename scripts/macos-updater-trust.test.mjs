@@ -8,8 +8,8 @@ import { captureMacosTrustEnvironment, sanitizeTrustOutput, validateGatekeeperEv
 const enabled = { status: 0, stdout: '', stderr: 'assessments enabled\n' }
 const accepted = { status: 0, stdout: '', stderr: 'accepted\nsource=Notarized Developer ID\n' }
 const cdhash = '8747a7e9782b590c95d51545aca9c540e7cc2c23'
-const stapleIdentity = `Props are {\n    cdhash = {length = 20, bytes = 0x${cdhash}};\n    signingId = com.wangjiawei508.workgpt;\n    teamId = R35G7F4A9U;\n}\n`
-const codeIdentity = `Identifier=com.wangjiawei508.workgpt\nCDHash=${cdhash}\nTeamIdentifier=R35G7F4A9U\n`
+const stapleIdentity = `Props are {\n    cdhash = {length = 20, bytes = 0x${cdhash}};\n    signingId = com.example.railwise;\n    teamId = R35G7F4A9U;\n}\n`
+const codeIdentity = `Identifier=com.example.railwise\nCDHash=${cdhash}\nTeamIdentifier=R35G7F4A9U\n`
 const cloudKitFailure = {
   status: 68, stderr: '', stdout: stapleIdentity + 'Domain is api.apple-cloudkit.com\nResponse is (null)\n'
     + 'error is Error Domain=NSURLErrorDomain Code=-1005 "The network connection was lost." UserInfo={}\n'

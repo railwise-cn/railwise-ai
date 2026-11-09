@@ -66,7 +66,7 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 
 ### 第一份精确包发现的问题与修正
 
-同次构建 Apple Silicon DMG 为 `RailWise-AI-0.5.5-mac-arm64.dmg`，SHA-256 `81449c83b9b5e98dd12c8d9cdbe0d1be5b1a86d5da216bd479a3336d4f9856c6`。已私有安装，版本 0.5.5、App ID `com.wangjiawei508.workgpt`、源码 8c7d2603、ASAR SHA-256 `9c05dcfd609b4ef6aab4c0f786f81cdbc421643185a89beabd09b9bfe31ff144` 均匹配。deep/strict codesign 与 stapler validate 成功；本机 Gatekeeper assessment 返回 Notarized Developer ID，但系统 assessments disabled，不能将本机结果表述为安全策略开启下的执行验证。Actions 原始 runner 的 Gatekeeper assessments enabled，目标 ZIP 预检及更新后签名检查均通过。
+同次构建 Apple Silicon DMG 为 `RailWise-AI-0.5.5-mac-arm64.dmg`，SHA-256 `81449c83b9b5e98dd12c8d9cdbe0d1be5b1a86d5da216bd479a3336d4f9856c6`。已私有安装，版本 0.5.5、App ID 与身份迁移文档中的历史兼容值一致、源码 8c7d2603、ASAR SHA-256 `9c05dcfd609b4ef6aab4c0f786f81cdbc421643185a89beabd09b9bfe31ff144` 均匹配。deep/strict codesign 与 stapler validate 成功；本机 Gatekeeper assessment 返回 Notarized Developer ID，但系统 assessments disabled，不能将本机结果表述为安全策略开启下的执行验证。Actions 原始 runner 的 Gatekeeper assessments enabled，目标 ZIP 预检及更新后签名检查均通过。
 
 官方 0.5.4 → 该精确 0.5.5 的原生 Squirrel 回执 `native-updater.json` 为 passed，已实际下载、安装、重启并保留 nonce/profile。外层 `frozen-updater.json` 为 failed：更新后只读 `stapler validate` 请求 Apple CloudKit 连接中断（NSURLError -1005，退出码 68）。原始失败回执保留，未改写为 passed。外层后续详细工程数据、配置和再次重启读回尚未执行，不能声称通过。相同签名身份与资源封印的本机应用补充公证复核成功，仅作为独立信任证据，不替代未执行的详细数据检查。
 
@@ -75,3 +75,5 @@ PDF 实际解析和首屏检查：监测 2 页、投标 5 页、研究最终稿 
 整改补齐实际 preload→main 合同回归（含分页、普通聊天协调、候选重生成）；模板只将用户目标保存为可见 goal，Turn 仍使用完整执行指令；历史模板显示使用保守提取，不改写历史；补齐中英按钮并用真实字典检查任务动态标签。修正涉及应用载荷，必须用修正后的源码重新构建和检查精确包，不能沿用本次失败包作为最终验收。
 
 整改本地验证：preload/main/真实中文 DOM/显示合同聚焦 117 项通过，生产模板装配及恢复 7 项通过，web/node 类型检查、lint、生产构建及 1,240 输入 freshness 通过。公证只读检查现对已观察的精确 CloudKit -1005/exit68 最多尝试 3 次，500/1,000 ms 间隔；保留每次失败，复核同一签名身份和资源封印后才重试，不重放更新器、不接受无效票据。该模块 12 项和现有 updater 57 项回归通过。
+
+修正版提交 2f8330a9 的真实研究复跑整体 passed=true，39,939 ms、8 次 DeepSeek 请求、116,295 tokens（实际返回 deepseek-flash），Markdown/DOCX/PDF 均通过，场景内人工介入 0，成本仍为 null。原始报告 `/private/tmp/railwise-next-live-delivery-2f8330a9-research/results.json` 记录干净源码与实际文件哈希。该提交首轮 Quality 品牌检查因测试夹具及 QA 记录逐字保存的旧 App ID 被误判为公开名称而失败；将合成夹具改为示例 ID、记录引用兼容身份文档，品牌扫描规则未放宽。后续修正仅限不进安装包的测试、证据和来源校验器，继续复用同一次修正版精确构建。

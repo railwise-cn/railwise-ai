@@ -58,6 +58,7 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/verify-exact-updater-evidence.mjs',
   'scripts/verify-exact-updater-evidence.test.mjs',
   'scripts/run-task-delivery-live.mjs',
+  'scripts/macos-updater-trust.test.mjs',
   'docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md',
   'openspec/changes/durable-task-document-workbench/tasks.md',
 ])

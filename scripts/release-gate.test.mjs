@@ -780,7 +780,7 @@ test('effective version evidence cannot disguise a source-version or installed p
 
 test('package-external policy, test harness and evidence edits can follow the exact package without a second build', t => {
   const f = currentPolicyFixture(t, { exact: true })
-  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
+  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/macos-updater-trust.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
   const policyHead = f.commit('record nonshipped policy and evidence harness changes')
   f.manifest.checks.requiredCI.workflowRun.sourceHead = policyHead
   f.manifest.checks.focusedTests.sourceHead = policyHead
