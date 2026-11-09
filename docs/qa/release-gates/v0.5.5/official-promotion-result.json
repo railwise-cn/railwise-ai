@@ -1,0 +1,11 @@
+{
+  "status": "published",
+  "restored": [],
+  "targetTag": "v0.5.5",
+  "attempt": {
+    "repository": "railwise-cn/railwise-ai",
+    "sourceHead": "f809b3b27ece254b8cfee17d0308f5fbbbc94753",
+    "runId": "42637737565",
+    "runAttempt": "1"
+  }
+}
