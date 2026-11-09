@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "exact-package-static-and-trust",
+  "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+  "version": "0.5.5",
+  "appPath": "/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app",
+  "dmgPath": "/private/tmp/railwise-exact-42625022802/RailWise-AI-0.5.5-mac-arm64.dmg",
+  "artifactSha256": "77c80faa00c4c40d13c37aba6f350caf37e42f4be1cbcf9395de8345b64b4994",
+  "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+  "bundleId": "com.wangjiawei508.workgpt",
+  "packageName": "workwise",
+  "productName": "RailWise AI",
+  "installedVersion": "0.5.5",
+  "buildProvenance": {
+    "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299"
+  },
+  "updater": {
+    "provider": "generic",
+    "url": "https://www.railwise.cn/downloads/workwise/channels/stable/latest/",
+    "updaterCacheDirName": "workwise-updater"
+  },
+  "signature": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Renderer).app\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper.app\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (GPU).app\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/RailWise AI Helper (Plugin).app\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Mantle.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.\n--prepared:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler\n--validated:/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.\n/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app: valid on disk\n/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app: satisfies its Designated Requirement\n"
+  },
+  "signingDetails": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "Executable=/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app/Contents/MacOS/RailWise AI\nIdentifier=com.wangjiawei508.workgpt\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=453 flags=0x10000(runtime) hashes=3+7 location=embedded\nVersionPlatform=1\nVersionMin=786432\nVersionSDK=1705216\nHash type=sha256 size=32\nCandidateCDHash sha256=b1dd519f4a3fa0aca0cae64033e1570cc7afcbad\nCandidateCDHashFull sha256=b1dd519f4a3fa0aca0cae64033e1570cc7afcbadce70db765600415224513ee1\nHash choices=sha256\nCMSDigest=b1dd519f4a3fa0aca0cae64033e1570cc7afcbadce70db765600415224513ee1\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=16384\nExecutable Segment flags=0x1\nPage size=16384\nCDHash=b1dd519f4a3fa0aca0cae64033e1570cc7afcbad\nSignature size=9113\nAuthority=Developer ID Application: Ningbo Ruiwei Engineering Technology Co., Ltd. (R35G7F4A9U)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTimestamp=Nov 9, 2026 at 21:55:52\nNotarization Ticket=stapled\nInfo.plist entries=32\nTeamIdentifier=R35G7F4A9U\nRuntime Version=26.5.0\nSealed Resources version=2 rules=13 files=9823\nInternal requirements count=1 size=188\nTotal signatures=1\nChosen signature=1\n"
+  },
+  "stapleAttempts": [
+    {
+      "exitCode": 0,
+      "stdout": "Processing: /private/tmp/railwise-exact-42625022802/installed/RailWise AI.app\nThe validate action worked!\n",
+      "stderr": ""
+    }
+  ],
+  "gatekeeperStatus": {
+    "exitCode": 1,
+    "stdout": "assessments disabled\n",
+    "stderr": ""
+  },
+  "assessment": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "/private/tmp/railwise-exact-42625022802/installed/RailWise AI.app: accepted\nsource=Notarized Developer ID\noverride=security disabled\n"
+  },
+  "limitations": [
+    "Local Gatekeeper status must be reported exactly as captured; a disabled host is not an enabled-policy execution test.",
+    "Application staple is verified; this does not assert a stapled ticket on the DMG.",
+    "Intel UI is not run on this Apple Silicon host."
+  ]
+}

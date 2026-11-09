@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+  "version": "0.5.5",
+  "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+  "scope": "primary affected Chinese task workspace navigation and layout",
+  "language": "zh",
+  "theme": "light",
+  "window": {
+    "width": 1280,
+    "height": 840
+  },
+  "profile": "fresh isolated candidate profile; outbound/inbound and credential access disabled",
+  "observations": [
+    "Application opened from the final-source exact installed DMG.",
+    "Task entry navigated to the packaged task workspace.",
+    "Monitoring, tender technical file, and research/document template cards were visible in Chinese.",
+    "Search, workspace filter, ongoing, needs-user, completed and all-task filters were readable.",
+    "Completed filter changed selected tab; all four counts and empty list consistently showed zero for the fresh profile.",
+    "Ordinary sidebar and task home showed no technical execution IDs.",
+    "Work surfaces were readable and sufficiently opaque."
+  ],
+  "defects": [],
+  "limitations": [
+    "No task was launched in this credential-disabled fresh profile. This check covers navigation/layout, not another paid template or model test.",
+    "Runtime/document acceptance on the unchanged production implementation is recorded separately.",
+    "No full theme/language/size matrix or Intel local UI run performed."
+  ],
+  "screenshots": [
+    "task-workspace-zh-light-1280x840.png",
+    "task-filters-zh-light-1280x840.png"
+  ],
+  "cleanup": "Normal application quit requested after inspection; no user profile used."
+}

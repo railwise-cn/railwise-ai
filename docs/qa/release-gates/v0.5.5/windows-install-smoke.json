@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "private-exact-package-install",
+  "platform": "win32",
+  "arch": "x64",
+  "version": "0.5.5",
+  "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+  "productionTouched": false,
+  "provenance": {
+    "runAttempt": "1",
+    "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "runId": "42625022802"
+  },
+  "runner": {
+    "environment": "github-hosted",
+    "tempRoot": "D:\\a\\_temp",
+    "os": "Windows"
+  },
+  "errors": [],
+  "cleanup": {
+    "shortcutsAbsent": true,
+    "registryAbsent": true,
+    "ownedInstanceVerified": true,
+    "exitCode": 0,
+    "attempted": true,
+    "appExecutableAbsent": true
+  },
+  "profileSentinels": [
+    {
+      "beforeSha256": "2ac17adf631b098bf25bfff63262e4163bacae81acea4da07881480327137cfb",
+      "afterSha256": "2ac17adf631b098bf25bfff63262e4163bacae81acea4da07881480327137cfb",
+      "path": "C:\\Users\\runneradmin\\AppData\\Roaming\\RailWise AI\\railwise-install-smoke-6c07207f93af4e1ca1c059065ef2c380.txt"
+    },
+    {
+      "beforeSha256": "2ac17adf631b098bf25bfff63262e4163bacae81acea4da07881480327137cfb",
+      "afterSha256": "2ac17adf631b098bf25bfff63262e4163bacae81acea4da07881480327137cfb",
+      "path": "C:\\Users\\runneradmin\\AppData\\Roaming\\workwise\\railwise-install-smoke-6c07207f93af4e1ca1c059065ef2c380.txt"
+    }
+  ],
+  "installer": {
+    "path": "D:\\a\\_temp\\exact-windows-packages\\RailWise-AI-0.5.5-win-x64.exe",
+    "name": "RailWise-AI-0.5.5-win-x64.exe",
+    "sha256": "3d9abb28849ecc8155d3b0331754af8057897ec5ec1a83efa24350e64c5bf2ed",
+    "size": 293581748,
+    "versionInfo": {
+      "fileVersion": "0.5.5",
+      "productVersion": "0.5.5",
+      "productName": "RailWise AI"
+    },
+    "authenticode": {
+      "statusMessage": "The file D:\\a\\_temp\\exact-windows-packages\\RailWise-AI-0.5.5-win-x64.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170",
+      "status": "NotSigned",
+      "signerThumbprint": null
+    }
+  },
+  "cleanScope": {
+    "targetAbsent": true,
+    "shortcutsAbsent": true,
+    "registryAbsent": true
+  },
+  "target": {
+    "executable": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\RailWise AI.exe",
+    "authenticode": {
+      "statusMessage": "The file D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\RailWise AI.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170",
+      "status": "NotSigned",
+      "signerThumbprint": null
+    },
+    "versionInfo": {
+      "fileVersion": "0.5.5",
+      "productVersion": "0.5.5.0",
+      "productName": "RailWise AI"
+    },
+    "directory": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI",
+    "package": {
+      "name": "workwise",
+      "productName": "RailWise AI",
+      "version": "0.5.5",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "asarSha256": "1c0fb39d6f30de9b328f0dfe2429c83aa96a4adafc0afc57fbe28dab6cdcce6c",
+      "asarSize": 396890856
+    },
+    "uninstaller": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\Uninstall RailWise AI.exe"
+  },
+  "install": {
+    "exitCode": 0
+  },
+  "registry": {
+    "install": {
+      "view": "Registry64",
+      "hive": "CurrentUser",
+      "values": {
+        "InstallLocation": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI",
+        "KeepShortcuts": "true",
+        "ShortcutName": "RailWise AI"
+      },
+      "key": "Software\\0daef81e-c00a-5e19-aa76-e6b9a68e0938"
+    },
+    "uninstall": {
+      "view": "Registry64",
+      "hive": "CurrentUser",
+      "values": {
+        "URLInfoAbout": "https://github.com/railwise-cn/railwise-ai",
+        "DisplayName": "RailWise AI",
+        "EstimatedSize": 1110077,
+        "NoModify": 1,
+        "DisplayVersion": "0.5.5",
+        "HelpLink": "https://github.com/railwise-cn/railwise-ai",
+        "URLUpdateInfo": "https://github.com/railwise-cn/railwise-ai",
+        "Comments": "AI workbench for engineering, infrastructure, and operations workflows",
+        "Publisher": "RailWise AI Contributors",
+        "DisplayIcon": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\RailWise AI.exe,0",
+        "NoRepair": 1,
+        "Readme": "https://github.com/railwise-cn/railwise-ai",
+        "UninstallString": "\"D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\Uninstall RailWise AI.exe\" /currentuser",
+        "QuietUninstallString": "\"D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\Uninstall RailWise AI.exe\" /currentuser /S"
+      },
+      "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\0daef81e-c00a-5e19-aa76-e6b9a68e0938"
+    }
+  },
+  "shortcuts": [
+    {
+      "scope": "current-user",
+      "name": "RailWise AI.lnk",
+      "target": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\RailWise AI.exe",
+      "kind": "desktop",
+      "path": "C:\\Users\\runneradmin\\Desktop\\RailWise AI.lnk"
+    },
+    {
+      "scope": "current-user",
+      "name": "RailWise AI.lnk",
+      "target": "D:\\a\\_temp\\railwise-install-6c07207f93af4e1ca1c059065ef2c380\\RailWise AI\\RailWise AI.exe",
+      "kind": "start-menu",
+      "path": "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\RailWise AI.lnk"
+    }
+  ],
+  "verification": {
+    "status": "passed",
+    "installerSha256": "3d9abb28849ecc8155d3b0331754af8057897ec5ec1a83efa24350e64c5bf2ed",
+    "installedAsarSha256": "1c0fb39d6f30de9b328f0dfe2429c83aa96a4adafc0afc57fbe28dab6cdcce6c",
+    "windowsSigning": "not-configured",
+    "signatureStatuses": {
+      "installer": "NotSigned",
+      "installedExecutable": "NotSigned"
+    }
+  }
+}

@@ -52,7 +52,13 @@ function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4', options 
   put('src/runtime.js', 'export const value = 1\n')
   for (const [path, contents] of Object.entries(options.sourceFiles ?? {})) put(path, contents)
   if (options.previousTag) {
-    commit('previous formal source fixture')
+    const previousSourceHead = commit('previous formal source fixture')
+    const previousVersion = options.previousTag.slice(1)
+    put(`docs/qa/release-gates/${options.previousTag}.json`, JSON.stringify({
+      schemaVersion: 1, scope: 'public-release', status: 'passed',
+      release: { tag: options.previousTag, version: previousVersion, sourceHead: previousSourceHead }
+    }))
+    commit('previous formal release evidence fixture')
     git('tag', options.previousTag)
     put('src/runtime.js', 'export const value = 2\n')
     for (const [path, contents] of Object.entries(options.changedFiles ?? {})) put(path, contents)
@@ -146,6 +152,13 @@ function releaseFixture(t, packageVersion = '0.5.4', version = '0.5.4', options 
   }
   return { root, git, put, commit, reviewedSourceHead, base, manifestPath, manifest, machineReport, nativeReport, recordEvidence, tagRelease, verify }
 }
+
+test('previous formal tag may point to evidence after its packaged source', t => {
+  const f = currentPolicyFixture(t)
+  f.recordEvidence()
+  const releaseHead = f.tagRelease()
+  assert.match(f.verify(releaseHead), /verified v0\.5\.5/)
+})
 
 function input(name) {
   const value = triggers?.workflow_dispatch?.inputs?.[name]

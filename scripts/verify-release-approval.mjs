@@ -122,7 +122,19 @@ function releaseChangeRequirements(manifest, reviewedSourceHead) {
   const currentParts = manifest.release.version.split('.').map(Number)
   const different = currentParts.findIndex((value, index) => value !== previousParts[index])
   if (different < 0 || currentParts[different] < previousParts[different]) fail('release.previousTag must precede the target version')
-  try { git(['merge-base', '--is-ancestor', `${previousTag}^{commit}`, reviewedSourceHead]) } catch { fail('previous formal version must resolve to an ancestor of the packaged source') }
+  let previousManifest
+  try {
+    previousManifest = JSON.parse(git(['show', `${previousTag}:docs/qa/release-gates/${previousTag}.json`]))
+  } catch {
+    fail(`previous formal release evidence cannot be read from ${previousTag}`)
+  }
+  const previousSourceHead = previousManifest?.release?.sourceHead
+  if (previousManifest?.scope !== 'public-release' || previousManifest?.status !== 'passed'
+    || previousManifest?.release?.tag !== previousTag || previousManifest?.release?.version !== previousTag.slice(1)
+    || !/^[0-9a-f]{40}$/.test(previousSourceHead ?? '')) {
+    fail(`previous formal release evidence is invalid: ${previousTag}`)
+  }
+  try { git(['merge-base', '--is-ancestor', `${previousSourceHead}^{commit}`, reviewedSourceHead]) } catch { fail('previous formal package source must be an ancestor of the reviewed source') }
   const changedPaths = git(['diff', '--name-only', '-z', '--no-renames', `${previousTag}^{commit}`, reviewedSourceHead]).split('\0').filter(Boolean)
   const detected = classifyReleaseChanges(changedPaths)
   return { updater: detected.updater.length > 0 || manifest.release.updaterPathChanged === true,

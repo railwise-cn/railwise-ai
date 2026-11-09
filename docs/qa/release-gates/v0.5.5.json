@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 2,
+  "scope": "public-release",
+  "status": "passed",
+  "release": {
+    "tag": "v0.5.5",
+    "version": "0.5.5",
+    "previousTag": "v0.5.4",
+    "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "updaterPathChanged": true,
+    "visualChange": true
+  },
+  "package": {
+    "version": "0.5.5",
+    "sourceVersion": "0.5.4",
+    "buildVersion": "0.5.5",
+    "identity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "artifactSha256": "77c80faa00c4c40d13c37aba6f350caf37e42f4be1cbcf9395de8345b64b4994",
+      "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a"
+    },
+    "installedMetadata": {
+      "version": "0.5.5",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a"
+    },
+    "versionOverride": {
+      "environmentVariable": "WORKWISE_APP_VERSION",
+      "value": "0.5.5",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299"
+    },
+    "reviewedBuild": {
+      "schemaVersion": 1,
+      "mode": "exact-build",
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/release.yml",
+      "headRef": "refs/heads/main",
+      "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+      "workflowSha": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "runId": 42625022802,
+      "runAttempt": 1,
+      "publicIdentity": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "packageName": "workwise",
+        "productName": "RailWise AI"
+      },
+      "artifacts": [
+        {
+          "id": 13680563281,
+          "name": "release-mac",
+          "digest": "sha256:0249458c3b0c56c78f89ca01568f37e0c6b7a92894660b0e255994e69d62d3a2"
+        },
+        {
+          "id": 13678553432,
+          "name": "release-win",
+          "digest": "sha256:b7ac4b5d4b1e25693d21060433a06e08500fa2ab94013782b3775502b32ef777"
+        }
+      ],
+      "files": [
+        {
+          "name": "RailWise-AI-0.5.5-mac-arm64.dmg",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 352487982,
+          "sha256": "77c80faa00c4c40d13c37aba6f350caf37e42f4be1cbcf9395de8345b64b4994"
+        },
+        {
+          "name": "RailWise-AI-0.5.5-mac-arm64.zip",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 359095866,
+          "sha256": "cfd7fbaecd30244cc88c5aeeb94ebd90842de3b246dcc57f8813db039a2b6ff4"
+        },
+        {
+          "name": "RailWise-AI-0.5.5-mac-x64.dmg",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 360737540,
+          "sha256": "fcd90788e932afd2c39273dec7ba9fe47250e951a233783eff82f321a1863e09"
+        },
+        {
+          "name": "RailWise-AI-0.5.5-mac-x64.zip",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 367662963,
+          "sha256": "2e8125e9993b89520c6f190e97197f46e4a5b93d9d7125b85ef2c29c2b5e7fcb"
+        },
+        {
+          "name": "latest-mac.yml",
+          "platform": "darwin",
+          "artifact": "release-mac",
+          "size": 839,
+          "sha256": "b018fb20eefd8ed125d4b716a0c4ec84239c60df4057076897a17d60fbbccd50"
+        },
+        {
+          "name": "RailWise-AI-0.5.5-win-x64.exe",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 293581748,
+          "sha256": "3d9abb28849ecc8155d3b0331754af8057897ec5ec1a83efa24350e64c5bf2ed"
+        },
+        {
+          "name": "RailWise-AI-0.5.5-win-x64.exe.blockmap",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 300748,
+          "sha256": "efd65233558af26b07cd6eea9079d65ef69af08511db0b7f415ac56995b0241c"
+        },
+        {
+          "name": "latest.yml",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 355,
+          "sha256": "a403ebd4b08adbb5852fdfeba4b052ae26b61084bd6602e5a7905ef8e6d26a79"
+        }
+      ]
+    },
+    "signature": {
+      "status": "passed",
+      "scope": "macOS application",
+      "teamIdentifier": "R35G7F4A9U",
+      "windowsAuthenticode": "NotSigned",
+      "windowsSigning": "not-configured"
+    },
+    "notarization": {
+      "status": "passed",
+      "scope": "macOS application staple and same-run native Gatekeeper validation",
+      "dmgStapleClaimed": false
+    },
+      "screenshots": [
+        {
+          "path": "docs/qa/release-gates/v0.5.5/task-workspace-zh-light-1280x840.png"
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.5/task-filters-zh-light-1280x840.png"
+        }
+      ],
+    "limitations": [
+      "Windows Authenticode is not configured: installer and installed executable are NotSigned.",
+      "Intel UI was not run on the local Apple Silicon host.",
+      "Local Gatekeeper status is retained verbatim; enabled-policy native verification comes from the same-run updater reports."
+    ]
+  },
+  "checks": {
+    "productionBuild": {
+      "status": "passed",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "path": "docs/qa/release-gates/v0.5.5/build-and-tests.md"
+    },
+    "focusedTests": {
+      "status": "passed",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "path": "docs/qa/release-gates/v0.5.5/build-and-tests.md"
+    },
+    "requiredCI": {
+      "status": "passed",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/quality.yml",
+        "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+        "runId": 42624327229,
+        "runAttempt": 1
+      }
+    }
+  },
+  "acceptance": {
+    "installedPackage": {
+      "status": "passed",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "path": "docs/qa/release-gates/v0.5.5/installed-package.md"
+    },
+    "packagedUI": {
+      "status": "passed",
+      "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "path": "docs/qa/release-gates/v0.5.5/ui.md"
+    },
+    "updaterRoundTrip": {
+      "status": "passed",
+      "mode": "exact-build",
+      "path": "docs/qa/release-gates/v0.5.5/updater.md",
+      "machineReportPath": "docs/qa/release-gates/v0.5.5/frozen-updater.json",
+      "nativeReportPath": "docs/qa/release-gates/v0.5.5/native-updater.json",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/release.yml",
+        "headRef": "refs/heads/main",
+        "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+        "workflowSha": "02165b64bffe5e24f4a4f50811d22086f1489299",
+        "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+        "runId": 42625022802,
+        "runAttempt": 1,
+        "artifact": {
+          "id": 13681262821,
+          "name": "exact-package-updater-42625022802",
+          "digest": "sha256:003d2da84c0087d42526ba6f0dfa554cf6969ebb39ddb605a24a2622f357f7ba"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,4348 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "baseVersion": "0.5.4",
+  "targetVersion": "0.5.5",
+  "platform": "darwin",
+  "arch": "arm64",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+    "workflowSha": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "runId": 42625022802,
+    "runAttempt": 1,
+    "mode": "private-exact-package-smoke"
+  },
+  "productionTouched": false,
+  "systemTrustModified": false,
+  "officialFeedsModified": false,
+  "publicReleasePerformed": false,
+  "transport": "Temporary externally reachable Cloudflare Quick Tunnel with default CA TLS and a 256-bit bearer capability path; no persistent remote storage.",
+  "steps": [
+    {
+      "operation": "sw_vers",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:11:51.340Z"
+    },
+    {
+      "operation": "trust-runner-environment",
+      "command": "macos-version",
+      "status": "recorded",
+      "exitCode": 0,
+      "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t15.8.2\nBuildVersion:\t\t24H232\n",
+      "stderr": "",
+      "at": "2026-11-09T14:11:51.354Z"
+    },
+    {
+      "operation": "sw_vers",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:11:51.354Z"
+    },
+    {
+      "operation": "xcode-select",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:11:51.356Z"
+    },
+    {
+      "operation": "trust-runner-environment",
+      "command": "xcode-selection",
+      "status": "recorded",
+      "exitCode": 0,
+      "stdout": "/Applications/Xcode_16.4.app/Contents/Developer\n",
+      "stderr": "",
+      "at": "2026-11-09T14:11:51.362Z"
+    },
+    {
+      "operation": "xcode-select",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:11:51.362Z"
+    },
+    {
+      "operation": "xcodebuild",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:11:51.363Z"
+    },
+    {
+      "operation": "trust-runner-environment",
+      "command": "xcode-version",
+      "status": "recorded",
+      "exitCode": 0,
+      "stdout": "Xcode 16.4\nBuild version 16F6\n",
+      "stderr": "",
+      "at": "2026-11-09T14:11:51.797Z"
+    },
+    {
+      "operation": "xcodebuild",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:11:51.797Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:11:51.798Z"
+    },
+    {
+      "operation": "trust-runner-environment",
+      "command": "stapler-location",
+      "status": "recorded",
+      "exitCode": 0,
+      "stdout": "/Applications/Xcode_16.4.app/Contents/Developer/usr/bin/stapler\n",
+      "stderr": "",
+      "at": "2026-11-09T14:11:53.605Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:11:53.606Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:04.831Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:08.421Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:08.430Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:18.792Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:18.802Z"
+    },
+    {
+      "operation": "hdiutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:19.208Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:19.211Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:19.236Z"
+    },
+    {
+      "operation": "bundle-trust-boundary",
+      "status": "started",
+      "boundary": "baseline-dmg-copy",
+      "at": "2026-11-09T14:12:19.414Z"
+    },
+    {
+      "operation": "bundle-ticket-files",
+      "boundary": "baseline-dmg-copy",
+      "status": "recorded",
+      "files": [
+        {
+          "path": "Contents/Info.plist",
+          "size": 3858,
+          "sha256": "455f206ef05dcb8b7476a9a8dba0a84ce62c4d0c1e4de7753df67f23c281a26a"
+        },
+        {
+          "path": "Contents/CodeResources",
+          "size": 5370,
+          "sha256": "578115eee41b5092c3d82c2cb3d528b3a5e9e8e0acf89852256d452a5ff68dce"
+        },
+        {
+          "path": "Contents/_CodeSignature/CodeResources",
+          "size": 3452858,
+          "sha256": "fd970f4bb9dc4b9095f36ed76e354a872e3281d18e391f9c9a7374782e9f3ff6"
+        }
+      ],
+      "at": "2026-11-09T14:12:19.422Z"
+    },
+    {
+      "operation": "xattr",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:19.423Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "baseline-dmg-copy",
+      "command": "bundle-xattr-names",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "",
+      "at": "2026-11-09T14:12:19.430Z"
+    },
+    {
+      "operation": "xattr",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:19.432Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:19.433Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "baseline-dmg-copy",
+      "command": "gatekeeper-status",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "assessments enabled\n",
+      "stderr": "",
+      "at": "2026-11-09T14:12:19.448Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:19.449Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:19.449Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "baseline-dmg-copy",
+      "command": "codesign-verify",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "",
+      "at": "2026-11-09T14:12:22.795Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:22.801Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:22.804Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "baseline-dmg-copy",
+      "command": "stapler-validate",
+      "attempt": 1,
+      "maxAttempts": 3,
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "Processing: /Users/runner/work/_temp/railwise-frozen-update-GlSX9d/baseline/RailWise AI.app\nProperties are {\n    NSURLIsDirectoryKey = 1;\n    NSURLIsPackageKey = 1;\n    NSURLIsSymbolicLinkKey = 0;\n    NSURLLocalizedTypeDescriptionKey = Application;\n    NSURLTypeIdentifierKey = \"com.apple.application-bundle\";\n    \"_NSURLIsApplicationKey\" = 1;\n}\nProps are {\n    cdhash = {length = 20, bytes = 0x88eb7cbb6003d64fcd0bdea5ea35e6ae63e87a5e};\n    digestAlgorithm = 2;\n    flags = 65536;\n    secureTimestamp = \"2026-11-05 20:54:28 +0000\";\n    signingId = \"com.wangjiawei508.workgpt\";\n    teamId = R35G7F4A9U;\n}\nJSON Data is {\n    records =     (\n                {\n            recordName = \"2/2/88eb7cbb6003d64fcd0bdea5ea35e6ae63e87a5e\";\n        }\n    );\n}\n Headers: {\n    \"Content-Type\" = \"application/json\";\n}\nDomain is api.apple-cloudkit.com\nResponse is <NSHTTPURLResponse: 0x600002ac8b20> { URL: [URL redacted] } { Status Code: 200, Headers {\n    \"Alt-Svc\" =     (\n        \"h3=\\\":443\\\"; ma=2592000\"\n    );\n    \"Content-Encoding\" =     (\n        gzip\n    );\n    \"Content-Type\" =     (\n        \"application/json; charset=UTF-8\"\n    );\n    Date =     (\n        \"Mon, 09 Nov 2026 14:12:23 GMT\"\n    );\n    Server =     (\n        \"AppleHttpServer/9ba8c84d5fb2\"\n    );\n    \"Strict-Transport-Security\" =     (\n        \"max-age=31536000; includeSubDomains;\"\n    );\n    Via =     (\n        \"xrail:icloud-xrail-group68-ext-64585685df-wgqfj:8301:26R375:grp68,631194250daa17e24277dea86cf30319:b9337b1f3adc1199035aa747b4eebb13:ussjc1\"\n    );\n    \"access-control-expose-headers\" =     (\n        \"X-Apple-Request-UUID,X-Responding-Instance,Via\"\n    );\n    \"x-apple-cloudkit-version\" =     (\n        \"1.0\"\n    );\n    \"x-apple-edge-response-time\" =     (\n        68\n    );\n    \"x-apple-request-uuid\" =     (\n        \"8325a2ce-5f67-42fa-8b40-70c106705145\"\n    );\n    \"x-apple-user-partition\" =     (\n        63\n    );\n    \"x-responding-instance\" =     (\n        \"ckdatabasews:1656852510:prod_p63_ckdatabasews_50percent_56c6d44d79_n8kbt:8080:2640B311:a0b7f9c6f5a30656ae97aa217197caa86df3eb88\"\n    );\n} }\nSize of data is 7773\nJSON Response is: {\n    records =     (\n                {\n            created =             {\n                deviceID = 2;\n                timestamp = 1793912420941;\n                userRecordName = \"_b133e60953755a92966d7ca08d9c731a\";\n            };\n            deleted = 0;\n            fields =             {\n                signedTicket =                 {\n                    type = BYTES;\n                    value = \"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\";\n                };\n            };\n            modified =             {\n                deviceID = 2;\n                timestamp = 1793912420941;\n                userRecordName = \"_b133e60953755a92966d7ca08d9c731a\";\n            };\n            pluginFields =             {\n            };\n            recordChangeTag = mw414ytl;\n            recordName = \"2/2/88eb7cbb6003d64fcd0bdea5ea35e6ae63e87a5e\";\n            recordType = DeveloperIDTicket;\n        }\n    );\n}\nDownloaded ticket has been stored at file:///var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/8325a2ce-5f67-42fa-8b40-70c106705145.ticket.\nThe validate action worked!\n",
+      "stderr": "",
+      "at": "2026-11-09T14:12:23.271Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:23.278Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:23.299Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "baseline-dmg-copy",
+      "command": "gatekeeper-assess",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "/Users/runner/work/_temp/railwise-frozen-update-GlSX9d/baseline/RailWise AI.app: accepted\nsource=Notarized Developer ID\n",
+      "at": "2026-11-09T14:12:25.863Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:25.864Z"
+    },
+    {
+      "operation": "bundle-trust-boundary",
+      "boundary": "baseline-dmg-copy",
+      "status": "completed",
+      "at": "2026-11-09T14:12:25.866Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:25.867Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:25.944Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:25.946Z"
+    },
+    {
+      "operation": "unzip",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:25.992Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:26.002Z"
+    },
+    {
+      "operation": "ditto",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:32.310Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:32.315Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:32.337Z"
+    },
+    {
+      "operation": "bundle-trust-boundary",
+      "status": "started",
+      "boundary": "target-zip-preflight",
+      "at": "2026-11-09T14:12:32.422Z"
+    },
+    {
+      "operation": "bundle-ticket-files",
+      "boundary": "target-zip-preflight",
+      "status": "recorded",
+      "files": [
+        {
+          "path": "Contents/Info.plist",
+          "size": 3861,
+          "sha256": "0d6d0b7f1659f612c90ca26aea39f970d8f62d8150cde69a47d1c14cf6c2890c"
+        },
+        {
+          "path": "Contents/CodeResources",
+          "size": 5370,
+          "sha256": "49b3686433bc28ef7314a52d8214a8337535610d5e69a7fc94e9f98a8970a7de"
+        },
+        {
+          "path": "Contents/_CodeSignature/CodeResources",
+          "size": 3478810,
+          "sha256": "147dc73f69d3f0fc635dcff6c29f2629ef323fc19cfc0e514ad9dffd4278eab6"
+        }
+      ],
+      "at": "2026-11-09T14:12:32.438Z"
+    },
+    {
+      "operation": "xattr",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:32.439Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "target-zip-preflight",
+      "command": "bundle-xattr-names",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "",
+      "at": "2026-11-09T14:12:32.444Z"
+    },
+    {
+      "operation": "xattr",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:32.445Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:32.446Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "target-zip-preflight",
+      "command": "gatekeeper-status",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "assessments enabled\n",
+      "stderr": "",
+      "at": "2026-11-09T14:12:32.453Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:32.454Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:32.455Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "target-zip-preflight",
+      "command": "codesign-verify",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "",
+      "at": "2026-11-09T14:12:36.332Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:36.335Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:36.337Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "target-zip-preflight",
+      "command": "stapler-validate",
+      "attempt": 1,
+      "maxAttempts": 3,
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "Processing: /Users/runner/work/_temp/railwise-frozen-update-GlSX9d/target/RailWise AI.app\nProperties are {\n    NSURLIsDirectoryKey = 1;\n    NSURLIsPackageKey = 1;\n    NSURLIsSymbolicLinkKey = 0;\n    NSURLLocalizedTypeDescriptionKey = Application;\n    NSURLTypeIdentifierKey = \"com.apple.application-bundle\";\n    \"_NSURLIsApplicationKey\" = 1;\n}\nProps are {\n    cdhash = {length = 20, bytes = 0xb1dd519f4a3fa0aca0cae64033e1570cc7afcbad};\n    digestAlgorithm = 2;\n    flags = 65536;\n    secureTimestamp = \"2026-11-09 13:55:52 +0000\";\n    signingId = \"com.wangjiawei508.workgpt\";\n    teamId = R35G7F4A9U;\n}\nJSON Data is {\n    records =     (\n                {\n            recordName = \"2/2/b1dd519f4a3fa0aca0cae64033e1570cc7afcbad\";\n        }\n    );\n}\n Headers: {\n    \"Content-Type\" = \"application/json\";\n}\nDomain is api.apple-cloudkit.com\nResponse is <NSHTTPURLResponse: 0x600000543500> { URL: [URL redacted] } { Status Code: 200, Headers {\n    \"Alt-Svc\" =     (\n        \"h3=\\\":443\\\"; ma=2592000\"\n    );\n    \"Content-Encoding\" =     (\n        gzip\n    );\n    \"Content-Type\" =     (\n        \"application/json; charset=UTF-8\"\n    );\n    Date =     (\n        \"Mon, 09 Nov 2026 14:12:37 GMT\"\n    );\n    Server =     (\n        \"AppleHttpServer/9ba8c84d5fb2\"\n    );\n    \"Strict-Transport-Security\" =     (\n        \"max-age=31536000; includeSubDomains;\"\n    );\n    Via =     (\n        \"xrail:icloud-xrail-group68-ext-64585685df-b7rpl:8301:26R375:grp68,631194250daa17e24277dea86cf30319:efc8e0728c3a50b1e9ad1d94e0e168c0:ussjc1\"\n    );\n    \"access-control-expose-headers\" =     (\n        \"X-Apple-Request-UUID,X-Responding-Instance,Via\"\n    );\n    \"x-apple-cloudkit-version\" =     (\n        \"1.0\"\n    );\n    \"x-apple-edge-response-time\" =     (\n        69\n    );\n    \"x-apple-request-uuid\" =     (\n        \"dbd224f8-1a70-4bb7-ba5d-5487df8f2c87\"\n    );\n    \"x-apple-user-partition\" =     (\n        63\n    );\n    \"x-responding-instance\" =     (\n        \"ckdatabasews:1733958245:prod_p63_ckdatabasews_100percent_6f59965869_lf8bn:8080:2640B311:a0b7f9c6f5a30656ae97aa217197caa86df3eb88\"\n    );\n} }\nSize of data is 7773\nJSON Response is: {\n    records =     (\n                {\n            created =             {\n                deviceID = 2;\n                timestamp = 1794232851133;\n                userRecordName = \"_b133e60953755a92966d7ca08d9c731a\";\n            };\n            deleted = 0;\n            fields =             {\n                signedTicket =                 {\n                    type = BYTES;\n                    value = \"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\";\n                };\n            };\n            modified =             {\n                deviceID = 2;\n                timestamp = 1794232851133;\n                userRecordName = \"_b133e60953755a92966d7ca08d9c731a\";\n            };\n            pluginFields =             {\n            };\n            recordChangeTag = mw9bwwca;\n            recordName = \"2/2/b1dd519f4a3fa0aca0cae64033e1570cc7afcbad\";\n            recordType = DeveloperIDTicket;\n        }\n    );\n}\nDownloaded ticket has been stored at file:///var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/dbd224f8-1a70-4bb7-ba5d-5487df8f2c87.ticket.\nThe validate action worked!\n",
+      "stderr": "",
+      "at": "2026-11-09T14:12:36.655Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:36.656Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:36.657Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "target-zip-preflight",
+      "command": "gatekeeper-assess",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "/Users/runner/work/_temp/railwise-frozen-update-GlSX9d/target/RailWise AI.app: accepted\nsource=Notarized Developer ID\n",
+      "at": "2026-11-09T14:12:39.308Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:39.310Z"
+    },
+    {
+      "operation": "bundle-trust-boundary",
+      "boundary": "target-zip-preflight",
+      "status": "completed",
+      "at": "2026-11-09T14:12:39.311Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:39.312Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:39.375Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "started",
+      "timeoutMs": 300000,
+      "at": "2026-11-09T14:12:40.419Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:41.961Z"
+    },
+    {
+      "operation": "tar",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:42.483Z"
+    },
+    {
+      "operation": "tar",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:42.569Z"
+    },
+    {
+      "operation": "tar",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:12:42.570Z"
+    },
+    {
+      "operation": "tar",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:42.656Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "started",
+      "timeoutMs": 300000,
+      "at": "2026-11-09T14:12:42.659Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:12:51.572Z"
+    },
+    {
+      "operation": "tunnel-connection-readiness",
+      "status": "waiting",
+      "category": "endpoint-pending",
+      "attempt": 1,
+      "elapsedMs": 0,
+      "at": "2026-11-09T14:12:52.407Z"
+    },
+    {
+      "operation": "tunnel-connection-readiness",
+      "status": "waiting",
+      "category": "connection-pending",
+      "attempt": 7,
+      "elapsedMs": 3023,
+      "at": "2026-11-09T14:12:55.430Z"
+    },
+    {
+      "operation": "tunnel-connection-readiness",
+      "status": "completed",
+      "category": "connected",
+      "attempt": 8,
+      "elapsedMs": 3541,
+      "at": "2026-11-09T14:12:55.947Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 1,
+      "elapsedMs": 38,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:12:55.994Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 2,
+      "elapsedMs": 1045,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:12:57.001Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 3,
+      "elapsedMs": 2053,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:12:58.010Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 4,
+      "elapsedMs": 3074,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:12:59.030Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 5,
+      "elapsedMs": 4088,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:00.044Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 6,
+      "elapsedMs": 5101,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:01.058Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 7,
+      "elapsedMs": 6111,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:02.068Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 8,
+      "elapsedMs": 7124,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:03.080Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 9,
+      "elapsedMs": 8132,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:04.088Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 10,
+      "elapsedMs": 9148,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:05.104Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 11,
+      "elapsedMs": 10164,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:06.121Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 12,
+      "elapsedMs": 11177,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:07.134Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 13,
+      "elapsedMs": 12185,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:08.142Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 14,
+      "elapsedMs": 13193,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:09.150Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 15,
+      "elapsedMs": 14206,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:10.163Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 16,
+      "elapsedMs": 15216,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:11.172Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 17,
+      "elapsedMs": 16223,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:12.179Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 18,
+      "elapsedMs": 17231,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:13.188Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 19,
+      "elapsedMs": 18238,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:14.195Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 20,
+      "elapsedMs": 19248,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:15.205Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 21,
+      "elapsedMs": 20272,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:16.228Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 22,
+      "elapsedMs": 21279,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:17.236Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 23,
+      "elapsedMs": 22287,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:18.244Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 24,
+      "elapsedMs": 23290,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:19.247Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 25,
+      "elapsedMs": 24295,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:20.252Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 26,
+      "elapsedMs": 25300,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:21.257Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 27,
+      "elapsedMs": 26306,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:22.262Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 28,
+      "elapsedMs": 27309,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:23.266Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 29,
+      "elapsedMs": 28315,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:24.271Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 30,
+      "elapsedMs": 29322,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:25.279Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 31,
+      "elapsedMs": 30328,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:26.285Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 32,
+      "elapsedMs": 31336,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:27.293Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 33,
+      "elapsedMs": 32341,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:28.298Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 34,
+      "elapsedMs": 33353,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:29.309Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 35,
+      "elapsedMs": 34359,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:30.315Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 36,
+      "elapsedMs": 35364,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:31.321Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 37,
+      "elapsedMs": 36372,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:32.329Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 38,
+      "elapsedMs": 37380,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:33.337Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 39,
+      "elapsedMs": 38385,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:34.342Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 40,
+      "elapsedMs": 39394,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:35.351Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 41,
+      "elapsedMs": 40404,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:36.361Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 42,
+      "elapsedMs": 41418,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:37.375Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 43,
+      "elapsedMs": 42424,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:38.381Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 44,
+      "elapsedMs": 43431,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:39.388Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 45,
+      "elapsedMs": 44436,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:40.393Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 46,
+      "elapsedMs": 45448,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:41.405Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 47,
+      "elapsedMs": 46454,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:42.410Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 48,
+      "elapsedMs": 47459,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:43.415Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 49,
+      "elapsedMs": 48464,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:44.420Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 50,
+      "elapsedMs": 49471,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:45.428Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 51,
+      "elapsedMs": 50477,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:46.434Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 52,
+      "elapsedMs": 51485,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:47.441Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 53,
+      "elapsedMs": 52494,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:48.450Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 54,
+      "elapsedMs": 53501,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:49.457Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 55,
+      "elapsedMs": 54507,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:50.464Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 56,
+      "elapsedMs": 55515,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:51.472Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 57,
+      "elapsedMs": 56523,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:52.479Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 58,
+      "elapsedMs": 57530,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:53.486Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 59,
+      "elapsedMs": 58538,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:54.494Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 60,
+      "elapsedMs": 59550,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:55.506Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 61,
+      "elapsedMs": 60557,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:56.514Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 62,
+      "elapsedMs": 61564,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:57.521Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 63,
+      "elapsedMs": 62569,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:58.525Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 64,
+      "elapsedMs": 63577,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:13:59.533Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 65,
+      "elapsedMs": 64583,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:00.539Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 66,
+      "elapsedMs": 65590,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:01.547Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 67,
+      "elapsedMs": 66598,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:02.555Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 68,
+      "elapsedMs": 67617,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:03.574Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 69,
+      "elapsedMs": 68623,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:04.580Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 70,
+      "elapsedMs": 69634,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:05.590Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 71,
+      "elapsedMs": 70643,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:06.600Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 72,
+      "elapsedMs": 71652,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:07.608Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 73,
+      "elapsedMs": 72660,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:08.617Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 74,
+      "elapsedMs": 73677,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:09.634Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 75,
+      "elapsedMs": 74684,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:10.641Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 76,
+      "elapsedMs": 75692,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:11.648Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 77,
+      "elapsedMs": 76699,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:12.656Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 78,
+      "elapsedMs": 77707,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:13.664Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 79,
+      "elapsedMs": 78715,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:14.672Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 80,
+      "elapsedMs": 79722,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:15.679Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 81,
+      "elapsedMs": 80737,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:16.694Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 82,
+      "elapsedMs": 81752,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:17.709Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 83,
+      "elapsedMs": 82764,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:18.720Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 84,
+      "elapsedMs": 83772,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:19.728Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 85,
+      "elapsedMs": 84778,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:20.734Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 86,
+      "elapsedMs": 85786,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:21.743Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 87,
+      "elapsedMs": 86790,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:22.747Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 88,
+      "elapsedMs": 87797,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:23.754Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 89,
+      "elapsedMs": 88802,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:24.758Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 90,
+      "elapsedMs": 89807,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:25.764Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 91,
+      "elapsedMs": 90814,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:26.771Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 92,
+      "elapsedMs": 91820,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:27.777Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 93,
+      "elapsedMs": 92826,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:28.783Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 94,
+      "elapsedMs": 93831,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:29.788Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 95,
+      "elapsedMs": 94840,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:30.796Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 96,
+      "elapsedMs": 95846,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:31.802Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 97,
+      "elapsedMs": 96853,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:32.810Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 98,
+      "elapsedMs": 97860,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:33.816Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 99,
+      "elapsedMs": 98866,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:34.823Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 100,
+      "elapsedMs": 99873,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:35.829Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 101,
+      "elapsedMs": 100879,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:36.836Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 102,
+      "elapsedMs": 101885,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:37.842Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 103,
+      "elapsedMs": 102891,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:38.848Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 104,
+      "elapsedMs": 103896,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:39.853Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 105,
+      "elapsedMs": 104901,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:40.858Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 106,
+      "elapsedMs": 105908,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:41.864Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 107,
+      "elapsedMs": 106913,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:42.870Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 108,
+      "elapsedMs": 107917,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:43.874Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 109,
+      "elapsedMs": 108924,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:44.880Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 110,
+      "elapsedMs": 109931,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:45.888Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 111,
+      "elapsedMs": 110939,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:46.895Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 112,
+      "elapsedMs": 111951,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:47.908Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 113,
+      "elapsedMs": 112972,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:48.929Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 114,
+      "elapsedMs": 113977,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:49.934Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 115,
+      "elapsedMs": 114981,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:50.938Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 116,
+      "elapsedMs": 115988,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:51.945Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 117,
+      "elapsedMs": 116995,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:52.952Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 118,
+      "elapsedMs": 118000,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:53.957Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 119,
+      "elapsedMs": 119007,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:54.964Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 120,
+      "elapsedMs": 120014,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:55.971Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 121,
+      "elapsedMs": 121020,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:56.977Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 122,
+      "elapsedMs": 122028,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:57.984Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 123,
+      "elapsedMs": 123032,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:58.989Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 124,
+      "elapsedMs": 124037,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:14:59.993Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 125,
+      "elapsedMs": 125045,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:01.002Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 126,
+      "elapsedMs": 126051,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:02.007Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 127,
+      "elapsedMs": 127057,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:03.014Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 128,
+      "elapsedMs": 128062,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:04.019Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 129,
+      "elapsedMs": 129071,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:05.028Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 130,
+      "elapsedMs": 130076,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:06.033Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 131,
+      "elapsedMs": 131080,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:07.036Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 132,
+      "elapsedMs": 132089,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:08.045Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 133,
+      "elapsedMs": 133095,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:09.052Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 134,
+      "elapsedMs": 134101,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:10.058Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 135,
+      "elapsedMs": 135110,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:11.066Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 136,
+      "elapsedMs": 136118,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:12.075Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 137,
+      "elapsedMs": 137123,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:13.079Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 138,
+      "elapsedMs": 138129,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:14.085Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 139,
+      "elapsedMs": 139134,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:15.091Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 140,
+      "elapsedMs": 140139,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:16.096Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 141,
+      "elapsedMs": 141149,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:17.106Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 142,
+      "elapsedMs": 142154,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:18.110Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 143,
+      "elapsedMs": 143159,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:19.116Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 144,
+      "elapsedMs": 144165,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:20.122Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 145,
+      "elapsedMs": 145169,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:21.126Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 146,
+      "elapsedMs": 146176,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:22.133Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 147,
+      "elapsedMs": 147182,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:23.139Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 148,
+      "elapsedMs": 148186,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:24.143Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 149,
+      "elapsedMs": 149192,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:25.149Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 150,
+      "elapsedMs": 150197,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:26.154Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 151,
+      "elapsedMs": 151203,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:27.160Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 152,
+      "elapsedMs": 152210,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:28.166Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 153,
+      "elapsedMs": 153215,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:29.172Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 154,
+      "elapsedMs": 154221,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:30.178Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 155,
+      "elapsedMs": 155228,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:31.185Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 156,
+      "elapsedMs": 156233,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:32.189Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 157,
+      "elapsedMs": 157237,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:33.193Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 158,
+      "elapsedMs": 158242,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:34.198Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 159,
+      "elapsedMs": 159247,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:35.204Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 160,
+      "elapsedMs": 160254,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:36.211Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 161,
+      "elapsedMs": 161259,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:37.216Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 162,
+      "elapsedMs": 162264,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:38.220Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 163,
+      "elapsedMs": 163269,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:39.226Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 164,
+      "elapsedMs": 164276,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:40.233Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 165,
+      "elapsedMs": 165284,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:41.241Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 166,
+      "elapsedMs": 166293,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:42.250Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 167,
+      "elapsedMs": 167298,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:43.255Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 168,
+      "elapsedMs": 168311,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:44.268Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 169,
+      "elapsedMs": 169317,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:45.274Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 170,
+      "elapsedMs": 170323,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:46.280Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 171,
+      "elapsedMs": 171329,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:47.285Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 172,
+      "elapsedMs": 172347,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:48.303Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 173,
+      "elapsedMs": 173352,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:49.308Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 174,
+      "elapsedMs": 174358,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:50.315Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 175,
+      "elapsedMs": 175365,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:51.322Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 176,
+      "elapsedMs": 176372,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:52.329Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 177,
+      "elapsedMs": 177378,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:53.334Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 178,
+      "elapsedMs": 178391,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:54.348Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 179,
+      "elapsedMs": 179397,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:55.354Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 180,
+      "elapsedMs": 180421,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:56.378Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 181,
+      "elapsedMs": 181428,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:57.385Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 182,
+      "elapsedMs": 182436,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:58.392Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 183,
+      "elapsedMs": 183441,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:15:59.398Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 184,
+      "elapsedMs": 184460,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:00.417Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 185,
+      "elapsedMs": 185465,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:01.421Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 186,
+      "elapsedMs": 186472,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:02.429Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 187,
+      "elapsedMs": 187488,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:03.444Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 188,
+      "elapsedMs": 188509,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:04.466Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 189,
+      "elapsedMs": 189515,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:05.471Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 190,
+      "elapsedMs": 190520,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:06.477Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 191,
+      "elapsedMs": 191526,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:07.483Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 192,
+      "elapsedMs": 192531,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:08.488Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 193,
+      "elapsedMs": 193537,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:09.493Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 194,
+      "elapsedMs": 194543,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:10.500Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 195,
+      "elapsedMs": 195550,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:11.507Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 196,
+      "elapsedMs": 196556,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:12.513Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 197,
+      "elapsedMs": 197561,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:13.518Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 198,
+      "elapsedMs": 198568,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:14.525Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 199,
+      "elapsedMs": 199575,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:15.531Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 200,
+      "elapsedMs": 200583,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:16.539Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 201,
+      "elapsedMs": 201589,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:17.546Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 202,
+      "elapsedMs": 202595,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:18.552Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 203,
+      "elapsedMs": 203601,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:19.558Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 204,
+      "elapsedMs": 204607,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:20.563Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 205,
+      "elapsedMs": 205613,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:21.570Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 206,
+      "elapsedMs": 206621,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:22.578Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 207,
+      "elapsedMs": 207626,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:23.583Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 208,
+      "elapsedMs": 208632,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:24.588Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 209,
+      "elapsedMs": 209637,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:25.594Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 210,
+      "elapsedMs": 210643,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:26.600Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 211,
+      "elapsedMs": 211650,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:27.607Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 212,
+      "elapsedMs": 212656,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:28.613Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 213,
+      "elapsedMs": 213661,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:29.618Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 214,
+      "elapsedMs": 214667,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:30.624Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 215,
+      "elapsedMs": 215672,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:31.628Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 216,
+      "elapsedMs": 216680,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:32.636Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 217,
+      "elapsedMs": 217688,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:33.644Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 218,
+      "elapsedMs": 218694,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:34.651Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 219,
+      "elapsedMs": 219702,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:35.659Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 220,
+      "elapsedMs": 220709,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:36.666Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 221,
+      "elapsedMs": 221714,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:37.671Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 222,
+      "elapsedMs": 222722,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:38.679Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 223,
+      "elapsedMs": 223729,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:39.685Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 224,
+      "elapsedMs": 224734,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:40.691Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 225,
+      "elapsedMs": 225741,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:41.697Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 226,
+      "elapsedMs": 226746,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:42.703Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 227,
+      "elapsedMs": 227751,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:43.707Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 228,
+      "elapsedMs": 228759,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:44.715Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 229,
+      "elapsedMs": 229766,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:45.723Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 230,
+      "elapsedMs": 230786,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:46.742Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 231,
+      "elapsedMs": 231790,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:47.747Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 232,
+      "elapsedMs": 232798,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:48.755Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 233,
+      "elapsedMs": 233809,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:49.766Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 234,
+      "elapsedMs": 234834,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:50.791Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 235,
+      "elapsedMs": 235854,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:51.811Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 236,
+      "elapsedMs": 236861,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:52.818Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 237,
+      "elapsedMs": 237867,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:53.824Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 238,
+      "elapsedMs": 238876,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:54.833Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 239,
+      "elapsedMs": 239883,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:55.840Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 240,
+      "elapsedMs": 240888,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:56.845Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 241,
+      "elapsedMs": 241896,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:57.852Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 242,
+      "elapsedMs": 242905,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:58.862Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 243,
+      "elapsedMs": 243912,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:16:59.869Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 244,
+      "elapsedMs": 244920,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:00.877Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 245,
+      "elapsedMs": 245928,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:01.885Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 246,
+      "elapsedMs": 246936,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:02.893Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 247,
+      "elapsedMs": 247941,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:03.897Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 248,
+      "elapsedMs": 248947,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:04.903Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 249,
+      "elapsedMs": 249953,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:05.909Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 250,
+      "elapsedMs": 250960,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:06.917Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 251,
+      "elapsedMs": 251966,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:07.923Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 252,
+      "elapsedMs": 252973,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:08.930Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 253,
+      "elapsedMs": 253979,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:09.936Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 254,
+      "elapsedMs": 254986,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:10.943Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 255,
+      "elapsedMs": 255991,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:11.948Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 256,
+      "elapsedMs": 256997,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:12.954Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 257,
+      "elapsedMs": 258003,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:13.959Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 258,
+      "elapsedMs": 259010,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:14.967Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 259,
+      "elapsedMs": 260015,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:15.971Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "retrying",
+      "attempt": 260,
+      "elapsedMs": 261021,
+      "category": "dns-transient",
+      "retryable": true,
+      "networkCodes": [
+        "ENOTFOUND"
+      ],
+      "at": "2026-11-09T14:17:16.978Z"
+    },
+    {
+      "operation": "frozen-manifest-readiness",
+      "status": "completed",
+      "category": "identity-verified",
+      "attempt": 261,
+      "elapsedMs": 262420,
+      "at": "2026-11-09T14:17:18.377Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:14.792Z"
+    },
+    {
+      "operation": "plutil",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:14.836Z"
+    },
+    {
+      "operation": "bundle-trust-boundary",
+      "status": "started",
+      "boundary": "native-installed-target",
+      "at": "2026-11-09T14:19:14.944Z"
+    },
+    {
+      "operation": "bundle-ticket-files",
+      "boundary": "native-installed-target",
+      "status": "recorded",
+      "files": [
+        {
+          "path": "Contents/Info.plist",
+          "size": 3861,
+          "sha256": "0d6d0b7f1659f612c90ca26aea39f970d8f62d8150cde69a47d1c14cf6c2890c"
+        },
+        {
+          "path": "Contents/CodeResources",
+          "size": 5370,
+          "sha256": "49b3686433bc28ef7314a52d8214a8337535610d5e69a7fc94e9f98a8970a7de"
+        },
+        {
+          "path": "Contents/_CodeSignature/CodeResources",
+          "size": 3478810,
+          "sha256": "147dc73f69d3f0fc635dcff6c29f2629ef323fc19cfc0e514ad9dffd4278eab6"
+        }
+      ],
+      "at": "2026-11-09T14:19:14.957Z"
+    },
+    {
+      "operation": "xattr",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:14.959Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "native-installed-target",
+      "command": "bundle-xattr-names",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "",
+      "at": "2026-11-09T14:19:14.964Z"
+    },
+    {
+      "operation": "xattr",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:14.966Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:14.969Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "native-installed-target",
+      "command": "gatekeeper-status",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "assessments enabled\n",
+      "stderr": "",
+      "at": "2026-11-09T14:19:14.981Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:14.982Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:14.984Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "native-installed-target",
+      "command": "codesign-verify",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "",
+      "at": "2026-11-09T14:19:17.926Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:17.929Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:17.930Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "native-installed-target",
+      "command": "stapler-validate",
+      "attempt": 1,
+      "maxAttempts": 3,
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "Processing: /Users/runner/work/_temp/railwise-frozen-update-GlSX9d/native-temp/workwise-native-updater-GGBMGz/Applications/RailWise AI.app\nProperties are {\n    NSURLIsDirectoryKey = 1;\n    NSURLIsPackageKey = 1;\n    NSURLIsSymbolicLinkKey = 0;\n    NSURLLocalizedTypeDescriptionKey = Application;\n    NSURLTypeIdentifierKey = \"com.apple.application-bundle\";\n    \"_NSURLIsApplicationKey\" = 1;\n}\nProps are {\n    cdhash = {length = 20, bytes = 0xb1dd519f4a3fa0aca0cae64033e1570cc7afcbad};\n    digestAlgorithm = 2;\n    flags = 65536;\n    secureTimestamp = \"2026-11-09 13:55:52 +0000\";\n    signingId = \"com.wangjiawei508.workgpt\";\n    teamId = R35G7F4A9U;\n}\nJSON Data is {\n    records =     (\n                {\n            recordName = \"2/2/b1dd519f4a3fa0aca0cae64033e1570cc7afcbad\";\n        }\n    );\n}\n Headers: {\n    \"Content-Type\" = \"application/json\";\n}\nDomain is api.apple-cloudkit.com\nResponse is <NSHTTPURLResponse: 0x60000162ce00> { URL: [URL redacted] } { Status Code: 200, Headers {\n    \"Alt-Svc\" =     (\n        \"h3=\\\":443\\\"; ma=2592000\"\n    );\n    \"Content-Encoding\" =     (\n        gzip\n    );\n    \"Content-Type\" =     (\n        \"application/json; charset=UTF-8\"\n    );\n    Date =     (\n        \"Mon, 09 Nov 2026 14:19:18 GMT\"\n    );\n    Server =     (\n        \"AppleHttpServer/9ba8c84d5fb2\"\n    );\n    \"Strict-Transport-Security\" =     (\n        \"max-age=31536000; includeSubDomains;\"\n    );\n    Via =     (\n        \"xrail:icloud-xrail-group68-ext-64585685df-9shfw:8301:26R375:grp68,631194250daa17e24277dea86cf30319:5e822490728bd3df61f323dac80be4f2:ussjc1\"\n    );\n    \"access-control-expose-headers\" =     (\n        \"X-Apple-Request-UUID,X-Responding-Instance,Via\"\n    );\n    \"x-apple-cloudkit-version\" =     (\n        \"1.0\"\n    );\n    \"x-apple-edge-response-time\" =     (\n        67\n    );\n    \"x-apple-request-uuid\" =     (\n        \"b04870c6-671e-48d2-8918-b1c221c97ea5\"\n    );\n    \"x-apple-user-partition\" =     (\n        63\n    );\n    \"x-responding-instance\" =     (\n        \"ckdatabasews:1879284647:prod_p63_ckdatabasews_50percent_56c6d44d79_g4zvr:8080:2640B311:a0b7f9c6f5a30656ae97aa217197caa86df3eb88\"\n    );\n} }\nSize of data is 7773\nJSON Response is: {\n    records =     (\n                {\n            created =             {\n                deviceID = 2;\n                timestamp = 1794232851133;\n                userRecordName = \"_b133e60953755a92966d7ca08d9c731a\";\n            };\n            deleted = 0;\n            fields =             {\n                signedTicket =                 {\n                    type = BYTES;\n                    value = \"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\";\n                };\n            };\n            modified =             {\n                deviceID = 2;\n                timestamp = 1794232851133;\n                userRecordName = \"_b133e60953755a92966d7ca08d9c731a\";\n            };\n            pluginFields =             {\n            };\n            recordChangeTag = mw9bwwca;\n            recordName = \"2/2/b1dd519f4a3fa0aca0cae64033e1570cc7afcbad\";\n            recordType = DeveloperIDTicket;\n        }\n    );\n}\nDownloaded ticket has been stored at file:///var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/b04870c6-671e-48d2-8918-b1c221c97ea5.ticket.\nThe validate action worked!\n",
+      "stderr": "",
+      "at": "2026-11-09T14:19:18.177Z"
+    },
+    {
+      "operation": "xcrun",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:18.179Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:18.180Z"
+    },
+    {
+      "operation": "bundle-trust-diagnostic",
+      "boundary": "native-installed-target",
+      "command": "gatekeeper-assess",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": "/Users/runner/work/_temp/railwise-frozen-update-GlSX9d/native-temp/workwise-native-updater-GGBMGz/Applications/RailWise AI.app: accepted\nsource=Notarized Developer ID\n",
+      "at": "2026-11-09T14:19:19.727Z"
+    },
+    {
+      "operation": "spctl",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:19.730Z"
+    },
+    {
+      "operation": "bundle-trust-boundary",
+      "boundary": "native-installed-target",
+      "status": "completed",
+      "at": "2026-11-09T14:19:19.732Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:19.733Z"
+    },
+    {
+      "operation": "codesign",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:19.806Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "started",
+      "timeoutMs": 300000,
+      "at": "2026-11-09T14:19:20.359Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:21.241Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "started",
+      "timeoutMs": 300000,
+      "at": "2026-11-09T14:19:21.243Z"
+    },
+    {
+      "operation": "RailWise AI",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:22.047Z"
+    },
+    {
+      "operation": "real-native-update-and-historical-readback",
+      "status": "completed",
+      "at": "2026-11-09T14:19:22.057Z"
+    },
+    {
+      "operation": "ps",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:22.082Z"
+    },
+    {
+      "operation": "ps",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:22.176Z"
+    },
+    {
+      "operation": "ps",
+      "status": "started",
+      "timeoutMs": 120000,
+      "at": "2026-11-09T14:19:22.178Z"
+    },
+    {
+      "operation": "ps",
+      "status": "completed",
+      "exitCode": 0,
+      "signal": null,
+      "at": "2026-11-09T14:19:22.201Z"
+    },
+    {
+      "operation": "owned-resource-cleanup",
+      "status": "completed",
+      "at": "2026-11-09T14:19:26.575Z"
+    }
+  ],
+  "privatePackage": {
+    "sourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "artifactRunId": 42625022802,
+    "artifactName": "release-mac",
+    "files": [
+      {
+        "name": "RailWise-AI-0.5.5-mac-arm64.dmg",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 352487982,
+        "sha256": "77c80faa00c4c40d13c37aba6f350caf37e42f4be1cbcf9395de8345b64b4994"
+      },
+      {
+        "name": "RailWise-AI-0.5.5-mac-arm64.zip",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 359095866,
+        "sha256": "cfd7fbaecd30244cc88c5aeeb94ebd90842de3b246dcc57f8813db039a2b6ff4"
+      },
+      {
+        "name": "RailWise-AI-0.5.5-mac-x64.dmg",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 360737540,
+        "sha256": "fcd90788e932afd2c39273dec7ba9fe47250e951a233783eff82f321a1863e09"
+      },
+      {
+        "name": "RailWise-AI-0.5.5-mac-x64.zip",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 367662963,
+        "sha256": "2e8125e9993b89520c6f190e97197f46e4a5b93d9d7125b85ef2c29c2b5e7fcb"
+      },
+      {
+        "name": "latest-mac.yml",
+        "platform": "darwin",
+        "artifact": "release-mac",
+        "size": 839,
+        "sha256": "b018fb20eefd8ed125d4b716a0c4ec84239c60df4057076897a17d60fbbccd50"
+      }
+    ]
+  },
+  "baselineAsset": {
+    "tag": "v0.5.4",
+    "name": "WorkWise-0.5.4-mac-Apple-Silicon.dmg",
+    "sha256": "ad766839b02f3b7ae5a290641715b3075cdd46caf08ef9ed92b0d21dfe11b21d",
+    "size": 352281074
+  },
+  "baselineIdentity": {
+    "version": "0.5.4",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "signature": "verified",
+    "stapledNotarization": "verified",
+    "gatekeeper": "accepted",
+    "gatekeeperAssessments": "enabled",
+    "gatekeeperSource": "Notarized Developer ID",
+    "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U"
+  },
+  "targetIdentity": {
+    "version": "0.5.5",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "signature": "verified",
+    "stapledNotarization": "verified",
+    "gatekeeper": "accepted",
+    "gatekeeperAssessments": "enabled",
+    "gatekeeperSource": "Notarized Developer ID",
+    "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U"
+  },
+  "targetZipSha256": "cfd7fbaecd30244cc88c5aeeb94ebd90842de3b246dcc57f8813db039a2b6ff4",
+  "targetAsarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+  "targetServiceIdentity": {
+    "schemaVersion": 1,
+    "packageVersion": "0.5.5",
+    "packageSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+    "layout": "asar-unpacked",
+    "serviceSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+    "serviceTreeSha256": "54c13825a924817a724b92a6a6bb37dea859b13dcbc2699135bf4eb7e9195457",
+    "modules": [
+      {
+        "path": "dist/engineering/engineering-service.js",
+        "sha256": "8d09e03aa2ddbcf27e63e35971caff6fdfcee3fdcd2d73e790be2d58b367216f"
+      },
+      {
+        "path": "dist/engineering/survey-service.js",
+        "sha256": "1a57b2faef00cc1846c840d2f737ab95f0b43f9077500f47a7e3fa021bd8baff"
+      }
+    ],
+    "dependencies": [
+      {
+        "name": "better-sqlite3",
+        "path": "app.asar.unpacked/node_modules/better-sqlite3/package.json",
+        "sha256": "35f5841195912569932e7816ca09d03f6567a9c37a6668d4fdd450314d46e24b",
+        "treeSha256": "cdcc31b71f1a50d9876d0a99db6422b52760266b0364f3c2aa417140ea228893"
+      },
+      {
+        "name": "jszip",
+        "path": "app.asar.unpacked/kun/node_modules/jszip/package.json",
+        "sha256": "83569b5b130b5ec27ae281ed80420ad364baf1bf64cb82e6ac8fb891e1b4ec4c",
+        "treeSha256": "f43a168df7bc5bc7cdb72d60918ceebc3f2590fd0390aafd446b469c3ff227fd"
+      },
+      {
+        "name": "pdfkit",
+        "path": "app.asar.unpacked/kun/node_modules/pdfkit/package.json",
+        "sha256": "a4a1151ae3f3fdac9c6e24feb68d30b33809377263bf5bab9d6e8aa36983736b",
+        "treeSha256": "fe6f576bf60f12e3f710bdcb9dc2ad7cde763ca82378acc426e2ff1647418dc0"
+      },
+      {
+        "name": "zod",
+        "path": "app.asar.unpacked/kun/node_modules/zod/package.json",
+        "sha256": "c2d190d9ee4e0bdb60332aaa2130a6a98d65ddb903fe1d29248b15de57832c45",
+        "treeSha256": "29cd82e0e6217d0b9470a23767f7f437d5ac089f94bdeaa3b1b0a6b48101e1b6"
+      },
+      {
+        "name": "better-sqlite3-native",
+        "path": "app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+        "sha256": "4a1033842237baaceb3cc5e960df20753659acd102f04cea46f6fcaa2171c785"
+      }
+    ]
+  },
+  "cloudflared": {
+    "version": "2026.10.0",
+    "name": "cloudflared-darwin-arm64.tgz",
+    "size": 19809074,
+    "sha256": "a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70"
+  },
+  "dataSeed": {
+    "schemaVersion": 1,
+    "mode": "seed",
+    "status": "passed",
+    "projects": 1,
+    "networks": 1,
+    "adjustments": 1,
+    "monitoringDatasets": 1,
+    "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+    "serviceSource": "source-bound-compatibility-service",
+    "serviceIdentity": {
+      "schemaVersion": 1,
+      "packageVersion": "0.5.4",
+      "packageSourceHead": "31b23359374a2eca56fd3112d586d91bde876d4e",
+      "asarSha256": "5d165dd7bce24725ead973d405c8bc18cfe67991541461fb713e28834eb2c6d2",
+      "layout": "source-compatibility",
+      "serviceSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "serviceTreeSha256": "54c13825a924817a724b92a6a6bb37dea859b13dcbc2699135bf4eb7e9195457",
+      "modules": [
+        {
+          "path": "dist/engineering/engineering-service.js",
+          "sha256": "8d09e03aa2ddbcf27e63e35971caff6fdfcee3fdcd2d73e790be2d58b367216f"
+        },
+        {
+          "path": "dist/engineering/survey-service.js",
+          "sha256": "1a57b2faef00cc1846c840d2f737ab95f0b43f9077500f47a7e3fa021bd8baff"
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "better-sqlite3",
+          "path": "node_modules/better-sqlite3/package.json",
+          "sha256": "35f5841195912569932e7816ca09d03f6567a9c37a6668d4fdd450314d46e24b",
+          "treeSha256": "b1f3898cfbee8c42a28c9076360f43d7a85420d25c8561fcc1005f0527470b09"
+        },
+        {
+          "name": "jszip",
+          "path": "node_modules/jszip/package.json",
+          "sha256": "83569b5b130b5ec27ae281ed80420ad364baf1bf64cb82e6ac8fb891e1b4ec4c",
+          "treeSha256": "f43a168df7bc5bc7cdb72d60918ceebc3f2590fd0390aafd446b469c3ff227fd"
+        },
+        {
+          "name": "pdfkit",
+          "path": "node_modules/pdfkit/package.json",
+          "sha256": "a4a1151ae3f3fdac9c6e24feb68d30b33809377263bf5bab9d6e8aa36983736b",
+          "treeSha256": "fe6f576bf60f12e3f710bdcb9dc2ad7cde763ca82378acc426e2ff1647418dc0"
+        },
+        {
+          "name": "zod",
+          "path": "node_modules/zod/package.json",
+          "sha256": "c2d190d9ee4e0bdb60332aaa2130a6a98d65ddb903fe1d29248b15de57832c45",
+          "treeSha256": "29cd82e0e6217d0b9470a23767f7f437d5ac089f94bdeaa3b1b0a6b48101e1b6"
+        },
+        {
+          "name": "better-sqlite3-native",
+          "path": "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+          "sha256": "3ca9ce9942459a854e1ba851959d6b138a7377feb3f7ec0ff0a553253a90245b"
+        }
+      ]
+    },
+    "scope": "Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official 0.5.4 Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary 0.5.4 schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution."
+  },
+  "tunnelConnectionReadiness": {
+    "attempts": 8,
+    "elapsedMs": 3543
+  },
+  "frozenManifestReadiness": {
+    "attempts": 261,
+    "elapsedMs": 262420,
+    "manifestSha256": "b018fb20eefd8ed125d4b716a0c4ec84239c60df4057076897a17d60fbbccd50"
+  },
+  "strictNonceProbe": {
+    "nonceSha256": "ceacbc9b0a2f430169af5b22cd75afe09330d3e97ac5d38149759968c76d28f9",
+    "strictProbeRequired": true
+  },
+  "installedIdentity": {
+    "version": "0.5.5",
+    "bundleId": "com.wangjiawei508.workgpt",
+    "signature": "verified",
+    "stapledNotarization": "verified",
+    "gatekeeper": "accepted",
+    "gatekeeperAssessments": "enabled",
+    "gatekeeperSource": "Notarized Developer ID",
+    "designatedRequirement": "designated => identifier \"com.wangjiawei508.workgpt\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = R35G7F4A9U"
+  },
+  "installedAsarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+  "dataReadback": {
+    "schemaVersion": 1,
+    "mode": "verify",
+    "status": "passed",
+    "projects": 1,
+    "networks": 1,
+    "adjustments": 1,
+    "monitoringDatasets": 1,
+    "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+    "serviceSource": "target-package",
+    "serviceIdentity": {
+      "schemaVersion": 1,
+      "packageVersion": "0.5.5",
+      "packageSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+      "layout": "asar-unpacked",
+      "serviceSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "serviceTreeSha256": "54c13825a924817a724b92a6a6bb37dea859b13dcbc2699135bf4eb7e9195457",
+      "modules": [
+        {
+          "path": "dist/engineering/engineering-service.js",
+          "sha256": "8d09e03aa2ddbcf27e63e35971caff6fdfcee3fdcd2d73e790be2d58b367216f"
+        },
+        {
+          "path": "dist/engineering/survey-service.js",
+          "sha256": "1a57b2faef00cc1846c840d2f737ab95f0b43f9077500f47a7e3fa021bd8baff"
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "better-sqlite3",
+          "path": "app.asar.unpacked/node_modules/better-sqlite3/package.json",
+          "sha256": "35f5841195912569932e7816ca09d03f6567a9c37a6668d4fdd450314d46e24b",
+          "treeSha256": "cdcc31b71f1a50d9876d0a99db6422b52760266b0364f3c2aa417140ea228893"
+        },
+        {
+          "name": "jszip",
+          "path": "app.asar.unpacked/kun/node_modules/jszip/package.json",
+          "sha256": "83569b5b130b5ec27ae281ed80420ad364baf1bf64cb82e6ac8fb891e1b4ec4c",
+          "treeSha256": "f43a168df7bc5bc7cdb72d60918ceebc3f2590fd0390aafd446b469c3ff227fd"
+        },
+        {
+          "name": "pdfkit",
+          "path": "app.asar.unpacked/kun/node_modules/pdfkit/package.json",
+          "sha256": "a4a1151ae3f3fdac9c6e24feb68d30b33809377263bf5bab9d6e8aa36983736b",
+          "treeSha256": "fe6f576bf60f12e3f710bdcb9dc2ad7cde763ca82378acc426e2ff1647418dc0"
+        },
+        {
+          "name": "zod",
+          "path": "app.asar.unpacked/kun/node_modules/zod/package.json",
+          "sha256": "c2d190d9ee4e0bdb60332aaa2130a6a98d65ddb903fe1d29248b15de57832c45",
+          "treeSha256": "29cd82e0e6217d0b9470a23767f7f437d5ac089f94bdeaa3b1b0a6b48101e1b6"
+        },
+        {
+          "name": "better-sqlite3-native",
+          "path": "app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+          "sha256": "4a1033842237baaceb3cc5e960df20753659acd102f04cea46f6fcaa2171c785"
+        }
+      ]
+    },
+    "scope": "Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official 0.5.4 Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary 0.5.4 schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution."
+  },
+  "dataRestartReadback": {
+    "schemaVersion": 1,
+    "mode": "verify",
+    "status": "passed",
+    "projects": 1,
+    "networks": 1,
+    "adjustments": 1,
+    "monitoringDatasets": 1,
+    "sourceSha256": "4281cc7a10673570756867e8c8665f22f82611839bd34c396a5eba9dbb89d9f0",
+    "serviceSource": "target-package",
+    "serviceIdentity": {
+      "schemaVersion": 1,
+      "packageVersion": "0.5.5",
+      "packageSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "asarSha256": "296312d513668a4d7c45be717cc227816ff4de0d2dffbc8c0d567f74498a2a7a",
+      "layout": "asar-unpacked",
+      "serviceSourceHead": "02165b64bffe5e24f4a4f50811d22086f1489299",
+      "serviceTreeSha256": "54c13825a924817a724b92a6a6bb37dea859b13dcbc2699135bf4eb7e9195457",
+      "modules": [
+        {
+          "path": "dist/engineering/engineering-service.js",
+          "sha256": "8d09e03aa2ddbcf27e63e35971caff6fdfcee3fdcd2d73e790be2d58b367216f"
+        },
+        {
+          "path": "dist/engineering/survey-service.js",
+          "sha256": "1a57b2faef00cc1846c840d2f737ab95f0b43f9077500f47a7e3fa021bd8baff"
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "better-sqlite3",
+          "path": "app.asar.unpacked/node_modules/better-sqlite3/package.json",
+          "sha256": "35f5841195912569932e7816ca09d03f6567a9c37a6668d4fdd450314d46e24b",
+          "treeSha256": "cdcc31b71f1a50d9876d0a99db6422b52760266b0364f3c2aa417140ea228893"
+        },
+        {
+          "name": "jszip",
+          "path": "app.asar.unpacked/kun/node_modules/jszip/package.json",
+          "sha256": "83569b5b130b5ec27ae281ed80420ad364baf1bf64cb82e6ac8fb891e1b4ec4c",
+          "treeSha256": "f43a168df7bc5bc7cdb72d60918ceebc3f2590fd0390aafd446b469c3ff227fd"
+        },
+        {
+          "name": "pdfkit",
+          "path": "app.asar.unpacked/kun/node_modules/pdfkit/package.json",
+          "sha256": "a4a1151ae3f3fdac9c6e24feb68d30b33809377263bf5bab9d6e8aa36983736b",
+          "treeSha256": "fe6f576bf60f12e3f710bdcb9dc2ad7cde763ca82378acc426e2ff1647418dc0"
+        },
+        {
+          "name": "zod",
+          "path": "app.asar.unpacked/kun/node_modules/zod/package.json",
+          "sha256": "c2d190d9ee4e0bdb60332aaa2130a6a98d65ddb903fe1d29248b15de57832c45",
+          "treeSha256": "29cd82e0e6217d0b9470a23767f7f437d5ac089f94bdeaa3b1b0a6b48101e1b6"
+        },
+        {
+          "name": "better-sqlite3-native",
+          "path": "app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+          "sha256": "4a1033842237baaceb3cc5e960df20753659acd102f04cea46f6fcaa2171c785"
+        }
+      ]
+    },
+    "scope": "Synthetic IN2 and CSV storage continuity. Seed uses frozen-source compatibility services with the official 0.5.4 Electron runtime and packaged SQLite ABI; both target readbacks use the frozen target services. This does not certify migration of arbitrary 0.5.4 schemas, field data, vendor interoperability, report/signature migration or live credential/plugin execution."
+  },
+  "configReferences": {
+    "status": "byte-preserved",
+    "kinds": [
+      "disabled MCP",
+      "plugin manifest reference",
+      "Skill text",
+      "inert credential reference"
+    ],
+    "scope": "Stored bytes only; updater acceptance exits before configuration activation. No real credential, plugin activation or complete catalog migration is certified."
+  },
+  "separateSentinelPreserved": true,
+  "feedRequests": {
+    "manifest": 2,
+    "zip": 1,
+    "rejected": 0,
+    "bytesServed": 359095866
+  },
+  "frozenManifestSha256": "b018fb20eefd8ed125d4b716a0c4ec84239c60df4057076897a17d60fbbccd50",
+  "nativeReportSha256": "b267585d9781bac54a1d9662aa5e1ce9f9e6d28da325c9dd71800d82100ef5c3"
+}
