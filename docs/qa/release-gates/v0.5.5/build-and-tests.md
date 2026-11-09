@@ -7,6 +7,7 @@ Source package version remains 0.5.4. The existing release workflow applies
 On 2026-11-09, in the isolated checkout of that exact source:
 
 - `node --test scripts/release-promotion-recovery.test.mjs scripts/repair-website-cache.test.mjs`: 30 passed, zero failed/skipped.
+- `node --test scripts/release-gate.test.mjs`: 494 passed, one non-Windows parser test skipped, zero failed. This includes a regression for formal tags whose evidence commit follows the actual packaged-source commit.
 - `npm run build`: passed, including the main, preload, and renderer production builds.
 
 The focused cases cover branded publication recovery, canonical and legacy

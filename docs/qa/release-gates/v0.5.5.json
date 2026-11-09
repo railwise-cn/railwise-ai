@@ -130,6 +130,14 @@
       "scope": "macOS application staple and same-run native Gatekeeper validation",
       "dmgStapleClaimed": false
     },
+      "screenshots": [
+        {
+          "path": "docs/qa/release-gates/v0.5.5/task-workspace-zh-light-1280x840.png"
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.5/task-filters-zh-light-1280x840.png"
+        }
+      ],
     "limitations": [
       "Windows Authenticode is not configured: installer and installed executable are NotSigned.",
       "Intel UI was not run on the local Apple Silicon host.",

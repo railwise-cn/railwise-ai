@@ -35,9 +35,13 @@ The following is the actual packaged UI observation record. It covers the affect
     "No full theme/language/size matrix or Intel local UI run performed."
   ],
   "screenshots": [
-    "/private/tmp/railwise-exact-42625022802/isolated-tasks-zh.png",
-    "/private/tmp/railwise-exact-42625022802/isolated-filter-zh.png"
+    "task-workspace-zh-light-1280x840.png",
+    "task-filters-zh-light-1280x840.png"
   ],
   "cleanup": "Normal application quit requested after inspection; no user profile used."
 }
 ```
+
+The two screenshots are stored beside this report with those filenames. The
+application was closed normally after inspection; the profile was isolated
+and its outbound, inbound, and credential access were disabled.
