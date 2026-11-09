@@ -252,11 +252,11 @@ describe('gui updater source helpers', () => {
         kind: 'generic',
         url: 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/'
       })
-      expect(module._internals.downloadPageUrl()).toBe('https://www.railwise.cn/products/workwise/')
+      expect(module._internals.downloadPageUrl()).toBe('https://www.railwise.cn/products/railwise-ai/')
 
       process.env.WORKWISE_UPDATE_PROVIDER = 'none'
       expect(module._internals.resolveUpdateFeedConfig('stable')).toEqual({ kind: 'none' })
-      expect(module._internals.downloadPageUrl()).toBe('https://www.railwise.cn/products/workwise/')
+      expect(module._internals.downloadPageUrl()).toBe('https://www.railwise.cn/products/railwise-ai/')
       delete process.env.WORKWISE_UPDATE_PROVIDER
 
       process.env.WORKWISE_PUBLIC_BASE_URL = 'https://downloads.example.test/workwise'
@@ -265,7 +265,7 @@ describe('gui updater source helpers', () => {
         kind: 'generic',
         url: 'https://downloads.example.test/workwise/desktop/channels/stable/latest/'
       })
-      expect(module._internals.downloadPageUrl()).toBe('https://www.railwise.cn/products/workwise/')
+      expect(module._internals.downloadPageUrl()).toBe('https://www.railwise.cn/products/railwise-ai/')
 
       process.env.WORKWISE_UPDATE_URL_STABLE = 'https://mirror.example.test/{channel}/latest'
       expect(module._internals.resolveUpdateFeedConfig('stable')).toEqual({

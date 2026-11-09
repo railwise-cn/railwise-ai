@@ -14,10 +14,19 @@ import {
   runtimeTaskResumePath,
   runtimeTaskRetryPath,
   runtimeTaskDiagnosticsPath,
+  runtimeTaskPausePath,
+  runtimeTaskInputsPath,
+  runtimeTaskEventsPath,
+  runtimeTaskTemplateStartPath,
+  runtimeTaskTemplateSavePath,
   runtimeThreadAgentPath,
   runtimeThreadPath
 } from '../shared/runtime-endpoints'
 
+const notificationOpenTaskBuffer = createNotificationOpenThreadBuffer()
+const notificationOpenFlowBuffer = createNotificationOpenThreadBuffer()
+ipcRenderer.on('notification:open-flow',(_event,reference:unknown)=>{if(reference && typeof reference==='object' && 'flowRunId' in reference && typeof reference.flowRunId==='string')notificationOpenFlowBuffer.push(JSON.stringify(reference))})
+ipcRenderer.on('notification:open-task',(_event,taskId:unknown)=>{if(typeof taskId==='string')notificationOpenTaskBuffer.push(taskId)})
 const notificationOpenThreadBuffer = createNotificationOpenThreadBuffer()
 ipcRenderer.on('notification:open-thread', (_event, threadId: unknown) => {
   if (typeof threadId === 'string') notificationOpenThreadBuffer.push(threadId)
@@ -70,6 +79,9 @@ const api = {
     ipcRenderer.on('app:menu-action', wrapped)
     return () => ipcRenderer.removeListener('app:menu-action', wrapped)
   },
+  notifyTask: (payload) => ipcRenderer.invoke('notification:task',payload),
+  onNotificationOpenTask: (handler) => notificationOpenTaskBuffer.subscribe(handler),
+  onNotificationOpenFlow: (handler) => notificationOpenFlowBuffer.subscribe(value=>handler(JSON.parse(value))),
   onNotificationOpenThread: (handler) => {
     return notificationOpenThreadBuffer.subscribe(handler)
   },
@@ -79,17 +91,38 @@ const api = {
   runtimeRequest: (path, method, body) =>
     ipcRenderer.invoke('runtime:request', { path, method, body }),
   cancelOperation: (request) => ipcRenderer.invoke('operation:cancel', request),
+  coordinateTaskCommand: (request) => runtimeJson('/v1/task-commands','POST',request),
   getTaskRun: (taskId) => runtimeJson(runtimeTaskPath(taskId)),
+  readDocumentCandidate: (payload) => ipcRenderer.invoke('write:read-candidate', payload),
+  decideDocumentCandidate: (payload) => ipcRenderer.invoke('write:decide-candidate',payload),
+  startTaskSse: (sinceSeq,streamId) => ipcRenderer.invoke('runtime:sse:start',{scope:'tasks',sinceSeq,streamId}),
+  listTaskPage: (query) => {
+    const params = new URLSearchParams({pagination:'cursor'})
+    for(const [key,value] of Object.entries(query ?? {})) if(value !== undefined) params.set(key,String(value))
+    return runtimeJson(`/v1/tasks?${params}`)
+  },
   listTaskRuns: (query) => {
     const params = new URLSearchParams()
     if (query?.threadId) params.set('threadId', query.threadId)
     if (query?.status) params.set('status', query.status)
+    if (query?.workspaceRoot) params.set('workspaceRoot', query.workspaceRoot)
+    if (query?.search) params.set('search', query.search)
+    if (query?.offset) params.set('offset', String(query.offset))
     if (query?.limit) params.set('limit', String(query.limit))
+    if (query?.cursor) params.set('cursor', query.cursor)
     return runtimeJson(`${RUNTIME_TASKS_PATH}${params.size ? `?${params}` : ''}`)
   },
   resumeTask: (taskId, request) => runtimeJson(runtimeTaskResumePath(taskId), 'POST', request),
   retryTask: (taskId, request) => runtimeJson(runtimeTaskRetryPath(taskId), 'POST', request),
   cancelTask: (taskId, request) => runtimeJson(runtimeTaskCancelPath(taskId), 'POST', request),
+  pauseTask: (taskId, request) => runtimeJson(runtimeTaskPausePath(taskId), 'POST', request),
+  listTaskInputs: (taskId) => runtimeJson(runtimeTaskInputsPath(taskId)),
+  appendTaskInput: (taskId, request) => runtimeJson(runtimeTaskInputsPath(taskId), 'POST', request),
+  listTaskEvents: (taskId, afterSequence) => runtimeJson(`${runtimeTaskEventsPath(taskId)}${afterSequence ? `?afterSequence=${afterSequence}` : ''}`),
+  listTaskInbox: (workspaceRoot) => runtimeJson(`/v1/inbox${workspaceRoot ? `?workspaceRoot=${encodeURIComponent(workspaceRoot)}` : ''}`),
+  listTaskTemplates: () => runtimeJson('/v1/task-templates'),
+  startTaskTemplate: (templateId, request) => runtimeJson(runtimeTaskTemplateStartPath(templateId), 'POST', request),
+  saveTaskTemplate: (templateId, request) => runtimeJson(runtimeTaskTemplateSavePath(templateId), 'POST', request),
   getTaskDiagnostics: (taskId) => runtimeJson(runtimeTaskDiagnosticsPath(taskId)),
   exportTaskDiagnostics: (taskId) => ipcRenderer.invoke('diagnostics:export-task', { taskId }),
   listShellSessions: (taskId) => {

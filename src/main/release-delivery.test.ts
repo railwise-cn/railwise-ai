@@ -269,7 +269,12 @@ describe('R2 release delivery gates', () => {
       versions: Record<string, Record<string, { name: string; sha256: string; size: number }>>
     }
     expect(baselines.schemaVersion).toBe(1)
-    expect(Object.keys(baselines.versions)).toEqual(['0.3.5', '0.4.0', '0.4.1', '0.5.1'])
+    expect(Object.keys(baselines.versions).sort()).toEqual(['0.3.5', '0.4.0', '0.4.1', '0.5.1', '0.5.4'])
+    expect(baselines.versions['0.5.4']).toEqual({
+      'darwin-arm64': { name: 'WorkWise-0.5.4-mac-Apple-Silicon.dmg', sha256: 'ad766839b02f3b7ae5a290641715b3075cdd46caf08ef9ed92b0d21dfe11b21d', size: 352281074 },
+      'darwin-x64': { name: 'WorkWise-0.5.4-mac-Intel.dmg', sha256: 'b58822e31f7029801521db6371e6b12d1f7204b1d6b8581b5be7cac7d1743563', size: 360548688 },
+      'win32-x64': { name: 'WorkWise-0.5.4-win-x64.exe', sha256: 'a90204159b8d33d7977babee1ecf6247e73a2e23dcd2cf3fd16af98b4f1ae5ac', size: 293407849 }
+    })
     expect(baselines.versions['0.4.0']).toEqual({
       'darwin-arm64': {
         name: 'WorkWise-0.4.0-mac-Apple-Silicon.dmg',
@@ -350,6 +355,9 @@ describe('R2 release delivery gates', () => {
     const finalGate = workflow.jobs['acceptance-gate'].steps.map((step: any) => step.run || '').join('\n')
     expect(finalGate).toContain('single short/no-cache policy')
     expect(workflow.jobs['cleanup-test-feed'].steps.at(-1).run).toContain('cleanup-acceptance')
+    const isolatedUpload = workflow.jobs['publish-test-feed'].steps.find((step: any) => step.name === 'Upload and verify isolated immutable feed')?.run
+    expect(isolatedUpload).toContain('--dist acceptance-release-assets')
+    expect(isolatedUpload).not.toContain('--dist target-release')
     expect(workflow.jobs['cleanup-test-feed'].steps.at(-1).run).toContain('github.run_id')
     const nativeUpdate = workflow.jobs['native-update'].steps.map((step: any) => step.run || '').join('\n')
     expect(nativeUpdate).toContain('release/updater-acceptance-baselines.json')

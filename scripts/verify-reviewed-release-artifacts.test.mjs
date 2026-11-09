@@ -44,15 +44,23 @@ function fixture(t) {
   return { root, build, downloads, output, receipts, save, verify }
 }
 
+function exactFixture(t) {
+  const f = fixture(t)
+  Object.assign(f.build, { mode: 'exact-build', headRef: 'refs/heads/codex/durable-task-document-workbench', workflowSha: sourceHead })
+  f.build.workflowRef = `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@${f.build.headRef}`
+  for (const artifact of f.build.artifacts) rmSync(join(f.downloads, artifact.name, 'reviewed-build.json'))
+  return f
+}
+
 function githubFixture(build) {
   const root = `repos/${RELEASE_REPOSITORY}`
   const mainHead = 'd'.repeat(40)
-  const jobs = ['Build macOS', 'Build Windows', 'Two-hour pre-release stability', 'Verify three-client candidate', 'Verify final candidate on macOS'].map(name => ({ name, conclusion: 'success', steps: [{ name: 'Record frozen public package identity', conclusion: 'success' }] }))
+  const jobs = ['Build macOS', 'Build Windows', 'Two-hour pre-release stability', 'Verify three-client candidate', 'Verify final candidate on macOS'].map(name => ({ name, status: 'completed', conclusion: 'success', steps: [{ name: 'Record frozen public package identity', conclusion: 'success' }] }))
   const responses = {
     [root]: { id: 98, full_name: RELEASE_REPOSITORY, default_branch: 'main' },
     [`${root}/actions/workflows/release.yml`]: { id: 55, path: RELEASE_WORKFLOW },
     // Match GitHub REST: workflow_ref is absent, not a runner context field.
-    [`${root}/actions/runs/${build.runId}`]: { id: build.runId, run_attempt: build.runAttempt, workflow_id: 55, path: RELEASE_WORKFLOW, head_branch: 'main', repository: { id: 98 }, head_repository: { id: 98 }, head_sha: sourceHead, event: 'workflow_dispatch', status: 'completed', conclusion: 'success' },
+    [`${root}/actions/runs/${build.runId}`]: { id: build.runId, run_attempt: build.runAttempt, workflow_id: 55, path: RELEASE_WORKFLOW, head_branch: build.headRef?.slice('refs/heads/'.length) ?? 'main', repository: { id: 98 }, head_repository: { id: 98 }, head_sha: sourceHead, event: 'workflow_dispatch', status: 'completed', conclusion: 'success' },
     [`${root}/branches/main`]: { name: 'main', protected: true, commit: { sha: mainHead } },
     [`${root}/compare/${sourceHead}...${mainHead}`]: { status: 'ahead', base_commit: { sha: sourceHead }, merge_base_commit: { sha: sourceHead } },
     [`${root}/actions/runs/${build.runId}/attempts/${build.runAttempt}/jobs?per_page=100&page=1`]: { total_count: jobs.length, jobs },
@@ -72,9 +80,89 @@ test('a frozen exact installer/update file set is copied without changing bytes'
   assert.equal(existsSync(join(f.output, 'reviewed-build.json')), false)
 })
 
+test('exact-build verifies and copies the same artifact bytes without requiring a private freeze receipt', async t => {
+  const f = exactFixture(t); const g = githubFixture(f.build)
+  // A normal exact package run does not perform the historical freeze checks.
+  for (const job of g.jobs) if (!job.name.startsWith('Build ')) job.conclusion = 'skipped'
+  for (const job of g.jobs) job.steps = []
+  const api = path => {
+    assert.equal(path.includes('/branches/') || path.includes('/compare/'), false, 'exact source ancestry belongs to release approval, not a second freeze')
+    return g.api(path)
+  }
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, api), f.build)
+  const result = await f.verify()
+  assert.equal(result.files, 8)
+  assert.deepEqual(readdirSync(f.output).sort(), f.build.files.map(file => file.name).sort())
+  for (const file of f.build.files) assert.equal(sha(readFileSync(join(f.output, file.name))), file.sha256)
+})
+
+test('exact-build mode cannot relax the exact file set, file integrity, source, identity or branch ref', async t => {
+  const changes = {
+    missing: f => rmSync(join(f.downloads, 'release-win', 'latest.yml')),
+    extra: f => writeFileSync(join(f.downloads, 'release-win', 'extra.txt'), 'extra'),
+    unrelatedFreezeReceipt: f => writeFileSync(join(f.downloads, 'release-win', 'reviewed-build.json'), '{}'),
+    hash: f => writeFileSync(join(f.downloads, 'release-win', 'latest.yml'), 'x'.repeat('latest.yml'.length)),
+    size: f => writeFileSync(join(f.downloads, 'release-win', 'latest.yml'), 'bad'),
+    symlink: f => { const path = join(f.downloads, 'release-win', 'latest.yml'); rmSync(path); symlinkSync('../release-mac/latest-mac.yml', path) },
+    source: f => { f.build.sourceHead = 'f'.repeat(40) },
+    repository: f => { f.build.repository = 'attacker/railwise-ai' },
+    candidate: f => { f.build.publicIdentity.bundleId += '.candidate' },
+    missingRef: f => { delete f.build.headRef },
+    tagRef: f => { f.build.headRef = 'refs/tags/main' },
+    foreignBranch: f => { f.build.headRef = 'refs/heads/attacker/feature' },
+    malformedRef: f => { f.build.headRef = 'refs/heads/codex/a/../feature' },
+    workflowRef: f => { f.build.workflowRef = RELEASE_WORKFLOW_REF },
+    workflowSha: f => { f.build.workflowSha = 'f'.repeat(40) },
+    unknownMode: f => { f.build.mode = 'unverified' },
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, async st => {
+    const f = exactFixture(st); change(f)
+    await assert.rejects(f.verify)
+    assert.equal(existsSync(f.output), false)
+  })
+})
+
+test('exact-build source checks bind trusted jobs, same repository, branch, workflow, attempt and immutable artifacts', async t => {
+  const changes = {
+    missingMacJob: g => { g.jobs[0].name = 'unrelated' },
+    failedBuild: g => { g.jobs[0].conclusion = 'failure' },
+    skippedBuild: g => { g.jobs[0].conclusion = 'skipped' },
+    unfinishedBuild: g => { g.jobs[0].status = 'in_progress' },
+    duplicateBuild: g => { g.jobs.push({ ...g.jobs[0] }) },
+    foreignRepository: g => { g.run.repository.id += 1 },
+    foreignHeadRepository: g => { g.run.head_repository.id += 1 },
+    source: g => { g.run.head_sha = 'f'.repeat(40) },
+    branch: g => { g.run.head_branch = 'main' },
+    workflow: g => { g.run.workflow_id += 1 },
+    workflowPath: g => { g.run.path = '.github/workflows/other.yml' },
+    failedRun: g => { g.run.conclusion = 'failure' },
+    attempt: g => { g.run.run_attempt += 1 },
+    artifactDigest: g => { g.artifacts[0].digest = `sha256:${'f'.repeat(64)}` },
+    artifactRun: g => { g.artifacts[0].workflow_run.id += 1 },
+    artifactSource: g => { g.artifacts[0].workflow_run.head_sha = 'f'.repeat(40) },
+    artifactRepository: g => { g.artifacts[0].workflow_run.repository_id += 1 },
+    artifactHeadRepository: g => { g.artifacts[0].workflow_run.head_repository_id += 1 },
+  }
+  for (const [name, change] of Object.entries(changes)) await t.test(name, st => {
+    const f = exactFixture(st); const g = githubFixture(f.build); change(g)
+    assert.throws(() => verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api))
+  })
+})
+
+test('exact-build accepts explicit source job requirements without requiring skipped historical freeze jobs', t => {
+  const f = exactFixture(t); const g = githubFixture(f.build)
+  const requiredSourceJobs = ['Private exact-package Windows install smoke', 'Private updater smoke']
+  assert.throws(() => verifyReviewedBuildSource(f.build, { version, sourceHead, requiredSourceJobs }, g.api), /Windows install smoke/)
+  g.jobs.push(...requiredSourceJobs.map(name => ({ name, status: 'completed', conclusion: 'success' })))
+  g.responses[`${g.root}/actions/runs/${f.build.runId}/attempts/${f.build.runAttempt}/jobs?per_page=100&page=1`].total_count = g.jobs.length
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead, requiredSourceJobs }, g.api), f.build)
+  g.jobs.at(-1).conclusion = 'failure'
+  assert.throws(() => verifyReviewedBuildSource(f.build, { version, sourceHead, requiredSourceJobs }, g.api), /Private updater smoke/)
+})
+
 test('file tampering, set mismatches and unsafe filesystem entries fail before output', async t => {
   const changes = {
-    missing: f => rmSync(join(f.downloads, 'release-win', `WorkWise-${version}-win-x64.exe.blockmap`)),
+    missing: f => rmSync(join(f.downloads, 'release-win', expectedReleaseFiles(version).find(file => file.name.endsWith('.blockmap')).name)),
     extra: f => writeFileSync(join(f.downloads, 'release-win', 'secret.txt'), 'unexpected'),
     nested: f => mkdirSync(join(f.downloads, 'release-win', 'nested')),
     hash: f => writeFileSync(join(f.downloads, 'release-win', 'latest.yml'), 'x'.repeat('latest.yml'.length)),
@@ -153,6 +241,17 @@ test('source provenance requires successful trusted workflow and immutable artif
   assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
 })
 
+test('optional stability may be skipped without inventing a successful job', t => {
+  const f = fixture(t); const g = githubFixture(f.build)
+  const stability = g.jobs.find(job => job.name === 'Two-hour pre-release stability')
+  stability.conclusion = 'skipped'
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
+  assert.equal(stability.conclusion, 'skipped')
+  g.jobs.splice(g.jobs.indexOf(stability), 1)
+  g.responses[`${g.root}/actions/runs/${f.build.runId}/attempts/${f.build.runAttempt}/jobs?per_page=100&page=1`].total_count = g.jobs.length
+  assert.equal(verifyReviewedBuildSource(f.build, { version, sourceHead }, g.api), f.build)
+})
+
 test('a freeze at the current protected main head uses the real identical comparison shape', t => {
   const f = fixture(t); const g = githubFixture(f.build)
   g.branch.commit.sha = sourceHead
@@ -182,7 +281,6 @@ test('wrong repository, workflow, source, attempt, failed runs and arbitrary art
     inProgress: g => { g.run.status = 'in_progress' },
     failed: g => { g.run.conclusion = 'failure' },
     rerun: g => { g.run.run_attempt += 1 },
-    skippedStability: g => { g.jobs.find(job => job.name === 'Two-hour pre-release stability').conclusion = 'skipped' },
     ordinaryCandidate: g => { g.jobs[0].steps[0].conclusion = 'skipped' },
     duplicateBuildJob: g => g.jobs.push({ ...g.jobs[0] }),
     artifactId: g => { g.artifacts[0].id += 1 },

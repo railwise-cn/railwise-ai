@@ -148,7 +148,7 @@ describe('write quoted selections', () => {
 
     expect(prompt).toContain('[RailWise 知识库检索结果]')
     expect(prompt).toContain('[工程监测知识库](https://kb.railwise.cn/monitoring)')
-    expect(prompt).toContain('不要复述 WorkWise 内部绝对路径')
+    expect(prompt).toContain('不要复述 RailWise AI 内部绝对路径')
     expect(formatWriteKnowledgeForPrompt({ source: 'unavailable', keywords: [], snippets: [] }))
       .toContain('检索暂时不可用')
   })

@@ -11,6 +11,7 @@ import {
 import { DEFAULT_GUI_UPDATE_CHANNEL } from '../shared/gui-update'
 import {
   JsonSettingsStore,
+  LegacySettingsSourceConflictError,
   resolveWorkwiseHome,
   SettingsRevisionConflictError
 } from './settings-store'
@@ -280,7 +281,7 @@ describe('JsonSettingsStore', () => {
     const loaded = await store.load()
     const welcome = await readFile(join(loaded.write.defaultWorkspaceRoot, 'welcome.md'), 'utf8')
 
-    expect(welcome).toContain('欢迎使用 WorkWise 写作台')
+    expect(welcome).toContain('欢迎使用 RailWise AI 写作台')
     expect(welcome).toContain('本地编辑和导出不依赖 AI')
   })
 
@@ -296,7 +297,7 @@ describe('JsonSettingsStore', () => {
     const localized = await store.patch({ locale: 'zh' }, initial.revision)
     const welcome = await readFile(join(localized.write.defaultWorkspaceRoot, 'welcome.md'), 'utf8')
 
-    expect(welcome).toContain('欢迎使用 WorkWise 写作台')
+    expect(welcome).toContain('欢迎使用 RailWise AI 写作台')
     expect(welcome).not.toContain('Welcome to Write')
   })
 
@@ -503,6 +504,38 @@ describe('JsonSettingsStore', () => {
 
     expect(loaded.provider.apiKey).toBe('sk-legacy-provider')
     expect(await readFile(currentSettingsPath, 'utf8')).toContain('sk-legacy-provider')
+  })
+
+  it.each(['WorkWise', 'workwise', 'RailWise AI', 'RailWise-AI'])('recognizes settings from the %s profile without changing the source', async name => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-settings-alias-'))
+    try {
+      const source = join(root, name)
+      const target = join(root, 'CurrentProfile')
+      await mkdir(source)
+      const raw = JSON.stringify({ version: 1, provider: { apiKey: 'local-test-key' } })
+      await writeFile(join(source, 'workwise-settings.json'), raw)
+      const loaded = await new JsonSettingsStore(target, { workwiseHome: join(target, '.workwise') }).load()
+      expect(loaded.provider.apiKey).toBe('local-test-key')
+      expect(await readFile(join(source, 'workwise-settings.json'), 'utf8')).toBe(raw)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  it('does not bypass a multiple-profile conflict through the settings compatibility reader', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-settings-conflict-'))
+    try {
+      for (const name of ['WorkWise', 'RailWise AI']) {
+        await mkdir(join(root, name))
+        await writeFile(join(root, name, 'workwise-settings.json'), JSON.stringify({ version: 1, workspaceRoot: join(root, name, 'workspace') }))
+      }
+      const target = join(root, 'CurrentProfile')
+      const store = new JsonSettingsStore(target, { workwiseHome: join(target, '.workwise') })
+      await expect(store.load()).rejects.toBeInstanceOf(LegacySettingsSourceConflictError)
+      await expect(store.load()).rejects.toMatchObject({ code: 'legacy_profile_conflict', sourcePaths: expect.arrayContaining([join(root, 'WorkWise'), join(root, 'RailWise AI')]) })
+      expect(await readdir(root)).not.toContain('CurrentProfile')
+      await mkdir(target)
+      await writeFile(join(target, 'workgpt-settings.json'), '{"version":1,"locale":"en"}')
+      expect((await store.load()).locale).toBe('en')
+    } finally { await rm(root, { recursive: true, force: true }) }
   })
 
   it('creates the configured code workspace on load', async () => {

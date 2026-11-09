@@ -89,7 +89,7 @@ site_packages, package_name, executable = sys.argv[1:4]
 sys.path.insert(0, site_packages)
 entry = next((item for item in distribution(package_name).entry_points if item.group == "console_scripts" and item.name == executable), None)
 if entry is None:
-    raise SystemExit("WorkWise Python entry point is unavailable: " + executable)
+    raise SystemExit("RailWise AI Python entry point is unavailable: " + executable)
 sys.argv = [executable, *sys.argv[4:]]
 result = entry.load()()
 raise SystemExit(result if isinstance(result, int) else 0)
@@ -153,7 +153,7 @@ async function resolveArtifact(
 ): Promise<PypiArtifact> {
   const metadataUrl = `https://pypi.org/pypi/${encodeURIComponent(source.packageName)}/${encodeURIComponent(source.version)}/json`
   const response = await fetchImpl(metadataUrl, {
-    headers: { Accept: 'application/json', 'User-Agent': 'WorkWise' },
+    headers: { Accept: 'application/json', 'User-Agent': 'RailWise AI' },
     redirect: 'error',
     signal: AbortSignal.timeout(30_000)
   })
@@ -188,7 +188,7 @@ async function resolveArtifact(
 
 async function downloadWheel(artifact: PypiArtifact, fetchImpl: typeof fetch): Promise<Buffer> {
   const response = await fetchImpl(artifact.url, {
-    headers: { Accept: 'application/octet-stream', 'User-Agent': 'WorkWise' },
+    headers: { Accept: 'application/octet-stream', 'User-Agent': 'RailWise AI' },
     redirect: 'follow',
     signal: AbortSignal.timeout(90_000)
   })
@@ -251,7 +251,7 @@ export async function preservePypiLicense(
     const url = new URL(`https://api.github.com/repos/${encodeURIComponent(source.owner)}/${encodeURIComponent(source.repository)}/contents/${segments.map(encodeURIComponent).join('/')}`)
     url.searchParams.set('ref', source.resolvedRef)
     const response = await fetchImpl(url.toString(), {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'WorkWise' },
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'RailWise AI' },
       redirect: 'error',
       signal: AbortSignal.timeout(30_000)
     })

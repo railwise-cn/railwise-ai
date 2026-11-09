@@ -612,7 +612,7 @@ describe('AgentLoop', () => {
       kind: 'turn_failed',
       message: expect.stringContaining('model stream exploded')
     })
-    expect(failed?.kind === 'turn_failed' ? failed.message : '').toContain('[WorkWise turn failed]')
+    expect(failed?.kind === 'turn_failed' ? failed.message : '').toContain('[RailWise AI turn failed]')
   })
 
   it('fails the turn when the model stream yields an error chunk', async () => {
@@ -951,7 +951,7 @@ describe('AgentLoop', () => {
 	    expect(items.find((item) => item.kind === 'error' && item.code === 'tool_catalog_changed'))
 	      .toMatchObject({
 	        kind: 'error',
-	        message: expect.stringContaining('WorkWise stopped this turn')
+          message: expect.stringContaining('RailWise AI stopped this turn')
 	      })
 	  })
 

@@ -4,6 +4,7 @@ const { createHash } = require('node:crypto')
 const { createReadStream } = require('node:fs')
 const { readdir, stat, writeFile } = require('node:fs/promises')
 const { basename, resolve, join } = require('node:path')
+const { parseArtifactName } = require('./release-publication.cjs')
 
 function usage() {
   console.error('Usage: node scripts/generate-mac-latest.cjs [distDir]')
@@ -37,13 +38,13 @@ async function main() {
   const artifacts = []
 
   for (const fileName of entries) {
-    const match = fileName.match(/^WorkWise-(.+)-mac-(arm64|x64)\.(zip|dmg)$/)
-    if (!match) continue
+    const match = parseArtifactName(fileName)
+    if (!match || match.candidateSourceHead || match.platform !== 'mac' || match.publicName || match.blockmap || !['zip', 'dmg'].includes(match.format)) continue
     artifacts.push({
       fileName,
-      version: match[1],
-      arch: match[2],
-      ext: match[3],
+      version: match.version,
+      arch: match.arch,
+      ext: match.format,
       path: join(distDir, fileName)
     })
   }

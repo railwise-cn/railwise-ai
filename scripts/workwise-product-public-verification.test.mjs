@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { NGINX_VHOST_ROOTS_PYTHON, verifyProductPublication } from './workwise-product-public-verification.mjs'
 
 const manifest = JSON.parse(readFileSync(new URL('../website/data/workwise-product.json', import.meta.url)))
+const productPageSource = readFileSync(new URL('../website/products/workwise/index.php', import.meta.url), 'utf8')
 const html = `"softwareVersion":"v${manifest.version}" ${manifest.name} v${manifest.version} 已发布 releases/tag/v${manifest.version} ${manifest.platforms.map((item) => item.url).join(' ')}`
 const options = { attempts: 2, delay: async () => {}, log: () => {} }
 const goodResponse = (url) => {
@@ -14,6 +15,10 @@ const goodResponse = (url) => {
   if (String(url).includes('/releases/')) return new Response('data', { status: 206, headers: { 'content-range': 'bytes 0-3/100' } })
   return new Response(html)
 }
+
+test('product JSON-LD falls back to the canonical public download namespace', () => {
+  assert.match(productPageSource, /'downloadUrl'\s*=>[^\n]*\?\?\s*'\/downloads\/railwise-ai\/'/)
+})
 
 test('failure rollback reads the screenshot inventory inside the web container', () => {
   const source = readFileSync(new URL('./deploy-workwise-product-page.mjs', import.meta.url), 'utf8')

@@ -6,6 +6,7 @@ const jsonIn = [port('input', 'Input', 'json')]
 const jsonOut = [port('output', 'Output', 'json')]
 
 const CATALOGUE: Array<Omit<FlowNodeRegistryEntryV1, 'available' | 'disabledReason' | 'configurationRoute'>> = [
+  { type: 'railwise.task_delivery', category: 'intelligence', label: '持续文档交付任务', inputs: jsonIn, outputs: jsonOut, requiredCapabilities: ['model'] },
   { type: 'manual_trigger', category: 'trigger', label: 'Manual', inputs: [], outputs: jsonOut, requiredCapabilities: [] },
   { type: 'schedule_trigger', category: 'trigger', label: 'Schedule', inputs: [], outputs: jsonOut, requiredCapabilities: ['schedule'] },
   { type: 'webhook_trigger', category: 'trigger', label: 'Webhook', inputs: [], outputs: jsonOut, requiredCapabilities: ['webhook'] },

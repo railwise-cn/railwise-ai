@@ -290,10 +290,10 @@ function imRuntimeFailureMessage(settings: AppSettingsV1, rawMessage: string): s
     return '任务已结束，但没有产生可交付的文本或文件。'
   }
   if (message === 'Agent turn is waiting for approval.') {
-    return '任务正在等待授权，尚未完成。请在 WorkWise 中处理授权后重试。'
+    return '任务正在等待授权，尚未完成。请在 RailWise AI 中处理授权后重试。'
   }
   if (message === 'Agent turn is waiting for user input.') {
-    return '任务正在等待补充信息，尚未完成。请在 WorkWise 中处理后重试。'
+    return '任务正在等待补充信息，尚未完成。请在 RailWise AI 中处理后重试。'
   }
   if (isWebAccessFailure(message)) {
     return '在线搜索连续失败，暂时无法核实最新资讯。本次任务未完成，请稍后重试，或发来可访问的网页链接。'
@@ -303,7 +303,7 @@ function imRuntimeFailureMessage(settings: AppSettingsV1, rawMessage: string): s
   }
   return message && !/^agent turn (?:failed|aborted)\.?$/i.test(message)
     ? `任务未完成：${message}`
-    : '任务未完成，WorkWise Runtime 没有产生可交付结果。请稍后重试。'
+    : '任务未完成，RailWise AI Runtime 没有产生可交付结果。请稍后重试。'
 }
 
 function isWebAccessFailure(message: string): boolean {
@@ -417,7 +417,7 @@ async function imConnectionStatusText(
         ...(health.updatedAt
           ? [`状态更新时间：${formatLocalTime(health.updatedAt, settings.locale)}`]
           : []),
-        '以上状态由 WorkWise 主进程直接读取，未调用 AI 模型。'
+        '以上状态由 RailWise AI 主进程直接读取，未调用 AI 模型。'
       ].join('\n')
     }
     return [
@@ -429,7 +429,7 @@ async function imConnectionStatusText(
       ...(health.updatedAt
         ? [`Status updated: ${formatLocalTime(health.updatedAt, settings.locale)}`]
         : []),
-      'This status was read directly by the WorkWise main process without calling the AI model.'
+      'This status was read directly by the RailWise AI main process without calling the AI model.'
     ].join('\n')
   }
   const credential = channel.platformCredential
@@ -463,7 +463,7 @@ async function imConnectionStatusText(
       ...(status.updatedAt
         ? [`状态更新时间：${formatLocalTime(status.updatedAt, settings.locale)}`]
         : []),
-      '以上状态由 WorkWise 主进程直接读取，未调用 AI 模型。'
+      '以上状态由 RailWise AI 主进程直接读取，未调用 AI 模型。'
     ].join('\n')
   }
   return [
@@ -475,7 +475,7 @@ async function imConnectionStatusText(
     ...(status.updatedAt
       ? [`Status updated: ${formatLocalTime(status.updatedAt, settings.locale)}`]
       : []),
-    'This status was read directly by the WorkWise main process without calling the AI model.'
+    'This status was read directly by the RailWise AI main process without calling the AI model.'
   ].join('\n')
 }
 
@@ -485,11 +485,11 @@ async function imConnectionStatusText(
  */
 export function imWelcomeText(settings: AppSettingsV1, channel?: ClawImChannelV1): string {
   const profile = channel?.agentProfile
-  const name = profile?.name.trim() || channel?.label.trim() || 'WorkWise Runtime'
+  const name = profile?.name.trim() || channel?.label.trim() || 'RailWise AI Runtime'
   const description = profile?.description.trim() ?? ''
   if (isChineseLocale(settings)) {
     return [
-      `你好，我是 ${name}，通过 WorkWise Runtime 连接到这个对话的 AI 助手。`,
+      `你好，我是 ${name}，通过 RailWise AI Runtime 连接到这个对话的 AI 助手。`,
       ...(description ? [description] : []),
       '你可以直接发消息让我帮忙：回答问题、查资料、读写已连接电脑工作区里的文件、生成文档等，完成后我会在这里回复你。',
       imCommandHelpText(settings),
@@ -497,7 +497,7 @@ export function imWelcomeText(settings: AppSettingsV1, channel?: ClawImChannelV1
     ].join('\n\n')
   }
   return [
-    `Hi, I am ${name}, an AI assistant connected to this chat through WorkWise Runtime.`,
+    `Hi, I am ${name}, an AI assistant connected to this chat through RailWise AI Runtime.`,
     ...(description ? [description] : []),
     'Send me a message and I will handle it on the connected computer: answering questions, research, reading and writing workspace files, generating documents — I reply here once done.',
     imCommandHelpText(settings),
@@ -1937,7 +1937,7 @@ export class ClawRuntime {
       await this.sendFeishuMessage(
         bridge,
         to,
-        { markdown: '文件已生成，但附件发送失败，WorkWise 将自动重试；当前任务尚未完成。' },
+        { markdown: '文件已生成，但附件发送失败，RailWise AI 将自动重试；当前任务尚未完成。' },
         options,
         { ...context, purpose: 'file-delivery-failed' },
         outboundId?.trim() ? `${outboundId.trim()}-failure` : undefined,
@@ -2084,7 +2084,7 @@ export class ClawRuntime {
         { method: 'GET' }
       )
       if (!detailRes.ok) {
-        this.deps.logError('claw-im', 'Failed to read recent generated files from WorkWise Runtime thread', {
+        this.deps.logError('claw-im', 'Failed to read recent generated files from RailWise AI Runtime thread', {
           ...context,
           threadId: targetThreadId,
           message: runtimeErrorMessage(detailRes, 'Failed to read thread result.')
@@ -2098,7 +2098,7 @@ export class ClawRuntime {
         fallbackToThread: options.fallbackToThread
       })
     } catch (error) {
-      this.deps.logError('claw-im', 'Failed to inspect WorkWise Runtime thread for recent generated files', {
+      this.deps.logError('claw-im', 'Failed to inspect RailWise AI Runtime thread for recent generated files', {
         ...context,
         threadId: targetThreadId,
         message: errorMessage(error)
@@ -3012,13 +3012,13 @@ export class ClawRuntime {
       if (url.pathname === '/claw/internal/gui-plan/create' && req.method === 'POST') {
         // The legacy `gui_plan_create` MCP bridge is no longer the
         // active plan path. GUI plan creation now flows through the
-        // native WorkWise Runtime `create_plan` tool. Reject legacy calls
+        // native RailWise AI Runtime `create_plan` tool. Reject legacy calls
         // loudly so older clients see a clear migration error.
         writeJson(res, 410, {
           ok: false,
           code: 'gui_plan_create_retired',
           message:
-            'The /claw/internal/gui-plan/create endpoint is no longer active. Use the WorkWise Runtime create_plan tool.'
+            'The /claw/internal/gui-plan/create endpoint is no longer active. Use the RailWise AI Runtime create_plan tool.'
         })
         return
       }

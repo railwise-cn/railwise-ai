@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-const { createHash } = require('node:crypto')
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } = require('node:fs')
 const { basename, join, resolve } = require('node:path')
 const productBrand = require('../src/shared/product-brand.json')
+const publication = require('./release-publication.cjs')
 
 function usage() {
   console.error('Usage: node scripts/prepare-website-release-assets.cjs <inputDir> <outputDir> <version> [--channel stable|frontier] [--release-prefix workwise[/acceptance/RUN_ID]] [--public-base-url HTTPS_URL]')
@@ -12,7 +12,7 @@ function usage() {
 function readOptions(argv) {
   const options = {
     channel: 'stable',
-    releasePrefix: 'workwise',
+    releasePrefix: publication.policy.downloadNamespace,
     publicBaseUrl: 'https://www.railwise.cn/downloads'
   }
   for (let index = 5; index < argv.length; index += 1) {
@@ -26,15 +26,9 @@ function readOptions(argv) {
     index += 1
   }
   if (!['stable', 'frontier'].includes(options.channel)) die(`Invalid channel: ${options.channel}`)
-  if (!/^workwise(?:\/acceptance\/[1-9]\d*)?$/.test(options.releasePrefix)) {
-    die(`Invalid release prefix: ${options.releasePrefix}`)
-  }
+  publication.namespace(options.releasePrefix)
   if (!options.publicBaseUrl.startsWith('https://')) die('Public base URL must use HTTPS.')
   return options
-}
-
-function sha256(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex')
 }
 
 function readReleaseDate(outputDir) {
@@ -45,24 +39,16 @@ function readReleaseDate(outputDir) {
   return releaseDates.at(-1) || '1970-01-01T00:00:00.000Z'
 }
 
-function writeLatestJson(outputDir, version, options) {
-  const updateBaseUrl = `${options.publicBaseUrl}/${options.releasePrefix}/channels/${options.channel}/latest/`
-  const files = readdirSync(outputDir)
-    .filter((name) => name.startsWith(`WorkWise-${version}-`))
-    .sort()
-    .map((name) => ({
-      name,
-      url: `${updateBaseUrl}${encodeURIComponent(name)}`,
-      size: statSync(join(outputDir, name)).size,
-      sha256: sha256(join(outputDir, name))
-    }))
+function writeLatestJson(outputDir, sealed) {
+  const updateBaseUrl = sealed.updateBaseUrl
+  const files = sealed.files.map(file => ({ name: file.name, url: file.latestUrl, size: file.size, sha256: file.sha256 }))
   const manifest = {
     schemaVersion: 1,
     productName: productBrand.platform,
-    channel: options.channel,
-    version,
-    tag: `v${version}`,
-    generatedAt: readReleaseDate(outputDir),
+    channel: sealed.channel,
+    version: sealed.version,
+    tag: sealed.tag,
+    generatedAt: sealed.publishedAt,
     updateBaseUrl,
     updateMetadata: {
       mac: `${updateBaseUrl}latest-mac.yml`,
@@ -76,14 +62,6 @@ function writeLatestJson(outputDir, version, options) {
 function die(message) {
   console.error(`[prepare-website-release-assets] ${message}`)
   process.exit(1)
-}
-
-function findOne(entries, pattern, label) {
-  const matches = entries.filter((name) => pattern.test(name))
-  if (matches.length !== 1) {
-    die(`Expected exactly one ${label}, found ${matches.length}: ${matches.join(', ') || '<none>'}`)
-  }
-  return matches[0]
 }
 
 function copyMapped(inputDir, outputDir, fromName, toName, fileMap) {
@@ -112,33 +90,35 @@ function main() {
     die(`Invalid arguments: input=${process.argv[2] || ''}, output=${process.argv[3] || ''}, version=${version}`)
   }
   const options = readOptions(process.argv)
+  // Public URLs are independent of the immutable legacy storage key.
+  const publicOptions = { ...options, releasePrefix: options.releasePrefix.includes('/acceptance/') ? options.releasePrefix : publication.policy.downloadNamespace }
 
   if (!existsSync(inputDir)) die(`Input directory does not exist: ${inputDir}`)
   rmSync(outputDir, { recursive: true, force: true })
   mkdirSync(outputDir, { recursive: true })
 
   const entries = readdirSync(inputDir)
-  const arm64Dmg = findOne(entries, /^WorkWise-.+-mac-arm64\.dmg$/, 'macOS arm64 dmg')
-  const x64Dmg = findOne(entries, /^WorkWise-.+-mac-x64\.dmg$/, 'macOS x64 dmg')
-  const arm64Zip = findOne(entries, /^WorkWise-.+-mac-arm64\.zip$/, 'macOS arm64 update zip')
-  const x64Zip = findOne(entries, /^WorkWise-.+-mac-x64\.zip$/, 'macOS x64 update zip')
-  const winExe = findOne(entries, /^WorkWise-.+-win-x64\.exe$/, 'Windows x64 exe')
-
   const fileMap = new Map()
-  copyMapped(inputDir, outputDir, arm64Dmg, `WorkWise-${version}-mac-Apple-Silicon.dmg`, fileMap)
-  copyMapped(inputDir, outputDir, x64Dmg, `WorkWise-${version}-mac-Intel.dmg`, fileMap)
-  copyMapped(inputDir, outputDir, arm64Zip, `WorkWise-${version}-mac-arm64.zip`, fileMap)
-  copyMapped(inputDir, outputDir, x64Zip, `WorkWise-${version}-mac-x64.zip`, fileMap)
-  copyMapped(inputDir, outputDir, winExe, `WorkWise-${version}-win-x64.exe`, fileMap)
-
-  const winBlockMap = `${winExe}.blockmap`
-  if (existsSync(join(inputDir, winBlockMap))) {
-    copyMapped(inputDir, outputDir, winBlockMap, `WorkWise-${version}-win-x64.exe.blockmap`, fileMap)
+  for (const spec of [
+    ...['arm64', 'x64'].flatMap(arch => ['dmg', 'zip'].map(format => ({ platform: 'mac', arch, format }))),
+    { platform: 'win', arch: 'x64', format: 'exe' }
+  ]) {
+    const matches = entries.filter(name => {
+      const parsed = publication.parseArtifactName(name)
+      return parsed && !parsed.blockmap && parsed.version === version && parsed.platform === spec.platform && parsed.arch === spec.arch && parsed.format === spec.format
+    })
+    if (matches.length !== 1) die(`Expected exactly one ${spec.platform}/${spec.arch}/${spec.format}, found ${matches.length}`)
+    const sourceName = matches[0]
+    const targetName = publication.artifactName({ version, ...spec, publicName: true })
+    copyMapped(inputDir, outputDir, sourceName, targetName, fileMap)
+    if (existsSync(join(inputDir, `${sourceName}.blockmap`))) copyMapped(inputDir, outputDir, `${sourceName}.blockmap`, `${targetName}.blockmap`, fileMap)
   }
 
   rewriteUpdateMetadata(inputDir, outputDir, 'latest-mac.yml', fileMap)
   rewriteUpdateMetadata(inputDir, outputDir, 'latest.yml', fileMap)
-  writeLatestJson(outputDir, version, options)
+  const manifest = publication.createPublicationManifest({ directory: outputDir, version, sourceHead: process.env.GITHUB_SHA || '', publishedAt: readReleaseDate(outputDir), ...publicOptions })
+  writeFileSync(join(outputDir, 'publication-manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
+  writeLatestJson(outputDir, manifest)
 
   const output = readdirSync(outputDir).map((name) => basename(name)).sort()
   for (const name of output) console.log(name)

@@ -17,9 +17,10 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 // Keep the published manifest identity in lockstep with the packaged app.
-// Artifact filenames intentionally retain the WorkWise prefix for updater
-// compatibility, but latest.json must expose the public RailWise AI name.
+// New artifacts use the publication identity. Legacy feeds and historical
+// package names remain readable without changing bundle or storage identity.
 const require = createRequire(import.meta.url)
+const publication = require('./release-publication.cjs')
 const PRODUCT_NAME = require('../src/shared/product-brand.json').platform
 const R2_COPY_CONCURRENCY = 3
 
@@ -29,7 +30,7 @@ function createR2RequestHandler() {
     requestTimeout: 5 * 60_000
   })
 }
-const DEFAULT_RELEASE_PREFIX = 'workwise'
+const DEFAULT_RELEASE_PREFIX = publication.policy.storageNamespace
 const DEFAULT_RELEASE_CHANNEL = 'frontier'
 const PLATFORMS = ['mac', 'win']
 const RELEASE_CHANNELS = ['frontier', 'stable']
@@ -39,15 +40,15 @@ const ROOT = resolve(SCRIPT_DIR, '..')
 const PLATFORM_SPECS = {
   mac: {
     updateFile: 'latest-mac.yml',
-    assetPattern: /^WorkWise-.+-mac-(arm64|x64)\.(dmg|zip)(\.blockmap)?$/
+    assetPattern: { test: name => { const file = publication.parseArtifactName(name); return file && !file.candidateSourceHead && file.platform === 'mac' && ['dmg', 'zip'].includes(file.format) } }
   },
   win: {
     updateFile: 'latest.yml',
-    assetPattern: /^WorkWise-.+-win-x64\.exe(\.blockmap)?$/
+    assetPattern: { test: name => { const file = publication.parseArtifactName(name); return file && !file.candidateSourceHead && file.platform === 'win' && file.arch === 'x64' && file.format === 'exe' } }
   },
   linux: {
     updateFile: 'latest-linux.yml',
-    assetPattern: /^WorkWise-.+-linux-x86_64\.AppImage(\.blockmap)?$/
+    assetPattern: { test: name => { const file = publication.parseArtifactName(name); return file && !file.candidateSourceHead && file.platform === 'linux' && file.format === 'AppImage' } }
   }
 }
 
@@ -362,7 +363,7 @@ function classifyDownload(fileName, platform) {
           : 'bin'
 
   if (platform === 'mac') {
-    const arch = fileName.includes('-arm64.') ? 'arm64' : 'x64'
+    const arch = publication.parseArtifactName(fileName)?.arch || 'x64'
     return {
       platform,
       arch,
@@ -392,14 +393,20 @@ async function collectPlatformRelease({ distDir, platform, tag, channel, config 
   }
 
   const referenced = new Set(updateMetadata.files.map((file) => basename(file.url)))
+  const sealedPath = join(distDir, 'publication-manifest.json')
+  const sealed = existsSync(sealedPath) ? publication.readPublicationManifest(sealedPath) : null
+  if (sealed && (sealed.version !== tagVersion || sealed.channel !== channel)) throw new Error('Publication manifest release mismatch')
   const assets = entries.filter((name) => spec.assetPattern.test(name))
+  if (assets.some(name => publication.parseArtifactName(name).version !== tagVersion)) throw new Error('Mixed publication versions')
+  if (assets.some(name => publication.parseArtifactName(name).prefix === publication.policy.artifactPrefix) && !sealed) throw new Error('New publication artifacts require publication-manifest.json')
+  if (sealed && assets.some(name => !sealed.files.some(file => file.name === name))) throw new Error('Asset is absent from publication manifest')
   for (const name of referenced) {
     if (!entries.includes(name)) {
       throw new Error(`${spec.updateFile} references ${name}, but it was not found in ${distDir}`)
     }
   }
 
-  const fileNames = Array.from(new Set([spec.updateFile, ...assets, ...referenced])).sort()
+  const fileNames = Array.from(new Set([spec.updateFile, ...assets, ...referenced, ...(sealed ? ['publication-manifest.json'] : [])])).sort()
   const files = []
   const downloadByName = new Map(updateMetadata.files.map((file) => [basename(file.url), file]))
 
@@ -411,6 +418,8 @@ async function collectPlatformRelease({ distDir, platform, tag, channel, config 
     const archiveKey = `${basePath}/releases/${tag}/${fileName}`
     const sha256 = await hashFile(path, 'sha256', 'hex')
     const sha512 = await hashFile(path, 'sha512', 'base64')
+    const declared = sealed?.files.find(file => file.name === fileName)
+    if (declared && (declared.sha256 !== sha256 || declared.sha512 !== sha512 || declared.size !== info.size)) throw new Error(`Publication asset changed: ${fileName}`)
     files.push({
       fileName,
       path,
@@ -429,6 +438,7 @@ async function collectPlatformRelease({ distDir, platform, tag, channel, config 
     const fileName = basename(file.url)
     const local = filesByName.get(fileName)
     if (!local) throw new Error(`Missing collected file: ${fileName}`)
+    if (sealed && (file.sha512 !== local.sha512 || file.size !== local.size)) throw new Error(`Updater metadata differs from publication asset: ${fileName}`)
     return {
       ...classifyDownload(fileName, platform),
       fileName,
@@ -436,8 +446,8 @@ async function collectPlatformRelease({ distDir, platform, tag, channel, config 
       sha256: local.sha256,
       sha512: file.sha512 || local.sha512,
       blockMapSize: file.blockMapSize,
-      archiveUrl: joinUrl(config.publicBaseUrl, config.prefix, 'channels', channel, 'releases', tag, fileName),
-      latestUrl: joinUrl(config.publicBaseUrl, config.prefix, 'channels', channel, 'latest', fileName)
+      archiveUrl: sealed?.files.find(asset => asset.name === fileName)?.url || joinUrl(config.publicBaseUrl, config.prefix, 'channels', channel, 'releases', tag, fileName),
+      latestUrl: sealed?.files.find(asset => asset.name === fileName)?.latestUrl || joinUrl(config.publicBaseUrl, config.prefix, 'channels', channel, 'latest', fileName)
     }
   })
 
@@ -449,6 +459,7 @@ async function collectPlatformRelease({ distDir, platform, tag, channel, config 
     platform,
     version: updateMetadata.version,
     releaseDate: updateMetadata.releaseDate,
+    ...(sealed ? { publication: { artifactPrefix: sealed.artifactPrefix, sourceHead: sealed.sourceHead, updateBaseUrl: sealed.updateBaseUrl } } : {}),
     generatedAt: new Date().toISOString(),
     updateMetadata: {
       fileName: spec.updateFile,
@@ -705,6 +716,9 @@ async function verifyRemoteRelease({ flags }) {
 
 export function buildLatestManifest({ platformManifests, channel, tag, publicBaseUrl, basePath, generatedAt }) {
   const releaseDates = platformManifests.map(manifest => manifest.releaseDate).filter(Boolean).sort()
+  const publicationBases = new Set(platformManifests.map(manifest => manifest.publication?.updateBaseUrl).filter(Boolean))
+  if (publicationBases.size > 1 || (publicationBases.size && platformManifests.some(manifest => !manifest.publication?.updateBaseUrl))) throw new Error('Platform publication URLs do not agree')
+  const updateBaseUrl = [...publicationBases][0] || joinUrl(publicBaseUrl, basePath, 'latest') + '/'
   return {
     schemaVersion: 1,
     productName: PRODUCT_NAME,
@@ -714,13 +728,13 @@ export function buildLatestManifest({ platformManifests, channel, tag, publicBas
     releaseDate: releaseDates.at(-1) ?? generatedAt,
     generatedAt,
     githubReleaseUrl: `https://github.com/railwise-cn/railwise-ai/releases/tag/${tag}`,
-    updateBaseUrl: joinUrl(publicBaseUrl, basePath, 'latest') + '/',
+    updateBaseUrl,
     updateMetadata: Object.fromEntries(platformManifests.map(manifest => [manifest.platform, {
       fileName: manifest.updateMetadata.fileName,
-      url: joinUrl(publicBaseUrl, basePath, 'latest', manifest.updateMetadata.fileName)
+      url: new URL(manifest.updateMetadata.fileName, updateBaseUrl).href
     }])),
     downloads: platformManifests.flatMap(manifest => manifest.downloads.map(download => ({
-      ...download, url: joinUrl(publicBaseUrl, basePath, 'latest', download.fileName)
+      ...download, url: new URL(download.fileName, updateBaseUrl).href
     })))
   }
 }
@@ -783,9 +797,7 @@ async function promoteRelease({ flags, dryRun }) {
   }
 
   const latestTargets = [{ basePath: channelBasePath(config.prefix, channel), label: `${channel} latest` }]
-  if (channel === 'stable') {
-    latestTargets.push({ basePath: config.prefix, label: 'legacy stable latest' })
-  }
+  if (channel === 'stable') latestTargets.push({ basePath: config.prefix, label: 'legacy stable latest' })
 
   console.log(`Promoting ${PRODUCT_NAME} ${tag} to R2 ${channel} latest (${platforms.join(', ')})`)
   for (const target of latestTargets) {
@@ -868,6 +880,7 @@ export const _internals = {
   acceptancePrefixForRunId,
   parseUpdateYml,
   classifyDownload,
+  collectPlatformRelease,
   createR2RequestHandler,
   R2_COPY_CONCURRENCY
 }

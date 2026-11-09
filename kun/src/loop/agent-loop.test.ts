@@ -297,7 +297,15 @@ describe('AgentLoop completion guard', () => {
     } as unknown as RuntimeSpanService
     const tasks = {
       activeTask: () => activeTask,
+      registerExecutionAbort: () => () => undefined,
       beginAttempt: () => activeTask,
+      pendingDeliveries: () => [],
+      tokenForTurn: () => undefined,
+      beginWork: () => () => undefined,
+      workBudget: () => undefined,
+      recordCost: () => undefined,
+      beginToolOperation: () => undefined,
+      endRun: () => undefined,
       assessCandidate: async () => ({ kind: 'completed', task: activeTask })
     } as unknown as TaskController
     const turns = new TurnService({
@@ -572,7 +580,15 @@ describe('AgentLoop completion guard', () => {
     const activeTask = { id: 'task_provider_blocked', attempts: 1 }
     const tasks = {
       activeTask: () => activeTask,
+      registerExecutionAbort: () => () => undefined,
       beginAttempt: () => activeTask,
+      pendingDeliveries: () => [],
+      tokenForTurn: () => undefined,
+      beginWork: () => () => undefined,
+      workBudget: () => undefined,
+      recordCost: () => undefined,
+      beginToolOperation: () => undefined,
+      endRun: () => undefined,
       assessCandidate: async () => ({
         kind: 'waiting_user',
         task: activeTask,

@@ -249,10 +249,26 @@ describe('DelegationRuntime', () => {
     taskRepository.close()
   })
 
+  it('rejects child assignments outside the parent workspace authority', async () => {
+    const taskRepository = new TaskRunRepository(join(dir, 'tasks-authority.sqlite3'))
+    taskRepository.create(parentTask())
+    const runtime = createRuntime({ taskRepository })
+    await expect(runtime.startChild({
+      parentThreadId: 'thr_1',
+      parentTurnId: 'turn_1',
+      prompt: 'escape',
+      workspace: join(dir, 'outside'),
+      executionMode: 'detached'
+    })).rejects.toThrow(/outside parent task authority/)
+    taskRepository.close()
+  })
+
   it('recovers an interrupted detached child without losing its durable record', async () => {
     const store = new FileDelegationStore(join(dir, 'children-recovery'))
     await store.upsert({
       id: 'child_recover',
+      ownerPid: 2147483646,
+      ownerStartedAt: `${process.platform}:verified-exited-process`,
       parentThreadId: 'thr_1',
       parentTurnId: 'turn_1',
       prompt: 'resume research',
@@ -283,6 +299,16 @@ describe('DelegationRuntime', () => {
       attempt: 2
     })
     expect(await store.get('child_recover')).toMatchObject({ status: 'completed' })
+  })
+
+  it('does not replay a legacy running child whose original process cannot be identified', async () => {
+    const store = new FileDelegationStore(join(dir, 'children-unknown'))
+    await store.upsert({ id: 'child_unknown', parentThreadId: 'thr_1', parentTurnId: 'turn_1', prompt: 'preserve old operation', status: 'running', executionMode: 'detached', attempt: 1, maxDurationMs: 60_000, usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), revision: 1 })
+    let calls = 0
+    const runtime = new DelegationRuntime({ config: KunCapabilitiesConfig.parse({ subagents: { enabled: true, maxParallel: 1, maxChildRuns: 3 } }).subagents, store, executor: async () => { calls += 1; return { summary: 'must not run' } } })
+    const recovered = await runtime.recoverInterrupted()
+    expect(recovered[0]).toMatchObject({ status: 'interrupted', error: expect.stringContaining('outcome_unknown') })
+    expect(calls).toBe(0)
   })
 
   function createRuntime(options: {

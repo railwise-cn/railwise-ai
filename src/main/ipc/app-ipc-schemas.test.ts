@@ -477,6 +477,78 @@ describe('app-ipc-schemas', () => {
     }).path).toBe('/v1/threads/thr_1/agent')
   })
 
+  it('allows the durable task workspace endpoints with bounded query keys', () => {
+    const task = '/v1/tasks/task_1'
+    const template = '/v1/task-templates/research-document'
+    for (const request of [
+      { path: '/v1/tasks?workspaceRoot=%2Fworkspace&search=report&limit=100&offset=0', method: 'GET' },
+      { path: `${task}/pause`, method: 'POST', body: '{}' },
+      { path: `${task}/inputs`, method: 'GET' },
+      { path: `${task}/inputs`, method: 'POST', body: '{}' },
+      { path: `${task}/events?afterSequence=2`, method: 'GET' },
+      { path: '/v1/inbox?workspaceRoot=%2Fworkspace', method: 'GET' },
+      { path: '/v1/task-templates', method: 'GET' },
+      { path: `${template}/start`, method: 'POST', body: '{}' },
+      { path: `${template}/save`, method: 'POST', body: '{}' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(true)
+    for (const request of [
+      { path: `${task}/pause`, method: 'GET' },
+      { path: `${task}/inputs?search=unexpected`, method: 'GET' },
+      { path: `${task}/events?unexpected=1`, method: 'GET' },
+      { path: '/v1/inbox?limit=1', method: 'GET' },
+      { path: `${template}/start`, method: 'GET' },
+      { path: '/v1/task-templates/../start', method: 'POST', body: '{}' }
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
+
+  it('accepts the actual task workspace cursor queries while retaining legacy list requests', () => {
+    const cursor = Buffer.from(JSON.stringify({ id: 'query_snapshot_1', offset: 200 })).toString('base64url')
+    const requests = [
+      '/v1/tasks?pagination=cursor&filter=all&limit=200',
+      `/v1/tasks?pagination=cursor&filter=all&limit=200&cursor=${cursor}`,
+      '/v1/tasks?pagination=cursor&filter=ongoing&workspaceRoot=%2Fworkspace&threadId=thread_1&search=%E6%8A%A5%E5%91%8A&limit=50',
+      '/v1/tasks?pagination=cursor&filter=attention',
+      '/v1/tasks?pagination=cursor&filter=completed',
+      `/v1/tasks?threadId=thread_1&status=running&limit=100&cursor=${cursor}`,
+      '/v1/tasks?workspaceRoot=%2Fworkspace&search=report&limit=100&offset=0'
+    ]
+    for (const path of requests) expect(runtimeRequestPayloadSchema.safeParse({ path, method: 'GET' }).success, path).toBe(true)
+    for (const query of [
+      'pagination=offset', 'pagination=cursor&filter=unknown', 'filter=all',
+      'pagination=cursor&limit=0', 'pagination=cursor&limit=201', 'pagination=cursor&limit=1.5',
+      'pagination=cursor&limit=NaN', 'pagination=cursor&limit=01',
+      'pagination=cursor&offset=0', 'pagination=cursor&status=running',
+      'pagination=cursor&filter=all&filter=completed', 'pagination=cursor&unexpected=1', 'cursor=../other'
+    ]) expect(runtimeRequestPayloadSchema.safeParse({ path: `/v1/tasks?${query}`, method: 'GET' }).success, query).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: requests[0], method: 'POST', body: '{}' }).success).toBe(false)
+    expect(runtimeRequestPayloadSchema.safeParse({ path: requests[0], body: '{}' }).success).toBe(false)
+  })
+
+  it('accepts typed coordinator commands used by chat and candidate review without widening runtime IPC', () => {
+    const command = { threadId: 'origin_1', taskId: 'task_1', intent: 'auto', idempotencyKey: 'command_1', expectedRevision: 2,
+      request: { prompt: '根据合成资料形成报告', displayText: '形成报告', mode: 'agent', model: 'deepseek-flash', providerId: 'deepseek', reasoningEffort: 'high', attachmentIds: ['attachment_1'], workspaceReferences: [{ path: 'source.md', kind: 'file' }] } }
+    for (const intent of ['auto', 'status', 'supplement', 'new', 'chat', 'pause', 'resume', 'cancel']) {
+      const body = JSON.stringify({ ...command, intent })
+      expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/task-commands', method: 'POST', body }).success, intent).toBe(true)
+    }
+    expect(runtimeRequestPayloadSchema.safeParse({ path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...command, resolveAttentionId: 'attention_1' }) }).success).toBe(true)
+    for (const request of [
+      { path: '/v1/task-commands', method: 'GET' },
+      { path: '/v1/task-commands', method: 'POST' },
+      { path: '/v1/task-commands?unexpected=1', method: 'POST', body: JSON.stringify(command) },
+      { path: '/v1/task-commands/other', method: 'POST', body: JSON.stringify(command) },
+      { path: '/v1/task-commands', method: 'POST', body: '{bad json' },
+      ...[
+        { idempotencyKey: '' }, { intent: 'shell' }, { expectedRevision: -1 }, { actor: 'trusted' },
+        { request: { ...command.request, arbitraryTool: 'shell' } },
+        { request: { ...command.request, prompt: '' } },
+        { request: { ...command.request, reasoningEffort: 'unbounded' } },
+        { request: { ...command.request, attachmentIds: new Array(9).fill('attachment_1') } },
+        { request: { ...command.request, workspaceReferences: [{ path: '../secret', kind: 'file' }] } }
+      ].map(change => ({ path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...command, ...change }) }))
+    ]) expect(runtimeRequestPayloadSchema.safeParse(request).success, JSON.stringify(request)).toBe(false)
+  })
+
   it('allows scoped quality evidence requests but rejects forged outcomes, mutable plans and unbounded reads', () => {
     const base = '/v1/engineering/projects/project_1'
     const plan = { manifestId: 'manifest_1', expectedProjectRevision: 2, idempotencyKey: 'freeze-plan-1', requiredEvidence: [{ id: 'report', title: 'Retain report bytes', memberId: 'output-1' }] }

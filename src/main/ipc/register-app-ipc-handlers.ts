@@ -1,4 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell, type WebContents } from 'electron'
+import { claimTaskNotification } from '../services/task-notification-service'
+import { reviewDocumentCandidate, decideDocumentCandidate } from '../services/document-candidate-service'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification, shell, type WebContents } from 'electron'
 import brand from '../../shared/product-brand.json'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -103,6 +105,8 @@ import {
   workspaceFileWatchPayloadSchema,
   workspaceFileWritePayloadSchema,
   documentReadPayloadSchema,
+  documentCandidateReadPayloadSchema,
+  documentCandidateDecisionPayloadSchema,
   documentSearchPayloadSchema,
   checkedDocumentWritePayloadSchema,
   documentHistoryPayloadSchema,
@@ -904,7 +908,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const { locale } = await store.load()
     const options: Electron.SaveDialogOptions = {
       title: locale === 'zh' ? `导出 ${brand.platform} 任务诊断包` : `Export ${brand.platform} task diagnostics`,
-      defaultPath: `WorkWise-task-diagnostics-${request.taskId}.json`,
+      defaultPath: `RailWise-AI-task-diagnostics-${request.taskId}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }]
     }
     const mainWindow = getMainWindow()
@@ -1540,7 +1544,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
         runId: health.runId,
         checks: [
           { id: 'connection_state', pass: true, code: 'user_paused', summary: '连接已由用户暂停；未执行凭据、桥接和心跳在线检查。' },
-          { id: 'runtime', pass: runtimeAvailable, code: runtimeAvailable ? 'runtime_available' : 'runtime_unavailable', summary: runtimeAvailable ? 'WorkWise Runtime 可访问。' : 'WorkWise Runtime 不可访问。' },
+          { id: 'runtime', pass: runtimeAvailable, code: runtimeAvailable ? 'runtime_available' : 'runtime_unavailable', summary: runtimeAvailable ? 'RailWise AI Runtime 可访问。' : 'RailWise AI Runtime 不可访问。' },
           { id: 'ledger', pass: ledgerHealthy, code: ledgerHealthy ? 'ledger_healthy' : 'ledger_unhealthy', summary: ledgerHealthy ? '通信账本完整性检查通过。' : '通信账本完整性检查失败。' }
         ]
       }
@@ -1939,6 +1943,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const request = parseIpcPayload('file:read-document-snapshot', documentReadPayloadSchema, payload)
     return readDocumentSnapshot(request.path, request.workspaceRoot)
   })
+  ipcMain.handle('write:read-candidate', async (_, payload: unknown) =>
+    reviewDocumentCandidate(parseIpcPayload('write:read-candidate',documentCandidateReadPayloadSchema,payload)))
+  ipcMain.handle('write:decide-candidate', async (_, payload: unknown) =>
+    decideDocumentCandidate(parseIpcPayload('write:decide-candidate',documentCandidateDecisionPayloadSchema,payload)))
   ipcMain.handle('file:search-workspace-documents', async (_, payload: unknown) =>
     searchWorkspaceDocuments(
       parseIpcPayload('file:search-workspace-documents', documentSearchPayloadSchema, payload)
@@ -2410,6 +2418,16 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('shell:open-external', async (_, url: unknown) => {
     const validatedUrl = parseIpcPayload('shell:open-external', shellOpenExternalUrlSchema, url)
     await shell.openExternal(validatedUrl)
+  })
+  ipcMain.handle('notification:task', async (_, payload: unknown) => {
+    const data=z.object({key:z.string().min(1).max(512),taskId:z.string().min(1).max(256).optional(),flowId:z.string().min(1).max(256).optional(),flowRunId:z.string().min(1).max(256).optional(),kind:z.enum(['attention','artifact']),title:z.string().max(160),body:z.string().max(500)}).strict().refine(value=>Boolean(value.taskId || value.flowRunId),'A task or Flow destination is required.').parse(payload)
+    const settings=await store.load()
+    if(!settings.notifications.turnComplete || !Notification.isSupported()) return {shown:false}
+    if(!await claimTaskNotification(join(app.getPath('userData'),'task-notification-ledger.json'),data.key))return {shown:false}
+    const notification=new Notification({title:data.title,body:data.body})
+    notification.on('click',()=>{const win=getMainWindow();if(!win)return;if(win.isMinimized())win.restore();win.show();win.focus();if(data.taskId)win.webContents.send('notification:open-task',data.taskId);else win.webContents.send('notification:open-flow',{flowId:data.flowId,flowRunId:data.flowRunId})})
+    notification.show()
+    return {shown:true}
   })
   ipcMain.handle('notification:turn-complete', async (_, payload: unknown) =>
     showTurnCompleteNotification(

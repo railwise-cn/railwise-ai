@@ -380,7 +380,7 @@ function compatibility(value: unknown): MarketplacePackageV1['compatibility'] {
     throw new Error('Package compatibility contains an unsupported platform or architecture.')
   }
   return {
-    workwise: optionalString(item.workwise, 'WorkWise compatibility') ?? '>=0.3.6',
+    workwise: optionalString(item.workwise, 'RailWise AI compatibility') ?? '>=0.3.6',
     platforms: platforms as MarketplacePackageV1['compatibility']['platforms'],
     architectures: architectures as MarketplacePackageV1['compatibility']['architectures']
   }
@@ -630,7 +630,7 @@ function configurationFromEnvironment(
     const value = string(rawValue, `${label} ${key}`)
     const match = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/.exec(value)
     if (!match) {
-      warnings.push(`${label} ${key} uses a fixed value that WorkWise will not copy into runtime configuration.`)
+      warnings.push(`${label} ${key} uses a fixed value that RailWise AI will not copy into runtime configuration.`)
       reasons.push(`fixed-environment-value-unsupported:${key}`)
       continue
     }
@@ -836,7 +836,7 @@ async function parseCodex(context: ParseContext): Promise<ParsedPackage> {
   if (appPath) {
     const appManifest = await readPackageJson(context, appPath)
     if (Object.keys(record(appManifest.apps, 'Codex apps')).length > 0) {
-      warnings.push('Codex App Connector metadata is preserved but cannot run in WorkWise.')
+      warnings.push('Codex App Connector metadata is preserved but cannot run in RailWise AI.')
       if (components.length === 0) reasons.push('codex-app-connector-required')
     }
   }
@@ -861,7 +861,7 @@ async function parseCodex(context: ParseContext): Promise<ParsedPackage> {
       access: 'authenticate',
       default: 'review',
       reviewRequired: true,
-      description: 'Use credentials stored in WorkWise safe storage.'
+      description: 'Use credentials stored in RailWise AI safe storage.'
     })
   }
   const install = installability(license, evidence.length, reasons)
@@ -911,7 +911,7 @@ function mcpbConfiguration(
       access: 'authenticate',
       default: 'review',
       reviewRequired: true,
-      description: 'Use sensitive MCPB configuration stored in WorkWise safe storage.'
+      description: 'Use sensitive MCPB configuration stored in RailWise AI safe storage.'
     })
   }
   const pathKeys = fields.filter((field) => field.type === 'directory' || field.type === 'file').map((field) => field.key)
@@ -1055,30 +1055,30 @@ async function packageSignature(
   if (!context.paths.has(path)) return { status: 'unsigned' }
   const value = await readPackageJson(context, path)
   if (value.schemaVersion !== 1 || value.algorithm !== 'ed25519') {
-    throw new Error('WorkWise signature metadata is invalid.')
+    throw new Error('RailWise AI signature metadata is invalid.')
   }
-  const keyId = string(value.keyId, 'WorkWise signature keyId')
-  const signer = optionalString(value.signer, 'WorkWise signature signer')
-  const declaredFiles = record(value.files, 'WorkWise signature files')
+  const keyId = string(value.keyId, 'RailWise AI signature keyId')
+  const signer = optionalString(value.signer, 'RailWise AI signature signer')
+  const declaredFiles = record(value.files, 'RailWise AI signature files')
   const actualPaths = [...context.paths].filter((entry) => entry !== path).sort()
   const declaredPaths = Object.keys(declaredFiles).sort()
   if (canonicalJson(actualPaths) !== canonicalJson(declaredPaths)) {
-    throw new Error('WorkWise signature file list does not match package contents.')
+    throw new Error('RailWise AI signature file list does not match package contents.')
   }
   const files: Record<string, string> = {}
   for (const file of actualPaths) {
-    const expected = string(declaredFiles[file], `WorkWise signature digest for ${file}`).toLowerCase()
-    if (!SHA256.test(expected)) throw new Error(`WorkWise signature digest is invalid: ${file}.`)
+    const expected = string(declaredFiles[file], `RailWise AI signature digest for ${file}`).toLowerCase()
+    if (!SHA256.test(expected)) throw new Error(`RailWise AI signature digest is invalid: ${file}.`)
     const actual = createHash('sha256').update(
       await readPackageFile(context, file, 32 * 1024 * 1024)
     ).digest('hex')
-    if (actual !== expected) throw new Error(`WorkWise signature digest does not match: ${file}.`)
+    if (actual !== expected) throw new Error(`RailWise AI signature digest does not match: ${file}.`)
     files[file] = expected
   }
-  const encoded = string(value.signature, 'WorkWise Ed25519 signature')
-  if (!BASE64.test(encoded)) throw new Error('WorkWise Ed25519 signature is not valid base64.')
+  const encoded = string(value.signature, 'RailWise AI Ed25519 signature')
+  if (!BASE64.test(encoded)) throw new Error('RailWise AI Ed25519 signature is not valid base64.')
   const signature = Buffer.from(encoded, 'base64')
-  if (signature.byteLength !== 64) throw new Error('WorkWise Ed25519 signature must be 64 bytes.')
+  if (signature.byteLength !== 64) throw new Error('RailWise AI Ed25519 signature must be 64 bytes.')
   const payload = Buffer.from(canonicalJson({
     schemaVersion: 1,
     algorithm: 'ed25519',
@@ -1094,9 +1094,9 @@ async function packageSignature(
   try {
     valid = verifySignature(null, payload, createPublicKey(trusted.publicKey), signature)
   } catch {
-    throw new Error('Trusted WorkWise signing key is invalid.')
+    throw new Error('Trusted RailWise AI signing key is invalid.')
   }
-  if (!valid) throw new Error('WorkWise package signature verification failed.')
+  if (!valid) throw new Error('RailWise AI package signature verification failed.')
   return {
     status: 'verified',
     algorithm: 'ed25519',

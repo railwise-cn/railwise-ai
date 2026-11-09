@@ -61,11 +61,13 @@ import { atomicWriteFile as durableWriteFile } from './services/durable-file'
 import { resolvePptMasterSidecarExecutable } from './services/ppt-master-sidecar'
 import { loadOrCreateFlowSecretStoreKey } from './services/flow-secret-store-key'
 import { McpConfigService } from './services/mcp-config-service'
+import type { TaskDocumentExportBridge } from './services/task-document-export-service'
 
 let child: ChildProcess | null = null
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
+let documentExportBridge: TaskDocumentExportBridge | null = null
 const RUNTIME_READY_PREFIX = 'KUN_READY '
 // Cold starts on slow disks (Windows + antivirus scans, sqlite rebuilds,
 // MCP server connects) routinely exceed 15s; killing kun that early left
@@ -159,7 +161,7 @@ function formatRuntimeLogLine(
     .replace(/^KUN_READY\s+/, 'WORKWISE_RUNTIME_READY ')
     .replace(/\[kun\]/gi, '[runtime]')
     .replace(/("service"\s*:\s*)"kun"/gi, '$1"runtime"')
-    .replace(/\bkun runtime\b/gi, 'WorkWise Runtime')
+    .replace(/\bkun runtime\b/gi, 'RailWise AI Runtime')
   return `[${stamp}] [${stream.toUpperCase()}] [${pidLabel}] ${publicMessage}\n`
 }
 
@@ -421,7 +423,7 @@ export async function startManagedRuntimeChild(
   const resolution = resolveManagedRuntimeExecutable(root, runtime.binaryPath)
   if (resolution.command === process.execPath && !existsSync(resolution.args[0])) {
     throw new Error(
-      `WorkWise Runtime build is missing at ${resolution.args[0]}. Reinstall WorkWise or rebuild the bundled runtime.`
+      `RailWise AI Runtime build is missing at ${resolution.args[0]}. Reinstall RailWise AI or rebuild the bundled runtime.`
     )
   }
   const homeDir = candidateRoot
@@ -478,13 +480,20 @@ export async function startManagedRuntimeChild(
   })
   const pptMasterSidecarExecutable = resolvePptMasterSidecarExecutable()
   const flowSecretStoreKey = options.flowSecretStoreKey ?? await loadOrCreateFlowSecretStoreKey()
-  child = await safeSpawn(resolution.command, args, {
+  const { startTaskDocumentExportBridge } = await import('./services/task-document-export-service')
+  await documentExportBridge?.close()
+  const startedExportBridge = await startTaskDocumentExportBridge()
+  documentExportBridge = startedExportBridge
+  try {
+    child = await safeSpawn(resolution.command, args, {
     env: {
       ...process.env,
       ...mcpV2.environment,
       [MCP_PATH_ENV_KEY]: resolveMcpToolPath(process.env, homeDir),
       ELECTRON_RUN_AS_NODE: '1',
       WORKWISE_RUNTIME_TOKEN: runtime.runtimeToken,
+      RAILWISE_DOCUMENT_EXPORT_URL: startedExportBridge.url,
+      RAILWISE_DOCUMENT_EXPORT_TOKEN: startedExportBridge.token,
       WORKWISE_FLOW_SECRET_STORE_KEY: flowSecretStoreKey ?? '',
       WORKWISE_PPT_MASTER_ROOT: resolveBundledSkillDirectory('ppt-master') || '',
       // Packaged clients require the frozen sidecar. Development builds may
@@ -512,6 +521,11 @@ export async function startManagedRuntimeChild(
     detached: false,
     workspaceRoot: homeDir
   })
+  } catch (error) {
+    await startedExportBridge.close()
+    if (documentExportBridge === startedExportBridge) documentExportBridge = null
+    throw error
+  }
   const startedChild = child
   const startedLogCapture = createRuntimeLogCapture(startedChild.pid)
   childLogCapture = startedLogCapture
@@ -519,6 +533,8 @@ export async function startManagedRuntimeChild(
   startedChild.stdout?.on('data', startedLogCapture.captureStdout)
   startedChild.stderr?.on('data', startedLogCapture.captureStderr)
   child.on('exit', (code, signal) => {
+    void startedExportBridge.close()
+    if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
       signal
         ? `exited with signal ${signal}`
@@ -711,7 +727,7 @@ export async function syncManagedRuntimeConfig(
   const parsedNext = InternalRuntimeConfigSchema.safeParse(next)
   if (!parsedNext.success) {
     throw new Error(
-      `Refusing to write invalid WorkWise Runtime config at ${configPath}: ${JSON.stringify(parsedNext.error.issues, null, 2)}`
+      `Refusing to write invalid RailWise AI Runtime config at ${configPath}: ${JSON.stringify(parsedNext.error.issues, null, 2)}`
     )
   }
   const nextText = `${JSON.stringify(next, null, 2)}\n`
@@ -1177,6 +1193,8 @@ function objectValue(value: unknown): Record<string, unknown> {
 
 export async function stopManagedRuntimeChildAndWait(): Promise<void> {
   if (!child) {
+    await documentExportBridge?.close()
+    documentExportBridge = null
     actualManagedRuntimePort = null
     if (childLogCapture) {
       const capture = childLogCapture
@@ -1205,6 +1223,8 @@ export async function stopManagedRuntimeChildAndWait(): Promise<void> {
     await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
   }
   if (child === stoppingChild) child = null
+  await documentExportBridge?.close()
+  documentExportBridge = null
   actualManagedRuntimePort = null
   if (capture) {
     childLogCapture = null
@@ -1355,14 +1375,14 @@ function describeRuntimeExit(
   stderrTail = ''
 ): string {
   const suffix = stderrTail.trim() ? `\n${stderrTail.trim()}` : ''
-  if (signal) return `WorkWise Runtime exited during startup with signal ${signal}${suffix}`
-  if (typeof code === 'number') return `WorkWise Runtime exited during startup with code ${code}${suffix}`
-  return `WorkWise Runtime exited during startup${suffix}`
+  if (signal) return `RailWise AI Runtime exited during startup with signal ${signal}${suffix}`
+  if (typeof code === 'number') return `RailWise AI Runtime exited during startup with code ${code}${suffix}`
+  return `RailWise AI Runtime exited during startup${suffix}`
 }
 
 function describeRuntimeStartupTimeout(stderrTail: string): string {
   const suffix = stderrTail.trim() ? `\n${stderrTail.trim()}` : ''
-  return `WorkWise Runtime did not report ready within ${RUNTIME_STARTUP_TIMEOUT_MS}ms${suffix}`
+  return `RailWise AI Runtime did not report ready within ${RUNTIME_STARTUP_TIMEOUT_MS}ms${suffix}`
 }
 
 async function probeRuntimeHealth(port: number): Promise<boolean> {

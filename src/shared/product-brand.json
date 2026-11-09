@@ -3,5 +3,13 @@
   "survey": "RailWise Survey",
   "runtime": "RailWise AI Runtime",
   "surveySubtitle": { "zh": "工程测量内业", "en": "Engineering Survey Processing" },
+  "release": {
+    "artifactPrefix": "RailWise-AI",
+    "downloadNamespace": "railwise-ai",
+    "storageNamespace": "workwise",
+    "legacyArtifactPrefixes": ["WorkWise"],
+    "legacyDownloadNamespaces": ["workwise"],
+    "productPage": "https://www.railwise.cn/products/railwise-ai/"
+  },
   "compatibility": { "packageName": "workwise", "productName": "RailWise AI", "domain": "engineering" }
 }

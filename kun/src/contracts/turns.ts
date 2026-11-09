@@ -147,7 +147,11 @@ export const StartTurnRequest = z.object({
    */
   disableUserInput: z.boolean().optional(),
   /** Stable caller key used to return the same turn on a retry. */
-  idempotencyKey: z.string().trim().min(1).max(256).optional()
+  idempotencyKey: z.string().trim().min(1).max(256).optional(),
+  /** How this request relates to an existing long-running task. */
+  taskIntent: z.enum(['auto', 'status', 'supplement', 'new']).optional(),
+  taskOriginThreadId: z.string().optional(),
+  taskVisibility: z.enum(['task', 'internal', 'chat']).optional()
 })
 export type StartTurnRequest = z.input<typeof StartTurnRequest>
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { LocalTool } from './local-tool-host.js'
 import { defineLocalTool } from './local-tool-definition.js'
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead } from './truncate.js'
@@ -39,6 +40,7 @@ export function createReadLocalTool(options: ReadLocalToolOptions = {}): LocalTo
       const { absolutePath, relativePath } = await resolveWorkspacePath(rawPath, context)
       await statOp(absolutePath)
       const fileBuffer = await readFileOp(absolutePath)
+      const sha256 = createHash('sha256').update(fileBuffer).digest('hex')
       const classification = getReadClassification(absolutePath, context.workspace)
       const image = detectImageMimeTypeOp(fileBuffer)
       if (image) {
@@ -49,6 +51,7 @@ export function createReadLocalTool(options: ReadLocalToolOptions = {}): LocalTo
               output: {
                 path: absolutePath,
                 relative_path: relativePath,
+                sha256,
                 kind: 'image',
                 mime_type: image.mimeType,
                 width: image.width ?? null,
@@ -64,6 +67,7 @@ export function createReadLocalTool(options: ReadLocalToolOptions = {}): LocalTo
             output: {
               path: absolutePath,
               relative_path: relativePath,
+              sha256,
               kind: 'image',
               mime_type: resized.mimeType,
               width: resized.width,
@@ -82,6 +86,7 @@ export function createReadLocalTool(options: ReadLocalToolOptions = {}): LocalTo
           output: {
             path: absolutePath,
             relative_path: relativePath,
+            sha256,
             kind: 'image',
             mime_type: image.mimeType,
             width: image.width ?? null,
@@ -94,7 +99,7 @@ export function createReadLocalTool(options: ReadLocalToolOptions = {}): LocalTo
         }
       }
       if (isBinaryBuffer(fileBuffer)) {
-        return { output: { error: 'read only supports text files in WorkWise Runtime mode', path: absolutePath }, isError: true }
+        return { output: { error: 'read only supports text files in RailWise AI Runtime mode', path: absolutePath }, isError: true }
       }
       const text = fileBuffer.toString('utf8').replace(/\r\n/g, '\n')
       const allLines = text.split('\n')
@@ -138,6 +143,7 @@ export function createReadLocalTool(options: ReadLocalToolOptions = {}): LocalTo
         output: {
           path: absolutePath,
           relative_path: relativePath,
+          sha256,
           content,
           classification: classification ?? null,
           start_line: offset,

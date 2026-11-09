@@ -1,6 +1,23 @@
 {
   "schemaVersion": 1,
   "versions": {
+    "0.5.4": {
+      "darwin-arm64": {
+        "name": "WorkWise-0.5.4-mac-Apple-Silicon.dmg",
+        "sha256": "ad766839b02f3b7ae5a290641715b3075cdd46caf08ef9ed92b0d21dfe11b21d",
+        "size": 352281074
+      },
+      "darwin-x64": {
+        "name": "WorkWise-0.5.4-mac-Intel.dmg",
+        "sha256": "b58822e31f7029801521db6371e6b12d1f7204b1d6b8581b5be7cac7d1743563",
+        "size": 360548688
+      },
+      "win32-x64": {
+        "name": "WorkWise-0.5.4-win-x64.exe",
+        "sha256": "a90204159b8d33d7977babee1ecf6247e73a2e23dcd2cf3fd16af98b4f1ae5ac",
+        "size": 293407849
+      }
+    },
     "0.3.5": {
       "darwin-arm64": {
         "name": "WorkWise-0.3.5-mac-Apple-Silicon.dmg",

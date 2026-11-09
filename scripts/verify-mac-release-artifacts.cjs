@@ -5,6 +5,7 @@ const { existsSync, mkdtempSync, readdirSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { basename, join, resolve } = require('node:path')
 const productBrand = require('../src/shared/product-brand.json')
+const { parseArtifactName } = require('./release-publication.cjs')
 const { verifyMacRuntimeEntitlements } = require('./mac-notarize.cjs')._internals
 
 function usage() {
@@ -20,9 +21,9 @@ function run(command, args, options = {}) {
 }
 
 function versionFromArtifactName(name) {
-  const match = name.match(/^WorkWise-(.+)-mac-(?:arm64|x64|Apple-Silicon|Intel)\.dmg$/)
+  const match = parseArtifactName(name)
   if (!match) throw new Error(`Could not resolve version from ${name}.`)
-  return match[1]
+  return match.version
 }
 
 function normalizeLipoArchitecture(architecture) {

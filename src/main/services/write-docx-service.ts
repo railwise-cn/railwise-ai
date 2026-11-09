@@ -925,7 +925,7 @@ async function buildDocxFromMarkdownInner(options: {
   }
 
   const doc = new Document({
-    creator: 'WorkWise',
+    creator: 'RailWise AI',
     title: options.title || basename(options.sourcePath),
     // docx 9.x types restrict all blocks to Paragraph, although its serializer
     // supports tables after the first Paragraph. Normalize that runtime contract

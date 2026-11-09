@@ -1,6 +1,7 @@
 export const TASK_RUN_STATUSES = [
   'queued',
   'running',
+  'paused',
   'waiting_user',
   'waiting_approval',
   'retrying',
@@ -98,19 +99,30 @@ export type TaskCheckpointV1 = {
 export type TaskRunV1 = {
   id: string
   threadId: string
+  originThreadId?: string
+  executionSessionId?: string
+  visible?: boolean
+  visibility?: string
+  retryOfTaskId?: string
+  timing?: { executionMs: number; queuedMs: number; humanWaitMs: number; pausedMs: number; sampledAt: string; coverage: 'complete' | 'partial' }
   activeTurnId?: string
   parentTaskId?: string
+  rootTaskId?: string
   childTaskIds: string[]
   workspaceRoot: string
   repositoryRoot?: string
   goal: string
+  templateId?: string
   status: TaskRunStatus
   acceptance: TaskAcceptanceV1
   agentId: string
   model?: string
   budget: {
+    version?: 1 | 2
     maxAttempts: number
     maxDurationMs: number
+    maxExecutionMs?: number
+    maxElapsedMs?: number
     maxCostUsd?: number
   }
   attempts: number
@@ -132,6 +144,70 @@ export type TaskRunListQuery = {
   workspaceRoot?: string
   status?: TaskRunStatus
   limit?: number
+  offset?: number
+  search?: string
+  cursor?: string
+}
+
+export type TaskInputV1 = {
+  id: string
+  taskId: string
+  kind: 'supplement' | 'user_answer' | 'tool_result' | 'handoff'
+  text: string
+  createdAt: string
+  deliveredAt?: string
+  consumedAt?: string
+  sourceId?: string
+  idempotencyKey: string
+}
+
+export type TaskEventV1 = {
+  taskId: string
+  sequence: number
+  eventKey: string
+  kind: string
+  payload: Record<string, unknown>
+  createdAt: string
+}
+
+export type TaskAttentionV1 = {
+  id: string
+  ownerKind: 'task' | 'flow'
+  ownerId: string
+  taskId?: string
+  threadId?: string
+  workspaceRoot?: string
+  flowId?: string
+  flowRunId?: string
+  nodeId?: string
+  kind: 'question' | 'approval' | 'conflict' | 'blocked'
+  title: string
+  message: string
+  status: 'pending' | 'answered' | 'cancelled' | 'expired'
+  revision: number
+  createdAt: string
+  updatedAt: string
+  requestId?: string
+  payload?: Record<string, unknown>
+}
+
+export type TaskTemplateId = 'monitoring-report' | 'tender-document' | 'research-document'
+export type TaskTemplateV1 = {
+  id: TaskTemplateId
+  name: string
+  description: string
+  stages: string[]
+  outputs: string[]
+  requiredInputs: string[]
+}
+export type TaskTemplateStartV1 = {
+  workspaceRoot: string
+  goal: string
+  sourcePaths?: string[]
+  outputDirectory?: string
+  model?: string
+  providerId?: string
+  idempotencyKey: string
 }
 
 export type AgentProfileV1 = {
@@ -440,3 +516,7 @@ export type LspResponseV1 = {
 export type WorkbenchMutationResult<T> =
   | { ok: true; value: T }
   | { ok: false; code: 'stale_request' | 'unsafe_path' | 'resource_limit' | 'not_found' | 'invalid_state' | 'error'; message: string }
+
+export type TaskPageQuery = { workspaceRoot?: string; threadId?: string; search?: string; filter?: 'ongoing'|'attention'|'completed'|'all'; limit?: number; cursor?: string }
+export type TaskRunPage = { items: TaskRunV1[]; relatedTasks: TaskRunV1[]; attention: TaskAttentionV1[]; total: number; counts: Record<'ongoing'|'attention'|'completed'|'all',number>; nextCursor?: string; snapshotId: string; expiresAt: string; eventWatermark: number }
+export type TaskChangeEvent = { seq:number; taskId?:string; kind:'task_changed'|'attention_changed'; payload:Record<string,unknown>; createdAt:string }

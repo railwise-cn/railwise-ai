@@ -259,6 +259,33 @@ describe('registerAppIpcHandlers', () => {
     }
   })
 
+  it('forwards task workspace pagination and typed coordinator commands through the real desktop IPC handler', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const response = { ok: true, status: 200, body: '{"items":[],"kind":"snapshot"}' }
+    const runtimeRequest = vi.fn(async () => response)
+    registerAppIpcHandlers(registerOptions({ runtimeRequest: runtimeRequest as never }))
+    const query = new URLSearchParams({ pagination: 'cursor', filter: 'all', limit: '200' })
+    const cursor = Buffer.from(JSON.stringify({ id: 'snapshot_1', offset: 200 })).toString('base64url')
+    const command = { threadId: 'origin_1', taskId: 'task_1', intent: 'status', idempotencyKey: 'query_1', request: { prompt: '现在做到哪了', model: 'deepseek-flash', providerId: 'deepseek' } }
+    const requests = [
+      { path: `/v1/tasks?${query}`, method: 'GET', body: undefined },
+      { path: `/v1/tasks?${query}&cursor=${cursor}`, method: 'GET', body: undefined },
+      { path: '/v1/task-commands', method: 'POST', body: JSON.stringify(command) },
+      { path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...command, intent: 'new', request: { prompt: '重读合成资料并只更新风险章节。', model: 'deepseek-flash' } }) }
+    ]
+    for (const request of requests) {
+      await expect(handlers.get('runtime:request')?.({}, request)).resolves.toEqual(response)
+      expect(runtimeRequest).toHaveBeenLastCalledWith(request.path, request.method, request.body)
+    }
+    const calls = runtimeRequest.mock.calls.length
+    for (const request of [
+      { path: '/v1/tasks?pagination=cursor&filter=all&unexpected=1', method: 'GET' },
+      { path: '/v1/task-commands', method: 'GET' },
+      { path: '/v1/task-commands', method: 'POST', body: JSON.stringify({ ...command, request: { prompt: 'x', arbitrary: true } }) }
+    ]) await expect(handlers.get('runtime:request')?.({}, request)).rejects.toThrow(/Invalid payload for runtime:request/)
+    expect(runtimeRequest).toHaveBeenCalledTimes(calls)
+  })
+
   it('registers native PPTX revision IPC channels and rejects malformed payloads', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     registerAppIpcHandlers(registerOptions())

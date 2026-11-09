@@ -111,8 +111,8 @@ collect() {
   done
 }
 
-collect "Windows exe" "dist/WorkWise-*-win-*.exe"
-collect "Windows blockmap" "dist/WorkWise-*-win-*.exe.blockmap"
+collect "Windows exe" "dist/RailWise-AI-*-win-*.exe"
+collect "Windows blockmap" "dist/RailWise-AI-*-win-*.exe.blockmap"
 
 cyan "Uploading ${#ASSETS[@]} Windows asset(s) to ${TAG_NAME}..."
 for asset in "${ASSETS[@]}"; do

@@ -3,6 +3,7 @@
 const { execFileSync } = require('node:child_process')
 const { existsSync, readdirSync, rmSync } = require('node:fs')
 const { join, resolve } = require('node:path')
+const { artifactName } = require('./release-publication.cjs')
 
 const arch = process.argv[2]
 if (arch !== 'arm64' && arch !== 'x64') {
@@ -34,10 +35,7 @@ if (isCandidate && candidateApps.length !== 1) {
 }
 const appName = isCandidate ? candidateApps[0] : `${productBrand.platform}.app`
 const appPath = join(appOutDir, appName)
-const artifactPrefix = isCandidate && /^[0-9a-f]{12,40}$/.test(candidateHead)
-  ? `WorkWise-Candidate-${candidateHead.slice(0, 12)}`
-  : 'WorkWise'
-const zipPath = join(distDir, `${artifactPrefix}-${version}-mac-${arch}.zip`)
+const zipPath = join(distDir, artifactName({ version, platform: 'mac', arch, format: 'zip', ...(isCandidate ? { candidateSourceHead: candidateHead } : {}) }))
 
 if (!existsSync(appPath)) {
   console.error(`[zip-mac-app] App bundle not found: ${appPath}`)

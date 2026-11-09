@@ -7,7 +7,7 @@ export function buildFlowToolProviders(service: FlowRuntimeService): CapabilityT
     id: 'flow', kind: 'flow', enabled: true, available: true,
     tools: [LocalToolHost.defineTool({
       name: 'run_flow',
-      description: 'Run an authorized published WorkWise Flow through the existing Runtime. Recursive calls and depth above three are rejected.',
+      description: 'Run an authorized published RailWise AI Flow through the existing Runtime. Recursive calls and depth above three are rejected.',
       inputSchema: { type: 'object', properties: { flow_id: { type: 'string' }, input: {} }, required: ['flow_id'], additionalProperties: false },
       policy: 'on-request',
       execute: async (args, context) => {

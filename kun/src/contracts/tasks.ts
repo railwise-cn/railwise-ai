@@ -1,8 +1,11 @@
 import { z } from 'zod'
+import { WorkspaceReferenceSchema } from './workspace-references.js'
+import type { ContextBundle, HandoffPacket } from './task-context.js'
 
 export const TaskRunStatusSchema = z.enum([
   'queued',
   'running',
+  'paused',
   'waiting_user',
   'waiting_approval',
   'retrying',
@@ -75,16 +78,85 @@ export const TaskCheckpointSchema = z.object({
   eventSequence: z.number().int().nonnegative(),
   resumeSummary: z.string(),
   progressFingerprint: z.string().optional(),
+  executionId: z.string().optional(),
+  consumedInputIds: z.array(z.string()).optional(),
+  sessionItemId: z.string().optional(),
+  sessionHash: z.string().optional(),
   createdAt: z.string().min(1),
   revision: z.number().int().nonnegative()
 })
 export type TaskCheckpoint = z.infer<typeof TaskCheckpointSchema>
 
+export const TaskAuthoritySchema = z.object({
+  source: z.enum(['user', 'inherited', 'legacy']),
+  workspaceRoot: z.string().min(1),
+  toolAllowlist: z.array(z.string()).optional(),
+  mcpAllowlist: z.array(z.string()).optional(),
+  approvalPolicy: z.string().optional(),
+  sandboxMode: z.string().optional(),
+  externalTargets: z.array(z.string()).default([]),
+  grantedAt: z.string(),
+  revokedAt: z.string().optional()
+})
+export type TaskAuthority = z.infer<typeof TaskAuthoritySchema>
+
+export const TaskInputSchema = z.object({
+  id: z.string().min(1), taskId: z.string().min(1),
+  kind: z.enum(['supplement', 'user_answer', 'tool_result', 'handoff']),
+  text: z.string().min(1), idempotencyKey: z.string().min(1),
+  sourceId: z.string().optional(), createdAt: z.string(), deliveredAt: z.string().optional(), consumedAt: z.string().optional()
+  ,attachmentIds: z.array(z.string().min(1)).max(32).optional()
+  ,workspaceReferences: z.array(WorkspaceReferenceSchema).max(32).optional()
+})
+export type TaskInput = z.infer<typeof TaskInputSchema>
+
+export const AttentionItemSchema = z.object({
+  id: z.string().min(1), ownerKind: z.enum(['task', 'flow']), ownerId: z.string().min(1),
+  taskId: z.string().optional(), threadId: z.string().optional(), requestId: z.string().optional(),
+  workspaceRoot:z.string().optional(),flowId:z.string().optional(),flowRunId:z.string().optional(),nodeId:z.string().optional(),
+  kind: z.enum(['question', 'approval', 'conflict', 'blocked']),
+  title: z.string(), message: z.string(),
+  status: z.enum(['pending', 'answered', 'cancelled', 'expired']),
+  revision: z.number().int().nonnegative(), createdAt: z.string(), updatedAt: z.string(),
+  payload: z.record(z.string(), z.unknown()).optional()
+})
+export type AttentionItem = z.infer<typeof AttentionItemSchema>
+
+export const OperationReceiptSchema = z.object({
+  id: z.string(), ownerId: z.string(), idempotencyKey: z.string(), fingerprint: z.string(), kind: z.string(),
+  status: z.enum(['prepared', 'running', 'succeeded', 'failed', 'outcome_unknown']),
+  request: z.record(z.string(), z.unknown()).optional(), result: z.unknown().optional(),
+  createdAt: z.string(), updatedAt: z.string(), error: z.string().optional()
+})
+export type OperationReceipt = z.infer<typeof OperationReceiptSchema>
+
+export type RuntimeOutboxItem = {
+  id: string; ownerId: string; kind: string; payload: Record<string, unknown>;
+  createdAt: string; deliveredAt?: string; attempts: number
+}
+
+export type TaskAssignment = {
+  id: string; parentTaskId: string; childTaskId: string; goal: string;
+  acceptance: string[]; authority: TaskAuthority; sessionId: string;
+  handoff?: HandoffPacket
+}
+
 export const TaskRunSchema = z.object({
   id: z.string().min(1),
   threadId: z.string().min(1),
   activeTurnId: z.string().optional(),
+  originThreadId: z.string().optional(),
+  executionSessionId: z.string().optional(),
+  visibility: z.enum(['task', 'internal', 'chat']).optional(),
   parentTaskId: z.string().optional(),
+  rootTaskId: z.string().optional(),
+  retryOfTaskId: z.string().optional(),
+  flowRunId: z.string().optional(),
+  flowId: z.string().optional(),
+  templateId: z.string().optional(),
+  authority: TaskAuthoritySchema.optional(),
+  executionMs: z.number().nonnegative().optional(),
+  executionStartedAt: z.string().optional(),
   childTaskIds: z.array(z.string()),
   workspaceRoot: z.string().min(1),
   repositoryRoot: z.string().optional(),
@@ -99,6 +171,9 @@ export const TaskRunSchema = z.object({
   budget: z.object({
     maxAttempts: z.number().int().positive(),
     maxDurationMs: z.number().int().positive(),
+    version: z.literal(2).optional(),
+    maxExecutionMs: z.number().int().positive().optional(),
+    maxElapsedMs: z.number().int().positive().optional(),
     maxCostUsd: z.number().positive().optional()
   }),
   attempts: z.number().int().nonnegative(),
@@ -147,8 +222,14 @@ export const ShellSessionSchema = z.object({
   nodeId: z.string().min(1),
   workspaceRoot: z.string().min(1),
   commandSummary: z.string(),
+  pid: z.number().int().positive().optional(),
+  processFingerprint: z.string().optional(),
+  processGroup: z.number().int().positive().optional(),
+  ownerId: z.string().optional(),
+  executionId: z.string().optional(),
+  cancelRequestedAt: z.string().optional(),
   cwd: z.string().min(1),
-  status: z.enum(['starting', 'running', 'completed', 'failed', 'terminated', 'interrupted']),
+  status: z.enum(['starting', 'running', 'completed', 'failed', 'terminated', 'interrupted', 'outcome_unknown']),
   exitCode: z.number().int().optional(),
   outputPath: z.string().min(1),
   outputBytes: z.number().int().nonnegative(),

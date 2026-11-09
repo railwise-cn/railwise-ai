@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, rm, open } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { LocalTool } from './local-tool-host.js'
 import { defineLocalTool } from './local-tool-definition.js'
@@ -26,6 +26,8 @@ import {
 import { safeSpawn } from './safe-spawn.js'
 import { RUNTIME_RESOURCE_LIMITS_V1 } from '../../contracts/resource-limits.js'
 import { summarizeBashCommandForPersistence } from '../../security/tool-persistence-security.js'
+import { processIdentity, inspectProcess } from '../../services/process-identity.js'
+import type { CapacityManager, CapacityPermit } from '../../services/capacity-manager.js'
 
 const DEFAULT_BASH_YIELD_SECONDS = 10
 const MAX_BASH_YIELD_SECONDS = 60
@@ -53,6 +55,10 @@ type BashSession = {
   exitWaiters: Set<() => void>
   persistentOutput: boolean
   lifecycle?: BashSessionLifecycle
+  capacityPermit?: CapacityPermit
+  startedPersistence?: Promise<void>
+  finishedPersistence?: Promise<void>
+  cleanupExecution?: () => void
 }
 
 type BashPayload = {
@@ -99,8 +105,11 @@ export async function stopAllBashSessions(reason = 'application_exit'): Promise<
   }
   await Promise.all(running.map((session) => waitForSessionExitOrDelay(session, STOP_GRACE_MS)))
   for (const session of running) {
-    if (session.status === 'running') settleSession(session, 'failed', null, reason)
+    if (session.status === 'running') terminateSpawnTree(session.child, { signal: 'SIGKILL' })
   }
+  await Promise.all(running.map(session => waitForSessionExitOrDelay(session, STOP_GRACE_MS)))
+  if (running.some(session => session.status === 'running')) throw new Error(`Shell shutdown could not confirm process exit (${reason}); results remain unknown.`)
+  await Promise.all([...bashSessions.values()].map(session => session.finishedPersistence))
   await Promise.all([...bashSessions.values()].map(disposeSession))
   return running.length
 }
@@ -371,7 +380,8 @@ async function sessionPayload(
   options: { stopSent?: boolean } = {}
 ): Promise<BashPayload> {
   if (session.status !== 'running') {
-    await finalizeSessionOutput(session)
+    if (session.finishedPersistence) await session.finishedPersistence
+    else await finalizeSessionOutput(session)
   }
   const snapshot = session.output.snapshot({ persistIfTruncated: true })
   const truncated = textSliceFromSnapshot(snapshot)
@@ -411,13 +421,21 @@ function settleSession(
   session.exitCode = exitCode
   session.finishedAt = new Date().toISOString()
   if (error) session.error = error
-  void session.lifecycle?.onFinished?.({
-    sessionId: session.id,
-    status: status === 'stopped' ? 'terminated' : status,
-    ...(exitCode !== null ? { exitCode } : {}),
-    outputBytes: session.rawOutputBytes,
-    finishedAt: session.finishedAt
+  session.cleanupExecution?.()
+  session.capacityPermit?.release()
+  session.finishedPersistence = Promise.resolve(session.startedPersistence).then(async () => {
+    await finalizeSessionOutput(session)
+    await session.lifecycle?.onFinished?.({
+      sessionId: session.id,
+      status: status === 'stopped' ? 'terminated' : status,
+      ...(exitCode !== null ? { exitCode } : {}),
+      outputBytes: session.rawOutputBytes,
+      finishedAt: session.finishedAt!
+    })
   })
+  // Keep failure observable at shutdown/poll, without an unhandled rejection
+  // when a process finishes between tool polls.
+  void session.finishedPersistence.catch(() => undefined)
   for (const waiter of session.exitWaiters) waiter()
   session.exitWaiters.clear()
   scheduleSessionCleanup(session)
@@ -466,6 +484,7 @@ async function startBashSession(
     workspaceRoot: string
     sessionOutputRoot?: string
     lifecycle?: BashSessionLifecycle
+    capacityManager?: CapacityManager
   },
   onUpdate?: (update: { output: unknown; isError?: boolean }) => Promise<void> | void
 ): Promise<{ payload: BashPayload; isError?: boolean }> {
@@ -487,17 +506,18 @@ async function startBashSession(
   }
   const shellRuntime = shellRuntimeInfo()
   const sessionId = nextSessionId()
+  const capacityPermit = input.capacityManager?.reserve({ id: `shell:${sessionId}`, workspaceRoot: input.workspaceRoot, resources: { shell: 1 } })
   const outputFilePath = input.sessionOutputRoot
     ? join(input.sessionOutputRoot, `${sessionId}.log`)
     : undefined
-  if (input.sessionOutputRoot) await mkdir(input.sessionOutputRoot, { recursive: true })
-  const child = await safeSpawn(shellRuntime.shell, shellCommandArgs(shellRuntime, input.command), {
-    cwd: input.cwd,
-    workspace: input.cwd,
-    env: process.env,
-    detached: process.platform !== 'win32',
-    windowsHide: true
-  })
+  let child: ChildProcessWithoutNullStreams
+  try {
+    if (input.sessionOutputRoot) await mkdir(input.sessionOutputRoot, { recursive: true })
+    child = await safeSpawn(shellRuntime.shell, shellCommandArgs(shellRuntime, input.command), {
+      cwd: input.cwd, workspace: input.cwd, env: process.env,
+      detached: process.platform !== 'win32', windowsHide: true
+    })
+  } catch (error) { capacityPermit?.release(); throw error }
   const session: BashSession = {
     id: sessionId,
     command: input.command,
@@ -513,12 +533,13 @@ async function startBashSession(
     rawOutputBytes: 0,
     exitWaiters: new Set(),
     persistentOutput: Boolean(outputFilePath),
+    ...(capacityPermit ? { capacityPermit } : {}),
     ...(input.lifecycle ? { lifecycle: input.lifecycle } : {})
   }
   bashSessions.set(session.id, session)
-  if (outputFilePath) {
-    try {
-      await input.lifecycle?.onStarted?.({
+  const identity = child.pid ? processIdentity(child.pid) : null
+  session.startedPersistence = Promise.resolve().then(async () => {
+    if (outputFilePath) await input.lifecycle?.onStarted?.({
         sessionId,
         threadId: input.threadId,
         turnId: input.turnId,
@@ -526,14 +547,11 @@ async function startBashSession(
         cwd: input.cwd,
         commandSummary: summarizeBashCommandForPersistence(input.command),
         outputPath: outputFilePath,
-        startedAt: session.startedAt
+        startedAt: session.startedAt,
+        ...(child.pid ? { pid: child.pid, ...(process.platform !== 'win32' ? { processGroup: child.pid } : {}) } : {}),
+        ...(identity ? { processFingerprint: identity.fingerprint } : {})
       })
-    } catch (error) {
-      stopSession(session)
-      await waitForSessionExitOrDelay(session, STOP_GRACE_MS)
-      throw error
-    }
-  }
+  })
 
   let updateDirty = false
   let updateTimer: NodeJS.Timeout | undefined
@@ -583,13 +601,23 @@ async function startBashSession(
   child.once('exit', (code) => {
     settleSession(session, session.stopRequested ? 'stopped' : 'completed', code)
   })
+  // Register exit/output listeners before awaiting the durable start receipt;
+  // a short command may otherwise finish while SQLite is being written.
+  try { await session.startedPersistence } catch (error) {
+    stopSession(session)
+    await waitForSessionExitOrDelay(session, STOP_GRACE_MS)
+    throw error
+  }
 
   const onAbort = () => stopSession(session)
   input.signal.addEventListener('abort', onAbort, { once: true })
   const timeoutMs = input.timeoutSeconds * 1000
+  const commandTimer = setTimeout(() => stopSession(session), timeoutMs)
+  commandTimer.unref?.()
+  session.cleanupExecution = () => { clearTimeout(commandTimer); input.signal.removeEventListener('abort', onAbort) }
+  if (session.status !== 'running') session.cleanupExecution()
   const yieldMs = Math.min(input.yieldSeconds * 1000, timeoutMs)
   const exited = await waitForSessionExitOrDelay(session, yieldMs)
-  input.signal.removeEventListener('abort', onAbort)
   if (updateTimer) clearTimeout(updateTimer)
 
   if (input.signal.aborted) {
@@ -658,6 +686,22 @@ export function createBashLocalTool(options: BashLocalToolOptions = {}): LocalTo
         }
         const session = sessionById(args.session_id)
         if (!session) {
+          const recovered = typeof args.session_id === 'string' ? options.recoverSession?.(args.session_id, context.threadId) : null
+          if (recovered && action === 'poll') {
+            let output = ''
+            if (recovered.outputPath) {
+              const handle = await open(recovered.outputPath, 'r')
+              try {
+                const info = await handle.stat()
+                const buffer = Buffer.alloc(Math.min(info.size, DEFAULT_MAX_BYTES))
+                const read = await handle.read(buffer, 0, buffer.length, Math.max(0, info.size - buffer.length))
+                output = buffer.subarray(0, read.bytesRead).toString('utf8')
+              } finally { await handle.close() }
+            }
+            const identity = recovered.pid && recovered.processFingerprint ? { pid: recovered.pid, fingerprint: recovered.processFingerprint } : null
+            return { output: { session_id: recovered.id, output, cwd: recovered.cwd, status: recovered.status, process_state: identity ? inspectProcess(identity) : 'unknown', full_output_path: recovered.outputPath, recovered: true, read_only: true } }
+          }
+          if (recovered) return { output: { error: 'Recovered process must be verified before writing or stopping; read-only poll remains available.', session_id: recovered.id, code: 'outcome_unknown' }, isError: true }
           return { output: { error: 'bash session not found', session_id: args.session_id ?? null }, isError: true }
         }
         if (action === 'write') {
@@ -700,6 +744,7 @@ export function createBashLocalTool(options: BashLocalToolOptions = {}): LocalTo
               threadId: context.threadId,
               turnId: context.turnId,
               workspaceRoot: context.workspace,
+              ...(options.capacityManager ? { capacityManager: options.capacityManager } : {}),
               ...(options.sessionOutputRoot ? { sessionOutputRoot: options.sessionOutputRoot } : {}),
               ...(options.sessionLifecycle ? { lifecycle: options.sessionLifecycle } : {})
             },

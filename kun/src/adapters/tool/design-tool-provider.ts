@@ -60,7 +60,7 @@ function createDesignApplyCanvasCommandsTool(): LocalTool {
   return LocalToolHost.defineTool({
     name: DESIGN_APPLY_CANVAS_COMMANDS_TOOL_NAME,
     description:
-      'Apply one atomic batch of structured operations to the currently open WorkWise Design canvas. ' +
+      'Apply one atomic batch of structured operations to the currently open RailWise AI Design canvas. ' +
       'Use this instead of writing SVG or HTML files. The renderer validates the active document, page, ' +
       'workspace and revision before changing the canvas. Supported operations are add, update, remove, ' +
       'group and ungroup.',

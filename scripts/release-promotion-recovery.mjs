@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import publication from './release-publication.cjs'
 // Preserve the currently selected public versions before this attempt changes them.
 // Immutable uploads and draft preparation do not authorize a pointer rollback.
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
@@ -194,7 +195,9 @@ async function sha256File(path) {
 }
 async function reviewedInstallers(targetTag) {
   const version = tagVersion(targetTag); const installers = {}
-  for (const name of [`WorkWise-${version}-mac-Apple-Silicon.dmg`, `WorkWise-${version}-mac-Intel.dmg`, `WorkWise-${version}-win-x64.exe`]) {
+  const manifest = publication.readPublicationManifest(resolve('website-release-assets/publication-manifest.json'))
+  equal(manifest.version, version, 'installer publication version')
+  for (const { name } of manifest.installers) {
     const path = resolve('public-release-assets', name)
     installers[name] = { sha256: await sha256File(path), size: statSync(path).size }
   }
@@ -244,7 +247,7 @@ function liveTransport(env) {
     }
     if (!files.size) fail('saved R2 metadata does not identify any recoverable packages')
     for (const [key, file] of files) {
-      if (typeof file.fileName !== 'string' || !file.fileName.startsWith(`WorkWise-${version}-`)
+      if (typeof file.fileName !== 'string' || publication.parseArtifactName(file.fileName)?.version !== version
         || !/^[A-Za-z0-9._-]+$/.test(file.fileName) || !/^[A-Za-z0-9+/]{86}==$/.test(file.sha512 ?? '')) fail('saved R2 package identity or SHA-512 is invalid')
       const response = await client.send(new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key }))
       if (!response.Body) fail(`saved R2 package is missing: ${key}`)
@@ -266,7 +269,7 @@ function liveTransport(env) {
       verifyPublishedInstallers(releases[0], state)
       const directory = mkdtempSync(join(tmpdir(), 'railwise-commit-installers-'))
       try {
-        execFileSync('gh', ['release', 'download', state.targetTag, '--repo', REPOSITORY, '--dir', directory, '--pattern', 'WorkWise-*'], { stdio: 'inherit', timeout: 30 * 60_000 })
+        execFileSync('gh', ['release', 'download', state.targetTag, '--repo', REPOSITORY, '--dir', directory, '--pattern', `${publication.detectPrefix(Object.keys(state.installers), tagVersion(state.targetTag))}-*`], { stdio: 'inherit', timeout: 30 * 60_000 })
         equal(readdirSync(directory).sort(), Object.keys(state.installers).sort(), 'downloaded GitHub installers differ from the reviewed set')
         for (const [name, expected] of Object.entries(state.installers)) {
           equal(await sha256File(join(directory, name)), expected.sha256, `downloaded GitHub installer differs from accepted bytes: ${name}`)

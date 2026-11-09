@@ -109,7 +109,7 @@ function readRuntimeJson<T>(body: string, fallback: string): T {
  */
 export class WorkWiseRuntimeProvider implements AgentProvider {
   readonly id = 'kun' as const
-  readonly displayName = 'WorkWise Agent Runtime'
+  readonly displayName = 'RailWise AI Runtime'
 
   getCapabilities(): {
     interrupt: boolean

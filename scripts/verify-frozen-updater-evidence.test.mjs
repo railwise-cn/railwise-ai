@@ -217,6 +217,16 @@ test('packaged service contracts support both layouts and explicitly labeled bas
   }
 })
 
+test('explicit baseline flows through service readback without changing historical defaults', () => {
+  const sourceHead = 'a'.repeat(40); const version = '0.5.5'
+  const machine = { ...serviceEvidence(sourceHead, version), arch: 'arm64', baseVersion: '0.5.4' }
+  machine.dataSeed.serviceIdentity.packageVersion = '0.5.4'
+  assert.equal(validateUpdaterServiceEvidence(machine, { sourceHead, version, baseVersion: '0.5.4' }), machine)
+  assert.throws(() => validateUpdaterServiceEvidence(machine, { sourceHead, version }), /baseline version/)
+  machine.dataSeed.serviceIdentity.packageVersion = '0.5.3'
+  assert.throws(() => validateUpdaterServiceEvidence(machine, { sourceHead, version, baseVersion: '0.5.4' }), /dataSeed package version/)
+})
+
 test('source fallback, unbound or changed services and unsafe dependency identities are rejected', async t => {
   const changes = {
     targetFallback: f => { f.machine.dataReadback.serviceSource = 'source-bound-compatibility-service' },

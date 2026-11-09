@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { TaskRun } from '../contracts/tasks.js'
-import { TaskRevisionConflictError, TaskRunRepository } from './task-run-repository.js'
+import { TaskLeaseLostError, TaskRevisionConflictError, TaskRunRepository } from './task-run-repository.js'
 
 const cleanup: string[] = []
 
@@ -119,7 +119,42 @@ describe('TaskRunRepository', () => {
     store.close()
   })
 
-  it('persists shell sessions and marks unfinished processes interrupted on restart', async () => {
+  it('renews a lease only for its current owner and fences stale revisions', async () => {
+    const store = await repository()
+    const created = store.create(task({ status: 'running' }))
+    const first = store.acquireLease(created.id, 'owner-a', '2026-07-18T00:00:00.000Z', '2026-07-18T00:01:00.000Z')!
+
+    expect(store.renewLease(
+      created.id,
+      first.ownerId,
+      first.revision,
+      '2026-07-18T00:00:30.000Z',
+      '2026-07-18T00:01:30.000Z'
+    )).toMatchObject({ ownerId: 'owner-a', revision: first.revision, expiresAt: '2026-07-18T00:01:30.000Z' })
+    expect(store.renewLease(
+      created.id,
+      'owner-b',
+      first.revision,
+      '2026-07-18T00:00:30.000Z',
+      '2026-07-18T00:01:30.000Z'
+    )).toBeNull()
+
+    const revisionBeforeTakeover = store.get(created.id)!.revision
+    expect(store.acquireLease(created.id, 'owner-b', '2026-07-18T00:02:00.000Z', '2026-07-18T00:03:00.000Z'))
+      .toMatchObject({ ownerId: 'owner-b', revision: first.revision + 1 })
+    expect(store.releaseLease(created.id, 'owner-a', first.revision)).toBe(false)
+    expect(store.getLease(created.id)?.ownerId).toBe('owner-b')
+    expect(() => store.update(
+      created.id,
+      revisionBeforeTakeover,
+      current => ({ ...current, updatedAt: '2026-07-18T00:02:01.000Z' }),
+      undefined,
+      { ownerId: 'owner-a', leaseRevision: first.revision, nowIso: '2026-07-18T00:02:01.000Z' }
+    )).toThrow(TaskLeaseLostError)
+    store.close()
+  })
+
+  it('keeps an unverified unfinished process outcome unknown on restart', async () => {
     const store = await repository()
     store.create(task({ status: 'running' }))
     const created = store.createShellSession({
@@ -141,7 +176,7 @@ describe('TaskRunRepository', () => {
     expect(interrupted).toHaveLength(1)
     expect(interrupted[0]).toMatchObject({
       id: created.id,
-      status: 'interrupted',
+      status: 'outcome_unknown',
       revision: 1,
       finishedAt: '2026-07-18T00:01:00.000Z'
     })

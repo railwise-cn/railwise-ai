@@ -10,6 +10,7 @@ import { SurveyInitialValueChangeRequestV1, SurveySegmentComparisonRequestV1 } f
 import { SurveyQualityPlanCreateV1, SurveyQualityEvidenceCreateV1, SurveyQualityRecordCreateV1, SurveyQualityCheckAppendV1 } from '../../shared/survey-quality-workspace'
 import { QUALITY_WORKFLOW_LIMITS, SurveyQualityWorkflowCreateV1, SurveyQualityWorkflowAppendV1, parseQualityWorkflowJson } from '../../shared/survey-quality-workflow'
 import { SurveyDraftCreateV1, SurveyDraftSealV1 } from '../../shared/survey-collaboration'
+import { TaskCommandSchema } from '../../../kun/src/contracts/execution'
 import {
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIALS_TEMPLATE,
   RUNTIME_ENGINEERING_FREE_LEVELING_TRIAL_TEMPLATE,
@@ -32,6 +33,14 @@ import {
   RUNTIME_TASK_RETRY_TEMPLATE,
   RUNTIME_TASK_CANCEL_TEMPLATE,
   RUNTIME_TASK_DIAGNOSTICS_TEMPLATE,
+  RUNTIME_TASK_PAUSE_TEMPLATE,
+  RUNTIME_TASK_INPUTS_TEMPLATE,
+  RUNTIME_TASK_EVENTS_TEMPLATE,
+  RUNTIME_TASK_SUMMARY_TEMPLATE,
+  RUNTIME_INBOX_TEMPLATE,
+  RUNTIME_TASK_TEMPLATES_TEMPLATE,
+  RUNTIME_TASK_TEMPLATE_START_TEMPLATE,
+  RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE,
   RUNTIME_SHELL_SESSIONS_TEMPLATE,
   RUNTIME_SHELL_SESSION_TERMINATE_TEMPLATE,
   RUNTIME_THREADS_TEMPLATE,
@@ -255,6 +264,10 @@ const COLLABORATION_ENDPOINTS = [
   { path: '/v1/engineering/collaboration-drafts/resolve', methods: ['POST'], schema: surveyDraftSelectionSchema }
 ].map(entry => ({ ...entry, endpoint: compileEndpoint(entry.path, entry.methods, []) }))
 
+// Use the Runtime's real command/Turn contract so model, attachments and scoped
+// source references stay aligned with the desktop coordinator entry point.
+const desktopTaskCommandSchema = TaskCommandSchema.extend({ request: TaskCommandSchema.shape.request.strict() }).strict()
+
 const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_STANDARD_BASIS_PATH, ['GET'], []),
   compileEndpoint(`${RUNTIME_STANDARD_BASIS_PATH}/{id}/{recordId}`, ['GET'], STANDARD_BASIS_QUERY_KEYS),
@@ -281,12 +294,21 @@ const ENDPOINTS: readonly EndpointTemplate[] = [
   compileEndpoint(RUNTIME_INFO_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TOOLS_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_SKILLS_TEMPLATE, ['GET']),
-  compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASKS_TEMPLATE, ['GET'], ['threadId', 'workspaceRoot', 'status', 'limit', 'offset', 'search', 'pagination', 'filter', 'cursor']),
+  compileEndpoint('/v1/task-commands', ['POST'], []),
   compileEndpoint(RUNTIME_TASK_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_TASK_RESUME_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_RETRY_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_CANCEL_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_TASK_DIAGNOSTICS_TEMPLATE, ['GET']),
+  compileEndpoint(RUNTIME_TASK_PAUSE_TEMPLATE, ['POST']),
+  compileEndpoint(RUNTIME_TASK_INPUTS_TEMPLATE, ['GET', 'POST'], []),
+  compileEndpoint(RUNTIME_TASK_EVENTS_TEMPLATE, ['GET'], ['afterSequence']),
+  compileEndpoint(RUNTIME_TASK_SUMMARY_TEMPLATE, ['GET'], ['workspaceRoot', 'search', 'threadId']),
+  compileEndpoint(RUNTIME_INBOX_TEMPLATE, ['GET'], ['workspaceRoot']),
+  compileEndpoint(RUNTIME_TASK_TEMPLATES_TEMPLATE, ['GET'], []),
+  compileEndpoint(RUNTIME_TASK_TEMPLATE_START_TEMPLATE, ['POST'], []),
+  compileEndpoint(RUNTIME_TASK_TEMPLATE_SAVE_TEMPLATE, ['POST'], []),
   compileEndpoint(RUNTIME_SHELL_SESSIONS_TEMPLATE, ['GET']),
   compileEndpoint(RUNTIME_SHELL_SESSION_TERMINATE_TEMPLATE, ['POST']),
   compileEndpoint(RUNTIME_ATTACHMENTS_TEMPLATE, ['POST']),
@@ -409,6 +431,27 @@ export const runtimeRequestPayloadSchema = z
     try { url = new URL(payload.path, 'http://localhost') } catch {
       context.addIssue({ code: 'custom', message: 'invalid runtime request URL' })
       return
+    }
+    if (url.pathname === RUNTIME_TASKS_TEMPLATE) {
+      const pagination = url.searchParams.get('pagination')
+      const filter = url.searchParams.get('filter')
+      const cursor = url.searchParams.get('cursor')
+      const limit = url.searchParams.get('limit')
+      const valid = (payload.method ?? 'GET') === 'GET' && payload.body === undefined && !url.hash
+        && (pagination === null || pagination === 'cursor')
+        && (filter === null || (pagination === 'cursor' && ['ongoing', 'attention', 'completed', 'all'].includes(filter)))
+        && (cursor === null || /^[A-Za-z0-9_-]+$/.test(cursor))
+        && (pagination !== 'cursor' || (!url.searchParams.has('status') && !url.searchParams.has('offset')
+          && (limit === null || (/^[1-9]\d*$/.test(limit) && Number(limit) <= 200))))
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid task list request' })
+    }
+    if (url.pathname === '/v1/task-commands') {
+      let valid = payload.method === 'POST' && !url.search && !url.hash && payload.body !== undefined
+        && Buffer.byteLength(payload.body, 'utf8') <= MAX_BODY_BYTES
+      if (valid) {
+        try { valid = desktopTaskCommandSchema.safeParse(JSON.parse(payload.body!)).success } catch { valid = false }
+      }
+      if (!valid) context.addIssue({ code: 'custom', message: 'invalid task coordinator command' })
     }
     if (/^\/v1\/engineering\/adjustments\/[^/]+\/professional-review$/.test(url.pathname)
       && ((payload.method ?? 'GET') !== 'GET' || payload.body !== undefined || url.search || url.hash)) {
@@ -1237,6 +1280,12 @@ export const checkedDocumentWritePayloadSchema = z.object({
   source: z.enum(['user', 'agent', 'external', 'restore']).optional()
 }).strict()
 
+export const documentCandidateReadPayloadSchema = documentReadPayloadSchema.extend({ targetPath: defaultPathSchema.optional() }).strict()
+export const documentCandidateDecisionPayloadSchema = documentCandidateReadPayloadSchema.extend({
+  decision: z.enum(['accept','reject']), idempotencyKey: trimmedString(256),
+  candidateRevision: documentRevisionSchema, expectedRevision: documentRevisionSchema.nullable()
+}).strict()
+
 export const documentHistoryPayloadSchema = documentReadPayloadSchema.extend({
   id: z.string().regex(/^\d{13}-[a-f0-9-]{36}$/)
 }).strict()
@@ -1678,11 +1727,17 @@ export const clawImInstallPollPayloadSchema = z
 
 export const sseStartPayloadSchema = z
   .object({
-    threadId: trimmedString(MAX_ID_LENGTH),
+    scope: z.enum(['thread','tasks']).default('thread'),
+    threadId: optionalTrimmedString(MAX_ID_LENGTH),
     sinceSeq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
     streamId: optionalTrimmedString(MAX_ID_LENGTH)
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.scope === 'thread' && !value.threadId) {
+      context.addIssue({ code: 'custom', path: ['threadId'], message: 'A thread stream requires a threadId.' })
+    }
+  })
 
 export const streamIdSchema = trimmedString(MAX_ID_LENGTH)
 

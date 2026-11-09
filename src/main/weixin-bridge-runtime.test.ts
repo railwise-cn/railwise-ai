@@ -40,7 +40,7 @@ describe('weixin bridge runtime', () => {
 
     expect(baseInfo).toMatchObject({
       channel_version: pkg.version,
-      bot_agent: 'WorkWise Runtime/0.2.0-test'
+      bot_agent: 'RailWise AI Runtime/0.2.0-test'
     })
   })
 
@@ -608,7 +608,7 @@ describe('weixin bridge runtime', () => {
       now = Date.parse('2026-08-17T00:00:09.999Z')
       expect(() => heartbeat.assertOwned()).not.toThrow()
       now = Date.parse('2026-08-17T00:00:10.000Z')
-      expect(() => heartbeat.assertOwned()).toThrow('WorkWise delivery lease is no longer owned')
+      expect(() => heartbeat.assertOwned()).toThrow('RailWise AI delivery lease is no longer owned')
     } finally {
       heartbeat.stop()
       vi.useRealTimers()

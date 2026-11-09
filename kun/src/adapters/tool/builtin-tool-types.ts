@@ -126,6 +126,8 @@ export type BashLocalToolOptions = {
   operations?: BashLocalToolOperations
   sessionOutputRoot?: string
   sessionLifecycle?: BashSessionLifecycle
+  capacityManager?: import('../../services/capacity-manager.js').CapacityManager
+  recoverSession?: (sessionId: string, threadId: string) => import('../../contracts/tasks.js').ShellSession | null
 }
 
 export type BashSessionLifecycle = {
@@ -138,6 +140,9 @@ export type BashSessionLifecycle = {
     commandSummary: string
     outputPath: string
     startedAt: string
+    pid?: number
+    processFingerprint?: string
+    processGroup?: number
   }) => Promise<void> | void
   onFinished?: (input: {
     sessionId: string

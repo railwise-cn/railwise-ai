@@ -5,6 +5,7 @@ import type { AttachmentsCapabilityConfig } from '../contracts/capabilities.js'
 import type { AttachmentDiagnostics, AttachmentKind, AttachmentMetadata, AttachmentMetadataV2, AttachmentSectionV1, AttachmentTextFallback } from '../contracts/attachments.js'
 import { ATTACHMENT_LIMITS_V2, AttachmentMetadata as AttachmentMetadataSchema, AttachmentMetadataV1, AttachmentMetadataV2 as AttachmentMetadataV2Schema, upgradeAttachmentMetadataV1 } from '../contracts/attachments.js'
 import { atomicWriteFile } from '../adapters/file/atomic-write.js'
+import { withFileMutationQueue } from '../adapters/tool/file-mutation-queue.js'
 import { AttachmentIndex, type AttachmentSearchResult } from './attachment-index.js'
 import JSZip from 'jszip'
 
@@ -27,6 +28,7 @@ export interface AttachmentStore {
   get(id: string): Promise<AttachmentMetadata | null>
   getV2(id: string): Promise<AttachmentMetadataV2 | null>
   resolveMetadataV2(id: string, scope: { threadId?: string; workspace?: string }): Promise<AttachmentMetadataV2>
+  grantTaskReference?(id:string,source:{threadId:string;workspace:string},target:{threadId:string;workspace:string}):Promise<void>
   createDocument(input: {
     name: string
     data: Buffer
@@ -276,6 +278,16 @@ export class FileAttachmentStore implements AttachmentStore {
 
   async resolveMetadataV2(id: string, scope: { threadId?: string; workspace?: string }): Promise<AttachmentMetadataV2> {
     return this.authorizeV2(id, scope)
+  }
+
+  /** Explicitly selected inputs may be shared with a worker in the same workspace. */
+  async grantTaskReference(id:string,source:{threadId:string;workspace:string},target:{threadId:string;workspace:string}):Promise<void> {
+    await withFileMutationQueue(this.metadataPath(id),async()=>{
+    const metadata=await this.authorizeV2(id,source)
+    const workspace=await canonicalWorkspace(target.workspace)
+    if(workspace !== await canonicalWorkspace(source.workspace)) throw new Error('attachment cannot be shared across project workspaces')
+    await atomicWriteFile(this.metadataPath(id),JSON.stringify(mergeScopeV2({...metadata,updatedAt:this.options.nowIso?.() ?? new Date().toISOString()},{threadId:target.threadId,workspace}),null,2))
+    })
   }
 
   async diagnostics(): Promise<AttachmentDiagnostics> {

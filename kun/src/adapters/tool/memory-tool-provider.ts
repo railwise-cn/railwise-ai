@@ -19,6 +19,7 @@ export function buildMemoryToolProviders(store: MemoryStore | undefined): Capabi
             content: { type: 'string' },
             scope: { type: 'string', enum: ['user', 'workspace', 'project'] },
             workspace: { type: 'string' },
+            project: { type: 'string', description: 'Exact project ID for a project-scoped memory.' },
             tags: { type: 'array', items: { type: 'string' } }
           },
           required: ['content'],
@@ -34,6 +35,7 @@ export function buildMemoryToolProviders(store: MemoryStore | undefined): Capabi
                 content,
                 scope: args.scope === 'user' || args.scope === 'project' ? args.scope : 'workspace',
                 workspace: typeof args.workspace === 'string' ? args.workspace : context.workspace,
+                ...(typeof args.project === 'string' ? { project: args.project } : {}),
                 sourceThreadId: context.threadId,
                 sourceTurnId: context.turnId,
                 tags: Array.isArray(args.tags) ? args.tags.filter((tag): tag is string => typeof tag === 'string') : []

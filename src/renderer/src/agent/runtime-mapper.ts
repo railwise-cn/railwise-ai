@@ -1340,7 +1340,7 @@ export async function dispatchRuntimeEvent(
       })
       return
     case 'turn_failed': {
-      const payload = runtimeErrorFromEvent(event, 'WorkWise Runtime turn failed')
+      const payload = runtimeErrorFromEvent(event, 'RailWise AI Runtime turn failed')
       sink.onRuntimeError?.(payload)
       sink.onError(errorForRuntimeEvent(payload), {
         terminal: true,

@@ -79,7 +79,7 @@ release_compute_version() {
     [[ "${TAG_NAME}" == v* ]] || TAG_NAME="v${TAG_NAME}"
     RELEASE_VERSION="${TAG_NAME#v}"
     release_validate_semver "${RELEASE_VERSION}" || die "Release tag must be vX.Y.Z. electron-updater cannot use four-part versions: ${TAG_NAME}"
-    RELEASE_NAME="WorkWise ${RELEASE_VERSION}"
+    RELEASE_NAME="RailWise AI ${RELEASE_VERSION}"
     LATEST_TAG=""
     return
   fi
@@ -114,7 +114,7 @@ release_compute_version() {
   RELEASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 
   TAG_NAME="v${RELEASE_VERSION}"
-  RELEASE_NAME="WorkWise ${RELEASE_VERSION}"
+  RELEASE_NAME="RailWise AI ${RELEASE_VERSION}"
 }
 
 release_export_app_version() {
@@ -157,7 +157,7 @@ release_acquire_lock() {
 
 release_clean_dist_artifacts() {
   rm -rf "${ROOT}/dist/mac" "${ROOT}/dist/mac-arm64" "${ROOT}/dist/.mac-build" "${ROOT}/dist/win-unpacked" "${ROOT}/dist/linux-unpacked"
-  rm -f "${ROOT}"/dist/WorkWise-* "${ROOT}"/dist/latest*.yml "${ROOT}"/dist/*.blockmap
+  rm -f "${ROOT}"/dist/RailWise-AI-* "${ROOT}"/dist/WorkWise-* "${ROOT}"/dist/latest*.yml "${ROOT}"/dist/*.blockmap
 }
 
 release_apply_signing_env() {

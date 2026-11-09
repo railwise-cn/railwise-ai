@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, mkdir, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -180,6 +180,39 @@ describe('Memory store and recall', () => {
     // No .tmp leftover from the atomic write.
     const entries = await readdir(join(dir, 'memory'))
     expect(entries.filter((entry) => entry.includes('.tmp'))).toEqual([])
+  })
+
+  it('retrieves Chinese engineering terminology and isolates project scope within a canonical workspace', async () => {
+    const workspace = join(dir, 'workspace')
+    const alias = join(dir, 'alias')
+    await mkdir(workspace)
+    await symlink(workspace, alias)
+    const store = createStore()
+    const first = await store.create({ content: '地铁沉降报告采用毫米单位，并附累计变化曲线', scope: 'project', workspace, project: 'metro-a' })
+    await store.create({ content: '地铁沉降报告使用厘米单位', scope: 'project', workspace, project: 'metro-b' })
+    const global = await store.create({ content: '中文监测报告优先使用简体中文', scope: 'user' })
+    expect((await store.retrieve({ query: '沉降报告', workspace: alias, project: 'metro-a', limit: 8 })).map(item => item.id)).toEqual([first.id, global.id])
+    expect((await store.retrieve({ query: '沉降', workspace: alias, limit: 8 }))).toEqual([])
+    expect((await store.retrieve({ query: '沉降', workspace: join(dir, 'other'), project: 'metro-a', limit: 8 }))).toEqual([])
+  })
+
+  it('retains orphan project memories for association without injecting them into unrelated tasks', async () => {
+    const store = createStore()
+    const orphan = await store.create({ content: '沉降预警按项目约定', scope: 'project', workspace: '/tmp/ws' })
+    expect(await store.list({ workspace: '/tmp/ws' })).toContainEqual(expect.objectContaining({ id: orphan.id, associationStatus: 'pending_association' }))
+    expect(await store.retrieve({ query: '沉降', workspace: '/tmp/ws', project: 'project-a', limit: 8 })).toEqual([])
+    await store.update(orphan.id, { project: 'project-a' })
+    expect(await store.retrieve({ query: '沉降', workspace: '/tmp/ws', project: 'project-a', limit: 8 })).toContainEqual(expect.objectContaining({ id: orphan.id, version: 2, associationStatus: 'associated' }))
+  })
+
+  it('keeps experience candidates disabled by default and requires explicit acceptance before recall', async () => {
+    await expect(createStore().create({ content: '报告经验', scope: 'project', workspace: '/tmp/ws', project: 'a', kind: 'experience' })).rejects.toThrow(/disabled/)
+    const store = createStore({ experienceCandidatesEnabled: true })
+    const candidate = await store.create({ content: '沉降报告应校验缺测时间', scope: 'project', workspace: '/tmp/ws', project: 'a', kind: 'experience', sourceTaskIds: ['task-1'] })
+    expect(candidate.admissionStatus).toBe('candidate')
+    expect(await store.retrieve({ query: '沉降报告', workspace: '/tmp/ws', project: 'a', limit: 8 })).toEqual([])
+    await store.update(candidate.id, { admissionStatus: 'accepted' })
+    expect(await store.retrieve({ query: '沉降报告', workspace: '/tmp/ws', project: 'a', limit: 8 })).toHaveLength(1)
   })
 
   function createStore(overrides: Partial<MemoryCapabilityConfig> = {}) {

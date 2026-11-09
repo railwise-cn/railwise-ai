@@ -13,6 +13,11 @@ export const MemoryRecord = z.object({
   sourceTurnId: z.string().optional(),
   tags: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1).default(1),
+  kind: z.enum(['fact', 'experience']).default('fact'),
+  admissionStatus: z.enum(['accepted', 'candidate', 'rejected']).default('accepted'),
+  associationStatus: z.enum(['associated', 'pending_association']).optional(),
+  sourceTaskIds: z.array(z.string().min(1)).max(64).default([]),
+  version: z.number().int().positive().default(1),
   createdAt: z.string(),
   updatedAt: z.string(),
   disabledAt: z.string().optional(),
@@ -28,7 +33,10 @@ export const MemoryCreateRequest = z.object({
   sourceThreadId: z.string().optional(),
   sourceTurnId: z.string().optional(),
   tags: z.array(z.string()).default([]),
-  confidence: z.number().min(0).max(1).default(1)
+  confidence: z.number().min(0).max(1).default(1),
+  kind: z.enum(['fact', 'experience']).default('fact'),
+  admissionStatus: z.enum(['accepted', 'candidate']).optional(),
+  sourceTaskIds: z.array(z.string().min(1)).max(64).default([])
 }).strict()
 export type MemoryCreateRequest = z.input<typeof MemoryCreateRequest>
 
@@ -36,7 +44,10 @@ export const MemoryUpdateRequest = z.object({
   content: z.string().min(1).optional(),
   tags: z.array(z.string()).optional(),
   confidence: z.number().min(0).max(1).optional(),
-  disabled: z.boolean().optional()
+  disabled: z.boolean().optional(),
+  workspace: z.string().min(1).optional(),
+  project: z.string().min(1).optional(),
+  admissionStatus: z.enum(['accepted', 'rejected']).optional()
 }).strict()
 export type MemoryUpdateRequest = z.input<typeof MemoryUpdateRequest>
 
@@ -45,6 +56,9 @@ export const MemoryDiagnostics = z.object({
   rootDir: z.string(),
   activeCount: z.number().int().nonnegative(),
   tombstoneCount: z.number().int().nonnegative(),
+  pendingAssociationCount: z.number().int().nonnegative().optional(),
+  candidateCount: z.number().int().nonnegative().optional(),
+  experienceCandidatesEnabled: z.boolean().optional(),
   lastInjectedIds: z.array(z.string()).default([])
 }).strict()
 export type MemoryDiagnostics = z.infer<typeof MemoryDiagnostics>

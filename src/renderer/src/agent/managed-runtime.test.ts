@@ -63,10 +63,10 @@ afterEach(() => {
 })
 
 describe('WorkWiseRuntimeProvider', () => {
-  it('reports the compatibility id and WorkWise display name', () => {
+  it('reports the compatibility id and RailWise AI display name', () => {
     const provider = new WorkWiseRuntimeProvider()
     expect(provider.id).toBe('kun')
-    expect(provider.displayName).toBe('WorkWise Agent Runtime')
+    expect(provider.displayName).toBe('RailWise AI Runtime')
   })
 
   it('exposes the local HTTP/SSE capabilities', () => {

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('WorkWise brand boundary', () => {
@@ -15,10 +15,21 @@ describe('WorkWise brand boundary', () => {
   it('preserves historical package identities only in release evidence', () => {
     const root = mkdtempSync(join(tmpdir(), 'railwise-brand-evidence-'))
     try {
-      for (const dir of ['src', 'scripts', '.github', 'docs/qa/release-gates', 'release']) mkdirSync(join(root, dir), { recursive: true })
+      for (const dir of ['src', 'scripts', '.github', 'docs/qa/release-gates', 'release', 'website']) mkdirSync(join(root, dir), { recursive: true })
       for (const file of ['README.md', 'README.en.md', 'DESIGN.md', 'DESIGN.zh-CN.md', 'electron-builder.cjs', 'package.json']) writeFileSync(join(root, file), '')
       const script = join(root, 'scripts/verify-brand-boundary.mjs')
-      writeFileSync(script, readFileSync('scripts/verify-brand-boundary.mjs'))
+      const checker = readFileSync('scripts/verify-brand-boundary.mjs', 'utf8')
+      writeFileSync(script, checker)
+      // Materialize the checker's explicit prospective-output fixtures. Their
+      // paths are fixtures; the assertions below exercise the exception boundary.
+      for (const name of ['publicIdentityFiles', 'publicCopyFiles']) {
+        const list = checker.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\n\\]`))?.[1] || ''
+        for (const match of list.matchAll(/'([^']+)'/g)) {
+          const path = join(root, match[1])
+          mkdirSync(dirname(path), { recursive: true })
+          writeFileSync(path, '')
+        }
+      }
       const evidence = join(root, 'docs/qa/release-gates/review.md')
       const run = (): void => { execFileSync(process.execPath, [script], { cwd: root, stdio: 'pipe' }) }
       const legacyId = 'com.wangjiawei508.' + 'work' + 'gpt'
@@ -28,6 +39,9 @@ describe('WorkWise brand boundary', () => {
       expect(run).toThrow()
       writeFileSync(evidence, '')
       writeFileSync(join(root, 'src/visible.ts'), legacyId)
+      expect(run).toThrow()
+      writeFileSync(join(root, 'src/visible.ts'), '')
+      writeFileSync(join(root, 'src/main/services/plugin-package-formats.ts'), "throw new Error('WorkWise package signature verification failed.')")
       expect(run).toThrow()
     } finally {
       rmSync(root, { recursive: true, force: true })

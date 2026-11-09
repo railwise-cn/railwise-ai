@@ -19,6 +19,7 @@ function createProps(): ComponentProps<typeof WriteSidebar> {
     onEngineeringOpen: vi.fn(),
     onWriteOpen: vi.fn(),
     onOpenPlugins: vi.fn(),
+    onTasksOpen: vi.fn(),
     onScheduleOpen: vi.fn(),
     onFlowOpen: vi.fn(),
     onDesignOpen: vi.fn(),
@@ -48,7 +49,7 @@ afterEach(async () => {
 })
 
 describe('WriteSidebar navigation', () => {
-  it('keeps the two primary entries and all five sidebar tools visible and clickable', async () => {
+  it('keeps the two primary entries and all six sidebar tools visible and clickable', async () => {
     const sidebarProps = createProps()
     await act(async () => root.render(createElement(WriteSidebar, sidebarProps)))
 
@@ -57,6 +58,7 @@ describe('WriteSidebar navigation', () => {
     expect([...primaryButtons].map((button) => button.textContent)).toEqual(['Code', 'Survey'])
     expect([...toolButtons].map((button) => button.textContent)).toEqual([
       'Write',
+      'Tasks',
       'Scheduled tasks',
       'Flow',
       'Design',
@@ -70,6 +72,7 @@ describe('WriteSidebar navigation', () => {
     expect(sidebarProps.onCodeOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onEngineeringOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onWriteOpen).toHaveBeenCalledOnce()
+    expect(sidebarProps.onTasksOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onOpenPlugins).toHaveBeenCalledOnce()
     expect(sidebarProps.onScheduleOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onFlowOpen).toHaveBeenCalledOnce()

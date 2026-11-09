@@ -1,3 +1,4 @@
+import productBrand from '../shared/product-brand.json'
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -25,9 +26,9 @@ import {
   legacyUpdateUrl
 } from './compat/legacy-environment'
 
-const DEFAULT_OFFICIAL_RELEASE_PREFIX = 'workwise'
+const DEFAULT_OFFICIAL_RELEASE_PREFIX = productBrand.release.storageNamespace
 const DEFAULT_OFFICIAL_UPDATE_BASE_URL = 'https://www.railwise.cn/downloads'
-const DEFAULT_PRODUCT_PAGE_URL = 'https://www.railwise.cn/products/workwise/'
+const DEFAULT_PRODUCT_PAGE_URL = productBrand.release.productPage
 const DEFAULT_GITHUB_REPO = 'railwise-cn/railwise-ai'
 const UPDATE_REQUEST_HEADERS = {
   'Cache-Control': 'no-cache',

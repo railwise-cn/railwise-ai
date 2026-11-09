@@ -1,8 +1,13 @@
-name: Frozen public package native updater acceptance
+name: Exact public package native updater smoke
 
 on:
   workflow_dispatch:
     inputs:
+      base_version:
+        description: 'Pinned official installer baseline; existing historical evidence retains its original baseline.'
+        required: true
+        type: string
+        default: '0.5.4'
       reviewed_build:
         description: 'Exact package.reviewedBuild JSON from a successful release.yml candidate_only + prepare_public_artifacts freeze run. Includes immutable artifact IDs/digests and every file SHA256/size.'
         required: true
@@ -18,7 +23,7 @@ concurrency:
 
 jobs:
   native-macos:
-    name: Official 0.5.3 to exact frozen public package native updater
+    name: Official ${{ inputs.base_version }} to exact public package native updater
     runs-on: macos-15
     timeout-minutes: 65
     steps:
@@ -49,23 +54,27 @@ jobs:
       - name: Record immutable build reference without shell interpolation
         env:
           REVIEWED_BUILD_JSON: ${{ inputs.reviewed_build }}
+          BASE_VERSION: ${{ inputs.base_version }}
         run: |
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs'
           import { join } from 'node:path'
           import { validateReviewedBuild } from './scripts/verify-reviewed-release-artifacts.mjs'
-          import { readFrozenSourceVersion } from './scripts/frozen-release-version.mjs'
+          import { FROZEN_BASE_VERSION, readFrozenSourceVersion, resolveUpdaterBaseline } from './scripts/frozen-release-version.mjs'
           const build = JSON.parse(process.env.REVIEWED_BUILD_JSON)
-          validateReviewedBuild(build, { version: readFrozenSourceVersion(), sourceHead: process.env.GITHUB_SHA })
+          const baseline = resolveUpdaterBaseline(process.env.BASE_VERSION ?? FROZEN_BASE_VERSION)
+          validateReviewedBuild(build, { version: readFrozenSourceVersion(baseline.version), sourceHead: process.env.GITHUB_SHA })
           writeFileSync(join(process.env.RUNNER_TEMP, 'frozen-reviewed-build.json'), JSON.stringify(build), { mode: 0o600, flag: 'wx' })
           NODE
       - name: Run default-trust HTTPS download, Squirrel install and historical data readback
         timeout-minutes: 50
         env:
           GH_TOKEN: ${{ github.token }}
+          BASE_VERSION: ${{ inputs.base_version }}
         run: |
           node scripts/run-frozen-release-updater-acceptance.mjs \
             --build-file="${RUNNER_TEMP}/frozen-reviewed-build.json" \
+            --base-version="${BASE_VERSION}" \
             --evidence-dir="${RUNNER_TEMP}/frozen-updater-evidence"
       - name: Retain durable updater evidence including failures
         if: always()

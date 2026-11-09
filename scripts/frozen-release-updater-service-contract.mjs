@@ -57,12 +57,12 @@ function validateIdentity(identity, label) {
 
 // Pure evidence checks: neither a matching version string nor a source-tree
 // readback can replace services and dependencies from the frozen target ZIP.
-export function validateUpdaterServiceEvidence(machine, { sourceHead, version } = {}) {
-  validateFrozenTargetVersion(version)
+export function validateUpdaterServiceEvidence(machine, { sourceHead, version, baseVersion = FROZEN_BASE_VERSION } = {}) {
+  validateFrozenTargetVersion(version, baseVersion)
   object(machine, 'machine report')
   sha(sourceHead, 'frozen source', 40)
   if (!['arm64', 'x64'].includes(machine.arch)) fail('machine report must identify a supported native macOS architecture')
-  equal(machine.baseVersion, FROZEN_BASE_VERSION, 'official baseline version')
+  equal(machine.baseVersion, baseVersion, 'official baseline version')
   equal(machine.targetVersion, version, 'frozen target version')
   sha(machine.targetAsarSha256, 'frozen target ASAR')
   equal(machine.installedAsarSha256, machine.targetAsarSha256, 'installed/frozen ASAR')
@@ -86,7 +86,7 @@ export function validateUpdaterServiceEvidence(machine, { sourceHead, version } 
   object(seed, 'dataSeed')
   if (!['baseline-package', 'source-bound-compatibility-service'].includes(seed.serviceSource)) fail('dataSeed must identify baseline or explicitly source-bound compatibility services')
   validateIdentity(seed.serviceIdentity, 'dataSeed service identity')
-  equal(seed.serviceIdentity.packageVersion, FROZEN_BASE_VERSION, 'dataSeed package version')
+  equal(seed.serviceIdentity.packageVersion, baseVersion, 'dataSeed package version')
   if (seed.serviceSource === 'source-bound-compatibility-service') {
     equal(seed.serviceIdentity.layout, 'source-compatibility', 'dataSeed compatibility layout')
     equal(seed.serviceIdentity.serviceSourceHead, sourceHead, 'dataSeed compatibility source')

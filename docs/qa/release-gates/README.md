@@ -17,6 +17,8 @@ observed values of the successful frozen build and installed-package review.
 Never copy the illustrative `passed` statuses into a real manifest before the
 corresponding checks have passed.
 
+The compatibility `packageName` remains `workwise` for the existing bundle and update identity; public artifact filenames in this example use the `RailWise-AI-` prefix.
+
 ```json
 {
   "schemaVersion": 1,
@@ -59,28 +61,28 @@ corresponding checks have passed.
       ],
       "files": [
         {
-          "name": "WorkWise-X.Y.Z-mac-arm64.dmg",
+          "name": "RailWise-AI-X.Y.Z-mac-arm64.dmg",
           "platform": "darwin-arm64",
           "artifact": "release-mac",
           "size": 1,
           "sha256": "64-character lowercase sha256"
         },
         {
-          "name": "WorkWise-X.Y.Z-mac-arm64.zip",
+          "name": "RailWise-AI-X.Y.Z-mac-arm64.zip",
           "platform": "darwin-arm64",
           "artifact": "release-mac",
           "size": 1,
           "sha256": "64-character lowercase sha256"
         },
         {
-          "name": "WorkWise-X.Y.Z-mac-x64.dmg",
+          "name": "RailWise-AI-X.Y.Z-mac-x64.dmg",
           "platform": "darwin-x64",
           "artifact": "release-mac",
           "size": 1,
           "sha256": "64-character lowercase sha256"
         },
         {
-          "name": "WorkWise-X.Y.Z-mac-x64.zip",
+          "name": "RailWise-AI-X.Y.Z-mac-x64.zip",
           "platform": "darwin-x64",
           "artifact": "release-mac",
           "size": 1,
@@ -94,14 +96,14 @@ corresponding checks have passed.
           "sha256": "64-character lowercase sha256"
         },
         {
-          "name": "WorkWise-X.Y.Z-win-x64.exe",
+          "name": "RailWise-AI-X.Y.Z-win-x64.exe",
           "platform": "win32-x64",
           "artifact": "release-win",
           "size": 1,
           "sha256": "64-character lowercase sha256"
         },
         {
-          "name": "WorkWise-X.Y.Z-win-x64.exe.blockmap",
+          "name": "RailWise-AI-X.Y.Z-win-x64.exe.blockmap",
           "platform": "win32-x64",
           "artifact": "release-win",
           "size": 1,

@@ -80,7 +80,7 @@ describe('agent-pack-service', () => {
       name: 'data_analyst',
       version: '1.2.34'
     })
-  })
+  }, BUNDLED_PACK_INSTALL_TIMEOUT_MS)
 
   it('excludes blocked or missing Skill audit entries while retaining non-Skill assets', () => {
     const assets = [

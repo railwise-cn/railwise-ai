@@ -337,7 +337,7 @@ export function createThreadActions(
         if (reason === 'completed' || reason === 'aborted') {
           sink.onTurnComplete({ reason, threadId: activeThreadId, turnId: latestTurnId })
         } else {
-          sink.onError(new Error(latestTurnError?.trim() || 'WorkWise Runtime turn failed'), {
+          sink.onError(new Error(latestTurnError?.trim() || 'RailWise AI Runtime turn failed'), {
             terminal: true,
             terminalReason: reason,
             threadId: activeThreadId,
@@ -529,8 +529,30 @@ export function createThreadActions(
         return false
       }
     }
+    let coordinatedTurn: {threadId:string;turnId:string;userMessageItemId?:string}|undefined
+    const canCoordinate = !queued && !overrides?.guiPlan && !overrides?.guiDesign && get().route === 'chat' && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
+    const coordinate = async (threadId:string,prompt:string,appendUser=true,optimisticUserId?:string):Promise<boolean> => {
+      const result=await window.workwise.coordinateTaskCommand({threadId,intent:'auto',idempotencyKey:crypto.randomUUID(),request:{prompt,displayText:overrides?.displayText??trimmedText,mode:mode??'agent',...(composerModel?{model:composerModel}:{}),...(providerId?{providerId}:{}),...(overrides?.reasoningEffort?{reasoningEffort:overrides.reasoningEffort}:{}),...((overrides?.attachmentIds?.length || messageAttachments.length)?{attachmentIds:overrides?.attachmentIds?.length?overrides.attachmentIds:messageAttachments.map(item=>item.id)}:{}),...(overrides?.workspaceReferences?.length?{workspaceReferences:overrides.workspaceReferences}:{})}})
+      if(result.kind==='chat_started'){coordinatedTurn=result.turn;return false}
+      const localText=result.kind==='snapshot'?(result.task?`${result.task.goal}\n${i18n.t(`common:taskRunStatus_${result.task.status}`)}${result.task.waitingReason?`\n${result.task.waitingReason}`:''}`:i18n.t('common:taskCommandNoTask')):result.kind==='task_updated'?i18n.t(`common:taskRunStatus_${result.task.status}`):result.kind==='input_queued'?i18n.t('common:taskCommandQueued'):result.kind==='task_started'?i18n.t('common:taskCommandStarted'):('message' in result?result.message:i18n.t('common:taskCommandStarted'))
+      set(state=>{
+        const userId=result.receipt?.userMessageItemId??`task-command-user-${crypto.randomUUID()}`
+        const resultId=result.receipt?.resultMessageItemId??`task-command-result-${crypto.randomUUID()}`
+        const optimistic=optimisticUserId?state.blocks.find(block=>block.id===optimisticUserId):undefined
+        const blocks=state.blocks.filter(block=>block.id!==userId&&block.id!==resultId&&block.id!==optimisticUserId)
+        return {blocks:[...blocks,...(appendUser||optimistic?[optimistic?{...optimistic,id:userId}:{kind:'user' as const,id:userId,text:overrides?.displayText??trimmedText,createdAt:new Date().toISOString()}]:[]),{kind:'assistant' as const,id:resultId,text:localText,createdAt:new Date().toISOString()}],error:null}
+      })
+      return true
+    }
+    if(canCoordinate && get().activeThreadId){
+      try {
+        const settings=await rendererRuntimeClient.getSettings()
+        const runtimePrompt=get().threads.find(thread=>thread.id===get().activeThreadId)?.domain==='engineering'?trimmedText:buildCodeRuntimePrompt(settings,trimmedText)
+        if(await coordinate(get().activeThreadId!,runtimePrompt))return true
+      } catch(error) { set({error:formatRuntimeError(error)});return false }
+    }
     const hasPendingActiveTurn = get().blocks.some(hasPendingRuntimeWork)
-    if (get().busy || hasPendingActiveTurn) {
+    if (!coordinatedTurn && (get().busy || hasPendingActiveTurn)) {
       if (overrides?.guiPlan || overrides?.guiDesign) {
         set({ error: i18n.t('common:composerQueuePlaceholder') })
         return false
@@ -738,7 +760,10 @@ export function createThreadActions(
         runtimeText = buildCodeRuntimePrompt(settings, trimmedText)
       }
       const runtimeDisplayText = channel ? displayText : (userDisplayText ?? trimmedText)
-      const { turnId, userMessageItemId } = await p.sendUserMessage(activeThreadId, runtimeText, {
+      if(canCoordinate && !coordinatedTurn){
+        if(await coordinate(activeThreadId,runtimeText,false,userBlockId)){set({busy:false,currentTurnId:previousCurrentTurnId,currentTurnUserId:previousCurrentTurnUserId});return true}
+      }
+      const { turnId, userMessageItemId } = coordinatedTurn ?? await p.sendUserMessage(activeThreadId, runtimeText, {
         mode,
         ...(composerModel ? { model: composerModel } : {}),
         ...(providerId ? { providerId } : {}),

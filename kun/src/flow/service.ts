@@ -1,14 +1,24 @@
 import type { FlowDefinitionV1, FlowNodeRegistryEntryV1, FlowRunV1 } from '../contracts/flow.js'
 import { FLOW_INVOCATION_DEPTH_LIMIT } from '../contracts/flow.js'
 import { FlowExecutor } from './executor.js'
-import { FlowRepository } from './repository.js'
+import { FlowRepository, type FlowSourceEvent, type FlowAttentionEvent } from './repository.js'
+import { createHash } from 'node:crypto'
 import { validateFlowDefinition } from './validator.js'
 import type { FlowWebhookSecurity } from './webhook-security.js'
 
 export class FlowRuntimeService {
   readonly executor: FlowExecutor
   private scheduleTimer?: ReturnType<typeof setInterval>
-  constructor(readonly repository: FlowRepository, readonly registry: FlowNodeRegistryEntryV1[], adapters: ConstructorParameters<typeof FlowExecutor>[1], nowIso?: () => string, readonly webhooks?: FlowWebhookSecurity, defaultModelProviderId = 'deepseek') {
+  private sourceEventSink?: (event: FlowSourceEvent) => Promise<void>
+  private attentionSink?: (event: FlowAttentionEvent) => Promise<void>
+  private flushingSources?: Promise<void>
+  private flushSourcesRequested = false
+  private backgroundDispatchEnabled = true
+  private closed = false
+  private readonly stopProjection: () => void
+  constructor(readonly repository: FlowRepository, readonly registry: FlowNodeRegistryEntryV1[], adapters: ConstructorParameters<typeof FlowExecutor>[1], nowIso?: () => string, readonly webhooks?: FlowWebhookSecurity, defaultModelProviderId = 'deepseek', backgroundDispatchEnabled = true) {
+    this.backgroundDispatchEnabled = backgroundDispatchEnabled
+    this.stopProjection = repository.onChange(() => { if (!this.closed && repository.isOpen()) void this.flushSourceEvents().catch(() => undefined) })
     this.executor = new FlowExecutor(repository, adapters, nowIso)
     this.executor.reconcileStartup()
     this.migrateRetiredLegacyScheduleModels(defaultModelProviderId)
@@ -42,17 +52,38 @@ export class FlowRuntimeService {
   resume(runId: string) { return this.executor.resume(runId) }
   testNode(definition: FlowDefinitionV1, nodeId: string, input: unknown) { return this.executor.testNode(definition, nodeId, input) }
   decide(runId: string, nodeId: string, decision: 'approve' | 'reject', note?: string) {
-    const waiting = this.repository.listNodeRuns(runId).filter((item) => item.nodeId === nodeId && item.status === 'waiting_approval').at(-1)
-    if (!waiting) throw new Error('approval wait not found')
-    const runBeforeDecision = this.repository.getRun(runId); const version = runBeforeDecision ? this.repository.getVersion(runBeforeDecision.versionId) : null; const node = version?.definition.nodes.find((item) => item.id === nodeId)
-    if (decision === 'approve' && node?.type === 'restricted_code' && runBeforeDecision) {
-      const current = Array.isArray(runBeforeDecision.checkpoint?.restrictedCodePermissionGrants) ? runBeforeDecision.checkpoint.restrictedCodePermissionGrants.filter((item): item is string => typeof item === 'string') : []
-      this.repository.deleteNodeRuns(runId, [nodeId]); this.repository.saveRun({ ...runBeforeDecision, status: 'waiting_approval', checkpoint: { ...runBeforeDecision.checkpoint, restrictedCodePermissionGrants: [...new Set([...current, nodeId])] }, updatedAt: new Date().toISOString() })
-      return this.executor.resume(runId)
-    }
-    this.repository.saveNodeRun({ ...waiting, status: decision === 'approve' ? 'succeeded' : 'failed', output: { decision, note }, error: decision === 'reject' ? 'Approval rejected' : undefined, completedAt: new Date().toISOString() })
-    if (decision === 'reject') { const run = this.repository.getRun(runId); if (run) this.repository.saveRun({ ...run, status: 'failed', output: { error: 'Approval rejected', nodeId }, updatedAt: new Date().toISOString(), completedAt: new Date().toISOString() }); return run }
-    return this.executor.resume(runId)
+    let resumeOutboxId = ''
+    const accepted = this.repository.transaction(() => {
+      const waiting = this.repository.listNodeRuns(runId).filter(item => item.nodeId === nodeId).at(-1)
+      if (!waiting) throw new Error('approval wait not found')
+      // One receipt belongs to one immutable approval occurrence. A later retry
+      // of the same node requires a new decision and cannot inherit an old one.
+      const legacyKey = `decision:${nodeId}`
+      const key = waiting.status !== 'waiting_approval' && this.repository.operation(runId, legacyKey) ? legacyKey : `${legacyKey}:${waiting.id}`
+      const receipt = this.repository.beginOperation(runId, key, { nodeId, decision, note })
+      if (!receipt.created) return false
+      if (waiting.status !== 'waiting_approval') throw new Error('approval wait not found')
+      const run = this.repository.getRun(runId)
+      if (!run || run.status !== 'waiting_approval') throw new Error('Flow is not waiting for approval')
+      const node = this.repository.getVersion(run.versionId)?.definition.nodes.find(item => item.id === nodeId)
+      const now = new Date().toISOString()
+      if (decision === 'approve' && node?.type === 'restricted_code') {
+        const grants = Array.isArray(run.checkpoint?.restrictedCodePermissionGrants) ? run.checkpoint.restrictedCodePermissionGrants.filter((item): item is string => typeof item === 'string') : []
+        this.repository.deleteNodeRuns(runId, [nodeId])
+        this.repository.saveRun({ ...run, checkpoint: { ...run.checkpoint, restrictedCodePermissionGrants: [...new Set([...grants, nodeId])] }, updatedAt: now })
+      } else {
+        this.repository.saveNodeRun({ ...waiting, status: decision === 'approve' ? 'succeeded' : 'failed', output: { decision, note }, error: decision === 'reject' ? 'Approval rejected' : undefined, completedAt: now })
+        if (decision === 'reject') this.repository.saveRun({ ...run, status: 'failed', output: { error: 'Approval rejected', nodeId }, updatedAt: now, completedAt: now })
+      }
+      this.repository.finishOperation(runId, key, 'succeeded', { decision, nodeId })
+      if (decision === 'approve') {
+        resumeOutboxId = `resume:${runId}:${nodeId}:${waiting.id}`
+        this.repository.enqueueOutbox(resumeOutboxId, runId, 'flow_resume', { runId })
+      }
+      return true
+    })
+    if (!accepted || decision === 'reject') return this.repository.getRun(runId)
+    return this.executor.resume(runId).then(run => { this.repository.acknowledgeOutbox(resumeOutboxId); return run })
   }
   retryFrom(runId: string, nodeId: string) {
     const run = this.repository.getRun(runId); if (!run) throw new Error(`run not found: ${runId}`)
@@ -63,7 +94,72 @@ export class FlowRuntimeService {
   }
   exportRedacted(flowId: string) { const definition = this.repository.get(flowId); if (!definition) throw new Error(`flow not found: ${flowId}`); return redact(definition) }
   provisionWebhook(flowId: string, nodeId: string) { const flow = this.repository.get(flowId); if (!flow?.nodes.some((node) => node.id === nodeId && node.type === 'webhook_trigger')) throw new Error('Webhook trigger node not found'); if (!this.webhooks) throw new Error('Webhook security is unavailable'); return this.webhooks.provision(flowId, nodeId) }
-  async handleWebhook(triggerId: string, request: Request) { if (!this.webhooks) throw new Error('Webhook security is unavailable'); const verified = await this.webhooks.verify(triggerId, request); return this.run(verified.flowId, { triggerNodeId: verified.nodeId, payload: verified.input }) }
+  async handleWebhook(triggerId: string, request: Request) {
+    if (!this.webhooks) throw new Error('Webhook security is unavailable')
+    const verified = await this.webhooks.verifyForReceipt(triggerId, request)
+    const sourceKey = `${triggerId}:${verified.nonce}`
+    const previous = this.repository.getSourceEvent('webhook', sourceKey)
+    if (previous) {
+      if (previous.fingerprint !== verified.fingerprint) throw new Error('Webhook receipt is bound to another request')
+      await this.flushSourceEvents()
+      return this.repository.getRun(previous.runId)!
+    }
+    const flow = this.repository.get(verified.flowId)
+    if (!flow?.publishedVersionId || flow.variables.archived === true) throw new Error('Webhook Flow is not published')
+    const accepted = this.repository.acceptSourceEvent({ source: 'webhook', sourceKey, fingerprint: verified.fingerprint, flowId: flow.id, versionId: flow.publishedVersionId, workspaceRoot: flow.workspace, input: { triggerNodeId: verified.nodeId, payload: verified.input } }, { triggerId, value: verified.nonce, acceptedAt: verified.acceptedAt })
+    await this.flushSourceEvents()
+    return this.repository.getRun(accepted.event.runId)!
+  }
+
+  setSourceEventSink(sink: (event: FlowSourceEvent) => Promise<void>): void {
+    this.sourceEventSink = sink
+    void this.flushSourceEvents().catch(() => undefined)
+  }
+
+  setAttentionSink(sink: (event: FlowAttentionEvent) => Promise<void>): void {
+    this.attentionSink = sink
+    this.repository.reconcileAttention()
+    void this.flushSourceEvents().catch(() => undefined)
+  }
+
+  /** Rollback keeps accepted source events and attention readable, without starting background work. */
+  setBackgroundDispatchEnabled(enabled: boolean): void {
+    this.backgroundDispatchEnabled = enabled
+    if (enabled) void this.flushSourceEvents().catch(() => undefined)
+  }
+
+  /** Acknowledgement follows durable run creation / destination input commit. */
+  flushSourceEvents(): Promise<void> {
+    this.flushSourcesRequested = true
+    if (this.flushingSources) return this.flushingSources
+    this.flushingSources = (async () => {
+      do {
+        this.flushSourcesRequested = false
+        if (this.backgroundDispatchEnabled) for (const item of this.repository.pendingOutbox('flow_source_dispatch')) {
+          const payload = item.payload as { runId: string }
+          this.executor.dispatchQueued(payload.runId)
+          this.repository.acknowledgeOutbox(item.id)
+        }
+        if (this.backgroundDispatchEnabled && this.sourceEventSink) for (const item of this.repository.pendingOutbox('task_source_event')) {
+          await this.sourceEventSink(item.payload as FlowSourceEvent)
+          this.repository.acknowledgeOutbox(item.id)
+        }
+        if (this.attentionSink) for (const item of this.repository.pendingOutbox('flow_attention')) {
+          await this.attentionSink(item.payload as FlowAttentionEvent)
+          this.repository.acknowledgeOutbox(item.id)
+        }
+      } while (this.flushSourcesRequested && !this.closed)
+    })().then(() => {
+      this.flushingSources = undefined
+      // A repository listener may request another flush between the last loop
+      // condition and this continuation. Do not strand that persisted event.
+      if (this.flushSourcesRequested && !this.closed) return this.flushSourceEvents()
+    }, error => {
+      this.flushingSources = undefined
+      throw error
+    })
+    return this.flushingSources
+  }
   migrateLegacySchedules(tasks: LegacyScheduledTaskInput[]) {
     const migrationKey = 'schedule-to-flow-v1'; const completed = this.repository.getMigration(migrationKey)
     if (completed) return { migrated: false as const, idempotent: true as const, result: completed }
@@ -106,6 +202,7 @@ export class FlowRuntimeService {
   archive(flowId: string): FlowDefinitionV1 { const current = this.repository.get(flowId); if (!current) throw new Error(`flow not found: ${flowId}`); const archived = this.repository.update({ ...current, variables: { ...current.variables, archived: true }, revision: current.revision }, current.revision); for (const trigger of this.repository.listTriggerStates(flowId)) this.repository.saveTriggerState({ ...trigger, enabled: false }); return archived }
   startSchedules(intervalMs = 30_000): void { if (this.scheduleTimer) return; this.scheduleTimer = setInterval(() => { void this.tickSchedules().catch(() => undefined) }, intervalMs); this.scheduleTimer.unref?.(); void this.tickSchedules().catch(() => undefined) }
   async tickSchedules(now = new Date()): Promise<number> {
+    if (!this.backgroundDispatchEnabled) return 0
     let started = 0
     for (const trigger of this.repository.listAllTriggerStates().filter((item) => item.enabled)) {
       const flow = this.repository.get(trigger.flowId); const node = flow?.nodes.find((item) => item.id === trigger.nodeId && item.type === 'schedule_trigger'); if (!flow?.publishedVersionId || !node || flow.variables.archived === true) continue
@@ -113,12 +210,16 @@ export class FlowRuntimeService {
       const due = trigger.nextRunAt ? Date.parse(trigger.nextRunAt) : NaN; if (!Number.isFinite(due) || due > now.getTime()) continue
       const next = nextScheduleOccurrence(node.config, now)
       const { nextRunAt: _previousNextRunAt, ...triggerWithoutNext } = trigger
-      this.repository.saveTriggerState({ ...triggerWithoutNext, enabled: kind === 'at' ? false : trigger.enabled, lastRunAt: now.toISOString(), ...(next ? { nextRunAt: next } : {}), state: { ...trigger.state, lastDispatchAt: now.toISOString() } })
-      await this.run(trigger.flowId, { triggerNodeId: trigger.nodeId, scheduledAt: trigger.nextRunAt, dispatchedAt: now.toISOString() }); started += 1
+      const input = { triggerNodeId: trigger.nodeId, scheduledAt: trigger.nextRunAt, dispatchedAt: now.toISOString() }
+      const accepted = this.repository.acceptSourceEvent({ source: 'schedule', sourceKey: `${trigger.flowId}:${trigger.nodeId}:${trigger.nextRunAt}`, fingerprint: createHash('sha256').update(`${trigger.flowId}:${trigger.nodeId}:${trigger.nextRunAt}`).digest('hex'), flowId: trigger.flowId, versionId: flow.publishedVersionId, workspaceRoot: flow.workspace, input }, undefined, () => {
+        this.repository.saveTriggerState({ ...triggerWithoutNext, enabled: kind === 'at' ? false : trigger.enabled, lastRunAt: now.toISOString(), ...(next ? { nextRunAt: next } : {}), state: { ...trigger.state, lastDispatchAt: now.toISOString() } })
+      })
+      if (accepted.created) started += 1
     }
+    await this.flushSourceEvents()
     return started
   }
-  shutdown() { if (this.scheduleTimer) clearInterval(this.scheduleTimer); this.scheduleTimer = undefined; this.executor.checkpointActiveRuns(); this.repository.close() }
+  shutdown() { this.closed = true; this.stopProjection(); if (this.scheduleTimer) clearInterval(this.scheduleTimer); this.scheduleTimer = undefined; this.executor.checkpointActiveRuns(); this.repository.close() }
   private scheduleMigration(): ScheduleMigrationRecord { const raw = this.repository.getMigration('schedule-to-flow-v1'); if (!raw || typeof raw !== 'object') throw new Error('schedule migration not completed'); const value = raw as Partial<ScheduleMigrationRecord>; return { version: 1, migratedAt: String(value.migratedAt ?? ''), mappings: Array.isArray(value.mappings) ? value.mappings : [], compatibilityTasks: Array.isArray(value.compatibilityTasks) ? value.compatibilityTasks : Array.isArray(value.readOnlyBackup) ? value.readOnlyBackup : [], readOnlyBackup: Array.isArray(value.readOnlyBackup) ? value.readOnlyBackup : [], archivedMappings: Array.isArray(value.archivedMappings) ? value.archivedMappings : [] } }
   private saveScheduleMigration(value: ScheduleMigrationRecord): void { this.repository.saveMigration('schedule-to-flow-v1', value) }
   private activateScheduleTriggers(definition: FlowDefinitionV1): void { for (const node of definition.nodes.filter((item) => item.type === 'schedule_trigger')) { const current = this.repository.getTriggerState(definition.id, node.id); const nextRunAt = current?.nextRunAt ?? nextScheduleOccurrence(node.config, new Date()); this.repository.saveTriggerState({ flowId: definition.id, nodeId: node.id, enabled: current?.enabled ?? definition.variables.enabled !== false, ...(nextRunAt ? { nextRunAt } : {}), state: current?.state ?? {} }) } }

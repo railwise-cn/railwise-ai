@@ -160,6 +160,24 @@ async function appendHistory(root: string, snapshot: DocumentSnapshot, source: D
   return entry
 }
 
+/** Register a completed candidate commit without rewriting a file an external editor may now own. */
+export async function recordDocumentCommitHistory(workspaceRoot: string, snapshot: DocumentSnapshot, source: DocumentHistoryEntry['source'], operationKey: string): Promise<DocumentHistoryEntry> {
+  const root = await canonicalizeContainmentRoot(expandHomePath(workspaceRoot))
+  const path = await resolveContainedPath({ root, target: snapshot.path, expect: 'file', rejectFinalLink: true })
+  if (!revisionsEqual(snapshot.revision, computeDocumentRevision(snapshot.content))) throw new Error('Invalid committed snapshot.')
+  const digest = createHash('sha256').update(`${operationKey}:${source}:${snapshot.revision.fingerprint}`).digest('hex')
+  const uuid = `${digest.slice(0,8)}-${digest.slice(8,12)}-${digest.slice(12,16)}-${digest.slice(16,20)}-${digest.slice(20,32)}`
+  const id = `${String(Math.max(0,Math.trunc(snapshot.revision.modifiedAt))).padStart(13,'0')}-${uuid}`
+  const directory = (await sidecarDirectory(root, 'document-history', path, true))!
+  const target = resolve(directory, `${id}.json`)
+  try { return validateHistoryEntry(JSON.parse((await readRegularFile(target,MAX_SIDECAR_BYTES)).content),path) }
+  catch (error) { if (!isMissing(error)) throw error }
+  const entry: DocumentHistoryEntry = { ...snapshot, path, id, source, createdAt:new Date().toISOString() }
+  await atomicWriteFile(target,JSON.stringify(entry), { beforeReplace:async()=> { await recheckContainedParent(root,target); await resolveContainedPath({root,target,expect:'file',rejectFinalLink:true}) } })
+  invalidateWriteDocumentIndex(root)
+  return entry
+}
+
 function validateHistoryEntry(value: unknown, path: string): DocumentHistoryEntry {
   const entry = value as DocumentHistoryEntry
   if (!entry || !HISTORY_ID.test(entry.id) || entry.path !== path || typeof entry.content !== 'string'

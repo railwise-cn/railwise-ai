@@ -43,7 +43,7 @@ export const managedRuntimeAdapter = {
       const scriptPath = resolution.args[0] ?? ''
       return runtime.binaryPath.trim()
         ? `Node.js script (${scriptPath})`
-        : `Bundled WorkWise Runtime (${scriptPath})`
+        : `Bundled RailWise AI Runtime (${scriptPath})`
     }
     return resolution.command
   },

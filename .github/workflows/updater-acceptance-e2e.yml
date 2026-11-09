@@ -61,6 +61,7 @@ jobs:
           set -euo pipefail
           node - <<'NODE'
           const fs = require('node:fs')
+          const { parseArtifactName } = require('./scripts/release-publication.cjs')
           const base = process.env.BASE_VERSION
           const target = process.env.TARGET_VERSION
           const packageVersion = JSON.parse(fs.readFileSync('package.json', 'utf8')).version
@@ -75,7 +76,9 @@ jobs:
           if (!baselines.versions?.[base]) throw new Error(`base_version ${base} is not a pinned official acceptance baseline`)
           for (const key of ['darwin-arm64', 'darwin-x64', 'win32-x64']) {
             const asset = baselines.versions[base][key]
-            if (!asset || !asset.name?.startsWith(`WorkWise-${base}-`) || !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.size)) {
+            const parsed = parseArtifactName(asset?.name)
+            const [platform, arch] = key.split('-')
+            if (!parsed || parsed.candidateSourceHead || parsed.version !== base || parsed.platform !== (platform === 'darwin' ? 'mac' : 'win') || parsed.arch !== arch || parsed.format !== (platform === 'darwin' ? 'dmg' : 'exe') || parsed.blockmap || !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.size) || asset.size < 1) {
               throw new Error(`base_version ${base} has an invalid ${key} asset pin`)
             }
           }
@@ -250,7 +253,7 @@ jobs:
           node scripts/verify-packaged-markitdown.cjs dist mac
           node scripts/verify-packaged-runtime-native.cjs dist mac
           mkdir -p acceptance-artifacts/target-mac
-          cp dist/WorkWise-${WORKWISE_APP_VERSION}-mac-* acceptance-artifacts/target-mac/
+          cp dist/RailWise-AI-${WORKWISE_APP_VERSION}-mac-* acceptance-artifacts/target-mac/
           cp dist/latest-mac.yml acceptance-artifacts/target-mac/
 
       - uses: actions/upload-artifact@v4
@@ -314,15 +317,15 @@ jobs:
         env:
           WORKWISE_APP_VERSION: ${{ inputs.target_version }}
         run: |
-          Get-ChildItem dist -Filter 'WorkWise-*' -ErrorAction SilentlyContinue | Remove-Item -Force
+          Get-ChildItem dist -Include 'RailWise-AI-*','WorkWise-*' -File -Recurse -Depth 0 -ErrorAction SilentlyContinue | Remove-Item -Force
           Remove-Item dist/latest.yml -Force -ErrorAction SilentlyContinue
           npm run dist:win
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/verify-packaged-markitdown.cjs dist win
           node scripts/verify-packaged-runtime-native.cjs dist win
           New-Item -ItemType Directory -Force -Path acceptance-artifacts/target-win | Out-Null
-          Copy-Item "dist/WorkWise-$env:WORKWISE_APP_VERSION-win-x64.exe" acceptance-artifacts/target-win/
-          Copy-Item "dist/WorkWise-$env:WORKWISE_APP_VERSION-win-x64.exe.blockmap" acceptance-artifacts/target-win/
+          Copy-Item "dist/RailWise-AI-$env:WORKWISE_APP_VERSION-win-x64.exe" acceptance-artifacts/target-win/
+          Copy-Item "dist/RailWise-AI-$env:WORKWISE_APP_VERSION-win-x64.exe.blockmap" acceptance-artifacts/target-win/
           Copy-Item dist/latest.yml acceptance-artifacts/target-win/
 
       - uses: actions/upload-artifact@v4
@@ -428,8 +431,8 @@ jobs:
           TARGET_TAG: v${{ inputs.target_version }}
         run: |
           set -euo pipefail
-          node scripts/publish-r2.mjs upload --platform mac --tag "${TARGET_TAG}" --channel frontier --dist target-release
-          node scripts/publish-r2.mjs upload --platform win --tag "${TARGET_TAG}" --channel frontier --dist target-release
+          node scripts/publish-r2.mjs upload --platform mac --tag "${TARGET_TAG}" --channel frontier --dist acceptance-release-assets
+          node scripts/publish-r2.mjs upload --platform win --tag "${TARGET_TAG}" --channel frontier --dist acceptance-release-assets
           node scripts/publish-r2.mjs verify --tag "${TARGET_TAG}" --channel frontier --platforms mac,win
 
       - name: Stage and verify isolated official website release

@@ -31,8 +31,8 @@
     "generate:specialist-skill-audit": "node ./scripts/specialist-skill-audit.cjs --write",
     "verify:specialist-skills": "node ./scripts/specialist-skill-audit.cjs",
     "dist": "npm run build && npx --yes electron-builder@26.8.1 --config electron-builder.cjs --publish never",
-    "dist:mac": "rm -f dist/WorkWise-*-mac-* dist/latest-mac.yml && npm run build && npm run dist:mac:x64:artifacts && npm run dist:mac:arm64:artifacts",
-    "dist:mac:signed": "rm -f dist/WorkWise-*-mac-* dist/latest-mac.yml && npm run build && MAC_SIGN=1 node ./scripts/run-mac-artifact-build-with-retry.mjs x64 && MAC_SIGN=1 node ./scripts/run-mac-artifact-build-with-retry.mjs arm64",
+    "dist:mac": "rm -f dist/RailWise-AI-*-mac-* dist/WorkWise-*-mac-* dist/latest-mac.yml && npm run build && npm run dist:mac:x64:artifacts && npm run dist:mac:arm64:artifacts",
+    "dist:mac:signed": "rm -f dist/RailWise-AI-*-mac-* dist/WorkWise-*-mac-* dist/latest-mac.yml && npm run build && MAC_SIGN=1 node ./scripts/run-mac-artifact-build-with-retry.mjs x64 && MAC_SIGN=1 node ./scripts/run-mac-artifact-build-with-retry.mjs arm64",
     "dist:mac:arm64": "npm run build && npm run dist:mac:arm64:artifacts",
     "dist:mac:x64": "npm run build && npm run dist:mac:x64:artifacts",
     "dist:mac:arm64:artifacts": "npm run dist:mac:arm64:dmg && node ./scripts/zip-mac-app.cjs arm64",
@@ -159,7 +159,7 @@
     "proxy-addr": "2.0.8",
     "qs": "6.16.1"
   },
-  "author": "WorkWise Contributors",
+  "author": "RailWise AI Contributors",
   "homepage": "https://github.com/railwise-cn/railwise-ai",
   "repository": {
     "type": "git",

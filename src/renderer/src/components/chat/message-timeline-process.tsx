@@ -712,9 +712,7 @@ function RuntimeMetaBadges({
   const childLabel =
     typeof child?.childLabel === 'string' && child.childLabel.trim()
       ? child.childLabel.trim()
-      : typeof child?.childId === 'string'
-        ? child.childId
-        : ''
+      : ''
   if (
     sources.length === 0 &&
     attachmentIds.length === 0 &&

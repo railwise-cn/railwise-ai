@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-// Freeze public-identity packages privately, then publish only the reviewed bytes.
+// Publish only the exact verified public-identity bytes. Historical freezes
+// retain their build receipts; normal exact builds use immutable API provenance.
 // A successful build is provenance, not UI/updater acceptance or release approval.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -17,6 +18,8 @@ const RECEIPT = 'reviewed-build.json'
 const RECORD_STEP = 'Record frozen public package identity'
 const ARTIFACT_NAMES = ['release-mac', 'release-win']
 const require = createRequire(import.meta.url)
+const publication = require('./release-publication.cjs')
+const LEGACY_BUILD_MODE = 'frozen-public-release'
 
 function fail(message) { throw new Error(`[reviewed-artifacts] ${message}`) }
 function equal(actual, expected, label) { if (actual !== expected) fail(`${label} mismatch: expected ${expected}, received ${actual}`) }
@@ -26,19 +29,26 @@ function exactSet(actual, expected, label) {
     fail(`${label} has missing, duplicate or extra entries`)
   }
 }
+function buildMode(build) {
+  const mode = build.mode ?? LEGACY_BUILD_MODE
+  if (![LEGACY_BUILD_MODE, 'exact-build'].includes(mode)) fail('unsupported source build mode')
+  return mode
+}
+function exactBuildBranch(build) {
+  // Only an explicit same-repository release/work branch is eligible. The
+  // release approval verifier separately proves source ancestry at release HEAD.
+  const ref = build.headRef
+  if (typeof ref !== 'string' || !/^refs\/heads\/(?:main|codex\/[A-Za-z0-9][A-Za-z0-9._/-]*)$/.test(ref)
+    || ref.includes('..') || ref.includes('//') || ref.endsWith('/') || ref.endsWith('.')
+    || ref.split('/').some(part => part.startsWith('.') || part.endsWith('.lock'))) fail('exact build requires a valid main or codex branch headRef')
+  return ref.slice('refs/heads/'.length)
+}
 export function validatePublicIdentity(identity) {
   for (const [key, value] of Object.entries(PUBLIC_IDENTITY)) equal(identity?.[key], value, `public package ${key}`)
 }
 
-export function expectedReleaseFiles(version) {
-  if (!/^\d+\.\d+\.\d+$/.test(version)) fail('invalid public version')
-  return [
-    ...['arm64', 'x64'].flatMap(arch => ['dmg', 'zip'].map(extension => ({ name: `WorkWise-${version}-mac-${arch}.${extension}`, platform: `darwin-${arch}`, artifact: 'release-mac' }))),
-    { name: 'latest-mac.yml', platform: 'darwin', artifact: 'release-mac' },
-    { name: `WorkWise-${version}-win-x64.exe`, platform: 'win32-x64', artifact: 'release-win' },
-    { name: `WorkWise-${version}-win-x64.exe.blockmap`, platform: 'win32-x64', artifact: 'release-win' },
-    { name: 'latest.yml', platform: 'win32-x64', artifact: 'release-win' },
-  ]
+export function expectedReleaseFiles(version, prefix = publication.policy.artifactPrefix) {
+  return publication.expectedReleaseFiles(version, prefix)
 }
 
 export function validateFileManifest(files, expected) {
@@ -55,6 +65,12 @@ export function validateFileManifest(files, expected) {
 
 export function validateReviewedBuild(build, { version, sourceHead }) {
   if (!build || typeof build !== 'object') fail('package.reviewedBuild is required')
+  if (build.schemaVersion !== undefined) equal(build.schemaVersion, 1, 'source build schema version')
+  if (buildMode(build) === 'exact-build') {
+    exactBuildBranch(build)
+    equal(build.workflowRef, `${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW}@${build.headRef}`, 'exact build workflow ref')
+    equal(build.workflowSha, sourceHead, 'exact build workflow source SHA')
+  }
   equal(build.repository, RELEASE_REPOSITORY, 'source repository')
   equal(build.workflowPath, RELEASE_WORKFLOW, 'source workflow')
   equal(build.sourceHead, sourceHead, 'reviewed source HEAD')
@@ -69,7 +85,7 @@ export function validateReviewedBuild(build, { version, sourceHead }) {
     positive(artifact.id, 'artifact ID')
     if (!/^sha256:[a-f0-9]{64}$/.test(artifact.digest)) fail('immutable artifact digest is required')
   }
-  validateFileManifest(build.files, expectedReleaseFiles(version))
+  validateFileManifest(build.files, expectedReleaseFiles(version, publication.detectPrefix(build.files, version)))
   return build
 }
 
@@ -80,18 +96,21 @@ export function githubApi(path) {
 
 export function verifyReviewedBuildSource(build, expected, api = githubApi) {
   validateReviewedBuild(build, expected)
+  const exactBuild = buildMode(build) === 'exact-build'
   const root = `repos/${RELEASE_REPOSITORY}`
   const repository = api(root)
   const workflow = api(`${root}/actions/workflows/release.yml`)
   const run = api(`${root}/actions/runs/${build.runId}`)
   equal(repository.full_name, RELEASE_REPOSITORY, 'API repository')
+  positive(repository.id, 'API repository ID')
+  positive(workflow.id, 'trusted workflow ID')
   equal(repository.default_branch, 'main', 'protected default branch')
   equal(workflow.path, RELEASE_WORKFLOW, 'trusted workflow path')
   equal(run.workflow_id, workflow.id, 'trusted workflow ID')
   equal(run.path, RELEASE_WORKFLOW, 'run workflow path')
   equal(run.repository?.id, repository.id, 'run repository ID')
   equal(run.head_repository?.id, repository.id, 'run head repository ID')
-  equal(run.head_branch, 'main', 'run protected head branch')
+  equal(run.head_branch, exactBuild ? exactBuildBranch(build) : 'main', 'run head branch')
   equal(run.head_sha, build.sourceHead, 'run source HEAD')
   equal(run.event, 'workflow_dispatch', 'run event')
   equal(run.status, 'completed', 'source run status')
@@ -99,19 +118,20 @@ export function verifyReviewedBuildSource(build, expected, api = githubApi) {
   equal(run.run_attempt, build.runAttempt, 'source run attempt')
   equal(run.id, build.runId, 'source run ID')
   // The workflow-run REST response does not expose GITHUB_WORKFLOW_REF.
-  // Bind the real API fields to protected main and prove the source belongs
-  // to that history; the immutable build receipt separately carries the
-  // exact runner workflow ref/SHA. This also rejects a tag named "main" that
-  // points to code outside the protected branch.
-  const branch = api(`${root}/branches/main`)
-  equal(branch.name, 'main', 'protected branch name')
-  equal(branch.protected, true, 'main branch protection')
-  if (!/^[a-f0-9]{40}$/.test(branch.commit?.sha ?? '')) fail('invalid protected main commit')
-  const ancestry = api(`${root}/compare/${build.sourceHead}...${branch.commit.sha}`)
-  if (!['ahead', 'identical'].includes(ancestry.status)) fail('source is not an ancestor of protected main')
-  equal(ancestry.base_commit?.sha, build.sourceHead, 'comparison source commit')
-  equal(ancestry.merge_base_commit?.sha, build.sourceHead, 'protected source ancestry')
-  if (ancestry.status === 'identical') equal(branch.commit.sha, build.sourceHead, 'identical protected source')
+  // Legacy freeze receipts separately bind the runner ref/SHA to protected
+  // main. Exact builds bind the declared ref to the run's real branch, workflow
+  // and source fields above; release approval proves ancestry at release HEAD.
+  if (!exactBuild) {
+    const branch = api(`${root}/branches/main`)
+    equal(branch.name, 'main', 'protected branch name')
+    equal(branch.protected, true, 'main branch protection')
+    if (!/^[a-f0-9]{40}$/.test(branch.commit?.sha ?? '')) fail('invalid protected main commit')
+    const ancestry = api(`${root}/compare/${build.sourceHead}...${branch.commit.sha}`)
+    if (!['ahead', 'identical'].includes(ancestry.status)) fail('source is not an ancestor of protected main')
+    equal(ancestry.base_commit?.sha, build.sourceHead, 'comparison source commit')
+    equal(ancestry.merge_base_commit?.sha, build.sourceHead, 'protected source ancestry')
+    if (ancestry.status === 'identical') equal(branch.commit.sha, build.sourceHead, 'identical protected source')
+  }
   const jobs = []
   for (let page = 1; ; page += 1) {
     const result = api(`${root}/actions/runs/${build.runId}/attempts/${build.runAttempt}/jobs?per_page=100&page=${page}`)
@@ -120,10 +140,15 @@ export function verifyReviewedBuildSource(build, expected, api = githubApi) {
     if (jobs.length >= result.total_count) break
     if (result.jobs.length === 0) fail('incomplete source jobs response')
   }
-  for (const name of ['Build macOS', 'Build Windows', 'Two-hour pre-release stability', 'Verify three-client candidate', 'Verify final candidate on macOS']) {
+  const additionalJobs = expected.requiredSourceJobs ?? []
+  if (!Array.isArray(additionalJobs) || additionalJobs.some(name => typeof name !== 'string' || !name.trim())) fail('required source jobs must be nonempty job names')
+  const requiredJobs = exactBuild
+    ? [...new Set(['Build macOS', 'Build Windows', ...additionalJobs])]
+    : ['Build macOS', 'Build Windows', 'Verify three-client candidate', 'Verify final candidate on macOS', ...new Set(additionalJobs)]
+  for (const name of new Set(requiredJobs)) {
     const matches = jobs.filter(job => job.name === name)
-    if (matches.length !== 1 || matches[0].conclusion !== 'success') fail(`trusted source job must succeed exactly once: ${name}`)
-    if (name.startsWith('Build ')) {
+    if (matches.length !== 1 || matches[0].conclusion !== 'success' || (exactBuild && matches[0].status !== 'completed')) fail(`trusted source job must succeed exactly once: ${name}`)
+    if (!exactBuild && name.startsWith('Build ')) {
       const steps = matches[0].steps?.filter(step => step.name === RECORD_STEP) ?? []
       if (steps.length !== 1 || steps[0].conclusion !== 'success') fail(`${name} did not freeze candidate_only public-identity packages`)
     }
@@ -174,7 +199,7 @@ function inspectPackagedIdentity(app, platform, version, sourceHead) {
   equal(metadata.buildProvenance?.sourceHead, sourceHead, 'packaged source HEAD')
   equal(metadata.updateChannel, 'stable', 'packaged update channel')
   equal(updater.provider, 'generic', 'public updater provider')
-  equal(updater.url, 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', 'public updater URL')
+  if (!publication.namespaces.some(releasePrefix => updater.url === publication.updateUrl({ releasePrefix }))) fail('public updater URL mismatch')
   equal(updater.updaterCacheDirName, 'workwise-updater', 'public updater cache')
   return { ...identity, version, sourceHead, updateUrl: updater.url }
 }
@@ -224,32 +249,38 @@ export async function recordReviewedBuild({ dist, platform, version, env = proce
 
 export async function verifyDownloadedReleaseArtifacts({ build, version, sourceHead, downloads, output }) {
   validateReviewedBuild(build, { version, sourceHead })
+  const exactBuild = buildMode(build) === 'exact-build'
   exactSet(readdirSync(downloads), ARTIFACT_NAMES, 'downloaded artifact directories')
   const verified = []
   for (const artifact of ARTIFACT_NAMES) {
     const root = join(downloads, artifact)
     if (!lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) fail('artifact directory must not be a symlink')
     const files = build.files.filter(file => file.artifact === artifact)
-    exactSet(readdirSync(root), [...files.map(file => file.name), RECEIPT], `${artifact} files`)
-    plainFile(join(root, RECEIPT))
-    const receipt = JSON.parse(readFileSync(join(root, RECEIPT), 'utf8'))
-    for (const key of ['repository', 'workflowPath', 'sourceHead', 'runId', 'runAttempt']) equal(receipt[key], build[key], `build receipt ${key}`)
-    equal(receipt.workflowRef, RELEASE_WORKFLOW_REF, 'build receipt protected workflow ref')
-    equal(receipt.workflowSha, sourceHead, 'build receipt workflow source SHA')
-    for (const [key, value] of Object.entries({ schemaVersion: 1, purpose: 'frozen-public-release', artifact, version, candidateOnly: true, preparePublicArtifacts: true, publishRelease: false })) equal(receipt[key], value, `build receipt ${key}`)
-    const platforms = artifact === 'release-mac' ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64']
-    exactSet(Object.keys(receipt.identities ?? {}), platforms, 'packaged identities')
-    for (const platform of platforms) {
-      validatePublicIdentity(receipt.identities[platform])
-      equal(receipt.identities[platform].version, version, 'identity version')
-      equal(receipt.identities[platform].sourceHead, sourceHead, 'identity source HEAD')
-      equal(receipt.identities[platform].updateUrl, 'https://www.railwise.cn/downloads/workwise/channels/stable/latest/', 'identity update URL')
+    exactSet(readdirSync(root), [...files.map(file => file.name), ...(!exactBuild ? [RECEIPT] : [])], `${artifact} files`)
+    let receipt
+    if (!exactBuild) {
+      plainFile(join(root, RECEIPT))
+      receipt = JSON.parse(readFileSync(join(root, RECEIPT), 'utf8'))
+      for (const key of ['repository', 'workflowPath', 'sourceHead', 'runId', 'runAttempt']) equal(receipt[key], build[key], `build receipt ${key}`)
+      equal(receipt.workflowRef, RELEASE_WORKFLOW_REF, 'build receipt protected workflow ref')
+      equal(receipt.workflowSha, sourceHead, 'build receipt workflow source SHA')
+      for (const [key, value] of Object.entries({ schemaVersion: 1, purpose: 'frozen-public-release', artifact, version, candidateOnly: true, preparePublicArtifacts: true, publishRelease: false })) equal(receipt[key], value, `build receipt ${key}`)
+      const platforms = artifact === 'release-mac' ? ['darwin-arm64', 'darwin-x64'] : ['win32-x64']
+      exactSet(Object.keys(receipt.identities ?? {}), platforms, 'packaged identities')
+      for (const platform of platforms) {
+        validatePublicIdentity(receipt.identities[platform])
+        equal(receipt.identities[platform].version, version, 'identity version')
+        equal(receipt.identities[platform].sourceHead, sourceHead, 'identity source HEAD')
+        if (!publication.namespaces.some(releasePrefix => receipt.identities[platform].updateUrl === publication.updateUrl({ releasePrefix }))) fail('identity update URL mismatch')
+      }
+      validateFileManifest(receipt.files, expectedReleaseFiles(version, publication.detectPrefix(build.files, version)).filter(file => file.artifact === artifact))
     }
-    validateFileManifest(receipt.files, expectedReleaseFiles(version).filter(file => file.artifact === artifact))
     for (const file of files) {
-      const recorded = receipt.files.find(entry => entry.name === file.name)
-      equal(recorded.sha256, file.sha256, `${file.name} reviewed/build hash`)
-      equal(recorded.size, file.size, `${file.name} reviewed/build size`)
+      if (receipt) {
+        const recorded = receipt.files.find(entry => entry.name === file.name)
+        equal(recorded.sha256, file.sha256, `${file.name} reviewed/build hash`)
+        equal(recorded.size, file.size, `${file.name} reviewed/build size`)
+      }
       const path = join(root, file.name)
       equal(plainFile(path).size, file.size, `${file.name} downloaded size`)
       equal(await fileHash(path), file.sha256, `${file.name} downloaded hash`)
@@ -257,7 +288,8 @@ export async function verifyDownloadedReleaseArtifacts({ build, version, sourceH
     }
   }
   if (existsSync(output)) fail('verified output directory must not already exist')
-  // Copy only after every artifact, receipt and file passed. No merging/overwrites.
+  // Copy only after all provenance-specific receipts and file hashes passed.
+  // Never merge with or overwrite a previous verification output.
   mkdirSync(output, { recursive: true })
   for (const file of verified) copyFileSync(file.path, join(output, file.name))
   return { files: verified.length, sourceHead, runId: build.runId }

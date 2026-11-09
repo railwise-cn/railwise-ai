@@ -1,3 +1,7 @@
+import { randomUUID as executionUUID } from 'node:crypto'
+import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
+import { processIdentity, inspectProcess } from './process-identity.js'
+import type { ToolCallLike, ToolHostResult } from '../ports/tool-host.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { extname, isAbsolute, relative, resolve } from 'node:path'
@@ -9,12 +13,14 @@ import type {
   TaskArtifact,
   TaskCheckpoint,
   TaskRun,
-  TaskRunStatus
+  TaskRunStatus,
+  TaskInput
 } from '../contracts/tasks.js'
 import type { SessionStore } from '../ports/session-store.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import {
   completionIntentText,
+  declaredFileOutputPaths,
   fileOutputPaths,
   looksLikeExternalCapabilityBlockedReply,
   looksLikeProgressOnlyReply,
@@ -23,9 +29,11 @@ import {
   requiredFileExtensionsForPrompt,
   verifiedShellDeliverablePaths
 } from '../loop/turn-completion-guard.js'
-import { TaskRunRepository } from './task-run-repository.js'
+import { TaskLeaseLostError, TaskRunRepository, operationFingerprint, type TaskLeaseGuard } from './task-run-repository.js'
+import { sanitizeTurnItemForPersistence } from '../security/tool-persistence-security.js'
 import { validateArtifactFile } from './artifact-validator.js'
 import type { RuntimeSpanService } from './runtime-span-service.js'
+import { verifyTaskDelivery } from '../delivery/verification.js'
 
 const DEFAULT_MAX_ATTEMPTS = 8
 const DEFAULT_MAX_DURATION_MS = 30 * 60 * 1000
@@ -50,6 +58,17 @@ export type TaskControllerDeps = {
   completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string; retryable?: boolean } | null
 }
 
+export type TaskWatchdogOptions = {
+  intervalMs?: number
+  leaseMs?: number
+  initialRecoveryTaskIds?: ReadonlySet<string>
+  onLeaseLost?: (task: TaskRun) => void
+  onRecoveryNeeded?: (tasks: TaskRun[]) => void | Promise<void>
+}
+
+type SharedWorkBudgetState={aborts:Map<string,(reason:string)=>void>;active:Map<string,{rootTaskId:string;turnId:string}>;timers:Map<string,ReturnType<typeof setTimeout>>}
+const sharedWorkBudgets=new WeakMap<TaskRunRepository,SharedWorkBudgetState>()
+
 export class TaskController {
   private readonly repository: TaskRunRepository
   private readonly threadStore: ThreadStore
@@ -58,9 +77,23 @@ export class TaskController {
   private readonly ownerId: string
   private readonly spans?: RuntimeSpanService
   private readonly completionGuard?: TaskControllerDeps['completionGuard']
+  private readonly leases = new Map<string, { leaseRevision: number; turnId?: string }>()
+  private readonly attemptTokens = new Map<string, ExecutionToken>()
+  private readonly identity: ProcessIdentity = processIdentity() ?? { pid: process.pid, fingerprint: `unverified:${executionUUID()}` }
+  private readonly fencedTasks = new Set<string>()
+  private watchdogTimer?: ReturnType<typeof setInterval>
+  private watchdogRunning = false
+  private recoveryInFlight = new Set<string>()
+  private watchdogOptions: TaskWatchdogOptions = {}
+  private readonly executionAborts:SharedWorkBudgetState['aborts']
+  private readonly activeWork:SharedWorkBudgetState['active']
+  private readonly rootBudgetTimers:SharedWorkBudgetState['timers']
 
   constructor(deps: TaskControllerDeps) {
     this.repository = deps.repository
+    let sharedBudget=sharedWorkBudgets.get(deps.repository)
+    if(!sharedBudget){sharedBudget={aborts:new Map(),active:new Map(),timers:new Map()};sharedWorkBudgets.set(deps.repository,sharedBudget)}
+    this.executionAborts=sharedBudget.aborts;this.activeWork=sharedBudget.active;this.rootBudgetTimers=sharedBudget.timers
     this.threadStore = deps.threadStore
     this.sessionStore = deps.sessionStore
     this.nowIso = deps.nowIso
@@ -83,7 +116,9 @@ export class TaskController {
     if (input.continuationTaskId && active?.id !== input.continuationTaskId) {
       throw Object.assign(new Error('the task to resume is no longer active for this thread'), { code: 'invalid_state' })
     }
-    if (active && (input.continuationTaskId || (!consultation && shouldContinueActiveTask(input.request.prompt)))) {
+    const intent = input.request.taskIntent ?? 'auto'
+    if (active && intent === 'status') return active
+    if (active && (input.continuationTaskId || intent === 'supplement' || (!consultation && intent !== 'new' && shouldContinueActiveTask(input.request.prompt)))) {
       return this.repository.update(active.id, active.revision, (current) => ({
         ...current,
         activeTurnId: input.turnId,
@@ -99,9 +134,10 @@ export class TaskController {
         createdAt: now
       })
     }
-    if (active) {
-      this.finish(active, 'cancelled', '用户发起了新的请求，旧任务已停止。')
-    }
+    // A new message never implicitly revokes or cancels another task.
+    const priorTurn = active?.activeTurnId ? input.thread.turns.find(turn=>turn.id===active.activeTurnId) : undefined
+    const legacyUnexecutedReply = active?.status === 'queued' && active.attempts === 0 && priorTurn?.status === 'completed'
+    if (active && intent !== 'new' && !consultation && !legacyUnexecutedReply) throw Object.assign(new Error('active task requires explicit supplement or new-task routing'), { code: 'task_intent_required' })
 
     const acceptance = acceptanceForPrompt(consultation ? 'Answer the Survey question or propose a plan for review.' : input.request.prompt)
     const id = `task_${randomUUID()}`
@@ -112,6 +148,8 @@ export class TaskController {
     const created = this.repository.create({
       id,
       threadId: input.thread.id,
+      originThreadId: input.request.taskOriginThreadId,
+      visibility: input.request.taskVisibility ?? (consultation ? 'chat' : 'task'),
       activeTurnId: input.turnId,
       childTaskIds: [],
       workspaceRoot: input.thread.workspace,
@@ -123,9 +161,18 @@ export class TaskController {
       providerId: input.request.providerId,
       engineeringPlanId: input.engineeringPlanId,
       reasoningEffort: input.request.reasoningEffort,
+      authority: {
+        source: 'user', workspaceRoot: input.thread.workspace,
+        toolAllowlist: profile?.toolAllowlist, mcpAllowlist: profile?.mcpAllowlist,
+        approvalPolicy: input.request.approvalPolicy ?? input.thread.approvalPolicy,
+        sandboxMode: input.request.sandboxMode ?? input.thread.sandboxMode,
+        externalTargets: [], grantedAt: now
+      },
+      executionMs: 0,
       budget: {
         maxAttempts: profile?.budget.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         maxDurationMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS,
+        ...(input.request.taskOriginThreadId || input.request.taskIntent==='new' ? { version: 2 as const, maxExecutionMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS } : {}),
         ...(maxCostUsd !== undefined ? { maxCostUsd } : {})
       },
       attempts: 0,
@@ -137,6 +184,7 @@ export class TaskController {
       updatedAt: now,
       revision: 0
     })
+    this.repository.execution.ensureSession(created, now)
     this.spans?.start({
       id: taskSpanId(created.id),
       taskId: created.id,
@@ -153,8 +201,8 @@ export class TaskController {
   }
 
   continuationSelection(thread: ThreadRecord, request: StartTurnRequest, engineeringExecution?: boolean, continuationTaskId?: string): Pick<StartTurnRequest, 'model' | 'providerId' | 'reasoningEffort'> & { engineeringPlanId?: string } {
+    if (request.taskIntent === 'new' || request.taskVisibility === 'chat') return {}
     if (!continuationTaskId && thread.domain === 'engineering' && !engineeringExecution) return {}
-    if (!continuationTaskId && !shouldContinueActiveTask(request.prompt)) return {}
     const task = this.repository.findActiveByThread(thread.id)
     if (continuationTaskId && task?.id !== continuationTaskId) throw Object.assign(new Error('the task to resume is no longer active for this thread'), { code: 'invalid_state' })
     return task ? { model: task.model, providerId: task.providerId, reasoningEffort: task.reasoningEffort, engineeringPlanId: task.engineeringPlanId } : {}
@@ -166,33 +214,69 @@ export class TaskController {
 
   getTask(taskId: string): TaskRun | null { return this.repository.get(taskId) }
 
+  startWatchdog(options: TaskWatchdogOptions = {}): void {
+    this.stopWatchdog()
+    this.watchdogOptions = options
+    for (const taskId of options.initialRecoveryTaskIds ?? []) this.recoveryInFlight.add(taskId)
+    const intervalMs = Math.max(1_000, Math.trunc(options.intervalMs ?? 20_000))
+    this.watchdogTimer = setInterval(() => { void this.runWatchdogTick() }, intervalMs)
+    this.watchdogTimer.unref?.()
+    void this.runWatchdogTick()
+  }
+
+  stopWatchdog(): void {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer)
+    this.watchdogTimer = undefined
+    this.watchdogOptions = {}
+    this.recoveryInFlight.clear()
+  }
+
   beginAttempt(threadId: string, turnId: string): TaskRun | null {
     const task = this.repository.findActiveByThread(threadId)
-    if (!task || task.activeTurnId !== turnId || TERMINAL.has(task.status)) return task
+    if (!task || task.activeTurnId !== turnId || TERMINAL.has(task.status) || task.status === 'paused') return task
     const now = this.nowIso()
-    const expiresAt = new Date(Date.parse(now) + 60_000).toISOString()
+    const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
+    const expiresAt = new Date(Date.parse(now) + leaseMs).toISOString()
     const lease = this.repository.acquireLease(task.id, this.ownerId, now, expiresAt)
     if (!lease) {
       throw Object.assign(new Error('task is already running in another runtime'), {
         code: 'task_lease_conflict'
       })
     }
-    const started = this.repository.update(task.id, task.revision, (current) => ({
-      ...current,
-      status: 'running',
-      attempts: current.attempts + 1,
-      nodes: current.nodes.map((node) =>
-        node.status === 'pending' || node.status === 'failed'
-          ? { ...node, status: 'running', attempt: node.attempt + 1, startedAt: node.startedAt ?? now, revision: node.revision + 1 }
-          : node
-      ),
-      updatedAt: now
-    }), {
-      key: `attempt-started:${task.attempts + 1}`,
-      kind: 'attempt_started',
-      payload: { turnId, attempt: task.attempts + 1 },
-      createdAt: now
-    })
+    this.fencedTasks.add(task.id)
+    this.leases.set(task.id, { leaseRevision: lease.revision, turnId })
+    const session = this.repository.execution.ensureSession(task, now)
+    const token: ExecutionToken = { taskId: task.id, sessionId: session.id, executionId: `attempt_${executionUUID()}`, turnId, ownerId: this.ownerId, leaseRevision: lease.revision, process: this.identity }
+    const previousToken = this.attemptTokens.get(turnId)
+    if (previousToken) this.repository.execution.finishAttempt(previousToken.executionId, 'completed', now)
+    this.attemptTokens.set(turnId, token)
+    this.repository.execution.beginAttempt(token, now)
+    this.recoveryInFlight.delete(task.id)
+    let started: TaskRun
+    try {
+      started = this.repository.update(task.id, task.revision, (current) => ({
+        ...current,
+        status: 'running',
+        executionStartedAt: current.executionStartedAt ?? now,
+        attempts: current.attempts + 1,
+        nodes: current.nodes.map((node) =>
+          node.status === 'pending' || node.status === 'failed'
+            ? { ...node, status: 'running', attempt: node.attempt + 1, startedAt: node.startedAt ?? now, revision: node.revision + 1 }
+            : node
+        ),
+        updatedAt: now
+      }), {
+        key: `attempt-started:${task.attempts + 1}`,
+        kind: 'attempt_started',
+        payload: { turnId, attempt: task.attempts + 1 },
+        createdAt: now
+      }, this.leaseGuard(task.id))
+    } catch (error) {
+      this.leases.delete(task.id)
+      this.fencedTasks.delete(task.id)
+      this.repository.releaseLease(task.id, this.ownerId, lease.revision)
+      throw error
+    }
     this.spans?.start({
       id: turnSpanId(started.id, turnId, started.attempts),
       taskId: started.id,
@@ -214,10 +298,16 @@ export class TaskController {
     if (!task) {
       throw Object.assign(new Error(`active task not found for thread ${threadId}`), { code: 'not_found' })
     }
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    const unsettled = this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool')
+    if (unsettled.length) return this.stallUnknown(task,unsettled.map(operation=>operation.id))
     const [thread, items] = await Promise.all([
       this.threadStore.get(threadId),
       this.sessionStore.loadItems(threadId)
     ])
+    const capturedToken = this.attemptTokens.get(turnId)
+    if (capturedToken) this.assertToken(capturedToken)
+    if (this.repository.listShellSessions(task.id).some(session => ['running','starting','outcome_unknown'].includes(session.status))) return this.retry(task,'命令进程尚未确认完成，请轮询已有命令并核实其结果后交付。',`shell-pending:${task.attempts}`,turnId)
     const turn = thread?.turns.find((candidate) => candidate.id === turnId)
     const turnItems = items.filter((item) => item.turnId === turnId)
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
@@ -252,6 +342,10 @@ export class TaskController {
         'web_access_exhausted: 在线搜索连续失败，无法核实当前资讯。'
       )
     }
+    if (task.templateId) {
+      const delivery = verifyTaskDelivery(this.repository,task)
+      if (!delivery.complete) return this.waitForUser(task,delivery.reasons.join('；'),finalResponse,`delivery:${task.revision}`,turnId)
+    }
 
     const artifacts = task.acceptance.kind === 'files'
       ? await this.collectArtifacts(task, turnItems, turnId)
@@ -273,7 +367,7 @@ export class TaskController {
     }
 
     const now = this.nowIso()
-    const completed = this.repository.update(task.id, task.revision, (current) => ({
+    const completed = this.updateExecution(task.id, task.revision, (current) => ({
       ...current,
       status: 'completed',
       waitingReason: undefined,
@@ -296,7 +390,7 @@ export class TaskController {
       payload: { turnId, artifactCount: artifacts.length },
       createdAt: now
     })
-    this.repository.releaseLease(task.id, this.ownerId)
+    this.releaseExecutionLease(task.id)
     this.spans?.finishTurn(task.id, turnId, {
       status: 'ok',
       attributes: { artifactCount: artifacts.length }
@@ -323,6 +417,9 @@ export class TaskController {
   recordAttemptFailure(threadId: string, turnId: string, code: string, message: string): TaskCandidateDecision | null {
     const task = this.repository.findActiveByThread(threadId)
     if (!task || task.activeTurnId !== turnId) return null
+    if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
+    const unsettled = this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool')
+    if (unsettled.length) return this.stallUnknown(task,unsettled.map(operation=>operation.id))
     if (code === 'operation_cancelled' || code === 'turn_total_timeout') {
       return this.finish(task, code === 'operation_cancelled' ? 'cancelled' : 'failed', message)
     }
@@ -337,18 +434,215 @@ export class TaskController {
     )
   }
 
+  private stallUnknown(task: TaskRun, operationIds: string[]): Extract<TaskCandidateDecision,{kind:'stalled'}> {
+    const reason = '操作已派发，但结果尚未核实。请先检查原执行回执，系统不会重复派发。'
+    const now=this.nowIso()
+    const next=this.updateExecution(task.id,task.revision,current=>({...current,status:'stalled',waitingReason:undefined,stalledReason:reason,updatedAt:now}),{key:`unknown:${task.revision}`,kind:'task_stalled',payload:{operationIds},createdAt:now})
+    this.saveCheckpoint(next,reason,`unknown:${task.revision}`)
+    this.repository.putAttention({id:`unknown_${task.id}`,ownerKind:'task',ownerId:task.id,taskId:task.id,threadId:task.originThreadId ?? task.threadId,kind:'blocked',title:'核实上次操作结果',message:reason,status:'pending',revision:0,createdAt:now,updatedAt:now,payload:{operationIds}})
+    this.releaseExecutionLease(task.id)
+    return {kind:'stalled',task:next,reason}
+  }
+
   cancel(threadId: string, reason: string): TaskRun | null {
     const task = this.repository.findActiveByThread(threadId)
     if (!task) return null
+    if (task.status === 'paused' || reason === 'application_exit') return task
     return this.finish(task, 'cancelled', reason).task
+  }
+
+  pauseTask(taskId: string, expectedRevision: number, reason = '用户暂停了任务。'): TaskRun {
+    const task = this.repository.get(taskId)
+    if (!task) throw Object.assign(new Error('task not found'), { code: 'not_found' })
+    if (TERMINAL.has(task.status)) throw Object.assign(new Error('terminal task cannot pause'), { code: 'invalid_state' })
+    const now = this.nowIso()
+    const next = this.updateExecution(taskId, expectedRevision, current => ({ ...current, status: 'paused', waitingReason: reason, executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now), executionStartedAt: undefined, updatedAt: now }), { key: `paused:${expectedRevision}`, kind: 'task_paused', payload: { reason }, createdAt: now })
+    this.saveCheckpoint(next, reason, `paused:${expectedRevision}`)
+    this.releaseExecutionLease(taskId)
+    return next
+  }
+
+  tokenForTurn(turnId: string): ExecutionToken | undefined { return this.attemptTokens.get(turnId) }
+  registerExecutionAbort(turnId:string,abort:(reason:string)=>void):()=>void {
+    this.executionAborts.set(turnId,abort)
+    return ()=>{if(this.executionAborts.get(turnId)===abort)this.executionAborts.delete(turnId)}
+  }
+
+  endRun(turnId: string): void {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) return
+    // The in-process worker has actually returned; this is stronger evidence
+    // than a lease timeout or a stale lock file.
+    this.repository.execution.finishAttempt(token.executionId, 'cancelled', this.nowIso())
+    this.repository.releaseLease(token.taskId, token.ownerId, token.leaseRevision)
+    this.attemptTokens.delete(turnId)
+    this.leases.delete(token.taskId)
+    this.fencedTasks.delete(token.taskId)
+  }
+
+  assertToken(token: ExecutionToken): void {
+    const attempt = this.repository.execution.attempt(token.executionId)
+    const task = this.repository.get(token.taskId)
+    if (!attempt || attempt.status !== 'running' || attempt.turnId !== token.turnId || !task || task.activeTurnId !== token.turnId || task.status === 'paused' || TERMINAL.has(task.status)
+      || !this.repository.hasLease({ ownerId: token.ownerId, leaseRevision: token.leaseRevision, nowIso: this.nowIso() }, token.taskId)) throw new TaskLeaseLostError(token.taskId)
+  }
+
+  pendingDeliveries(threadId: string, turnId: string): Array<{ delivery: InputDelivery; input: TaskInput }> {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) return []
+    this.assertToken(token)
+    const task = this.repository.get(token.taskId)!
+    for (const input of this.repository.inputs(task.id, true)) this.repository.execution.enqueue(input.id, task.id, token.sessionId)
+    const inputs = new Map(this.repository.inputs(task.id, true).map(input => [input.id, input]))
+    return this.repository.execution.pending(token.sessionId).flatMap(delivery => inputs.has(delivery.inputId) ? [{ delivery, input: inputs.get(delivery.inputId)! }] : [])
+  }
+
+  markInputsDelivered(turnId:string,deliveries:InputDelivery[],sessionItemId:string,sessionHash:string):void {
+    const token=this.attemptTokens.get(turnId)
+    if(!token||!deliveries.length)return
+    this.repository.transact(()=>{
+      this.assertToken(token)
+      const now=this.nowIso()
+      for(const delivery of deliveries) {
+        if(delivery.sessionId!==token.sessionId||delivery.taskId!==token.taskId)throw new TaskLeaseLostError(token.taskId)
+        this.repository.execution.delivered(delivery,sessionItemId,sessionHash,now)
+        this.repository.markInputDelivered(delivery.inputId,now)
+      }
+    })
+  }
+
+  acknowledgeInputs(turnId: string, deliveries: InputDelivery[], sessionItemId: string, sessionHash: string): void {
+    const token = this.attemptTokens.get(turnId)
+    if (!token || !deliveries.length) return
+    this.repository.transact(() => {
+      this.assertToken(token)
+      const pending=new Map(this.repository.execution.pending(token.sessionId).map(delivery=>[delivery.id,delivery]))
+      for(const delivery of deliveries) {
+        const stored=pending.get(delivery.id)
+        if(!stored||stored.status!=='delivered'||stored.sessionItemId!==sessionItemId||stored.sessionHash!==sessionHash)throw new Error('input transcript proof does not match checkpoint acknowledgement')
+      }
+      const task = this.repository.get(token.taskId)!
+      const now = this.nowIso()
+      const checkpoint = this.repository.saveCheckpoint({
+        id: `checkpoint_inputs_${token.executionId}_${deliveries.at(-1)!.sequence}`, taskId: task.id,
+        executionId: token.executionId, consumedInputIds: deliveries.map(item => item.inputId), sessionItemId, sessionHash,
+        completedNodeIds: task.nodes.filter(node => node.status === 'completed').map(node => node.id),
+        pendingNodeIds: task.nodes.filter(node => node.status !== 'completed').map(node => node.id), artifactIds: task.artifacts.map(item => item.id),
+        eventSequence: this.repository.events(task.id).at(-1)?.sequence ?? 0,
+        resumeSummary: 'Persisted user inputs are included in the execution history.', createdAt: now, revision: task.revision
+      })
+      for (const delivery of deliveries) { this.repository.execution.acknowledge(delivery, checkpoint.id, now); this.repository.consumeInput(delivery.inputId, now) }
+    })
+  }
+
+  beginToolOperation(turnId: string, call: ToolCallLike): { key: string; token: ExecutionToken; prior?: ToolHostResult } | undefined {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) return undefined
+    return this.repository.transact(() => {
+      this.assertToken(token)
+      const key = `tool:${turnId}:${call.callId}`
+      // Arguments can contain credentials or external message bodies. Only the
+      // canonical digest belongs in the durable operation ledger.
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, argumentsHash: operationFingerprint(call.arguments) }, nowIso: this.nowIso() })
+      if (!prepared.created) {
+        if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
+        if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })
+        if (prepared.receipt.status === 'failed') throw Object.assign(new Error('Failed tool operation requires a new explicit attempt.'), { code: 'operation_failed' })
+      }
+      this.repository.finishOperation(token.taskId, key, { status: 'running' }, this.nowIso())
+      return { key, token }
+    })
+  }
+
+  finishToolOperation(token: ExecutionToken, key: string, result?: ToolHostResult): void {
+    // An already-dispatched result is immutable evidence even after lease loss.
+    const prior = this.repository.operation(token.taskId, key)
+    if (!prior || prior.status === 'succeeded') return
+    this.repository.finishOperation(token.taskId, key, { status: result ? 'succeeded' : 'outcome_unknown', ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {}) }, this.nowIso())
+  }
+
+  beginWork(turnId: string, id: string, kind: string): () => void {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) return () => undefined
+    this.assertToken(token)
+    const task = this.repository.get(token.taskId)!
+    const root = task.rootTaskId ?? task.parentTaskId ?? task.id
+    const rootTask = this.repository.get(root) ?? task
+    const used = this.repository.execution.usedExecutionMs(root, Date.parse(this.nowIso()))
+    if (rootTask.budget.version === 2 && used >= (rootTask.budget.maxExecutionMs ?? rootTask.budget.maxDurationMs)) throw Object.assign(new Error('Root task execution budget exhausted.'), { code: 'execution_budget_exhausted' })
+    if (rootTask.budget.maxCostUsd && this.repository.execution.usedCost(root) >= rootTask.budget.maxCostUsd) throw Object.assign(new Error('Root task cost budget exhausted.'), { code: 'cost_budget_exhausted' })
+    this.repository.execution.beginWork(id, root, kind, Date.parse(this.nowIso()), token.executionId)
+    this.activeWork.set(id,{rootTaskId:root,turnId})
+    this.refreshRootBudget(root)
+    let finished=false
+    return () => {
+      if(finished)return
+      finished=true
+      this.repository.execution.finishWork(id, Date.parse(this.nowIso()))
+      this.activeWork.delete(id)
+      this.refreshRootBudget(root)
+    }
+  }
+
+  /** Concurrent work draws from one root ledger, so each child cannot spend a full copy. */
+  private refreshRootBudget(rootTaskId:string):void {
+    const old=this.rootBudgetTimers.get(rootTaskId)
+    if(old)clearTimeout(old)
+    this.rootBudgetTimers.delete(rootTaskId)
+    const root=this.repository.get(rootTaskId)
+    const active=[...this.activeWork.values()].filter(work=>work.rootTaskId===rootTaskId)
+    if(!root||root.budget.version!==2||!active.length)return
+    const remaining=(root.budget.maxExecutionMs ?? root.budget.maxDurationMs)-this.repository.execution.usedExecutionMs(rootTaskId,Date.parse(this.nowIso()))
+    if(remaining<=0) {
+      for(const turnId of new Set(active.map(work=>work.turnId)))this.executionAborts.get(turnId)?.('execution_budget_exhausted')
+      return
+    }
+    const timer=setTimeout(()=>{
+      this.rootBudgetTimers.delete(rootTaskId)
+      this.refreshRootBudget(rootTaskId)
+    },Math.max(1,Math.min(2_147_483_647,Math.ceil(remaining/active.length))))
+    timer.unref?.()
+    this.rootBudgetTimers.set(rootTaskId,timer)
+  }
+
+  workBudget(turnId: string): { rootTaskId: string; serialRoot: boolean; remainingMs?: number } | undefined {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) return undefined
+    const task = this.repository.get(token.taskId)
+    if (!task) return undefined
+    const rootTaskId = task.rootTaskId ?? task.parentTaskId ?? task.id
+    const root = this.repository.get(rootTaskId) ?? task
+    return { rootTaskId, serialRoot: root.budget.maxCostUsd !== undefined,
+      ...(root.budget.version === 2 ? { remainingMs: Math.max(0,(root.budget.maxExecutionMs ?? root.budget.maxDurationMs) - this.repository.execution.usedExecutionMs(rootTaskId, Date.parse(this.nowIso()))) } : {}) }
+  }
+
+  recordCost(turnId: string, id: string, costUsd?: number): void {
+    const token = this.attemptTokens.get(turnId)
+    if (!token || costUsd === undefined) return
+    const task = this.repository.get(token.taskId)!
+    this.repository.execution.recordCost(task.rootTaskId ?? task.parentTaskId ?? task.id, id, costUsd)
+  }
+
+  pendingInputs(threadId: string): TaskInput[] {
+    const task = this.repository.findActiveByThread(threadId)
+    return task && task.status !== 'paused' ? this.repository.inputs(task.id, true) : []
+  }
+
+  consumeInput(inputId: string): void { this.repository.consumeInput(inputId, this.nowIso()) }
+
+  markInputDelivered(inputId: string): void { this.repository.markInputDelivered(inputId, this.nowIso()) }
+
+  appendInput(taskId: string, expectedRevision: number, idempotencyKey: string, text: string, kind: TaskInput['kind'] = 'supplement', sourceId?: string, references?:Pick<TaskInput,'attachmentIds'|'workspaceReferences'>) {
+    return this.repository.appendInput({ taskId, expectedRevision, idempotencyKey, text, kind, sourceId, ...references, nowIso: this.nowIso() })
   }
 
   prepareResume(taskId: string, expectedRevision: number, model?: string): TaskRun {
     const task = this.repository.get(taskId)
     if (!task) throw Object.assign(new Error(`task not found: ${taskId}`), { code: 'not_found' })
-    if (!['stalled', 'waiting_user', 'waiting_approval', 'retrying'].includes(task.status)) {
+    if (!['paused', 'stalled', 'waiting_user', 'waiting_approval', 'retrying'].includes(task.status)) {
       throw Object.assign(new Error(`task cannot resume from ${task.status}`), { code: 'invalid_state' })
     }
+    if (this.repository.unsettledOperations(taskId).some(operation => operation.kind === 'tool') || this.repository.listShellSessions(taskId).some(session => ['outcome_unknown','running','starting'].includes(session.status))) throw Object.assign(new Error('Verify outstanding operation and process outcomes before resuming this task.'), {code:'outcome_unknown'})
     const now = this.nowIso()
     return this.repository.update(task.id, expectedRevision, (current) => ({
       ...current,
@@ -405,9 +699,22 @@ export class TaskController {
     return this.finish(task, 'cancelled', reason).task
   }
 
-  reconcileStartup(): TaskRun[] {
+  reconcileStartup(excludeTaskIds: ReadonlySet<string> = new Set(), onlyTaskIds?: ReadonlySet<string>): TaskRun[] {
     const now = this.nowIso()
-    return this.repository.reconcileExpired(now).map((task) => {
+    const recovered = this.repository.reconcileExpired(now)
+      .filter((task) => !excludeTaskIds.has(task.id) && (!onlyTaskIds || onlyTaskIds.has(task.id)))
+      .map((task) => {
+      const lastAttempt = this.repository.execution.latestAttempt(task.id)
+      if (lastAttempt && !['completed','cancelled'].includes(lastAttempt.status) && inspectProcess(lastAttempt.process) !== 'exited') {
+        return task
+      }
+      const lease = this.repository.getLease(task.id)
+      if (lastAttempt) this.repository.execution.finishOrphanedWork(lastAttempt.executionId, Math.min(Date.parse(now), Date.parse(lastAttempt.finishedAt ?? lease?.expiresAt ?? task.updatedAt)))
+      const unknownShell = this.repository.listShellSessions(task.id).some(session => ['running', 'starting', 'outcome_unknown'].includes(session.status))
+      const unknown = this.repository.unsettledOperations(task.id)
+      if (unknown.length || unknownShell) {
+        return this.repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', waitingReason: undefined, stalledReason: '上次操作结果尚未确认，请先核实执行回执后继续。', updatedAt: now }), { key: `recovery-unknown:${task.revision}`, kind: 'task_stalled', payload: { operationIds: unknown.map(item => item.id) }, createdAt: now })
+      }
       const recovered = this.repository.update(task.id, task.revision, (current) => ({
         ...current,
         status: 'retrying',
@@ -426,6 +733,87 @@ export class TaskController {
       )
       return recovered
     })
+    return recovered
+  }
+
+  private async runWatchdogTick(): Promise<void> {
+    if (this.watchdogRunning) return
+    this.watchdogRunning = true
+    try {
+      const now = this.nowIso()
+      const leaseMs = Math.max(1_000, Math.trunc(this.watchdogOptions.leaseMs ?? 60_000))
+      // Startup recovery is suppressed only until the resumed worker owns a
+      // fresh lease; a later lease expiry must remain recoverable.
+      for (const taskId of this.recoveryInFlight) {
+        if (this.leases.has(taskId)) this.recoveryInFlight.delete(taskId)
+      }
+      for (const [taskId, state] of this.leases) {
+        const task = this.repository.get(taskId)
+        if (!task || TERMINAL.has(task.status) || task.status === 'paused') {
+          this.releaseExecutionLease(taskId)
+          continue
+        }
+        const renewed = this.repository.renewLease(
+          taskId,
+          this.ownerId,
+          state.leaseRevision,
+          now,
+          new Date(Date.parse(now) + leaseMs).toISOString()
+        )
+        if (renewed) continue
+        this.leases.delete(taskId)
+        for (const token of this.attemptTokens.values()) if (token.taskId === taskId) this.repository.execution.finishAttempt(token.executionId, 'lost', now)
+        try {
+          this.watchdogOptions.onLeaseLost?.(task)
+        } catch {
+          // A lease-loss observer must not prevent recovery of other tasks.
+        }
+      }
+
+      const recovery = this.watchdogOptions.onRecoveryNeeded
+      if (!recovery) return
+      const candidates = this.repository.reconcileExpired(now)
+        .filter((task) => !this.leases.has(task.id) && !this.recoveryInFlight.has(task.id))
+      if (candidates.length === 0) return
+      for (const candidate of candidates) this.recoveryInFlight.add(candidate.id)
+      const recovered = this.reconcileStartup(new Set(this.leases.keys()), new Set(candidates.map(task => task.id)))
+        .filter((task) => task.status === 'retrying')
+      try {
+        await recovery(recovered)
+      } catch {
+        for (const task of recovered) this.recoveryInFlight.delete(task.id)
+      }
+    } finally {
+      this.watchdogRunning = false
+    }
+  }
+
+  private leaseGuard(taskId: string): TaskLeaseGuard {
+    const lease = this.leases.get(taskId)
+    if (!lease || !this.fencedTasks.has(taskId)) throw new TaskLeaseLostError(taskId)
+    return { ownerId: this.ownerId, leaseRevision: lease.leaseRevision, nowIso: this.nowIso() }
+  }
+
+  private updateExecution(
+    taskId: string,
+    expectedRevision: number,
+    mutator: (current: TaskRun) => TaskRun,
+    event?: { key: string; kind: string; payload?: Record<string, unknown>; createdAt?: string }
+  ): TaskRun {
+    return this.fencedTasks.has(taskId)
+      ? this.repository.update(taskId, expectedRevision, mutator, event, this.leaseGuard(taskId))
+      : this.repository.update(taskId, expectedRevision, mutator, event)
+  }
+
+  private releaseExecutionLease(taskId: string): void {
+    const lease = this.leases.get(taskId)
+    if (lease) this.repository.releaseLease(taskId, this.ownerId, lease.leaseRevision)
+    this.leases.delete(taskId)
+    for (const [turnId, token] of this.attemptTokens) if (token.taskId === taskId) {
+      this.repository.execution.finishAttempt(token.executionId, 'completed', this.nowIso())
+      this.attemptTokens.delete(turnId)
+    }
+    this.fencedTasks.delete(taskId)
   }
 
   private retry(
@@ -440,7 +828,9 @@ export class TaskController {
     const shouldReplan = noProgressCount >= 3
     const replans = shouldReplan ? stored.replans + 1 : stored.replans
     const now = this.nowIso()
-    const durationExhausted = Math.max(0, Date.parse(now) - Date.parse(stored.createdAt)) >= stored.budget.maxDurationMs
+    const durationExhausted = stored.budget.version === 2
+      ? this.repository.execution.usedExecutionMs(stored.rootTaskId ?? stored.id, Date.parse(now)) >= (stored.budget.maxExecutionMs ?? stored.budget.maxDurationMs) || Boolean(stored.budget.maxElapsedMs && Date.parse(now) - Date.parse(stored.createdAt) >= stored.budget.maxElapsedMs)
+      : Math.max(0, Date.parse(now) - Date.parse(stored.createdAt)) >= stored.budget.maxDurationMs
     const attemptExhausted = stored.attempts >= stored.budget.maxAttempts
     const stalled = replans >= 2 && shouldReplan
     const status: TaskRunStatus = durationExhausted
@@ -450,7 +840,7 @@ export class TaskController {
         : attemptExhausted
           ? 'failed'
           : 'retrying'
-    const next = this.repository.update(stored.id, stored.revision, (current) => ({
+    const next = this.updateExecution(stored.id, stored.revision, (current) => ({
       ...current,
       status,
       noProgressCount: shouldReplan ? 0 : noProgressCount,
@@ -492,7 +882,7 @@ export class TaskController {
         attributes: { nextStatus: status, replans, noProgressCount }
       })
     }
-    if (status !== 'retrying') this.repository.releaseLease(next.id, this.ownerId)
+    if (status !== 'retrying') this.releaseExecutionLease(next.id)
     if (status === 'failed') {
       this.spans?.finish(taskSpanId(next.id), {
         status: 'error',
@@ -514,9 +904,11 @@ export class TaskController {
   ): Extract<TaskCandidateDecision, { kind: 'waiting_user' }> {
     const stored = this.repository.get(taskInput.id) ?? taskInput
     const now = this.nowIso()
-    const next = this.repository.update(stored.id, stored.revision, (current) => ({
+    const next = this.updateExecution(stored.id, stored.revision, (current) => ({
       ...current,
       status: 'waiting_user',
+      executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now),
+      executionStartedAt: undefined,
       finalResponse,
       waitingReason: reason,
       stalledReason: undefined,
@@ -540,7 +932,7 @@ export class TaskController {
       createdAt: now
     })
     this.saveCheckpoint(next, reason, progressFingerprint)
-    this.repository.releaseLease(next.id, this.ownerId)
+    this.releaseExecutionLease(next.id)
     this.spans?.finishTurn(next.id, turnId, {
       status: 'ok',
       attributes: { nextStatus: 'waiting_user' }
@@ -550,9 +942,12 @@ export class TaskController {
 
   private finish(task: TaskRun, status: Extract<TaskRunStatus, 'failed' | 'cancelled'>, reason: string): Extract<TaskCandidateDecision, { kind: 'failed' }> {
     const now = this.nowIso()
-    const next = this.repository.update(task.id, task.revision, (current) => ({
+    const next = this.updateExecution(task.id, task.revision, (current) => ({
       ...current,
       status,
+      authority: current.authority ? { ...current.authority, ...(status === 'cancelled' ? { revokedAt: now } : {}) } : undefined,
+      executionMs: (current.executionMs ?? 0) + activeExecutionMs(current, now),
+      executionStartedAt: undefined,
       stalledReason: reason,
       nodes: current.nodes.map((node) =>
         node.status === 'completed' ? node : { ...node, status: 'failed', errorMessage: reason, finishedAt: now, revision: node.revision + 1 }
@@ -565,7 +960,7 @@ export class TaskController {
       payload: { reason },
       createdAt: now
     })
-    this.repository.releaseLease(task.id, this.ownerId)
+    this.releaseExecutionLease(task.id)
     if (task.activeTurnId) {
       this.spans?.finishTurn(task.id, task.activeTurnId, {
         status: status === 'cancelled' ? 'cancelled' : 'error',
@@ -598,18 +993,20 @@ export class TaskController {
 
   private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string): Promise<TaskArtifact[]> {
     const paths = [
-      ...items.flatMap((item) => item.kind === 'tool_result' && !item.isError
-        ? fileOutputPaths(item.output)
-        : []),
+      ...items.flatMap(declaredFileOutputPaths),
       ...verifiedShellDeliverablePaths(items, turnId)
     ]
     const root = await realpath(task.workspaceRoot).catch(() => resolve(task.workspaceRoot))
     const required = task.acceptance.requiredFormats?.map((value) => value.toLowerCase())
     const artifacts: TaskArtifact[] = []
+    const seenTargets=new Set<string>()
     for (const rawPath of [...new Set(paths)]) {
       const absolutePath = isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath)
       const canonical = await realpath(absolutePath).catch(() => '')
       const relativePath = canonical ? relative(root, canonical) : relative(root, absolutePath)
+      const targetKey=process.platform==='win32'?(canonical||absolutePath).toLowerCase():canonical||absolutePath
+      if(seenTargets.has(targetKey))continue
+      seenTargets.add(targetKey)
       const extension = extname(rawPath).slice(1).toLowerCase()
       const inside = relativePath !== '' && relativePath !== '..' && !relativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) && !isAbsolute(relativePath)
       const info = canonical && inside ? await stat(canonical).catch(() => null) : null
@@ -757,4 +1154,8 @@ function fingerprint(items: TurnItem[], artifacts: TaskArtifact[] = []): string 
   })
   const unique = [...new Map(normalized.map((entry) => [JSON.stringify(entry), entry])).values()]
   return createHash('sha256').update(JSON.stringify({ normalized: unique, artifacts })).digest('hex').slice(0, 24)
+}
+
+function activeExecutionMs(task: TaskRun, now: string): number {
+  return task.executionStartedAt ? Math.max(0, Date.parse(now) - Date.parse(task.executionStartedAt)) : 0
 }

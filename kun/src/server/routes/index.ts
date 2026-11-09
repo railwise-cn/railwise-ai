@@ -1,3 +1,5 @@
+import { taskFeedResponse } from '../../services/task-view-service.js'
+import { taskCommand } from './task-commands.js'
 import { registerSurveyCollaborationRoutes } from './survey-collaboration.js'
 import { registerSurveyQualityAssessmentRoutes } from './survey-quality-assessment.js'
 import { registerSurveyContextMcpRoutes } from './survey-context-mcp.js'
@@ -41,6 +43,7 @@ import {
 } from './turns.js'
 import { startReview } from './review.js'
 import { buildEventStreamResponse } from './events.js'
+import { buildTaskEventStreamResponse } from './task-events.js'
 import { decideApproval } from './approvals.js'
 import { resolveUserInput } from './user-inputs.js'
 import { resumeSession } from './sessions.js'
@@ -69,11 +72,12 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { cancelTask, getTask, getTaskDiagnostics, listTasks, resumeTask, retryTask } from './tasks.js'
+import { appendTaskInput, cancelTask, getTask, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
 import { startUiAction } from './ui-actions.js'
 import * as engineeringRoutes from './engineering.js'
 import * as engineeringAiRoutes from './engineering-ai.js'
+import { registerTaskDeliveryRoutes } from './task-delivery.js'
 
 /**
  * Build the full router used by the HTTP server. The router exposes:
@@ -107,6 +111,7 @@ import * as engineeringAiRoutes from './engineering-ai.js'
  */
 export function buildRouter(runtime: ServerRuntime): Router {
   const router = new Router()
+  registerTaskDeliveryRoutes(router, runtime, request => authorize(request, runtime))
   registerSurveyContextMcpRoutes(router, {
     getHost: () => runtime.surveyContextMcp,
     runtimeToken: runtime.runtimeToken,
@@ -310,6 +315,22 @@ export function buildRouter(runtime: ServerRuntime): Router {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     return listTasks(runtime, request)
   })
+  router.add('GET', '/v1/inbox', async request => authorize(request, runtime) ? getTaskInbox(runtime, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/events', async (request, ctx) => authorize(request, runtime) ? getTaskEvents(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/stream', (request, ctx) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.taskRepository?.get(ctx.params.id)) return ERRORS.notFound('task not found')
+    return buildTaskEventStreamResponse({ request, taskId: ctx.params.id, repository: runtime.taskRepository })
+  })
+  router.add('GET', '/v1/tasks/:id/inputs', async (request, ctx) => authorize(request, runtime) ? getTaskInputs(runtime, ctx.params.id) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/inputs', async (request, ctx) => authorize(request, runtime) ? appendTaskInput(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/subscriptions', async (request, ctx) => authorize(request, runtime) ? getTaskSubscriptions(runtime,ctx.params.id) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/subscriptions', async (request, ctx) => authorize(request, runtime) ? subscribeTaskSource(runtime,ctx.params.id,request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/pause', async (request, ctx) => authorize(request, runtime) ? pauseTask(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/stream', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    return runtime.taskViewService ? taskFeedResponse(runtime.taskViewService, request) : ERRORS.unavailable('task feed unavailable')
+  })
   router.add('GET', '/v1/tasks/:id', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     return getTask(runtime, ctx.params.id)
@@ -385,6 +406,10 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('DELETE', '/v1/threads/:id/todos', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     return clearThreadTodos(runtime.threadService, ctx.params.id)
+  })
+  router.add('POST', '/v1/task-commands', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    return taskCommand(runtime, request)
   })
   router.add('POST', '/v1/threads/:id/turns', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()

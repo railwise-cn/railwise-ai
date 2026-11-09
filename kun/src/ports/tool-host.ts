@@ -101,6 +101,9 @@ export type ToolHostContext = {
   /** Filesystem/command sandbox selected for this turn. Defaults at execution time for old callers. */
   sandboxMode?: SandboxMode
   abortSignal: AbortSignal
+  /** Recheck the immutable task lease immediately before dispatch, after approvals. */
+  assertExecution?: () => void
+  beginExecutionWork?: () => (() => void) | undefined
   /** Resolves a pending approval with the user's decision. */
   awaitApproval: (approval: ApprovalRequest) => Promise<'allow' | 'deny'>
   /** Resolves structured GUI input requested by a tool call. */

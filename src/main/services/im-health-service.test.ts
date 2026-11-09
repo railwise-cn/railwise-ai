@@ -265,7 +265,7 @@ describe('ImHealthService', () => {
     expect(result.overall).toBe('FAIL')
     expect(result.checks.find((check) => check.id === 'credential')?.summary).toBe('连接凭据可用。')
     expect(result.checks.find((check) => check.id === 'bridge')?.summary).toBe('通信桥当前不可访问。')
-    expect(result.checks.find((check) => check.id === 'runtime')?.summary).toBe('WorkWise Runtime 当前不可访问。')
+    expect(result.checks.find((check) => check.id === 'runtime')?.summary).toBe('RailWise AI Runtime 当前不可访问。')
     expect(result.checks.find((check) => check.id === 'heartbeat')?.summary).toBe('当前连接尚无新鲜心跳。')
     expect(result.checks.find((check) => check.id === 'ledger')?.summary).toBe('通信账本完整性检查失败。')
   })
