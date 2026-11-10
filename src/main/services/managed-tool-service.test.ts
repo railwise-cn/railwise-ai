@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ManagedLarkAppSetup } from './managed-lark-app-setup'
 
 const systemFetchMock = vi.hoisted(() => vi.fn())
 
@@ -47,6 +48,8 @@ type Fixture = {
 
 let toolsRoot = ''
 let originalHome: string | undefined
+const larkScopes = 'task:task:read task:task:write approval:task:read approval:instance:read approval:task:write'
+const completedLarkLogin = (userOpenId: string) => JSON.stringify({ event: 'authorization_complete', user_open_id: userOpenId, scope: larkScopes, missing: [] })
 
 function response(body: string | Buffer, status = 200, headers: HeadersInit = {}): Response {
   return new Response(body as unknown as BodyInit, { status, headers })
@@ -130,6 +133,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   _internals.setToolRunnerForTests()
   _internals.setTargetPlatformForTests()
   _internals.clearReleaseCache()
@@ -199,6 +203,97 @@ describe('managed-tool-service', () => {
     expect(_internals.parseLarkIdentity('not json').available).toBe(false)
   })
 
+  it('carries the verified app profile through login and persistent runtime diagnosis despite a different CLI default', async () => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    const binding = { executablePath, executableHash: createHash('sha256').update('fixture').digest('hex'), profile: 'railwise-this-attempt', appId: 'cli-this-attempt', brand: 'feishu' as const }
+    const selected = vi.spyOn(ManagedLarkAppSetup.prototype, 'binding').mockReturnValue(binding)
+    const calls: string[][] = []
+    const runner = async (_path: string, args: string[]) => {
+      calls.push(args)
+      const exact = args.includes(binding.profile)
+      if (args[0] === '--version') return { ok: true, output: '1.2.3' }
+      if (args[0] === 'config') return { ok: true, output: JSON.stringify(exact ? binding : { appId: 'cli-unrelated-default', profile: 'unrelated-default', brand: 'lark' }) }
+      if (args[1] === 'status') return { ok: true, output: JSON.stringify({ identity: 'user', appId: exact ? binding.appId : 'cli-unrelated-default', brand: exact ? 'feishu' : 'lark', identities: { user: { available: true, openId: exact ? 'ou-authorized' : 'ou-unrelated', scope: 'task:task:read task:task:write approval:task:read approval:instance:read approval:task:write' } } }) }
+      if (args.includes('--no-wait')) return { ok: true, output: JSON.stringify({ device_code: 'private-code', verification_url: 'https://accounts.feishu.cn/device', expires_in: 600 }) }
+      return { ok: true, output: completedLarkLogin('ou-authorized') }
+    }
+    _internals.setToolRunnerForTests(runner)
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: true })
+    expect(await completeManagedLarkLogin()).toMatchObject({ ok: true, status: { profile: binding.profile, appId: binding.appId, userOpenId: 'ou-authorized' } })
+    selected.mockRestore()
+    _internals.clearPendingLarkLogin()
+    calls.length = 0
+    expect(await diagnoseManagedTool('lark-cli')).toMatchObject({ ok: true, status: { state: 'installed', profile: binding.profile, appId: binding.appId, userOpenId: 'ou-authorized' } })
+    expect(calls).toContainEqual(['auth', 'status', '--profile', binding.profile, '--json'])
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: true })
+    expect(calls.filter(args => args[0] === 'config')).toEqual([['config', 'show', '--profile', binding.profile, '--json']])
+    expect(calls.filter(args => args[1] === 'login').every(args => args.includes(binding.profile))).toBe(true)
+    expect(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).not.toContain('private-code')
+  })
+
+  it.each(['changed_app', 'changed_binary'])('does not begin login when the verified setup binding has %s', async failure => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    vi.spyOn(ManagedLarkAppSetup.prototype, 'binding').mockReturnValue({ executablePath, executableHash: failure === 'changed_binary' ? 'a'.repeat(64) : createHash('sha256').update('fixture').digest('hex'), profile: 'railwise-this-attempt', appId: 'cli-this-attempt', brand: 'feishu' })
+    const runner = vi.fn(async (_path: string, args: string[]) => args[0] === 'config' ? { ok: true, output: JSON.stringify({ appId: failure === 'changed_app' ? 'cli-other' : 'cli-this-attempt', profile: 'railwise-this-attempt', brand: 'feishu' }) } : { ok: true, output: '1.2.3' })
+    _internals.setToolRunnerForTests(runner)
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: false })
+    expect(runner.mock.calls.some(([, args]) => args[1] === 'login')).toBe(false)
+  })
+
+  it('does not resume a late login request after application setup was cancelled', async () => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    let resolveConfig!: (value: { ok: boolean; output: string }) => void
+    const runner = vi.fn(async (_path: string, args: string[]) => args[0] === 'config' ? new Promise<{ ok: boolean; output: string }>(resolve => { resolveConfig = resolve }) : { ok: true, output: '1.2.3' })
+    _internals.setToolRunnerForTests(runner)
+    const result = beginManagedLarkLogin()
+    await vi.waitFor(() => expect(resolveConfig).toBeTypeOf('function'))
+    await cancelManagedLarkAppSetup()
+    resolveConfig({ ok: true, output: JSON.stringify({ appId: 'cli-existing', profile: 'existing', brand: 'feishu' }) })
+    expect(await result).toMatchObject({ ok: false })
+    expect(runner.mock.calls.some(([, args]) => args[1] === 'login')).toBe(false)
+  })
+
+  it('blocks account login while the official application setup is still waiting', async () => {
+    vi.spyOn(ManagedLarkAppSetup.prototype, 'isWaiting').mockReturnValue(true)
+    const runner = vi.fn(async () => ({ ok: true, output: '{}' }))
+    _internals.setToolRunnerForTests(runner)
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: false, reason: 'app_configuration_required' })
+    expect(runner).not.toHaveBeenCalled()
+  })
+
+  it('does not replace the selected account with another logged-in user during later diagnosis', async () => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    writeFileSync(join(toolsRoot, 'lark-account-selection.json'), JSON.stringify({ profile: 'railwise-selected', appId: 'cli-existing', brand: 'feishu', userOpenId: 'ou-authorized', identityFingerprint: createHash('sha256').update(JSON.stringify(['lark-user-v1', 'feishu', 'cli-existing', 'ou-authorized'])).digest('hex') }))
+    const runner = vi.fn(async (_path: string, args: string[]) => args[1] === 'status' ? { ok: true, output: JSON.stringify({ appId: 'cli-existing', brand: 'feishu', identities: { user: { available: true, openId: 'ou-switched', scope: 'task:task:read task:task:write' } } }) } : { ok: true, output: '1.2.3' })
+    _internals.setToolRunnerForTests(runner)
+    expect(await diagnoseManagedTool('lark-cli')).toMatchObject({ ok: true, status: { state: 'needs_login', scopes: [] } })
+    expect(await diagnoseManagedTool('lark-cli')).not.toHaveProperty('status.identityFingerprint')
+    expect(runner.mock.calls).toContainEqual([executablePath, ['auth', 'status', '--profile', 'railwise-selected', '--json']])
+    expect(JSON.parse(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).userOpenId).toBe('ou-authorized')
+  })
+
+  it.each(['invalid_json', 'invalid_fingerprint'])('preserves an unverifiable stored selection and refuses default-account fallback for %s', async failure => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    const stored = failure === 'invalid_json' ? '{' : JSON.stringify({ profile: 'selected', appId: 'cli-existing', brand: 'feishu', userOpenId: 'ou-authorized', identityFingerprint: 'a'.repeat(64) })
+    writeFileSync(join(toolsRoot, 'lark-account-selection.json'), stored)
+    const runner = vi.fn(async () => ({ ok: true, output: '1.2.3' }))
+    _internals.setToolRunnerForTests(runner)
+    expect(await diagnoseManagedTool('lark-cli')).toMatchObject({ ok: false })
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: false })
+    expect(runner.mock.calls).toEqual([[executablePath, ['--version']]])
+    expect(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).toBe(stored)
+  })
+
   it('keeps device codes in main process and completes only the current official flow', async () => {
     const executablePath = join(toolsRoot, 'lark-cli')
     writeFileSync(executablePath, 'fixture')
@@ -212,7 +307,7 @@ describe('managed-tool-service', () => {
       if (args[1] === 'status') return { ok: true, output: JSON.stringify({ identity: connected ? 'user' : 'none', appId: 'cli-existing', brand: 'feishu', identities: { user: { available: connected, openId: 'ou-synthetic', scope: 'task:task:read task:task:write approval:task:read approval:instance:read approval:task:write' } } }) }
       if (args.includes('--no-wait')) return { ok: true, output: JSON.stringify({ device_code: 'private-code', verification_url: 'https://accounts.feishu.cn/oauth/device?user_code=test', expires_in: 600 }) }
       connected = true
-      return { ok: true, output: '{}' }
+      return { ok: true, output: completedLarkLogin('ou-synthetic') }
     })
     const [begin, simultaneous] = await Promise.all([beginManagedLarkLogin(), beginManagedLarkLogin()])
     expect(begin).toMatchObject({ ok: true, verificationUrl: 'https://accounts.feishu.cn/oauth/device?user_code=test' })
@@ -225,10 +320,12 @@ describe('managed-tool-service', () => {
     expect(await completeManagedLarkLogin()).toMatchObject({ ok: false })
   })
 
-  it.each(['failed_device', 'missing_scope', 'different_app', 'changed_binary'])('does not let an old login hide %s in this authorization', async (failure) => {
+  it.each(['failed_device', 'missing_scope', 'different_app', 'changed_binary', 'malformed_poll', 'different_user', 'poll_missing_scope'])('does not let an old login hide %s in this authorization', async (failure) => {
     const executablePath = join(toolsRoot, 'lark-cli')
     writeFileSync(executablePath, 'fixture')
     writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    const oldSelection = JSON.stringify({ profile: 'railwise-existing', appId: 'cli-existing', brand: 'feishu', userOpenId: 'ou-existing', identityFingerprint: createHash('sha256').update(JSON.stringify(['lark-user-v1', 'feishu', 'cli-existing', 'ou-existing'])).digest('hex') })
+    writeFileSync(join(toolsRoot, 'lark-account-selection.json'), oldSelection)
     const calls: string[][] = []
     let completing = false
     _internals.setToolRunnerForTests(async (_path, args) => {
@@ -238,7 +335,7 @@ describe('managed-tool-service', () => {
       if (args[1] === 'status') return { ok: true, output: JSON.stringify({ identity: 'user', appId: completing && failure === 'different_app' ? 'cli-other' : 'cli-existing', brand: 'feishu', identities: { user: { available: true, openId: 'ou-existing', scope: failure === 'missing_scope' ? 'task:task:read' : 'task:task:read task:task:write approval:task:read approval:instance:read approval:task:write' } } }) }
       if (args.includes('--no-wait')) return { ok: true, output: JSON.stringify({ device_code: 'private-code', verification_url: 'https://accounts.feishu.cn/device', expires_in: 600 }) }
       completing = true
-      return { ok: failure !== 'failed_device', output: '{}' }
+      return { ok: failure !== 'failed_device', output: failure === 'malformed_poll' ? '{}' : failure === 'poll_missing_scope' ? JSON.stringify({ event: 'authorization_complete', user_open_id: 'ou-existing', scope: 'task:task:read', missing: ['task:task:write'] }) : completedLarkLogin(failure === 'different_user' ? 'ou-other' : 'ou-existing') }
     })
     expect(await beginManagedLarkLogin()).toMatchObject({ ok: true })
     if (failure === 'changed_binary') writeFileSync(executablePath, 'replacement')
@@ -246,6 +343,33 @@ describe('managed-tool-service', () => {
     expect(await completeManagedLarkLogin()).toMatchObject({ ok: false })
     expect(calls.filter(args => args.includes('--device-code'))).toHaveLength(failure === 'changed_binary' ? 0 : 1)
     expect(calls.filter(args => args.includes('--device-code')).every(args => args.includes('railwise-existing'))).toBe(true)
+    expect(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).toBe(oldSelection)
+  })
+
+  it.each(['cancel', 'new_setup'])('keeps the previous account selection when %s invalidates an in-flight login completion', async invalidation => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    const oldSelection = JSON.stringify({ profile: 'railwise-existing', appId: 'cli-existing', brand: 'feishu', userOpenId: 'ou-existing', identityFingerprint: createHash('sha256').update(JSON.stringify(['lark-user-v1', 'feishu', 'cli-existing', 'ou-existing'])).digest('hex') })
+    writeFileSync(join(toolsRoot, 'lark-account-selection.json'), oldSelection)
+    let resolvePoll!: (value: { ok: boolean; output: string }) => void
+    const runner = vi.fn(async (_path: string, args: string[]) => {
+      if (args[0] === '--version') return { ok: true, output: '1.2.3' }
+      if (args[0] === 'config') return { ok: true, output: JSON.stringify({ appId: 'cli-existing', profile: 'railwise-existing', brand: 'feishu' }) }
+      if (args[1] === 'status') return { ok: true, output: JSON.stringify({ appId: 'cli-existing', brand: 'feishu', identities: { user: { available: true, openId: 'ou-existing', scope: larkScopes } } }) }
+      if (args.includes('--no-wait')) return { ok: true, output: JSON.stringify({ device_code: 'private-code', verification_url: 'https://accounts.feishu.cn/device', expires_in: 600 }) }
+      return new Promise<{ ok: boolean; output: string }>(resolve => { resolvePoll = resolve })
+    })
+    _internals.setToolRunnerForTests(runner)
+    expect(await beginManagedLarkLogin()).toMatchObject({ ok: true })
+    const result = completeManagedLarkLogin()
+    await vi.waitFor(() => expect(resolvePoll).toBeTypeOf('function'))
+    if (invalidation === 'cancel') await cancelManagedLarkAppSetup()
+    else expect(await beginManagedLarkAppSetup()).toEqual({ ok: true, state: 'configured' })
+    resolvePoll({ ok: true, output: completedLarkLogin('ou-new') })
+    expect(await result).toMatchObject({ ok: false })
+    expect(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).toBe(oldSelection)
+    expect(await completeManagedLarkLogin()).toMatchObject({ ok: false })
   })
 
 

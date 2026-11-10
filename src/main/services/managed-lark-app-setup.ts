@@ -4,6 +4,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { ManagedLarkAppSetupResult } from '../../shared/workwise-api'
 
 type Run = (path: string, args: string[]) => Promise<{ ok: boolean; output: string }>
+export type LarkAppSetupBinding = { executablePath: string; executableHash: string; profile: string; appId: string; brand: 'feishu' | 'lark' }
 type Launch = (path: string, args: string[], env: NodeJS.ProcessEnv) => ChildProcessWithoutNullStreams
 const launch: Launch = (path, args, env) => spawn(path, args, { env, shell: false, windowsHide: true, stdio: 'pipe' })
 
@@ -37,10 +38,12 @@ export class ManagedLarkAppSetup {
   private pending?: Pending
   private starting?: Promise<ManagedLarkAppSetupResult>
   private generation = 0
+  private verifiedBinding?: LarkAppSetupBinding
   constructor(private readonly run: Run, private readonly env: () => NodeJS.ProcessEnv, private readonly start: Launch = launch) {}
 
   private stop(pending: Pending, state: 'cancelled' | 'expired' | 'failed'): void {
     pending.state = state
+    if (this.verifiedBinding?.profile === pending.profile) this.clearBinding()
     clearTimeout(pending.timer)
     // Signal only the captured child, never a persisted/reused PID.
     if (!pending.closed && pending.child.exitCode === null && pending.child.signalCode === null) pending.child.kill('SIGTERM')
@@ -48,8 +51,18 @@ export class ManagedLarkAppSetup {
 
   cancel(): ManagedLarkAppSetupResult {
     this.generation++
+    this.clearBinding()
     if (this.pending && ['waiting', 'verifying', 'succeeded'].includes(this.pending.state)) this.stop(this.pending, 'cancelled')
     return { ok: true, state: 'cancelled' }
+  }
+
+  clearBinding(): void { this.verifiedBinding = undefined }
+  binding(): LarkAppSetupBinding | undefined { return this.verifiedBinding ? { ...this.verifiedBinding } : undefined }
+  isWaiting(): boolean {
+    const pending = this.pending
+    if (!pending || !this.isCurrent(pending)) return false
+    this.snapshot(pending)
+    return ['waiting', 'verifying'].includes(pending.state)
   }
 
   private snapshot(pending: Pending): ManagedLarkAppSetupResult {
@@ -79,10 +92,18 @@ export class ManagedLarkAppSetup {
     const generation = this.generation
     if (this.pending && ['waiting', 'verifying'].includes(this.pending.state)) return this.snapshot(this.pending)
     if (this.pending && !this.pending.closed) return { ok: false, message: 'The previous application setup process is still stopping. Check its state before retrying.' }
+    this.pending = undefined
+    this.clearBinding()
     const check = await this.run(executablePath, ['config', 'show', '--json'])
     if (generation !== this.generation) return { ok: true, state: 'cancelled' }
     const configuration = larkAppConfiguration(check.output, check.ok)
-    if (configuration === 'configured') return { ok: true, state: 'configured' }
+    if (configuration === 'configured') {
+      const executableHash = createHash('sha256').update(await readFile(executablePath)).digest('hex')
+      if (generation !== this.generation) return { ok: true, state: 'cancelled' }
+      const value = JSON.parse(check.output) as { profile?: string; appId: string; brand: 'feishu' | 'lark' }
+      this.verifiedBinding = { executablePath, executableHash, profile: value.profile?.trim() || value.appId, appId: value.appId, brand: value.brand }
+      return { ok: true, state: 'configured' }
+    }
     if (configuration !== 'missing') return { ok: false, message: 'Existing Lark configuration could not be verified. It has not been replaced.' }
     const fingerprint = createHash('sha256').update(await readFile(executablePath)).digest('hex')
     if (generation !== this.generation) return { ok: true, state: 'cancelled' }
@@ -155,6 +176,8 @@ export class ManagedLarkAppSetup {
       return { ok: false, message: 'Application setup ended without a verifiable app configuration for this attempt. No account login was started.' }
     }
     pending.state = 'succeeded'
+    const value = JSON.parse(check.output) as { appId: string; brand: 'feishu' | 'lark' }
+    this.verifiedBinding = { executablePath: pending.executablePath, executableHash: fingerprint, profile: pending.profile, appId: value.appId, brand: value.brand }
     clearTimeout(pending.timer)
     return { ok: true, state: 'configured' }
   }

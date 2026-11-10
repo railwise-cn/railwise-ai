@@ -57,8 +57,11 @@ describe('managed official Lark app initialization', () => {
     f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-new', brand: 'feishu', profile: args[4] }) })
     const completed = await f.setup.check()
     expect(completed).toEqual({ ok: true, state: 'configured' })
+    expect(f.setup.binding()).toMatchObject({ executablePath: executable, profile: args[4], appId: 'cli-new', brand: 'feishu', executableHash: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(JSON.stringify([result, completed])).not.toContain('must-not-cross-ipc')
     expect(f.run).toHaveBeenLastCalledWith(executable, ['config', 'show', '--profile', args[4], '--json'])
+    f.setup.cancel()
+    expect(f.setup.binding()).toBeUndefined()
   })
 
   it.each(['missing', 'wrong_profile'])('does not report success when the process exits zero before a link and configuration is %s', async outcome => {
@@ -106,7 +109,8 @@ describe('managed official Lark app initialization', () => {
     expect(await f.setup.begin(executable)).toEqual({ ok: true, state: 'configured' })
     resolveCheck({ ok: true, output: JSON.stringify({ appId: 'cli-created', brand: 'feishu', profile: args[4] }) })
     expect(await checked).toEqual({ ok: true, state: 'cancelled' })
-    expect(await f.setup.check()).toMatchObject({ ok: true, state: 'cancelled' })
+    expect(f.setup.binding()).toMatchObject({ appId: 'cli-other-existing', profile: 'cli-other-existing' })
+    expect(await f.setup.check()).toMatchObject({ ok: false })
     expect(f.launch).toHaveBeenCalledOnce()
   })
 

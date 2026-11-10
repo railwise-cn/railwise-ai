@@ -26,7 +26,7 @@ import type {
   ManagedToolStatus
 } from '../../shared/workwise-api'
 import { describeNetworkFailure, systemFetch } from './system-network'
-import { atomicWriteFile as durableWriteFile } from './durable-file'
+import { atomicWriteFile as durableWriteFile, recoverAtomicFile } from './durable-file'
 import { ManagedLarkAppSetup, larkAppConfiguration, officialLarkURL } from './managed-lark-app-setup'
 import { resolveLarkCliEnvironment } from '../../../kun/src/services/lark-cli-environment.js'
 import { parseLarkIdentityBinding } from '../../../kun/src/services/lark-cli-identity.js'
@@ -493,7 +493,9 @@ let larkAppSetupRequestGeneration = 0
 process.once('exit', () => larkAppSetup.cancel())
 
 export async function beginManagedLarkAppSetup(): Promise<ManagedLarkAppSetupResult> {
-  const generation = larkAppSetupRequestGeneration
+  const generation = ++larkAppSetupRequestGeneration
+  larkAppSetup.clearBinding()
+  pendingLarkLogin = undefined
   if (larkCandidateCredentialsDisabled()) return { ok: false, message: 'Candidate credential access is disabled. Application setup has not started.' }
   const diagnosis = await diagnoseManagedTool('lark-cli')
   if (generation !== larkAppSetupRequestGeneration) return { ok: true, state: 'cancelled' }
@@ -506,6 +508,7 @@ export async function checkManagedLarkAppSetup(): Promise<ManagedLarkAppSetupRes
 }
 export async function cancelManagedLarkAppSetup(): Promise<ManagedLarkAppSetupResult> {
   larkAppSetupRequestGeneration++
+  pendingLarkLogin = undefined
   return larkAppSetup.cancel()
 }
 
@@ -513,7 +516,7 @@ export async function cancelManagedLarkAppSetup(): Promise<ManagedLarkAppSetupRe
 // This fixed scope set is requested only after a user clicks Connect. No credentials or
 // device code cross IPC; the renderer receives only the official verification URL.
 const LARK_TASK_SCOPES = ['task:task:read', 'task:task:write', 'approval:task:read', 'approval:instance:read', 'approval:task:write']
-let pendingLarkLogin: { executablePath: string; executableHash: string; deviceCode: string; expiresAt: number; appId: string; profile: string; brand: string; verificationUrl: string; userCode?: string } | undefined
+let pendingLarkLogin: { generation: number; executablePath: string; executableHash: string; deviceCode: string; expiresAt: number; appId: string; profile: string; brand: string; verificationUrl: string; userCode?: string } | undefined
 let larkLoginCompleting = false
 let larkLoginStarting: Promise<ManagedLarkLoginResult> | undefined
 
@@ -521,6 +524,20 @@ function jsonRecord(output: string): Record<string, unknown> {
   try { const value = JSON.parse(output); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} }
 }
 const parseLarkIdentity = parseLarkIdentityBinding
+// RailWise's explicit account selection is metadata only. Keep all CLI apps,
+// tokens and the CLI's own default untouched; restart diagnosis uses this selector.
+type SelectedLarkAccount = { profile: string; appId: string; brand: 'feishu' | 'lark'; userOpenId: string; identityFingerprint: string }
+const selectedLarkAccountPath = (): string => join(managedToolsRoot(), 'lark-account-selection.json')
+async function readSelectedLarkAccount(): Promise<SelectedLarkAccount | undefined> {
+  let value: Record<string, unknown>
+  try { await recoverAtomicFile(selectedLarkAccountPath()); value = jsonRecord(await readFile(selectedLarkAccountPath(), 'utf8')) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error }
+  if (!['profile', 'appId', 'userOpenId'].every(key => typeof value[key] === 'string' && String(value[key]).trim()) || !['feishu', 'lark'].includes(String(value.brand)) || value.identityFingerprint !== createHash('sha256').update(JSON.stringify(['lark-user-v1', value.brand, value.appId, value.userOpenId])).digest('hex')) throw new Error('The selected Lark account record could not be verified. Existing CLI accounts are preserved.')
+  return value as SelectedLarkAccount
+}
+function assertLarkConnectionCurrent(generation: number): void {
+  if (generation !== larkAppSetupRequestGeneration) throw new Error('The connection request was cancelled or replaced. Check the official account state before reconnecting.')
+}
 export async function beginManagedLarkLogin(): Promise<ManagedLarkLoginResult> {
   if (larkLoginStarting) return larkLoginStarting
   const operation = beginManagedLarkLoginOnce().catch((): ManagedLarkLoginResult => ({ ok: false, message: 'The official authorization flow could not be verified or started. Existing configuration was not replaced.' }))
@@ -528,13 +545,19 @@ export async function beginManagedLarkLogin(): Promise<ManagedLarkLoginResult> {
   try { return await operation } finally { if (larkLoginStarting === operation) larkLoginStarting = undefined }
 }
 async function beginManagedLarkLoginOnce(): Promise<ManagedLarkLoginResult> {
+  const generation = larkAppSetupRequestGeneration
   if (larkCandidateCredentialsDisabled()) return { ok: false, reason: 'candidate_credentials_disabled', message: 'Candidate credential access is disabled. No account configuration or Keychain was read.' }
   if (larkLoginCompleting) return { ok: false, message: 'Authorization is already being completed.' }
+  if (larkAppSetup.isWaiting()) return { ok: false, reason: 'app_configuration_required', message: 'Complete or cancel the current application setup before starting account login.' }
   if (pendingLarkLogin && pendingLarkLogin.expiresAt > Date.now()) return { ok: true, verificationUrl: pendingLarkLogin.verificationUrl, expiresAt: new Date(pendingLarkLogin.expiresAt).toISOString(), ...(pendingLarkLogin.userCode ? { userCode: pendingLarkLogin.userCode } : {}) }
   pendingLarkLogin = undefined
+  const selection = larkAppSetup.binding() ?? await readSelectedLarkAccount()
+  assertLarkConnectionCurrent(generation)
   const diagnosis = await diagnoseManagedTool('lark-cli')
+  assertLarkConnectionCurrent(generation)
   if (!diagnosis.ok || !diagnosis.status.executablePath || diagnosis.status.state === 'error') return { ok: false, message: 'Install and diagnose Lark CLI before connecting an account.' }
-  const app = await runTool(diagnosis.status.executablePath, ['config', 'show', '--json'])
+  const app = await runTool(diagnosis.status.executablePath, ['config', 'show', ...(selection ? ['--profile', selection.profile] : []), '--json'])
+  assertLarkConnectionCurrent(generation)
   const configuration = larkAppConfiguration(app.output, app.ok)
   if (configuration === 'missing') return { ok: false, reason: 'app_configuration_required', message: 'Configure a Feishu application on the official scan page first, then log in. Existing apps and accounts are preserved.' }
   if (configuration !== 'configured') return { ok: false, message: 'Lark application configuration could not be verified. Existing configuration was not replaced.' }
@@ -542,13 +565,16 @@ async function beginManagedLarkLoginOnce(): Promise<ManagedLarkLoginResult> {
   const appId = String(appConfig.appId)
   const profile = typeof appConfig.profile === 'string' && appConfig.profile.trim() ? appConfig.profile : appId
   const executableHash = createHash('sha256').update(await readFile(diagnosis.status.executablePath)).digest('hex')
+  assertLarkConnectionCurrent(generation)
+  if (selection && (profile !== selection.profile || appId !== selection.appId || appConfig.brand !== selection.brand || ('executableHash' in selection && (selection.executablePath !== diagnosis.status.executablePath || selection.executableHash !== executableHash)))) return { ok: false, message: 'The verified Lark application changed before login. Check its configuration before reconnecting.' }
   const result = await runTool(diagnosis.status.executablePath, ['auth', 'login', '--profile', profile, '--scope', LARK_TASK_SCOPES.join(' '), '--no-wait', '--json'])
+  assertLarkConnectionCurrent(generation)
   const value = jsonRecord(result.output)
   if (!result.ok || typeof value.device_code !== 'string' || typeof value.verification_url !== 'string' || typeof value.expires_in !== 'number' || value.expires_in <= 0) return { ok: false, message: 'The official Lark authorization flow could not be started. Check application configuration and network connectivity.' }
   const url = officialLarkURL(value.verification_url)
   if (!url) return { ok: false, message: 'Untrusted Lark authorization URL.' }
   const expiresAt = Date.now() + Math.min(value.expires_in, 1800) * 1000
-  pendingLarkLogin = { executablePath: diagnosis.status.executablePath, executableHash, deviceCode: value.device_code, expiresAt, appId, profile, brand: String(appConfig.brand), verificationUrl: url, ...(typeof value.user_code === 'string' ? { userCode: value.user_code } : {}) }
+  pendingLarkLogin = { generation, executablePath: diagnosis.status.executablePath, executableHash, deviceCode: value.device_code, expiresAt, appId, profile, brand: String(appConfig.brand), verificationUrl: url, ...(typeof value.user_code === 'string' ? { userCode: value.user_code } : {}) }
   return { ok: true, verificationUrl: url, expiresAt: new Date(expiresAt).toISOString(), ...(typeof value.user_code === 'string' ? { userCode: value.user_code } : {}) }
 }
 export async function completeManagedLarkLogin(): Promise<ManagedToolResult> {
@@ -558,13 +584,15 @@ export async function completeManagedLarkLogin(): Promise<ManagedToolResult> {
   if (larkLoginCompleting) return { ok: false, message: 'Authorization is already being completed.' }
   larkLoginCompleting = true
   try {
+    assertLarkConnectionCurrent(pending.generation)
     if (createHash('sha256').update(await readFile(pending.executablePath)).digest('hex') !== pending.executableHash) {
       pendingLarkLogin = undefined
       return { ok: false, message: 'Lark CLI changed during authorization. Check the official account state before reconnecting.' }
     }
     const app = await runTool(pending.executablePath, ['config', 'show', '--profile', pending.profile, '--json'])
+    assertLarkConnectionCurrent(pending.generation)
     const appConfig = jsonRecord(app.output)
-    if (larkAppConfiguration(app.output, app.ok) !== 'configured' || appConfig.appId !== pending.appId || appConfig.brand !== pending.brand) {
+    if (larkAppConfiguration(app.output, app.ok) !== 'configured' || appConfig.appId !== pending.appId || appConfig.brand !== pending.brand || (typeof appConfig.profile === 'string' && appConfig.profile !== pending.profile)) {
       pendingLarkLogin = undefined
       return { ok: false, message: 'The app changed during authorization. This authorization was not resumed.' }
     }
@@ -572,12 +600,19 @@ export async function completeManagedLarkLogin(): Promise<ManagedToolResult> {
     // The device code may have been consumed even if the result was lost.
     // Never retry it automatically, or claim an old login is this flow's success.
     pendingLarkLogin = undefined
+    assertLarkConnectionCurrent(pending.generation)
     if (!result.ok) return { ok: false, message: 'Authorization did not complete. Check the official account state before reconnecting; an existing login is not proof this authorization succeeded.' }
+    const completed = jsonRecord(result.output)
+    const completedScopes = typeof completed.scope === 'string' ? completed.scope.split(/\s+/).filter(Boolean) : []
+    if (completed.event !== 'authorization_complete' || typeof completed.user_open_id !== 'string' || !completed.user_open_id.trim() || !Array.isArray(completed.missing) || completed.missing.length || completed.warning || LARK_TASK_SCOPES.some(scope => !completedScopes.includes(scope))) return { ok: false, message: 'The current authorization result did not verify an authorized user and all requested permissions. Existing account selection was preserved.' }
     const auth = await runTool(pending.executablePath, ['auth', 'status', '--profile', pending.profile, '--json'])
+    assertLarkConnectionCurrent(pending.generation)
     const identity = parseLarkIdentity(auth.ok ? auth.output : '')
-    if (!identity.available || identity.appId !== pending.appId || identity.brand !== pending.brand) return { ok: false, message: 'The authorized user identity could not be verified for this application.' }
+    if (!identity.available || identity.appId !== pending.appId || identity.brand !== pending.brand || identity.userOpenId !== completed.user_open_id) return { ok: false, message: 'The authorized user identity could not be verified for this application and this login result.' }
     const missingScopes = LARK_TASK_SCOPES.filter(scope => !identity.scopes.includes(scope))
     if (missingScopes.length) return { ok: false, message: `Authorization is missing required permissions: ${missingScopes.join(', ')}. Check permissions on the official page.` }
+    await durableWriteFile(selectedLarkAccountPath(), `${JSON.stringify({ profile: pending.profile, appId: identity.appId, brand: identity.brand, userOpenId: identity.userOpenId, identityFingerprint: identity.identityFingerprint }, null, 2)}\n`, { beforeReplace: async () => assertLarkConnectionCurrent(pending.generation) })
+    assertLarkConnectionCurrent(pending.generation)
     return { ok: true, status: { id: 'lark-cli', state: 'installed', executablePath: pending.executablePath, executableHash: pending.executableHash, scopes: identity.scopes, brand: identity.brand, appId: identity.appId, profile: pending.profile, userOpenId: identity.userOpenId, identityFingerprint: identity.identityFingerprint, message: 'Lark user identity and requested permissions are verified.' } }
   } catch {
     pendingLarkLogin = undefined
@@ -603,10 +638,13 @@ export async function diagnoseManagedTool(id: ManagedToolId): Promise<ManagedToo
     if (!versionCheck.ok) return { ok: true, status: { id, state: 'error', installedVersion: record.version, executablePath: record.executablePath, message: versionCheck.output } }
     if (id === 'lark-cli') {
       if (larkCandidateCredentialsDisabled()) return { ok: true, status: { id, state: 'needs_login', installedVersion: record.version, executablePath: record.executablePath, scopes: [], message: 'Candidate credential access is disabled. No account configuration or Keychain was read.' } }
-      const auth = await runTool(record.executablePath, ['auth', 'status', '--json'])
+      const selection = await readSelectedLarkAccount()
+      const auth = await runTool(record.executablePath, ['auth', 'status', ...(selection ? ['--profile', selection.profile] : []), '--json'])
       const diagnosis = parseLarkIdentity(auth.ok ? auth.output : '')
       const executableHash = createHash('sha256').update(await readFile(record.executablePath)).digest('hex')
-      return { ok: true, status: { id, state: diagnosis.available ? 'installed' : 'needs_login', installedVersion: record.version, executablePath: record.executablePath, executableHash, scopes: diagnosis.scopes, ...(diagnosis.brand ? { brand: diagnosis.brand } : {}), ...(diagnosis.appId ? { appId: diagnosis.appId, profile: diagnosis.appId } : {}), ...(diagnosis.userOpenId ? { userOpenId: diagnosis.userOpenId } : {}), ...(diagnosis.identityFingerprint ? { identityFingerprint: diagnosis.identityFingerprint } : {}), message: diagnosis.available ? 'Lark user identity is ready.' : 'Connect a Lark user account before using task or approval data.' } }
+      const matchesSelection = !selection || diagnosis.identityFingerprint === selection.identityFingerprint
+      const ready = diagnosis.available && matchesSelection
+      return { ok: true, status: { id, state: ready ? 'installed' : 'needs_login', installedVersion: record.version, executablePath: record.executablePath, executableHash, scopes: ready ? diagnosis.scopes : [], ...(diagnosis.brand ? { brand: diagnosis.brand } : {}), ...(ready && diagnosis.appId ? { appId: diagnosis.appId, profile: selection?.profile ?? diagnosis.appId } : {}), ...(ready && diagnosis.userOpenId ? { userOpenId: diagnosis.userOpenId } : {}), ...(ready && diagnosis.identityFingerprint ? { identityFingerprint: diagnosis.identityFingerprint } : {}), message: ready ? 'Lark user identity is ready.' : 'Connect the selected Lark user account before using task or approval data.' } }
     }
     return { ok: true, status: { id, state: 'installed', installedVersion: record.version, executablePath: record.executablePath, message: versionCheck.output } }
   } catch (error) {
@@ -766,7 +804,7 @@ export const _internals = {
   larkSkills: LARK_SKILLS,
   parseLarkIdentity,
   managedLarkEnvironment,
-  clearPendingLarkLogin: () => { pendingLarkLogin = undefined; larkLoginCompleting = false },
+  clearPendingLarkLogin: () => { pendingLarkLogin = undefined; larkLoginCompleting = false; larkAppSetupRequestGeneration++; larkAppSetup.cancel() },
   officeSkills: OFFICE_SKILLS,
   clearReleaseCache: () => releaseVersionCache.clear(),
   setToolRunnerForTests: (runner?: ToolRunner) => {
