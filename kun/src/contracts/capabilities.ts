@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DingTalkCapabilityConfig } from './dingtalk.js'
 
 export const RUNTIME_CAPABILITY_CONTRACT_VERSION = 1
 
@@ -224,7 +225,8 @@ export const KunCapabilitiesConfig = z
     attachments: AttachmentsCapabilityConfig.default(() => AttachmentsCapabilityConfig.parse({})),
     memory: MemoryCapabilityConfig.default(() => MemoryCapabilityConfig.parse({})),
     imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({})),
-    lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({}))
+    lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({})),
+    dingtalk: DingTalkCapabilityConfig.default(() => DingTalkCapabilityConfig.parse({}))
   })
   .strict()
 export type KunCapabilitiesConfig = z.infer<typeof KunCapabilitiesConfig>
