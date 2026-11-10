@@ -68,6 +68,19 @@ describe('managed DingTalk connection', () => {
     expect(api.checkManagedDingTalkLogin).toHaveBeenCalledOnce()
   })
 
+  it('refreshes the connector after verified completion before an authorization page is needed', async () => {
+    vi.useFakeTimers()
+    const onChanged = vi.fn()
+    api.diagnoseManagedDingTalk.mockResolvedValue({ ok: true, status: { state: 'needs_login' } })
+    api.beginManagedDingTalkLogin.mockResolvedValue({ ok: true, state: 'succeeded', status: { state: 'installed', identityFingerprint: 'synthetic-identity' } })
+    await render(true, onChanged)
+    expect(onChanged).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toContain('钉钉登录已核验')
+    expect(api.openExternal).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    expect(api.checkManagedDingTalkLogin).not.toHaveBeenCalled()
+  })
+
   it('cancels only the authorization flow and does not reopen it', async () => {
     await render(true)
     await click('取消本次登录')

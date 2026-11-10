@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { ManagedDwsResult } from '../../shared/managed-dws'
 import {
   mergeScheduleSettings,
   defaultClawSettings,
@@ -18,7 +19,7 @@ const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<
 const dwsMocks = vi.hoisted(() => ({
   diagnose: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
   install: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
-  begin: vi.fn(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://login.dingtalk.com/device' })),
+  begin: vi.fn<() => Promise<ManagedDwsResult>>(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://login.dingtalk.com/device' })),
   check: vi.fn(async () => ({ ok: true, state: 'succeeded', status: { state: 'installed', identityFingerprint: 'synthetic-fingerprint' } })),
   cancel: vi.fn(async () => ({ ok: true, state: 'cancelled' }))
 }))
@@ -1053,6 +1054,17 @@ describe('registerAppIpcHandlers', () => {
     expect(await handlers.get('tool:dingtalk:login-check')?.({})).toMatchObject({ state: 'succeeded' })
     expect(refresh).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'installed', identityFingerprint: 'synthetic-fingerprint' }))
     expect(await handlers.get('tool:dingtalk:login-cancel')?.({})).toMatchObject({ state: 'cancelled' })
+  })
+
+  it('refreshes Runtime when DingTalk authorization finishes and verifies before returning its first page', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const status = { state: 'installed' as const, identityFingerprint: 'synthetic-fast-completion' }
+    dwsMocks.begin.mockResolvedValueOnce({ ok: true, state: 'succeeded', status })
+    const refresh = vi.fn(async () => ({ enabled: true }))
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: refresh })
+    expect(await handlers.get('tool:dingtalk:login-begin')?.({})).toMatchObject({ state: 'succeeded', status: { ...status, enabled: true } })
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(status)
+    expect(dwsMocks.check).not.toHaveBeenCalled()
   })
 
   it('changes DingTalk enablement only through an explicit strict boolean command without reading accounts', async () => {

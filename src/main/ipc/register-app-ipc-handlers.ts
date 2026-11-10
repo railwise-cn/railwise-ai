@@ -1720,7 +1720,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   }
   ipcMain.handle('tool:dingtalk:diagnose', async () => refreshDingTalk(await diagnoseManagedDingTalk()))
   ipcMain.handle('tool:dingtalk:install', async () => refreshDingTalk(await installManagedDingTalk()))
-  ipcMain.handle('tool:dingtalk:login-begin', async () => beginManagedDingTalkLogin())
+  ipcMain.handle('tool:dingtalk:login-begin', async () => refreshDingTalk(await beginManagedDingTalkLogin()))
   ipcMain.handle('tool:dingtalk:login-check', async () => refreshDingTalk(await checkManagedDingTalkLogin()))
   ipcMain.handle('tool:dingtalk:login-cancel', async () => cancelManagedDingTalkLogin())
   ipcMain.handle('tool:dingtalk:set-enabled', async (_, payload: unknown) => {

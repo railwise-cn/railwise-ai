@@ -63,6 +63,7 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     if (current.state === 'installed' && current.identityFingerprint) return
     if (!window.workwise.beginManagedDingTalkLogin) throw new Error(t('capabilityLoginUnavailable'))
     const result = await apply(await window.workwise.beginManagedDingTalkLogin())
+    if (result.state === 'succeeded') await changed.current?.()
     // The main process accepts only the pinned official CLI's allowlisted URL.
     if (mounted.current && result.state === 'waiting' && result.verificationUrl) await window.workwise.openExternal(result.verificationUrl)
   }, [apply, diagnose, t])
