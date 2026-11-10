@@ -1,8 +1,8 @@
-# RailWise AI Harness 实施状态核对（2026-11-10）
+# RailWise AI Harness 实施状态核对（截至 2026-11-11）
 
 本记录对照用户《Harness 可信执行与连接器闭环整改计划》阶段 A—E，核对生产入口、测试覆盖和验收缺口。首包源码为 `72e4bf9b4ca890152f7a0c7f30d9fb9e223b7455`，随后修复到 `7596843628f96901634198f54cb74ec28099faa4`；当前工作树进一步实现技能与连接器独立页签、飞书首次配置与身份绑定、钉钉官方 DWS。旧源码的测试和安装包结果仅证明各自版本，不能覆盖后续改动。最新源码与精确包证据见本页末尾的连接器工作台增量记录。这些改动尚未发布。
 
-**当前结论：主要生产接线、自动化回归及 `81f8367f` 精确 macOS 包的身份和部分中文场景已验证，不能据此宣布整个计划或发行验收全部完成。** 类型化连接器代码、模拟协议回放、真实 Runtime/SQLite 集成测试与真实平台业务操作是不同证据等级。开启凭据后的能力刷新失败已定位并在 `70496430` 修复 HTTP 请求体转换，修复后精确包仍待验收；真实扫码、账号读写、中文 Windows 和完整用户资料验收仍须分别记录。
+**当前结论：`682f4b17` 精确 macOS 候选包已通过身份、签名、公证、连接检查与重启历史恢复等有限中文实测，不能据此宣布整个计划或发行验收全部完成。** HTTP refresh 400 和会话索引缺陷已在该精确包回归。官方 DWS 已由包内连接流程安装，并打开设备授权扫码页，当前等待用户本轮扫码；真实身份、业务 scopes、平台读取和写入仍未通过验收。类型化代码、合成协议回放、真实 Runtime/SQLite 测试与真实平台业务操作继续区分记录，中文 Windows 和完整用户资料验收仍有缺口。
 
 ## 状态口径
 
@@ -21,7 +21,7 @@
 | --- | --- | --- | --- |
 | `TaskIntent`、规则优先识别 | `kun/src/contracts/harness.ts`、`services/external-task-capability.ts`、`services/task-coordinator.ts` 区分知识问答、外部请求、连接请求和双平台歧义；飞书/Feishu 归一为独立的 `lark` Provider，与钉钉分开 | `external-task-capability.test.ts`、`task-coordinator.test.ts`、`server/routes/external-turn-routing.test.ts` | 已接线。不是任意自然语言的无误分类保证；规则之外的归属判断仍受现有协调器约束 |
 | 在创建 Turn 前能力预检 | `contextual-external-task-preflight.ts` 在 Provider 诊断后核对持久执行 Thread、工作区信任、Agent 白名单和真实 `listTools`；`runtime-factory.ts` 正式装配；缺能力请求持久为等待任务 | `tests/harness-preflight-context.test.ts`、`contextual-external-task-preflight.test.ts`、`external-turn-routing.test.ts` 覆盖无 Turn、禁止策略、Agent 范围、不可读信任记录和旧 Turn 入口 | 已接线。`networkState: unknown` 不代表已联网成功；预检不额外发业务请求来冒充网络验证 |
-| 阻断不调用 Bash、不生成虚构 `dws` | 系统提示、沙箱解析、连接器预检和类型化 Provider 分层限制；钉钉缺配置不会转成飞书或命令教程 | `sandbox-policy.test.ts`、`lark-cli-tool-provider.test.ts`、`dingtalk-tool-provider.test.ts`、连接器 Runtime 测试 | 已接线。仍需精确包回放原始钉钉案例，检查实际模型回复及界面 |
+| 阻断不调用 Bash、不生成虚构 `dws` | 系统提示、沙箱解析、连接器预检和类型化 Provider 分层限制；钉钉缺配置不会转成飞书或命令教程 | `sandbox-policy.test.ts`、`lark-cli-tool-provider.test.ts`、`dingtalk-tool-provider.test.ts`、连接器 Runtime 测试 | 已接线。`682f4b17` 原始钉钉请求保持等待，未调用模型或生成执行命令；真实授权后业务另验收 |
 | `ExecutionGrant` 写入当前执行 | `contracts/permissions.ts`、`loop/agent-loop.ts`、`contracts/turns.ts` 和执行记录保存服务端 Grant；工具边界再次核验版本、范围和有效期 | `sandbox-policy.test.ts`、`explicit-approval.test.ts`、权限与生产预检集成测试 | 已接线。Grant 是服务端确定的当前 Turn 权限，客户端设置本身不是执行授权 |
 | 持久 `OperationReceipt`、`ResultEvidence`、`effect` 验收 | `contracts/tasks.ts` 复用旧持久回执结构；`prepared/running` 对应计划的请求准备/已开始语义，保留兼容状态名；`external-effect-evidence.ts` 校验 Provider、操作、目标、当前任务执行和真实核验数据 | `external-effect-evidence.test.ts`、`external-effect-recovery.test.ts`、`tests/task-retry-ledger.test.ts` | 已接线。模型文本、假工具结果、其他任务回执或一项成功不能满足完整 effect 合同 |
 | 动态真实工具目录、旧解析入口保护 | `local-tool-host.ts`、`sandbox-policy.ts`、`agent-loop.ts` 按 Grant、沙箱、Agent 和 Provider 过滤；记录目录指纹及变化事件；普通 `workspace-write/read-only` 不广告 Bash | `capability-registry.test.ts`、`sandbox-policy.test.ts`、`tests/harness-connector-runtime.test.ts` | 已接线。尚需用最终模型请求/精确包确认实际展示的工具目录 |
@@ -62,7 +62,7 @@
 
 | 计划事项 | 实际生产接线 | 关键测试覆盖 | 状态及缺口 |
 | --- | --- | --- | --- |
-| `capability_required` 持久待办 | TaskCoordinator 保存原请求、等待任务和卡片 payload；聊天 outbox 与任务中心显示同一阻断；卡片继续原任务，避免跳入隐藏执行聊天 | `task-coordinator.test.ts`、`external-turn-routing.test.ts`、卡片与任务 DOM 测试 | 已接线；精确包中文操作待验收 |
+| `capability_required` 持久待办 | TaskCoordinator 保存原请求、等待任务和卡片 payload；聊天 outbox 与任务中心显示同一阻断；卡片继续原任务，避免跳入隐藏执行聊天 | `task-coordinator.test.ts`、`external-turn-routing.test.ts`、卡片与任务 DOM 测试 | 已接线；`682f4b17` 中文实测等待卡、连接检查和重启恢复原文通过，授权后继续原任务尚未验收 |
 | 任务状态、回执和核验证据 | `TaskWorkspaceView.tsx`、`TaskExecutionEvidence.tsx` 展示平台、动作、目标、成功/失败/未知回执和证据；未知结果提供只读核验及配置入口；内部执行 ID 不在普通详情中展开 | `task-operation-receipts.test.ts`、`TaskWorkspaceView.dom.test.ts` | 已接线；仅 UI mock/DOM 断言不能代表实际包视觉和全部操作可用 |
 | 状态询问/补充/新任务/暂停 | 协调器在 Turn 前路由；状态本地读取，补充持久入队，新任务独立执行，暂停期间输入不自行唤醒；IM/Schedule 已经过协调入口 | Coordinator、任务控制、schedule-runtime 和 external-turn-routing 测试 | 已接线；真实模型跨回合交互待验收 |
 | SSE、恢复和通知 | `task-live-store.ts` 共享一个状态流；main/preload 使用现有 SSE；按序号去重、断线有界退避并补读；持久待办为权威状态，OS 通知失败不变更任务 | `task-live-store.test.ts`、已有 SSE/API 合同与任务事件测试 | 已接线。本实现采用共享流及退避刷新，没有把“2.5 秒全量轮询”当作正常连接策略；端到端断网实机回放待补 |
@@ -77,14 +77,14 @@
 
 | 交付/检查 | 本记录可确认的证据 | 当前结论 |
 | --- | --- | --- |
-| 精确源码、相关 CI、聚焦测试、类型检查 | `81f8367fe91e8accb071fa91bd19fe4fa9fe7e1a` 的独立依赖树完成 9 文件/187 项聚焦回归、Node/Web 类型检查；该 SHA 的 push/PR 两条 Quality 均成功，包含全量检查、测试和构建 | 对应精确源码通过；后续提交不借用该 CI 结果 |
-| 生产构建 | `81f8367f` 本地 `npm run build` 及两条 Quality 的生产构建通过；签名候选构建 `42826647263` 成功 | 该源码构建通过；不代表真实账号业务通过 |
-| 精确 macOS 候选包安装、版本、bundle、签名、适用公证 | `81f8367f` 安装到隔离目录，版本 `0.5.4`、arm64、独立 bundle `com.wangjiawei508.workwise.candidate.head81f8367fe91e`，Developer ID `R35G7F4A9U`；本机签名、stapled 公证、Gatekeeper 及 DMG/ASAR hash 校验通过 | 该精确包身份验收通过，未发布 |
-| 中文 macOS 主使用场景 | `81f8367f` 中文深色界面验证三个页签、飞书高级原包管理、两平台等待任务、状态查询及隐藏执行线程。只读探针记录模型/执行 Turn/工具回执均为 0，两项任务均为 `waiting_user` | 上述有限场景通过；能力刷新 transport 修复不在该包内，修复后扫码和真实读写未通过精确包验收 |
+| 精确源码、相关 CI、聚焦测试、类型检查 | `682f4b173de9b1ef74791a6ef8fb3570d430b421` 干净源码完成 7 文件/52 项 Runtime 聚焦回归、Desktop 类型检查及生产构建；仅多出文档改动的 `073b09e2` push/PR Quality 均为三个 job 全通过；索引专项 6 文件/64 项另记 | 对应源码与文档差异已明确；不将其他源码 CI 当作同一 SHA |
+| 生产构建 | `682f4b17` 干净源码 `npm run build` 与签名候选构建 `42844447988` 成功 | 该源码构建通过；不代表真实账号业务通过 |
+| 精确 macOS 候选包安装、版本、bundle、签名、适用公证 | `682f4b17` 下载 artifact digest/ZIP CRC 校验、隔离安装通过；版本 `0.5.4`、arm64、bundle `com.wangjiawei508.workwise.candidate.head682f4b173de9`，Developer ID `R35G7F4A9U`；本机签名、stapled 公证、Gatekeeper 及 DMG/ASAR hash 校验通过 | 该精确包身份验收通过，未发布；未导入生产 profile |
+| 中文 macOS 主使用场景 | `682f4b17` 在 `credentialAccess=1` 空隔离 profile、无模型 key 下验证三个页签、钉钉原始请求等待、检查连接不再 400、状态本地读取、正常重启后原文及等待卡恢复，内部执行会话隐藏 | 上述有限场景通过；官方设备授权页已打开，真实扫码结果、身份、业务读写仍待验收 |
 | 中文 Windows、安装身份和主要交互 | Windows 相关路径/工具安装有自动化分支；没有对应 Windows 机器/精确包证据 | 待验收，不得以 macOS 成功代替 |
 | 真实 Lark/Feishu 账户 | 有协议核对与合成回放；尚无本轮账户安装→登录→Scope→预检→读取→明确批准→写入→回读结果 | 待真实测试账户和有限目标验收 |
-| 钉钉缺配置 | 预检/Runtime/设置卡片有合成覆盖；`81f8367f` 中文原始请求回放保持等待，未调用模型、创建执行 Turn 或执行平台工具 | 缺能力阻断范围已验证；开启凭据后的连接恢复另验收 |
-| 钉钉真实 OAuth、个人待办和企业审批 | 有官方 API 适配和合成覆盖；个人 OAuth 不代表企业 Workflow 已授权 | 待各自平台实际权限与测试目标验收 |
+| 钉钉缺配置 | `682f4b17` 中文原始请求保持一项 `waiting_user`；重启后只读探针中模型 span、持久执行 Turn、工具操作回执均为 0，本地会话条目为 2 | 缺能力阻断、连接检查与重启恢复范围已验证；不是业务执行成功 |
+| 钉钉真实 OAuth、个人待办和企业审批 | `682f4b17` 通过正式连接入口自动安装官方 DWS 并打开设备授权扫码页；当前等待用户本轮扫码，未取得真实身份、业务 scopes、读取或写入证据 | 授权前流程通过；个人 OAuth 与企业 Workflow 权限仍需分别验收 |
 | 真实旧资料迁移 | 生产迁移服务为实际旧工作区 1670 文件建立私有快照，哈希和幂等重试通过，源目录不变；生产 JsonSettingsStore 对 3 个 profile/4 份真实 V1/V2 设置的私有副本完成读取、保存、重开与 V1 备份核验，敏感配置值均保留，源文件不变 | 上述真实数据副本范围通过；真实样本无 credentialRef，不宣称 Keychain、完整 profile 或 SQLite 迁移通过 |
 | 发布说明和回归证据 | [可信执行说明](../harness-trusted-execution.md)、[Lark](harness-lark-provider.md)、[钉钉](../dingtalk-provider.md) 说明实现、边界和迁移 | 需把最终结果追加后形成候选交付证据 |
 | 公开发布、版本号、Stable、官网 | 本记录未执行或证明任何公开发布操作 | 未发布，不宣称发行就绪 |
@@ -94,8 +94,8 @@
 ## 尚不能关闭的事项与下一步
 
 1. CI、本地精确源码聚焦测试、类型检查和生产构建已通过。保留旧 CI 的翻译插值失败及旧占位归档被误期望为成功的失败记录；后续测试分别验证正常 DOCX/持久审批成功、保留旧归档节点的流程明确失败，未放宽生产拒绝策略。
-2. `81f8367f` 精确候选包已安装并通过身份、签名、公证和上述中文 macOS 场景；开启凭据后的能力刷新 transport 问题已在 `70496430` 源码回归通过，会话索引修复 `682f4b17` 的相关 64 项回归也已通过。下一精确候选以 `682f4b17` 构建，尚未取得修复后包结果；需安装后验收刷新、重启历史、官方扫码和连接恢复。中文 Windows 仍需实际运行证据；后续源码与旧包区分记录。
-3. 用明确授权的测试账户完成飞书/Lark 与钉钉连接、真实读取、Scope 缺失/过期及恢复；真实写入只针对明确测试待办/审批，保留平台实际响应及回读证据。
+2. `682f4b17` 精确候选包的身份、签名、公证、HTTP refresh 和正常退出后历史恢复已实测通过。中文 Windows 仍需实际运行证据；macOS 的有限通过范围不替代其他平台或业务验收。
+3. 官方 DWS 已安装并打开设备授权页，等待用户本轮扫码；完成后核验本次真实身份、Scope、读取及授权失效/恢复。飞书/Lark 真实连接仍待验收。业务写入只针对用户明确选择的测试待办/审批，保留平台实际响应及回读证据；不要求用户在聊天提供账号密钥，也不把打开扫码页当作登录成功。
 4. 真实工作区和设置副本验证已完成上述范围；完整插件/MCP/Skill 及 credentialRef/Keychain 仍需相应真实样本，不能从设置值保留推断整套资料验收。活动 SQLite 走一致性备份，不对原件执行普通目录复制迁移。
 5. 逐项核对计划中尚属部分交付的体验：任意路径/网络的一次性范围授权、每次执行前的权限总览、市场提供商的实时诊断及全部深链配置页。市场已根据本地 catalog/安装/配置事实统一显示状态，但这些仍不能被现有任务卡、Shell 授权或三个工作台的导航过滤代替。
 6. 取得上述证据后再判断 A—D 是否满足正式产品完成条件及 E 是否可以进入发布；缺少真实平台或目标 OS 能力时明确写待验收，不把模拟结果填成通过。
@@ -171,7 +171,7 @@
 - `704964304cdf6ace399e2d19208ad6937fa3c2de` 修复 `kun/src/server/node-http-server.ts`。Node 的 `IncomingMessage` 即使没有 payload 也始终是可读流；旧转换逻辑把所有非 GET/HEAD 请求都设为非空 Fetch body，导致合法的空 POST 被连接器 refresh 的无请求体校验以 400 拒绝。该问题属于本机 HTTP 适配，不能归因于平台授权失败。
 - 无 payload framing 或 `Content-Length: 0` 的请求现在保留 `body: null`；正长度 payload 和 `Transfer-Encoding: chunked` 继续流式传递，包括零字节 chunked。实现不预读、不缓存请求体，路由和授权仍在原边界执行；真正带 body 的 refresh 请求仍返回 400。
 - `kun/src/server/node-http-server.test.ts` 与连接器路由聚焦回归共 13 项通过，并通过相应类型检查和 ESLint。新增测试经过真实 Node HTTP/TCP 服务，覆盖两个 Provider 的空 POST refresh、无 framing、正长度内容、空/非空 chunked，以及请求结束前交付首块；这不是仅调用 Router 的 Fetch fixture。
-- 此源码修复不在已安装的 `81f8367f` 精确包内。旧包已经退出；下一候选源码已包含下述 Runtime 会话索引修复，仍需重新构建、安装并验证。尚不能用源码测试宣称精确包刷新或真实账号连接已通过。
+- 此源码修复不在 `81f8367f` 包内。旧包已退出，后续 `682f4b17` 精确包已安装并通过连接检查回归，见下节；真实账号授权与业务执行不由该 transport 结果证明。
 
 ### 会话回执持久化与列表索引闭环修复
 
@@ -179,7 +179,16 @@
 - `682f4b173de9b1ef74791a6ef8fb3570d430b421` 将 canonical 本地 command receipt 纳入会话 count、preview 和活动时间投影，与真实 Turn items 按 ID 去重。回执仍不是执行 Turn，不增加模型调用，也不移除空壳过滤；File backend 使用同一投影。
 - `recordCommandExchange` 在所有 JSONL items/events 持久后、outbox 确认前统一 reconcile summary。崩溃后 outbox 重放时，即使回执已存在，也重新 reconcile；重写和编辑回执同步刷新索引。旧索引版本由 1 升为 2，经现有懒更新和后台 rebuild 修复，不删除 JSONL、用户配置、凭据或工作区文件。
 - 相关 6 文件/64 项回归、KUN 全量类型检查、变更文件 ESLint 和 diff 检查通过；root 的干净 `682f4b17` 源码生产构建也已通过。回归覆盖即时列表、重复 command、关闭重开、v1 索引修复、当前版本旧索引的重放修复、回执重写移除、File parity、空壳保留规则，以及真实运行 Turn 与本地回执并存而不虚构额外 Turn。私有根因记录为 `candidate-runtime-probe-81f8367f-findings.md`；未提交账号资料或 Runtime token。
-- 此修复不在 `81f8367f` 精确包内。下一候选以 `682f4b17` 为源码准备构建，目前仅有源码回归证据，未宣称新包、重启 UI 或真实扫码通过。
+- 此修复不在 `81f8367f` 精确包内。后续 `682f4b17` 精确包已验证正常退出后重启可见原会话并恢复原文/等待卡，见下节；真实扫码与平台业务仍待验收。
+
+### `682f4b17` 精确包实测（2026-11-11）
+
+- 精确源码为 `682f4b173de9b1ef74791a6ef8fb3570d430b421`，[签名候选构建 42844447988](https://github.com/railwise-cn/railwise-ai/actions/runs/42844447988) 成功。下载 artifact `13779102665` 为 353112455 字节，ZIP SHA-256 `ff711f57cfc3ad73c9d98a8ed2217e5e8ef67da0fea897d563848fc0c7cad7b1` 与 GitHub artifact digest 一致，ZIP CRC 校验通过；记录为 `artifact-download-682f4b17-evidence.json`，未保存签名下载链接。
+- 安装文件为 `RailWise-AI-Candidate-682f4b173de9-0.5.4-mac-arm64.dmg`，DMG SHA-256 `76cef973a44fb5f21a7dcaf0d561edd16b4653424ffa9a2c6ce8c4abce03fd45`，ASAR SHA-256 `4624b1fc565a432a0251c0ac80b54aeb73936c786f1c713503bb9832fd72ac4b`。版本 `0.5.4`、arm64、bundle `com.wangjiawei508.workwise.candidate.head682f4b173de9`，Developer ID Team `R35G7F4A9U`；codesign、stapled 公证、Gatekeeper 和隔离安装通过。证据为 `candidate-local-package-682f4b17-evidence.json`；未发布，未导入或使用生产 profile。
+- 干净 `682f4b17` 源码完成生产构建、Desktop 类型检查、7 文件/52 项 Runtime 聚焦测试；日志见 `connector-682f4b17-source-validation.json` 引用。`073b09e2` 与该候选源码仅有文档差异，其 [push Quality 42844825163](https://github.com/railwise-cn/railwise-ai/actions/runs/42844825163) 和 [PR Quality 42844848596](https://github.com/railwise-cn/railwise-ai/actions/runs/42844848596) 均为三个 job 全通过，记录为 `quality-073b09e2-evidence.json`。不改写候选源码 SHA，也不把 Windows CI 作为中文 Windows 实机结果。
+- 中文 macOS、`credentialAccess=1` 的空隔离 profile、无模型 key 下，已打开设置与“连接器／技能／插件”三个独立页签。原始“帮我处理钉钉待办”持久为待授权任务；“检查连接”成功返回，不再出现 refresh 400；状态询问返回本地快照。
+- 正常退出并重启后，侧栏“帮我处理钉钉待办”可见，点击可恢复原文和待授权卡，内部执行会话继续隐藏。`candidate-runtime-682f4b17-after-restart.json` 严格只读核对：任务 1 项为 `waiting_user`，会话条目 2 项、会话回执 1 项、公开 Thread 1 个、内部 Thread 1 个；模型 span、持久执行 Turn、`turn_started`、发送/usage 事件及工具操作回执均为 0。探针本身不调用 Runtime API，不把持久投影计数冒充业务 API 计数。
+- 该精确包的正式连接流程已自动安装官方 DWS 并打开官方设备授权扫码页，当前等待用户完成本轮扫码。仅把工具安装和授权页打开记为通过；未把真实身份、scopes、平台读取、写入或原任务执行恢复记为通过。含临时授权代码的界面截图留在私有验收目录，不提交仓库。
 
 ### 仅由源码阅读发现的启动风险
 
