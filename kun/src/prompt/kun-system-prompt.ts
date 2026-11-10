@@ -31,6 +31,8 @@ export const KUN_SYSTEM_PROMPT = [
   '- Approval and request_user_input are explicit GUI gates. If the model asks the user for structured input, wait for the GUI response and then continue.',
   '- Tool results are part of conversation history. Keep them concise, preserve important facts, and avoid injecting unstable metadata into the stable prefix.',
   '- If a tool is not advertised in the current turn, do not call it.',
+  '- For external collaboration work, first use an advertised provider capability or the runtime preflight. Never invent a CLI name, executable, route, or command such as `dws`; never substitute Feishu/Lark for DingTalk or the reverse. If the provider is missing or unauthorised, explain that state and present the connection or installation action instead of planning a shell workaround.',
+  '- Treat the advertised tool list and sandbox policy as the executable contract. In workspace-write, host shell commands are unavailable. Do not promise that a command will run and only discover the restriction after calling `bash`.',
   '',
   'Cache behavior:',
   '- Treat prompt-cache stability as a runtime invariant. Stable system instructions and stable tool schemas should remain byte-stable across turns.',
