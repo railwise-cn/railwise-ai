@@ -6,7 +6,7 @@ import {
 } from '../../contracts/policy.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { LocalTool } from './local-tool-host.js'
-import { workspaceRoot } from './builtin-tool-utils.js'
+const workspaceRoot = (workspace: string): string => resolve(workspace.trim() || process.cwd())
 import type { ApprovalPolicy } from '../../contracts/policy.js'
 
 export type SandboxBlock = {
@@ -70,7 +70,10 @@ export function sandboxBlockForTool(
   const grantBlock = executionGrantBlock(context)
   if (grantBlock) return grantBlock
   const mode = effectiveSandboxMode(context)
-  if (mode === 'danger-full-access') return null
+  if (mode === 'danger-full-access') {
+    if (tool.toolKind === 'command_execution' && context.executionGrant && (!context.executionGrant.pathAllowlist.includes('*') || !context.executionGrant.networkAllowlist.includes('*'))) return { code: 'sandbox_command_blocked', message: 'Host Shell cannot enforce a restricted path/network grant; use a typed tool or explicitly authorize full host access.' }
+    return null
+  }
   if (isInteractiveGuiGateTool(tool.name)) return null
 
   if (tool.toolKind === 'file_change') {
@@ -185,7 +188,7 @@ export function grantPathBlock(absolutePath: string, context: Pick<ToolHostConte
   const grant = context.executionGrant
   if (!grant) return null
   const target = isAbsolute(absolutePath) ? resolve(absolutePath) : resolve(workspaceRoot(context.workspace), absolutePath)
-  if (grant.pathAllowlist.some(root => root && isPathInsideOrEqual(root, target))) return null
+  if (grant.pathAllowlist.some(root => root === '*' || (root && isPathInsideOrEqual(root, target)))) return null
   return { code: 'workspace_path_blocked', message: `Path is outside the execution grant: ${absolutePath}` }
 }
 

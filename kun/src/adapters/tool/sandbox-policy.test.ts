@@ -38,7 +38,7 @@ describe('execution grant sandbox and approval enforcement', () => {
   })
 
   it('allows host commands only when the immutable grant is full-access', () => {
-    const context = base(grant({ workspaceTrust: 'full-access' }))
+    const context = base(grant({ workspaceTrust: 'full-access', pathAllowlist: ['*'], networkAllowlist: ['*'] }))
     expect(effectiveSandboxMode(context)).toBe('danger-full-access')
     expect(sandboxBlockForTool({ name: 'bash', toolKind: 'command_execution' }, context)).toBeNull()
   })

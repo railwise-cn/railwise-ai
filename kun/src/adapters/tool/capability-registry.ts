@@ -4,7 +4,7 @@ import type {
   ToolProviderPolicy
 } from '../../ports/tool-host.js'
 import type { LocalTool } from './local-tool-host.js'
-import { executionGrantBlock, isToolAdvertisedInSandbox } from './sandbox-policy.js'
+import { executionGrantBlock, isToolAdvertisedInSandbox, sandboxBlockForTool } from './sandbox-policy.js'
 
 export type CapabilityToolRecord = {
   provider: ToolProviderPolicy
@@ -106,8 +106,9 @@ export class CapabilityRegistry {
     if (!this.canUseTool(toolName, context)) {
       throw new Error(`tool ${toolName} is not advertised by active tool policy`)
     }
-    if (!isToolAdvertisedInSandbox(record.tool, context)) {
-      throw Object.assign(new Error(`tool ${toolName} is not advertised in the active sandbox`), { code: 'sandbox_command_blocked' })
+    const sandboxBlock = sandboxBlockForTool(record.tool, context)
+    if (sandboxBlock) {
+      throw Object.assign(new Error(`tool ${toolName} is not advertised in the active sandbox: ${sandboxBlock.message}`), { code: sandboxBlock.code })
     }
     if (record.tool.shouldAdvertise && !record.tool.shouldAdvertise(context)) {
       throw new Error(`tool ${toolName} is not advertised in this turn context`)

@@ -116,8 +116,15 @@ export class LocalToolHost implements ToolHost {
     if (context.abortSignal.aborted) {
       throw new Error('tool call aborted before start')
     }
-    await context.validateExecutionGrant?.()
-    const { tool } = this.registry.resolveTool(call.toolName, context, call.providerId)
+    let tool: LocalTool
+    try {
+      await context.validateExecutionGrant?.()
+      tool = this.registry.resolveTool(call.toolName, context, call.providerId).tool
+    } catch (error) {
+      const code = (error as { code?: unknown })?.code
+      if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_)/.test(code)) throw error
+      return { item: this.errorToolResult(context, call, { toolKind: call.toolKind ?? 'tool_call' }, error instanceof Error ? error.message : String(error), code), approved: false }
+    }
     if (tool.policy === 'never') {
       throw new Error(`tool ${call.toolName} is disabled by policy`)
     }
@@ -324,7 +331,7 @@ export class LocalToolHost implements ToolHost {
   private errorToolResult(
     context: ToolHostContext,
     call: ToolCallLike,
-    tool: LocalTool,
+    tool: Pick<LocalTool, 'toolKind'>,
     message: string,
     code: string
   ): TurnItem {

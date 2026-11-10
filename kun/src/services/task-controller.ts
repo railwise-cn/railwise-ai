@@ -1,5 +1,6 @@
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget } from './external-effect-evidence.js'
+import type { ExecutionGrant } from '../contracts/permissions.js'
 import { randomUUID as executionUUID } from 'node:crypto'
 import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
 import { processIdentity, inspectProcess } from './process-identity.js'
@@ -573,7 +574,7 @@ export class TaskController {
     })
   }
 
-  beginToolOperation(turnId: string, call: ToolCallLike): { key: string; token: ExecutionToken; prior?: ToolHostResult } | undefined {
+  beginToolOperation(turnId: string, call: ToolCallLike, executionGrant?: ExecutionGrant): { key: string; token: ExecutionToken; prior?: ToolHostResult } | undefined {
     const token = this.attemptTokens.get(turnId)
     if (!token) return undefined
     return this.repository.transact(() => {
@@ -581,7 +582,7 @@ export class TaskController {
       const key = `tool:${turnId}:${call.callId}`
       // Arguments can contain credentials or external message bodies. Only the
       // canonical digest belongs in the durable operation ledger.
-      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, ...externalOperationForTool(call.toolName), target: externalTarget(call.arguments), turnId, argumentsHash: operationFingerprint(call.arguments) }, nowIso: this.nowIso() })
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, ...externalOperationForTool(call.toolName), target: externalTarget(call.arguments), turnId, argumentsHash: operationFingerprint(call.arguments), ...(executionGrant ? { executionGrant } : {}) }, nowIso: this.nowIso() })
       if (!prepared.created) {
         if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
         if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })

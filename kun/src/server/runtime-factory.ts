@@ -1,3 +1,4 @@
+import { FileWorkspaceTrustReader } from '../services/workspace-trust-reader.js'
 import { TaskControlService } from '../services/task-control-service.js'
 import { TaskCoordinator } from '../services/task-coordinator.js'
 import { CapacityManager } from '../services/capacity-manager.js'
@@ -170,6 +171,7 @@ export async function createKunServeRuntime(
   const taskContextRuntime = new TaskContextRuntime(taskContextRepository, taskRepository)
   const approvalGate = new PersistentApprovalGate(taskRepository, () => new Date().toISOString())
   const userInputGate = new PersistentUserInputGate(taskRepository, () => new Date().toISOString())
+  const workspaceTrust = new FileWorkspaceTrustReader()
   const workspaceInspector = new LocalWorkspaceInspector()
   const workspaceReferenceService = new WorkspaceReferenceService()
   const usageService = new UsageService()
@@ -581,6 +583,7 @@ export async function createKunServeRuntime(
           tokenEconomy,
           ...(options.runtime ? { runtime: options.runtime } : {}),
           ...(memoryStore ? { memoryStore } : {}),
+          workspaceTrust,
           nowIso
         }),
         recordExternalUsage: (threadId, usage) => {
@@ -663,6 +666,7 @@ export async function createKunServeRuntime(
     sampling: surveySamplingWorkspaceService, assessment: surveyQualityAssessmentService
   })))
   loop = new AgentLoop({
+    workspaceTrust,
     threadStore,
     sessionStore,
     approvalGate,

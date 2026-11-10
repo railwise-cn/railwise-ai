@@ -767,6 +767,7 @@ export class TurnService {
     turnId: string,
     patch: Pick<
       Partial<Turn>,
+      | 'executionGrant'
       | 'activeSkillIds'
       | 'injectedMemoryIds'
       | 'skillInjectionBytes'
@@ -781,6 +782,7 @@ export class TurnService {
         turn.id === turnId
           ? {
               ...turn,
+              ...(patch.executionGrant ? { executionGrant: patch.executionGrant } : {}),
               ...(patch.activeSkillIds ? { activeSkillIds: [...patch.activeSkillIds] } : {}),
               ...(patch.injectedMemoryIds ? { injectedMemoryIds: [...patch.injectedMemoryIds] } : {}),
               ...(patch.skillInjectionBytes !== undefined ? { skillInjectionBytes: patch.skillInjectionBytes } : {}),

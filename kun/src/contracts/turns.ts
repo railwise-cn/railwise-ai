@@ -1,3 +1,4 @@
+import { ExecutionGrantSchema } from './permissions.js'
 import { z } from 'zod'
 import { TurnItem } from './items.js'
 import { isGuiPlanRelativePath } from '../shared/gui-plan.js'
@@ -94,6 +95,7 @@ export const TurnSchema = z.object({
   activeSkillIds: z.array(z.string().min(1)).default([]),
   injectedMemoryIds: z.array(z.string().min(1)).default([]),
   skillInjectionBytes: z.number().int().nonnegative().optional(),
+  executionGrant: ExecutionGrantSchema.optional(),
   toolCatalogFingerprint: z.string().optional(),
   toolCatalogToolCount: z.number().int().nonnegative().optional(),
   toolCatalogDrift: z.boolean().optional(),

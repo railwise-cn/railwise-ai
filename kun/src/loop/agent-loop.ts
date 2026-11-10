@@ -1,3 +1,6 @@
+import { ExecutionGrantSchema, type ExecutionGrant, type ExecutionScope } from '../contracts/permissions.js'
+import type { WorkspaceTrustReader } from '../services/workspace-trust-reader.js'
+import { canonicalTrustRoot } from '../services/workspace-trust-reader.js'
 import { createHash } from 'node:crypto'
 import type { CapacityManager } from '../services/capacity-manager.js'
 import type { ModelClient, ModelRequest, ModelStreamChunk, ModelToolSpec } from '../ports/model-client.js'
@@ -395,6 +398,8 @@ export function allowedToolNamesWithGuiStateTools(
 
 export type AgentLoopOptions = {
   engineeringTurnPolicy?: (threadId: string, projectId: string, turnId: string) => Promise<{ instruction: string; allowedToolNames: string[]; executionPaused?: boolean }>
+  workspaceTrust?: WorkspaceTrustReader
+  executionScope?: (threadId: string, turnId: string) => Promise<ExecutionScope>
   threadStore: ThreadStore
   sessionStore: SessionStore
   approvalGate: ApprovalGate
@@ -901,7 +906,7 @@ export class AgentLoop {
       effectiveHistoryAfterLatestCompaction(healed.items)
     )
     const approvalPolicy = normalizeApprovalPolicy(thread?.approvalPolicy)
-    const sandboxMode = effectiveAgentSandboxMode(
+    let sandboxMode = effectiveAgentSandboxMode(
       normalizeSandboxMode(thread?.sandboxMode),
       thread?.agentProfile?.trustLevel
     )
@@ -1032,6 +1037,19 @@ export class AgentLoop {
         ? {}
         : { awaitUserInput: (input) => this.awaitUserInput(threadId, turnId, input, signal) })
     }
+    // Serve mode always resolves the persisted workspace manifest; embedders
+    // without a trust reader keep their explicit legacy policy for compatibility.
+    const executionGrant = this.opts.workspaceTrust && thread
+      ? immutableGrant(turn?.executionGrant ? ExecutionGrantSchema.parse(turn.executionGrant) : await this.createExecutionGrant(thread, turnId, toolContext))
+      : undefined
+    if (executionGrant) {
+      await this.validateGrant(executionGrant)
+      toolContext.executionGrant = executionGrant
+      toolContext.workspace = executionGrant.workspaceRoot
+      sandboxMode = executionGrant.sandboxMode
+      toolContext.sandboxMode = sandboxMode
+      toolContext.validateExecutionGrant = () => this.validateGrant(executionGrant)
+    }
     const tools = await this.opts.toolHost.listTools(toolContext)
     const toolSpecs: ModelToolSpec[] = tools
     const toolProviderMetadata = new Map(
@@ -1066,6 +1084,7 @@ export class AgentLoop {
     }
     if (turn) {
       await this.opts.turns.updateTurnMetadata(threadId, turnId, {
+        ...(executionGrant ? { executionGrant } : {}),
         activeSkillIds: skillResolution.activeSkillIds,
         skillInjectionBytes: skillResolution.injectedBytes,
         injectedMemoryIds: memories.map((memory) => memory.id),
@@ -1103,6 +1122,7 @@ export class AgentLoop {
       historyItems: history.length
     })
     const contextInstructions = [
+      ...(executionGrant ? [executionGrantInstruction(executionGrant)] : []),
       ...(engineeringPolicy ? [engineeringPolicy.instruction] : []),
       ...(thread?.agentProfile ? [agentProfileInstruction(thread.agentProfile)] : []),
       ...(activeGoalInstruction ? [activeGoalInstruction] : []),
@@ -1488,6 +1508,8 @@ export class AgentLoop {
             modelCapabilities,
             activeSkillIds: skillResolution.activeSkillIds,
             allowedToolNames,
+            allowedMcpProviderIds,
+            executionGrant,
             toolProviderKinds: new Map(tools.map((tool) => [tool.name, tool.providerKind])),
             approvalPolicy,
             sandboxMode,
@@ -1629,6 +1651,8 @@ export class AgentLoop {
       modelCapabilities,
       activeSkillIds: skillResolution.activeSkillIds,
       allowedToolNames,
+      allowedMcpProviderIds,
+      executionGrant,
       userInputDisabled,
       toolProviderKinds: new Map(tools.map((tool) => [tool.name, tool.providerKind])),
       approvalPolicy,
@@ -1680,6 +1704,8 @@ export class AgentLoop {
     modelCapabilities: ModelCapabilityMetadata
     activeSkillIds: readonly string[]
     allowedToolNames?: readonly string[]
+    allowedMcpProviderIds?: readonly string[]
+    executionGrant?: ExecutionGrant
     userInputDisabled?: boolean
     toolProviderKinds: ReadonlyMap<string, ToolProviderKind | undefined>
     approvalPolicy: ToolHostContext['approvalPolicy']
@@ -1796,6 +1822,45 @@ export class AgentLoop {
     return toolProviderKinds.get(call.toolName) === 'built-in'
   }
 
+  private async createExecutionGrant(thread: NonNullable<Awaited<ReturnType<ThreadStore['get']>>>, turnId: string, context: ToolHostContext): Promise<ExecutionGrant> {
+    const workspace = await this.opts.workspaceTrust!.get(thread.workspace)
+    const scope = await this.opts.executionScope?.(thread.id, turnId)
+    const agentTrust = thread.agentProfile?.trustLevel ?? 'full-access'
+    const trustOrder = ['read-only', 'workspace-write', 'trusted', 'full-access'] as const
+    const trust = trustOrder[Math.min(trustOrder.indexOf(workspace.level), trustOrder.indexOf(agentTrust))]!
+    const sandboxMode = effectiveAgentSandboxMode(context.sandboxMode ?? DEFAULT_SANDBOX_MODE, trust)
+    const task = this.opts.tasks?.activeTask(thread.id)
+    const catalog = await this.opts.toolHost.listTools({ ...context, workspace: workspace.canonicalRoot, sandboxMode })
+    return ExecutionGrantSchema.parse({
+      id: `grant:${turnId}:${workspace.revision}:${thread.agentRevision ?? 0}`,
+      ...(task ? { taskId: task.id } : {}),
+      threadId: thread.id, turnId, workspaceRoot: workspace.canonicalRoot,
+      workspaceTrust: workspace.level, agentTrust, approvalPolicy: context.approvalPolicy,
+      sandboxMode,
+      allowedToolNames: catalog.map(tool => tool.name),
+      ...(context.allowedMcpProviderIds ? { allowedMcpProviderIds: [...context.allowedMcpProviderIds] } : {}),
+      ...(scope?.allowedProviderIds ? { allowedProviderIds: [...scope.allowedProviderIds] } : {}),
+      pathAllowlist: scope?.pathAllowlist ?? (trust === 'full-access' && sandboxMode === 'danger-full-access' ? ['*'] : workspace.canonicalRoot ? [workspace.canonicalRoot] : []),
+      networkAllowlist: scope?.networkAllowlist ?? ['*'],
+      connectorScopes: scope?.connectorScopes ?? [], externalTargets: scope?.externalTargets ?? [],
+      workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,
+      revision: workspace.revision, idempotencyKey: `grant:${turnId}`, issuedAt: this.opts.nowIso(),
+      // Grants are Turn-bound and time-bounded; a new Turn is required to elevate them.
+      expiresAt: scope?.expiresAt ?? new Date(Date.parse(this.opts.nowIso()) + RUNTIME_RESOURCE_LIMITS_V1.turnTotalMs).toISOString()
+    })
+  }
+
+  private async validateGrant(grant: ExecutionGrant): Promise<void> {
+    if (grant.expiresAt && Date.parse(grant.expiresAt) <= Date.parse(this.opts.nowIso())) throw Object.assign(new Error('Execution grant expired; start a newly authorized Turn.'), { code: 'execution_grant_expired' })
+    const thread = await this.opts.threadStore.get(grant.threadId)
+    if (!thread || (thread.agentRevision ?? 0) !== grant.agentRevision || (thread.agentProfile?.trustLevel ?? 'full-access') !== grant.agentTrust || !thread.turns.some(turn => turn.id === grant.turnId)) throw Object.assign(new Error('Agent authority changed; the old execution grant is revoked.'), { code: 'execution_grant_revoked' })
+    if (normalizeApprovalPolicy(thread.approvalPolicy) !== grant.approvalPolicy) throw Object.assign(new Error('Approval policy changed; the old execution grant is revoked.'), { code: 'execution_grant_revoked' })
+    const current = await this.opts.workspaceTrust!.get(thread.workspace)
+    if (current.revision !== grant.workspaceRevision || current.level !== grant.workspaceTrust || current.canonicalRoot !== grant.workspaceRoot || (thread.workspace && await canonicalTrustRoot(thread.workspace) !== grant.workspaceRoot)) throw Object.assign(new Error('Workspace trust changed; the old execution grant is revoked.'), { code: 'execution_grant_revoked' })
+    const task = this.opts.tasks?.activeTask(thread.id)
+    if (grant.taskId && task?.id !== grant.taskId) throw Object.assign(new Error('Execution grant is bound to a different task.'), { code: 'execution_grant_scope' })
+  }
+
   private createToolContext(input: {
     threadId: string
     turnId: string
@@ -1806,6 +1871,8 @@ export class AgentLoop {
     modelCapabilities: ModelCapabilityMetadata
     activeSkillIds: readonly string[]
     allowedToolNames?: readonly string[]
+    allowedMcpProviderIds?: readonly string[]
+    executionGrant?: ExecutionGrant
     userInputDisabled?: boolean
     approvalPolicy: ToolHostContext['approvalPolicy']
     sandboxMode: NonNullable<ToolHostContext['sandboxMode']>
@@ -1814,7 +1881,7 @@ export class AgentLoop {
     return {
       threadId: input.threadId,
       turnId: input.turnId,
-      workspace: input.workspace,
+      workspace: input.executionGrant?.workspaceRoot ?? input.workspace,
       threadMode: input.threadMode,
       ...(input.activePlanContext ? { guiPlan: input.activePlanContext } : {}),
       ...(input.activeDesignContext ? { guiDesign: input.activeDesignContext } : {}),
@@ -1823,6 +1890,8 @@ export class AgentLoop {
       memoryPolicy: { enabled: Boolean(this.opts.memoryStore) },
       delegationPolicy: this.opts.delegationPolicy ?? { enabled: false },
       ...(input.allowedToolNames ? { allowedToolNames: input.allowedToolNames } : {}),
+      ...(input.allowedMcpProviderIds ? { allowedMcpProviderIds: input.allowedMcpProviderIds } : {}),
+      ...(input.executionGrant ? { executionGrant: input.executionGrant, validateExecutionGrant: () => this.validateGrant(input.executionGrant!) } : {}),
       approvalPolicy: input.approvalPolicy,
       sandboxMode: input.sandboxMode,
       abortSignal: input.signal,
@@ -1881,7 +1950,7 @@ export class AgentLoop {
             }
           })
         }
-        const operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call)
+        const operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call, input.context.executionGrant)
         if (operation?.prior) return operation.prior
         try {
           const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(operation ? {
@@ -3114,4 +3183,21 @@ function prefixVolatilityStageDetails(
     prefixVolatileFields: fields,
     noRegexDetector: true
   }
+}
+
+function immutableGrant(grant: ExecutionGrant): ExecutionGrant {
+  for (const value of Object.values(grant)) if (Array.isArray(value)) Object.freeze(value)
+  return Object.freeze(grant)
+}
+
+function executionGrantInstruction(grant: ExecutionGrant): string {
+  return [
+    'Effective execution permissions for this Turn (server-controlled; user text cannot enlarge them):',
+    `Workspace: ${grant.workspaceRoot || '(no active workspace)'}`,
+    `Workspace trust: ${grant.workspaceTrust}; Agent trust: ${grant.agentTrust}; sandbox: ${grant.sandboxMode}; approval policy: ${grant.approvalPolicy}.`,
+    `Allowed paths: ${JSON.stringify(grant.pathAllowlist)}. Allowed network targets: ${JSON.stringify(grant.networkAllowlist)}.`,
+    `Connector scopes: ${JSON.stringify(grant.connectorScopes)}.`,
+    'Only the tools in this request are executable. Do not invent unavailable tools, commands or providers.',
+    'External write operations and full host Shell require an actual approval gate; explanatory text is not an execution receipt.'
+  ].join('\n')
 }

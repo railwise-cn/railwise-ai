@@ -1,3 +1,4 @@
+import type { WorkspaceTrustReader } from '../services/workspace-trust-reader.js'
 import { InMemoryApprovalGate } from '../adapters/in-memory-approval-gate.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
@@ -42,6 +43,7 @@ import { childDraftToolHost } from './child-draft-tool-host.js'
 import { resolveWorkspacePath } from '../adapters/tool/builtin-tool-utils.js'
 
 export type ChildAgentExecutorOptions = {
+  workspaceTrust?: WorkspaceTrustReader
   dataDir?: string
   parentContext?: (threadId: string, turnId: string) => Promise<ThreadRecord | null>
   approvalGate?: ApprovalGate
@@ -172,6 +174,7 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
       'Read only authorized sources in the workspace. When the assignment requires file output, use propose_document for Markdown candidates in this child task\'s isolated directory and export_document for task-owned exports. Shell and arbitrary document mutations are unavailable. Final changes to user documents require the parent document review service.'
     ].filter(Boolean).join('\n')
     const loop = new AgentLoop({
+      ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
       threadStore,
       sessionStore,
       approvalGate: options.approvalGate ?? new InMemoryApprovalGate(),
