@@ -2,7 +2,7 @@
 
 本记录对照用户《Harness 可信执行与连接器闭环整改计划》阶段 A—E，核对生产入口、测试覆盖和验收缺口。首包源码为 `72e4bf9b4ca890152f7a0c7f30d9fb9e223b7455`，随后修复到 `7596843628f96901634198f54cb74ec28099faa4`；当前工作树进一步实现技能与连接器独立页签、飞书首次配置与身份绑定、钉钉官方 DWS。旧源码的测试和安装包结果仅证明各自版本，不能覆盖后续改动。最新源码与精确包证据见本页末尾的连接器工作台增量记录。这些改动尚未发布。
 
-**当前结论：`682f4b17` 精确 macOS 候选包已通过身份、签名、公证、连接检查、重启历史恢复及 DWS 账号身份后验等有限中文实测，不能据此宣布整个计划或发行验收全部完成。** HTTP refresh 400 和会话索引缺陷已在该精确包回归。早先设备授权过期后，2026-11-11 北京时间约 02:54 重新发起官方 DWS 设备流程，应用自动显示账号已连接及登录身份已核验；再次检查连接维持核验状态且无刷新错误。未确认用户人工扫码，不推断官方会话是否续用；业务 scopes、平台读取、写入和原任务执行恢复仍未验收。类型化代码、合成协议回放、真实 Runtime/SQLite 测试与真实平台业务操作继续区分记录，中文 Windows 和完整用户资料验收仍有缺口。
+**当前 `0a94e6a7` 精确 macOS 候选包已通过安装身份、签名、公证及钉钉入口实测。** “测试待办读取”两次通过界面返回 1 条，“打开本机钉钉”成功唤起已安装客户端，“重新授权 / 切换账号”显示二维码、官方链接与复制入口。Chrome 已加载官方设备授权及身份认证页面，扫码页可见。验收取消了此次新授权，随后原账号读取再次成功。完整任务执行、审批写入、当前候选的飞书账号与中文 Windows 实机验收仍待完成，详见文末精确包记录。
 
 ## 状态口径
 
@@ -51,12 +51,12 @@
 | 启动诊断 Lark CLI | `src/main/managed-runtime-process.ts` 启动时诊断受管理 CLI，保存可信状态；`services/managed-tool-service.ts` 区分未安装/未登录/有效身份/错误；Runtime `managed-lark-runtime.ts` 读取状态 | 主进程 `managed-runtime-process.test.ts`、`managed-tool-service.test.ts`、`harness-connector-runtime.test.ts` | 已接线。不能仅凭 CLI 退出码 0 判定用户已授权 |
 | 受控安装、设备登录和热刷新 | 安装、设备登录与回调由主进程管理；验证官方 HTTPS 登录域；凭据/设备流程留在主进程；IPC 更新后请求 Runtime refresh；卡片需再次预检再继续原任务 | `managed-tool-service.test.ts`、`register-app-ipc-handlers.test.ts`、`lark-connector-refresh.test.ts`、卡片测试 | 已接线；真实 CLI 下载、真实用户登录和 Scope 授予待验收，尤其国内网络环境 |
 | Lark 待办/审批工具 | `lark-cli-tool-provider.ts` 注册任务 list/detail/complete、审批 list/detail/approve/reject；仅传类型化参数和固定 CLI 协议，要求诊断身份、品牌和实际用户 scopes | Provider 测试覆盖工具过滤、错误回包、确认、目标回读和回执 | 已接线。协议核对基于固定上游版本，见 [Lark 说明](harness-lark-provider.md)；不是已运行真实审批的证据 |
-| 钉钉官方连接器 | 官方 DWS 受管理安装及设备授权作为主路径，类型化命令绑定精确账号；原 `connectors/dingtalk-auth.ts`、`managed-dingtalk-runtime.ts`、`dingtalk-tool-provider.ts` 和企业应用设置保留高级兼容，个人与企业授权继续分开 | `dingtalk-auth.test.ts`、`managed-dingtalk-runtime.test.ts`、Provider 和设置卡片测试 | 已接线；`682f4b17` 官方新设备流程返回及精确账号身份后验通过，业务 scopes、企业权限和 API 操作仍待验收。缺配置继续阻断 |
+| 钉钉官方连接器 | 官方 DWS 受管理安装及设备授权作为主路径，类型化命令绑定精确账号；原 `connectors/dingtalk-auth.ts`、`managed-dingtalk-runtime.ts`、`dingtalk-tool-provider.ts` 和企业应用设置保留高级兼容，个人与企业授权继续分开 | `dingtalk-auth.test.ts`、`managed-dingtalk-runtime.test.ts`、Provider 和设置卡片测试 | 已接线；`0a94e6a7` 精确包的待办只读检查、重新授权页面及本机客户端入口已实测通过。企业审批和写入仍待验收 |
 | 写操作确认和有限目标集 | `external-effect-scope-tool-provider.ts` 先审阅完整有限 Provider/动作/目标集合；Provider 每次写前检查当前范围和显式批准，执行前持久记录批准证明 | scope Provider、Lark、钉钉与 evidence 测试 | 已接线；实际平台写操作需要用户指定测试目标，不能自动用真实业务审批做试验 |
 | 成功核验、幂等和未知结果 | 工具边界持久回执；Provider 对目标回读；`external-operation-verification.ts` 用只读工具核验未知操作，原未知记录保留；不会自动重放写入或自动恢复任务 | `external-effect-recovery.test.ts`、`external-operation-verification.test.ts`、`task-retry-ledger.test.ts` | 已接线。平台没有返回操作 ID 时不伪造；使用实际可获得的目标状态及哈希证据 |
 | 不通过 Bash/HTTP 代替平台 | 平台权限只给类型化 Provider；普通聊天不注册平台写入，子任务不能自行扩大权限；Flow 通用 HTTP 旁路已阻断 | host-shell、connector-runtime、Flow runtime-adapter 测试 | 已接线。现有 Flow 通用 HTTP/Agent 节点没有直接替代任务授权账本的外部写入入口，旧写节点需按迁移说明处理 |
 
-真实飞书、Lark 与钉钉均未在此记录中获得“真实账户端到端通过”结论。DWS 的官方新设备流程返回及精确账号身份后验已在 `682f4b17` 实测通过，范围仅限连接身份；平台业务 scopes 与读写另验收。合成 API/CLI 回包仍仅验证程序分支、权限和持久化，不替代实际平台证据。
+DWS 已在 `0a94e6a7` 精确包通过当前账号的待办只读检查和授权入口实测。完整任务执行、企业审批及写入继续待验收。飞书/Lark 当前候选包的真实账户验收另行记录。
 
 ## D：任务和界面闭环
 
@@ -77,14 +77,14 @@
 
 | 交付/检查 | 本记录可确认的证据 | 当前结论 |
 | --- | --- | --- |
-| 精确源码、相关 CI、聚焦测试、类型检查 | `682f4b173de9b1ef74791a6ef8fb3570d430b421` 干净源码完成 7 文件/52 项 Runtime 聚焦回归、Desktop 类型检查及生产构建；仅多出文档改动的 `073b09e2` push/PR Quality 均为三个 job 全通过；索引专项 6 文件/64 项另记 | 对应源码与文档差异已明确；不将其他源码 CI 当作同一 SHA |
-| 生产构建 | `682f4b17` 干净源码 `npm run build` 与签名候选构建 `42844447988` 成功 | 该源码构建通过；不代表真实账号业务通过 |
-| 精确 macOS 候选包安装、版本、bundle、签名、适用公证 | `682f4b17` 下载 artifact digest/ZIP CRC 校验、隔离安装通过；版本 `0.5.4`、arm64、bundle `com.wangjiawei508.workwise.candidate.head682f4b173de9`，Developer ID `R35G7F4A9U`；本机签名、stapled 公证、Gatekeeper 及 DMG/ASAR hash 校验通过 | 该精确包身份验收通过，未发布；未导入生产 profile |
-| 中文 macOS 主使用场景 | `682f4b17` 在 `credentialAccess=1` 的隔离 profile、无模型 key 下验证三个页签、原始请求等待、检查连接、状态本地读取及重启历史恢复；后续重新发起 DWS 官方设备流程，UI 自动显示登录身份已核验 | 上述有限场景与 DWS 身份后验通过；未确认人工扫码，业务 scopes 和读写仍待验收 |
+| 精确源码、相关 CI、聚焦测试、类型检查 | `0a94e6a73eab47144d1f9474c83a30566bff089c` 完成 112 项聚焦回归及本地生产构建，push/PR Quality 各三个 job 全通过，含类型检查、全量测试和构建 | 对应精确源码通过，运行链接见文末 |
+| 生产构建 | `0a94e6a7` 本地生产构建与签名候选构建 `42909030668` 成功 | 通过 |
+| 精确 macOS 候选包安装、版本、bundle、签名、适用公证 | `0a94e6a7` 版本 `0.5.4`、arm64、bundle `com.wangjiawei508.workwise.candidate.head0a94e6a73eab`，Developer ID `R35G7F4A9U`，签名、公证、Gatekeeper、DMG/ASAR 校验和隔离安装通过 | 复用原隔离候选资料后的签名与 ASAR 再次核验通过 |
+| 中文 macOS 主使用场景 | `0a94e6a7` 中文界面完成待办读取、本机钉钉启动、重新授权二维码及官方身份认证页面验收，取消新授权后原账号读取继续成功 | 本轮入口与只读范围通过 |
 | 中文 Windows、安装身份和主要交互 | Windows 相关路径/工具安装有自动化分支；没有对应 Windows 机器/精确包证据 | 待验收，不得以 macOS 成功代替 |
 | 真实 Lark/Feishu 账户 | 有协议核对与合成回放；用户此前报告浏览器侧成功，但未在当前候选包完成账户登录、Scope、读取或写入核验 | 当前精确候选包仍待验收，不从浏览器结果推断本地账号已连接 |
 | 钉钉缺配置 | `682f4b17` 中文原始请求保持一项 `waiting_user`；重启后只读探针中模型 span、持久执行 Turn、工具操作回执均为 0，本地会话条目为 2 | 缺能力阻断、连接检查与重启恢复范围已验证；不是业务执行成功 |
-| 钉钉真实 OAuth、个人待办和企业审批 | `682f4b17` 安装及早先授权到期提示已验收；北京时间 02:54 左右重新连接后官方新设备流程返回，UI 自动显示账号已连接、登录身份已核验，重复检查维持结果且无 Runtime 刷新错误 | 官方设备流程及精确账号身份后验部分通过；未确认人工扫码，业务 scopes、个人待办及企业 Workflow 仍需分别验收 |
+| 钉钉真实 OAuth、个人待办和企业审批 | 精确 `0a94e6a7` UI 两次只读查询均返回 1 条，重新授权展示 208px 二维码和可复制链接，Chrome 官方页面与扫码页加载成功 | 本轮取消新授权，审批写入与完整任务执行仍待验收 |
 | 真实旧资料迁移 | 生产迁移服务为实际旧工作区 1670 文件建立私有快照，哈希和幂等重试通过，源目录不变；生产 JsonSettingsStore 对 3 个 profile/4 份真实 V1/V2 设置的私有副本完成读取、保存、重开与 V1 备份核验，敏感配置值均保留，源文件不变 | 上述真实数据副本范围通过；真实样本无 credentialRef，不宣称 Keychain、完整 profile 或 SQLite 迁移通过 |
 | 发布说明和回归证据 | [可信执行说明](../harness-trusted-execution.md)、[Lark](harness-lark-provider.md)、[钉钉](../dingtalk-provider.md) 说明实现、边界和迁移 | 需把最终结果追加后形成候选交付证据 |
 | 公开发布、版本号、Stable、官网 | 本记录未执行或证明任何公开发布操作 | 未发布，不宣称发行就绪 |
@@ -94,8 +94,8 @@
 ## 尚不能关闭的事项与下一步
 
 1. CI、本地精确源码聚焦测试、类型检查和生产构建已通过。保留旧 CI 的翻译插值失败及旧占位归档被误期望为成功的失败记录；后续测试分别验证正常 DOCX/持久审批成功、保留旧归档节点的流程明确失败，未放宽生产拒绝策略。
-2. `682f4b17` 精确候选包的身份、签名、公证、HTTP refresh 和正常退出后历史恢复已实测通过。中文 Windows 仍需实际运行证据；macOS 的有限通过范围不替代其他平台或业务验收。
-3. DWS 在重新发起官方设备流程后已通过精确账号身份后验，下一步验收业务 Scope、真实读取、授权失效/恢复及有限目标写入。未恢复原先“处理钉钉待办”的泛化任务，也未新增模型配置。飞书/Lark 在当前候选包的真实连接仍待验收；用户此前浏览器侧成功不能代替。业务写入只针对用户明确选择的测试待办/审批，保留平台实际响应及回读证据；不要求用户在聊天提供账号密钥，不把页面打开或人工扫码推断当作执行证据。
+2. `0a94e6a7` 精确候选包已通过本轮钉钉入口与真实待办只读实测。中文 Windows 仍需实际运行证据。
+3. DWS 后续验收完整任务执行、授权失效恢复及用户明确目标的写入和回读。本轮两次界面只读检查通过，重新授权已到达官方扫码页，验收取消后原账号仍可读取。飞书/Lark 在当前候选包的真实连接继续待验收。
 4. 真实工作区和设置副本验证已完成上述范围；完整插件/MCP/Skill 及 credentialRef/Keychain 仍需相应真实样本，不能从设置值保留推断整套资料验收。活动 SQLite 走一致性备份，不对原件执行普通目录复制迁移。
 5. 逐项核对计划中尚属部分交付的体验：任意路径/网络的一次性范围授权、每次执行前的权限总览、市场提供商的实时诊断及全部深链配置页。市场已根据本地 catalog/安装/配置事实统一显示状态，但这些仍不能被现有任务卡、Shell 授权或三个工作台的导航过滤代替。
 6. 取得上述证据后再判断 A—D 是否满足正式产品完成条件及 E 是否可以进入发布；缺少真实平台或目标 OS 能力时明确写待验收，不把模拟结果填成通过。
@@ -203,3 +203,11 @@
 本轮加入明确的重新授权、可复制官方链接、置顶二维码、本机钉钉入口，以及固定读取一条未完成待办的诊断按钮。诊断复用正式 Provider、工具宿主和仅允许该读取的 ExecutionGrant，返回条数与错误分类。设备授权重试时刷新链接和授权码。现有安装与凭据继续使用，重新授权由用户点击发起。
 
 通过 `682f4b17` 精确包内的正式 Provider 和 LocalToolHost，已对当前账号执行一次第一页、最多一条的只读查询，返回成功且条数为 1。仅保留计数及核验状态。实际任务工作流与新按钮的精确包 UI 验收继续记录，审批写入仍待验收。本机 `/Applications/DingTalk.app` 已实际打开。
+
+### `0a94e6a7` 精确包钉钉入口实测（2026-11-11）
+
+- 精确源码 `0a94e6a73eab47144d1f9474c83a30566bff089c` 对应候选构建 `42909030668`。版本 `0.5.4`、macOS arm64、bundle `com.wangjiawei508.workwise.candidate.head0a94e6a73eab`，Developer ID Team `R35G7F4A9U`。签名、装订公证票据、Gatekeeper、下载摘要和安装校验通过。DMG SHA-256 为 `d6056da2757a8cebe387956e91efe4582189c0efe5c38a3a73fbad08e914f41e`，ASAR SHA-256 为 `323527be84f332641aeaf7c387ade6bdbfd97b88bca038e90276b06c37ef65db`。私有回执为 `candidate-local-package-0a94e6a7-evidence.json`。[候选构建](https://github.com/railwise-cn/railwise-ai/actions/runs/42909030668)
+- 本次将签名应用复制到原 `candidate-682f4b17` 隔离目录的新应用名称下，复用已有候选登录和资料。环境文件的旧版本已备份，源码标识更新为本次完整 SHA，复制后的签名和 ASAR 再次核验一致。测试使用该隔离候选资料，环境复用记录为 `candidate-0a94e6a7-existing-profile-update.json`。
+- 中文界面点击“测试待办读取”通过正式 Provider、工具宿主与受限 ExecutionGrant，第一页最多读取一条，实际返回条数 1。“打开本机钉钉”显示成功，操作系统可见 DingTalk 客户端。检查本地登录后，按钮显示“重新授权 / 切换账号”，点击后窗口内显示 208px 二维码、官方 URL 输入框和复制按钮。
+- Chrome 实际加载官方设备授权页，点击登录后到达官方身份认证页，扫码登录页可见二维码与已有账号。此次验收在最终同意新授权前取消，关闭新增验收页面并取消应用内登录流程。随后再次通过“测试待办读取”返回 1 条。本轮两次界面查询均为只读，审批写入与完整任务执行继续待验收。结构化实测记录为 `dingtalk-0a94e6a7-ui-acceptance.json`。截图 `dingtalk-working-0a94e6a7.png` 等保存在私有验收目录，授权码与账号内容不进入仓库。
+- 112 项聚焦回归及本地生产构建通过。同一 SHA 的 push 和 PR Quality 各三个 job 全部成功，覆盖主质量检查、Electron 生产启动及 Windows 路径/进程/持久化自动化。精简证据为 `quality-0a94e6a7-evidence.json`。中文 Windows 实机交互仍待验收。[push Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/42908909871) · [PR Quality](https://github.com/railwise-cn/railwise-ai/actions/runs/42908924435)
