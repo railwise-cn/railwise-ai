@@ -22,6 +22,7 @@ import { GuiUpdateControl } from './settings-gui-update'
 import { DocumentEngineSettingsCard } from './document-engine-settings-card'
 import { WorkspaceMigrationCard } from './workspace-migration-card'
 import { WorkspaceTrustControl } from './workspace-trust-control'
+import { DingTalkConnectorSettingsCard } from './dingtalk-connector-settings-card'
 import {
   InlineNoticeView,
   SectionJumpButton,
@@ -286,6 +287,7 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
               </SettingsCard>
 
               <WorkspaceMigrationCard t={t} />
+              <DingTalkConnectorSettingsCard />
 
               <SettingsCard title={t('desktopBehavior')} className="mt-6">
                 <SettingRow

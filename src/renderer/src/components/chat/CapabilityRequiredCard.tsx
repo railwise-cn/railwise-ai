@@ -106,8 +106,8 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
         <button type="button" disabled={pending} onClick={() => {
           if (action?.kind === 'switch_workspace') void run(async () => { await chooseWorkspace({ createThreadAfter: false, selectThreadAfter: false }) })
           else if (isLark) openPlugins()
-          else openSettings('mcp')
-        }}>{t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureCustomConnector')}</button>
+          else openSettings('general')
+        }}>{t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : null}

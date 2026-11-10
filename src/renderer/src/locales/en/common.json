@@ -4373,6 +4373,7 @@
   "capabilityLoginLark": "Sign in to Feishu / Lark",
   "capabilityOpenMarketplace": "Open plugin marketplace",
   "capabilityConfigureCustomConnector": "Configure a custom MCP connector",
+  "capabilityConfigureDingTalk": "Configure DingTalk connection",
   "capabilityRecheckResume": "Recheck and resume this task",
   "capabilityDecline": "Cancel this task",
   "capabilityDeclined": "Task cancelled; existing records are preserved.",

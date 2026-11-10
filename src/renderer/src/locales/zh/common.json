@@ -4373,6 +4373,7 @@
   "capabilityLoginLark": "登录并授权飞书",
   "capabilityOpenMarketplace": "打开插件市场",
   "capabilityConfigureCustomConnector": "配置自定义 MCP 连接器",
+  "capabilityConfigureDingTalk": "配置钉钉连接",
   "capabilityRecheckResume": "重新检查并继续原任务",
   "capabilityDecline": "取消此任务",
   "capabilityDeclined": "任务已取消，已有记录保留。",

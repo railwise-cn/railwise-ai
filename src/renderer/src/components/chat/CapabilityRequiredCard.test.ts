@@ -49,13 +49,13 @@ describe('capability waiting card', () => {
   })
   afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
-  it('shows the blocking reason and opens a real configuration surface without executing the task', async () => {
+  it('opens the dedicated DingTalk connection settings without executing the task', async () => {
     await render({ ...card, capability: { provider: 'dingtalk', status: 'unsupported', message: '尚无钉钉连接器' } })
     expect(container.textContent).toContain('尚无钉钉连接器')
     expect(container.textContent).toContain('尚未执行')
     expect(container.textContent).not.toContain('thread-original')
-    await click('配置自定义 MCP 连接器')
-    expect(state.openSettings).toHaveBeenCalledWith('mcp')
+    await click('配置钉钉连接')
+    expect(state.openSettings).toHaveBeenCalledWith('general')
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.openExternal).not.toHaveBeenCalled()
   })
