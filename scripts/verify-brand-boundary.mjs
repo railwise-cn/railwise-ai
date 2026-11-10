@@ -173,7 +173,8 @@ const publicCopyFiles = [
   'kun/src/cli/agent-cli.ts', 'kun/src/adapters/tool/design-tool-provider.ts',
   'kun/src/network/safe-web-fetch.ts', 'src/main/index.ts',
   'kun/src/adapters/tool/builtin-read-tool.ts', 'kun/src/adapters/tool/flow-tool-provider.ts',
-  'src/main/services/plugin-activation-service.ts'
+  'src/main/services/plugin-activation-service.ts',
+  'src/asset/skills/design/SKILL.md'
 ]
 const publicLegacyPatterns = [
   /(?:Welcome to|欢迎使用) WorkWise/,

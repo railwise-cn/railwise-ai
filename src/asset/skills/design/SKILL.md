@@ -1,13 +1,13 @@
 ---
 name: design
 description: >
-  WorkWise Design 画板编辑与导出能力。用户在 Design 工作区修改当前画板、
+  RailWise AI Design 画板编辑与导出能力。用户在 Design 工作区修改当前画板、
   使用预设形状或导出 PowerPoint 时使用。
 ---
 
 # Design Skill
 
-This skill operates on the active WorkWise Design document. Canvas edits must
+This skill operates on the active RailWise AI Design document. Canvas edits must
 use the renderer-scoped command bridge; do not create disconnected SVG/HTML
 files as a substitute for changing the open canvas.
 
