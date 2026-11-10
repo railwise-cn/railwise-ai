@@ -162,6 +162,9 @@ export class TurnService {
       if (!existing.has(item.id)) await this.deps.sessionStore.appendItem(input.threadId,item)
       if (!recorded.has(item.id)) await this.deps.events.record({kind:'item_created',threadId:input.threadId,turnId,itemId:item.id,item})
     }
+    // Replay may find both JSONL items already durable after a crash before
+    // the summary index was updated. Reconcile before acknowledging outbox.
+    await this.deps.threadStore.refreshConversationSummary?.(input.threadId)
   }
 
   private async recordCompletedTurnInternal(input: {

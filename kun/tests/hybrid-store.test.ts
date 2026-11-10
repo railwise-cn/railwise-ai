@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InMemoryEventBus } from '../src/adapters/in-memory-event-bus.js'
 import { HybridSessionStore, HybridThreadStore } from '../src/adapters/hybrid/index.js'
+import { FileSessionStore, FileThreadStore } from '../src/adapters/file/index.js'
 import { makeAssistantTextItem, makeToolCallItem, makeUserItem } from '../src/domain/item.js'
 import { appendTurnItem, createTurnRecord, startTurn } from '../src/domain/turn.js'
 import { createThreadRecord } from '../src/domain/thread.js'
@@ -41,6 +42,7 @@ describe('HybridThreadStore', () => {
     const turns = createTurnService(threadStore, sessionStore)
     await turns.recordCommandExchange({ threadId:thread.id, commandId, userText:'帮我处理飞书审批', assistantText:'请先安装并授权飞书连接器', createdAt:'2026-11-10T00:00:01.000Z' })
     await turns.recordCommandExchange({ threadId:thread.id, commandId, userText:'帮我处理飞书审批', assistantText:'请先安装并授权飞书连接器', createdAt:'2026-11-10T00:00:01.000Z' })
+    expect(await threadStore.list()).toMatchObject([{ id:thread.id, messageCount:2, preview:'请先安装并授权飞书连接器', updatedAt:'2026-11-10T00:00:01.000Z' }])
     expect((await threadStore.get(thread.id))?.turns).toEqual([])
     expect((await sessionStore.loadEventsSince(thread.id, 0)).map(event => event.kind)).toEqual(['item_created','item_created'])
     const items = await sessionStore.loadItems(thread.id)
@@ -53,6 +55,7 @@ describe('HybridThreadStore', () => {
     await sessionStore.rewriteItems(thread.id, items.map(({conversationReceiptId:_marker,...item}) => item))
     threadStore.close()
     const reopened = await createHybridStores()
+    expect(await reopened.threadStore.list()).toMatchObject([{ id:thread.id, messageCount:2, preview:'请先安装并授权飞书连接器' }])
     expect((await reopened.threadStore.get(thread.id))?.turns).toEqual([])
     const restored = await getThread({get:(id:string) => reopened.threadStore.get(id)} as Parameters<typeof getThread>[0], thread.id, reopened.sessionStore)
     expect(JSON.parse(restored.body).conversationItems).toHaveLength(2)
@@ -70,6 +73,54 @@ describe('HybridThreadStore', () => {
     expect(JSON.parse(mixed.body)).toMatchObject({status:'running',turns:[{id:'turn_real',status:'running'}]})
     expect(JSON.parse(mixed.body).turns).toHaveLength(1)
     expect(JSON.parse(mixed.body).conversationItems).toHaveLength(2)
+    expect(await reopened.threadStore.list()).toMatchObject([{ id:thread.id, messageCount:3, preview:'继续原任务' }])
+    await reopened.sessionStore.rewriteItems(thread.id, [realUser])
+    expect(await reopened.threadStore.list()).toMatchObject([{ id:thread.id, messageCount:1, preview:'继续原任务' }])
+  })
+
+  it('rebuilds legacy zero-message indexes from receipt JSONL without creating Turns', async () => {
+    if (!sqliteAvailable) return
+    const { threadStore, sessionStore } = await createHybridStores()
+    const thread = createThreadRecord({ id:'thr_legacy_receipt', title:'新会话', workspace:dataDir, model:'fixture', createdAt:'2026-11-10T00:00:00.000Z' })
+    await threadStore.upsert(thread)
+    await createTurnService(threadStore, sessionStore).recordCommandExchange({threadId:thread.id,commandId:'b'.repeat(32),userText:'处理钉钉待办',assistantText:'请先连接钉钉',createdAt:'2026-11-10T00:00:01.000Z'})
+    threadStore.close()
+    const database = new Database(join(dataDir, 'index.sqlite3'))
+    database.prepare("UPDATE threads SET message_count = 0, message_count_version = 1, preview = ''").run()
+    database.close()
+    const reopened = await createHybridStores()
+    expect(await reopened.threadStore.list()).toMatchObject([{id:thread.id,messageCount:2,preview:'请先连接钉钉'}])
+    expect((await reopened.threadStore.get(thread.id))?.turns).toEqual([])
+  })
+
+  it('includes coordinator receipts in file-backend listings while keeping real empty shells empty', async () => {
+    const threadStore = new FileThreadStore({dataDir}), sessionStore = new FileSessionStore({dataDir})
+    const thread = createThreadRecord({id:'thr_file_receipt',title:'新会话',workspace:dataDir,model:'fixture',createdAt:'2026-11-10T00:00:00.000Z'})
+    await threadStore.upsert(thread)
+    expect(await threadStore.list()).toMatchObject([{messageCount:0,preview:''}])
+    const command = {threadId:thread.id,commandId:'c'.repeat(32),userText:'处理飞书审批',assistantText:'请先连接飞书',createdAt:'2026-11-10T00:00:01.000Z'}
+    await createTurnService(threadStore,sessionStore).recordCommandExchange(command)
+    const reopened = new FileThreadStore({dataDir})
+    expect(await reopened.list()).toMatchObject([{messageCount:2,preview:'请先连接飞书',updatedAt:command.createdAt}])
+    expect((await reopened.get(thread.id))?.turns).toEqual([])
+  })
+
+  it('repairs a current-version stale index when replay finds command items already durable', async () => {
+    if (!sqliteAvailable) return
+    const {threadStore,sessionStore} = await createHybridStores()
+    const thread = createThreadRecord({id:'thr_receipt_replay',title:'新会话',workspace:dataDir,model:'fixture',createdAt:'2026-11-10T00:00:00.000Z'})
+    await threadStore.upsert(thread)
+    const command = {threadId:thread.id,commandId:'d'.repeat(32),userText:'处理待办',assistantText:'等待连接',createdAt:'2026-11-10T00:00:01.000Z'}
+    const service = createTurnService(threadStore,sessionStore)
+    await service.recordCommandExchange(command)
+    const database = new Database(join(dataDir,'index.sqlite3'))
+    database.prepare("UPDATE threads SET message_count = 0, preview = ''").run()
+    database.close()
+    expect(await threadStore.list()).toMatchObject([{messageCount:0,preview:''}])
+    await service.recordCommandExchange(command)
+    expect(await threadStore.list()).toMatchObject([{messageCount:2,preview:'等待连接'}])
+    expect(await sessionStore.loadItems(thread.id)).toHaveLength(2)
+    expect((await threadStore.get(thread.id))?.turns).toEqual([])
   })
 
   it('keeps item bodies in JSONL and uses SQLite metadata indexing when available', async () => {
@@ -691,8 +742,8 @@ describe('HybridThreadStore', () => {
   }
 
   function createTurnService(
-    threadStore: HybridThreadStore,
-    sessionStore: HybridSessionStore,
+    threadStore: ConstructorParameters<typeof TurnService>[0]['threadStore'],
+    sessionStore: ConstructorParameters<typeof TurnService>[0]['sessionStore'],
     options: { failEventKind?: string } = {}
   ): TurnService {
     const bus = new InMemoryEventBus()

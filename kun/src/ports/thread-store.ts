@@ -19,5 +19,7 @@ export interface ThreadStore {
   list(options?: ThreadStoreListOptions): Promise<ThreadSummary[]>
   get(threadId: string): Promise<ThreadRecord | null>
   upsert(thread: ThreadRecord): Promise<ThreadRecord>
+  /** Reconcile a derived sidebar index after durable coordinator history. */
+  refreshConversationSummary?(threadId: string): Promise<void>
   delete(threadId: string): Promise<boolean>
 }

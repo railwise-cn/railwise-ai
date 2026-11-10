@@ -123,6 +123,21 @@ export function toThreadSummary(
   }
 }
 
+/** Local coordinator history contributes to the sidebar, without execution Turns. */
+export function toConversationThreadSummary(thread: ThreadEntity, conversationItems: readonly TurnItem[]): ThreadSummary {
+  if (conversationItems.length === 0) return toThreadSummary(thread)
+  const items = [...new Map([
+    ...thread.turns.flatMap((turn) => turn.items),
+    ...conversationItems
+  ].map(item => [item.id, item])).values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return {
+    ...toThreadSummary(thread),
+    messageCount: countVisibleThreadMessages(items),
+    preview: previewFromThreadItems(items),
+    updatedAt: conversationItems.reduce((latest, item) => item.createdAt > latest ? item.createdAt : latest, thread.updatedAt)
+  }
+}
+
 /** User-visible conversation count; reasoning, tools and approvals are not messages. */
 export function countVisibleThreadMessages(items: readonly TurnItem[]): number {
   return items.reduce(

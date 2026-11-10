@@ -1,5 +1,5 @@
 import type { RuntimeEvent } from '../../contracts/events.js'
-import type { TurnItem } from '../../contracts/items.js'
+import { isConversationReceiptItem, type TurnItem } from '../../contracts/items.js'
 import type { AgentSession } from '../../domain/session.js'
 import type {
   SessionLatestUsageSnapshot,
@@ -41,10 +41,13 @@ export class HybridSessionStore implements SessionStore {
 
   async rewriteItems(threadId: string, items: TurnItem[]): Promise<void> {
     await this.delegate.rewriteItems(threadId, items)
+    await this.index.refreshConversationSummary(threadId)
   }
 
   async updateItem(threadId: string, itemId: string, patch: Partial<TurnItem>): Promise<TurnItem | null> {
-    return this.delegate.updateItem(threadId, itemId, patch)
+    const item = await this.delegate.updateItem(threadId, itemId, patch)
+    if (item && isConversationReceiptItem(item)) await this.index.refreshConversationSummary(threadId)
+    return item
   }
 
   async loadEventsSince(threadId: string, sinceSeq: number): Promise<RuntimeEvent[]> {

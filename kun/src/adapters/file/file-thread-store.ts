@@ -2,7 +2,8 @@ import { mkdir, readFile, readdir, rm, stat, truncate } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type { ThreadStore, ThreadStoreListOptions } from '../../ports/thread-store.js'
 import type { ThreadRecord, ThreadSummary } from '../../contracts/threads.js'
-import { toThreadSummary } from '../../domain/thread.js'
+import { isConversationReceiptItem, type TurnItem } from '../../contracts/items.js'
+import { toConversationThreadSummary } from '../../domain/thread.js'
 import { atomicWriteFile } from './atomic-write.js'
 
 /**
@@ -35,7 +36,8 @@ export class FileThreadStore implements ThreadStore {
       try {
         const raw = await readFile(path, 'utf-8')
         const thread = JSON.parse(raw) as ThreadRecord
-        summaries.push(toThreadSummary(thread))
+        const receipts = (await readJsonl<TurnItem>(join(this.threadDir(threadId), 'messages.jsonl'))).filter(isConversationReceiptItem)
+        summaries.push(toConversationThreadSummary(thread, receipts))
       } catch {
         // Skip broken entries rather than failing the whole list.
       }
