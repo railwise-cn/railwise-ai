@@ -1,5 +1,10 @@
 {
   "title": "设置",
+  "pluginAvailableToInstall": "可安装",
+  "pluginConfiguredUnverified": "已配置 · 待验证授权",
+  "pluginInstalledUnavailable": "已安装 · 当前不可用",
+  "pluginInstalledSourceUnavailable": "已安装 · 来源不可用",
+  "pluginInstallationHealth": "安装完整性",
   "subtitle": "管理 API、界面偏好、默认目录和 AI 助手行为。",
   "back": "返回",
   "general": "通用",

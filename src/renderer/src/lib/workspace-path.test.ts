@@ -16,7 +16,7 @@ describe('workspace path normalization', () => {
     expect(isInternalTemporaryWorkspace('/private/var/folders/ab/cd/T/session-1')).toBe(true)
   })
 
-  it('recognizes .workgpt labels without conflating independent directories', () => {
+  it('recognizes historical workspace labels without conflating independent directories', () => {
     expect(isLegacyDefaultWorkspacePath('/users/example/.workgpt/default_workspace')).toBe(true)
     const roots = ['.workgpt', '.workwise', '.kun', '.deepseekgui'].map(root => `/users/example/${root}/default_workspace`)
     expect(new Set(roots.map(workspaceRootIdentityKey)).size).toBe(4)

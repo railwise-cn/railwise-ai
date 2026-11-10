@@ -96,6 +96,8 @@ export class ManagedDingTalkRuntime {
       workspaceState: 'unknown' as const, sandboxState: 'allowed' as const,
       approvalState: intent.mutation ? 'required' as const : 'not_required' as const, checkedAt: this.status.checkedAt }
     const connect = { kind: 'connect' as const, route: 'settings', label: '配置钉钉连接器' }
+    if (intent.operation === 'send') return { ...base, status: 'unsupported', credentialState: this.status.credentialState,
+      errorCode: 'connector_operation_unsupported', message: '当前钉钉连接器尚不支持发送消息。请使用待办或审批能力。', action: connect, resolution: connect }
     if (!this.config.enabled) return { ...base, status: 'blocked', credentialState: 'missing', errorCode: 'connector_disabled',
       message: '钉钉连接器尚未启用，请先完成配置。', action: connect, resolution: connect }
     if (intent.kind === 'connect_provider') return { ...base, status: 'needs_authorization', credentialState: this.status.credentialState,

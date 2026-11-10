@@ -26,10 +26,26 @@ describe('WorkspaceMigrationService', () => {
     const service = new WorkspaceMigrationService({ home: root, stateRoot: join(root, '.workwise', 'migrations', 'workspaces') })
 
     const report = await service.scan()
+    expect(await service.aliases()).toEqual([{ path: join(root, '.workgpt', 'default_workspace'), canonicalRoot: current }])
     expect(report.entries).toHaveLength(12)
     expect(report.entries.find(entry => entry.id === '.workgpt:default')).toMatchObject({ status: 'populated', aliasOf: '.workwise:default' })
     expect(report.entries.find(entry => entry.id === '.kun:default')).toMatchObject({ status: 'populated', identicalTo: '.workwise:default', aliasOf: undefined })
     expect(report.entries.find(entry => entry.id === '.deepseekgui:default')).toMatchObject({ status: 'populated', conflictWith: expect.arrayContaining(['.workwise:default']) })
+  })
+
+  it('rechecks aliases after a symlink is replaced by an independent workspace', async () => {
+    const root = await home()
+    const current = join(root, '.workwise', 'default_workspace')
+    const legacy = join(root, '.workgpt', 'default_workspace')
+    await mkdir(current, { recursive: true })
+    await mkdir(join(root, '.workgpt'), { recursive: true })
+    await symlink(current, legacy, 'dir')
+    const service = new WorkspaceMigrationService({ home: root, stateRoot: join(root, 'state') })
+    expect(await service.aliases()).toHaveLength(1)
+    await rm(legacy)
+    await mkdir(legacy)
+    await writeFile(join(legacy, 'user.md'), 'independent content')
+    expect(await service.aliases()).toEqual([])
   })
 
   it('creates an exclusive, hash-verified copy, preserves originals, and replays the same receipt', async () => {

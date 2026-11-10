@@ -40,6 +40,8 @@ jobs:
           python sidecars/markitdown/generate_sbom.py build/sidecars/markitdown-darwin-arm64/SBOM-python.json
           node scripts/verify-document-dependencies.mjs --python-sbom build/sidecars/markitdown-darwin-arm64/SBOM-python.json
       - name: Prepare exact-source isolated identity
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           set -euo pipefail
           unset RELEASE_CHANNEL WORKWISE_PUBLIC_BASE_URL WORKWISE_UPDATE_URL WORKWISE_APP_VERSION

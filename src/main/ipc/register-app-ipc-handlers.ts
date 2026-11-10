@@ -955,6 +955,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return workspaceTrustService.get(request.workspaceRoot)
   })
   ipcMain.handle('workspace-migration:scan', async () => workspaceMigrationService.scan())
+  ipcMain.handle('workspace-migration:aliases', async () => workspaceMigrationService.aliases())
   ipcMain.handle('workspace-migration:import-snapshot', async (_, payload: unknown) => {
     const request = parseIpcPayload('workspace-migration:import-snapshot', workspaceMigrationImportPayloadSchema, payload)
     return workspaceMigrationService.importSnapshot(request)

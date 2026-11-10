@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolHostContext } from '../../ports/tool-host.js'
-import { assertGrantAllowsNetwork, assertGrantConnectorScopes, canWritePath, effectiveApprovalPolicy, effectiveSandboxMode, sandboxBlockForTool } from './sandbox-policy.js'
+import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes, canWritePath, effectiveApprovalPolicy, effectiveSandboxMode, externalTargetGrantKey, sandboxBlockForTool } from './sandbox-policy.js'
 
 const base = (grant: NonNullable<ToolHostContext['executionGrant']>): ToolHostContext => ({
   threadId: 'thread', turnId: 'turn', workspace: '/workspace', sandboxMode: 'danger-full-access',
@@ -17,6 +17,16 @@ const grant = (overrides: Partial<NonNullable<ToolHostContext['executionGrant']>
 })
 
 describe('execution grant sandbox and approval enforcement', () => {
+  it('treats empty target scopes as no write permission and keys exact provider/action/target', () => {
+    const unscoped = base(grant())
+    expect(() => assertGrantAllowsExternalTarget('lark', 'list', 'current_user', unscoped)).not.toThrow()
+    expect(() => assertGrantAllowsExternalTarget('lark', 'complete', 'a', unscoped)).toThrow(/outside the reviewed/)
+    const scoped = base(grant({ externalTargets: [externalTargetGrantKey('lark', 'complete', 'a')] }))
+    expect(() => assertGrantAllowsExternalTarget('lark', 'complete', 'a', scoped)).not.toThrow()
+    expect(() => assertGrantAllowsExternalTarget('dingtalk', 'complete', 'a', scoped)).toThrow()
+    expect(() => assertGrantAllowsExternalTarget('lark', 'approve', 'a', scoped)).toThrow()
+    expect(() => assertGrantAllowsExternalTarget('lark', 'complete', 'b', scoped)).toThrow()
+  })
   it('rejects reuse of a grant by another Turn', () => {
     const context = { ...base(grant()), turnId: 'different' }
     expect(sandboxBlockForTool({ name: 'read', toolKind: 'tool_call' }, context)?.code).toBe('execution_grant_scope')

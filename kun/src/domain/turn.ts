@@ -9,6 +9,7 @@ import type { ThreadMode } from '../contracts/threads.js'
 import type { TurnItem } from '../contracts/items.js'
 import type { WorkspaceReference } from '../contracts/workspace-references.js'
 import type { UiActionAudit } from '../contracts/ui-actions.js'
+import type { ExternalTaskProvider } from '../contracts/harness.js'
 
 export type TurnEntity = Turn
 
@@ -16,6 +17,7 @@ export function createTurnRecord(input: {
   id: string
   threadId: string
   prompt: string
+  externalTaskProvider?: ExternalTaskProvider
   model?: string
   providerId?: string
   engineeringExecution?: boolean
@@ -39,6 +41,7 @@ export function createTurnRecord(input: {
     threadId: input.threadId,
     status: input.status ?? 'queued',
     prompt: input.prompt,
+    ...(input.externalTaskProvider ? { externalTaskProvider: input.externalTaskProvider } : {}),
     steering: [],
     items: [],
     attachmentIds: [...(input.attachmentIds ?? [])],

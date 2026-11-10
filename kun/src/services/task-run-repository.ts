@@ -604,9 +604,9 @@ export class TaskRunRepository {
     return row ? OperationReceiptSchema.parse(JSON.parse(row.data_json)) : null
   }
 
-  finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string }, nowIso?: string): OperationReceipt
+  finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] }, nowIso?: string): OperationReceipt
   finishOperation(ownerId: string, key: string, status: OperationReceipt['status'], result?: unknown): OperationReceipt
-  finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
+  finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
     const previous = this.operation(ownerId, key)
     if (!previous) throw Object.assign(new Error('operation not found'), { code: 'not_found' })
     const patch = typeof patchOrStatus === 'string'
@@ -619,7 +619,22 @@ export class TaskRunRepository {
   }
 
   unsettledOperations(ownerId: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>).map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item => ['running', 'outcome_unknown'].includes(item.status))
+    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>).map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item => ['running', 'outcome_unknown'].includes(item.status) && !this.verifiedOperationResolution(item))
+  }
+  verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
+    const resolution = receipt.resolution
+    if (!resolution) return undefined
+    const proof = this.operations(receipt.ownerId, 'effect_verification').find(item => item.id === resolution.receiptId)
+    if (proof?.status !== 'succeeded' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) return undefined
+    const result = proof.result as { evidence?: unknown } | undefined
+    return operationFingerprint(result?.evidence) === operationFingerprint(resolution.evidence) ? resolution : undefined
+  }
+  resolveOperation(ownerId: string, key: string, resolution: NonNullable<OperationReceipt['resolution']>): void {
+    const receipt = this.operation(ownerId, key)
+    if (!receipt || receipt.status !== 'outcome_unknown') throw Object.assign(new Error('Unknown operation not found.'), { code: 'invalid_state' })
+    const next = OperationReceiptSchema.parse({ ...receipt, resolution })
+    if (!this.verifiedOperationResolution(next)) throw Object.assign(new Error('Verified readback proof is missing.'), { code: 'invalid_state' })
+    this.db.prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?').run(JSON.stringify(next), ownerId, key)
   }
   operations(ownerId: string, kind?: string): OperationReceipt[] {
     return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id=? ORDER BY rowid').all(ownerId) as Array<{data_json:string}>).map(row=>OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item=>!kind || item.kind===kind)

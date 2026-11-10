@@ -28,9 +28,40 @@ export const ExecutionGrantSchema = z.object({
   idempotencyKey: z.string().min(1),
   issuedAt: z.iso.datetime(),
   expiresAt: z.iso.datetime().optional()
+  ,taskPermissionId: z.string().min(1).optional()
 })
 export type ExecutionGrant = z.infer<typeof ExecutionGrantSchema>
 
+/** A server-owned, single-command exception; it never changes ambient workspace trust. */
+export const HostShellAuthorizationSchema = z.object({
+  id: z.string().min(1), taskId: z.string().min(1), threadId: z.string().min(1), turnId: z.string().min(1),
+  executionId: z.string().min(1), ownerId: z.string().min(1), leaseRevision: z.number().int().nonnegative(),
+  executionGrantId: z.string().min(1), workspaceRoot: z.string().min(1),
+  workspaceRevision: z.number().int().nonnegative(), agentRevision: z.number().int().nonnegative(),
+  commandHash: z.string().regex(/^[a-f0-9]{64}$/), requestHash: z.string().regex(/^[a-f0-9]{64}$/),
+  approvalId: z.string().min(1), idempotencyKey: z.string().min(1),
+  issuedAt: z.iso.datetime(), expiresAt: z.iso.datetime()
+})
+export type HostShellAuthorization = z.infer<typeof HostShellAuthorizationSchema>
+
+export const TaskApprovalGrantSchema = z.object({
+  id: z.string().min(1), taskId: z.string().min(1), threadId: z.string().min(1),
+  previousPolicy: z.literal('never'), approvalPolicy: z.literal('on-request'),
+  workspaceRoot: z.string().min(1), workspaceRevision: z.number().int().nonnegative(),
+  workspaceTrust: WorkspaceTrustLevelSchema, agentRevision: z.number().int().nonnegative(),
+  scopeFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  status: z.enum(['prepared','active']), confirmed: z.literal(true),
+  confirmedAt: z.iso.datetime(), expiresAt: z.iso.datetime(), idempotencyKey: z.string().min(1)
+})
+export type TaskApprovalGrant = z.infer<typeof TaskApprovalGrantSchema>
+
+export const TaskPermissionConfirmationSchema = z.object({
+  expectedRevision: z.number().int().nonnegative(), idempotencyKey: z.string().trim().min(1).max(256),
+  scopeHash: z.string().regex(/^[a-f0-9]{64}$/), confirmed: z.literal(true),
+  approvalPolicy: z.literal('on-request'), ttlSeconds: z.number().int().min(60).max(900)
+}).strict()
+export type TaskPermissionConfirmation = z.infer<typeof TaskPermissionConfirmationSchema>
+
 export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connectorScopes' | 'externalTargets'> &
   Pick<Partial<ExecutionGrant>, 'allowedToolNames'> &
-  Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'expiresAt'>
+  Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'expiresAt' | 'taskPermissionId'>

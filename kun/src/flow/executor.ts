@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { FlowDefinitionV1, FlowNodeRunV1, FlowNodeV1, FlowRunV1 } from '../contracts/flow.js'
 import { FlowRepository } from './repository.js'
 import { inspectProcess } from '../services/process-identity.js'
+import { assertFlowNodeExecutable, FlowExecutionPolicyError, flowPolicyEvidence } from './execution-policy.js'
 
 export type FlowAdapterContext = { run: FlowRunV1; definition: FlowDefinitionV1; node: FlowNodeV1; input: unknown; signal: AbortSignal }
 export type FlowAdapterResult = { kind: 'output'; output: unknown } | { kind: 'wait'; reason: 'approval' | 'breakpoint' | 'task'; checkpoint?: unknown }
@@ -38,6 +39,7 @@ export class FlowExecutor {
 
   async testNode(definition: FlowDefinitionV1, nodeId: string, input: unknown): Promise<FlowAdapterResult> {
     const node = definition.nodes.find((item) => item.id === nodeId); if (!node) throw new Error(`node not found: ${nodeId}`)
+    assertFlowNodeExecutable(node.type)
     const adapter = this.adapters.get(node.type); if (!adapter) throw new Error(`node adapter unavailable: ${node.type}`)
     const controller = new AbortController()
     const run = { id: `test_${randomUUID()}`, flowId: definition.id, versionId: 'draft', status: 'running', input, invocationStack: [], startedAt: this.nowIso(), updatedAt: this.nowIso() } as FlowRunV1
@@ -154,7 +156,7 @@ export class FlowExecutor {
     } catch (error) {
       if (this.interrupting.has(run.id)) { this.repository.saveRun({ ...run, status: 'interrupted', checkpoint: this.repository.getRun(run.id)?.checkpoint ?? { reason: 'application_exit', resumable: false }, updatedAt: this.nowIso(), completedAt: undefined }); return }
       const cancelled = (error as { code?: string }).code === 'cancelled' || controller.signal.aborted
-      this.repository.saveRun({ ...run, status: cancelled ? 'cancelled' : 'failed', output: { error: error instanceof Error ? error.message : String(error) }, updatedAt: this.nowIso(), completedAt: this.nowIso() })
+      this.repository.saveRun({ ...run, status: cancelled ? 'cancelled' : 'failed', output: { error: error instanceof Error ? error.message : String(error), ...flowPolicyEvidence(error) }, updatedAt: this.nowIso(), completedAt: this.nowIso() })
     } finally { this.active.delete(run.id); this.interrupting.delete(run.id) }
   }
 
@@ -169,11 +171,15 @@ export class FlowExecutor {
       this.repository.saveNodeRun(nodeRun)
       const controller = new AbortController(); const abort = () => controller.abort(); parentSignal.addEventListener('abort', abort, { once: true })
       try {
+        assertFlowNodeExecutable(node.type)
         const result = await withTimeout(adapter({ run, definition, node, input, signal: controller.signal }), node.policy.timeoutMs, controller)
         this.repository.saveNodeRun({ ...nodeRun, status: result.kind === 'wait' ? (result.reason === 'approval' ? 'waiting_approval' : 'paused') : 'succeeded', ...(result.kind === 'output' ? { output: bounded(result.output) } : {}), completedAt: this.nowIso() })
         return result
       } catch (error) {
-        lastError = error; this.repository.saveNodeRun({ ...nodeRun, status: parentSignal.aborted ? 'cancelled' : 'failed', error: error instanceof Error ? error.message : String(error), completedAt: this.nowIso() })
+        lastError = error; this.repository.saveNodeRun({ ...nodeRun, status: parentSignal.aborted ? 'cancelled' : 'failed', error: error instanceof Error ? error.message : String(error), ...(error instanceof FlowExecutionPolicyError ? { output: flowPolicyEvidence(error) } : {}), completedAt: this.nowIso() })
+        // Authorization/configuration blocks cannot be retried or converted
+        // into successful output by a legacy continue/error-edge policy.
+        if (error instanceof FlowExecutionPolicyError) throw error
         if (attempt <= node.policy.retryAttempts && !parentSignal.aborted) await delay(node.policy.retryBackoffMs * attempt, parentSignal)
       } finally { parentSignal.removeEventListener('abort', abort) }
     }

@@ -1169,25 +1169,39 @@ export class ClawRuntime {
       if (options.onThreadSelected) await options.onThreadSelected({ threadId: thread.id })
       turn = await this.startRuntimeTurn(settings, thread.id, turnBody)
     }
-    if (!turn.ok) return { ok: false, reason: 'failed', message: runtimeErrorMessage(turn, 'Failed to start turn.') }
+    if (!turn.ok) {
+      const failureBody = parseJsonObject(turn.body)
+      const message = asString(failureBody?.message) || runtimeErrorMessage(turn, 'Failed to start turn.')
+      return {
+        ok: false,
+        reason: failureBody?.code === 'capability_required' ? 'authorization_required' : 'failed',
+        message
+      }
+    }
 
     const parsedTurn = parseJsonObject(turn.body)
     const turnId = asString(parsedTurn?.turnId) || asString(nestedRecord(parsedTurn?.turn).id)
     if (!turnId) {
+      const kind = asString(parsedTurn?.kind)
+      const message = asString(parsedTurn?.message)
+      if (['snapshot', 'input_queued', 'task_updated', 'attention_required'].includes(kind ?? '') && message) {
+        return { ok: true, threadId: asString(parsedTurn?.threadId) || thread.id, text: message, message }
+      }
       return { ok: false, reason: 'failed', message: 'Failed to start turn: missing turn id.' }
     }
+    const executionThreadId = asString(parsedTurn?.threadId) || thread.id
     if (turnId && options.onTurnStarted) {
-      await options.onTurnStarted({ threadId: thread.id, turnId })
+      await options.onTurnStarted({ threadId: executionThreadId, turnId })
     }
     if (!options.waitForResult) {
-      return { ok: true, threadId: thread.id, turnId, message: 'Started' }
+      return { ok: true, threadId: executionThreadId, turnId, message: 'Started' }
     }
 
     let result: Awaited<ReturnType<ClawRuntime['waitForAssistantResult']>>
     try {
       result = await this.waitForAssistantResult(
         settings,
-        thread.id,
+        executionThreadId,
         turnId,
         options.responseTimeoutMs,
         workspace,
@@ -1202,12 +1216,12 @@ export class ClawRuntime {
       if (reason === 'timeout') {
         const interrupted = await this.deps.runtimeRequest(
           settings,
-          `/v1/threads/${encodeURIComponent(thread.id)}/turns/${encodeURIComponent(turnId)}/interrupt`,
+          `/v1/threads/${encodeURIComponent(executionThreadId)}/turns/${encodeURIComponent(turnId)}/interrupt`,
           { method: 'POST', body: JSON.stringify({ discard: false }) }
         )
         if (!interrupted.ok) {
           this.deps.logError('claw-runtime', 'Failed to interrupt timed-out IM Runtime turn.', {
-            threadId: thread.id,
+            threadId: executionThreadId,
             turnId,
             message: runtimeErrorMessage(interrupted, 'Runtime turn interrupt failed.')
           })
@@ -1221,7 +1235,7 @@ export class ClawRuntime {
     }
     return {
       ok: true,
-      threadId: thread.id,
+      threadId: executionThreadId,
       turnId,
       text: result.text,
       message: result.text || 'Completed',

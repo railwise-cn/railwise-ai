@@ -1,16 +1,23 @@
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
 import { deliveryFlow, type TaskDeliveryTemplateId } from '../src/delivery/templates.js'
 import type { ServerRuntime } from '../src/server/routes/server-runtime.js'
+import { FileWorkspaceTrustReader } from '../src/services/workspace-trust-reader.js'
 
 /** Protocol replay tests production assembly and tools; it is not a live-model quality claim. */
 describe('task delivery production assembly with synthetic model protocol', () => {
+  beforeEach(() => {
+    // These local fixtures explicitly authorize candidate writes; selecting a
+    // folder or setting a legacy sandbox mode alone no longer grants trust.
+    vi.spyOn(FileWorkspaceTrustReader.prototype, 'get').mockImplementation(async workspace => ({ canonicalRoot: await realpath(workspace), level: 'workspace-write', revision: 1 }))
+  })
+  afterEach(() => vi.restoreAllMocks())
   it('starts a fresh task from a completed hidden execution and regenerates an exact old candidate through the real tool boundary', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-regenerate-production-'))
     let runtime: ServerRuntime | undefined

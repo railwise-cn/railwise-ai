@@ -2,11 +2,14 @@ import { useTaskState, refreshTaskState, takeRequestedTask } from '../../store/t
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { CheckCircle2, ChevronRight, FileText, Folder, ListTodo, Loader2, MessageSquare, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
+import type { TaskAttentionV1, TaskEventV1, TaskInputV1, TaskOperationReceiptV1, TaskRunV1, TaskTemplateId, TaskTemplateStartV1, TaskTemplateV1 } from '@shared/agent-workbench'
 import { SidebarTitlebarToggleButton } from '../sidebar/SidebarPrimitives'
 import { TaskArtifactReview } from './TaskArtifactReview'
+import { TaskExecutionEvidence } from './TaskExecutionEvidence'
 import { currentTaskBranch } from '@shared/task-projection'
 import { taskDisplayGoal } from '@shared/task-presentation'
+import type { ExternalTaskCapabilityCard } from '@shared/task-command'
+import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
 
 type TaskFilter = 'ongoing' | 'attention' | 'completed' | 'all'
 type Props = {
@@ -17,6 +20,7 @@ type Props = {
   onOpenThread: (threadId: string) => void
   onOpenArtifact: (task: TaskRunV1, relativePath: string) => void | Promise<void>
   onOpenFlow?: (flowId?: string, flowRunId?: string) => void
+  onConfigureProvider?: (provider: string) => void
 }
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
@@ -132,7 +136,19 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [selectedProvider, setSelectedProvider] = useState<'dingtalk' | 'lark'>('dingtalk')
+  const [providerPrompt, setProviderPrompt] = useState('')
   const questions = attentionQuestions(item)
+  const capability = item.payload?.capability
+  const originalRequest = item.payload?.request
+  const capabilityCard: ExternalTaskCapabilityCard | null = item.payload?.kind === 'capability_required' && item.taskId &&
+    (conversationThreadId || item.threadId) && originalRequest && typeof originalRequest === 'object' &&
+    'prompt' in originalRequest && typeof originalRequest.prompt === 'string' && capability && typeof capability === 'object' &&
+    'provider' in capability && ['dingtalk','lark','feishu'].includes(String(capability.provider)) &&
+    'status' in capability && ['available','not_installed','needs_authorization','unsupported','blocked'].includes(String(capability.status)) &&
+    'message' in capability && typeof capability.message === 'string'
+      ? {threadId:(conversationThreadId || item.threadId)!,taskId:item.taskId,attentionId:item.id,prompt:originalRequest.prompt,capability:capability as ExternalTaskCapabilityCard['capability']}
+      : null
   const resolveFlow = async (decision?: 'approve' | 'reject'): Promise<void> => {
     if (busy || !item.flowRunId || (decision && !item.nodeId)) return
     setBusy(true)
@@ -163,6 +179,19 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
       onResolved()
     } catch (nextError) { setError(errorMessage(nextError)) } finally { setBusy(false) }
   }
+  const resolveProvider = async (): Promise<void> => {
+    const original = item.payload?.request
+    if (busy || !item.threadId || !providerPrompt.trim() || !original || typeof original !== 'object') return
+    setBusy(true)
+    setError('')
+    try {
+      await window.workwise.coordinateTaskCommand({ threadId:item.threadId, ...(item.taskId ? {taskId:item.taskId} : {}),
+        intent:'new', resolveAttentionId:item.id, selectedExternalProvider:selectedProvider,
+        idempotencyKey:`provider-choice:${item.id}:${operationKey()}`,
+        request:{...original,prompt:providerPrompt.trim(),displayText:providerPrompt.trim()} })
+      onResolved()
+    } catch (nextError) { setError(errorMessage(nextError)) } finally { setBusy(false) }
+  }
   const resolve = async (decision?: 'allow' | 'deny'): Promise<void> => {
     if (!item.requestId || busy) return
     setBusy(true)
@@ -182,6 +211,12 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   return <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
     <h4 className="text-sm font-semibold">{item.title}</h4>
     <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">{item.message}</p>
+    {capabilityCard ? <CapabilityRequiredCard card={capabilityCard} /> : null}
+    {item.payload?.kind === 'external_provider_choice' ? <div className="mt-3 space-y-2">
+      <label className="block text-xs">{t('taskCommandProvider')}<select aria-label={t('taskCommandProvider')} value={selectedProvider} onChange={event => setSelectedProvider(event.target.value as 'dingtalk' | 'lark')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="dingtalk">{t('taskEffectProvider_dingtalk')}</option><option value="lark">{t('taskEffectProvider_lark')}</option></select></label>
+      <label className="block text-xs">{t('taskCommandSingleProviderRequest')}<textarea aria-label={t('taskCommandSingleProviderRequest')} value={providerPrompt} onChange={event => setProviderPrompt(event.target.value)} rows={3} placeholder={t('taskCommandSingleProviderHint')} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink" /></label>
+      <button type="button" disabled={busy || !providerPrompt.trim()} onClick={() => void resolveProvider()} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskCommandCreateProviderTask')}</button>
+    </div> : null}
     {questions.map(question => <label key={question.id} className="mt-3 block text-xs font-medium">{question.label}
       {question.options?.length ? <select value={answers[question.id] ?? ''} onChange={event => setAnswers(current => ({ ...current, [question.id]: event.target.value }))} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink"><option value="">{t('taskWorkspaceChooseAnswer')}</option>{question.options.map(option => <option key={option.value ?? option.label} value={option.value ?? option.label}>{option.label}</option>)}</select> : null}
       <textarea aria-label={question.label} value={answers[question.id] ?? ''} onChange={event => setAnswers(current => ({ ...current, [question.id]: event.target.value }))} className="mt-1 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-ds-ink" rows={2} />
@@ -190,7 +225,7 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
       {item.ownerKind === 'flow' && item.payload?.action === 'review_flow' ? <><button type="button" disabled={busy} onClick={() => void resolveFlow('approve')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceAllow')}</button><button type="button" disabled={busy} onClick={() => void resolveFlow('reject')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskWorkspaceDeny')}</button></> : null}
       {item.ownerKind === 'flow' && item.payload?.action === 'continue_flow' ? <button type="button" disabled={busy} onClick={() => void resolveFlow()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskRunResume')}</button> : null}
       {item.ownerKind === 'flow' && onOpenFlow ? <button type="button" onClick={() => onOpenFlow(item.flowId, item.flowRunId)} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs">{t('taskWorkspaceOpenFlow')}</button> : null}
-      {item.payload?.kind === 'task_input_intent' ? <><button type="button" disabled={busy} onClick={() => void resolveIntent('supplement')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskCommandChooseSupplement')}</button><button type="button" disabled={busy} onClick={() => void resolveIntent('new')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskCommandChooseNew')}</button></> : null}
+      {item.payload?.kind === 'task_input_intent' ? <>{(!Array.isArray(item.payload.choices) || item.payload.choices.includes('supplement')) ? <button type="button" disabled={busy} onClick={() => void resolveIntent('supplement')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskCommandChooseSupplement')}</button> : null}{(!Array.isArray(item.payload.choices) || item.payload.choices.includes('new')) ? <button type="button" disabled={busy} onClick={() => void resolveIntent('new')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskCommandChooseNew')}</button> : null}</> : null}
       {item.kind === 'approval' && item.requestId ? <><button type="button" disabled={busy} onClick={() => void resolve('allow')} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceAllow')}</button><button type="button" disabled={busy} onClick={() => void resolve('deny')} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs disabled:opacity-50">{t('taskWorkspaceDeny')}</button></> : null}
       {item.kind === 'question' && item.requestId && questions.length ? <button type="button" disabled={busy || questions.some(question => !answers[question.id]?.trim())} onClick={() => void resolve()} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSubmitAnswer')}</button> : null}
       {conversationThreadId ? <button type="button" onClick={() => onOpenThread(conversationThreadId)} className="rounded-lg border border-current/20 px-3 py-1.5 text-xs">{t('taskWorkspaceOpenConversation')}</button> : null}
@@ -199,7 +234,7 @@ function AttentionCard({ item, conversationThreadId, onResolved, onOpenThread, o
   </div>
 }
 
-export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarCollapsed, onToggleLeftSidebar, onOpenThread, onOpenArtifact, onOpenFlow }: Props): ReactElement {
+export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarCollapsed, onToggleLeftSidebar, onOpenThread, onOpenArtifact, onOpenFlow, onConfigureProvider }: Props): ReactElement {
   const { t } = useTranslation('common')
   const live=useTaskState(runtimeReady)
   const [templates, setTemplates] = useState<TaskTemplateV1[]>(BUILTIN_TEMPLATES)
@@ -213,6 +248,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
   const [actionBusy, setActionBusy] = useState(false)
   const [inputs, setInputs] = useState<TaskInputV1[]>([])
   const [events, setEvents] = useState<TaskEventV1[]>([])
+  const [receipts, setReceipts] = useState<TaskOperationReceiptV1[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [templateId, setTemplateId] = useState<TaskTemplateId | null>(null)
   const [goal, setGoal] = useState('')
@@ -262,14 +298,16 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
     const generation = ++detailGeneration.current
     setInputs([])
     setEvents([])
+    setReceipts([])
     if (!selectedGroup || !runtimeReady) return
     void Promise.all(selectedGroup.all.map(async task => {
-      const [nextInputs, nextEvents] = await Promise.all([window.workwise.listTaskInputs(task.id), window.workwise.listTaskEvents(task.id)])
-      return { inputs: nextInputs, events: nextEvents }
+      const [nextInputs, nextEvents, nextReceipts] = await Promise.all([window.workwise.listTaskInputs(task.id), window.workwise.listTaskEvents(task.id), window.workwise.listTaskOperationReceipts(task.id)])
+      return { inputs: nextInputs, events: nextEvents, receipts: nextReceipts }
     })).then(results => {
       if (generation === detailGeneration.current) {
         setInputs(results.flatMap(result => result.inputs).sort((a, b) => a.createdAt.localeCompare(b.createdAt)))
         setEvents(results.flatMap(result => result.events).sort((a, b) => a.createdAt.localeCompare(b.createdAt)))
+        setReceipts(results.flatMap(result => result.receipts).sort((a, b) => a.createdAt.localeCompare(b.createdAt)))
       }
     }).catch(nextError => { if (generation === detailGeneration.current) setError(errorMessage(nextError)) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,6 +427,13 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
           {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>
           <ol className="mb-4 space-y-1.5">{(currentExecution ?? selected).nodes.map(node => <li key={node.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1">{node.title}</span><span className="shrink-0 text-ds-muted">{t(`taskNodeStatus_${node.status}`)}</span></li>)}</ol>
+          <TaskExecutionEvidence task={currentExecution ?? selected} relatedTasks={selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]} receipts={receipts.filter(receipt => (selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]).some(task => task.id === receipt.taskId))} onConfigureProvider={onConfigureProvider} onVerify={async receipt => {
+            const owner = selectedGroup?.all.find(task => task.id === receipt.taskId)
+            if (!owner) throw new Error(t('taskEffectReadbackUnconfirmed'))
+            const result = await window.workwise.verifyTaskOperationReceipt(owner.id, receipt.id, { expectedRevision: owner.revision, idempotencyKey: operationKey() })
+            await refresh()
+            return result
+          }} />
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunArtifacts')}</h3>
           {selectedGroup && taskGroupArtifacts(selectedGroup).length ? <ul className="mb-4 space-y-2">{taskGroupArtifacts(selectedGroup).map(({ task: artifactTask, artifact }) => <li key={`${artifactTask.id}:${artifact.id}`} className="rounded-lg border border-ds-border px-3 py-2"><button type="button" onClick={() => void onOpenArtifact(artifactTask, artifact.relativePath)} className="flex w-full items-start gap-2 text-left text-xs text-accent"><FileText className="h-4 w-4 shrink-0" /><span className="break-all">{artifact.relativePath}</span></button><p className="mt-1 text-[11px] text-ds-muted">{t(`taskArtifactValidation_${artifact.validation}`)} · {dateLabel(artifact.createdAt)}</p>{artifact.validationMessage ? <p className="mt-1 text-xs text-ds-muted">{artifact.validationMessage}</p> : null}<TaskArtifactReview task={artifactTask} artifact={artifact} onOpen={() => onOpenArtifact(artifactTask, artifact.relativePath)} /></li>)}</ul> : <p className="mb-4 text-xs text-ds-faint">{t('taskRunNoArtifacts')}</p>}
           {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <form onSubmit={event => { event.preventDefault(); void mutate('input') }} className="mb-4 rounded-xl border border-ds-border bg-ds-main p-3"><label htmlFor="task-supplement" className="text-xs font-semibold">{t('taskWorkspaceSupplement')}</label><textarea id="task-supplement" value={drafts[selected.id] ?? ''} onChange={event => setDrafts(current => ({ ...current, [selected.id]: event.target.value }))} rows={3} placeholder={t('taskWorkspaceSupplementHint')} className="mt-2 block w-full rounded-lg border border-ds-border bg-ds-card p-2 text-sm" /><button type="submit" disabled={actionBusy || !drafts[selected.id]?.trim()} className="mt-2 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{t('taskWorkspaceSendSupplement')}</button></form> : null}

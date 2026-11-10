@@ -19,7 +19,7 @@ export {
 export type UiFontScale = 'small' | 'medium' | 'large'
 export type ScheduleRunMode = 'agent' | 'plan'
 export type ScheduleKind = 'manual' | 'interval' | 'daily' | 'at'
-export type ScheduleTaskStatus = 'idle' | 'running' | 'success' | 'error'
+export type ScheduleTaskStatus = 'idle' | 'running' | 'waiting_user' | 'success' | 'error'
 export type ScheduleModel = 'auto' | 'deepseek-flash' | 'deepseek-v4-pro' | 'deepseek-v4-flash'
 export type ScheduleReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max'
 export type ClawRunMode = ScheduleRunMode
@@ -337,6 +337,8 @@ export type ScheduledTaskV1 = {
   lastStatus: ScheduleTaskStatus
   lastMessage: string
   lastThreadId: string
+  /** Runtime task that owns an occurrence blocked before it could create a Turn. */
+  runtimeTaskId?: string
 }
 
 export type ScheduleInternalSettingsV1 = {
@@ -554,7 +556,7 @@ export type ClawRunResult =
 
 export type ScheduleRunResult =
   | ClawRunSuccessV1
-  | { ok: false; message: string }
+  | { ok: false; message: string; status?: 'waiting_user'; threadId?: string; taskId?: string; attentionId?: string }
 
 export type ScheduleTaskFromTextResult =
   | { kind: 'noop' }

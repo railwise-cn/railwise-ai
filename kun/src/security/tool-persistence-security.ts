@@ -1,4 +1,5 @@
 import { isAbsolute, relative, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
 import type { RuntimeEvent } from '../contracts/events.js'
 import type { TurnItem } from '../contracts/items.js'
 import { redactSecrets, redactSecretText } from '../config/secret-redaction.js'
@@ -52,6 +53,39 @@ export function buildToolArgumentSummary(input: {
   const toolName = safeToolName(input.toolName)
   const args = input.arguments
   const lines = [`Run ${toolName}`]
+  if (toolName === 'request_host_shell') {
+    const command = typeof args.command === 'string' && args.command.length <= 1024 ? args.command : ''
+    const workspace = typeof input.workspace === 'string' && input.workspace.length <= 2048 ? input.workspace : ''
+    if (!command.trim() || !workspace) return [...lines, 'Authority: Invalid command or workspace; authorization cannot be recorded'].join('\n')
+    const digest = (value: string) => createHash('sha256').update(value).digest('hex')
+    return [...lines,
+      'Authority: Full host access for this exact command only; workspace trust remains unchanged',
+      `Workspace (JSON): ${JSON.stringify(redactSecretText(workspace))}`,
+      `Workspace SHA256: ${digest(workspace)}`,
+      `Command (JSON): ${JSON.stringify(redactSecretText(command))}`,
+      `Command SHA256: ${digest(command)}`,
+      `Request SHA256: ${digest(JSON.stringify(args))}`,
+      `Lifetime seconds: ${Number.isSafeInteger(args.ttl_seconds) ? args.ttl_seconds : 60}`,
+      `Timeout seconds: ${Number.isSafeInteger(args.timeout_seconds) ? args.timeout_seconds : 60}`,
+      'Session: Read output or stop only; no stdin writes, connector proxy or automatic replay'
+    ].join('\n')
+  }
+  if (toolName === 'confirm_external_effect_scope') {
+    const effects = Array.isArray(args.effects) ? args.effects : []
+    if (effects.length < 1 || effects.length > 8) return boundSummary([...lines, 'Scope: Invalid action set; no confirmation can be recorded'])
+    lines.push(`Scope: Entire task is limited to these ${effects.length} actions`)
+    if (Number.isSafeInteger(args.expected_revision) && Number(args.expected_revision) >= 0) lines.push(`Effect scope revision: ${args.expected_revision}`)
+    for (const [index, effect] of effects.entries()) {
+      const item = effect && typeof effect === 'object' ? effect as Record<string, unknown> : {}
+      const name = typeof item.tool_name === 'string' ? item.tool_name : ''
+      const provider = name.startsWith('lark_') ? 'lark' : name.startsWith('dingtalk_') ? 'dingtalk' : ''
+      const operation = /^(?:lark_(?:task|approval)_get|dingtalk_get_(?:task|approval))$/.test(name) ? 'detail' : name === 'dingtalk_complete_task' ? 'complete' : name.split('_').at(-1)
+      const target = safeConnectorId(item.target)
+      if (!provider || !operation || !['detail', 'approve', 'reject', 'complete', 'transfer'].includes(operation) || !target || target.length > 64) return boundSummary([lines[0]!, 'Scope: Invalid action set; no confirmation can be recorded'])
+      lines.push(`Action ${index + 1}: ${provider} ${operation} ${target}`)
+    }
+    return boundSummary(lines)
+  }
   if (TYPED_CONNECTOR_TOOLS.has(toolName)) {
     lines.push('Provider: lark')
     lines.push(`Action: ${toolName.split('_').at(-1)}`)
@@ -257,10 +291,24 @@ function normalizeArgumentSummary(toolName: string, summary: string | undefined)
   if (!summary?.trim()) {
     return buildToolArgumentSummary({ toolName, arguments: {} })
   }
+  if (toolName === 'request_host_shell') {
+    const lines = summary.split(/\r?\n/)
+    const valid = lines.length === 10 && lines[0] === 'Run request_host_shell'
+      && lines[1] === 'Authority: Full host access for this exact command only; workspace trust remains unchanged'
+      && /^Workspace \(JSON\): ".*"$/.test(lines[2]!) && /^Workspace SHA256: [a-f0-9]{64}$/.test(lines[3]!)
+      && /^Command \(JSON\): ".*"$/.test(lines[4]!) && /^Command SHA256: [a-f0-9]{64}$/.test(lines[5]!)
+      && /^Request SHA256: [a-f0-9]{64}$/.test(lines[6]!) && /^Lifetime seconds: [0-9]{1,3}$/.test(lines[7]!)
+      && /^Timeout seconds: [0-9]{1,3}$/.test(lines[8]!)
+      && lines[9] === 'Session: Read output or stop only; no stdin writes, connector proxy or automatic replay'
+      && summary.length <= 32_000
+    return valid ? lines.map(redactSecretText).join('\n') : 'Run request_host_shell\nAuthority: Invalid reviewed scope; authorization cannot be recorded'
+  }
   const lines = [`Run ${safeToolName(toolName)}`]
   for (const rawLine of summary.split(/\r?\n/).slice(1, 12)) {
     const line = rawLine.trim()
-    if (TYPED_CONNECTOR_TOOLS.has(toolName) && (/^Provider: lark$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance): [A-Za-z0-9_.:-]{1,512}$/.test(line))) {
+    if (toolName === 'confirm_external_effect_scope' && (/^Scope: Entire task is limited to these [1-8] actions$/.test(line) || /^Effect scope revision: [0-9]+$/.test(line) || /^Action [1-8]: (?:lark|dingtalk) (?:detail|approve|reject|complete|transfer) [A-Za-z0-9_.:-]{1,64}$/.test(line))) {
+      lines.push(redactSecretText(line))
+    } else if (TYPED_CONNECTOR_TOOLS.has(toolName) && (/^Provider: lark$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance): [A-Za-z0-9_.:-]{1,512}$/.test(line))) {
       lines.push(line)
     } else if (/^Target: <(?:workspace|outside-workspace|absolute-path|relative-path-outside-workspace)>/i.test(line)) {
       lines.push(clip(redactSecretText(line), MAX_SAFE_PATH_CHARS + 8))

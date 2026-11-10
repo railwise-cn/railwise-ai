@@ -11,13 +11,14 @@ import type { TaskContextRuntime } from './task-context-runtime.js'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import { WorkspaceReferenceService } from './workspace-reference-service.js'
 import { TaskControlService } from './task-control-service.js'
-import { preflightExternalTask, externalTaskIntent, type ExternalTaskCapability } from './external-task-capability.js'
+import { preflightExternalTask, externalTaskIntent, externalProviderAmbiguity, type ExternalTaskPreflight } from './external-task-capability.js'
+import { externalPreflightThreadContext } from './contextual-external-task-preflight.js'
 
 export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
   private flushingMessages = false
   private readonly controls:TaskControlService
-  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: (text:string) => ExternalTaskCapability | null | Promise<ExternalTaskCapability | null>; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
+  constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
   async command(raw: TaskCommand): Promise<TaskCommandResult> {
     const command = TaskCommandSchema.parse(raw)
     const queueKey = `${command.threadId}:${command.idempotencyKey}`
@@ -29,7 +30,7 @@ export class TaskCoordinator {
   }
   private resolveTask(threadId:string, taskId?:string):TaskRun|null {
     if(taskId) return this.deps.repository.currentExecution(taskId)
-    return this.deps.repository.findActiveByOrigin(threadId)
+    return this.deps.repository.findActiveByOrigin(threadId) ?? this.deps.repository.findActiveByThread(threadId)
   }
   private async execute(command: ReturnType<typeof TaskCommandSchema.parse>): Promise<TaskCommandResult> {
     const origin = await this.deps.threads.get(command.threadId)
@@ -38,15 +39,32 @@ export class TaskCoordinator {
     if(task && task.workspaceRoot !== origin.workspace) throw Object.assign(new Error('task belongs to another workspace'),{code:'scope_conflict'})
     const userText = command.request.displayText ?? command.request.prompt
     let intent = command.intent === 'auto' ? classifyTaskInput(userText,Boolean(task)) : command.intent
-    if(intent==='status') { const result:TaskCommandResult={kind:'snapshot',task}; await this.recordResult(command,result); return result }
+    // An explicit chat hint cannot bypass provider admission for an action.
+    if (intent === 'chat' && externalTaskIntent(userText)) intent = 'new'
+    if(intent==='status') return {kind:'snapshot',task}
     const resolving = command.resolveAttentionId ? this.deps.repository.attention(command.resolveAttentionId) : null
     if (command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
-      !(resolving.payload?.kind === 'task_input_intent' && ['supplement','new'].includes(intent) ||
+      !(resolving.payload?.kind === 'task_input_intent' && ['supplement','new'].includes(intent) &&
+          (!Array.isArray(resolving.payload.choices) || resolving.payload.choices.includes(intent)) ||
+        resolving.payload?.kind === 'external_provider_choice' && intent === 'new' && command.selectedExternalProvider && !externalProviderAmbiguity(userText) && externalTaskIntent(userText)?.provider === command.selectedExternalProvider ||
         resolving.payload?.kind === 'capability_required' && intent === 'resume' && resolving.taskId === task?.id))) {
       throw Object.assign(new Error('attention decision does not match this task command'), {code:'scope_conflict'})
     }
+    if (command.selectedExternalProvider && resolving?.payload?.kind !== 'external_provider_choice') throw Object.assign(new Error('Provider selection requires its original pending decision.'), { code: 'scope_conflict' })
     const receipt = this.deps.repository.execution.command(command.threadId,command.idempotencyKey,command)
     if(receipt.result) { const result=receipt.result as TaskCommandResult;await this.recordResult(command,result);return result }
+    if (externalProviderAmbiguity(userText) && !['pause', 'resume', 'cancel'].includes(intent)) {
+      const id = `provider_choice_${createHash('sha256').update(`${command.threadId}:${command.idempotencyKey}`).digest('hex').slice(0,32)}`
+      const now = this.deps.nowIso()
+      const message = '这条请求同时涉及钉钉和飞书。请先选择一个平台，并将请求明确为该平台的独立任务；原任务和请求会保留。'
+      this.deps.repository.putAttention({ id, ownerKind:'task', ownerId:task?.id ?? origin.id, ...(task ? { taskId:task.id } : {}), threadId:origin.id, workspaceRoot:origin.workspace,
+        kind:'question', title:'选择本次执行的平台', message, status:'pending', revision:0, createdAt:now, updatedAt:now,
+        payload:{ kind:'external_provider_choice', providers:['dingtalk','lark'], request:command.request, originalText:userText } })
+      const result:TaskCommandResult = { kind:'attention_required', ...(task ? {task} : {}), attentionId:id, message }
+      this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
+      await this.recordResult(command,result)
+      return result
+    }
     if (intent === 'ambiguous' && task && this.deps.classifyIntent) {
       try { intent = await this.deps.classifyIntent(userText,task) } catch { /* uncertainty remains a durable human decision */ }
     }
@@ -74,10 +92,30 @@ export class TaskCoordinator {
     else if(intent==='supplement') {
       if(!task) result={kind:'attention_required',message:'没有可接收补充的任务，请选择任务或新建任务。'}
       else {
-        await this.validateReferences(command,origin.workspace,task.threadId)
-        const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences})
-        // The durable queue is authoritative; no in-memory steering acknowledgement.
-        result={kind:'input_queued',task:saved.task,input:saved.input}
+        const executionThread = await this.deps.threadStore.get(task.threadId)
+        if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
+        const capability = this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(userText, executionThread) : preflightExternalTask(userText)
+        const providerChanged = capability && task.acceptance.effect?.provider !== capability.provider
+        const activeTurn = task.activeTurnId
+          ? (await this.deps.threadStore.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)
+          : undefined
+        const providerId = capability?.provider === 'lark' ? 'lark-cli' : capability?.provider === 'dingtalk' ? 'dingtalk' : undefined
+        const outsideActiveGrant = providerId && task.status === 'running' && !activeTurn?.executionGrant?.allowedProviderIds?.includes(providerId)
+        if (capability && (capability.status !== 'available' || providerChanged || outsideActiveGrant)) {
+          const attentionId = `capability_${task.id}_${createHash('sha256').update(command.idempotencyKey).digest('hex').slice(0,12)}`
+          const now = this.deps.nowIso()
+          const message = `${capability.status !== 'available' ? capability.message : '此补充引入了原任务之外的外部平台操作。'} 请为这条请求新建独立任务，保留原任务及其权限范围。`
+          this.deps.repository.putAttention({ id: attentionId, ownerKind:'task', ownerId:task.id, taskId:task.id,
+            threadId:origin.id, workspaceRoot:origin.workspace, kind:'blocked', title:'补充请求需要连接器授权',
+            message, status:'pending', revision:0, createdAt:now, updatedAt:now,
+            payload:{kind:'task_input_intent',capability,request:command.request,text:userText,choices:['new']} })
+          result={kind:'attention_required',task,attentionId,message}
+        } else {
+          await this.validateReferences(command,origin.workspace,task.threadId)
+          const saved=this.deps.tasks.appendInput(task.id,command.expectedRevision ?? task.revision,command.idempotencyKey,userText,'supplement',undefined,{attachmentIds:command.request.attachmentIds,workspaceReferences:command.request.workspaceReferences})
+          // The durable queue is authoritative; no in-memory steering acknowledgement.
+          result={kind:'input_queued',task:saved.task,input:saved.input}
+        }
       }
     } else {
       const isTask=intent==='new'
@@ -88,9 +126,9 @@ export class TaskCoordinator {
         const created=await this.deps.threads.create({workspace:origin.workspace,model:command.request.model ?? origin.model,mode:origin.mode,approvalPolicy:origin.approvalPolicy,sandboxMode:origin.sandboxMode,domain:origin.domain,projectId:origin.projectId},{id:executionThreadId,title:command.request.prompt.slice(0,100)})
         await this.deps.threadStore.upsert({...created,relation:'side',parentThreadId:origin.id,agentId:origin.agentId,agentRevision:origin.agentRevision,agentProfile:origin.agentProfile})
       }
-      const capability = isTask ? await (this.deps.preflightExternalTask ?? preflightExternalTask)(userText) : null
+      const executionThread = (await this.deps.threads.get(executionThreadId))!
+      const capability = isTask ? this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(userText, externalPreflightThreadContext(executionThread, command.request)) : preflightExternalTask(userText) : null
       if (capability && capability.status !== 'available') {
-        const executionThread = (await this.deps.threads.get(executionThreadId))!
         const waiting = this.deps.tasks.createWaitingTask({ id: `task_capability_${suffix}`, thread: executionThread,
           request: { ...command.request, taskIntent: 'new', taskVisibility: 'task', taskOriginThreadId: origin.id }, reason: capability.message })
         const attentionId = `capability_${waiting.id}`
@@ -100,13 +138,14 @@ export class TaskCoordinator {
           status: 'pending', revision: 0, createdAt: now, updatedAt: now,
           payload: { kind: 'capability_required', capability, request: command.request } })
         result = { kind: 'capability_required', task: waiting, attentionId, capability, message: capability.message }
+        if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:now})
         this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
         await this.recordResult(command, result)
         return result
       }
       const turnKey=`command:${command.idempotencyKey}`
       const oldTurn=(await this.deps.threads.get(executionThreadId))?.turns.find(turn=>turn.idempotencyKey===turnKey)
-      const turn=await this.deps.turns.startTurn({threadId:executionThreadId,request:{...command.request,idempotencyKey:turnKey,taskIntent:isTask?'new':undefined,taskVisibility:isTask?'task':'chat',...(isTask?{taskOriginThreadId:origin.id}:{})}})
+      const turn=await this.deps.turns.startTurn({threadId:executionThreadId,...(capability?.status==='available'?{externalTaskProvider:capability.provider}:{}),request:{...command.request,idempotencyKey:turnKey,taskIntent:isTask?'new':undefined,taskVisibility:isTask?'task':'chat',...(isTask?{taskOriginThreadId:origin.id}:{})}})
       const linked=this.deps.repository.findByTurn(turn.turnId)
       if (linked && isTask) this.deps.context?.subscribeTask(linked, origin.id)
       result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:linked}:{}),turn}
@@ -162,7 +201,7 @@ export function classifyTaskInput(text:string,hasTask:boolean):'status'|'supplem
   if(/^(?:新建(?:一个)?任务|另(?:起|开)(?:一个)?任务|独立任务|new task)/i.test(value)) return 'new'
   if(hasTask && /^(?:再(?:加|补)|补充|另外(?:加|补)|继续|请继续|还需要|把.*(?:也|一并)|also |add |continue\b)/i.test(value)) return 'supplement'
   if(externalTaskIntent(value)) return 'new'
-  if(/^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|什么是|how\s|what\s|explain)/i.test(value)) return 'chat'
+  if(/^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|什么是|对比|比较|how\s|what\s|explain|compare\b)/i.test(value)) return 'chat'
   if(!hasTask) return /(?:报告|投标|交付|文档|实现|完成.*计划|调研|research|implement|deliver|report|钉钉|飞书|dingtalk|lark|feishu).*(?:待办|审批|任务|工单|处理|todo|approval|task)|(?:处理|完成|查询|列出).*(?:钉钉|飞书|dingtalk|lark|feishu)/i.test(value)?'new':/(?:报告|投标|交付|文档|实现|完成.*计划|调研|research|implement|deliver|report)/i.test(value)?'new':'chat'
   return 'ambiguous'
 }

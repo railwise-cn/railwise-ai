@@ -32,6 +32,8 @@ describe('production preload task API and main IPC contract', () => {
     await api.listTaskPage({ filter: 'ongoing', workspaceRoot: '/workspace', threadId: 'origin_1', search: '报告', limit: 50 })
     await api.listTaskRuns({ threadId: 'origin_1', status: 'running', workspaceRoot: '/workspace', search: '报告', limit: 100, offset: 2, cursor })
     await api.getTaskRun('task_1')
+    await api.listTaskOperationReceipts('task_1')
+    await api.verifyTaskOperationReceipt('task_1', 'receipt_1', mutation)
     await api.resumeTask('task_1', mutation)
     await api.retryTask('task_1', mutation)
     await api.cancelTask('task_1', mutation)
@@ -47,6 +49,8 @@ describe('production preload task API and main IPC contract', () => {
     await api.listShellSessions('task_1')
     await api.terminateShellSession('shell_1', { expectedRevision: 1, idempotencyKey: 'terminate-1' })
     expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks?pagination=cursor&filter=all&limit=200', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts', method: 'GET' })
+    expect(bridge.invoke).toHaveBeenCalledWith('runtime:request', { path: '/v1/tasks/task_1/receipts/receipt_1/verify', method: 'POST', body: JSON.stringify(mutation) })
   })
 
   it('passes real chat/model and candidate review commands, and the aggregate task stream, through their typed boundaries', async () => {

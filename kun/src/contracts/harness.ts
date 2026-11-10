@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { ApprovalPolicySchema, SandboxModeSchema } from './policy.js'
+import { WorkspaceTrustLevelSchema } from './permissions.js'
 
 export const ExternalTaskProviderSchema = z.enum(['dingtalk', 'lark'])
 export type ExternalTaskProvider = z.infer<typeof ExternalTaskProviderSchema>
@@ -16,9 +18,14 @@ export const CapabilityPreflightSchema = z.object({
   provider: ExternalTaskProviderSchema,
   status: z.enum(['available', 'not_installed', 'needs_authorization', 'unsupported', 'blocked']),
   message: z.string(), errorCode: z.string().optional(), toolId: z.string().optional(), executablePath: z.string().optional(),
+  requiredScopes: z.array(z.string().min(1)).optional(),
   credentialState: z.enum(['missing', 'invalid', 'valid', 'unknown']), networkState: z.enum(['available', 'blocked', 'unknown']),
   workspaceState: z.enum(['allowed', 'blocked', 'unknown']), sandboxState: z.enum(['allowed', 'blocked']),
   approvalState: z.enum(['not_required', 'required', 'denied']),
+  executionContext: z.object({
+    workspaceRoot: z.string(), workspaceTrust: WorkspaceTrustLevelSchema, agentTrust: WorkspaceTrustLevelSchema,
+    sandboxMode: SandboxModeSchema, approvalPolicy: ApprovalPolicySchema, availableTools: z.array(z.string()).max(256).optional()
+  }).optional(),
   action: ResolutionSchema.optional(), resolution: ResolutionSchema.optional(), checkedAt: z.string()
 })
 export type CapabilityPreflight = z.infer<typeof CapabilityPreflightSchema>

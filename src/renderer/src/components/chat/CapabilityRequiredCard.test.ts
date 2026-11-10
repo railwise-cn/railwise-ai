@@ -30,7 +30,7 @@ function button(label: string): HTMLButtonElement {
   return result
 }
 async function render(value = card): Promise<void> {
-  await act(async () => { root.render(createElement(CapabilityRequiredCard, { card: value })) })
+  await act(async () => { root.render(createElement(CapabilityRequiredCard, { key: JSON.stringify(value.capability), card: value })) })
 }
 async function click(label: string): Promise<void> {
   await act(async () => { button(label).click(); await Promise.resolve(); await Promise.resolve() })
@@ -67,6 +67,47 @@ describe('capability waiting card', () => {
     expect(api.installManagedTool).toHaveBeenCalledWith('lark-cli')
     expect(container.textContent).toContain('已安装，需要登录授权')
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('routes a blocked task policy to settings rather than the connector marketplace', async () => {
+    await render({...card, capability:{...card.capability,status:'blocked',errorCode:'approval_policy_blocked',
+      resolution:{kind:'grant',route:'settings',label:'调整任务审批策略'}}})
+    await click('调整任务审批策略')
+    expect(state.openSettings).toHaveBeenCalledWith('general')
+    expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+  })
+
+  it('routes Agent scope inspection and workspace selection to their specific controls', async () => {
+    await render({...card, capability:{...card.capability,status:'blocked',errorCode:'agent_tool_blocked',
+      resolution:{kind:'grant',route:'settings/agents',label:'检查 Agent 工具范围'}}})
+    await click('检查 Agent 工具范围')
+    expect(state.openSettings).toHaveBeenCalledWith('agents')
+    await render({...card, capability:{...card.capability,status:'blocked',
+      resolution:{kind:'switch_workspace',route:'workspace',label:'选择工作区'}}})
+    await click('选择工作区')
+    expect(state.chooseWorkspace).toHaveBeenCalledWith({createThreadAfter:false,selectThreadAfter:false})
+    expect(state.openPlugins).not.toHaveBeenCalled()
+  })
+
+  it('keeps DingTalk configuration in General and honors an explicit marketplace route for Lark', async () => {
+    await render({...card, capability:{provider:'dingtalk',status:'needs_authorization',message:'缺少钉钉凭据',
+      resolution:{kind:'connect',route:'settings/mcp',label:'配置钉钉连接'}}})
+    await click('配置钉钉连接')
+    expect(state.openSettings).toHaveBeenCalledWith('general')
+    await render({...card, capability:{...card.capability,resolution:{kind:'connect',route:'marketplace',label:'连接飞书'}}})
+    await click('连接飞书')
+    expect(state.openPlugins).toHaveBeenCalledOnce()
+  })
+
+  it('shows actual authority limits without advertising hidden execution identities', async () => {
+    await render({ ...card, capability: { ...card.capability, executionContext: {
+      workspaceRoot: '/workspace/project', workspaceTrust: 'read-only', agentTrust: 'workspace-write', sandboxMode: 'read-only', approvalPolicy: 'never', availableTools: []
+    } } })
+    expect(container.textContent).toContain('工作区信任')
+    expect(container.textContent).toContain('从不执行')
+    expect(container.textContent).toContain('无可用工具')
+    expect(container.textContent).not.toContain('thread-original')
   })
 
   it('keeps login and resume separate and resumes the original persisted task', async () => {

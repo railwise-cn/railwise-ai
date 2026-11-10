@@ -4,7 +4,7 @@ import type { DingTalkCapabilityConfig, DingTalkCredential } from '../../contrac
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import type { LocalTool } from './local-tool-host.js'
-import { assertGrantAllowsNetwork, assertGrantConnectorScopes } from './sandbox-policy.js'
+import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes } from './sandbox-policy.js'
 
 const API = 'https://api.dingtalk.com'
 export const DINGTALK_SCOPES = {
@@ -57,6 +57,7 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
     const url=new URL(path,API)
     if(url.origin!==API)throw new RemoteFailure('network_scope_blocked',false)
     assertGrantAllowsNetwork(url.href,context)
+    context.assertExecution?.()
     let response:Response
     try { response=await fetcher(url,{method,redirect:'error',headers:{'content-type':'application/json','x-acs-dingtalk-access-token':credential.accessToken},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.any([context.abortSignal,AbortSignal.timeout(30_000)])}) }
     catch { throw new RemoteFailure('connector_network_failed',write) }
@@ -83,10 +84,16 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
     async execute(raw,context){
       try {
         const args=schema.parse(raw) as Json
+        const operation=name==='dingtalk_complete_task'?'complete':name==='dingtalk_approve'?'approve':name==='dingtalk_reject'?'reject':name==='dingtalk_transfer'?'transfer':undefined
+        const target=typeof args.taskId==='string'?args.taskId:typeof args.instanceId==='string'?args.instanceId:'current_user'
+        if(operation)assertGrantAllowsExternalTarget('dingtalk',operation,target,context)
         const credential=await credentialFor(workflow,scopes,context,write)
         // Context cancellation is checked again immediately before entering adapter logic.
         context.abortSignal.throwIfAborted()
-        return await execute(args,credential,context)
+        return await execute(args,credential,{...context,assertExecution:()=>{
+          context.assertExecution?.()
+          if(operation)assertGrantAllowsExternalTarget('dingtalk',operation,target,context)
+        }})
       }catch(error){
         const remote=error instanceof RemoteFailure?error:undefined
         const code=remote?.code ?? (error && typeof error==='object'&&'code'in error?String(error.code):error instanceof z.ZodError?'connector_invalid_arguments':'connector_failed')
@@ -98,7 +105,7 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
     build('dingtalk_list_tasks','查询当前授权钉钉用户的待办列表；不执行审批。',list,false,[DINGTALK_SCOPES.todoRead],false,async(args,credential,context)=>{
       const response=await request('POST',`/v1.0/todo/users/${escaped(credential.unionId)}/tasks/list`,credential,context,{isDone:false,...(args.nextToken?{nextToken:args.nextToken}:{})})
       if(!Array.isArray(response.todoCards))throw new RemoteFailure('connector_invalid_response',false)
-      return finish('list',credential.unionId,response,'read')
+      return finish('list','current_user',response,'read')
     }),
     build('dingtalk_get_task','查询指定钉钉待办详情。',todo,false,[DINGTALK_SCOPES.todoRead],false,async(args,credential,context)=>{
       const response=await request('GET',`/v1.0/todo/users/${escaped(credential.unionId)}/tasks/${escaped(String(args.taskId))}`,credential,context)
@@ -121,7 +128,7 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
     build('dingtalk_list_approvals','查询通过钉钉流程中心集成的 OA 待办（不是个人全部审批收件箱）。需要企业内部应用 qyapi_aflow 权限。',integratedList,true,[DINGTALK_SCOPES.integratedRead],false,async(args,credential,context)=>{
       const response=await request('GET',`/v1.0/workflow/processCentres/todoTasks?userId=${escaped(config.userId!)}&pageNumber=${args.pageNumber}&pageSize=${args.pageSize}`,credential,context)
       if(!response.result||!Array.isArray(object(response.result).list))throw new RemoteFailure('connector_invalid_response',false)
-      return finish('list',config.userId!,response,'read')
+      return finish('list','current_user',response,'read')
     }),
     build('dingtalk_get_approval','读取指定钉钉审批实例与节点状态。',approval,true,[DINGTALK_SCOPES.workflowRead],false,async(args,credential,context)=>{
       const response=await readInstance(String(args.instanceId),credential,context)

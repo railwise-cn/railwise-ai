@@ -112,6 +112,7 @@ export class TurnService {
   async startTurn(input: {
     threadId: string
     request: StartTurnRequest
+    externalTaskProvider?: 'dingtalk' | 'lark'
     engineeringExecution?: boolean
     engineeringPlanId?: string
     continuationTaskId?: string
@@ -439,6 +440,7 @@ export class TurnService {
   private async startTurnInternal(input: {
     threadId: string
     request: StartTurnRequest
+    externalTaskProvider?: 'dingtalk' | 'lark'
     engineeringExecution?: boolean
     engineeringPlanId?: string
     continuationTaskId?: string
@@ -456,7 +458,7 @@ export class TurnService {
             code: 'idempotency_conflict'
           })
         }
-        if (!sameIdempotentTurnRequest(existing, input.request)) {
+        if (!sameIdempotentTurnRequest(existing, input.request, input.externalTaskProvider)) {
           throw Object.assign(new Error('idempotency key is already bound to a different Turn request'), {
             code: 'idempotency_conflict'
           })
@@ -500,6 +502,7 @@ export class TurnService {
       id: turnId,
       threadId: input.threadId,
       prompt: input.request.prompt,
+      externalTaskProvider: input.externalTaskProvider,
       engineeringExecution: input.engineeringExecution,
       engineeringPlanId: input.engineeringPlanId,
       model: input.request.model,
@@ -768,6 +771,7 @@ export class TurnService {
     patch: Pick<
       Partial<Turn>,
       | 'executionGrant'
+      | 'hostShellAuthorizations'
       | 'activeSkillIds'
       | 'injectedMemoryIds'
       | 'skillInjectionBytes'
@@ -783,6 +787,7 @@ export class TurnService {
           ? {
               ...turn,
               ...(patch.executionGrant ? { executionGrant: patch.executionGrant } : {}),
+              ...(patch.hostShellAuthorizations ? { hostShellAuthorizations: [...new Map([...(turn.hostShellAuthorizations ?? []), ...patch.hostShellAuthorizations].map(value => [value.id, value])).values()] } : {}),
               ...(patch.activeSkillIds ? { activeSkillIds: [...patch.activeSkillIds] } : {}),
               ...(patch.injectedMemoryIds ? { injectedMemoryIds: [...patch.injectedMemoryIds] } : {}),
               ...(patch.skillInjectionBytes !== undefined ? { skillInjectionBytes: patch.skillInjectionBytes } : {}),
@@ -1000,6 +1005,7 @@ function uiActionTaskLabel(action: UiActionAudit): string {
 function sameIdempotentTurnRequest(
   existing: {
     prompt: string
+    externalTaskProvider?: 'dingtalk' | 'lark'
     model?: string
     providerId?: string
     reasoningEffort?: string
@@ -1010,12 +1016,14 @@ function sameIdempotentTurnRequest(
     mode?: string
     disableUserInput?: boolean
   },
-  request: StartTurnRequest
+  request: StartTurnRequest,
+  externalTaskProvider?: 'dingtalk' | 'lark'
 ): boolean {
   // These fields are persisted on the Turn and define the work a retry would
   // execute. displayText is intentionally excluded because it is presentation
   // metadata and does not change the requested operation.
   return existing.prompt === request.prompt
+    && (existing.externalTaskProvider ?? '') === (externalTaskProvider ?? '')
     && (request.model === undefined || existing.model === request.model)
     && (request.providerId === undefined || existing.providerId === request.providerId)
     && (request.reasoningEffort === undefined || (existing.reasoningEffort ?? 'auto') === request.reasoningEffort)

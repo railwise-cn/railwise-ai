@@ -29,6 +29,10 @@ describe('0.3.0 Agent workbench public API contracts', () => {
       .toContain('/v1/shell-sessions')
     expect(() => runtimeRequestPayloadSchema.parse({ path: '/v1/tasks/task_1/resume', method: 'GET' }))
       .toThrow(/not allowed/)
+    expect(runtimeRequestPayloadSchema.parse({ path: '/v1/tasks/task_1/receipts', method: 'GET' }).path)
+      .toBe('/v1/tasks/task_1/receipts')
+    expect(() => runtimeRequestPayloadSchema.parse({ path: '/v1/tasks/task_1/receipts', method: 'POST' }))
+      .toThrow(/not allowed/)
   })
 
   it('requires revisions and idempotency keys at mutable IPC boundaries', () => {

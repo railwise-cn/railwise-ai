@@ -403,4 +403,41 @@ describe('task coordinator before ordinary chat turns', () => {
       expect(coordinateTaskCommand).toHaveBeenCalledTimes(1)
     } finally { vi.unstubAllGlobals() }
   })
+
+  it('routes Write requests through preflight and preserves an actionable capability card without creating a Turn', async () => {
+    const { actions, state } = buildHarness()
+    state.route = 'write'
+    state.ensureWriteThreadForWorkspace = vi.fn(async () => 'thr_existing')
+    state.composerProviderId = 'default'
+    const capability = {provider:'lark',status:'needs_authorization',message:'需要飞书登录授权'}
+    const coordinateTaskCommand = vi.fn(async () => ({kind:'capability_required',task:{id:'waiting-task'},attentionId:'waiting-attention',message:capability.message,capability}))
+    const sendUserMessage = vi.fn()
+    registryMock.getProvider.mockReturnValue({sendUserMessage})
+    vi.stubGlobal('window',{workwise:{coordinateTaskCommand}})
+    try {
+      expect(await actions.sendMessage('帮我处理飞书待办')).toBe(true)
+      expect(coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({threadId:'thr_existing',intent:'auto',request:expect.objectContaining({displayText:'帮我处理飞书待办'})}))
+      expect(state.blocks.at(-1)).toMatchObject({kind:'assistant',capabilityCard:{threadId:'thr_existing',taskId:'waiting-task',attentionId:'waiting-attention',capability}})
+      expect(state.queuedMessages).toEqual([])
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(state.recoverActiveTurn).not.toHaveBeenCalled()
+    } finally {vi.unstubAllGlobals()}
+  })
+
+  it('handles a Write platform decision as a durable local result rather than a fake Turn', async () => {
+    const { actions, state } = buildHarness()
+    state.route = 'write'
+    state.ensureWriteThreadForWorkspace = vi.fn(async () => 'thr_existing')
+    state.composerProviderId = 'default'
+    const coordinateTaskCommand = vi.fn(async () => ({kind:'attention_required',attentionId:'provider-choice',message:'请先选择本次执行的平台'}))
+    const sendUserMessage = vi.fn()
+    registryMock.getProvider.mockReturnValue({sendUserMessage})
+    vi.stubGlobal('window',{workwise:{coordinateTaskCommand}})
+    try {
+      expect(await actions.sendMessage('处理钉钉和飞书待办')).toBe(true)
+      expect(state.blocks.at(-1)).toMatchObject({kind:'assistant',text:'请先选择本次执行的平台'})
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(state.queuedMessages).toEqual([])
+    } finally {vi.unstubAllGlobals()}
+  })
 })

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { StartTurnRequest } from '../../contracts/turns.js'
 import { taskFeedResponse } from '../../services/task-view-service.js'
 import { taskCommand } from './task-commands.js'
 import { registerSurveyCollaborationRoutes } from './survey-collaboration.js'
@@ -73,7 +75,9 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { appendTaskInput, cancelTask, getTask, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { appendTaskInput, cancelTask, getTask, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { externalProviderAmbiguity } from '../../services/external-task-capability.js'
+import { classifyTaskInput } from '../../services/task-coordinator.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
 import { startUiAction } from './ui-actions.js'
 import * as engineeringRoutes from './engineering.js'
@@ -186,6 +190,16 @@ export function buildRouter(runtime: ServerRuntime): Router {
     if (request.body) return ERRORS.validation('DingTalk refresh does not accept a request body')
     try { return jsonResponse(await runtime.refreshDingTalk()) }
     catch { return jsonResponse({ code: 'connector_refresh_failed', message: '无法读取或验证钉钉连接器配置，请检查本机配置和加密凭据后重试。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/lark/refresh', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.refreshLark) return ERRORS.unavailable('managed Lark connector refresh is unavailable')
+    if (request.headers.get('content-length') && Number(request.headers.get('content-length')) !== 0) {
+      return ERRORS.validation('Lark refresh does not accept a request body')
+    }
+    if (request.body) return ERRORS.validation('Lark refresh does not accept a request body')
+    try { return jsonResponse(await runtime.refreshLark()) }
+    catch { return jsonResponse({ code: 'connector_refresh_failed', message: '无法读取飞书连接器配置，请检查本机配置后重试。' }, 409) }
   })
   router.add('GET', '/v1/engineering/projects', async (request) => authorize(request, runtime) ? engineeringRoutes.listProjects(runtime.engineeringService) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/projects', async (request) => authorize(request, runtime) ? engineeringRoutes.createProject(runtime.engineeringService, request) : ERRORS.unauthorized())
@@ -356,6 +370,10 @@ export function buildRouter(runtime: ServerRuntime): Router {
   })
   router.add('GET', '/v1/inbox', async request => authorize(request, runtime) ? getTaskInbox(runtime, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/events', async (request, ctx) => authorize(request, runtime) ? getTaskEvents(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/receipts', async (request, ctx) => authorize(request, runtime) ? getTaskOperationReceipts(runtime, ctx.params.id) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? getTaskPermissions(runtime, ctx.params.id) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? confirmTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())
+  router.add('POST', '/v1/tasks/:id/receipts/:receipt/verify', async (request, ctx) => authorize(request, runtime) ? verifyTaskOperationReceipt(runtime, ctx.params.id, ctx.params.receipt, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/stream', (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     if (!runtime.taskRepository?.get(ctx.params.id)) return ERRORS.notFound('task not found')
@@ -452,6 +470,36 @@ export function buildRouter(runtime: ServerRuntime): Router {
   })
   router.add('POST', '/v1/threads/:id/turns', async (request, ctx) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    const body = await request.clone().json().catch(() => undefined)
+    const parsed = StartTurnRequest.safeParse(body)
+    if (parsed.success) {
+      const prompt = parsed.data.displayText ?? parsed.data.prompt
+      const statusQuery = classifyTaskInput(prompt, false) === 'status'
+      const capability = statusQuery ? null : await runtime.preflightExternalTask?.(prompt)
+      const activeTask = runtime.taskRepository?.findActiveByOrigin(ctx.params.id)
+        ?? runtime.taskRepository?.findActiveByThread(ctx.params.id)
+      const explicitTaskCommand = parsed.data.taskIntent === 'new' || parsed.data.taskIntent === 'supplement'
+      if (statusQuery || capability || activeTask || explicitTaskCommand || externalProviderAmbiguity(prompt)) {
+        if (!runtime.taskCoordinator) return ERRORS.unavailable('task coordinator is unavailable for external work')
+        const result = await runtime.taskCoordinator.command({
+          threadId: ctx.params.id,
+          intent: statusQuery ? 'status' : parsed.data.taskIntent === 'new' || parsed.data.taskIntent === 'supplement' ? parsed.data.taskIntent : 'auto',
+          idempotencyKey: parsed.data.idempotencyKey ?? randomUUID(),
+          request: parsed.data
+        })
+        if (result.kind === 'task_started' || result.kind === 'chat_started') return jsonResponse(result.turn, 202)
+        if (result.kind === 'capability_required') return jsonResponse({
+          code: 'capability_required', message: result.message, taskId: result.task?.id,
+          attentionId: result.attentionId, capability: result.capability
+        }, 409)
+        const message = result.kind === 'snapshot'
+          ? result.task ? `${result.task.goal}\n${result.task.waitingReason ?? result.task.stalledReason ?? result.task.status}` : '当前没有进行中的任务。'
+          : result.kind === 'input_queued' ? result.task.status === 'paused' ? '补充已保存，将在你继续任务后送达。' : '补充已保存，将送达当前任务。'
+            : result.kind === 'task_updated' ? result.action === 'pause' ? '任务已暂停。' : '任务已取消。'
+              : 'message' in result ? result.message : '已接收任务。'
+        return jsonResponse({ kind: result.kind, message, taskId: result.task?.id, attentionId: result.kind === 'attention_required' ? result.attentionId : undefined }, result.kind === 'snapshot' ? 200 : 202)
+      }
+    }
     return startTurn(runtime.turnService, ctx.params.id, request, ({ threadId, turnId }) => {
       runtime.runTurn(threadId, turnId)
     })

@@ -195,7 +195,7 @@ describe('Flow repository and executor', () => {
   })
   it('persists approval waits and resumes after an approval decision', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-flow-approval-')); const repository = new FlowRepository(join(root, 'flow.sqlite')); const service = new FlowRuntimeService(repository, buildFlowNodeRegistry(), buildCoreFlowAdapters())
-    const graph = definition([node('manual', 'manual_trigger'), node('approval', 'human_approval'), node('archive', 'archive')], [{ id: 'a', sourceNodeId: 'manual', sourcePortId: 'output', targetNodeId: 'approval', targetPortId: 'input', branch: 'normal' }, { id: 'b', sourceNodeId: 'approval', sourcePortId: 'approved', targetNodeId: 'archive', targetPortId: 'input', branch: 'normal' }]); repository.create(draftInput(graph)); repository.publish(graph.id)
+    const graph = definition([node('manual', 'manual_trigger'), node('approval', 'human_approval'), node('finish', 'merge')], [{ id: 'a', sourceNodeId: 'manual', sourcePortId: 'output', targetNodeId: 'approval', targetPortId: 'input', branch: 'normal' }, { id: 'b', sourceNodeId: 'approval', sourcePortId: 'approved', targetNodeId: 'finish', targetPortId: 'input', branch: 'normal' }]); repository.create(draftInput(graph)); repository.publish(graph.id)
     const started = await service.run(graph.id, {}); await vi.waitFor(() => expect(repository.getRun(started.id)?.status).toBe('waiting_approval')); await service.decide(started.id, 'approval', 'approve'); await vi.waitFor(() => expect(repository.getRun(started.id)?.status).toBe('succeeded')); service.shutdown()
   })
   it('resumes past a breakpoint and cancels adapters that ignore the abort signal', async () => {

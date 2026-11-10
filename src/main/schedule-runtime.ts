@@ -67,6 +67,8 @@ export class ScheduleRuntime {
   private powerSaveBlockerId: number | null = null
   private legacyScheduleModelMigrations = new Map<string, Promise<ScheduledTaskV1[]>>()
   private legacyScheduleModelMigrationQueue: Promise<void> = Promise.resolve()
+  private reconcilingWaitingTasks = false
+  private waitingTaskCursor = 0
 
   constructor(deps: ScheduleRuntimeDeps) {
     this.deps = deps
@@ -346,15 +348,68 @@ export class ScheduleRuntime {
   private async tick(): Promise<void> {
     const settings = await this.deps.store.load()
     if (!settings.schedule.enabled) return
-    await this.ensureNextRuns(settings)
+    await this.reconcileWaitingTasks(settings)
+    await this.ensureNextRuns(await this.deps.store.load())
     const fresh = await this.deps.store.load()
     const now = Date.now()
     for (const task of fresh.schedule.tasks) {
       if (!task.enabled || task.schedule.kind === 'manual') continue
+      // A durable blocked task already owns this occurrence. Continue it from
+      // its conversation instead of creating another task on every tick.
+      if (task.lastStatus === 'waiting_user') continue
       if (this.runningTaskIds.has(task.id)) continue
       const dueAt = Date.parse(task.nextRunAt)
       if (!Number.isFinite(dueAt) || dueAt > now) continue
       void this.runTaskInternal(task, true)
+    }
+  }
+
+  private async reconcileWaitingTasks(settings: AppSettingsV1): Promise<void> {
+    if (this.reconcilingWaitingTasks) return
+    const waiting = settings.schedule.tasks.filter(task => task.lastStatus === 'waiting_user' && task.runtimeTaskId)
+    if (!waiting.length) return
+    // Bound local snapshot traffic on each 30-second tick and rotate fairly.
+    const start = this.waitingTaskCursor % waiting.length
+    const batch = Array.from({ length: Math.min(waiting.length, 8) }, (_, index) => waiting[(start + index) % waiting.length])
+    this.waitingTaskCursor = (start + batch.length) % waiting.length
+    this.reconcilingWaitingTasks = true
+    try {
+      for (const scheduled of batch) {
+        try {
+          const response = await this.deps.runtimeRequest(settings, `/v1/tasks/${encodeURIComponent(scheduled.runtimeTaskId!)}`, { method: 'GET' })
+          if (!response.ok) continue
+          const task = parseJsonObject(response.body)
+          if (!task || task.id !== scheduled.runtimeTaskId ||
+            task.originThreadId !== scheduled.lastThreadId && task.threadId !== scheduled.lastThreadId) continue
+          const status = asString(task.status)
+          const completed = status === 'completed' && hasVerifiedScheduledTaskResult(task)
+          if (!completed && status !== 'failed' && status !== 'cancelled') continue
+          const finishedAt = new Date()
+          await this.updateTask(scheduled.id, current => {
+            // A user may have edited or re-run the schedule while the read was in flight.
+            if (current.lastStatus !== 'waiting_user' || current.runtimeTaskId !== scheduled.runtimeTaskId) return current
+            return {
+              ...current,
+              ...(current.schedule.kind === 'at' ? { enabled: false } : {}),
+              nextRunAt: current.schedule.kind === 'at' ? '' : computeScheduleNextRunAt(current, finishedAt),
+              lastStatus: completed ? 'success' : 'error',
+              lastMessage: completed
+                ? summarizeTaskResult(asString(task.finalResponse))
+                : asString(task.stalledReason) || asString(task.waitingReason) || (status === 'cancelled' ? 'Task was cancelled.' : 'Task failed.'),
+              updatedAt: finishedAt.toISOString()
+            }
+          })
+        } catch (error) {
+          // Network/runtime unavailability is not evidence that the task failed.
+          this.deps.logError('schedule-task', 'Unable to reconcile waiting task', {
+            taskId: scheduled.id,
+            runtimeTaskId: scheduled.runtimeTaskId,
+            message: error instanceof Error ? error.message : String(error)
+          })
+        }
+      }
+    } finally {
+      this.reconcilingWaitingTasks = false
     }
   }
 
@@ -366,6 +421,7 @@ export class ScheduleRuntime {
     let changed = false
     const now = new Date()
     const tasks = settings.schedule.tasks.map((task) => {
+      if (task.lastStatus === 'waiting_user') return task
       const wasInterrupted = task.lastStatus === 'running' && !this.runningTaskIds.has(task.id)
       if (!task.enabled || task.schedule.kind === 'manual' || this.runningTaskIds.has(task.id)) {
         if (!wasInterrupted) return task
@@ -427,6 +483,7 @@ export class ScheduleRuntime {
     await this.updateTask(task.id, (current) => ({
       ...current,
       lastStatus: 'running',
+      runtimeTaskId: undefined,
       lastMessage: 'Running',
       nextRunAt: '',
       updatedAt: new Date().toISOString()
@@ -446,19 +503,23 @@ export class ScheduleRuntime {
       })
       if (!result.ok) {
         const finishedAt = new Date()
+        const waiting = result.status === 'waiting_user'
         await this.updateTask(task.id, (current) => ({
           ...current,
-          ...(current.schedule.kind === 'at' ? { enabled: false } : {}),
+          ...(!waiting && current.schedule.kind === 'at' ? { enabled: false } : {}),
           lastRunAt: finishedAt.toISOString(),
-          nextRunAt: current.schedule.kind === 'at' ? '' : computeScheduleNextRunAt(current, finishedAt),
-          lastStatus: 'error',
+          nextRunAt: waiting || current.schedule.kind === 'at' ? '' : computeScheduleNextRunAt(current, finishedAt),
+          lastStatus: waiting ? 'waiting_user' : 'error',
           lastMessage: result.message,
+          lastThreadId: result.threadId || current.lastThreadId,
+          runtimeTaskId: waiting ? result.taskId : undefined,
           updatedAt: finishedAt.toISOString()
         }))
         this.runningTaskIds.delete(task.id)
         return result
       }
 
+      if (!result.turnId) throw new Error('Runtime did not start an executable turn.')
       const startedAt = new Date()
       await this.updateTask(task.id, (current) => ({
         ...current,
@@ -484,7 +545,7 @@ export class ScheduleRuntime {
           }
         )
       }
-      void this.monitorTaskTurn(task.id, result.threadId, result.turnId ?? '')
+      void this.monitorTaskTurn(task.id, result.threadId, result.turnId)
       return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -559,6 +620,7 @@ export class ScheduleRuntime {
 
     const turnBody: Record<string, unknown> = {
       prompt: buildScheduleRuntimePrompt(settings, options.prompt),
+      displayText: options.prompt,
       mode: options.mode,
       // Scheduled turns are headless — nobody can answer a user_input
       // prompt, and a turn that asks one hangs until the response timeout.
@@ -573,19 +635,41 @@ export class ScheduleRuntime {
       `/v1/threads/${encodeURIComponent(thread.id)}/turns`,
       { method: 'POST', body: JSON.stringify(turnBody) }
     )
+    const parsedTurn = parseJsonObject(turn.body)
+    if (parsedTurn?.code === 'capability_required' || parsedTurn?.kind === 'capability_required') {
+      return {
+        ok: false,
+        status: 'waiting_user',
+        threadId: thread.id,
+        taskId: asString(parsedTurn.taskId) || asString(nestedRecord(parsedTurn.task).id) || undefined,
+        attentionId: asString(parsedTurn.attentionId) || undefined,
+        message: asString(parsedTurn.message) || '任务正在等待连接器配置或授权，请打开原对话继续。'
+      }
+    }
     if (!turn.ok) return { ok: false, message: runtimeErrorMessage(turn, 'Failed to start turn.') }
 
-    const parsedTurn = parseJsonObject(turn.body)
     const turnId = asString(nestedRecord(parsedTurn?.turn).id) || asString(parsedTurn?.turnId)
     if (!turnId) {
+      const kind = asString(parsedTurn?.kind)
+      if (['snapshot', 'input_queued', 'task_updated', 'attention_required'].includes(kind)) {
+        return {
+          ok: false,
+          status: 'waiting_user',
+          threadId: thread.id,
+          taskId: asString(parsedTurn?.taskId) || undefined,
+          attentionId: asString(parsedTurn?.attentionId) || undefined,
+          message: asString(parsedTurn?.message) || '请求已保存，但尚未执行。请打开原对话查看并继续。'
+        }
+      }
       return { ok: false, message: 'Failed to start turn: missing turn id.' }
     }
+    const executionThreadId = asString(parsedTurn?.threadId) || thread.id
     if (!options.waitForResult) {
-      return { ok: true, threadId: thread.id, turnId, message: 'Started' }
+      return { ok: true, threadId: executionThreadId, turnId, message: 'Started' }
     }
 
-    const text = await this.waitForAssistantText(settings, thread.id, turnId, options.responseTimeoutMs, workspace)
-    return { ok: true, threadId: thread.id, turnId, text, message: text || 'Completed' }
+    const text = await this.waitForAssistantText(settings, executionThreadId, turnId, options.responseTimeoutMs, workspace)
+    return { ok: true, threadId: executionThreadId, turnId, text, message: text || 'Completed' }
   }
 
   private async waitForAssistantText(
@@ -833,4 +917,33 @@ export class ScheduleRuntime {
 
 export function createScheduleRuntime(deps: ScheduleRuntimeDeps): ScheduleRuntime {
   return new ScheduleRuntime(deps)
+}
+
+/** Do not turn a resumed task's prose or a bare completed flag into success. */
+function hasVerifiedScheduledTaskResult(task: Record<string, unknown>): boolean {
+  if (!asString(task.finalResponse).trim() || !asString(task.finishedAt)) return false
+  const acceptance = nestedRecord(task.acceptance)
+  const nodes = Array.isArray(task.nodes) ? task.nodes.map(nestedRecord) : []
+  const requiredKinds = Array.isArray(acceptance.requiredNodeKinds) ? acceptance.requiredNodeKinds : []
+  if (!requiredKinds.length || !requiredKinds.every(kind => nodes.some(node => node.kind === kind && node.status === 'completed')) ||
+    nodes.some(node => node.status !== 'completed')) return false
+  if (acceptance.kind === 'answer') return true
+  if (acceptance.kind === 'files') {
+    const artifacts = Array.isArray(task.artifacts) ? task.artifacts.map(nestedRecord) : []
+    const minimum = typeof acceptance.minimumArtifacts === 'number' ? Math.max(1, acceptance.minimumArtifacts) : 1
+    return artifacts.filter(artifact => artifact.validation === 'valid' && asString(artifact.relativePath) && asString(artifact.sha256)).length >= minimum
+  }
+  if (acceptance.kind !== 'effect') return false
+  const effect = nestedRecord(acceptance.effect)
+  const evidence = Array.isArray(task.resultEvidence) ? task.resultEvidence.map(nestedRecord).filter(item =>
+    item.kind === 'external_operation' && item.verified === true && asString(item.resultHash) && asString(item.status) &&
+    asString(item.verifiedAt) && asString(item.target) && asString(item.operation) && item.provider === effect.provider) : []
+  if (!evidence.length) return false
+  const required = Array.isArray(effect.requiredEffects) ? effect.requiredEffects.map(nestedRecord) : []
+  if (required.length) return required.every(item => evidence.some(result =>
+    result.provider === item.provider && result.operation === item.operation && result.target === item.target))
+  // A broad process goal is incomplete until a finite reviewed target set is
+  // persisted. Match the Runtime's requiredEffects boundary exactly.
+  if (effect.operation === 'process') return false
+  return evidence.some(item => item.operation === effect.operation && item.target === effect.target)
 }

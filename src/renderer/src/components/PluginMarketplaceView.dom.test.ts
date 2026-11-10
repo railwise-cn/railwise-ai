@@ -10,6 +10,7 @@ import type {
   PreparedPluginImportV1
 } from '@shared/marketplace'
 import type { SkillListItem } from '@shared/workwise-api'
+import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import i18n from '../i18n'
 import { useChatStore } from '../store/chat-store'
 import { PluginMarketplaceView } from './PluginMarketplaceView'
@@ -331,6 +332,88 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceView unified catalog', () => {
+  it('shows available-to-install readiness on a new package instead of its version number', () => {
+    const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Document Tools'))
+    expect(row?.textContent).toContain('Available to install')
+    expect(row?.textContent).not.toContain(DOCUMENTS.version)
+  })
+
+  it('keeps unavailable installed packages in Installed and reports availability consistently in details', async () => {
+    const unavailable: MarketplacePackageV1 = {
+      ...BROWSER,
+      availability: { status: 'unavailable', reasonCode: 'catalog_retired', message: 'The catalog no longer distributes this version.' }
+    }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({
+      packages: [{ key: `${SOURCE.id}:${BROWSER.id}`, sourceId: SOURCE.id, package: unavailable, conflicted: false }],
+      conflicts: []
+    })
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([])
+    const saveServer = vi.fn()
+    Object.assign(window.workwise, { saveMcpServer: saveServer })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+
+    const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Browser Tools'))
+    expect(row?.textContent).toContain('Installed · currently unavailable')
+    expect(row?.querySelector('.text-emerald-700')).toBeNull()
+    await act(async () => exactButton('Open source').click())
+    expect(window.workwise.openExternal).toHaveBeenCalledWith(BROWSER.source.location)
+    expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
+    await act(async () => button('Installed').click())
+    expect(container.textContent).toContain('Browser Tools')
+    const installedRow = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Browser Tools'))
+    await act(async () => (installedRow as HTMLElement).click())
+    expect(container.textContent?.match(/Installed · currently unavailable/g)).toHaveLength(2)
+    expect(container.textContent).toContain('Installation health')
+    expect(container.textContent).toContain('healthy')
+    expect(window.workwise.listInstalledPlugins).toHaveBeenLastCalledWith()
+    expect(saveServer).not.toHaveBeenCalled()
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    expect(installPrepared).not.toHaveBeenCalled()
+  })
+
+  it('includes unconfigured external services in configuration counts and never treats an OAuth reference as authorization', async () => {
+    const connector: MarketplacePackageV1 = {
+      ...DOCUMENTS,
+      id: 'service-connector',
+      name: 'Service Connector',
+      auth: { type: 'oauth', provider: 'service', discovery: 'ready' },
+      installation: { mode: 'external', installedByDefault: false, reinstallable: false },
+      components: [{ id: 'service-mcp', name: 'Service', sourceId: DOCUMENTS.source.id, type: 'mcp', runtime: { kind: 'remote', transport: 'streamable-http', endpoint: 'https://service.example/mcp' } }]
+    }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({
+      packages: [{ key: `${SOURCE.id}:${connector.id}`, sourceId: SOURCE.id, package: connector, conflicted: false }],
+      conflicts: []
+    })
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([])
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([])
+    const testServer = vi.fn()
+    Object.assign(window.workwise, { testMcpServer: testServer })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.textContent).toContain('Needs configuration')
+    await act(async () => iconButton('Filters').click())
+    await act(async () => button('Needs configuration').click())
+    expect(container.textContent).toContain('Service Connector')
+
+    const server: McpServerConfigV2 = { id: connector.id, name: connector.name, scope: 'global', transport: 'http', url: 'https://service.example/mcp', timeoutMs: 30_000, source: 'managed-tool', enabled: true, toolPolicy: {}, revision: 1, credentialRef: { id: 'credential-reference', storage: 'keychain' } }
+    vi.mocked(window.workwise.listMcpServers).mockResolvedValue([server])
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([{ ...INSTALLED, packageId: connector.id }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => button('Installed').click())
+    const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Service Connector'))
+    expect(row?.textContent).toContain('Configured · verification pending')
+    expect(row?.textContent).not.toContain('Authorized')
+    expect(row?.querySelector('.text-emerald-700')).toBeNull()
+    expect(server.enabled).toBe(true)
+    expect(testServer).not.toHaveBeenCalled()
+
+    await act(async () => i18n.changeLanguage('zh'))
+    await settle()
+    expect(container.textContent).toContain('已配置 · 待验证授权')
+  })
+
   it('keeps local Skill counts off the plugin surface and exposes installed product-level entries', () => {
     expect(container.textContent).not.toContain('local Skills indexed')
     expect(container.textContent).toContain('Installed')

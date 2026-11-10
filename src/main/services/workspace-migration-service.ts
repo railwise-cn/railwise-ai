@@ -24,6 +24,20 @@ export class WorkspaceMigrationService {
     this.stateRoot = resolve(options.stateRoot ?? join(this.home, '.workwise', 'migrations', 'workspaces'))
   }
 
+  /** Cheap identity check for navigation; never hash documents or infer aliases from names. */
+  async aliases(): Promise<WorkspaceMigrationReport['aliases']> {
+    const aliases: WorkspaceMigrationReport['aliases'] = []
+    const knownPaths = new Set(NAMESPACES.flatMap(namespace => WORKSPACES.map(workspace => canonicalPath(join(this.home, namespace, workspace.directory)))))
+    for (const namespace of NAMESPACES) for (const workspace of WORKSPACES) {
+      const path = join(this.home, namespace, workspace.directory)
+      try {
+        const canonicalRoot = canonicalPath(await realpath(path))
+        if (canonicalRoot !== canonicalPath(path) && knownPaths.has(canonicalRoot)) aliases.push({ path, canonicalRoot })
+      } catch { /* Unavailable paths remain visible as historical entries, never hidden. */ }
+    }
+    return aliases
+  }
+
   async scan(): Promise<WorkspaceMigrationReport> {
     const entries: WorkspaceMigrationEntry[] = []
     const knownPaths = new Set(NAMESPACES.flatMap(namespace => WORKSPACES.map(workspace => canonicalPath(resolve(this.home, namespace, workspace.directory)))))

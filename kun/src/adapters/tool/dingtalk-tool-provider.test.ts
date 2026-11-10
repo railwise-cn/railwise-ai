@@ -5,11 +5,32 @@ import {buildDingTalkToolProvider,DINGTALK_SCOPES} from './dingtalk-tool-provide
 const scopes=Object.values(DINGTALK_SCOPES)
 const config=DingTalkCapabilityConfig.parse({enabled:true,credentialRef:'user-ref',workflowCredentialRef:'app-ref',scopes,userScopes:['Todo.Todo.Read','Todo.Todo.Write'],unionId:'u',userId:'staff',allowedWriteUserIds:['staff']})
 const credential:DingTalkCredential={accessToken:'private-token',unionId:'u',userId:'staff',kind:'internal-app',scopes,expiresAt:'2027-01-01T00:00:00Z'}
-const context={threadId:'thread',turnId:'turn',workspace:'/synthetic',approvalPolicy:'auto',sandboxMode:'workspace-write',abortSignal:new AbortController().signal,awaitApproval:async()=> 'allow'} as ToolHostContext
+const context={threadId:'thread',turnId:'turn',workspace:'/synthetic',approvalPolicy:'auto',sandboxMode:'workspace-write',abortSignal:new AbortController().signal,awaitApproval:async()=> 'allow',assertExternalTarget:()=>undefined} as ToolHostContext
 const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','x-acs-request-id':'req-1'}})
 const fixture=(replies:Response[])=>{const fetcher=vi.fn(async(_input:unknown,_init?:RequestInit)=>replies.shift()!);const provider=buildDingTalkToolProvider({config,getCredential:async()=>credential,fetch:fetcher as unknown as typeof fetch,nowIso:()=> '2026-11-10T00:00:00Z'});return {provider,fetcher,run:(name:string,args:Record<string,unknown>)=>provider.tools.find(t=>t.name===name)!.execute(args,context)}}
 
 describe('official DingTalk provider',()=>{
+  it('refuses unscoped writes before credentials or networking, while lists remain readable',async()=>{
+    const fetcher=vi.fn(async()=>response({todoCards:[]})),getCredential=vi.fn(async()=>credential)
+    const provider=buildDingTalkToolProvider({config,getCredential,fetch:fetcher as unknown as typeof fetch,nowIso:()=> '2026-11-10T00:00:00Z'})
+    const unscoped={...context,assertExternalTarget:undefined}
+    expect(await provider.tools.find(t=>t.name==='dingtalk_complete_task')!.execute({taskId:'a'},unscoped)).toMatchObject({isError:true,output:{code:'external_target_blocked'}})
+    expect(getCredential).not.toHaveBeenCalled()
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(await provider.tools.find(t=>t.name==='dingtalk_list_tasks')!.execute({},unscoped)).toMatchObject({output:{status:'succeeded'}})
+  })
+  it('rechecks the reviewed scope after readback and before dispatching the actual write',async()=>{
+    const fetcher=vi.fn(async(_input:unknown,_init?:RequestInit)=>response({id:'a',done:false,executorIds:['u']}))
+    let checks=0
+    const assertExternalTarget=vi.fn((provider:string,operation:string,target:string)=>{
+      expect([provider,operation,target]).toEqual(['dingtalk','complete','a'])
+      if(++checks===3)throw Object.assign(new Error('Scope revoked'),{code:'external_target_blocked'})
+    })
+    const provider=buildDingTalkToolProvider({config,getCredential:async()=>credential,fetch:fetcher as unknown as typeof fetch,nowIso:()=> '2026-11-10T00:00:00Z'})
+    expect(await provider.tools.find(t=>t.name==='dingtalk_complete_task')!.execute({taskId:'a'},{...context,assertExternalTarget})).toMatchObject({isError:true,output:{code:'external_target_blocked'}})
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(fetcher.mock.calls[0]![0]).toBeInstanceOf(URL)
+  })
   it('advertises independent typed tools and explicit approval for every write',()=>{
     const {provider}=fixture([])
     expect(provider.id).toBe('dingtalk')

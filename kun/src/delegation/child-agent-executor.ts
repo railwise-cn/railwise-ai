@@ -194,10 +194,12 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
     ].filter(Boolean).join('\n')
     const loop = new AgentLoop({
       ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
-      ...(parentGrant ? { executionScope: async (threadId: string, turnId: string) => intersectChildExecutionScope(
+      ...(parentGrant ? { executionScope: async () => intersectChildExecutionScope(
         parentGrant,
         thread.workspace,
-        await options.executionScope?.(threadId, turnId)
+        // Refresh the original task's provider configuration. The child has
+        // its own store, so looking up its ID in the root store loses intent.
+        await options.executionScope?.(input.parentThreadId, input.parentTurnId)
       ) } : {}),
       threadStore,
       sessionStore,

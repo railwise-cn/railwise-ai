@@ -53,6 +53,10 @@ export class ExecutionStore {
     const row = this.db.prepare('SELECT data_json FROM execution_attempts WHERE task_id=? ORDER BY rowid DESC LIMIT 1').get(taskId) as { data_json: string } | undefined
     return row ? ExecutionAttemptSchema.parse(JSON.parse(row.data_json)) : null
   }
+  attempts(taskId: string): ExecutionAttempt[] {
+    return (this.db.prepare('SELECT data_json FROM execution_attempts WHERE task_id=? ORDER BY rowid').all(taskId) as Array<{data_json: string}>)
+      .map(row => ExecutionAttemptSchema.parse(JSON.parse(row.data_json)))
+  }
   finishAttempt(id: string, status: ExecutionAttempt['status'], now: string): void {
     const attempt = this.attempt(id)
     if (!attempt || (attempt.status !== 'running' && !(attempt.status === 'lost' && status === 'cancelled'))) return

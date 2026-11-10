@@ -62,6 +62,66 @@ export type TaskAcceptanceV1 = {
   minimumArtifacts?: number
   requireFinalResponse: boolean
   requireActionableArtifactCard: boolean
+  effect?: Omit<TaskRequiredEffectV1, 'target'> & { target?: string; requiredEffects?: TaskRequiredEffectV1[] }
+}
+
+export type TaskRequiredEffectV1 = {
+  provider: string
+  operation: string
+  target: string
+  requiredScopes?: string[]
+  requiresConfirmation?: boolean
+  successStatus?: string[]
+  verification?: 'provider_readback'
+}
+
+export type TaskResultEvidenceV1 = {
+  kind: 'external_operation' | 'file' | 'tool_result' | 'human_confirmation'
+  provider: string
+  operation: string
+  target: string
+  status: string
+  verified: boolean
+  verifiedAt: string
+  remoteOperationId?: string
+  resultHash: string
+  sourceVersion?: string
+  targetVersion?: string
+}
+
+/** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
+export type TaskOperationReceiptV1 = {
+  id: string
+  taskId: string
+  provider: string
+  operation: string
+  toolName: string
+  target?: string
+  requestHash: string
+  status: 'prepared' | 'running' | 'succeeded' | 'failed' | 'outcome_unknown'
+  remoteOperationId?: string
+  evidence?: TaskResultEvidenceV1
+  resolution?: { status: 'verified'; receiptId: string; evidence: TaskResultEvidenceV1; resolvedAt: string }
+  errorCode?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: TaskResultEvidenceV1; errorCode?: string }
+
+export type TaskPermissionSnapshotV1 = {
+  taskId: string; taskRevision: number; taskTitle: string; scopeHash: string
+  workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; workspaceRevision: number; agentRevision: number
+  approvalPolicy: string; targetApprovalPolicy: 'on-request'; maxTtlSeconds: 900
+  /** Server-derived authority ceilings; these are not the current executable tool catalog. */
+  sandboxMode?: string; agentTrust?: WorkspaceTrustLevel; agentName?: string
+  toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets?: string[]
+  connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
+  canConfirm: boolean; reason?: string
+  grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared'; confirmedAt: string; expiresAt: string }
+}
+export type TaskPermissionConfirmationV1 = {
+  expectedRevision: number; idempotencyKey: string; scopeHash: string; confirmed: true; approvalPolicy: 'on-request'; ttlSeconds: number
 }
 
 export type TaskNodeV1 = {
@@ -130,6 +190,7 @@ export type TaskRunV1 = {
   noProgressCount: number
   nodes: TaskNodeV1[]
   artifacts: TaskArtifactV1[]
+  resultEvidence?: TaskResultEvidenceV1[]
   finalResponse?: string
   stalledReason?: string
   waitingReason?: string

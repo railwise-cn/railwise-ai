@@ -1,10 +1,11 @@
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget } from './external-effect-evidence.js'
-import type { ExecutionGrant } from '../contracts/permissions.js'
+import { HostShellAuthorizationSchema, type ExecutionGrant } from '../contracts/permissions.js'
 import { randomUUID as executionUUID } from 'node:crypto'
 import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
 import { processIdentity, inspectProcess } from './process-identity.js'
 import type { ToolCallLike, ToolHostResult } from '../ports/tool-host.js'
+import { makeToolResultItem } from '../domain/item.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { extname, isAbsolute, relative, resolve } from 'node:path'
@@ -17,8 +18,11 @@ import type {
   TaskCheckpoint,
   TaskRun,
   TaskRunStatus,
-  TaskInput
+  TaskInput,
+  OperationReceipt,
+  RequiredEffect
 } from '../contracts/tasks.js'
+import { RequiredEffectSchema } from '../contracts/tasks.js'
 import type { SessionStore } from '../ports/session-store.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import {
@@ -163,7 +167,8 @@ export class TaskController {
   private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string }): TaskRun {
     const now = this.nowIso()
     const consultation = input.thread.domain === 'engineering' && !input.engineeringExecution
-    const acceptance = acceptanceForPrompt(consultation ? 'Answer the Survey question or propose a plan for review.' : input.request.prompt)
+    const taskGoal = input.request.displayText?.trim() || input.request.prompt
+    const acceptance = acceptanceForPrompt(consultation ? 'Answer the Survey question or propose a plan for review.' : taskGoal)
     const id = input.id ?? `task_${randomUUID()}`
     const nodes = nodeBlueprint(id, acceptance)
     const profile = input.thread.agentProfile
@@ -177,7 +182,7 @@ export class TaskController {
       activeTurnId: input.turnId,
       childTaskIds: [],
       workspaceRoot: input.thread.workspace,
-      goal: completionIntentText(input.request.prompt) || input.request.prompt,
+      goal: completionIntentText(taskGoal) || taskGoal,
       status: 'queued',
       acceptance,
       agentId: input.thread.agentId,
@@ -237,6 +242,44 @@ export class TaskController {
   }
 
   getTask(taskId: string): TaskRun | null { return this.repository.get(taskId) }
+
+  /** Persist a finite user-reviewed effect set before any mutating dispatch. */
+  confirmEffectScope(turnId: string, expectedRevision: number, idempotencyKey: string, effects: RequiredEffect[]): TaskRun {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) throw Object.assign(new Error('No active task execution for effect scope confirmation.'), { code: 'effect_scope_required' })
+    if (!idempotencyKey.trim() || effects.length < 1 || effects.length > 8) throw Object.assign(new Error('Review between one and eight exact external actions.'), { code: 'effect_scope_invalid' })
+    const requiredEffects = effects.map(effect => RequiredEffectSchema.parse(effect))
+    const keys = requiredEffects.map(effect => JSON.stringify([effect.provider, effect.operation, effect.target]))
+    if (new Set(keys).size !== keys.length) throw Object.assign(new Error('The reviewed effect set contains duplicate actions.'), { code: 'effect_scope_invalid' })
+    return this.repository.transact(() => {
+      this.assertToken(token)
+      const task = this.repository.get(token.taskId)!
+      const acceptance = task.acceptance.effect
+      if (task.acceptance.kind !== 'effect' || !acceptance || task.authority?.revokedAt || requiredEffects.some(effect => effect.provider !== acceptance.provider || !['detail', 'approve', 'reject', 'complete', 'transfer'].includes(effect.operation) || (acceptance.operation !== 'process' && acceptance.operation !== 'connect' && effect.operation !== acceptance.operation))) {
+        throw Object.assign(new Error('Every reviewed action must belong to this task provider.'), { code: 'effect_scope_conflict' })
+      }
+      const key = `effect-scope:${idempotencyKey}`
+      const request = { turnId, expectedRevision, requiredEffects }
+      const existing = this.repository.operation(task.id, key)
+      if (existing) {
+        if (existing.fingerprint !== operationFingerprint(request)) throw Object.assign(new Error('Effect scope key is bound to a different request.'), { code: 'idempotency_conflict' })
+        if (existing.status === 'succeeded') return task
+        throw Object.assign(new Error('Effect scope confirmation is incomplete; inspect its receipt.'), { code: 'outcome_unknown' })
+      }
+      if ((acceptance.scopeRevision ?? 0) !== expectedRevision) throw Object.assign(new Error('Effect scope changed while reviewing external actions; review it again.'), { code: 'stale_request' })
+      if (acceptance.requiredEffects?.length || acceptance.target) throw Object.assign(new Error('The task already has a fixed effect scope; it cannot be replaced or reduced.'), { code: 'effect_scope_conflict' })
+      if (this.repository.operations(task.id, 'tool').some(receipt => ['approve', 'reject', 'complete', 'transfer'].includes(String(receipt.request?.operation)))) {
+        throw Object.assign(new Error('Effect scope must be established before the first external mutation.'), { code: 'effect_scope_conflict' })
+      }
+      const now = this.nowIso()
+      const prepared = this.repository.beginOperation({ ownerId: task.id, idempotencyKey: key, kind: 'effect_scope', request, nowIso: now })
+      const updated = this.updateExecution(task.id, task.revision, current => ({ ...current, acceptance: { ...current.acceptance, effect: { ...acceptance, requiredEffects, scopeConfirmationId: prepared.receipt.id, scopeRevision: expectedRevision + 1 } }, updatedAt: now }), {
+        key: `effect-scope-confirmed:${prepared.receipt.id}`, kind: 'effect_scope_confirmed', payload: { confirmationId: prepared.receipt.id, requiredEffects }, createdAt: now
+      })
+      this.repository.finishOperation(task.id, key, { status: 'succeeded', result: { confirmationId: prepared.receipt.id, requiredEffects, taskRevision: updated.revision } }, now)
+      return updated
+    })
+  }
 
   startWatchdog(options: TaskWatchdogOptions = {}): void {
     this.stopWatchdog()
@@ -323,7 +366,8 @@ export class TaskController {
       throw Object.assign(new Error(`active task not found for thread ${threadId}`), { code: 'not_found' })
     }
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
-    const unsettled = this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool')
+    const hostShell = this.hostShellState(task)
+    const unsettled = [...this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool'), ...hostShell.unknown]
     if (unsettled.length) return this.stallUnknown(task,unsettled.map(operation=>operation.id))
     const [thread, items] = await Promise.all([
       this.threadStore.get(threadId),
@@ -331,9 +375,11 @@ export class TaskController {
     ])
     const capturedToken = this.attemptTokens.get(turnId)
     if (capturedToken) this.assertToken(capturedToken)
+    if (hostShell.pending.length) return this.retry(task,'已授权命令仍有待核验回执，请使用 host_shell_session 只读轮询原命令，不能重新执行或仅用文字交付。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     if (this.repository.listShellSessions(task.id).some(session => ['running','starting','outcome_unknown'].includes(session.status))) return this.retry(task,'命令进程尚未确认完成，请轮询已有命令并核实其结果后交付。',`shell-pending:${task.attempts}`,turnId)
     const turn = thread?.turns.find((candidate) => candidate.id === turnId)
     const turnItems = items.filter((item) => item.turnId === turnId)
+    if (hostShell.lastFailed) return this.waitForUser(task,'最后一次已授权命令执行失败、被停止或尚无成功退出证据。请先处理失败原因，再明确授权新的检查命令；文字说明不能代替执行成功。',latestAssistantText(turn,turnItems),`host-shell-failed:${hostShell.lastFailed.id}`,turnId)
     const blocked = this.completionGuard?.({ thread: thread ?? undefined, turn, task })
     if (blocked?.retryable === false) return this.waitForUser(task, blocked.reason, latestAssistantText(turn, turnItems), blocked.fingerprint, turnId)
     const pendingReason = pendingWorkReason(turnItems)
@@ -372,12 +418,12 @@ export class TaskController {
     }
 
     if (task.acceptance.kind === 'effect') {
-      const evidence = verifiedEffectReceipts(task, this.repository.operations(task.id, 'tool'))
+      const evidence = this.verifiedTaskEffects(task)
       const succeeded = evidence.length > 0
       if (!succeeded) {
         return this.waitForUser(
           task,
-          '外部操作没有已验证的工具回执，任务尚未完成。请先连接并授权目标服务，或核实上次操作结果后继续。',
+          '外部操作尚无完整、已确认的目标集合及逐项验证回执，任务不能标记完成。请先明确要处理的具体待办，再核验每项结果。',
           finalResponse,
           `effect-receipt:${task.revision}`,
           turnId
@@ -411,7 +457,7 @@ export class TaskController {
       waitingReason: undefined,
       stalledReason: undefined,
       finalResponse,
-      ...(task.acceptance.kind==='effect'?{resultEvidence:verifiedEffectReceipts(task,this.repository.operations(task.id,'tool'))}:{}),
+      ...(task.acceptance.kind==='effect'?{resultEvidence:this.verifiedTaskEffects(task)}:{}),
       artifacts,
       noProgressCount: 0,
       nodes: current.nodes.map((node) => ({
@@ -457,7 +503,8 @@ export class TaskController {
     const task = this.repository.findActiveByThread(threadId)
     if (!task || task.activeTurnId !== turnId) return null
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
-    const unsettled = this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool')
+    const hostShell = this.hostShellState(task)
+    const unsettled = [...this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool'), ...hostShell.unknown]
     if (unsettled.length) return this.stallUnknown(task,unsettled.map(operation=>operation.id))
     if (code === 'operation_cancelled' || code === 'turn_total_timeout') {
       return this.finish(task, code === 'operation_cancelled' ? 'cancelled' : 'failed', message)
@@ -465,12 +512,45 @@ export class TaskController {
     if (code === 'web_access_exhausted' || code === 'max_tokens') {
       return this.finish(task, 'failed', message)
     }
+    if (hostShell.lastFailed) return this.waitForUser(task,'最后一次已授权命令没有执行成功。请先处理失败原因，再明确授权新的检查命令。', '', `host-shell-failed:${hostShell.lastFailed.id}`,turnId)
+    if (hostShell.pending.length) return this.retry(task,'模型请求中断，但原命令仍有待核验回执。请只读轮询已有命令，不能重新执行。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     return this.retry(
       task,
       message,
       `${code}:${createHash('sha256').update(message).digest('hex').slice(0, 16)}`,
       turnId
     )
+  }
+
+  /** A prose response can never settle a command. Earlier known failures remain history,
+   * while an explicitly approved later command with real success evidence can resolve them. */
+  private hostShellState(task: TaskRun): { unknown: OperationReceipt[]; pending: OperationReceipt[]; knownSessionIds: Set<string>; lastFailed?: OperationReceipt } {
+    const operations = this.repository.operations(task.id,'host_shell')
+    const unknown: OperationReceipt[] = [], pending: OperationReceipt[] = [], knownSessionIds = new Set<string>()
+    for (const operation of operations) {
+      if (operation.status === 'outcome_unknown' || operation.status === 'prepared') { unknown.push(operation); continue }
+      if (operation.status !== 'running') continue
+      const result = operation.result as { authorization?: unknown; shell?: { output?: { session_id?: unknown } } } | undefined
+      const authority = HostShellAuthorizationSchema.safeParse(result?.authorization)
+      const sessionId = result?.shell?.output?.session_id
+      const session = typeof sessionId === 'string' ? this.repository.getShellSession(sessionId) : null
+      if (!authority.success || !session || authority.data.taskId !== task.id || authority.data.threadId !== task.threadId
+        || session.taskId !== task.id || session.executionId !== authority.data.executionId || session.ownerId !== authority.data.ownerId
+        || session.workspaceRoot !== authority.data.workspaceRoot || !session.pid || !session.processFingerprint
+        || ['outcome_unknown','interrupted'].includes(session.status)) {
+        unknown.push(operation)
+        continue
+      }
+      // A known process can be verified read-only in a later attempt. Its running
+      // receipt still prevents completion even if the process has since exited.
+      pending.push(operation)
+      knownSessionIds.add(session.id)
+    }
+    const last = operations.at(-1)
+    const result = last?.result as { shell?: { isError?: boolean; output?: { status?: string; exit_code?: number } } } | undefined
+    const success = last?.status === 'succeeded' && result?.shell?.isError !== true && result?.shell?.output?.status === 'completed' && result.shell.output.exit_code === 0
+    const lastFailed = last && (last.status === 'failed' || last.status === 'succeeded' && !success) ? last : undefined
+    return { unknown, pending, knownSessionIds, lastFailed }
   }
 
   private stallUnknown(task: TaskRun, operationIds: string[]): Extract<TaskCandidateDecision,{kind:'stalled'}> {
@@ -580,9 +660,33 @@ export class TaskController {
     return this.repository.transact(() => {
       this.assertToken(token)
       const key = `tool:${turnId}:${call.callId}`
+      const effect = externalOperationForTool(call.toolName)
+      const target = externalTarget(call.arguments, call.toolName)
+      if (effect && ['approve', 'reject', 'complete', 'send', 'transfer'].includes(effect.operation)) {
+        const task = this.repository.get(token.taskId)!
+        this.assertExternalTarget(turnId, effect.provider, effect.operation, target ?? '')
+        // Tool call IDs change when a task resumes. The finite reviewed action
+        // is still the same action; never repeat it just because a model emits
+        // a new call ID or changes the arguments after a successful dispatch.
+        const prior = this.repository.operations(task.id, 'tool').find(receipt => receipt.request?.provider === effect.provider && receipt.request?.operation === effect.operation && receipt.request?.target === target)
+        if (prior) {
+          if (prior.request?.toolName !== call.toolName || prior.request?.argumentsHash !== operationFingerprint(call.arguments)) {
+            throw Object.assign(new Error('This reviewed target already has a different operation request. Inspect its receipt before changing the action.'), { code: 'idempotency_conflict' })
+          }
+          const resolution = this.repository.verifiedOperationResolution(prior)
+          if (resolution) return { key: prior.idempotencyKey, token, prior: { approved: true, item: makeToolResultForVerifiedResolution(task, turnId, call, resolution.evidence) } }
+          if (prior.status === 'succeeded' && prior.result) {
+            const replay = prior.result as ToolHostResult
+            return { key: prior.idempotencyKey, token, prior: { ...replay, item: { ...replay.item, id: `item_${call.callId}`, callId: call.callId, turnId, threadId: task.threadId } as ToolHostResult['item'] } }
+          }
+          throw Object.assign(new Error('The reviewed action has already been dispatched. Verify its outcome before another attempt.'), { code: prior.status === 'failed' ? 'operation_failed' : 'outcome_unknown' })
+        }
+      }
       // Arguments can contain credentials or external message bodies. Only the
       // canonical digest belongs in the durable operation ledger.
-      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, ...externalOperationForTool(call.toolName), target: externalTarget(call.arguments), turnId, argumentsHash: operationFingerprint(call.arguments), ...(executionGrant ? { executionGrant } : {}) }, nowIso: this.nowIso() })
+      const scope = effect ? this.repository.get(token.taskId)?.acceptance.effect : undefined
+      const verificationLocator = effect ? externalVerificationLocator(call.arguments) : undefined
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, ...effect, target, turnId, argumentsHash: operationFingerprint(call.arguments), ...(effect ? { approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex') } : {}), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
       if (!prepared.created) {
         if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
         if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })
@@ -593,11 +697,60 @@ export class TaskController {
     })
   }
 
+  recordToolApproval(token: ExecutionToken, key: string, approval: { toolName: string; requestHash: string }): void {
+    this.repository.transact(() => {
+      this.assertToken(token)
+      const receipt = this.repository.operation(token.taskId, key)
+      if (!receipt?.request?.provider) return
+      if (!receipt || receipt.request?.toolName !== approval.toolName || !/^[a-f0-9]{64}$/.test(approval.requestHash)) throw Object.assign(new Error('Approval does not match the dispatched operation.'), { code: 'execution_grant_scope' })
+      if (receipt.request.approvalRequestHash !== approval.requestHash) throw Object.assign(new Error('The external request changed before approval. Submit a new typed request.'), { code: 'idempotency_conflict' })
+      this.repository.finishOperation(token.taskId, key, { status: receipt.status, dispatchApproval: { ...approval, approvedAt: this.nowIso() } }, this.nowIso())
+    })
+  }
+
+  assertExternalTarget(turnId: string, provider: string, operation: string, target: string): void {
+    const token = this.attemptTokens.get(turnId)
+    if (!token) throw Object.assign(new Error('No current task authority for this external action.'), { code: 'effect_scope_required' })
+    this.assertToken(token)
+    const task = this.repository.get(token.taskId)!
+    const accepted = task.acceptance.effect
+    const required = accepted?.requiredEffects ?? (accepted?.target ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
+    if (task.authority?.revokedAt || task.acceptance.kind !== 'effect' || !required.some(item => item.provider === provider && item.operation === operation && item.target === target)) {
+      throw Object.assign(new Error('Review and confirm the complete finite external action set with confirm_external_effect_scope before this mutation.'), { code: 'effect_scope_required' })
+    }
+  }
+
+  private verifiedTaskEffects(task: TaskRun) {
+    const session = this.repository.execution.sessionForTask(task.id)
+    const trustedTurns = new Set(this.repository.execution.attempts(task.id)
+      .filter(attempt => attempt.sessionId === session?.id && attempt.taskId === task.id)
+      .map(attempt => attempt.turnId))
+    return verifiedEffectReceipts(task, this.repository.operations(task.id), trustedTurns)
+  }
+
   finishToolOperation(token: ExecutionToken, key: string, result?: ToolHostResult): void {
     // An already-dispatched result is immutable evidence even after lease loss.
     const prior = this.repository.operation(token.taskId, key)
     if (!prior || prior.status === 'succeeded') return
     this.repository.finishOperation(token.taskId, key, { status: !result ? 'outcome_unknown' : result.item.kind==='tool_result' && result.item.isError ? ((result.item.output as {status?:string}|undefined)?.status==='outcome_unknown'?'outcome_unknown':'failed') : 'succeeded', ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {}) }, this.nowIso())
+  }
+
+  /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */
+  recordOperationVerification(taskId: string, expectedRevision: number, receiptId: string, verificationKey: string, evidence: import('../contracts/harness.js').ResultEvidence): void {
+    this.repository.transact(() => {
+      const task = this.repository.get(taskId)
+      const receipt = this.repository.operations(taskId, 'tool').find(item => item.id === receiptId)
+      const proof = this.repository.operation(taskId, verificationKey)
+      if (!task || !receipt || !proof || proof.kind !== 'effect_verification' || proof.request?.originalReceiptId !== receipt.id || proof.request?.originalFingerprint !== receipt.fingerprint) throw Object.assign(new Error('Readback proof does not belong to this operation.'), { code: 'invalid_state' })
+      if (task.revision !== expectedRevision) throw Object.assign(new Error('Task changed while verification was running.'), { code: 'stale_request' })
+      if (TERMINAL.has(task.status) || task.authority?.revokedAt) throw Object.assign(new Error('Task authorization was revoked.'), { code: 'execution_grant_revoked' })
+      const now = this.nowIso()
+      this.repository.finishOperation(taskId, verificationKey, { status: 'succeeded', result: { taskId, receiptId, status: 'verified', evidence } }, now)
+      this.repository.resolveOperation(taskId, receipt.idempotencyKey, { status: 'verified', receiptId: proof.id, evidence, resolvedAt: now })
+      this.repository.update(taskId, task.revision, current => ({ ...current, updatedAt: now,
+        resultEvidence: [...(current.resultEvidence ?? []).filter(item => !(item.provider === evidence.provider && item.operation === evidence.operation && item.target === evidence.target)), evidence] }),
+      { key: `operation-verified:${proof.id}`, kind: 'operation_verified', payload: { provider: evidence.provider, operation: evidence.operation, target: evidence.target, receiptId }, createdAt: now })
+    })
   }
 
   beginWork(turnId: string, id: string, kind: string): () => void {
@@ -681,7 +834,8 @@ export class TaskController {
     if (!['paused', 'stalled', 'waiting_user', 'waiting_approval', 'retrying'].includes(task.status)) {
       throw Object.assign(new Error(`task cannot resume from ${task.status}`), { code: 'invalid_state' })
     }
-    if (this.repository.unsettledOperations(taskId).some(operation => operation.kind === 'tool') || this.repository.listShellSessions(taskId).some(session => ['outcome_unknown','running','starting'].includes(session.status))) throw Object.assign(new Error('Verify outstanding operation and process outcomes before resuming this task.'), {code:'outcome_unknown'})
+    const hostShell = this.hostShellState(task)
+    if (hostShell.unknown.length || this.repository.unsettledOperations(taskId).some(operation => operation.kind === 'tool') || this.repository.listShellSessions(taskId).some(session => ['outcome_unknown','running','starting'].includes(session.status) && !hostShell.knownSessionIds.has(session.id))) throw Object.assign(new Error('Verify outstanding operation and process outcomes before resuming this task.'), {code:'outcome_unknown'})
     const now = this.nowIso()
     return this.repository.update(task.id, expectedRevision, (current) => ({
       ...current,
@@ -753,6 +907,10 @@ export class TaskController {
       const unknown = this.repository.unsettledOperations(task.id)
       if (unknown.length || unknownShell) {
         return this.repository.update(task.id, task.revision, current => ({ ...current, status: 'stalled', waitingReason: undefined, stalledReason: '上次操作结果尚未确认，请先核实执行回执后继续。', updatedAt: now }), { key: `recovery-unknown:${task.revision}`, kind: 'task_stalled', payload: { operationIds: unknown.map(item => item.id) }, createdAt: now })
+      }
+      const hostShell = this.hostShellState(task)
+      if (hostShell.lastFailed) {
+        return this.repository.update(task.id,task.revision,current=>({...current,status:'waiting_user',waitingReason:'上次已授权命令没有执行成功。请先处理失败原因，再明确授权新的检查命令；系统不会自动重放。',stalledReason:undefined,updatedAt:now}),{key:`recovery-shell-failed:${hostShell.lastFailed.id}`,kind:'task_waiting_user',payload:{operationId:hostShell.lastFailed.id},createdAt:now})
       }
       const recovered = this.repository.update(task.id, task.revision, (current) => ({
         ...current,
@@ -1134,6 +1292,19 @@ function shouldContinueActiveTask(prompt: string): boolean {
     (intent.length <= 80 && BARE_TASK_CONTINUATION_PATTERN.test(intent))
 }
 
+function externalVerificationLocator(args: Record<string, unknown>): Record<string, string> | undefined {
+  const locator: Record<string, string> = {}
+  for (const field of ['taskId', 'instanceCode', 'instanceId', 'toUserId']) {
+    const value = args[field]
+    if (typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,200}$/.test(value.trim())) locator[field] = value.trim()
+  }
+  return Object.keys(locator).length ? locator : undefined
+}
+
+function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call: ToolCallLike, evidence: NonNullable<OperationReceipt['resolution']>['evidence']): ToolHostResult['item'] {
+  return makeToolResultItem({ id: `item_${call.callId}`, threadId: task.threadId, turnId, callId: call.callId, toolName: call.toolName, output: { ok: true, status: 'succeeded', evidence, recovered: true } })
+}
+
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
   const effect = !files && promptRequiresExternalEffect(prompt)
@@ -1146,7 +1317,7 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     ...(files ? { minimumArtifacts: 1 } : {}),
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
-    ...(intent?.provider?{effect:{provider:intent.provider,operation:intent.operation ?? (intent.kind==='connect_provider'?'connect':'process'),target:intent.target,requiredScopes:[],requiresConfirmation:intent.mutation,successStatus:['succeeded'],verification:'provider_readback' as const}}:{})
+    ...(intent?.provider?{effect:{provider:intent.provider,operation:intent.operation ?? (intent.kind==='connect_provider'?'connect':'process'),target:intent.target ?? (intent.operation === 'list' ? 'current_user' : undefined),requiredScopes:[],requiresConfirmation:intent.mutation,successStatus:['succeeded'],verification:'provider_readback' as const}}:{})
   }
 }
 

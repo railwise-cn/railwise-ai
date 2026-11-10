@@ -62,6 +62,38 @@ const allowedFiles = [
   /^scripts\/verify-brand-boundary\.mjs$/
 ]
 
+// These files exercise or declare the precise historical workspace namespaces.
+// Remove only those literals before checking each line: unrelated product copy
+// in the same file must still fail the boundary check.
+const workspaceCompatibilityFiles = new Set([
+  'src/main/ipc/app-ipc-schemas.test.ts',
+  'src/main/ipc/register-app-ipc-handlers.test.ts',
+  'src/main/services/workspace-migration-service.ts',
+  'src/main/services/workspace-migration-service.test.ts',
+  'src/shared/workspace-migration.ts',
+  'src/renderer/src/components/chat/SidebarProjectsSection.test.ts',
+  'src/renderer/src/lib/workspace-path.test.ts',
+  'src/renderer/src/store/chat-store-helpers.test.ts'
+])
+
+function withoutWorkspaceCompatibilityLiterals(rel, line) {
+  let content = line
+  if (workspaceCompatibilityFiles.has(rel)) {
+    content = content.replace(/(['"])(?:\/[Uu]sers\/(?:example|zxy)\/)?\.workgpt(?:\/(?:default|write)_workspace|:(?:default|write))?\1/g, '$1$1')
+    if (rel === 'src/renderer/src/components/chat/SidebarProjectsSection.test.ts') {
+      content = content.replace(/(['"])\/users\/example\/\.kun\/default_workspace\1/g, '$1$1')
+    }
+  }
+  if (
+    /^src\/renderer\/src\/locales\/(?:en|zh)\/settings\.json$/.test(rel) &&
+    /^\s*"workspaceMigration(?:Description|Namespace_workgpt)":/.test(line)
+  ) content = content.replace(/"workspaceMigrationNamespace_workgpt":/, '"workspaceMigrationNamespace":').replace(/\.workgpt\b/g, '')
+  if (rel === 'docs/harness-trusted-execution.md' && line.includes('迁移服务盘点')) {
+    content = content.replace(/`\.workgpt`/g, '')
+  }
+  return content
+}
+
 function portable(path) {
   return path.split(sep).join('/')
 }
@@ -101,6 +133,8 @@ for (const absolute of files) {
     for (const rule of forbidden) {
       rule.pattern.lastIndex = 0
       if (!rule.pattern.test(line)) continue
+      rule.pattern.lastIndex = 0
+      if (!rule.pattern.test(withoutWorkspaceCompatibilityLiterals(rel, line))) continue
       if (
         (rel === 'electron-builder.cjs' || rel === 'src/main/index.ts') &&
         line.includes("com.wangjiawei508.workgpt")

@@ -32,6 +32,7 @@ export const KUN_SYSTEM_PROMPT = [
   '- Tool results are part of conversation history. Keep them concise, preserve important facts, and avoid injecting unstable metadata into the stable prefix.',
   '- If a tool is not advertised in the current turn, do not call it.',
   '- For external collaboration work, first use an advertised provider capability or the runtime preflight. Never invent a CLI name, executable, route, or command such as `dws`; never substitute Feishu/Lark for DingTalk or the reverse. If the provider is missing or unauthorised, explain that state and present the connection or installation action instead of planning a shell workaround.',
+  '- Before an external mutation, read actual provider records, then get_external_effect_scope and confirm_external_effect_scope to let the user review the entire finite action set. Do not silently reduce a broad request to one item. Once confirmed, execute only those exact actions, keep each write confirmation, and verify every result. Partial success or an unknown outcome is never full task completion.',
   '- Treat the advertised tool list and sandbox policy as the executable contract. In workspace-write, host shell commands are unavailable. Do not promise that a command will run and only discover the restriction after calling `bash`.',
   '',
   'Cache behavior:',

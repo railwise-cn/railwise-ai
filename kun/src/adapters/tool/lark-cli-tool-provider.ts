@@ -6,7 +6,7 @@ import type { LarkCapabilityConfig } from '../../contracts/capabilities.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { defineLocalTool } from './local-tool-definition.js'
-import { assertGrantAllowsNetwork, assertGrantConnectorScopes } from './sandbox-policy.js'
+import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes } from './sandbox-policy.js'
 
 const execFileAsync = promisify(execFile)
 export type LarkCommandResult = { ok: boolean; output: unknown; isError?: boolean }
@@ -42,11 +42,12 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
   const provider = 'lark'
   const apiRoot = config.brand === 'feishu' ? 'https://open.feishu.cn' : 'https://open.larksuite.com'
   const hasScopes = (required: readonly string[]) => required.every(scope => scopes.has(scope))
-  const run = async (args: string[], required: string[], context: ToolHostContext) => {
+  const run = async (args: string[], required: string[], context: ToolHostContext, action?: { operation: string; target: string }) => {
     if (context.abortSignal.aborted) throw new Error('Lark command aborted before start')
     if (!hasScopes(required)) throw new Error('connector_scope_missing')
     assertGrantAllowsNetwork(apiRoot, context)
     assertGrantConnectorScopes(required, context)
+    if (action) assertGrantAllowsExternalTarget(provider, action.operation, action.target, context)
     context.assertExecution?.()
     return normalizeLarkResult(await runner(config.executablePath!, args, context.abortSignal))
   }
@@ -59,7 +60,7 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
     execute: async (raw, context) => {
       const args = spec.parse.parse(raw)
       const target = typeof args.taskId === 'string' ? args.taskId : typeof args.instanceCode === 'string' ? args.instanceCode : 'current_user'
-      const result = await run(spec.args(args), spec.scopes, context)
+      const result = await run(spec.args(args), spec.scopes, context, { operation: spec.operation, target })
       if (!result.ok) {
         const response = asRecord(result.output)
         const remoteRejected = 'code' in response && response.code !== 0 && response.code !== '0'
@@ -70,7 +71,7 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
       if (spec.operation === 'complete') {
         remoteStatus = verifiedTaskState(data, target)
         if (!remoteStatus) {
-          const check = await run(['task', 'tasks', 'get', '--params', JSON.stringify({ task_guid: target }), ...jsonFlags], ['task:task:write'], context)
+          const check = await run(['task', 'tasks', 'get', '--params', JSON.stringify({ task_guid: target }), ...jsonFlags], ['task:task:read'], context)
           if (check.ok) { data = dataOf(check.output); remoteStatus = verifiedTaskState(data, target) }
         }
       } else if (spec.operation === 'approve' || spec.operation === 'reject') {
@@ -99,11 +100,11 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
   })
   const tools = [
     define({ name: 'lark_task_list', description: 'List pending tasks assigned to the connected Feishu/Lark user.', schema: { type: 'object', properties: { query: { type: 'string' } }, additionalProperties: false }, parse: taskQuery, scopes: ['task:task:read'], operation: 'list', args: args => ['task', '+get-my-tasks', '--complete=false', ...(args.query ? ['--query', String(args.query)] : []), ...jsonFlags] }),
-    define({ name: 'lark_task_get', description: 'Read one task by its exact task GUID.', schema: idSchema, parse: taskId, scopes: [scopes.has('task:task:read') ? 'task:task:read' : 'task:task:write'], operation: 'detail', args: args => ['task', 'tasks', 'get', '--params', JSON.stringify({ task_guid: args.taskId }), ...jsonFlags] }),
-    define({ name: 'lark_task_complete', description: 'Complete one task by GUID after explicit user approval; verify its final state.', schema: idSchema, parse: taskId, scopes: ['task:task:write'], operation: 'complete', mutation: true, args: args => ['task', '+complete', '--task-id', String(args.taskId), ...jsonFlags] }),
+    define({ name: 'lark_task_get', description: 'Read one task by its exact task GUID.', schema: idSchema, parse: taskId, scopes: ['task:task:read'], operation: 'detail', args: args => ['task', 'tasks', 'get', '--params', JSON.stringify({ task_guid: args.taskId }), ...jsonFlags] }),
+    define({ name: 'lark_task_complete', description: 'Complete one task by GUID after explicit user approval; verify its final state.', schema: idSchema, parse: taskId, scopes: ['task:task:read', 'task:task:write'], operation: 'complete', mutation: true, args: args => ['task', '+complete', '--task-id', String(args.taskId), ...jsonFlags] }),
     define({ name: 'lark_approval_list', description: 'Read pending approvals, including task IDs and instance codes.', schema: { type: 'object', properties: { keyword: { type: 'string' }, pageToken: { type: 'string' } }, additionalProperties: false }, parse: approvalQuery, scopes: ['approval:task:read'], operation: 'list', args: args => ['approval', 'tasks', 'query', '--params', JSON.stringify({ topic: '1', ...(args.keyword ? { keyword: args.keyword } : {}), ...(args.pageToken ? { page_token: args.pageToken } : {}) }), ...jsonFlags] }),
     define({ name: 'lark_approval_get', description: 'Read approval instance details and the states of its approval tasks.', schema: instanceSchema, parse: instanceId, scopes: ['approval:instance:read'], operation: 'detail', args: args => ['approval', 'instances', 'get', '--params', JSON.stringify({ instance_code: args.instanceCode }), ...jsonFlags] }),
-    ...(['approve', 'reject'] as const).map(operation => define({ name: `lark_approval_${operation}`, description: `${operation === 'approve' ? 'Approve' : 'Reject'} an exact approval task after explicit user approval; verify the task state.`, schema: actionSchema, parse: approvalAction, scopes: ['approval:task:write', 'approval:instance:read'], operation, mutation: true, args: args => ['approval', 'tasks', operation, '--data', JSON.stringify({ instance_code: args.instanceCode, task_id: args.taskId, ...(args.comment ? { comment: args.comment } : {}) }), ...jsonFlags, '--yes'] }))
+    ...(['approve', 'reject'] as const).map(operation => define({ name: `lark_approval_${operation}`, description: `${operation === 'approve' ? 'Approve' : 'Reject'} an exact approval task after explicit user approval; verify the task state.`, schema: actionSchema, parse: approvalAction, scopes: ['approval:task:read', 'approval:task:write', 'approval:instance:read'], operation, mutation: true, args: args => ['approval', 'tasks', operation, '--data', JSON.stringify({ instance_code: args.instanceCode, task_id: args.taskId, ...(args.comment ? { comment: args.comment } : {}) }), ...jsonFlags, '--yes'] }))
   ].filter(tool => tool.shouldAdvertise?.({} as ToolHostContext))
   if (tools.length === 0) return undefined
   return { id: 'lark-cli', kind: 'skill', enabled: true, available: true, tools }

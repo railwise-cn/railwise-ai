@@ -150,6 +150,7 @@ import type {
   RuntimeSpanV1,
   TaskRunListQuery,
   TaskRunV1,
+  TaskOperationReceiptV1,
   TaskInputV1,
   TaskEventV1,
   TaskAttentionV1,
@@ -389,6 +390,10 @@ export type WorkWiseApi = {
   cancelOperation: (request: CancelOperationRequest) => Promise<CancelOperationResult>
   coordinateTaskCommand: (request: import('./task-command').TaskCommandRequest) => Promise<import('./task-command').TaskCommandResult>
   getTaskRun: (taskId: string) => Promise<TaskRunV1 | null>
+  listTaskOperationReceipts: (taskId: string) => Promise<TaskOperationReceiptV1[]>
+  getTaskPermissions: (taskId: string) => Promise<import('./agent-workbench').TaskPermissionSnapshotV1>
+  confirmTaskPermissions: (taskId: string, request: import('./agent-workbench').TaskPermissionConfirmationV1) => Promise<{ task: TaskRunV1; permission: import('./agent-workbench').TaskPermissionSnapshotV1; resumed: false }>
+  verifyTaskOperationReceipt: (taskId: string, receiptId: string, request: Pick<RevisionTaskAction, 'expectedRevision' | 'idempotencyKey'>) => Promise<import('./agent-workbench').TaskOperationVerificationV1>
   readDocumentCandidate: (payload: import('./document-delivery').CandidateReviewRequest) => Promise<import('./document-delivery').DocumentCandidateReview>
   decideDocumentCandidate: (payload: import('./document-delivery').CandidateDecisionRequest) => Promise<import('./document-delivery').CandidateDecisionResult>
   listTaskPage: (query?: import('./agent-workbench').TaskPageQuery) => Promise<import('./agent-workbench').TaskRunPage>
@@ -518,6 +523,7 @@ export type WorkWiseApi = {
   }) => Promise<ThreadAgentSelectionV1>
   getWorkspaceTrust: (workspaceRoot: string) => Promise<WorkspaceTrustV1>
   scanLegacyWorkspaces: () => Promise<WorkspaceMigrationReport>
+  getLegacyWorkspaceAliases: () => Promise<WorkspaceMigrationReport['aliases']>
   importLegacyWorkspaceSnapshot: (request: WorkspaceImportRequest) => Promise<WorkspaceImportResult>
   setWorkspaceTrust: (request: {
     workspaceRoot: string

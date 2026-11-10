@@ -15,6 +15,8 @@ vi.mock('./chat-store-runtime', async (importOriginal) => ({
 
 import { createNavigationActions } from './chat-store-navigation-actions'
 import { createThreadActions } from './chat-store-thread-actions'
+import { rendererRuntimeClient } from '../agent/runtime-client'
+import type { WorkWiseSettingsV2 } from '@shared/app-settings'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -64,8 +66,32 @@ function buildHarness(initialThreads: NormalizedThread[]) {
 
 describe('chat-store-navigation-actions thread refresh races', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
     mocks.getProvider.mockReset()
     mocks.readWriteWorkspaceRoots.mockReset().mockResolvedValue([])
+  })
+
+  it('keeps an explicitly cleared workspace empty when starting another chat without rewriting old history', async () => {
+    const previous = { ...engineeringThread('old', 'unused'), domain: undefined, projectId: undefined, workspace: '/Users/test/.workwise/default_workspace' }
+    const settings = { workspaceRoot: '' } as WorkWiseSettingsV2
+    const setSettings = vi.fn(async () => settings)
+    vi.stubGlobal('window', { workwise: { setSettings } })
+    vi.spyOn(rendererRuntimeClient, 'setSettings').mockImplementation(setSettings)
+    vi.spyOn(rendererRuntimeClient, 'getSettings').mockResolvedValue(settings)
+    mocks.getProvider.mockReturnValue({ listThreads: vi.fn(async () => [previous]) })
+    const { state, sseAbortRef } = buildHarness([previous])
+    const stream = new AbortController()
+    sseAbortRef.current = stream
+    state.route = 'chat'
+    state.chooseWorkspace = vi.fn(async () => null)
+    await state.clearWorkspace()
+    expect(state.workspaceRoot).toBe('')
+    expect(state.activeThreadId).toBeNull()
+    expect(stream.signal.aborted).toBe(true)
+    expect(state.threads[0]?.workspace).toBe(previous.workspace)
+    await state.createThread()
+    expect(state.chooseWorkspace).toHaveBeenCalledWith({ createThreadAfter: true })
+    vi.unstubAllGlobals()
   })
 
   it.each([false, true])('keeps a newly created Survey conversation selected when an older refresh resumes (previous task: %s)', async (hasPreviousTask) => {

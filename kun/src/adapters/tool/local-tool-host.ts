@@ -5,6 +5,7 @@ import type {
   ToolCallLike,
   ToolExecutionUpdate
 } from '../../ports/tool-host.js'
+import { createHash } from 'node:crypto'
 import type { ApprovalRequest } from '../../domain/approval.js'
 import { createApprovalRequest } from '../../domain/approval.js'
 import { buildToolArgumentSummary } from '../../security/tool-persistence-security.js'
@@ -180,6 +181,7 @@ export class LocalToolHost implements ToolHost {
       }
     }
     const needsApproval = this.requiresApproval(tool, activeCall, context)
+    const approvedRequestHash = createHash('sha256').update(JSON.stringify(activeCall.arguments)).digest('hex')
     if (needsApproval) {
       const approvalId = `appr_${activeCall.callId}`
       const approval: ApprovalRequest = createApprovalRequest({
@@ -209,8 +211,12 @@ export class LocalToolHost implements ToolHost {
     try {
       await context.validateExecutionGrant?.()
       context.assertExecution?.()
+      if (needsApproval) context.recordExplicitApproval?.({ toolName: activeCall.toolName, requestHash: approvedRequestHash })
       const finishWork = context.beginExecutionWork?.()
-      try { result = await tool.execute(activeCall.arguments, context, async (update) => {
+      try { result = await tool.execute(activeCall.arguments, {
+        ...context,
+        explicitApproval: needsApproval ? { callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
+      }, async (update) => {
         if (!onUpdate) return
         const partialItem = makeToolResultItem({
           id: `item_${activeCall.callId}`,
@@ -273,7 +279,7 @@ export class LocalToolHost implements ToolHost {
       output,
       isError
     })
-    return { item, approved: !needsApproval }
+    return { item, approved: true }
   }
 
   clearReadTracker(threadId?: string): void {

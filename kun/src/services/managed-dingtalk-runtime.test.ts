@@ -64,6 +64,7 @@ describe('ManagedDingTalkRuntime', () => {
 
     expect(await runtime.preflight('帮我查询钉钉待办')).toMatchObject({ status: 'available', credentialState: 'valid' })
     expect(await runtime.preflight('帮我完成钉钉待办')).toMatchObject({ status: 'needs_authorization', errorCode: 'connector_scope_missing' })
+    expect(await runtime.preflight('帮我发送钉钉消息')).toMatchObject({ status: 'unsupported' })
     expect(await runtime.preflight('如何使用钉钉审批')).toBeNull()
   })
 

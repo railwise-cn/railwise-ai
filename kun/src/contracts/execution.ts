@@ -38,6 +38,7 @@ export const TaskCommandSchema = z.object({
   intent: z.enum(['auto', 'status', 'supplement', 'new', 'chat', 'pause', 'resume', 'cancel']).default('auto'),
   idempotencyKey: z.string().trim().min(1).max(256), expectedRevision: z.number().int().nonnegative().optional(),
   resolveAttentionId: z.string().min(1).optional(),
+  selectedExternalProvider: z.enum(['dingtalk', 'lark']).optional(),
   request: StartTurnRequest
 })
 export type TaskCommand = z.input<typeof TaskCommandSchema>

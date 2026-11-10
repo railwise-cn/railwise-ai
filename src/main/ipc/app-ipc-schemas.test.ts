@@ -735,7 +735,8 @@ describe('app-ipc-schemas', () => {
             timeOfDay: '09:30',
             atTime: ''
           },
-          lastStatus: 'idle'
+          lastStatus: 'waiting_user',
+          runtimeTaskId: 'runtime_task'
         }]
       }
     })
@@ -743,6 +744,8 @@ describe('app-ipc-schemas', () => {
     expect(payload.schedule?.internal?.port).toBe(9788)
     expect(payload.schedule?.tasks?.[0]?.schedule?.kind).toBe('daily')
     expect(payload.schedule?.tasks?.[0]?.reasoningEffort).toBe('high')
+    expect(payload.schedule?.tasks?.[0]?.lastStatus).toBe('waiting_user')
+    expect(payload.schedule?.tasks?.[0]?.runtimeTaskId).toBe('runtime_task')
 
     const fromText = scheduleTaskFromTextPayloadSchema.parse({
       text: 'Remind me tomorrow morning to ship the review',

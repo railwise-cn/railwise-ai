@@ -1,5 +1,10 @@
 {
   "title": "Settings",
+  "pluginAvailableToInstall": "Available to install",
+  "pluginConfiguredUnverified": "Configured · verification pending",
+  "pluginInstalledUnavailable": "Installed · currently unavailable",
+  "pluginInstalledSourceUnavailable": "Installed · source unavailable",
+  "pluginInstallationHealth": "Installation health",
   "subtitle": "Manage API access, interface preferences, default folders, and assistant behavior.",
   "back": "Back",
   "general": "General",

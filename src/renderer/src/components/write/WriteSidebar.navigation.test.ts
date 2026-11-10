@@ -49,7 +49,7 @@ afterEach(async () => {
 })
 
 describe('WriteSidebar navigation', () => {
-  it('keeps the two primary entries and all six sidebar tools visible and clickable', async () => {
+  it('keeps primary and document entries clickable while hiding unconfigured execution tools', async () => {
     const sidebarProps = createProps()
     await act(async () => root.render(createElement(WriteSidebar, sidebarProps)))
 
@@ -59,9 +59,6 @@ describe('WriteSidebar navigation', () => {
     expect([...toolButtons].map((button) => button.textContent)).toEqual([
       'Write',
       'Tasks',
-      'Scheduled tasks',
-      'Flow',
-      'Design',
       'Plugins'
     ])
     expect(toolButtons[0]?.getAttribute('aria-current')).toBe('page')
@@ -74,8 +71,8 @@ describe('WriteSidebar navigation', () => {
     expect(sidebarProps.onWriteOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onTasksOpen).toHaveBeenCalledOnce()
     expect(sidebarProps.onOpenPlugins).toHaveBeenCalledOnce()
-    expect(sidebarProps.onScheduleOpen).toHaveBeenCalledOnce()
-    expect(sidebarProps.onFlowOpen).toHaveBeenCalledOnce()
-    expect(sidebarProps.onDesignOpen).toHaveBeenCalledOnce()
+    expect(sidebarProps.onScheduleOpen).not.toHaveBeenCalled()
+    expect(sidebarProps.onFlowOpen).not.toHaveBeenCalled()
+    expect(sidebarProps.onDesignOpen).not.toHaveBeenCalled()
   })
 })

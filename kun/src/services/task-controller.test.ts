@@ -364,7 +364,7 @@ describe('TaskController reliability boundaries', () => {
     await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
       kind: 'waiting_user',
       task: { status: 'waiting_user', acceptance: { kind: 'effect' } },
-      reason: expect.stringContaining('外部操作没有已验证的工具回执')
+      reason: expect.stringContaining('目标集合及逐项验证回执')
     })
     expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
     repository.close()
@@ -407,6 +407,33 @@ describe('TaskController reliability boundaries', () => {
       task: { status: 'completed', acceptance: { kind: 'effect' } }
     })
     expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(1)
+    repository.close()
+  })
+
+  it('does not dispatch or complete a broad Lark task without a finite reviewed target set', async () => {
+    const { repository, sessionStore, controller, task } = await fixture('帮我处理飞书待办。')
+    expect(task.acceptance).toMatchObject({ kind: 'effect', effect: { provider: 'lark', operation: 'process', requiresConfirmation: true } })
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'item_lark_effect_done',
+      threadId: task.threadId,
+      turnId: 'turn_reliability',
+      text: '已完成飞书待办 task-42。',
+      status: 'completed'
+    }))
+
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    expect(() => controller.beginToolOperation('turn_reliability', {
+      callId: 'call_lark_complete',
+      toolName: 'lark_task_complete',
+      arguments: { taskId: 'task-42' }
+    })).toThrow(/confirm_external_effect_scope/)
+    expect(repository.operations(task.id, 'tool')).toHaveLength(0)
+
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
+      kind: 'waiting_user',
+      task: { status: 'waiting_user' }
+    })
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
     repository.close()
   })
 

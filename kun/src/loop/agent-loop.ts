@@ -400,6 +400,7 @@ export type AgentLoopOptions = {
   engineeringTurnPolicy?: (threadId: string, projectId: string, turnId: string) => Promise<{ instruction: string; allowedToolNames: string[]; executionPaused?: boolean }>
   workspaceTrust?: WorkspaceTrustReader
   executionScope?: (threadId: string, turnId: string) => Promise<ExecutionScope>
+  validateTaskPermission?: (threadId: string, permissionId?: string) => Promise<unknown>
   threadStore: ThreadStore
   sessionStore: SessionStore
   approvalGate: ApprovalGate
@@ -1830,7 +1831,12 @@ export class AgentLoop {
     const trust = trustOrder[Math.min(trustOrder.indexOf(workspace.level), trustOrder.indexOf(agentTrust))]!
     const sandboxMode = effectiveAgentSandboxMode(context.sandboxMode ?? DEFAULT_SANDBOX_MODE, trust)
     const task = this.opts.tasks?.activeTask(thread.id)
-    const catalog = await this.opts.toolHost.listTools({ ...context, workspace: workspace.canonicalRoot, sandboxMode })
+    const catalog = await this.opts.toolHost.listTools({
+      ...context,
+      workspace: workspace.canonicalRoot,
+      sandboxMode,
+      ...(scope?.allowedProviderIds !== undefined ? { allowedProviderIds: [...scope.allowedProviderIds] } : {})
+    })
     return ExecutionGrantSchema.parse({
       id: `grant:${turnId}:${workspace.revision}:${thread.agentRevision ?? 0}`,
       ...(task ? { taskId: task.id } : {}),
@@ -1839,18 +1845,20 @@ export class AgentLoop {
       sandboxMode,
       allowedToolNames: catalog.map(tool => tool.name).filter(name => !scope?.allowedToolNames || scope.allowedToolNames.includes(name)),
       ...(context.allowedMcpProviderIds ? { allowedMcpProviderIds: [...context.allowedMcpProviderIds] } : {}),
-      ...(scope?.allowedProviderIds ? { allowedProviderIds: [...scope.allowedProviderIds] } : {}),
+      ...(scope?.allowedProviderIds !== undefined ? { allowedProviderIds: [...scope.allowedProviderIds] } : {}),
       pathAllowlist: scope?.pathAllowlist ?? (trust === 'full-access' && sandboxMode === 'danger-full-access' ? ['*'] : workspace.canonicalRoot ? [workspace.canonicalRoot] : []),
       networkAllowlist: scope?.networkAllowlist ?? ['*'],
       connectorScopes: scope?.connectorScopes ?? [], externalTargets: scope?.externalTargets ?? [],
       workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,
       revision: workspace.revision, idempotencyKey: `grant:${turnId}`, issuedAt: this.opts.nowIso(),
+      ...(scope?.taskPermissionId ? { taskPermissionId: scope.taskPermissionId } : {}),
       // Grants are Turn-bound and time-bounded; a new Turn is required to elevate them.
       expiresAt: scope?.expiresAt ?? new Date(Date.parse(this.opts.nowIso()) + RUNTIME_RESOURCE_LIMITS_V1.turnTotalMs).toISOString()
     })
   }
 
   private async validateGrant(grant: ExecutionGrant): Promise<void> {
+    await this.opts.validateTaskPermission?.(grant.threadId, grant.taskPermissionId)
     if (grant.expiresAt && Date.parse(grant.expiresAt) <= Date.parse(this.opts.nowIso())) throw Object.assign(new Error('Execution grant expired; start a newly authorized Turn.'), { code: 'execution_grant_expired' })
     const thread = await this.opts.threadStore.get(grant.threadId)
     if (!thread || (thread.agentRevision ?? 0) !== grant.agentRevision || (thread.agentProfile?.trustLevel ?? 'full-access') !== grant.agentTrust || !thread.turns.some(turn => turn.id === grant.turnId)) throw Object.assign(new Error('Agent authority changed; the old execution grant is revoked.'), { code: 'execution_grant_revoked' })
@@ -1950,12 +1958,16 @@ export class AgentLoop {
             }
           })
         }
-        const operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call, input.context.executionGrant)
-        if (operation?.prior) return operation.prior
+        let operation: ReturnType<TaskController['beginToolOperation']>
         try {
-          const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(operation ? {
-            assertExecution: () => this.opts.tasks?.assertToken(operation.token),
-            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {beginExecutionWork:()=>this.opts.tasks?.beginWork(input.turnId,`tool-work:${operation.token.executionId}:${input.call.callId}`,'tool')} : {})
+          operation = this.opts.tasks?.beginToolOperation(input.turnId, input.call, input.context.executionGrant)
+          if (operation?.prior) return operation.prior
+          const dispatchOperation = operation
+          const result = await this.opts.toolHost.execute(input.call, { ...input.context, ...(dispatchOperation ? {
+            assertExecution: () => this.opts.tasks?.assertToken(dispatchOperation.token),
+            assertExternalTarget: (provider: string, operation: string, target: string) => this.opts.tasks!.assertExternalTarget(input.turnId, provider, operation, target),
+            recordExplicitApproval: approval => this.opts.tasks!.recordToolApproval(dispatchOperation.token, dispatchOperation.key, approval),
+            ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {beginExecutionWork:()=>this.opts.tasks?.beginWork(input.turnId,`tool-work:${dispatchOperation.token.executionId}:${input.call.callId}`,'tool')} : {})
           } : {}) }, async (item) => {
             if (operation) this.opts.tasks?.assertToken(operation.token)
             const existing = await this.opts.turns.updateItem(input.threadId, item.id, {
@@ -2008,9 +2020,11 @@ export class AgentLoop {
               toolName: input.call.toolName,
               toolKind: input.call.toolKind ?? 'tool_call',
               output: {
-                code: 'tool_dispatch_rejected',
+                code: (error as {code?:string}).code ?? 'tool_dispatch_rejected',
                 error: message,
-                guidance: 'Use only tools advertised in the current turn context.'
+                guidance: (error as {code?:string}).code === 'effect_scope_required'
+                  ? 'Read get_external_effect_scope and confirm the complete finite action set before requesting this mutation.'
+                  : 'Use only tools advertised in the current turn context.'
               },
               isError: true
             }),
@@ -2032,6 +2046,7 @@ export class AgentLoop {
   private isRecoverableToolDispatchError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error)
     return (
+      (error as {code?:string}).code === 'effect_scope_required' ||
       message.startsWith('unknown tool:') ||
       message.includes(' is not provided by ') ||
       message.includes(' is not advertised') ||

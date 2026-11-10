@@ -1,5 +1,6 @@
 import type { TaskViewService } from '../../services/task-view-service.js'
 import type { TaskControlService } from '../../services/task-control-service.js'
+import type { TaskPermissionService } from '../../services/task-permission-service.js'
 import type { TaskCoordinator } from '../../services/task-coordinator.js'
 import type { TaskContextRuntime } from '../../services/task-context-runtime.js'
 import type { CapacityManager } from '../../services/capacity-manager.js'
@@ -34,6 +35,7 @@ import type { TaskRunRepository } from '../../services/task-run-repository.js'
 import type { RuntimeSpanService } from '../../services/runtime-span-service.js'
 import type { FlowRuntimeService } from '../../flow/service.js'
 import type { WorkspaceReferenceService } from '../../services/workspace-reference-service.js'
+import type { ExternalTaskPreflight } from '../../services/external-task-capability.js'
 import type { UiActionService } from '../../services/ui-action-service.js'
 import type { EngineeringService } from '../../engineering/engineering-service.js'
 import type { EngineeringContextService } from '../../engineering/engineering-context-service.js'
@@ -72,11 +74,15 @@ export type ServerRuntime = {
   taskViewService?: TaskViewService
   taskCoordinator?: TaskCoordinator
   taskControlService?:TaskControlService
+  taskPermissionService?:TaskPermissionService
+  preflightExternalTask?: ExternalTaskPreflight
   configureDingTalk?: (input: unknown) => Promise<unknown>
   beginDingTalkOAuth?: () => Promise<unknown>
   completeDingTalkOAuth?: (callbackUrl: string) => Promise<unknown>
   authorizeDingTalkWorkflow?: (input: unknown) => Promise<unknown>
   refreshDingTalk?: () => Promise<unknown>
+  refreshLark?: () => Promise<unknown>
+  verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult>
   taskContextRuntime?: TaskContextRuntime
   capacityManager?: CapacityManager
   taskController?: TaskController

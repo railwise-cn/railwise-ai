@@ -522,7 +522,13 @@ export function createNavigationActions(
         return
       }
       const next = await rendererRuntimeClient.setSettings({ workspaceRoot: '' })
+      // Leaving a workspace detaches its visible chat, without cancelling the
+      // runtime task or rewriting the historical chat's workspace identity.
+      sseAbortRef.current?.abort()
+      sseAbortRef.current = null
+      clearBusyWatchdog()
       set({
+        ...clearedThreadSelection(),
         workspaceRoot: normalizeWorkspaceRoot(next.workspaceRoot),
         codeWorkspaceRoots: get().codeWorkspaceRoots,
         workspaceLabel: workspaceLabelFromPath(''),

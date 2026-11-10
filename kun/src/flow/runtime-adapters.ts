@@ -5,6 +5,8 @@ import PptxGenJS from 'pptxgenjs'
 import type { AttachmentStore } from '../attachments/attachment-store.js'
 import type { ModelClient } from '../ports/model-client.js'
 import type { FlowNodeAdapter } from './executor.js'
+import { assertFlowNodeExecutable, FlowExecutionPolicyError } from './execution-policy.js'
+import { externalProviderAmbiguity, externalTaskIntent } from '../services/external-task-capability.js'
 
 const MAX_MODEL_TEXT = 256_000
 const MAX_HTTP_BYTES = 1024 * 1024
@@ -23,6 +25,7 @@ export function buildRuntimeFlowAdapters(deps: RuntimeFlowAdapterDependencies): 
   adapters.set('classification', modelAdapter(deps, 'Classify the input. Return one JSON object with a category field.', true))
   adapters.set('parameter_extraction', modelAdapter(deps, 'Extract the requested parameters. Return one JSON object only.', true))
   adapters.set('subagent', async ({ run, node, input, signal, definition }) => {
+    assertFlowNodeExecutable('subagent')
     if (!deps.runSubagent) throw new Error('subagent capability is unavailable')
     return { kind: 'output', output: await deps.runSubagent({ parentThreadId: run.id, parentTurnId: node.id, label: node.label, prompt: promptFor(node.config, input), workspace: definition.workspace, model: stringValue(node.config.model), signal, maxDurationMs: node.policy.timeoutMs }) }
   })
@@ -40,10 +43,27 @@ export function buildRuntimeFlowAdapters(deps: RuntimeFlowAdapterDependencies): 
 
 function modelAdapter(deps: RuntimeFlowAdapterDependencies, instruction: string, json = false): FlowNodeAdapter {
   return async ({ run, node, input, signal }) => {
+    // A generic text-generation node has no task authority, typed connector or
+    // receipt ledger. It cannot turn an external action into a successful answer.
+    if (!json && [stringValue(node.config.prompt) ?? '', ...flowRequestTexts(input)].some(text => externalTaskIntent(text) || externalProviderAmbiguity(text))) {
+      throw new FlowExecutionPolicyError('A generic Agent node cannot execute or verify DingTalk or Feishu/Lark work. The model was not called.')
+    }
     const text = await collectModelText(deps.model, { threadId: run.id, turnId: `${run.id}_${node.id}`, model: stringValue(node.config.model) ?? deps.defaultModel, prompt: `${instruction}\n\n${promptFor(node.config, input)}`, signal, json })
     if (!json) return { kind: 'output', output: { role: 'assistant', text, model: stringValue(node.config.model) ?? deps.defaultModel } }
     try { return { kind: 'output', output: JSON.parse(extractJson(text)) } } catch { throw new Error(`model did not return valid JSON: ${text.slice(0, 500)}`) }
   }
+}
+
+/** Preserve user text boundaries so a how-to question stays a knowledge request. */
+function flowRequestTexts(value: unknown, depth = 0): string[] {
+  if (typeof value === 'string') return [value.slice(0, MAX_MODEL_TEXT)]
+  if (!value || typeof value !== 'object' || depth >= 6) return []
+  if (Array.isArray(value)) return value.slice(0, 64).flatMap(item => flowRequestTexts(item, depth + 1))
+  const entries = Object.entries(value).slice(0, 64)
+  const requestKeys = new Set(['displayText', 'prompt', 'request', 'text', 'message', 'instruction', 'goal'])
+  const requests = entries.filter(([key, item]) => requestKeys.has(key) && typeof item === 'string').map(([, item]) => String(item).slice(0, MAX_MODEL_TEXT))
+  const descriptors = entries.filter(([key, item]) => !requestKeys.has(key) && (typeof item === 'string' || typeof item === 'number')).map(([, item]) => String(item)).join('\n').slice(0, MAX_MODEL_TEXT)
+  return [...requests, ...(descriptors ? [descriptors] : []), ...entries.filter(([, item]) => item && typeof item === 'object').flatMap(([, item]) => flowRequestTexts(item, depth + 1))]
 }
 
 async function collectModelText(model: ModelClient, input: { threadId: string; turnId: string; model: string; prompt: string; signal: AbortSignal; json: boolean }): Promise<string> {
@@ -60,11 +80,18 @@ function httpAdapter(fetchImpl: typeof globalThis.fetch): FlowNodeAdapter {
   return async ({ node, input, signal }) => {
     const record = objectValue(input); const rawUrl = stringValue(node.config.url) ?? stringValue(record.url); if (!rawUrl) throw new Error('HTTP node requires url')
     const url = new URL(rawUrl); const loopback = ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+    const method = (stringValue(node.config.method) ?? 'GET').toUpperCase()
+    if (!['GET', 'HEAD'].includes(method)) throw new FlowExecutionPolicyError(`Generic HTTP supports GET/HEAD reads only; ${method} was not sent.`)
+    const hostname = url.hostname.toLowerCase().replace(/\.+$/, '')
+    if (['dingtalk.com', 'dingtalk.cn', 'feishu.cn', 'larksuite.com', 'larkoffice.com'].some(domain => hostname === domain || hostname.endsWith(`.${domain}`))) {
+      throw new FlowExecutionPolicyError('DingTalk and Feishu/Lark operations, including reads, require their own typed Provider; the request was not sent.')
+    }
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback && node.config.allowLoopback === true)) throw new Error('HTTP node requires HTTPS; loopback HTTP must be explicitly enabled')
     if (url.username || url.password) throw new Error('HTTP URL credentials are forbidden')
-    const method = (stringValue(node.config.method) ?? 'GET').toUpperCase(); if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) throw new Error('HTTP method is not allowed')
-    const headers = stringRecord(node.config.headers); const bodyValue = record.body ?? node.config.body; const body = method === 'GET' || bodyValue === undefined ? undefined : typeof bodyValue === 'string' ? bodyValue : JSON.stringify(bodyValue)
-    const response = await fetchImpl(url, { method, headers, body, signal }); const bytes = Buffer.from(await response.arrayBuffer()); if (bytes.length > MAX_HTTP_BYTES) throw new Error('HTTP response exceeds 1 MiB')
+    const headers = stringRecord(node.config.headers)
+    if (Object.keys(headers).some(name => ['x-http-method', 'x-http-method-override', 'x-method-override'].includes(name.toLowerCase()))) throw new FlowExecutionPolicyError('HTTP method override headers are not allowed; the request was not sent.')
+    // Do not follow redirects into platform APIs or another method/authority.
+    const response = await fetchImpl(url, { method, headers, redirect: 'error', signal }); const bytes = Buffer.from(await response.arrayBuffer()); if (bytes.length > MAX_HTTP_BYTES) throw new Error('HTTP response exceeds 1 MiB')
     const contentType = response.headers.get('content-type') ?? ''; const responseBody = contentType.includes('json') ? JSON.parse(bytes.toString('utf8') || 'null') : bytes.toString('utf8')
     return { kind: 'output', output: { status: response.status, ok: response.ok, headers: Object.fromEntries(response.headers.entries()), body: responseBody } }
   }

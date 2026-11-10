@@ -2,7 +2,7 @@ import { useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import type { ManagedToolResult } from '@shared/workwise-api'
-import { useChatStore } from '../../store/chat-store'
+import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 
 type LoginStartResult = { ok: true; verificationUrl: string; userCode: string; expiresAt: string } | { ok: false; message: string }
 type LoginApi = {
@@ -24,6 +24,26 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
   const [capability, setCapability] = useState(card.capability)
   const isLark = capability.provider === 'lark' || capability.provider === 'feishu'
   const action = capability.resolution ?? capability.action
+  const configure = (): void => {
+    if (action?.kind === 'switch_workspace') {
+      void run(async () => { await chooseWorkspace({ createThreadAfter: false, selectThreadAfter: false }) })
+      return
+    }
+    const route = action?.route ?? ''
+    if (action?.kind === 'grant' || route === 'settings' || route.startsWith('settings/')) {
+      // DingTalk credentials are configured in General. A generic MCP page or
+      // the marketplace cannot change an existing task's execution authority.
+      const section = route.slice('settings/'.length)
+      const sections: SettingsRouteSection[] = ['general', 'providers', 'write', 'imageGeneration', 'agents', 'skill', 'mcp', 'shortcuts', 'claw', 'help']
+      openSettings(capability.provider === 'dingtalk' && action?.kind === 'connect' ? 'general'
+        : sections.includes(section as SettingsRouteSection) ? section as SettingsRouteSection
+          : capability.errorCode === 'agent_tool_blocked' ? 'agents' : 'general')
+      return
+    }
+    if (route === 'marketplace' || isLark) openPlugins()
+    else openSettings('general')
+  }
+  const execution = capability.executionContext
   const loginApi: LoginApi = typeof window === 'undefined' ? {} : window.workwise as typeof window.workwise & LoginApi
   const run = async (operation: () => Promise<void>): Promise<void> => {
     if (pending) return
@@ -88,9 +108,16 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
         <dt className="text-ds-muted">{t('capabilityProvider')}</dt><dd>{isLark ? t('capabilityLark') : t('capabilityDingTalk')}</dd>
         <dt className="text-ds-muted">{t('capabilityCurrentStatus')}</dt><dd>{t(`capabilityStatus_${capability.status}`)}</dd>
-        <dt className="text-ds-muted">{t('capabilityWorkspace')}</dt><dd className="break-all">{capability.workspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
+        <dt className="text-ds-muted">{t('capabilityWorkspace')}</dt><dd className="break-all">{execution?.workspaceRoot || capability.workspaceRoot || t('capabilityWorkspaceUnknown')}</dd>
         <dt className="text-ds-muted">{t('capabilityRequestedScope')}</dt><dd>{capability.requiredScopes?.join(', ') || t('capabilityScopeNotGranted')}</dd>
+        {execution ? <>
+          <dt className="text-ds-muted">{t('capabilityWorkspaceTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.workspaceTrust}`)}</dd>
+          <dt className="text-ds-muted">{t('capabilityAgentTrust')}</dt><dd>{t(`settings:agentCenterTrust_${execution.agentTrust}`)}</dd>
+          <dt className="text-ds-muted">{t('capabilitySandbox')}</dt><dd>{t(({ 'read-only': 'sandboxReadOnlyShort', 'workspace-write': 'sandboxWorkspaceWriteShort', 'danger-full-access': 'sandboxFullAccessShort', 'external-sandbox': 'sandboxExternalShort' } as Record<string, string>)[execution.sandboxMode] ?? 'capabilityStateUnknown')}</dd>
+          <dt className="text-ds-muted">{t('composerApprovalShort')}</dt><dd>{t(({ auto: 'approvalAutoShort', 'on-request': 'approvalOnRequestShort', untrusted: 'approvalUntrustedShort', suggest: 'approvalSuggestShort', never: 'approvalNeverShort' } as Record<string, string>)[execution.approvalPolicy] ?? 'capabilityStateUnknown')}</dd>
+        </> : null}
       </dl>
+      {execution?.availableTools ? <details className="mt-2 text-xs text-ds-muted"><summary className="cursor-pointer">{t('capabilityAvailableTools', { count: execution.availableTools.length })}</summary><p className="mt-1 break-all">{execution.availableTools.join(', ') || t('capabilityNoTools')}</p></details> : null}
       {login ? <div role="status" className="mt-3 rounded-lg border border-ds-border bg-ds-surface p-3">
         <p>{t('capabilityLoginCode', { code: login.userCode })}</p>
         <p className="mt-1 text-xs text-ds-muted">{t('capabilityLoginExpires', { expiresAt: new Date(login.expiresAt).toLocaleString() })}</p>
@@ -103,11 +130,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
           <button type="button" disabled={pending} onClick={() => void run(() => managed(false))}>{t('capabilityDiagnose')}</button>
           {(capability.status !== 'not_installed' || managedState === 'needs_login' || managedState === 'installed') && loginApi.beginManagedLarkLogin ? <button type="button" disabled={pending} onClick={() => void run(beginLogin)}>{t('capabilityLoginLark')}</button> : null}
         </> : null}
-        <button type="button" disabled={pending} onClick={() => {
-          if (action?.kind === 'switch_workspace') void run(async () => { await chooseWorkspace({ createThreadAfter: false, selectThreadAfter: false }) })
-          else if (isLark) openPlugins()
-          else openSettings('general')
-        }}>{t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
+        <button type="button" disabled={pending} onClick={configure}>{action?.label || t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : null}

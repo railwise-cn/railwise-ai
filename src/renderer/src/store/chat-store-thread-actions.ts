@@ -530,7 +530,7 @@ export function createThreadActions(
       }
     }
     let coordinatedTurn: {threadId:string;turnId:string;userMessageItemId?:string}|undefined
-    const canCoordinate = !queued && !overrides?.guiPlan && !overrides?.guiDesign && get().route === 'chat' && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
+    const canCoordinate = !queued && !overrides?.guiPlan && !overrides?.guiDesign && ['chat', 'write'].includes(get().route) && typeof window !== 'undefined' && typeof window.workwise?.coordinateTaskCommand === 'function'
     const coordinate = async (threadId:string,prompt:string,appendUser=true,optimisticUserId?:string):Promise<boolean> => {
       const result=await window.workwise.coordinateTaskCommand({threadId,intent:'auto',idempotencyKey:crypto.randomUUID(),request:{prompt,displayText:overrides?.displayText??trimmedText,mode:mode??'agent',...(composerModel?{model:composerModel}:{}),...(providerId?{providerId}:{}),...(overrides?.reasoningEffort?{reasoningEffort:overrides.reasoningEffort}:{}),...((overrides?.attachmentIds?.length || messageAttachments.length)?{attachmentIds:overrides?.attachmentIds?.length?overrides.attachmentIds:messageAttachments.map(item=>item.id)}:{}),...(overrides?.workspaceReferences?.length?{workspaceReferences:overrides.workspaceReferences}:{})}})
       if(result.kind==='chat_started'){coordinatedTurn=result.turn;return false}

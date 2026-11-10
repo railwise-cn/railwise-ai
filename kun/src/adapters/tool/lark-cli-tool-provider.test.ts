@@ -6,14 +6,43 @@ import { buildLarkCliToolProvider, _larkCliToolProviderInternals } from './lark-
 
 const scopes = ['task:task:read', 'task:task:write', 'approval:task:read', 'approval:instance:read', 'approval:task:write']
 const config = () => LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes })
-const context = (awaitApproval: ToolHostContext['awaitApproval'] = vi.fn(async () => 'allow' as const)): ToolHostContext => ({ threadId: 'thread', turnId: 'turn', workspace: '/workspace', approvalPolicy: 'auto', sandboxMode: 'workspace-write', abortSignal: new AbortController().signal, awaitApproval })
+const context = (awaitApproval: ToolHostContext['awaitApproval'] = vi.fn(async () => 'allow' as const)): ToolHostContext => ({ threadId: 'thread', turnId: 'turn', workspace: '/workspace', approvalPolicy: 'auto', sandboxMode: 'workspace-write', abortSignal: new AbortController().signal, awaitApproval, assertExternalTarget: vi.fn() })
 
 describe('verified typed Lark CLI provider', () => {
+  it('keeps list reads available but refuses unscoped writes before invoking the CLI', async () => {
+    const runner = vi.fn(async () => ({ ok: true, output: { code: 0, data: { items: [] } } }))
+    const provider = buildLarkCliToolProvider(config(), runner)!
+    const unscoped = { ...context(), assertExternalTarget: undefined }
+    await provider.tools.find(tool => tool.name === 'lark_task_list')!.execute({}, unscoped)
+    await expect(provider.tools.find(tool => tool.name === 'lark_task_complete')!.execute({ taskId: 'outside' }, unscoped)).rejects.toMatchObject({ code: 'external_target_blocked' })
+    expect(runner).toHaveBeenCalledOnce()
+  })
+
+  it('checks the current reviewed provider/action/target before an approval write', async () => {
+    const runner = vi.fn()
+    const tool = buildLarkCliToolProvider(config(), runner)!.tools.find(tool => tool.name === 'lark_approval_approve')!
+    const assertExternalTarget = vi.fn((provider: string, operation: string, target: string) => {
+      expect([provider, operation, target]).toEqual(['lark', 'approve', 'task-2'])
+      throw Object.assign(new Error('Not reviewed'), { code: 'external_target_blocked' })
+    })
+    await expect(tool.execute({ instanceCode: 'ic-1', taskId: 'task-2' }, { ...context(), assertExternalTarget })).rejects.toMatchObject({ code: 'external_target_blocked' })
+    expect(runner).not.toHaveBeenCalled()
+  })
   it('requires diagnosed user identity, brand, and actual scopes', () => {
     expect(buildLarkCliToolProvider(LarkCapabilityConfig.parse({ enabled: true, authState: 'needs_login' }))).toBeUndefined()
     expect(buildLarkCliToolProvider(LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/cli' }))).toBeUndefined()
     const readOnly = buildLarkCliToolProvider({ ...config(), scopes: ['approval:task:read'] })!
     expect(readOnly.tools.map(tool => tool.name)).toEqual(['lark_approval_list'])
+  })
+
+  it('does not advertise task detail or write tools without their read and write scopes', () => {
+    const writeOnly = buildLarkCliToolProvider({ ...config(), scopes: ['task:task:write'] })
+    expect(writeOnly?.tools.map(tool => tool.name) ?? []).not.toContain('lark_task_get')
+    expect(writeOnly?.tools.map(tool => tool.name) ?? []).not.toContain('lark_task_complete')
+
+    const approvalWriteOnly = buildLarkCliToolProvider({ ...config(), scopes: ['approval:task:write', 'approval:instance:read'] })!
+    expect(approvalWriteOnly.tools.map(tool => tool.name)).not.toContain('lark_approval_approve')
+    expect(approvalWriteOnly.tools.map(tool => tool.name)).not.toContain('lark_approval_reject')
   })
 
   it('maps validated task reads without shell interpolation and normalizes successful evidence', async () => {

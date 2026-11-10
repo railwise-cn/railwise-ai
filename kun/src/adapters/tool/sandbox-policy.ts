@@ -19,6 +19,7 @@ export type SandboxBlock = {
     | 'workspace_path_blocked'
     | 'network_scope_blocked'
     | 'connector_scope_missing'
+    | 'external_target_blocked'
   message: string
 }
 
@@ -146,7 +147,7 @@ export function assertCanWritePath(
   context: Pick<ToolHostContext, 'workspace' | 'sandboxMode' | 'executionGrant'>
 ): void {
   const decision = canWritePath(absolutePath, context)
-  if (!decision.ok) throw new Error(decision.block.message)
+  if (!decision.ok) throw Object.assign(new Error(decision.block.message), { code: decision.block.code })
 }
 
 export function executionGrantBlock(
@@ -210,4 +211,27 @@ export function assertGrantConnectorScopes(scopes: readonly string[], context: P
   if (!grant) return
   const missing = scopes.filter(scope => !grant.connectorScopes.includes(scope))
   if (missing.length) throw Object.assign(new Error(`Connector permission required: ${missing.join(', ')}`), { code: 'connector_scope_missing' })
+}
+
+/** An opaque, exact action key prevents another provider or operation reusing a target ID. */
+export function externalTargetGrantKey(provider: string, operation: string, target: string): string {
+  return JSON.stringify([provider, operation, target])
+}
+
+/** Lists/detail reads remain available before the user selects the finite write scope. */
+export function assertGrantAllowsExternalTarget(
+  provider: string,
+  operation: string,
+  target: string,
+  context: Pick<ToolHostContext, 'executionGrant' | 'assertExternalTarget'>
+): void {
+  if (!['approve', 'reject', 'complete', 'send', 'transfer'].includes(operation)) return
+  if (context.assertExternalTarget) {
+    context.assertExternalTarget(provider, operation, target)
+    return
+  }
+  // Older internal callers can execute only actions explicitly captured by
+  // their immutable Grant. An empty list never means unrestricted writes.
+  if (context.executionGrant?.externalTargets.includes(externalTargetGrantKey(provider, operation, target))) return
+  throw Object.assign(new Error('External action target is outside the reviewed execution scope.'), { code: 'external_target_blocked' })
 }

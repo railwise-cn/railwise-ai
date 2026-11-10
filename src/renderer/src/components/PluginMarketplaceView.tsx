@@ -48,6 +48,7 @@ import brand from '@shared/product-brand.json'
 import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
 import { friendlyMarketplaceError, skillValidationWarning } from './plugin-marketplace-compat'
+import { marketplaceNeedsConfiguration, marketplacePackageStatus } from './plugin-marketplace-status'
 
 export * from './plugin-marketplace-compat'
 
@@ -171,12 +172,7 @@ function needsConfiguration(
   record: InstalledPackageV1 | undefined,
   server: McpServerConfigV2 | undefined
 ): boolean {
-  if (!record && !server && !isManagedInstalled(item)) return false
-  if (server?.enabled === false) return true
-  if (record?.health.status === 'degraded' || record?.health.status === 'unhealthy') return true
-  if (item.auth.type === 'token') return !server?.credentialRef
-  if (item.auth.type === 'oauth') return !server?.credentialRef
-  return Boolean(item.configuration?.some((field) => field.required && field.defaultValue === undefined))
+  return marketplaceNeedsConfiguration(item, record, server)
 }
 
 function permissionExpanded(
@@ -847,7 +843,7 @@ export function PluginMarketplaceView(): ReactElement {
               saved.id,
               authorization.authorizationState
             )
-            if (result.state !== 'connected') {
+            if (result.state !== 'connected' || !result.authorized) {
               throw new Error(result.message || 'OAuth authorization failed.')
             }
             setOauth(null)
@@ -858,7 +854,8 @@ export function PluginMarketplaceView(): ReactElement {
           }
         }
       }
-      setNotice({ tone: 'success', message: text('pluginUnifiedConnected', '{{name}} connected to MCP V2.', { name: item.name }) })
+      // Saving a server is configuration, not a successful remote connection or an authorization check.
+      setNotice({ tone: 'info', message: text('settings:pluginConfiguredUnverified', 'Configured · verification pending') })
       await refresh()
     } catch (error) {
       setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
@@ -876,7 +873,7 @@ export function PluginMarketplaceView(): ReactElement {
         state: oauth.state,
         authorizationCode: oauth.code.trim()
       })
-      if (result.state !== 'connected') throw new Error(result.message || 'OAuth authorization failed.')
+      if (result.state !== 'connected' || !result.authorized) throw new Error(result.message || 'OAuth authorization failed.')
       setOauth(null)
       setNotice({ tone: 'success', message: text('pluginUnifiedAuthorized', 'Authorization completed.') })
       await refresh()
@@ -889,6 +886,10 @@ export function PluginMarketplaceView(): ReactElement {
 
   const invokePrimaryAction = async (entry: MarketplaceCatalogPackageEntryV1): Promise<void> => {
     const item = entry.package
+    if (item.availability.status === 'unavailable') {
+      if (isHttpUrl(item.source.location)) await window.workwise.openExternal(item.source.location)
+      return
+    }
     const diagnostic = diagnosticMap.get(item.id)
     if (diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)) {
       setSelectedKey(packageKey(entry))
@@ -1622,6 +1623,31 @@ function InstalledPluginStrip({ entries, text, onSelect }: {
   )
 }
 
+function packageStatusLabel(
+  item: MarketplacePackageV1,
+  installed: InstalledPackageV1 | undefined,
+  server: McpServerConfigV2 | undefined,
+  diagnostic: PluginUpdateDiagnosticV1 | undefined,
+  text: Text,
+  reviewSha256?: string
+): string {
+  switch (marketplacePackageStatus(item, installed, server, diagnostic).state) {
+    case 'available': return text('settings:pluginAvailableToInstall', 'Available to install')
+    case 'installed': return text('pluginFilterInstalled', 'Installed')
+    case 'configuration': return text('pluginUnifiedNeedsConfig', 'Needs configuration')
+    case 'configured_unverified': return text('settings:pluginConfiguredUnverified', 'Configured · verification pending')
+    case 'installed_unavailable': return text('settings:pluginInstalledUnavailable', 'Installed · currently unavailable')
+    case 'installed_source_unavailable': return text('settings:pluginInstalledSourceUnavailable', 'Installed · source unavailable')
+    case 'source_unavailable': return text('pluginUpdateUnavailable', 'Source unavailable')
+    case 'unavailable': return text('pluginUnifiedUnavailable', 'Currently unavailable')
+    case 'runtime_drift': return text('pluginUpdateFull', 'Complete update required')
+    case 'metadata_refresh': return text('pluginUpdateReview', 'Review metadata changes')
+    case 'update_available': return permissionExpanded(item, installed, reviewSha256)
+      ? text('pluginUnifiedPermissionsChanged', 'Permissions changed')
+      : text('pluginUnifiedUpdateAvailable', 'Update available')
+  }
+}
+
 function PackageStatus({ item, installed, server, reviewSha256, diagnostic, text }: {
   item: MarketplacePackageV1
   installed?: InstalledPackageV1
@@ -1630,13 +1656,13 @@ function PackageStatus({ item, installed, server, reviewSha256, diagnostic, text
   diagnostic?: PluginUpdateDiagnosticV1
   text: Text
 }): ReactElement {
-  if (diagnostic && diagnostic.state !== 'current') return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{diagnosticLabel(diagnostic, text)}</span>
-  if (hasUpdate(item, installed, reviewSha256, diagnostic)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedPermissionsChanged', 'Permissions changed') : text('pluginUnifiedUpdateAvailable', 'Update available')}</span>
-  if (needsConfiguration(item, installed, server)) return <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{text('pluginUnifiedNeedsConfig', 'Needs configuration')}</span>
-  if (installed || server || isManagedInstalled(item)) return <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />{text('pluginFilterInstalled', 'Installed')}</span>
-  if (item.availability.status === 'unavailable') return <span className="text-[11px] font-medium text-ds-faint">{text('pluginUnifiedUnavailable', 'Unavailable')}</span>
-  if (item.installation.mode === 'external') return <span className="text-[11px] font-medium text-ds-muted">{text('pluginUnifiedExternal', 'External service')}</span>
-  return <span className="text-[11px] font-medium text-ds-faint">{item.version}</span>
+  const status = marketplacePackageStatus(item, installed, server, diagnostic)
+  const tone = status.tone === 'success' ? 'text-emerald-700 dark:text-emerald-300'
+    : status.tone === 'attention' ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'
+  return <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${tone}`}>
+    {status.state === 'installed' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+    {packageStatusLabel(item, installed, server, diagnostic, text, reviewSha256)}
+  </span>
 }
 
 function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy, text, onClick }: {
@@ -1650,6 +1676,8 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   onClick: () => void
 }): ReactElement | null {
   if (item.installation.mode === 'system-managed') return null
+  const sourceOnly = item.availability.status === 'unavailable'
+  if (sourceOnly && !isHttpUrl(item.source.location)) return null
   const added = Boolean(installed || server || isManagedInstalled(item))
   const update = hasUpdate(item, installed, reviewSha256, diagnostic)
   const blocked = diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)
@@ -1657,15 +1685,15 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   const remote = item.components.some((component) => component.type === 'mcp' && component.runtime.kind === 'remote')
   const canAct = item.installation.mode === 'direct-mirror' || remote || isHttpUrl(item.source.location)
   if (!canAct) return null
-  const label = blocked ? diagnosticLabel(diagnostic!, text) : update
+  const label = sourceOnly ? text('pluginOpenSource', 'Open source') : blocked ? diagnosticLabel(diagnostic!, text) : update
     ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
     : item.installation.mode === 'direct-mirror' && !added ? text('pluginUnifiedInstall', 'Install')
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
     : text('pluginOpenSource', 'Open source')
   return (
-    <button type="button" disabled={busy || Boolean(blocked) || (item.availability.status === 'unavailable' && !isHttpUrl(item.source.location))} onClick={(event) => { event.stopPropagation(); onClick() }} className="inline-flex h-8 min-w-[92px] items-center justify-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50">
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : item.installation.mode === 'external' ? <ExternalLink className="h-3.5 w-3.5" /> : update ? <RefreshCw className="h-3.5 w-3.5" /> : managesPermissions ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+    <button type="button" disabled={busy || (!sourceOnly && Boolean(blocked))} onClick={(event) => { event.stopPropagation(); onClick() }} className="inline-flex h-8 min-w-[92px] items-center justify-center gap-1.5 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] font-semibold hover:bg-ds-hover disabled:cursor-not-allowed disabled:opacity-50">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : sourceOnly || item.installation.mode === 'external' ? <ExternalLink className="h-3.5 w-3.5" /> : update ? <RefreshCw className="h-3.5 w-3.5" /> : managesPermissions ? <SlidersHorizontal className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
       {label}
     </button>
   )
@@ -1792,7 +1820,9 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
       </DetailSection>
       <DetailSection title={text('pluginUnifiedHealth', 'Health')}>
         <DefinitionList values={[
-          [text('pluginUnifiedStatus', 'Status'), packageHealthLabel(installed?.health.status ?? (server ? (server.enabled ? 'configured' : 'disabled') : isManagedInstalled(item) ? 'managed' : 'not installed'), text)],
+          [text('pluginUnifiedStatus', 'Status'), packageStatusLabel(item, installed, server, diagnostic, text, entry.reviewSha256)],
+          ...(installed ? [[text('settings:pluginInstallationHealth', 'Installation health'), packageHealthLabel(installed.health.status, text)] as [string, string]] : []),
+          ...(isManagedInstalled(item) ? [[text('pluginUnifiedImplementation', 'Implementation'), packageHealthLabel('managed', text)] as [string, string]] : []),
           [text('pluginUnifiedLastCheck', 'Last check'), installed?.health.checkedAt ?? installed?.timestamps.lastCheckedAt ?? (isManagedInstalled(item) ? text('pluginUnifiedManagedCheck', `Managed with ${brand.platform} releases`, { productName: brand.platform }) : text('pluginUnifiedNever', 'Never'))]
         ]} />
       </DetailSection>

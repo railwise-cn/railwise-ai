@@ -103,9 +103,15 @@ export type ToolHostContext = {
   sandboxMode?: SandboxMode
   /** Immutable effective workspace/agent grant for this execution attempt. */
   executionGrant?: ExecutionGrant
+  /** Supplied by LocalToolHost only after this exact call received an allow decision. */
+  explicitApproval?: { callId: string; toolName: string; requestHash: string }
+  /** Persist proof of a real allow decision before dispatching the approved action. */
+  recordExplicitApproval?: (approval: { toolName: string; requestHash: string }) => void
   abortSignal: AbortSignal
   /** Recheck the immutable task lease immediately before dispatch, after approvals. */
   assertExecution?: () => void
+  /** Recheck the persisted, user-reviewed action scope for this exact task/attempt. */
+  assertExternalTarget?: (provider: string, operation: string, target: string) => void
   /** Recheck persisted workspace trust/revocation immediately before dispatch, including after approval. */
   validateExecutionGrant?: () => Promise<void>
   beginExecutionWork?: () => (() => void) | undefined

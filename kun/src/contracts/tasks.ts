@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TaskApprovalGrantSchema } from './permissions.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
 import { ResultEvidenceSchema } from './harness.js'
@@ -40,7 +41,7 @@ export const TaskArtifactSchema = z.object({
 })
 export type TaskArtifact = z.infer<typeof TaskArtifactSchema>
 
-const RequiredEffectSchema = z.object({
+export const RequiredEffectSchema = z.object({
   provider: z.string().trim().min(1),
   operation: z.string().trim().min(1),
   target: z.string().trim().min(1),
@@ -49,6 +50,7 @@ const RequiredEffectSchema = z.object({
   successStatus: z.array(z.string()).default(['succeeded']),
   verification: z.literal('provider_readback').default('provider_readback')
 })
+export type RequiredEffect = z.infer<typeof RequiredEffectSchema>
 
 export const TaskAcceptanceSchema = z.object({
   kind: z.enum(['answer', 'files', 'effect']),
@@ -65,7 +67,9 @@ export const TaskAcceptanceSchema = z.object({
     requiresConfirmation: z.boolean(),
     successStatus: z.array(z.string()).default(['succeeded']),
     verification: z.literal('provider_readback'),
-    requiredEffects: z.array(RequiredEffectSchema).min(1).optional()
+    requiredEffects: z.array(RequiredEffectSchema).min(1).optional(),
+    scopeConfirmationId: z.string().optional(),
+    scopeRevision: z.number().int().nonnegative().optional()
   }).optional()
 })
 export type TaskAcceptance = z.infer<typeof TaskAcceptanceSchema>
@@ -118,6 +122,7 @@ export const TaskAuthoritySchema = z.object({
   externalTargets: z.array(z.string()).default([]),
   grantedAt: z.string(),
   revokedAt: z.string().optional()
+  ,taskApprovalGrant: TaskApprovalGrantSchema.optional()
 })
 export type TaskAuthority = z.infer<typeof TaskAuthoritySchema>
 
@@ -144,12 +149,14 @@ export const AttentionItemSchema = z.object({
 export type AttentionItem = z.infer<typeof AttentionItemSchema>
 
 export const OperationReceiptSchema = z.object({
+  dispatchApproval: z.object({ toolName: z.string(), requestHash: z.string(), approvedAt: z.string() }).optional(),
   id: z.string(), ownerId: z.string(), idempotencyKey: z.string(), fingerprint: z.string(), kind: z.string(),
   status: z.enum(['prepared', 'running', 'succeeded', 'failed', 'outcome_unknown']),
   request: z.record(z.string(), z.unknown()).optional(), result: z.unknown().optional(),
   createdAt: z.string(), updatedAt: z.string(), error: z.string().optional()
   ,taskId: z.string().optional(), turnId: z.string().optional(), provider: z.string().optional(), toolName: z.string().optional(),
-  remoteOperationId: z.string().optional(), target: z.string().optional(), evidence: ResultEvidenceSchema.optional()
+  remoteOperationId: z.string().optional(), target: z.string().optional(), evidence: ResultEvidenceSchema.optional(),
+  resolution: z.object({ status: z.literal('verified'), receiptId: z.string().min(1), evidence: ResultEvidenceSchema, resolvedAt: z.string() }).optional()
 })
 export type OperationReceipt = z.infer<typeof OperationReceiptSchema>
 

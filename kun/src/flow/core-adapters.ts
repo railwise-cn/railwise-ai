@@ -2,10 +2,12 @@ import type { FlowNodeAdapter } from './executor.js'
 import { restrictedCodeAdapter } from './restricted-code.js'
 import type { RuntimeFlowAdapterDependencies } from './runtime-adapters.js'
 import { buildRuntimeFlowAdapters } from './runtime-adapters.js'
+import { assertFlowNodeExecutable } from './execution-policy.js'
 
 export function buildCoreFlowAdapters(overrides: ReadonlyMap<string, FlowNodeAdapter> = new Map(), runtime?: RuntimeFlowAdapterDependencies): Map<string, FlowNodeAdapter> {
   const adapters = new Map<string, FlowNodeAdapter>()
-  for (const type of ['manual_trigger', 'schedule_trigger', 'webhook_trigger', 'merge', 'parallel', 'archive', 'publish']) adapters.set(type, passThrough)
+  for (const type of ['manual_trigger', 'schedule_trigger', 'webhook_trigger', 'merge', 'parallel']) adapters.set(type, passThrough)
+  for (const type of ['archive','publish','subagent']) adapters.set(type,async()=>{assertFlowNodeExecutable(type);throw new Error('Flow node is unavailable')})
   for (const type of ['railwise.monitoring_data_first_check', 'railwise.deformation_rate', 'railwise.chart_generator', 'railwise.report_export', 'railwise.archive']) adapters.set(type, async () => { throw new Error('此历史专业流程尚未接入计算服务；请使用内业处理和草稿复核流程。') })
   adapters.set('condition', async ({ node, input }) => ({ kind: 'output', output: { branch: evaluateCondition(input, node.config), value: input } }))
   adapters.set('switch', async ({ node, input }) => ({ kind: 'output', output: { branch: switchBranch(input, node.config), value: input } }))

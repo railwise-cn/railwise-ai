@@ -92,7 +92,7 @@ describe('SidebarProjectsSection groups', () => {
     expect(groups[1]?.[1].map((item) => item.id)).toEqual(['default-code'])
   })
 
-  it('merges default workspace aliases into one sidebar group', () => {
+  it('keeps unverified legacy paths separate instead of hiding independent user history', () => {
     const groups = buildSidebarWorkspaceGroups({
       threads: [
         thread({ id: 'default-short', workspace: '~/.deepseekgui/default_workspace' }),
@@ -108,9 +108,24 @@ describe('SidebarProjectsSection groups', () => {
       ]
     })
 
-    expect(groups).toHaveLength(1)
+    expect(groups).toHaveLength(2)
     expect(groups[0]?.[0]).toBe('C:\\Users\\zxy\\.deepseekgui\\default_workspace')
-    expect(groups[0]?.[1].map((item) => item.id)).toEqual(['default-short', 'default-absolute'])
+    expect(groups[0]?.[1].map((item) => item.id)).toEqual(['default-absolute'])
+    expect(groups[1]?.[1].map((item) => item.id)).toEqual(['default-short'])
+  })
+
+  it('merges only verified directory aliases while retaining every chat', () => {
+    const canonicalRoot = '/users/example/.workwise/default_workspace'
+    const legacy = '/users/example/.workgpt/default_workspace'
+    const independent = '/users/example/.kun/default_workspace'
+    const groups = buildSidebarWorkspaceGroups({
+      threads: [thread({ id: 'a', workspace: canonicalRoot }), thread({ id: 'b', workspace: legacy }), thread({ id: 'c', workspace: independent })],
+      activeThreadId: null, searchQuery: '', showArchived: false, workspaceRoot: canonicalRoot,
+      workspaceRoots: [legacy, canonicalRoot, independent], aliases: [{ path: legacy, canonicalRoot }]
+    })
+    expect(groups).toHaveLength(2)
+    expect(groups[0]).toEqual([canonicalRoot, expect.arrayContaining([expect.objectContaining({ id: 'a' }), expect.objectContaining({ id: 'b' })])])
+    expect(groups[1]?.[0]).toBe(independent)
   })
 
   it('hides known empty shells while preserving the active empty thread and real history', () => {
