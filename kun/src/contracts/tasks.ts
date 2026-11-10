@@ -40,16 +40,33 @@ export const TaskArtifactSchema = z.object({
 })
 export type TaskArtifact = z.infer<typeof TaskArtifactSchema>
 
+const RequiredEffectSchema = z.object({
+  provider: z.string().trim().min(1),
+  operation: z.string().trim().min(1),
+  target: z.string().trim().min(1),
+  requiredScopes: z.array(z.string()).default([]),
+  requiresConfirmation: z.boolean().default(true),
+  successStatus: z.array(z.string()).default(['succeeded']),
+  verification: z.literal('provider_readback').default('provider_readback')
+})
+
 export const TaskAcceptanceSchema = z.object({
   kind: z.enum(['answer', 'files', 'effect']),
   requiredNodeKinds: z.array(TaskNodeKindSchema),
   requiredFormats: z.array(z.string().min(1)).optional(),
   minimumArtifacts: z.number().int().nonnegative().optional(),
   requireFinalResponse: z.boolean(),
-  requireActionableArtifactCard: z.boolean()
-  ,effect: z.object({ provider: z.string(), operation: z.string(), target: z.string().optional(),
-    requiredScopes: z.array(z.string()).default([]), requiresConfirmation: z.boolean(), successStatus: z.array(z.string()).default(['succeeded']),
-    verification: z.literal('provider_readback') }).optional()
+  requireActionableArtifactCard: z.boolean(),
+  effect: z.object({
+    provider: z.string(),
+    operation: z.string(),
+    target: z.string().optional(),
+    requiredScopes: z.array(z.string()).default([]),
+    requiresConfirmation: z.boolean(),
+    successStatus: z.array(z.string()).default(['succeeded']),
+    verification: z.literal('provider_readback'),
+    requiredEffects: z.array(RequiredEffectSchema).min(1).optional()
+  }).optional()
 })
 export type TaskAcceptance = z.infer<typeof TaskAcceptanceSchema>
 

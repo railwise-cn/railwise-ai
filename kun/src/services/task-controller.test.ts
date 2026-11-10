@@ -372,6 +372,10 @@ describe('TaskController reliability boundaries', () => {
 
   it('completes an external-effect task only after a successful effect receipt', async () => {
     const { repository, sessionStore, controller, task, thread } = await fixture('同意钉钉审批。')
+    repository.update(task.id, task.revision, current => ({
+      ...current,
+      acceptance: { ...current.acceptance, effect: { provider: 'dingtalk', operation: 'approve', target: 'synthetic-task', requiredScopes: [], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' } }
+    }))
     await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
       id: 'item_effect_done',
       threadId: task.threadId,

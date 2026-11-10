@@ -23,15 +23,32 @@ export function externalTarget(args: Record<string, unknown>): string | undefine
 }
 export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt[]): ResultEvidence[] {
   const intent = externalTaskIntent(task.goal)
-  const expected = task.acceptance.effect ?? (intent?.provider ? {provider: intent.provider, operation: intent.operation, target: intent.target} : undefined)
-  if (!expected) return []
-  return receipts.flatMap(receipt => {
+  const accepted = task.acceptance.effect
+  const required = accepted?.requiredEffects?.length
+    ? accepted.requiredEffects
+    : accepted?.provider && accepted.operation !== 'process' && accepted.target?.trim()
+      ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target.trim() }]
+      : !accepted && intent?.provider && intent.operation && intent.target?.trim()
+        ? [{ provider: intent.provider, operation: intent.operation, target: intent.target.trim() }]
+        : []
+  if (required.length === 0 || !task.activeTurnId) return []
+
+  const verified = receipts.flatMap(receipt => {
     if (receipt.ownerId !== task.id || receipt.kind !== 'tool' || receipt.status !== 'succeeded') return []
     const request = receipt.request
+    const requestTurnId = typeof request?.turnId === 'string' ? request.turnId : undefined
+    const receiptTurnId = typeof receipt.turnId === 'string' ? receipt.turnId : undefined
+    const turnId = requestTurnId ?? receiptTurnId
+    if (!turnId || turnId !== task.activeTurnId || (receiptTurnId && receiptTurnId !== turnId)) return []
     const toolName = typeof request?.toolName === 'string' ? request.toolName : ''
     const spec = externalOperationForTool(toolName)
-    if (!spec || spec.provider !== expected.provider || (expected.operation==='process' ? !['approve','reject','complete','transfer','send'].includes(spec.operation) : spec.operation !== expected.operation)) return []
-    if (request?.provider && request.provider !== spec.provider) return []
+    if (!spec || request?.provider !== spec.provider) return []
+    const expectedProviderId = spec.provider === 'lark' ? 'lark-cli' : 'dingtalk'
+    if (request.providerId !== undefined && request.providerId !== expectedProviderId) return []
+    if (request.operation !== spec.operation || (receipt.provider && receipt.provider !== spec.provider)
+      || (receipt.toolName && receipt.toolName !== toolName)) return []
+    if (typeof request.target !== 'string' || !request.target.trim()) return []
+    if (receipt.target && receipt.target !== request.target) return []
     const result = receipt.result as {item?: {isError?: boolean; output?: unknown}; approved?: boolean} | undefined
     if (!result?.item || result.item.isError || result.approved === false) return []
     const output = result.item.output as Record<string, unknown> | undefined
@@ -40,12 +57,23 @@ export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt
     if (!parsed.success) return []
     const evidence = parsed.data
     if (!evidence.verified || evidence.kind !== 'external_operation' || evidence.provider !== spec.provider || evidence.operation !== spec.operation) return []
-    if (expected.target && evidence.target !== expected.target) return []
-    if (request?.target && evidence.target !== request.target) return []
-    // Writes require a specific target, a remote operation reference and explicit
-    // confirmation. A successful list can never prove an approval or completion.
+    if (evidence.target !== request.target) return []
+    // Writes require a specific target, verified provider readback, and explicit
+    // confirmation. A transport request ID is not a remote operation ID.
     if (['approve', 'reject', 'complete', 'send', 'transfer'].includes(spec.operation) &&
-      (!request?.target || !evidence.remoteOperationId || result.approved !== true)) return []
+      (!request?.target || !evidence.status || !evidence.resultHash || result.approved !== true)) return []
     return [evidence]
   })
+
+  const requiredKeys = new Set(required.map(effectKey))
+  const matched = new Map(verified.map(evidence => [effectKey(evidence), evidence]))
+  if ([...requiredKeys].some(key => !matched.has(key))) return []
+  return [...requiredKeys].flatMap(key => {
+    const evidence = matched.get(key)
+    return evidence ? [evidence] : []
+  })
+}
+
+function effectKey(effect: { provider: string; operation: string; target: string }): string {
+  return JSON.stringify([effect.provider, effect.operation, effect.target])
 }

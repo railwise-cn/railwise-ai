@@ -22,6 +22,8 @@ const defaultRunner: LarkCliRunner = async (executablePath, args, signal) => {
   }
 }
 
+// Control characters must never reach the argument vector passed to lark-cli.
+// eslint-disable-next-line no-control-regex
 const textId = z.string().trim().min(1).max(512).refine(value => !/[\u0000-\u001f]/u.test(value), 'Invalid identifier')
 const taskId = z.object({ taskId: textId }).strict()
 const instanceId = z.object({ instanceCode: textId }).strict()
@@ -90,10 +92,8 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
       }
       if (!remoteStatus) return failure({ code: 'remote_state_unverified', response: result.output }, 'outcome_unknown', provider, spec.operation, target)
       const resultHash = createHash('sha256').update(JSON.stringify(data)).digest('hex')
-      const remoteOperationId = stringValue(asRecord(result.output).request_id) ?? stringValue(asRecord(result.output).requestId)
       return { output: { ok: true, provider, operation: spec.operation, target, status: 'succeeded', data,
-        ...(remoteOperationId ? { remoteOperationId } : {}),
-        evidence: { kind: 'external_operation', provider, operation: spec.operation, target, verified: true, verifiedAt: new Date().toISOString(), resultHash, status: remoteStatus, ...(remoteOperationId ? { remoteOperationId } : {}) }
+        evidence: { kind: 'external_operation', provider, operation: spec.operation, target, verified: true, verifiedAt: new Date().toISOString(), resultHash, status: remoteStatus }
       } }
     }
   })
