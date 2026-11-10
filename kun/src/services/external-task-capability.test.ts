@@ -15,6 +15,11 @@ describe('external task capability preflight', () => {
     })
   })
 
+  it('detects an explicit connection or authorization request before work starts', () => {
+    expect(detectExternalTaskProvider('请先授权连接飞书')).toBe('lark')
+    expect(detectExternalTaskProvider('配置钉钉')).toBe('dingtalk')
+  })
+
   it('leaves ordinary discussion alone', () => {
     expect(detectExternalTaskProvider('介绍一下飞书和钉钉的区别')).toBeNull()
     expect(defaultExternalTaskCapability('dingtalk').message).toContain('不会生成未经验证的 dws 命令')

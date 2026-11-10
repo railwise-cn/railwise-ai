@@ -69,6 +69,7 @@ describe('task commands before Turn allocation',()=>{
     expect(result).toMatchObject({kind:'capability_required',capability:{provider:'dingtalk',status:'unsupported'}})
     expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
     expect(f.runTurn).not.toHaveBeenCalled()
+    expect(f.repository.list()).toHaveLength(0)
     const items=await f.sessionStore.loadItems(f.origin.id)
     expect(items.at(-1)).toMatchObject({text:expect.stringContaining('不会生成未经验证的 dws 命令')})
   })

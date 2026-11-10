@@ -17,11 +17,12 @@ export type ExternalTaskCapability = {
 const DINGTALK_PATTERN = /钉钉|dingtalk/i
 const LARK_PATTERN = /飞书|lark|feishu/i
 const WORK_ITEM_PATTERN = /待办|审批|任务|工单|处理|approvals?|todo|task/i
+const AUTH_PATTERN = /连接|接入|授权|登录|配置|安装|connect|authorize|login|setup|install/i
 
 /** Returns the provider only for an actual work-item request. */
 export function detectExternalTaskProvider(text: string): ExternalTaskProvider | null {
   const value = text.trim()
-  if (!WORK_ITEM_PATTERN.test(value)) return null
+  if (!WORK_ITEM_PATTERN.test(value) && !AUTH_PATTERN.test(value)) return null
   if (DINGTALK_PATTERN.test(value)) return 'dingtalk'
   if (LARK_PATTERN.test(value)) return 'lark'
   return null
