@@ -59,6 +59,8 @@ export type CoreThreadAgentProfileJson = {
 
 export type CoreThreadJson = CoreThreadSummaryJson & {
   turns?: CoreTurnJson[]
+  /** Local coordinator messages, never execution Turns or model usage. */
+  conversationItems?: CoreTurnItemJson[]
   latestSeq?: number
 }
 
@@ -374,6 +376,7 @@ export type CoreTurnJson = {
 export type CoreTurnItemJson = {
   id: string
   turnId: string
+  conversationReceiptId?: string
   threadId: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   status: CoreItemStatus

@@ -12,7 +12,7 @@ import type {
 } from '../../contracts/threads.js'
 import { ThreadSchema } from '../../contracts/threads.js'
 import type { RuntimeEvent } from '../../contracts/events.js'
-import type { TurnItem } from '../../contracts/items.js'
+import { isConversationReceiptItem, type TurnItem } from '../../contracts/items.js'
 import type { Turn } from '../../contracts/turns.js'
 import type { ApprovalPolicy, SandboxMode } from '../../contracts/policy.js'
 import type { ThreadStore, ThreadStoreListOptions } from '../../ports/thread-store.js'
@@ -898,13 +898,17 @@ function hydrateThreadItems(
   }
   const itemsByTurn = new Map<string, TurnItem[]>()
   for (const item of items) {
+    if (isConversationReceiptItem(item)) continue
     const list = itemsByTurn.get(item.turnId) ?? []
     list.push(item)
     itemsByTurn.set(item.turnId, list)
   }
 
-  const knownTurnIds = new Set(thread.turns.map((turn) => turn.id))
-  const turns = thread.turns.map((turn): Turn => {
+  // Earlier readers could have hydrated local receipts into metadata. Keep
+  // their messages in JSONL while removing that execution-only projection.
+  const executionTurns = thread.turns.filter(turn => !/^command_[a-f0-9]{32}$/.test(turn.id))
+  const knownTurnIds = new Set(executionTurns.map((turn) => turn.id))
+  const turns = executionTurns.map((turn): Turn => {
     const turnItems = itemsByTurn.get(turn.id) ?? []
     const attachmentIds = turn.attachmentIds.length > 0
       ? turn.attachmentIds

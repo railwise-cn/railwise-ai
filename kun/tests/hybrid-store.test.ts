@@ -15,6 +15,7 @@ import { ContextCompactor } from '../src/loop/context-compactor.js'
 import { SequentialIdGenerator } from '../src/ports/id-generator.js'
 import type { UsageSnapshot } from '../src/contracts/usage.js'
 import Database from 'better-sqlite3'
+import { getThread } from '../src/server/routes/threads.js'
 
 describe('HybridThreadStore', () => {
   let dataDir = ''
@@ -30,6 +31,45 @@ describe('HybridThreadStore', () => {
   afterEach(async () => {
     for (const store of openStores) store.close()
     await rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('replays local coordination receipts as conversation history without constructing execution Turns', async () => {
+    const { threadStore, sessionStore } = await createHybridStores()
+    const thread = createThreadRecord({ id:'thr_receipt', title:'Connector admission', workspace:dataDir, model:'fixture', createdAt:'2026-11-10T00:00:00.000Z' })
+    await threadStore.upsert(thread)
+    const commandId = 'a'.repeat(32)
+    const turns = createTurnService(threadStore, sessionStore)
+    await turns.recordCommandExchange({ threadId:thread.id, commandId, userText:'帮我处理飞书审批', assistantText:'请先安装并授权飞书连接器', createdAt:'2026-11-10T00:00:01.000Z' })
+    await turns.recordCommandExchange({ threadId:thread.id, commandId, userText:'帮我处理飞书审批', assistantText:'请先安装并授权飞书连接器', createdAt:'2026-11-10T00:00:01.000Z' })
+    expect((await threadStore.get(thread.id))?.turns).toEqual([])
+    expect((await sessionStore.loadEventsSince(thread.id, 0)).map(event => event.kind)).toEqual(['item_created','item_created'])
+    const items = await sessionStore.loadItems(thread.id)
+    expect(items).toHaveLength(2)
+    expect(items.every(item => item.conversationReceiptId === `command_${commandId}`)).toBe(true)
+    const detail = await getThread({ get:(id:string) => threadStore.get(id) } as Parameters<typeof getThread>[0], thread.id, sessionStore)
+    expect(JSON.parse(detail.body)).toMatchObject({ turns:[], conversationItems:[{kind:'user_message'},{kind:'assistant_text'}] })
+
+    // Earlier packages persisted these same IDs without an explicit marker.
+    await sessionStore.rewriteItems(thread.id, items.map(({conversationReceiptId:_marker,...item}) => item))
+    threadStore.close()
+    const reopened = await createHybridStores()
+    expect((await reopened.threadStore.get(thread.id))?.turns).toEqual([])
+    const restored = await getThread({get:(id:string) => reopened.threadStore.get(id)} as Parameters<typeof getThread>[0], thread.id, reopened.sessionStore)
+    expect(JSON.parse(restored.body).conversationItems).toHaveLength(2)
+
+    const realTurn = createTurnRecord({id:'turn_real',threadId:thread.id,prompt:'继续原任务',createdAt:'2026-11-10T00:00:00.500Z'})
+    const realUser = makeUserItem({id:'item_real_user',turnId:realTurn.id,threadId:thread.id,text:'继续原任务'})
+    await reopened.sessionStore.appendItem(thread.id, realUser)
+    // Drop a receipt projection saved by an old reader without dropping a
+    // genuine running Turn in the same conversation.
+    await reopened.threadStore.upsert({...thread,status:'running',turns:[
+      startTurn(appendTurnItem(realTurn,realUser),'2026-11-10T00:00:00.500Z'),
+      {...createTurnRecord({id:`command_${commandId}`,threadId:thread.id,prompt:'帮我处理飞书审批',createdAt:'2026-11-10T00:00:01.000Z'}),status:'completed'}
+    ]})
+    const mixed = await getThread({get:(id:string) => reopened.threadStore.get(id)} as Parameters<typeof getThread>[0], thread.id, reopened.sessionStore)
+    expect(JSON.parse(mixed.body)).toMatchObject({status:'running',turns:[{id:'turn_real',status:'running'}]})
+    expect(JSON.parse(mixed.body).turns).toHaveLength(1)
+    expect(JSON.parse(mixed.body).conversationItems).toHaveLength(2)
   })
 
   it('keeps item bodies in JSONL and uses SQLite metadata indexing when available', async () => {

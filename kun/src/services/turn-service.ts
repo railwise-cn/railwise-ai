@@ -158,7 +158,7 @@ export class TurnService {
     const recorded = new Set((await this.deps.sessionStore.loadEventsSince(input.threadId,0)).filter(event=>event.kind==='item_created').map(event=>'itemId' in event?event.itemId:undefined))
     const items = [makeUserItem({id:`item_${turnId}_user`,turnId,threadId:input.threadId,text:input.userText}),makeAssistantTextItem({id:`item_${turnId}_receipt`,turnId,threadId:input.threadId,text:input.assistantText,status:'completed'})]
     for(const value of items) {
-      const item={...value,createdAt:input.createdAt,finishedAt:input.createdAt,...(value.kind==='assistant_text'&&input.capabilityCard?{capabilityCard:input.capabilityCard}:{})}
+      const item={...value,conversationReceiptId:turnId,createdAt:input.createdAt,finishedAt:input.createdAt,...(value.kind==='assistant_text'&&input.capabilityCard?{capabilityCard:input.capabilityCard}:{})}
       if (!existing.has(item.id)) await this.deps.sessionStore.appendItem(input.threadId,item)
       if (!recorded.has(item.id)) await this.deps.events.record({kind:'item_created',threadId:input.threadId,turnId,itemId:item.id,item})
     }

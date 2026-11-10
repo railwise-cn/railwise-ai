@@ -662,6 +662,13 @@ export function buildThreadEventSink(
   }
 
   return {
+    onConversationItem: (block) => {
+      if (!isCurrentStream()) return
+      set(state => {
+        const index = state.blocks.findIndex(existing => existing.id === block.id)
+        return { blocks: index < 0 ? [...state.blocks, block] : state.blocks.map((existing, i) => i === index ? block : existing) }
+      })
+    },
     onReplayReset: () => {
       if (!isCurrentStream() || !boundThreadId) return
       void get().selectThread(boundThreadId)

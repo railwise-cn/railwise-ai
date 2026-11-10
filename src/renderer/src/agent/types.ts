@@ -419,6 +419,8 @@ export type ThreadUsageSnapshot = {
 }
 
 export type ThreadEventSink = {
+  /** Durable local messages; these must not toggle execution state. */
+  onConversationItem?(block: ChatBlock): void
   onSeq(seq: number): void
   onReplayReset?(seq: number): void | Promise<void>
   onDeltas(deltas: ThreadDeltaEvent[]): void

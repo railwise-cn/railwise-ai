@@ -63,6 +63,23 @@ afterEach(() => {
 })
 
 describe('WorkWiseRuntimeProvider', () => {
+  it.each([false, true])('renders local admission receipts without replacing execution identity (running=%s)', async running => {
+    const turnId = `command_${'a'.repeat(32)}`
+    installDsGui({runtimeRequest:vi.fn(async () => ({ok:true,status:200,body:JSON.stringify({
+      id:'thr_receipt',title:'Admission',workspace:'/tmp',model:'fixture',mode:'agent',status:running?'running':'idle',createdAt:'t0',updatedAt:'t1',latestSeq:2,
+      turns:running?[{id:'turn_real',status:'running',createdAt:'t0',items:[{id:'item_real_user',turnId:'turn_real',threadId:'thr_receipt',role:'user',status:'completed',createdAt:'t0',kind:'user_message',text:'继续原任务'}]}]:[],
+      conversationItems:[
+        {id:`item_${turnId}_user`,turnId,threadId:'thr_receipt',conversationReceiptId:turnId,role:'user',status:'completed',createdAt:'t0',kind:'user_message',text:'帮我处理飞书审批'},
+        {id:`item_${turnId}_receipt`,turnId,threadId:'thr_receipt',conversationReceiptId:turnId,role:'assistant',status:'completed',createdAt:'t1',kind:'assistant_text',text:'需要连接器授权'}
+      ]
+    })}))})
+    const detail = await new WorkWiseRuntimeProvider().getThreadDetail('thr_receipt')
+    expect(detail.blocks.map(block => block.kind)).toEqual(running?['user','user','assistant']:['user','assistant'])
+    expect(detail.threadStatus).toBe(running?'running':'idle')
+    expect(detail.latestTurnId).toBe(running?'turn_real':undefined)
+    expect(detail.latestTurnStatus).toBe(running?'running':undefined)
+    expect(detail.latestUserMessageId).toBe(running?'item_real_user':undefined)
+  })
   it('reports the compatibility id and RailWise AI display name', () => {
     const provider = new WorkWiseRuntimeProvider()
     expect(provider.id).toBe('kun')

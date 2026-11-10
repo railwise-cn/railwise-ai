@@ -16,6 +16,8 @@ import {
 } from './chat-store-runtime'
 import { stopTurnCompletionPoll } from './chat-store-schedulers'
 import { applyLiveUsageDelta } from './live-usage-projection'
+import { dispatchRuntimeEvent } from '../agent/runtime-mapper'
+import type { CoreRuntimeEventJson } from '../agent/runtime-contract'
 import type { ChatState, ChatStoreSet } from './chat-store-types'
 
 const registryMock = vi.hoisted(() => ({ getProvider: vi.fn() }))
@@ -65,6 +67,24 @@ function makeSinkHarness(overrides: Partial<ChatState> = {}): {
 afterEach(() => {
   stopTurnCompletionPoll()
   vi.unstubAllGlobals()
+})
+
+it.each([false,true])('replays coordinator receipt messages without changing execution state (running=%s)', async running => {
+  const harness = makeSinkHarness({busy:running,currentTurnId:running?'real-turn':null,currentTurnUserId:running?'real-user':null})
+  const sink = buildThreadEventSink(harness.set,harness.get,{threadId:'thread-current'})
+  const turnId = `command_${'b'.repeat(32)}`
+  for (const [kind,suffix,role,text] of [['user_message','user','user','帮我处理飞书审批'],['assistant_text','receipt','assistant','请安装连接器']]) {
+    await dispatchRuntimeEvent({kind:'item_created',seq:2,timestamp:'2026-11-10T00:00:00Z',threadId:'thread-current',turnId,
+      itemId:`item_${turnId}_${suffix}`,item:{kind,id:`item_${turnId}_${suffix}`,turnId,threadId:'thread-current',role,status:'completed',createdAt:'2026-11-10T00:00:00Z',text}
+    } as CoreRuntimeEventJson,sink,async () => undefined)
+  }
+  const state = harness.getState()
+  expect(state.blocks.map(block => block.kind)).toEqual(['user','assistant'])
+  expect(state.busy).toBe(running)
+  expect(state.currentTurnId).toBe(running?'real-turn':null)
+  expect(state.currentTurnUserId).toBe(running?'real-user':null)
+  expect(state.turnStartedAtByUserId).toEqual({'user-current':1000})
+  expect(state.liveUsageByThreadId).toEqual({})
 })
 
 it('keeps legacy Write Assistant shells out of the Code session list', () => {
