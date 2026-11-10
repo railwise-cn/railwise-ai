@@ -191,6 +191,12 @@ export function buildRouter(runtime: ServerRuntime): Router {
     try { return jsonResponse(await runtime.refreshDingTalk()) }
     catch { return jsonResponse({ code: 'connector_refresh_failed', message: '无法读取或验证钉钉连接器配置，请检查本机配置和加密凭据后重试。' }, 409) }
   })
+  router.add('POST','/v1/connectors/dws/refresh',async(request)=>{
+    if(!authorize(request,runtime))return ERRORS.unauthorized()
+    if(!runtime.refreshDws)return ERRORS.unavailable('managed DingTalk CLI refresh is unavailable')
+    if(request.body||Number(request.headers.get('content-length')||0)!==0)return ERRORS.validation('DingTalk CLI refresh does not accept a request body')
+    try{return jsonResponse(await runtime.refreshDws())}catch{return jsonResponse({code:'connector_refresh_failed',message:'无法读取钉钉连接状态，请重新诊断后继续。'},409)}
+  })
   router.add('POST', '/v1/connectors/lark/refresh', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     if (!runtime.refreshLark) return ERRORS.unavailable('managed Lark connector refresh is unavailable')

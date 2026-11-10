@@ -1,6 +1,6 @@
 # RailWise AI Harness 实施状态核对（2026-11-10）
 
-本记录对照用户《Harness 可信执行与连接器闭环整改计划》阶段 A—E，核对当前隔离工作树中的生产入口、测试覆盖和验收缺口。核对对象是当前源码，尚不是已发布版本。本记录编写时只读取源码及已有说明，未重新运行测试，也未执行真实账户、安装包或 Windows 操作。最终源码标识、测试命令、构建与安装包结果由主实施流程补充。
+本记录对照用户《Harness 可信执行与连接器闭环整改计划》阶段 A—E，核对生产入口、测试覆盖和验收缺口。首包源码为 `72e4bf9b4ca890152f7a0c7f30d9fb9e223b7455`，随后修复到 `7596843628f96901634198f54cb74ec28099faa4`；当前工作树进一步实现技能与连接器独立页签、飞书首次配置与身份绑定、钉钉官方 DWS。旧源码的测试和安装包结果仅证明各自版本，不能覆盖后续改动。最新源码与精确包证据见本页末尾的连接器工作台增量记录。这些改动尚未发布。
 
 **当前结论：已有主要生产接线和针对性回归，不能据此宣布整个计划或发行验收全部完成。** 类型化连接器代码、模拟协议回放、真实 Runtime/SQLite 集成测试与真实平台业务操作是不同证据等级。真实平台、精确包、中文 Windows/macOS 和真实用户资料验收仍须分别记录。
 
@@ -13,7 +13,7 @@
 | 待验收 | 需真实外部账户、平台权限、实际安装包或目标操作系统证据 |
 | 未宣称 | 代码或测试没有提供相应保证，不能以文字推断为已完成 |
 
-下列“测试覆盖”列只说明测试文件中存在相应断言。最终是否通过，以本轮精确源码、锁定依赖的实际执行记录为准。
+下列“测试覆盖”列说明相应断言所在位置。实际执行范围与结果见文末；未运行的环境、真实账户和实机故障场景继续标为待验收。
 
 ## A：Harness 合同和回归保护
 
@@ -51,7 +51,7 @@
 | 启动诊断 Lark CLI | `src/main/managed-runtime-process.ts` 启动时诊断受管理 CLI，保存可信状态；`services/managed-tool-service.ts` 区分未安装/未登录/有效身份/错误；Runtime `managed-lark-runtime.ts` 读取状态 | 主进程 `managed-runtime-process.test.ts`、`managed-tool-service.test.ts`、`harness-connector-runtime.test.ts` | 已接线。不能仅凭 CLI 退出码 0 判定用户已授权 |
 | 受控安装、设备登录和热刷新 | 安装、设备登录与回调由主进程管理；验证官方 HTTPS 登录域；凭据/设备流程留在主进程；IPC 更新后请求 Runtime refresh；卡片需再次预检再继续原任务 | `managed-tool-service.test.ts`、`register-app-ipc-handlers.test.ts`、`lark-connector-refresh.test.ts`、卡片测试 | 已接线；真实 CLI 下载、真实用户登录和 Scope 授予待验收，尤其国内网络环境 |
 | Lark 待办/审批工具 | `lark-cli-tool-provider.ts` 注册任务 list/detail/complete、审批 list/detail/approve/reject；仅传类型化参数和固定 CLI 协议，要求诊断身份、品牌和实际用户 scopes | Provider 测试覆盖工具过滤、错误回包、确认、目标回读和回执 | 已接线。协议核对基于固定上游版本，见 [Lark 说明](harness-lark-provider.md)；不是已运行真实审批的证据 |
-| 钉钉官方连接器 | `connectors/dingtalk-auth.ts`、`managed-dingtalk-runtime.ts`、`dingtalk-tool-provider.ts`、设置卡片提供独立官方 OAuth/OpenAPI；个人待办和企业应用 Workflow 凭据/操作者/权限分开 | `dingtalk-auth.test.ts`、`managed-dingtalk-runtime.test.ts`、Provider 和设置卡片测试 | 已接线；真实用户/企业应用权限和业务 API 接受情况待验收。缺配置继续阻断，不声称能力可用 |
+| 钉钉官方连接器 | 官方 DWS 受管理安装及设备授权作为主路径，类型化命令绑定精确账号；原 `connectors/dingtalk-auth.ts`、`managed-dingtalk-runtime.ts`、`dingtalk-tool-provider.ts` 和企业应用设置保留高级兼容，个人与企业授权继续分开 | `dingtalk-auth.test.ts`、`managed-dingtalk-runtime.test.ts`、Provider 和设置卡片测试 | 已接线；真实用户/企业应用权限和业务 API 接受情况待验收。缺配置继续阻断，不声称能力可用 |
 | 写操作确认和有限目标集 | `external-effect-scope-tool-provider.ts` 先审阅完整有限 Provider/动作/目标集合；Provider 每次写前检查当前范围和显式批准，执行前持久记录批准证明 | scope Provider、Lark、钉钉与 evidence 测试 | 已接线；实际平台写操作需要用户指定测试目标，不能自动用真实业务审批做试验 |
 | 成功核验、幂等和未知结果 | 工具边界持久回执；Provider 对目标回读；`external-operation-verification.ts` 用只读工具核验未知操作，原未知记录保留；不会自动重放写入或自动恢复任务 | `external-effect-recovery.test.ts`、`external-operation-verification.test.ts`、`task-retry-ledger.test.ts` | 已接线。平台没有返回操作 ID 时不伪造；使用实际可获得的目标状态及哈希证据 |
 | 不通过 Bash/HTTP 代替平台 | 平台权限只给类型化 Provider；普通聊天不注册平台写入，子任务不能自行扩大权限；Flow 通用 HTTP 旁路已阻断 | host-shell、connector-runtime、Flow runtime-adapter 测试 | 已接线。现有 Flow 通用 HTTP/Agent 节点没有直接替代任务授权账本的外部写入入口，旧写节点需按迁移说明处理 |
@@ -77,15 +77,15 @@
 
 | 交付/检查 | 本记录可确认的证据 | 当前结论 |
 | --- | --- | --- |
-| 最终精确源码、相关 CI、聚焦测试、类型检查 | 本记录只列源码和测试覆盖；主流程需补最终 commit/脏树状态、依赖锁、执行命令和结果 | 待主流程登记，不能把早期或其他源码测试替代最终结果 |
-| 生产构建 | 有正式 Electron/KUN 构建与候选 provenance 检查路径；本记录未运行构建 | 待主流程补实际构建日志 |
-| 精确 macOS 候选包安装、版本、bundle、签名、适用公证 | 此处未安装或校验最终包；证书存在或构建工具可用不等于最终包已签名/公证 | 待验收 |
-| 中文 macOS 主使用场景 | 有组件/DOM 测试；无本记录对应的精确包操作结果 | 待验收 |
+| 最终精确源码、相关 CI、聚焦测试、类型检查 | `72e4bf9b` 干净独立工作树按锁文件安装；KUN 36 文件/305 项、Desktop 28 文件/453 项通过，双端类型检查及 ESLint 通过；翻译/权限面板 6 项、旧流程 3 项补充验证通过；`c6f52a4b` 两轮自动 Quality 均通过 | 本地及完整 CI 通过；外部平台/精确包另验收 |
+| 生产构建 | 同一精确源码 `npm run build` 通过，build freshness 1267 个输入、品牌检查 3227 文件、文档依赖/许可证、OpenSpec 13 项通过 | 本地生产构建通过；精确分发包另验收 |
+| 精确 macOS 候选包安装、版本、bundle、签名、适用公证 | 首包 `72e4bf9b` 已安装隔离目录，版本 `0.5.4`，arm64，独立 bundle `com.wangjiawei508.workwise.candidate.head72e4bf9b4ca8`，Developer ID `R35G7F4A9U`；本机 codesign/stapler/Gatekeeper 与 DMG/ASAR hash 校验通过 | 首包身份通过；因发现 UI 缺陷需验收修复后精确包 |
+| 中文 macOS 主使用场景 | 首包中文深色 CUA 重放钉钉缺配置、Lark 未安装、状态查询、任务计数与证据面板、工作区改名。实际模型 span/发送/usage/工具回执均为 0，两平台任务保持 waiting_user。发现显式设置跳错页、会话假运行和重复安装标签三项缺陷 | 已执行并发现缺陷，不能标为整体验收通过；修复后回归待补 |
 | 中文 Windows、安装身份和主要交互 | Windows 相关路径/工具安装有自动化分支；没有对应 Windows 机器/精确包证据 | 待验收，不得以 macOS 成功代替 |
 | 真实 Lark/Feishu 账户 | 有协议核对与合成回放；尚无本轮账户安装→登录→Scope→预检→读取→明确批准→写入→回读结果 | 待真实测试账户和有限目标验收 |
 | 钉钉缺配置 | 预检/Runtime/设置卡片有合成覆盖 | 精确包未配置场景待验收 |
 | 钉钉真实 OAuth、个人待办和企业审批 | 有官方 API 适配和合成覆盖；个人 OAuth 不代表企业 Workflow 已授权 | 待各自平台实际权限与测试目标验收 |
-| 真实旧资料迁移 | 兼容读取、目录别名、快照、哈希和拒绝活动数据库有测试；本记录没有碰生产 profile | 待已备份资料副本验收，保留插件、MCP、Skill、凭据引用和原文件 |
+| 真实旧资料迁移 | 生产迁移服务为实际旧工作区 1670 文件建立私有快照，哈希和幂等重试通过，源目录不变；生产 JsonSettingsStore 对 3 个 profile/4 份真实 V1/V2 设置的私有副本完成读取、保存、重开与 V1 备份核验，敏感配置值均保留，源文件不变 | 上述真实数据副本范围通过；真实样本无 credentialRef，不宣称 Keychain、完整 profile 或 SQLite 迁移通过 |
 | 发布说明和回归证据 | [可信执行说明](../harness-trusted-execution.md)、[Lark](harness-lark-provider.md)、[钉钉](../dingtalk-provider.md) 说明实现、边界和迁移 | 需把最终结果追加后形成候选交付证据 |
 | 公开发布、版本号、Stable、官网 | 本记录未执行或证明任何公开发布操作 | 未发布，不宣称发行就绪 |
 
@@ -93,20 +93,45 @@
 
 ## 尚不能关闭的事项与下一步
 
-1. 由主流程补入最终精确源码、锁定依赖的聚焦测试、类型检查、CI 和生产构建结果；失败项逐项保留，不能把“有测试”写为“通过”。
+1. CI、本地精确源码聚焦测试、类型检查和生产构建已通过。保留旧 CI 的翻译插值失败及旧占位归档被误期望为成功的失败记录；后续测试分别验证正常 DOCX/持久审批成功、保留旧归档节点的流程明确失败，未放宽生产拒绝策略。
 2. 形成并安装同一精确候选包，核验实际版本、bundle、签名和适用公证，检查主要中文 macOS 场景；另取得中文 Windows 的实际运行证据。
 3. 用明确授权的测试账户完成飞书/Lark 与钉钉连接、真实读取、Scope 缺失/过期及恢复；真实写入只针对明确测试待办/审批，保留平台实际响应及回读证据。
-4. 在已备份的真实资料副本中验收旧配置、工作区、插件/MCP/Skill 与凭据引用兼容；活动 SQLite 走一致性备份，不对原件执行普通目录复制迁移。
+4. 真实工作区和设置副本验证已完成上述范围；完整插件/MCP/Skill 及 credentialRef/Keychain 仍需相应真实样本，不能从设置值保留推断整套资料验收。活动 SQLite 走一致性备份，不对原件执行普通目录复制迁移。
 5. 逐项核对计划中尚属部分交付的体验：任意路径/网络的一次性范围授权、每次执行前的权限总览、市场提供商的实时诊断及全部深链配置页。市场已根据本地 catalog/安装/配置事实统一显示状态，但这些仍不能被现有任务卡、Shell 授权或三个工作台的导航过滤代替。
 6. 取得上述证据后再判断 A—D 是否满足正式产品完成条件及 E 是否可以进入发布；缺少真实平台或目标 OS 能力时明确写待验收，不把模拟结果填成通过。
 
-## 最终执行结果（由主实施流程填写）
+## 首轮执行证据（历史源码，非当前最终包）
 
-- 精确源码/依赖锁：待登记。
-- CI、聚焦测试与类型检查：待登记。
-- 生产构建及精确候选标识：待登记。
-- 版本、bundle、签名、公证：待登记。
+- 精确源码/依赖锁：`72e4bf9b4ca890152f7a0c7f30d9fb9e223b7455`，独立干净工作树 `npm ci`；后续两个测试提交不改变生产代码，候选包仍对应 `72e4bf9b`。
+- 聚焦测试：KUN 305 项、Desktop 453 项通过（共 758 项）；翻译与权限面板补充验证 6 项、旧流程 3 项通过。Desktop/KUN 类型检查及 ESLint 均通过。
+- 完整 CI：`c6f52a4b` 的 [42804000420](https://github.com/railwise-cn/railwise-ai/actions/runs/42804000420)、[42804010470](https://github.com/railwise-cn/railwise-ai/actions/runs/42804010470) 均成功，含全量测试、生产构建、Windows 路径/进程/持久化及 Electron 生产启动。不是 Windows 交互 UI 或真实平台写入验收。
+- 生产构建及精确候选标识：本地生产构建通过；首个私有签名候选构建 [42801605406](https://github.com/railwise-cn/railwise-ai/actions/runs/42801605406)，源码 `72e4bf9b`，不发布、不改 Stable、无重复冻结。
+- 首包版本、bundle、签名、公证：`0.5.4` 私有 Candidate、arm64、独立 bundle `com.wangjiawei508.workwise.candidate.head72e4bf9b4ca8`，Developer ID `R35G7F4A9U`，本机 codesign/stapler/Gatekeeper 均通过。DMG SHA-256 `54a44f7bafe3bfe892ce26451a163c5bed8c9f74929c7e5a992c140f86abddbd`，ASAR SHA-256 `4bc8e054f4d8aee32fc56ccf861d0bb1a9d9efa70f38d94dab20f0dc18003dbc`。不代表修复后包通过。
 - macOS/Windows 中文包验收：待登记。
 - 真实 Provider、实际模型与测试目标：待登记；缺失保持待验收。
-- 真实资料副本迁移结果：待登记。
+- 真实资料副本迁移结果：4 个实际旧工作区、1670 文件私有快照校验通过；3 个 profile 的 4 份真实 V1/V2 设置副本读取/迁移/保存/重开通过，原资料哈希不变。未上传私有内容；未验证真实 Keychain、完整 profile 和活动 SQLite。
 - 发布判断与剩余缺陷：待登记。
+
+## 首包 CUA 缺陷记录
+
+| 缺陷 | 实际观察 | 修复与回归要求 |
+| --- | --- | --- |
+| HUI-01 | 无模型 Key 时，“配置钉钉连接器”请求通用设置，异步加载却覆盖为供应商页 | 移除无 Key 强制重定向，保留提示；DOM 覆盖延迟加载后的通用、供应商、写作和 Agent 显式入口；修复后包再次点击 |
+| HUI-02 | Lark 预检已持久等待，模型调用为零，但现有会话持续显示运行中；API 把本地 command 回执重建成 completed Turn | 明确本地会话回执与执行 Turn，SSE 回执不得启动 busy/watchdog；修复后包核对首次建会话与现有会话两入口 |
+| HUI-03 | 卡片两个“安装 Lark CLI”按钮，一个安装，另一个只打开市场 | 配置入口明确显示“打开插件市场”；DOM 验证只存在一个安装按钮且市场按钮不触发安装；修复后包检查 |
+
+首包检查结果为“发现缺陷”，并非 passed。原始包、回执和缺陷记录保留；重打包用于验证实际修复，不是重复冻结门禁。验收未使用生产 profile、真实账号或真实审批，也未修改官网/Stable。
+
+
+## 连接器工作台增量（2026-11-10）
+
+本增量依据用户要求研究了 WorkBuddy 的实际入口与连接前流程，再落实到 RailWise；没有复用其私有代码，也未把竞品的目录描述当作已支持能力。研究与迁移说明见 [技能与连接器工作台](../connector-workspace.md)。
+
+- 入口集中为“技能与连接器”，连接器、技能、插件各自页签。连接器默认展示，旧插件/Skill/MCP/安装及权限记录保留。
+- 飞书和钉钉原生连接卡在目录断网时仍可打开。详情说明能力、实际连接状态和操作边界；只有用户点击连接才安装或启动授权。
+- 飞书补齐首次 `config init` 官方应用扫码，再进入账号授权；应用/Profile/用户身份和可执行哈希绑定执行 Grant，业务使用同一隔离配置目录和固定 Profile。
+- 钉钉已核实存在官方 DWS 和设备授权。本增量增加固定版本、摘要校验、官方源回退、隔离配置/凭据目录、同进程等待和取消、类型化业务命令；原 HTTP 企业配置移入高级兼容入口，不删除旧配置。
+- DWS 只读身份诊断没有业务 Scope 清单，本机登录有效不能被显示为已完成审批权限验证。写操作继续经过明确目标确认、回执和回读；未知结果或后端/账号切换不能自动重放。
+- 用户无需现在提供账号、密钥或测试 ID。官方页面扫码和授权由用户完成；业务写入验收到执行时再选定具体测试条目。
+
+最新聚焦测试、CI、构建、精确包标识和中文 UI 结果将在对应操作实际完成后登记。未完成真实扫码、远端读取或写入时维持“待验收”，不把合成 fixture 当作真实平台通过。

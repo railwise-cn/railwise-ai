@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
+import { larkTestBinding } from './helpers/lark-identity.js'
 import { FileThreadStore } from '../src/adapters/file/file-thread-store.js'
 
 const cleanup: Array<() => Promise<unknown>> = []
@@ -55,7 +56,7 @@ describe('production managed Lark connector task path', () => {
     expect((await runtime.toolDiagnostics?.())?.providers.some(item => item.id === 'lark-cli')).toBe(false)
 
     await writeFile(configPath, JSON.stringify({ capabilities: { lark: {
-      enabled: true, authState: 'installed', executablePath: '/usr/bin/true', brand: 'feishu', scopes: ['task:task:read']
+      enabled: true, authState: 'installed', executablePath: '/usr/bin/true', ...larkTestBinding, scopes: ['task:task:read']
     } } }))
     await runtime.refreshLark?.()
     expect((await runtime.toolDiagnostics?.())?.providers.some(item => item.id === 'lark-cli' && item.available)).toBe(true)
@@ -69,7 +70,7 @@ describe('production managed Lark connector task path', () => {
     })
 
     await writeFile(configPath, JSON.stringify({ capabilities: { lark: {
-      enabled: true, authState: 'installed', executablePath: '/usr/bin/true', brand: 'feishu',
+      enabled: true, authState: 'installed', executablePath: '/usr/bin/true', ...larkTestBinding,
       scopes: ['task:task:read', 'task:task:write']
     } } }))
     await runtime.refreshLark?.()
@@ -104,7 +105,7 @@ describe('production managed Lark connector task path', () => {
       requests += 1
       if (requests === 1) {
         await writeFile(configPath, JSON.stringify({ capabilities: { lark: {
-          enabled: true, authState: 'installed', executablePath: '/usr/bin/true', brand: 'feishu', scopes: ['task:task:read']
+          enabled: true, authState: 'installed', executablePath: '/usr/bin/true', ...larkTestBinding, scopes: ['task:task:read']
         } } }))
         await runtime.refreshLark?.()
       }
@@ -124,7 +125,7 @@ describe('production managed Lark connector task path', () => {
       model: 'fixture', approvalPolicy: 'auto', sandboxMode: 'workspace-write', tokenEconomyMode: false,
       insecure: false, storage: { backend: 'file' },
       capabilities: KunCapabilitiesConfig.parse({
-        lark: { enabled: true, authState: 'installed', executablePath: '/usr/bin/true', brand: 'feishu', scopes: ['task:task:read', 'task:task:write'] },
+        lark: { enabled: true, authState: 'installed', executablePath: '/usr/bin/true', ...larkTestBinding, scopes: ['task:task:read', 'task:task:write'] },
         subagents: { enabled: true, maxParallel: 1, maxChildRuns: 2 }
       })
     })

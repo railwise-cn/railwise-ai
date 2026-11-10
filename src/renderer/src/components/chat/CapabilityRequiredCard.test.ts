@@ -22,7 +22,10 @@ let root: Root
 let container: HTMLDivElement
 const api = {
   installManagedTool: vi.fn(), diagnoseManagedTool: vi.fn(), beginManagedLarkLogin: vi.fn(),
-  completeManagedLarkLogin: vi.fn(), coordinateTaskCommand: vi.fn(), openExternal: vi.fn(async () => undefined)
+  completeManagedLarkLogin: vi.fn(), coordinateTaskCommand: vi.fn(), openExternal: vi.fn(async () => undefined),
+  beginManagedLarkAppSetup: vi.fn(), checkManagedLarkAppSetup: vi.fn(), cancelManagedLarkAppSetup: vi.fn(),
+  diagnoseManagedDingTalk: vi.fn(), installManagedDingTalk: vi.fn(), beginManagedDingTalkLogin: vi.fn(),
+  checkManagedDingTalkLogin: vi.fn(), cancelManagedDingTalkLogin: vi.fn()
 }
 function button(label: string): HTMLButtonElement {
   const result = [...container.querySelectorAll('button')].find(item => item.textContent === label)
@@ -49,13 +52,14 @@ describe('capability waiting card', () => {
   })
   afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
-  it('opens the dedicated DingTalk connection settings without executing the task', async () => {
+  it('opens the dedicated DingTalk connection hub without executing the task', async () => {
     await render({ ...card, capability: { provider: 'dingtalk', status: 'unsupported', message: '尚无钉钉连接器' } })
     expect(container.textContent).toContain('尚无钉钉连接器')
     expect(container.textContent).toContain('尚未执行')
     expect(container.textContent).not.toContain('thread-original')
     await click('配置钉钉连接')
-    expect(state.openSettings).toHaveBeenCalledWith('general')
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'dingtalk')
+    expect(state.openSettings).not.toHaveBeenCalled()
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
     expect(api.openExternal).not.toHaveBeenCalled()
   })
@@ -94,14 +98,15 @@ describe('capability waiting card', () => {
     expect(state.openPlugins).not.toHaveBeenCalled()
   })
 
-  it('keeps DingTalk configuration in General and honors an explicit marketplace route for Lark', async () => {
+  it('routes legacy DingTalk setup links and Lark links to their independent connection details', async () => {
     await render({...card, capability:{provider:'dingtalk',status:'needs_authorization',message:'缺少钉钉凭据',
       resolution:{kind:'connect',route:'settings/mcp',label:'配置钉钉连接'}}})
     await click('配置钉钉连接')
-    expect(state.openSettings).toHaveBeenCalledWith('general')
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'dingtalk')
+    expect(state.openSettings).not.toHaveBeenCalled()
     await render({...card, capability:{...card.capability,resolution:{kind:'connect',route:'marketplace',label:'连接飞书'}}})
     await click('连接飞书')
-    expect(state.openPlugins).toHaveBeenCalledOnce()
+    expect(state.openPlugins).toHaveBeenCalledWith(undefined, 'lark')
   })
 
   it('shows actual authority limits without advertising hidden execution identities', async () => {
@@ -129,6 +134,45 @@ describe('capability waiting card', () => {
       intent: 'resume', request: { prompt: card.prompt }
     }))
     expect(state.selectThread).toHaveBeenCalledWith('thread-original')
+  })
+
+  it('connects DingTalk with the official flow while requiring explicit resume of the original task', async () => {
+    api.diagnoseManagedDingTalk.mockResolvedValue({ ok: true, status: { state: 'needs_login' } })
+    api.beginManagedDingTalkLogin.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://login.dingtalk.com/oauth2/device', userCode: 'SYNTHETIC' })
+    api.checkManagedDingTalkLogin.mockResolvedValue({ ok: true, state: 'succeeded', status: { state: 'installed', identityFingerprint: 'synthetic-identity' } })
+    api.coordinateTaskCommand.mockResolvedValue({ kind: 'task_started', task: { id: 'task-original' } })
+    const dingTalkCard = { ...card, prompt: '帮我处理钉钉待办', capability: { provider: 'dingtalk' as const, status: 'needs_authorization' as const, message: '需要钉钉登录授权' } }
+    await render(dingTalkCard)
+    expect(api.diagnoseManagedDingTalk).not.toHaveBeenCalled()
+    expect(api.beginManagedDingTalkLogin).not.toHaveBeenCalled()
+    await click(i18n.t('managedDwsConnect', { ns: 'common' }))
+    expect(api.openExternal).toHaveBeenCalledWith('https://login.dingtalk.com/oauth2/device')
+    expect(container.textContent).toContain('SYNTHETIC')
+    await click('我已完成授权，检查登录')
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    expect(api.beginManagedLarkLogin).not.toHaveBeenCalled()
+    await click('重新检查并继续原任务')
+    expect(api.coordinateTaskCommand).toHaveBeenCalledWith(expect.objectContaining({
+      threadId: 'thread-original', taskId: 'task-original', resolveAttentionId: 'attention-original',
+      intent: 'resume', request: { prompt: dingTalkCard.prompt }
+    }))
+  })
+
+  it('offers official app scan setup first and keeps app setup, user login and task execution separate', async () => {
+    api.beginManagedLarkLogin.mockResolvedValue({ ok: false, reason: 'app_configuration_required', message: 'App is not configured' })
+    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://open.feishu.cn/device', expiresAt: '2026-11-11T00:00:00Z' })
+    api.checkManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'configured' })
+    await render()
+    await click('登录并授权飞书')
+    expect(container.textContent).toContain('无需在聊天中提供账号或密钥')
+    expect(api.beginManagedLarkAppSetup).not.toHaveBeenCalled()
+    await click('配置飞书应用（官方扫码）')
+    expect(api.openExternal).toHaveBeenCalledWith('https://open.feishu.cn/device')
+    expect(container.textContent).toContain('RailWise 不会替你确认平台权限')
+    await click('我已完成应用配置，检查结果')
+    expect(container.textContent).toContain('应用配置已核验')
+    expect(api.beginManagedLarkLogin).toHaveBeenCalledTimes(1)
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
   it('does not switch the current conversation when an original task is resumed elsewhere', async () => {

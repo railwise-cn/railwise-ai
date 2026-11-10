@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import type { LarkCapabilityConfig } from '../../contracts/capabilities.js'
@@ -7,14 +8,23 @@ import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { defineLocalTool } from './local-tool-definition.js'
 import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes } from './sandbox-policy.js'
+import { assertLarkCliCredentialAccess, resolveLarkCliEnvironment } from '../../services/lark-cli-environment.js'
+import { parseLarkIdentityBinding } from '../../services/lark-cli-identity.js'
 
 const execFileAsync = promisify(execFile)
 export type LarkCommandResult = { ok: boolean; output: unknown; isError?: boolean }
-export type LarkCliRunner = (executablePath: string, args: string[], signal: AbortSignal) => Promise<LarkCommandResult>
+export type LarkCliRunner = (executablePath: string, args: string[], signal: AbortSignal, expectedExecutableHash?: string) => Promise<LarkCommandResult>
 
-const defaultRunner: LarkCliRunner = async (executablePath, args, signal) => {
+const defaultRunner: LarkCliRunner = async (executablePath, args, signal, expectedExecutableHash) => {
+  assertLarkCliCredentialAccess()
+  const env = resolveLarkCliEnvironment()
+  if (!expectedExecutableHash) throw connectorFailure('connector_executable_unverified', 'Diagnose the managed Lark CLI before dispatch.')
+  let actualHash: string
+  try { actualHash = createHash('sha256').update(await readFile(executablePath)).digest('hex') }
+  catch { throw connectorFailure('connector_executable_unverified', 'The diagnosed Lark CLI is no longer readable. Recheck the connector before continuing.') }
+  if (actualHash !== expectedExecutableHash) throw connectorFailure('connector_executable_changed', 'The managed Lark CLI changed after diagnosis. Recheck the connector before continuing.')
   try {
-    const result = await execFileAsync(executablePath, args, { signal, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })
+    const result = await execFileAsync(executablePath, args, { env, signal, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })
     return normalizeLarkResult({ ok: true, output: parseJsonOutput(String(result.stdout ?? '')) })
   } catch (error) {
     const value = error as { stdout?: string; stderr?: string; message?: string }
@@ -37,19 +47,32 @@ const actionSchema = { type: 'object', properties: { instanceCode: { type: 'stri
 
 /** A fixed, verified CLI subset. Arguments never pass through a shell or come from model command text. */
 export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefined, runner: LarkCliRunner = defaultRunner): CapabilityToolProvider | undefined {
-  if (!config?.enabled || config.authState !== 'installed' || !config.executablePath || !config.brand) return undefined
+  if (!config?.enabled || config.authState !== 'installed' || !config.executablePath || !config.brand || !config.appId ||
+      !config.userOpenId || !config.identityFingerprint || !config.executableHash) return undefined
+  const profileFlags = ['--profile', config.profile || config.appId]
   const scopes = new Set(config.scopes)
   const provider = 'lark'
   const apiRoot = config.brand === 'feishu' ? 'https://open.feishu.cn' : 'https://open.larksuite.com'
   const hasScopes = (required: readonly string[]) => required.every(scope => scopes.has(scope))
   const run = async (args: string[], required: string[], context: ToolHostContext, action?: { operation: string; target: string }) => {
+    assertLarkCliCredentialAccess()
     if (context.abortSignal.aborted) throw new Error('Lark command aborted before start')
+    const expectedIdentity = context.executionGrant?.connectorIdentityFingerprints?.['lark-cli']
+    if (!expectedIdentity) throw connectorFailure('connector_identity_unverified', 'The current execution grant has no verified Lark account binding. Recheck authorization before continuing.')
+    if (expectedIdentity !== config.identityFingerprint) throw connectorFailure('connector_identity_changed', 'The connected Lark account changed after the task grant was issued. Review the original task before continuing.')
     if (!hasScopes(required)) throw new Error('connector_scope_missing')
     assertGrantAllowsNetwork(apiRoot, context)
     assertGrantConnectorScopes(required, context)
     if (action) assertGrantAllowsExternalTarget(provider, action.operation, action.target, context)
     context.assertExecution?.()
-    return normalizeLarkResult(await runner(config.executablePath!, args, context.abortSignal))
+    const identity = await runner(config.executablePath!, ['auth', 'status', ...profileFlags, '--json'], context.abortSignal, config.executableHash)
+    const live = identity.ok && !identity.isError ? parseLarkIdentityBinding(JSON.stringify(identity.output)) : undefined
+    if (!live?.available) throw connectorFailure('connector_identity_unverified', 'The connected Lark user could not be verified. Reconnect before continuing.')
+    if (live.identityFingerprint !== expectedIdentity) throw connectorFailure('connector_identity_changed', 'The Lark application or user changed after authorization. No platform operation was dispatched.')
+    if (!required.every(scope => live.scopes.includes(scope))) throw connectorFailure('connector_scope_missing', 'The current Lark account no longer has the required permissions.')
+    await context.validateExecutionGrant?.()
+    context.assertExecution?.()
+    return normalizeLarkResult(await runner(config.executablePath!, [...args, ...profileFlags], context.abortSignal, config.executableHash))
   }
   type Spec = { name: string; description: string; schema: Record<string, unknown>; parse: z.ZodType<Record<string, unknown>>; scopes: string[]; operation: string; mutation?: boolean; args: (args: Record<string, unknown>) => string[] }
   const define = (spec: Spec) => defineLocalTool({
@@ -71,18 +94,22 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
       if (spec.operation === 'complete') {
         remoteStatus = verifiedTaskState(data, target)
         if (!remoteStatus) {
-          const check = await run(['task', 'tasks', 'get', '--params', JSON.stringify({ task_guid: target }), ...jsonFlags], ['task:task:read'], context)
-          if (check.ok) { data = dataOf(check.output); remoteStatus = verifiedTaskState(data, target) }
+          try {
+            const check = await run(['task', 'tasks', 'get', '--params', JSON.stringify({ task_guid: target }), ...jsonFlags], ['task:task:read'], context)
+            if (check.ok) { data = dataOf(check.output); remoteStatus = verifiedTaskState(data, target) }
+          } catch (error) { return failure({ code: errorCode(error) }, 'outcome_unknown', provider, spec.operation, target) }
         }
       } else if (spec.operation === 'approve' || spec.operation === 'reject') {
-        const check = await run(['approval', 'instances', 'get', '--params', JSON.stringify({ instance_code: args.instanceCode }), ...jsonFlags], ['approval:instance:read'], context)
-        if (check.ok) {
-          const state = dataOf(check.output)
-          const tasks = Array.isArray(state.tasks) ? state.tasks : []
-          const matched = tasks.map(asRecord).find(task => String(task.id ?? task.task_id ?? '') === target)
-          const expected = spec.operation === 'approve' ? 'APPROVED' : 'REJECTED'
-          if (matched?.status === expected && (!state.instance_code || state.instance_code === args.instanceCode)) { data = state; remoteStatus = expected }
-        }
+        try {
+          const check = await run(['approval', 'instances', 'get', '--params', JSON.stringify({ instance_code: args.instanceCode }), ...jsonFlags], ['approval:instance:read'], context)
+          if (check.ok) {
+            const state = dataOf(check.output)
+            const tasks = Array.isArray(state.tasks) ? state.tasks : []
+            const matched = tasks.map(asRecord).find(task => String(task.id ?? task.task_id ?? '') === target)
+            const expected = spec.operation === 'approve' ? 'APPROVED' : 'REJECTED'
+            if (matched?.status === expected && (!state.instance_code || state.instance_code === args.instanceCode)) { data = state; remoteStatus = expected }
+          }
+        } catch (error) { return failure({ code: errorCode(error) }, 'outcome_unknown', provider, spec.operation, target) }
       } else {
         const validRead = spec.name === 'lark_task_list' ? Array.isArray(data.items)
           : spec.name === 'lark_approval_list' ? Array.isArray(data.tasks)
@@ -110,6 +137,8 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
   return { id: 'lark-cli', kind: 'skill', enabled: true, available: true, tools }
 }
 
+function connectorFailure(code: string, message: string) { return Object.assign(new Error(message), { code }) }
+function errorCode(error: unknown): string { const code = (error as { code?: unknown })?.code; return typeof code === 'string' && /^[a-z_]+$/.test(code) ? code : 'connector_readback_failed' }
 function asRecord(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 function stringValue(value: unknown): string | undefined { return typeof value === 'string' && value ? value : undefined }
 function dataOf(value: unknown): Record<string, unknown> { const record = asRecord(value); return record.data && typeof record.data === 'object' ? asRecord(record.data) : record }
@@ -129,4 +158,4 @@ function normalizeLarkResult(result: LarkCommandResult): LarkCommandResult {
 function parseJsonOutput(raw: string): unknown {
   try { return JSON.parse(raw.trim()) } catch { return { ok: false, error: 'invalid_connector_response' } }
 }
-export const _larkCliToolProviderInternals = { parseJsonOutput, normalizeLarkResult, verifiedTaskState }
+export const _larkCliToolProviderInternals = { parseJsonOutput, normalizeLarkResult, verifiedTaskState, defaultRunner }

@@ -62,7 +62,7 @@ export function WorkspaceSecondaryNavigation({
       </div>
       </details> : null}
       <div className="order-2">
-        <SidebarCommandRow icon={<ProductIcon name="plugins" className="h-4 w-4" strokeWidth={1.75} />} label={t('plugins')} onClick={onOpenPlugins} active={activeRoute === 'plugins'} />
+        <SidebarCommandRow icon={<ProductIcon name="plugins" className="h-4 w-4" strokeWidth={1.75} />} label={t('connectorHubHeading')} onClick={onOpenPlugins} active={activeRoute === 'plugins'} />
       </div>
     </nav>
   )

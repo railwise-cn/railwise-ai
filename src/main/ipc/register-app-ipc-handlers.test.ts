@@ -15,9 +15,26 @@ import {
 } from '../../shared/app-settings'
 
 const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<unknown>>()
+const dwsMocks = vi.hoisted(() => ({
+  diagnose: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
+  install: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
+  begin: vi.fn(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://login.dingtalk.com/device' })),
+  check: vi.fn(async () => ({ ok: true, state: 'succeeded', status: { state: 'installed', identityFingerprint: 'synthetic-fingerprint' } })),
+  cancel: vi.fn(async () => ({ ok: true, state: 'cancelled' }))
+}))
+vi.mock('../services/managed-dws-service', () => ({
+  diagnoseManagedDingTalk: dwsMocks.diagnose,
+  installManagedDingTalk: dwsMocks.install,
+  beginManagedDingTalkLogin: dwsMocks.begin,
+  checkManagedDingTalkLogin: dwsMocks.check,
+  cancelManagedDingTalkLogin: dwsMocks.cancel
+}))
 const managedToolMocks = vi.hoisted(() => ({
   beginLogin: vi.fn(async () => ({ ok: true, verificationUrl: 'https://accounts.feishu.cn/device', expiresAt: '2026-11-10T00:00:00.000Z' })),
   completeLogin: vi.fn(async () => ({ ok: true, status: { id: 'lark-cli', state: 'installed', scopes: ['task:task:read'], brand: 'feishu' } })),
+  beginAppSetup: vi.fn(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://accounts.feishu.cn/device' })),
+  checkAppSetup: vi.fn(async () => ({ ok: true, state: 'configured' })),
+  cancelAppSetup: vi.fn(async () => ({ ok: true, state: 'cancelled' })),
   list: vi.fn(async () => ({ ok: true, tools: [] })),
   install: vi.fn(async () => ({ ok: false, message: 'fixture' })),
   update: vi.fn(async () => ({ ok: false, message: 'fixture' })),
@@ -28,6 +45,9 @@ const managedToolMocks = vi.hoisted(() => ({
 vi.mock('../services/managed-tool-service', () => ({
   beginManagedLarkLogin: managedToolMocks.beginLogin,
   completeManagedLarkLogin: managedToolMocks.completeLogin,
+  beginManagedLarkAppSetup: managedToolMocks.beginAppSetup,
+  checkManagedLarkAppSetup: managedToolMocks.checkAppSetup,
+  cancelManagedLarkAppSetup: managedToolMocks.cancelAppSetup,
   listManagedTools: managedToolMocks.list,
   installManagedTool: managedToolMocks.install,
   updateManagedTool: managedToolMocks.update,
@@ -977,6 +997,9 @@ describe('registerAppIpcHandlers', () => {
     for (const channel of [
       'tool:lark-login:begin',
       'tool:lark-login:complete',
+      'tool:lark-app-setup:begin',
+      'tool:lark-app-setup:check',
+      'tool:lark-app-setup:cancel',
       'tool:list-managed',
       'tool:install-managed',
       'tool:update-managed',
@@ -1009,9 +1032,47 @@ describe('registerAppIpcHandlers', () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     const refresh = vi.fn(async () => undefined)
     registerAppIpcHandlers({ ...registerOptions(), refreshManagedCapabilities: refresh })
+    expect(await handlers.get('tool:lark-app-setup:begin')?.({})).toMatchObject({ ok: true, state: 'waiting' })
+    expect(await handlers.get('tool:lark-app-setup:check')?.({})).toMatchObject({ ok: true, state: 'configured' })
+    expect(await handlers.get('tool:lark-app-setup:cancel')?.({})).toMatchObject({ ok: true, state: 'cancelled' })
+    expect(refresh).not.toHaveBeenCalled()
     expect(await handlers.get('tool:lark-login:begin')?.({})).toMatchObject({ ok: true })
     expect(await handlers.get('tool:lark-login:complete')?.({})).toMatchObject({ ok: true, status: { state: 'installed' } })
     expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ id: 'lark-cli', scopes: ['task:task:read'] }))
+  })
+
+  it('exposes independent DingTalk installation and scan flow without treating a waiting scan as connected', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const refresh = vi.fn(async () => undefined)
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: refresh })
+    expect(await handlers.get('tool:dingtalk:diagnose')?.({})).toMatchObject({ ok: true, status: { state: 'needs_login' } })
+    expect(await handlers.get('tool:dingtalk:install')?.({})).toMatchObject({ ok: true })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(await handlers.get('tool:dingtalk:login-begin')?.({})).toMatchObject({ state: 'waiting' })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(await handlers.get('tool:dingtalk:login-check')?.({})).toMatchObject({ state: 'succeeded' })
+    expect(refresh).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'installed', identityFingerprint: 'synthetic-fingerprint' }))
+    expect(await handlers.get('tool:dingtalk:login-cancel')?.({})).toMatchObject({ state: 'cancelled' })
+  })
+
+  it('changes DingTalk enablement only through an explicit strict boolean command without reading accounts', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const setEnabled = vi.fn(async (enabled: boolean) => ({ ok: true as const, status: { state: 'needs_login' as const, enabled } }))
+    registerAppIpcHandlers({ ...registerOptions(), setManagedDingTalkEnabled: setEnabled })
+    expect(await handlers.get('tool:dingtalk:set-enabled')?.({}, true)).toEqual({ ok: true, status: { state: 'needs_login', enabled: true } })
+    expect(await handlers.get('tool:dingtalk:set-enabled')?.({}, false)).toEqual({ ok: true, status: { state: 'needs_login', enabled: false } })
+    for (const payload of ['true', 'false', 1, 0, null, { enabled: true }]) await expect(handlers.get('tool:dingtalk:set-enabled')?.({}, payload)).rejects.toThrow(/Invalid payload/)
+    expect(setEnabled.mock.calls).toEqual([[true], [false]])
+    expect(dwsMocks.diagnose).not.toHaveBeenCalled()
+    expect(dwsMocks.begin).not.toHaveBeenCalled()
+  })
+
+  it('returns persisted disabled state from a trusted refresh without replacing installation or identity diagnosis', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => ({ enabled: false }) })
+    expect(await handlers.get('tool:dingtalk:diagnose')?.({})).toMatchObject({ ok: true, status: { state: 'needs_login', enabled: false } })
+    expect(await handlers.get('tool:dingtalk:login-check')?.({})).toMatchObject({ ok: true, status: { state: 'installed', enabled: false, identityFingerprint: 'synthetic-fingerprint' } })
+    expect(await handlers.get('tool:dingtalk:set-enabled')?.({}, true)).toMatchObject({ ok: false })
   })
 
   it('routes unified catalog and plugin operations through validated IPC payloads', async () => {

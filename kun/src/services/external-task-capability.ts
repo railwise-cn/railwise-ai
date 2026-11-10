@@ -40,9 +40,9 @@ export function defaultExternalTaskCapability(provider: ExternalTaskProvider, st
     workspaceState: 'unknown' as const, sandboxState: 'allowed' as const,
     approvalState: intent?.mutation ? 'required' as const : 'not_required' as const, checkedAt: new Date().toISOString() }
   if (provider === 'dingtalk') {
-    const resolution = { kind: 'connect' as const, route: 'settings/mcp', label: '查看连接器设置' }
+    const resolution = { kind: 'connect' as const, route: 'marketplace', label: '连接钉钉' }
     return { ...base, status: 'unsupported', credentialState: 'missing', errorCode: 'connector_unavailable',
-      message: '当前版本没有可执行的钉钉连接器。请先配置钉钉连接器。系统不会生成未经验证的 dws 命令。', action: resolution, resolution }
+      message: '钉钉连接器尚未完成配置。请通过官方连接器安装和扫码登录后继续原任务；系统不会通过未经验证的 Shell 命令代理平台操作。', action: resolution, resolution }
   }
   const config = state.lark
   const resolution = { kind: 'connect' as const, route: 'marketplace', label: '连接飞书' }

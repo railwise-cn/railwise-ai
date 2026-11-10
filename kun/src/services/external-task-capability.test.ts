@@ -31,7 +31,7 @@ describe('external task capability preflight', () => {
   it('leaves ordinary discussion alone', () => {
     expect(detectExternalTaskProvider('介绍一下飞书和钉钉的区别')).toBeNull()
     expect(preflightExternalTask('如何使用钉钉审批')).toBeNull()
-    expect(defaultExternalTaskCapability('dingtalk').message).toContain('不会生成未经验证的 dws 命令')
+    expect(defaultExternalTaskCapability('dingtalk').message).toContain('不会通过未经验证的 Shell 命令代理平台操作')
   })
 
   it('requires a platform decision for dual-provider actions while preserving comparisons as chat', () => {

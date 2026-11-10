@@ -6,9 +6,10 @@ import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provide
 import { LocalToolHost } from '../adapters/tool/local-tool-host.js'
 import { ManagedLarkRuntime } from './managed-lark-runtime.js'
 import { contextualExternalTaskPreflight, externalPreflightThreadContext } from './contextual-external-task-preflight.js'
+import { larkTestBinding } from '../../tests/helpers/lark-identity.js'
 
 const scopes = ['task:task:read', 'task:task:write']
-const config = LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes })
+const config = LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', ...larkTestBinding, scopes })
 function fixture() {
   const runner = vi.fn()
   const registry = new CapabilityRegistry([buildLarkCliToolProvider(config, runner)!])

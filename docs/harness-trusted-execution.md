@@ -8,7 +8,7 @@
 
 Turn 保存服务端确定的 Provider 身份及不可变 ExecutionGrant。实际派发再次检查工作区信任、Agent 范围、沙箱、路径、网络、连接器 scopes 和当前租约。workspace-write/read-only 的普通目录不包含主机 Bash，旧工具解析入口也不能绕过限制。子任务只处理允许的资料与候选文件，不获得外部写操作或自行提权工具。
 
-Lark CLI 的安装、设备登录和诊断由主进程管理；Runtime 读取可信本机诊断配置并热刷新。钉钉直接使用官方 OAuth/OpenAPI，区分个人用户令牌与企业内部应用 Workflow 权限。两者均不接受模型提供的 CLI 路径、Shell、API host 或操作者身份。凭据保存在既有凭据存储，配置仅保存引用。
+飞书/Lark CLI 与钉钉官方 DWS 的安装、设备登录和诊断由主进程管理；Runtime 读取可信本机诊断配置并热刷新。连接器和技能集中在同一入口的独立页签，点击连接后进入官方配置或扫码，不提前索要账号。钉钉原 OAuth/OpenAPI 企业应用配置保留为高级兼容入口，个人用户令牌与企业内部应用 Workflow 权限继续区分。两个平台均不接受模型提供的 CLI 路径、Shell、API host 或操作者身份；受管理 CLI 使用隔离凭据目录，原配置及凭据引用继续保留。
 
 ## 验收范围与回执
 
@@ -46,6 +46,8 @@ Flow 的通用 `publish`、`archive` 和 `subagent` 节点保留为不可执行�
 
 自动化回归使用合成账户、固定 HTTP/CLI 回包、真实 SQLite、真实 Runtime 装配和本机子进程，覆盖预检、拒绝、授权、scope 收紧、输入隔离、有限目标集合、历史回执、未知结果、任务界面及兼容读取。模拟 Provider 和模型结果不代表真实平台验收。
 
-真实飞书与钉钉 OAuth/API 需要用户自己的平台应用和账户；写操作验收需要明确的合成待办或测试审批目标。实现期间不自动操作真实业务审批。精确依赖构建、安装包身份/签名/适用公证以及中文平台界面验收分别记录，缺少证据时不称发布就绪。本次不修改公开版本号、渠道或已发布资产。
+用户在官方页面完成扫码、账号选择与权限授权，无需提前在聊天中提供账号、密钥或测试 ID。飞书首次应用配置与账号授权为不同步骤；钉钉组织可能需管理员开启 CLI 访问。实际写操作验收到执行阶段再选择明确的合成待办或测试审批目标。实现期间不自动操作真实业务审批。精确依赖构建、安装包身份/签名/适用公证以及中文平台界面验收分别记录，缺少证据时不称发布就绪。本次不修改公开版本号、渠道或已发布资产。
 
 实现来源：`kun/src/services/task-coordinator.ts`、`task-controller.ts`、`external-effect-evidence.ts`，`kun/src/adapters/tool/*-tool-provider.ts`、`sandbox-policy.ts`，`src/main/services/workspace-migration-service.ts`，任务与连接器设置界面。Provider 协议说明见 [Lark](qa/harness-lark-provider.md) 和 [钉钉](dingtalk-provider.md)。
+
+连接器工作台的入口、状态和迁移说明见 [技能与连接器工作台](connector-workspace.md)。DWS 官方工具已核实存在，此前“dws 不存在”的判断不再作为产品约束；禁止的是未经核实的命令和通过 Shell 绕过类型化权限。

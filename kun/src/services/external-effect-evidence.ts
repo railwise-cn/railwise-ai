@@ -22,6 +22,7 @@ const TOOL_OPERATIONS: Record<string, {provider: string; operation: string}> = {
   dingtalk_list_tasks: {provider: 'dingtalk', operation: 'list'}, dingtalk_get_task: {provider: 'dingtalk', operation: 'detail'},
   dingtalk_complete_task: {provider: 'dingtalk', operation: 'complete'}, dingtalk_list_approvals: {provider: 'dingtalk', operation: 'list'},
   dingtalk_get_approval: {provider: 'dingtalk', operation: 'detail'}, dingtalk_approve: {provider: 'dingtalk', operation: 'approve'},
+  dingtalk_get_approval_tasks: {provider:'dingtalk',operation:'detail'},
   dingtalk_reject: {provider: 'dingtalk', operation: 'reject'}, dingtalk_transfer: {provider: 'dingtalk', operation: 'transfer'}
 }
 export function externalOperationForTool(name: string): {provider: string; operation: string} | undefined { return TOOL_OPERATIONS[name] }

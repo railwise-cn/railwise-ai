@@ -20,7 +20,7 @@ type VerificationInput = { expectedRevision: number; idempotencyKey: string }
 export type OperationVerificationResult = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: ResultEvidence; errorCode?: string }
 type Dependencies = {
   repository: TaskRunRepository; controller: TaskController; toolHost: ToolHost; threadStore: ThreadStore
-  workspaceTrust: WorkspaceTrustReader; refreshProvider(provider: string): Promise<unknown>; nowIso(): string
+  workspaceTrust: WorkspaceTrustReader; refreshProvider(provider: string,originalGrant?:ExecutionGrant): Promise<unknown>; nowIso(): string
 }
 
 /** User-triggered, bounded readback of one already-dispatched action. Never dispatches a mutation or model Turn. */
@@ -66,7 +66,9 @@ export class ExternalOperationVerificationService {
     repository.finishOperation(taskId, key, { status: 'running' }, this.deps.nowIso())
     let result: OperationVerificationResult
     try {
-      await this.deps.refreshProvider(spec.provider)
+      const originalGrant=ExecutionGrantSchema.safeParse(receipt.request?.executionGrant)
+      if(!originalGrant.success)throw failure('execution_grant_missing','原操作缺少有效权限记录，无法核验。')
+      await this.deps.refreshProvider(spec.provider,originalGrant.data)
       const context = await this.context(task, receipt, spec.provider, spec.operation, target, plan.toolName)
       const catalog = await this.deps.toolHost.listTools(context)
       const providerId = spec.provider === 'lark' ? 'lark-cli' : 'dingtalk'

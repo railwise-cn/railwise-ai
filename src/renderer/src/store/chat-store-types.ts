@@ -99,6 +99,7 @@ export type SettingsRouteSection =
   | 'help'
 export type AppRoute = 'chat' | 'write' | 'design' | 'flow' | 'tasks' | 'settings' | 'plugins' | 'claw' | 'schedule' | 'engineering'
 export type PluginHostRoute = 'chat' | 'claw'
+export type ConnectorProviderRoute = 'lark' | 'dingtalk'
 
 /**
  * A side conversation ("by-the-way") running alongside the active
@@ -139,6 +140,8 @@ export type ChatState = {
   flowFilter: 'all' | 'scheduled'
   settingsReturnRoute: Exclude<AppRoute, 'settings'>
   pluginHostRoute: PluginHostRoute
+  /** One-shot deep link to setup; opening it never starts authentication or work. */
+  pluginConnectorTarget?: ConnectorProviderRoute | null
   settingsSection: SettingsRouteSection
   initialSetupOpen: boolean
   initialSetupMode: InitialSetupMode
@@ -195,7 +198,7 @@ export type ChatState = {
   createWriteThread: (workspaceRoot?: string, filePath?: string | null) => Promise<string | null>
   selectWriteThread: (threadId: string, workspaceRoot?: string, filePath?: string | null) => Promise<void>
   openSettings: (section?: SettingsRouteSection) => void
-  openPlugins: (host?: PluginHostRoute) => void
+  openPlugins: (host?: PluginHostRoute, connector?: ConnectorProviderRoute) => void
   openClaw: () => void
   openSchedule: () => void
   openFlow: (filter?: 'scheduled') => void

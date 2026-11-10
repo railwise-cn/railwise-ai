@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DingTalkCapabilityConfig } from './dingtalk.js'
+import { DwsCapabilityConfig } from './dws.js'
 
 export const RUNTIME_CAPABILITY_CONTRACT_VERSION = 1
 
@@ -212,23 +213,38 @@ export const LarkCapabilityConfig = CapabilityToggleConfig.extend({
   executablePath: z.string().min(1).optional(),
   authState: LarkAuthState.default('not_installed'),
   scopes: z.array(z.string().min(1)).default([]),
-  brand: z.enum(['feishu', 'lark']).optional()
+  brand: z.enum(['feishu', 'lark']).optional(),
+  appId: z.string().min(1).optional(),
+  profile: z.string().min(1).optional(),
+  executableHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  userOpenId: z.string().min(1).optional(),
+  identityFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional()
 }).strict()
 export type LarkCapabilityConfig = z.infer<typeof LarkCapabilityConfig>
 
-export const KunCapabilitiesConfig = z
-  .object({
-    mcp: McpCapabilityConfig.default(() => McpCapabilityConfig.parse({})),
-    web: WebCapabilityConfig.default(() => WebCapabilityConfig.parse({})),
-    skills: SkillsCapabilityConfig.default(() => SkillsCapabilityConfig.parse({})),
-    subagents: SubagentsCapabilityConfig.default(() => SubagentsCapabilityConfig.parse({})),
-    attachments: AttachmentsCapabilityConfig.default(() => AttachmentsCapabilityConfig.parse({})),
-    memory: MemoryCapabilityConfig.default(() => MemoryCapabilityConfig.parse({})),
-    imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({})),
-    lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({})),
-    dingtalk: DingTalkCapabilityConfig.default(() => DingTalkCapabilityConfig.parse({}))
-  })
-  .strict()
+export const KunCapabilitiesConfig = z.preprocess(input => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input
+  const raw = input as Record<string, unknown>
+  const legacy = raw.dingtalk
+  if (raw.dws === undefined && legacy && typeof legacy === 'object' && !Array.isArray(legacy) &&
+    (legacy as Record<string, unknown>).enabled === false) {
+    // Preserve an explicit historical platform disable when adding a backend.
+    return { ...raw, dws: { enabled: false } }
+  }
+  return input
+}, z.object({
+  mcp: McpCapabilityConfig.default(() => McpCapabilityConfig.parse({})),
+  web: WebCapabilityConfig.default(() => WebCapabilityConfig.parse({})),
+  skills: SkillsCapabilityConfig.default(() => SkillsCapabilityConfig.parse({})),
+  subagents: SubagentsCapabilityConfig.default(() => SubagentsCapabilityConfig.parse({})),
+  attachments: AttachmentsCapabilityConfig.default(() => AttachmentsCapabilityConfig.parse({})),
+  memory: MemoryCapabilityConfig.default(() => MemoryCapabilityConfig.parse({})),
+  imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({})),
+  lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({})),
+  dingtalk: DingTalkCapabilityConfig.default(() => DingTalkCapabilityConfig.parse({})),
+  dws: DwsCapabilityConfig.default(() => DwsCapabilityConfig.parse({}))
+}).strict())
+
 export type KunCapabilitiesConfig = z.infer<typeof KunCapabilitiesConfig>
 
 export const DEFAULT_KUN_CAPABILITIES_CONFIG: KunCapabilitiesConfig = KunCapabilitiesConfig.parse({})

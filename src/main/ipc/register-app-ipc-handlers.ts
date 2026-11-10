@@ -217,12 +217,16 @@ import { installBundledAgentPack } from '../services/agent-pack-service'
 import {
   beginManagedLarkLogin,
   completeManagedLarkLogin,
+  beginManagedLarkAppSetup,
+  checkManagedLarkAppSetup,
+  cancelManagedLarkAppSetup,
   diagnoseManagedTool,
   installManagedTool,
   listManagedTools,
   removeManagedTool,
   updateManagedTool
 } from '../services/managed-tool-service'
+import { diagnoseManagedDingTalk, installManagedDingTalk, beginManagedDingTalkLogin, checkManagedDingTalkLogin, cancelManagedDingTalkLogin } from '../services/managed-dws-service'
 import { appCancellationRegistry } from '../cancellation-registry'
 import { runtimeThreadInterruptPath } from '../../shared/runtime-endpoints'
 import { atomicWriteFile as durableWriteFile } from '../services/durable-file'
@@ -309,6 +313,8 @@ type RegisterAppIpcHandlersOptions = {
   getUserDataPath?: () => string
   resolveRuntimeConfigPath: () => string
   refreshManagedCapabilities?: (status: import('../../shared/workwise-api').ManagedToolStatus) => Promise<void>
+  refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
+  setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
@@ -704,6 +710,8 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     resolveRuntimeConfigPath,
     onRuntimeMcpConfigWritten,
     refreshManagedCapabilities,
+    refreshManagedDingTalkCapabilities,
+    setManagedDingTalkEnabled,
     showTurnCompleteNotification,
     getAppVersion,
     readGuiUpdateState,
@@ -1701,7 +1709,29 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
 
   ipcMain.handle('tool:list-managed', async () => listManagedTools())
+  const refreshDingTalk = async (result: import('../../shared/managed-dws').ManagedDwsResult): Promise<import('../../shared/managed-dws').ManagedDwsResult> => {
+    if (result.status) {
+      try {
+        const refreshed = await refreshManagedDingTalkCapabilities?.(result.status)
+        if (refreshed) return { ...result, status: { ...result.status, enabled: refreshed.enabled } }
+      } catch { return { ok: false, message: 'DingTalk state was checked, but Runtime capabilities could not refresh. Retry the connection check.' } }
+    }
+    return result
+  }
+  ipcMain.handle('tool:dingtalk:diagnose', async () => refreshDingTalk(await diagnoseManagedDingTalk()))
+  ipcMain.handle('tool:dingtalk:install', async () => refreshDingTalk(await installManagedDingTalk()))
+  ipcMain.handle('tool:dingtalk:login-begin', async () => beginManagedDingTalkLogin())
+  ipcMain.handle('tool:dingtalk:login-check', async () => refreshDingTalk(await checkManagedDingTalkLogin()))
+  ipcMain.handle('tool:dingtalk:login-cancel', async () => cancelManagedDingTalkLogin())
+  ipcMain.handle('tool:dingtalk:set-enabled', async (_, payload: unknown) => {
+    const enabled = parseIpcPayload('tool:dingtalk:set-enabled', z.boolean(), payload)
+    if (!setManagedDingTalkEnabled) return { ok: false, message: 'DingTalk enablement is unavailable. No settings or tasks were changed.' }
+    return setManagedDingTalkEnabled(enabled)
+  })
   ipcMain.handle('tool:lark-login:begin', async () => beginManagedLarkLogin())
+  ipcMain.handle('tool:lark-app-setup:begin', async () => beginManagedLarkAppSetup())
+  ipcMain.handle('tool:lark-app-setup:check', async () => checkManagedLarkAppSetup())
+  ipcMain.handle('tool:lark-app-setup:cancel', async () => cancelManagedLarkAppSetup())
   ipcMain.handle('tool:lark-login:complete', async () => {
     const result = await completeManagedLarkLogin()
     if (result.ok) {

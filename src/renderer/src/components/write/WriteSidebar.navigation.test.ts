@@ -59,7 +59,7 @@ describe('WriteSidebar navigation', () => {
     expect([...toolButtons].map((button) => button.textContent)).toEqual([
       'Write',
       'Tasks',
-      'Plugins'
+      'Skills & connectors'
     ])
     expect(toolButtons[0]?.getAttribute('aria-current')).toBe('page')
 

@@ -1,4 +1,5 @@
 import type { WorkspaceMigrationReport, WorkspaceImportRequest, WorkspaceImportResult } from './workspace-migration'
+import type { ManagedDwsResult } from './managed-dws'
 import type {
   AppSettingsPatch,
   WorkWiseSettingsV2,
@@ -238,12 +239,20 @@ export type ManagedToolStatus = {
   externalUrl?: string
   scopes?: string[]
   brand?: 'feishu' | 'lark'
+  appId?: string
+  profile?: string
+  userOpenId?: string
+  identityFingerprint?: string
+  executableHash?: string
 }
 export type ManagedToolResult =
   | { ok: true; status: ManagedToolStatus }
   | { ok: false; message: string }
 export type ManagedLarkLoginResult =
   | { ok: true; verificationUrl: string; userCode?: string; expiresAt: string }
+  | { ok: false; message: string; reason?: 'app_configuration_required' | 'candidate_credentials_disabled' }
+export type ManagedLarkAppSetupResult =
+  | { ok: true; state: 'configured' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'expired'; verificationUrl?: string; expiresAt?: string }
   | { ok: false; message: string }
 export type ManagedToolListResult =
   | { ok: true; tools: ManagedToolStatus[] }
@@ -507,6 +516,15 @@ export type WorkWiseApi = {
   diagnoseManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   beginManagedLarkLogin: () => Promise<ManagedLarkLoginResult>
   completeManagedLarkLogin: () => Promise<ManagedToolResult>
+  beginManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
+  checkManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
+  cancelManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
+  diagnoseManagedDingTalk: () => Promise<ManagedDwsResult>
+  installManagedDingTalk: () => Promise<ManagedDwsResult>
+  beginManagedDingTalkLogin: () => Promise<ManagedDwsResult>
+  checkManagedDingTalkLogin: () => Promise<ManagedDwsResult>
+  cancelManagedDingTalkLogin: () => Promise<ManagedDwsResult>
+  setManagedDingTalkEnabled: (enabled: boolean) => Promise<ManagedDwsResult>
   removeManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   listAgentProfiles: (workspaceRoot?: string) => Promise<AgentProfileSnapshotV1>
   saveAgentProfile: (request: {

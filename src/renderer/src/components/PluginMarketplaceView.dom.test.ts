@@ -71,6 +71,7 @@ function catalogPackage(id: string, version: string): MarketplacePackageV1 {
         ? 'Document Tools'
         : 'Advanced Reasoning',
     summary: `Summary for ${id}`,
+    productType: 'utility',
     tier: 'recommended',
     categories: [id === 'browser-tools' ? 'browser' : 'documents'],
     version,
@@ -241,8 +242,9 @@ function setInput(input: HTMLInputElement, value: string): void {
 }
 
 beforeEach(async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   await i18n.changeLanguage('en')
-  useChatStore.setState({ workspaceRoot: '/tmp/workwise-marketplace-qa' })
+  useChatStore.setState({ workspaceRoot: '/tmp/workwise-marketplace-qa', pluginConnectorTarget: null })
   installPrepared = vi.fn(async () => INSTALLED)
   Object.defineProperty(window, 'workwise', {
     configurable: true,
@@ -322,6 +324,8 @@ beforeEach(async () => {
   root = createRoot(container)
   await act(async () => root.render(createElement(PluginMarketplaceView)))
   await settle()
+  // Existing package-management coverage remains on its explicit Plugins tab.
+  await act(async () => exactButton('Plugins').click())
 })
 
 afterEach(async () => {
@@ -332,6 +336,46 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceView unified catalog', () => {
+  it('opens task capability deep links on the matching connector and consumes the navigation target', async () => {
+    await act(async () => {
+      useChatStore.getState().openPlugins(undefined, 'dingtalk')
+      await Promise.resolve()
+    })
+    await settle()
+    expect(container.querySelector('[role="dialog"] h2')?.textContent).toBe('DingTalk')
+    expect(useChatStore.getState().pluginConnectorTarget).toBeNull()
+    expect(window.workwise.openExternal).not.toHaveBeenCalled()
+    await act(async () => iconButton('Close connector details').click())
+    await act(async () => {
+      useChatStore.getState().openPlugins()
+      await Promise.resolve()
+    })
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('keeps connectors, skills, and package management on separate surfaces in one hub', async () => {
+    await act(async () => exactButton('Connectors').click())
+    expect(container.textContent).toContain('Connect your services')
+    expect(container.textContent).toContain('Feishu / Lark')
+    expect(container.textContent).toContain('DingTalk')
+    expect(container.textContent).toContain('RailWise Knowledge Base')
+    expect(container.textContent).not.toContain('Browser Tools')
+    expect(container.textContent).not.toContain('arch-diagram-skill')
+    expect(container.querySelector('input[placeholder="Search connectors"]')).not.toBeNull()
+    await act(async () => exactButton('Custom connector').click())
+    expect(useChatStore.getState()).toMatchObject({ route: 'settings', settingsSection: 'mcp' })
+    await act(async () => exactButton('Skills').click())
+    expect(container.textContent).toContain('Discover skills')
+    expect(container.textContent).toContain('arch-diagram-skill')
+    expect(container.textContent).not.toContain('Connect your services')
+    await act(async () => exactButton('Plugins').click())
+    expect(container.textContent).toContain('Browser Tools')
+    expect(container.textContent).not.toContain('RailWise Knowledge Base')
+    expect(window.workwise.listInstalledPlugins).toHaveBeenCalled()
+    expect(window.workwise.listMcpServers).toHaveBeenCalledWith('/tmp/workwise-marketplace-qa')
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+  })
+
   it('shows available-to-install readiness on a new package instead of its version number', () => {
     const row = [...container.querySelectorAll('[role="button"]')].find((candidate) => candidate.textContent?.includes('Document Tools'))
     expect(row?.textContent).toContain('Available to install')
@@ -417,7 +461,7 @@ describe('PluginMarketplaceView unified catalog', () => {
   it('keeps local Skill counts off the plugin surface and exposes installed product-level entries', () => {
     expect(container.textContent).not.toContain('local Skills indexed')
     expect(container.textContent).toContain('Installed')
-    expect(container.textContent).toContain('Connector')
+    expect(container.textContent).not.toContain('RailWise Knowledge Base')
     expect(container.textContent).not.toContain('MCP')
     expect(container.querySelector('button[aria-label="Browser Tools"]')).not.toBeNull()
     expect(container.querySelector('button[aria-label="Filters"]')).not.toBeNull()
@@ -440,7 +484,8 @@ describe('PluginMarketplaceView unified catalog', () => {
   })
 
   it('shows managed connectors as installed and managed in details', async () => {
-    const managed = container.querySelector('button[aria-label="RailWise Knowledge Base"]')
+    await act(async () => exactButton('Connectors').click())
+    const managed = container.querySelector('button[aria-label="View RailWise Knowledge Base connection"]')
     if (!(managed instanceof HTMLButtonElement)) throw new Error('Managed connector was not rendered.')
     await act(async () => managed.click())
 

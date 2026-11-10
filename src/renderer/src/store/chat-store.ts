@@ -126,6 +126,7 @@ export const useChatStore = create<ChatState>((rawSet, get) => {
   flowFilter: 'all',
   settingsReturnRoute: 'chat',
   pluginHostRoute: 'chat',
+  pluginConnectorTarget: null,
   settingsSection: 'general',
   initialSetupOpen: false,
   initialSetupMode: 'required',

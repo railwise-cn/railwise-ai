@@ -1,14 +1,9 @@
 import { useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
-import type { ManagedToolResult } from '@shared/workwise-api'
+import { ManagedLarkConnection } from '../connectors/ManagedLarkConnection'
+import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnection'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
-
-type LoginStartResult = { ok: true; verificationUrl: string; userCode: string; expiresAt: string } | { ok: false; message: string }
-type LoginApi = {
-  beginManagedLarkLogin?: () => Promise<LoginStartResult>
-  completeManagedLarkLogin?: () => Promise<ManagedToolResult>
-}
 
 /** A capability failure is a durable waiting task, never a completed answer. */
 export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityCard }): ReactElement {
@@ -18,9 +13,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
   const chooseWorkspace = useChatStore((state) => state.chooseWorkspace)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
-  const [login, setLogin] = useState<Extract<LoginStartResult, { ok: true }> | null>(null)
   const [settled, setSettled] = useState(false)
-  const [managedState, setManagedState] = useState<string | null>(null)
   const [capability, setCapability] = useState(card.capability)
   const isLark = capability.provider === 'lark' || capability.provider === 'feishu'
   const action = capability.resolution ?? capability.action
@@ -30,33 +23,29 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       return
     }
     const route = action?.route ?? ''
+    if (action?.kind === 'connect' || action?.kind === 'install' || (!action && capability.provider === 'dingtalk')) {
+      openPlugins(undefined, isLark ? 'lark' : 'dingtalk')
+      return
+    }
     if (action?.kind === 'grant' || route === 'settings' || route.startsWith('settings/')) {
-      // DingTalk credentials are configured in General. A generic MCP page or
-      // the marketplace cannot change an existing task's execution authority.
+      // Account setup and task authority are separate. A connector page cannot
+      // widen an existing task's execution grant.
       const section = route.slice('settings/'.length)
       const sections: SettingsRouteSection[] = ['general', 'providers', 'write', 'imageGeneration', 'agents', 'skill', 'mcp', 'shortcuts', 'claw', 'help']
-      openSettings(capability.provider === 'dingtalk' && action?.kind === 'connect' ? 'general'
-        : sections.includes(section as SettingsRouteSection) ? section as SettingsRouteSection
+      openSettings(sections.includes(section as SettingsRouteSection) ? section as SettingsRouteSection
           : capability.errorCode === 'agent_tool_blocked' ? 'agents' : 'general')
       return
     }
-    if (route === 'marketplace' || isLark) openPlugins()
+    if (route === 'marketplace' || isLark) openPlugins(undefined, isLark ? 'lark' : 'dingtalk')
     else openSettings('general')
   }
   const execution = capability.executionContext
-  const loginApi: LoginApi = typeof window === 'undefined' ? {} : window.workwise as typeof window.workwise & LoginApi
   const run = async (operation: () => Promise<void>): Promise<void> => {
     if (pending) return
     setPending(true)
     setMessage('')
     try { await operation() } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setPending(false) }
-  }
-  const managed = async (install: boolean): Promise<void> => {
-    const result = await (install ? window.workwise.installManagedTool('lark-cli') : window.workwise.diagnoseManagedTool('lark-cli'))
-    if (!result.ok) throw new Error(result.message)
-    setManagedState(result.status.state)
-    setMessage(result.status.message ?? t(`capabilityManaged_${result.status.state}`))
   }
   const recheck = async (): Promise<void> => {
     const result = await window.workwise.coordinateTaskCommand({
@@ -75,22 +64,6 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
     const store = useChatStore.getState()
     await store.refreshThreads()
     if (store.activeThreadId === card.threadId) await store.selectThread(card.threadId)
-  }
-  const beginLogin = async (): Promise<void> => {
-    if (!loginApi.beginManagedLarkLogin) throw new Error(t('capabilityLoginUnavailable'))
-    const result = await loginApi.beginManagedLarkLogin()
-    if (!result.ok) throw new Error(result.message)
-    setLogin(result)
-    // The main-process login service validates the official authorization URL.
-    await window.workwise.openExternal(result.verificationUrl)
-  }
-  const finishLogin = async (): Promise<void> => {
-    if (!loginApi.completeManagedLarkLogin) throw new Error(t('capabilityLoginUnavailable'))
-    const result = await loginApi.completeManagedLarkLogin()
-    if (!result.ok) throw new Error(result.message)
-    setLogin(null)
-    setMessage(result.status.state === 'installed' ? t('capabilityLoginReady') : result.status.message ?? t('capabilityLoginIncomplete'))
-    // Login does not silently resume or authorize the queued external action.
   }
   const decline = async (): Promise<void> => {
     const result = await window.workwise.coordinateTaskCommand({
@@ -118,18 +91,10 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
         </> : null}
       </dl>
       {execution?.availableTools ? <details className="mt-2 text-xs text-ds-muted"><summary className="cursor-pointer">{t('capabilityAvailableTools', { count: execution.availableTools.length })}</summary><p className="mt-1 break-all">{execution.availableTools.join(', ') || t('capabilityNoTools')}</p></details> : null}
-      {login ? <div role="status" className="mt-3 rounded-lg border border-ds-border bg-ds-surface p-3">
-        <p>{t('capabilityLoginCode', { code: login.userCode })}</p>
-        <p className="mt-1 text-xs text-ds-muted">{t('capabilityLoginExpires', { expiresAt: new Date(login.expiresAt).toLocaleString() })}</p>
-        <button type="button" disabled={pending} onClick={() => void run(finishLogin)} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('capabilityLoginCompleted')}</button>
-      </div> : null}
+      {isLark && !settled ? <ManagedLarkConnection compact initialState={capability.status === 'not_installed' ? 'not_installed' : undefined} /> : null}
+      {!isLark && !settled ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {!settled ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-        {isLark && capability.status === 'not_installed' && (!managedState || managedState === 'not_installed') ? <button type="button" disabled={pending} onClick={() => void run(() => managed(true))}>{t('capabilityInstallLark')}</button> : null}
-        {isLark ? <>
-          <button type="button" disabled={pending} onClick={() => void run(() => managed(false))}>{t('capabilityDiagnose')}</button>
-          {(capability.status !== 'not_installed' || managedState === 'needs_login' || managedState === 'installed') && loginApi.beginManagedLarkLogin ? <button type="button" disabled={pending} onClick={() => void run(beginLogin)}>{t('capabilityLoginLark')}</button> : null}
-        </> : null}
         <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>

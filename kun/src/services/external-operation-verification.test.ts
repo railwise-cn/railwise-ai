@@ -19,6 +19,7 @@ import { LocalToolHost } from '../adapters/tool/local-tool-host.js'
 import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provider.js'
 import { buildDingTalkToolProvider } from '../adapters/tool/dingtalk-tool-provider.js'
 import { verifiedEffectReceipts } from './external-effect-evidence.js'
+import { larkTestBinding, withLarkTestIdentity } from '../../tests/helpers/lark-identity.js'
 
 const stores: Array<{ root: string; repository: TaskRunRepository }> = []
 const now = '2026-11-10T08:00:00.000Z'
@@ -47,6 +48,7 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
     workspaceTrust: 'workspace-write', agentTrust: 'full-access', sandboxMode: 'workspace-write', approvalPolicy: 'auto',
     allowedProviderIds: [provider === 'lark' ? 'lark-cli' : provider], allowedToolNames: [toolName, readToolName],
     networkAllowlist: [provider === 'lark' ? 'https://open.feishu.cn' : 'https://api.dingtalk.com'], connectorScopes: scopes,
+    ...(provider === 'lark' ? {connectorIdentityFingerprints:{'lark-cli':larkTestBinding.identityFingerprint}} : {}),
     externalTargets: [], workspaceRevision: 1, agentRevision: 0, revision: 1, idempotencyKey: 'grant-key', issuedAt: '2026-11-09T00:00:00.000Z', expiresAt: '2026-11-09T00:01:00.000Z' })
   const args = operation === 'complete' ? { taskId: target } : provider === 'lark' ? { taskId: target, instanceCode: 'instance-42' }
     : { taskId: target, instanceId: 'instance-42', ...(operation === 'transfer' ? { toUserId: 'recipient-1' } : {}) }
@@ -61,7 +63,7 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
     : operation === 'complete' ? { id: target, done: true } : { processInstanceId: 'instance-42', tasks: [{ taskId: target, status: 'COMPLETED', result: 'AGREE' }] })
   const runner = vi.fn(async () => ({ ok: true, output: { code: 0, data: remote } }))
   const fetcher = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify(operation === 'complete' ? remote : { result: remote }), { status: 200 }))
-  const adapter = provider === 'lark' ? buildLarkCliToolProvider(LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes }), runner)!
+  const adapter = provider === 'lark' ? buildLarkCliToolProvider(LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', ...larkTestBinding, scopes }), withLarkTestIdentity(runner))!
     : buildDingTalkToolProvider({ config: DingTalkCapabilityConfig.parse({ enabled: true, credentialRef: 'user-ref', workflowCredentialRef: 'workflow-ref', unionId: 'union-1', userId: 'user-1', userScopes: scopes.filter(scope => scope.startsWith('Todo.')), scopes: scopes.filter(scope => scope.startsWith('Workflow.')), allowedWriteUserIds: ['user-1'] }),
       getCredential: async ref => ({ kind: ref === 'user-ref' ? 'user' : 'internal-app', accessToken: 'private-token', expiresAt: '2026-11-11T00:00:00Z', unionId: 'union-1', userId: 'user-1', scopes }), fetch: fetcher as typeof fetch, nowIso: () => now })
   const registry = new CapabilityRegistry([adapter]), toolHost = new LocalToolHost({ registry })
@@ -135,9 +137,20 @@ describe('typed unknown-operation readback', () => {
     expect(f.repository.unsettledOperations(f.task.id)).toHaveLength(1)
   })
 
+  it('cannot verify an old unknown operation using a newly connected Lark account', async () => {
+    const f=await fixture()
+    const runner=vi.fn()
+    f.registry.replaceProvider('lark-cli',buildLarkCliToolProvider(LarkCapabilityConfig.parse({enabled:true,authState:'installed',executablePath:'/managed/lark-cli',
+      ...larkTestBinding,userOpenId:'ou-new-account',identityFingerprint:'b'.repeat(64),scopes:['task:task:read']}),runner))
+    expect(await f.service.verify(f.task.id,f.receipt.id,f.input())).toMatchObject({status:'outcome_unknown',errorCode:'connector_identity_changed'})
+    expect(runner).not.toHaveBeenCalled()
+    expect(f.repository.operation(f.task.id,f.receipt.idempotencyKey)?.resolution).toBeUndefined()
+    expect(f.repository.unsettledOperations(f.task.id)).toHaveLength(1)
+  })
+
   it('cannot use a missing provider read scope, even when the original write grant allowed it', async () => {
     const f = await fixture()
-    f.registry.replaceProvider('lark-cli', buildLarkCliToolProvider(LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes: ['task:task:write'] })))
+    f.registry.replaceProvider('lark-cli', buildLarkCliToolProvider(LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', ...larkTestBinding, scopes: ['task:task:write'] })))
     expect(await f.service.verify(f.task.id, f.receipt.id, f.input())).toMatchObject({ status: 'outcome_unknown', errorCode: 'connector_scope_missing' })
     expect(f.execute).not.toHaveBeenCalled()
     expect(f.runner).not.toHaveBeenCalled()

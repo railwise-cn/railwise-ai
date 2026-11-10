@@ -21,6 +21,7 @@ export const ExecutionGrantSchema = z.object({
   pathAllowlist: z.array(z.string()).default([]),
   networkAllowlist: z.array(z.string()).default([]),
   connectorScopes: z.array(z.string()).default([]),
+  connectorIdentityFingerprints: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).optional(),
   externalTargets: z.array(z.string()).default([]),
   workspaceRevision: z.number().int().nonnegative(),
   agentRevision: z.number().int().nonnegative(),
@@ -63,5 +64,6 @@ export const TaskPermissionConfirmationSchema = z.object({
 export type TaskPermissionConfirmation = z.infer<typeof TaskPermissionConfirmationSchema>
 
 export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connectorScopes' | 'externalTargets'> &
+  Pick<Partial<ExecutionGrant>, 'connectorIdentityFingerprints'> &
   Pick<Partial<ExecutionGrant>, 'allowedToolNames'> &
   Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'expiresAt' | 'taskPermissionId'>

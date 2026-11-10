@@ -1849,6 +1849,7 @@ export class AgentLoop {
       pathAllowlist: scope?.pathAllowlist ?? (trust === 'full-access' && sandboxMode === 'danger-full-access' ? ['*'] : workspace.canonicalRoot ? [workspace.canonicalRoot] : []),
       networkAllowlist: scope?.networkAllowlist ?? ['*'],
       connectorScopes: scope?.connectorScopes ?? [], externalTargets: scope?.externalTargets ?? [],
+      ...(scope?.connectorIdentityFingerprints ? {connectorIdentityFingerprints:scope.connectorIdentityFingerprints} : {}),
       workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,
       revision: workspace.revision, idempotencyKey: `grant:${turnId}`, issuedAt: this.opts.nowIso(),
       ...(scope?.taskPermissionId ? { taskPermissionId: scope.taskPermissionId } : {}),

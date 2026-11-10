@@ -3,6 +3,7 @@ import { LarkCapabilityConfig, type LarkCapabilityConfig as LarkConfig } from '.
 import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provider.js'
 import type { CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import { preflightExternalTask, externalTaskIntent } from './external-task-capability.js'
+import { assertLarkCliCredentialAccess } from './lark-cli-environment.js'
 
 /** Refreshes only trusted local configuration; callers cannot choose a CLI path. */
 export class ManagedLarkRuntime {
@@ -27,6 +28,16 @@ export class ManagedLarkRuntime {
     const intent = externalTaskIntent(text)
     if (!intent) return result
     if (result.status !== 'available') return result
+    try { assertLarkCliCredentialAccess() } catch {
+      const resolution = {kind:'connect' as const,route:'marketplace',label:'查看飞书授权'}
+      return {...result,status:'blocked' as const,credentialState:'missing' as const,errorCode:'candidate_credentials_disabled',
+        message:'本候选环境未开启凭据访问，未读取飞书账号或执行平台操作。',action:resolution,resolution}
+    }
+    if (!this.config.identityFingerprint || !this.config.appId || !this.config.userOpenId || !this.config.executableHash) {
+      const resolution = {kind:'connect' as const,route:'marketplace',label:'重新核对飞书账号'}
+      return {...result,status:'needs_authorization' as const,credentialState:'unknown' as const,errorCode:'connector_identity_unverified',
+        message:'请重新诊断飞书连接，确认当前应用和用户身份后继续原任务。',action:resolution,resolution}
+    }
     if (intent?.kind === 'connect_provider') {
       const resolution = { kind: 'retry' as const, route: 'marketplace', label: '管理飞书连接' }
       return {
@@ -85,12 +96,13 @@ export class ManagedLarkRuntime {
   }
 
   scope(externalTargets: readonly string[] = []) {
-    const ready = this.config.enabled && this.config.authState === 'installed'
+    const ready = Boolean(this.config.enabled && this.config.authState === 'installed' && this.config.identityFingerprint && this.config.appId && this.config.userOpenId && this.config.executableHash)
     return {
       networkAllowlist: ready
         ? [this.config.brand === 'lark' ? 'https://open.larksuite.com' : 'https://open.feishu.cn']
         : [],
       connectorScopes: ready ? [...this.config.scopes] : [],
+      ...(ready && this.config.identityFingerprint ? {connectorIdentityFingerprints:{'lark-cli':this.config.identityFingerprint}} : {}),
       externalTargets: [...externalTargets]
     }
   }

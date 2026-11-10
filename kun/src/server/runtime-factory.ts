@@ -27,7 +27,7 @@ import { FileSessionStore, FileThreadStore } from '../adapters/file/index.js'
 import { HybridSessionStore, HybridThreadStore } from '../adapters/hybrid/index.js'
 import { DeepseekCompatModelClient } from '../adapters/model/deepseek-compat-model-client.js'
 import { ProviderRoutingModelClient, unavailableModelProvider, type ModelProviderRoutes } from '../adapters/model/provider-routing-model-client.js'
-import { CapabilityRegistry } from '../adapters/tool/capability-registry.js'
+import { CapabilityRegistry, type CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import { buildGoalLocalTools } from '../adapters/tool/goal-tools.js'
 import { buildTodoLocalTools } from '../adapters/tool/todo-tools.js'
 import { LocalToolHost, buildDefaultLocalTools } from '../adapters/tool/local-tool-host.js'
@@ -117,6 +117,7 @@ import { buildRailwiseToolProviders } from '../adapters/tool/railwise-tool-provi
 import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provider.js'
 import { ManagedDingTalkRuntime } from '../services/managed-dingtalk-runtime.js'
 import { ManagedLarkRuntime } from '../services/managed-lark-runtime.js'
+import { ManagedDwsRuntime } from '../services/managed-dws-runtime.js'
 import { externalTaskIntent } from '../services/external-task-capability.js'
 import { contextualExternalTaskPreflight } from '../services/contextual-external-task-preflight.js'
 import { SurveyService } from '../engineering/survey-service.js'
@@ -502,12 +503,18 @@ export async function createKunServeRuntime(
     : new UnavailableFlowSecretStore()
   let activeToolRegistry: CapabilityRegistry | undefined
   let activeChildToolRegistry: CapabilityRegistry | undefined
-  const dingtalkRuntime = new ManagedDingTalkRuntime(options.capabilities?.dingtalk, flowSecretStore, options.configPath ?? (options.dataDir ? join(options.dataDir, 'config.json') : undefined),
-    undefined, undefined, provider => {
-      activeToolRegistry?.replaceProvider('dingtalk', provider)
-      activeChildToolRegistry?.replaceProvider('dingtalk', provider)
-    })
+  const dingtalkRuntime = new ManagedDingTalkRuntime(options.capabilities?.dingtalk, flowSecretStore, options.configPath ?? (options.dataDir ? join(options.dataDir, 'config.json') : undefined))
   await dingtalkRuntime.initialize()
+  const dwsRuntime = new ManagedDwsRuntime(options.capabilities?.dws, options.configPath ?? join(options.dataDir,'config.json'),()=>applyDingTalkProvider())
+  function applyDingTalkProvider(legacyUpdate?: { provider: CapabilityToolProvider | undefined }) {
+    // Legacy refresh invokes apply before assigning its internal provider. Use
+    // the diagnosed argument, including explicit removal, instead of stale state.
+    const provider = dwsRuntime.toolProvider() ?? (legacyUpdate ? legacyUpdate.provider : dingtalkRuntime.toolProvider())
+    activeToolRegistry?.replaceProvider('dingtalk', provider)
+    activeChildToolRegistry?.replaceProvider('dingtalk', provider)
+  }
+  dingtalkRuntime.setApply(provider => applyDingTalkProvider({ provider }))
+  const useDws=()=>Boolean(dwsRuntime.toolProvider())
   const larkRuntime = new ManagedLarkRuntime(options.capabilities?.lark, options.configPath ?? join(options.dataDir, 'config.json'), provider => {
     activeToolRegistry?.replaceProvider('lark-cli', provider)
     activeChildToolRegistry?.replaceProvider('lark-cli', provider)
@@ -557,7 +564,7 @@ export async function createKunServeRuntime(
       gitCheckpointCoordinator.beforeMutation(input)
   })
   const larkProvider = buildLarkCliToolProvider(larkRuntime.state())
-  const dingtalkProvider = dingtalkRuntime.toolProvider()
+  const dingtalkProvider = dwsRuntime.toolProvider()??dingtalkRuntime.toolProvider()
   const baseToolProviders = [
     {
       id: 'builtin',
@@ -632,7 +639,7 @@ export async function createKunServeRuntime(
   flowDelegationRuntime = delegationRuntime
   if(backgroundTaskScheduling)flowService.startSchedules()
   const capabilities = buildRuntimeCapabilityManifest({
-    config: options.capabilities,
+    config: useDws()&&options.capabilities?{...options.capabilities,dingtalk:{...options.capabilities.dingtalk,enabled:true}}:options.capabilities,
     model: modelCapabilitiesForModel(defaultModelClient.model, modelProfiles),
     mcp: {
       configuredServers: Object.keys(options.capabilities?.mcp.servers ?? {}).length,
@@ -681,7 +688,7 @@ export async function createKunServeRuntime(
         ? 'Lark CLI requires authorization.'
         : 'Lark CLI is not installed or unavailable.'
     },
-    dingtalk: dingtalkRuntime.state()
+    dingtalk: useDws()?{available:true,credentialState:'valid',identityVerified:true,scopes:[]}:dingtalkRuntime.state()
   })
   const registry = new CapabilityRegistry([
     ...baseToolProviders,
@@ -709,7 +716,12 @@ export async function createKunServeRuntime(
   let engineeringAi: EngineeringAiOrchestrator
   const toolHost = new LocalToolHost({ registry, readTracker: true })
   const operationVerification = new ExternalOperationVerificationService({ repository: taskRepository, controller: taskController,
-    toolHost, threadStore, workspaceTrust, nowIso, refreshProvider: provider => provider === 'lark' ? larkRuntime.refresh() : dingtalkRuntime.refresh() })
+    toolHost, threadStore, workspaceTrust, nowIso, refreshProvider: async (provider,originalGrant) => {
+      if(provider==='lark')return larkRuntime.refresh()
+      const originalDws=Boolean(originalGrant?.connectorIdentityFingerprints?.dingtalk)
+      if(originalDws!==useDws())throw Object.assign(new Error('Reconnect the original DingTalk backend before verifying this operation.'),{code:'connector_backend_changed'})
+      return originalDws?dwsRuntime.refresh():dingtalkRuntime.refresh()
+    } })
   let loop: AgentLoop
   registry.registerProvider(buildEngineeringConversationTools(threadStore, () => engineeringAi, new SurveyEvidenceReader({
     engineering: engineeringService, survey: surveyService, advanced: surveyAdvancedTrialsWorkspaceService,
@@ -736,6 +748,7 @@ export async function createKunServeRuntime(
       .map(provider => provider.id)
       .filter(providerId => !externalProviderIds.has(providerId) || providerId === selectedProviderId)
     if (selectedProviderId === 'lark-cli') return { ...larkRuntime.scope(externalTargets), allowedProviderIds, ...restriction }
+    if(selectedProviderId==='dingtalk'&&useDws())return {...dwsRuntime.scope(externalTargets),allowedProviderIds,...restriction}
     if (selectedProviderId === 'dingtalk') return {
       networkAllowlist: ['https://api.dingtalk.com'],
       connectorScopes: dingtalkRuntime.state().scopes,
@@ -806,7 +819,12 @@ export async function createKunServeRuntime(
     nowIso
   })
   const externalPreflight = contextualExternalTaskPreflight({
-    providerPreflight: async (text: string) => await dingtalkRuntime.preflight(text) ?? larkRuntime.preflight(text),
+    providerPreflight: async (text: string) => {
+      if (externalTaskIntent(text)?.provider === 'dingtalk') {
+        return useDws() || !dingtalkRuntime.state().enabled ? dwsRuntime.preflight(text) : dingtalkRuntime.preflight(text)
+      }
+      return larkRuntime.preflight(text)
+    },
     workspaceTrust,
     toolHost,
     validateTaskPermission: threadId => taskPermissionService.executionRestriction(threadId)
@@ -892,6 +910,7 @@ export async function createKunServeRuntime(
     authorizeDingTalkWorkflow(input) { return dingtalkRuntime.authorizeWorkflow(input) },
     refreshDingTalk() { return dingtalkRuntime.refresh() },
     refreshLark() { return larkRuntime.refresh() },
+    refreshDws() { return dwsRuntime.refresh() },
     verifyTaskOperationReceipt(taskId, receiptId, input) { return operationVerification.verify(taskId, receiptId, input) },
     runtimeToken: options.runtimeToken,
     insecure: options.insecure,
@@ -917,7 +936,9 @@ export async function createKunServeRuntime(
         enabled: larkRuntime.state().enabled,
         available: registry.diagnostics().some(provider => provider.id === 'lark-cli' && provider.enabled && provider.available),
         authState: larkRuntime.state().authState
-      }, dingtalk: {
+      }, dingtalk: useDws()?{
+        status:'available',enabled:true,available:true,credentialState:'valid',identityVerified:true,scopes:[]
+      }: {
         status: dingtalkRuntime.state().enabled ? dingtalkRuntime.state().available ? 'available' : 'unavailable' : 'disabled',
         enabled: dingtalkRuntime.state().enabled,
         available: dingtalkRuntime.state().available,

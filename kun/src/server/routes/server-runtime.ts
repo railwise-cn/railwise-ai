@@ -82,6 +82,7 @@ export type ServerRuntime = {
   authorizeDingTalkWorkflow?: (input: unknown) => Promise<unknown>
   refreshDingTalk?: () => Promise<unknown>
   refreshLark?: () => Promise<unknown>
+  refreshDws?: () => Promise<unknown>
   verifyTaskOperationReceipt?: (taskId: string, receiptId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<import('../../services/external-operation-verification.js').OperationVerificationResult>
   taskContextRuntime?: TaskContextRuntime
   capacityManager?: CapacityManager

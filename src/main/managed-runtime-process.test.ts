@@ -28,6 +28,12 @@ vi.mock('electron', () => ({
 vi.mock('./services/flow-secret-store-key', () => ({
   loadOrCreateFlowSecretStoreKey: vi.fn(async () => 'managed-runtime-test-flow-key')
 }))
+// Process-launch tests must never diagnose a developer's real CLI account.
+vi.mock('./services/managed-tool-service', async importOriginal => ({
+  ...await importOriginal<typeof import('./services/managed-tool-service')>(),
+  diagnoseManagedTool: vi.fn(async () => ({ok:true,status:{id:'lark-cli',state:'not_installed'}}))
+}))
+vi.mock('./services/managed-dws-service',()=>({diagnoseManagedDingTalk:vi.fn(async()=>({ok:true,status:{state:'not_installed'}}))}))
 
 let tempRoot: string | null = null
 
@@ -91,6 +97,7 @@ afterEach(async () => {
     rmSync(tempRoot, { recursive: true, force: true })
     tempRoot = null
   }
+  vi.unstubAllEnvs()
 })
 
 describe('startManagedRuntimeChild', () => {
@@ -263,12 +270,18 @@ describe('startManagedRuntimeChild', () => {
       'candidate-flow-key-child.js',
       [
         "if (process.env.WORKWISE_FLOW_SECRET_STORE_KEY !== 'candidate-flow-key') process.exit(31)",
+        "const path = require('node:path')",
+        "if (process.env.LARKSUITE_CLI_CONFIG_DIR !== path.join(process.env.WORKWISE_CANDIDATE_HOME, '.lark-cli')) process.exit(32)",
+        "if (process.env.WORKWISE_CANDIDATE !== '1' || process.env.WORKWISE_CANDIDATE_CREDENTIAL_ACCESS !== '0') process.exit(33)",
+        "if (process.env.DWS_CONFIG_DIR !== path.join(process.env.WORKWISE_CANDIDATE_HOME, '.railwise-dws', 'config') || process.env.DWS_KEYCHAIN_DIR !== path.join(process.env.WORKWISE_CANDIDATE_HOME, '.railwise-dws', 'keychain') || process.env.DWS_DISABLE_KEYCHAIN !== '1') process.exit(34)",
         "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
         'setInterval(() => {}, 1_000)'
       ].join('\n')
     )
     const module = await import('./managed-runtime-process')
     const candidateHome = join(tempRoot, 'home')
+    vi.stubEnv('LARKSUITE_CLI_CONFIG_DIR','/formal-cli-config')
+    vi.stubEnv('WORKWISE_CANDIDATE_CREDENTIAL_ACCESS',undefined)
     await expect(module.startManagedRuntimeChild(createSettings(script), {
       candidateRoot: tempRoot,
       homeDir: candidateHome,
@@ -397,25 +410,92 @@ describe('syncManagedRuntimeConfig', () => {
     const module = await import('./managed-runtime-process')
 
     await module.syncManagedRuntimeConfig(tempRoot, defaultManagedRuntimeSettings(), {
-      larkCli: { state: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes: ['task:task:read'] }
+      larkCli: { state: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes: ['task:task:read'],appId:'cli-synthetic',profile:'bound-profile',userOpenId:'ou-synthetic',identityFingerprint:'a'.repeat(64),executableHash:'b'.repeat(64) }
     })
 
     const parsed = JSON.parse(readFileSync(join(tempRoot, 'config.json'), 'utf8')) as any
     expect(parsed.capabilities.lark).toMatchObject({
       enabled: true,
       authState: 'installed',
-      executablePath: '/managed/lark-cli'
+      executablePath: '/managed/lark-cli',appId:'cli-synthetic',profile:'bound-profile',userOpenId:'ou-synthetic',identityFingerprint:'a'.repeat(64),executableHash:'b'.repeat(64)
     })
   })
 
   it('clears stale Lark paths/scopes and preserves intentional disable during refresh', async () => {
     if (!tempRoot) throw new Error('temp root not initialized')
     const path = join(tempRoot, 'config.json')
-    writeFileSync(path, JSON.stringify({ keep: 'existing', capabilities: { lark: { enabled: false, executablePath: '/old', authState: 'installed', scopes: ['old'], brand: 'lark' } } }))
+    writeFileSync(path, JSON.stringify({ keep: 'existing', capabilities: { lark: { enabled: false, executablePath: '/old', authState: 'installed', scopes: ['old'], brand: 'lark',appId:'old-app',profile:'old-profile',userOpenId:'old-user',identityFingerprint:'a'.repeat(64),executableHash:'b'.repeat(64) } } }))
     const module = await import('./managed-runtime-process')
     await module.syncManagedLarkCapability(tempRoot, { state: 'not_installed' })
     expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ keep: 'existing', capabilities: { lark: { enabled: false, authState: 'not_installed', scopes: [] } } })
     expect(JSON.parse(readFileSync(path, 'utf8')).capabilities.lark).not.toHaveProperty('executablePath')
+    for(const key of ['appId','profile','userOpenId','identityFingerprint','executableHash'])expect(JSON.parse(readFileSync(path,'utf8')).capabilities.lark).not.toHaveProperty(key)
+  })
+
+  it('persists managed DWS diagnosis while retaining the legacy HTTP integration and clearing stale CLI identity',async()=>{
+    if(!tempRoot)throw new Error('temp root not initialized')
+    const path=join(tempRoot,'config.json')
+    const legacy={enabled:true,clientId:'legacy-client',clientSecretRef:'legacy-ref',userScopes:['Todo.Todo.Read']}
+    writeFileSync(path,JSON.stringify({capabilities:{dingtalk:legacy}}))
+    const module=await import('./managed-runtime-process')
+    const installed={state:'installed' as const,executablePath:'/managed/dws',executableHash:'a'.repeat(64),corpId:'corp',userId:'user',profile:'corp:user',identityFingerprint:'b'.repeat(64)}
+    await module.syncManagedRuntimeConfig(tempRoot,defaultManagedRuntimeSettings(),{dws:installed})
+    expect(JSON.parse(readFileSync(path,'utf8')).capabilities).toMatchObject({dingtalk:legacy,dws:{authState:'installed',profile:'corp:user',identityFingerprint:'b'.repeat(64),scopes:[]}})
+    await module.syncManagedDwsCapability(tempRoot,{state:'needs_login',executablePath:'/managed/dws',executableHash:'a'.repeat(64)})
+    const next=JSON.parse(readFileSync(path,'utf8')).capabilities
+    expect(next.dingtalk).toMatchObject(legacy)
+    expect(next.dws).toMatchObject({authState:'needs_login',scopes:[]})
+    for(const key of ['profile','corpId','userId','identityFingerprint'])expect(next.dws).not.toHaveProperty(key)
+  })
+
+  it('serializes simultaneous connector refreshes without dropping the other diagnosis or legacy HTTP fields', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const path = join(tempRoot, 'config.json')
+    const legacy = { enabled: true, clientId: 'legacy-client', credentialRef: 'preserved-ref' }
+    writeFileSync(path, JSON.stringify({ retained: 'metadata', capabilities: { dingtalk: legacy } }))
+    const module = await import('./managed-runtime-process')
+    await Promise.all([
+      module.syncManagedLarkCapability(tempRoot, {
+        state: 'installed', executablePath: '/managed/lark', scopes: ['task:task:read'], brand: 'feishu',
+        appId: 'app', profile: 'profile', userOpenId: 'user', identityFingerprint: 'a'.repeat(64), executableHash: 'b'.repeat(64)
+      }),
+      module.syncManagedDwsCapability(tempRoot, {
+        state: 'installed', executablePath: '/managed/dws', profile: 'corp:user', corpId: 'corp', userId: 'user',
+        identityFingerprint: 'c'.repeat(64), executableHash: 'd'.repeat(64)
+      })
+    ])
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({
+      retained: 'metadata', capabilities: {
+        dingtalk: legacy,
+        lark: { authState: 'installed', identityFingerprint: 'a'.repeat(64) },
+        dws: { authState: 'installed', identityFingerprint: 'c'.repeat(64) }
+      }
+    })
+  })
+
+  it('inherits a legacy explicit DingTalk disable on startup and diagnosis instead of enabling a new backend', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const path = join(tempRoot, 'config.json')
+    const legacy = { enabled: false, clientId: 'legacy-client', credentialRef: 'preserved-ref' }
+    const installed = {
+      state: 'installed' as const, executablePath: '/managed/dws', profile: 'corp:user', corpId: 'corp', userId: 'user',
+      identityFingerprint: 'c'.repeat(64), executableHash: 'd'.repeat(64)
+    }
+    const module = await import('./managed-runtime-process')
+    writeFileSync(path, JSON.stringify({ capabilities: { dingtalk: legacy } }))
+    await module.syncManagedDwsCapability(tempRoot, installed)
+    expect(JSON.parse(readFileSync(path, 'utf8')).capabilities).toMatchObject({ dingtalk: legacy, dws: { enabled: false } })
+    writeFileSync(path, JSON.stringify({ capabilities: { dingtalk: legacy } }))
+    await module.syncManagedRuntimeConfig(tempRoot, defaultManagedRuntimeSettings(), { dws: installed })
+    expect(JSON.parse(readFileSync(path, 'utf8')).capabilities).toMatchObject({ dingtalk: legacy, dws: { enabled: false } })
+    expect(KunConfigSchema.parse({ capabilities: { dingtalk: legacy } }).capabilities.dws.enabled).toBe(false)
+    expect(KunConfigSchema.parse({ capabilities: { dingtalk: legacy, dws: { enabled: true } } }).capabilities.dws.enabled).toBe(true)
+    const explicitlyEnabled = await module.setManagedDwsEnabled(tempRoot, true)
+    expect(explicitlyEnabled).toMatchObject({ enabled: true, state: 'installed', identityFingerprint: 'c'.repeat(64) })
+    expect(JSON.parse(readFileSync(path, 'utf8')).capabilities).toMatchObject({ dingtalk: legacy, dws: { enabled: true } })
+    expect(await module.syncManagedDwsCapability(tempRoot, installed)).toBe(true)
+    expect((await module.setManagedDwsEnabled(tempRoot, false)).enabled).toBe(false)
+    expect(await module.syncManagedDwsCapability(tempRoot, installed)).toBe(false)
   })
 
   it('creates GUI-managed config with attachments enabled for image paste/upload', async () => {

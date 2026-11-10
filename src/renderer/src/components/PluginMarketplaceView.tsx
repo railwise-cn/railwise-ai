@@ -49,11 +49,12 @@ import { normalizeWorkspaceRoot } from '../lib/workspace-path'
 import { useChatStore } from '../store/chat-store'
 import { friendlyMarketplaceError, skillValidationWarning } from './plugin-marketplace-compat'
 import { marketplaceNeedsConfiguration, marketplacePackageStatus } from './plugin-marketplace-status'
+import { ConnectorCatalog } from './connectors/ConnectorCatalog'
 
 export * from './plugin-marketplace-compat'
 
 type StatusFilter = 'recommended' | 'all' | 'installed' | 'updates' | 'configuration'
-type MarketplaceView = 'plugins' | 'skills'
+type MarketplaceView = 'connectors' | 'skills' | 'plugins'
 type AudienceFilter = 'official' | 'personal' | 'team'
 type SkillBrowseFilter = 'overview' | 'workwise' | 'personal' | 'project' | 'integrations' | 'attention'
 type SkillGroupCounts = Record<Exclude<SkillBrowseFilter, 'overview'>, number>
@@ -406,6 +407,8 @@ export function PluginMarketplaceView(): ReactElement {
     return typeof translated === 'string' ? translated : fallback
   }, [t])
   const workspaceRoot = normalizeWorkspaceRoot(useChatStore((state) => state.workspaceRoot))
+  const openSettings = useChatStore(state => state.openSettings)
+  const connectorTarget = useChatStore(state => state.pluginConnectorTarget)
   const [sources, setSources] = useState<CatalogSourceV1[]>([])
   const [catalogCredentials, setCatalogCredentials] = useState<CatalogCredentialStatusV1[]>([])
   const [entries, setEntries] = useState<MarketplaceCatalogPackageEntryV1[]>([])
@@ -439,8 +442,13 @@ export function PluginMarketplaceView(): ReactElement {
     code: string
     callback: 'loopback' | 'manual'
   } | null>(null)
-  const [viewMode, setViewMode] = useState<MarketplaceView>('plugins')
+  const [viewMode, setViewMode] = useState<MarketplaceView>('connectors')
+  const [connectionRefresh, setConnectionRefresh] = useState(0)
   const [skillFilter, setSkillFilter] = useState<SkillBrowseFilter>('overview')
+
+  useEffect(() => {
+    if (connectorTarget) { setViewMode('connectors'); setQuery(''); setDetailsOpen(false) }
+  }, [connectorTarget])
 
   const installed = useMemo(
     () => new Map(installedPackages.map((item) => [item.packageId, item])),
@@ -504,7 +512,7 @@ export function PluginMarketplaceView(): ReactElement {
       })
     }
     setLoading(false)
-  }, [t, text, workspaceRoot])
+  }, [text, workspaceRoot])
 
   useEffect(() => {
     void refresh(true)
@@ -522,19 +530,20 @@ export function PluginMarketplaceView(): ReactElement {
       .catch(() => undefined)
   }), [workspaceRoot])
 
+  const pluginEntries = useMemo(() => entries.filter(entry => productType(entry.package) !== 'connector'), [entries])
   const categories = useMemo(() => {
     const available = new Set(
-      entries
+      pluginEntries
         .flatMap((entry) => [marketplaceCollection(entry.package)])
     )
     return [
       ...MARKETPLACE_CATEGORY_ORDER.filter((category) => available.delete(category)),
       ...[...available].sort()
     ]
-  }, [entries])
+  }, [pluginEntries])
   const visibleEntries = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return entries.filter((entry) => {
+    return pluginEntries.filter((entry) => {
       const item = entry.package
       const record = installed.get(item.id)
       const server = installedServerForPackage(item, mcpServers)
@@ -565,15 +574,22 @@ export function PluginMarketplaceView(): ReactElement {
       if (left.package.tier !== right.package.tier) return left.package.tier === 'recommended' ? -1 : 1
       return left.package.name.localeCompare(right.package.name)
     })
-  }, [diagnosticMap, audienceFilter, categoryFilter, entries, installed, mcpServers, query, sourceFilter, sourceMap, statusFilter, text])
+  }, [diagnosticMap, audienceFilter, categoryFilter, pluginEntries, installed, mcpServers, query, sourceFilter, sourceMap, statusFilter, text])
 
   const installedEntries = useMemo(
-    () => entries.filter((entry) => isInstalled(entry.package, installed, mcpServers)),
-    [entries, installed, mcpServers]
+    () => pluginEntries.filter((entry) => isInstalled(entry.package, installed, mcpServers)),
+    [pluginEntries, installed, mcpServers]
   )
+  const connectorEntries = useMemo(() => entries.filter(entry => productType(entry.package) === 'connector'), [entries])
+  const skillCatalogEntries = useMemo(() => entries.filter(entry => {
+    if (!entry.package.components.some(component => component.type === 'skill')) return false
+    const needle = query.trim().toLowerCase()
+    return !needle || [packageDisplayName(entry.package, text), packageDisplaySummary(entry.package, text), entry.package.id]
+      .some(value => value.toLowerCase().includes(needle))
+  }), [entries, query, text])
 
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => {
-    const scoped = entries.filter((entry) => {
+    const scoped = pluginEntries.filter((entry) => {
       if (sourceAudience(sourceMap.get(entry.sourceId), entry.sourceId) !== audienceFilter) return false
       return sourceFilter === 'all' || entry.sourceId === sourceFilter
     })
@@ -593,7 +609,7 @@ export function PluginMarketplaceView(): ReactElement {
         installedServerForPackage(entry.package, mcpServers)
       )).length
     }
-  }, [diagnosticMap, audienceFilter, entries, installed, mcpServers, sourceFilter, sourceMap])
+  }, [diagnosticMap, audienceFilter, pluginEntries, installed, mcpServers, sourceFilter, sourceMap])
 
   const visibleEntryGroups = useMemo(() => {
     const showFeatured = categoryFilter === 'all' && statusFilter === 'recommended' && !query.trim()
@@ -913,43 +929,44 @@ export function PluginMarketplaceView(): ReactElement {
       <header className="shrink-0 border-b border-ds-border bg-ds-page px-5 py-4 md:px-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[20px] font-semibold">{text('pluginUnifiedTitle', 'Plugins')}</h1>
+            <h1 className="text-[20px] font-semibold">{text('connectorHubHeading', 'Skills & connectors')}</h1>
             <p className="mt-0.5 text-[12px] text-ds-muted">
               {text('pluginUnifiedSummary', `Connect ${brand.platform} to the tools you use every day`, { productName: brand.platform })}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <IconButton
+            {viewMode === 'plugins' ? <IconButton
               label={text('pluginUnifiedFilters', 'Filters')}
               onClick={() => setFiltersOpen((value) => !value)}
             >
               <SlidersHorizontal className="h-4 w-4" />
-            </IconButton>
+            </IconButton> : null}
             <IconButton
               label={text('pluginUnifiedSources', 'Catalog sources')}
               onClick={() => setSourcesOpen(true)}
             >
               <Settings2 className="h-4 w-4" />
             </IconButton>
-            <IconButton label={text('pluginUnifiedRefresh', 'Refresh')} onClick={() => void refresh(true)} disabled={loading}>
+            <IconButton label={text('pluginUnifiedRefresh', 'Refresh')} onClick={() => { void refresh(true); setConnectionRefresh(value => value + 1) }} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </IconButton>
             <button
               type="button"
-              onClick={() => setImportOpen(true)}
+              onClick={() => viewMode === 'connectors' ? openSettings('mcp') : setImportOpen(true)}
               className="inline-flex h-9 items-center gap-2 rounded-md bg-ds-userbubble px-3 text-[13px] font-semibold text-ds-userbubbleFg hover:opacity-90"
             >
-              <Import className="h-4 w-4" />
-              {text('pluginUnifiedAddPlugin', 'Add plugin')}
-              <ChevronDown className="h-3.5 w-3.5" />
+              {viewMode === 'connectors' ? <Plus className="h-4 w-4" /> : <Import className="h-4 w-4" />}
+              {viewMode === 'connectors' ? text('connectorHubCustom', 'Custom connector') : text('pluginUnifiedAddPlugin', 'Add plugin')}
+              {viewMode !== 'connectors' ? <ChevronDown className="h-3.5 w-3.5" /> : null}
             </button>
           </div>
         </div>
 
-        <div className="mt-3 flex w-fit items-center gap-1 rounded-md border border-ds-border bg-ds-subtle p-1">
+        <div role="tablist" aria-label={text('connectorHubSections', 'Skills and connector sections')} className="mt-3 flex w-fit items-center gap-1 rounded-md border border-ds-border bg-ds-subtle p-1">
           {([
-            ['plugins', text('pluginUnifiedPluginsTab', 'Plugins')],
-            ['skills', text('pluginUnifiedSkillsTab', 'Skills')]
+            ['connectors', text('connectorHubTab', 'Connectors')],
+            ['skills', text('pluginUnifiedSkillsTab', 'Skills')],
+            ['plugins', text('pluginUnifiedPluginsTab', 'Plugins')]
           ] as Array<[MarketplaceView, string]>).map(([value, label]) => (
             <button
               key={value}
@@ -959,6 +976,7 @@ export function PluginMarketplaceView(): ReactElement {
               onClick={() => {
                 setViewMode(value)
                 setQuery('')
+                setDetailsOpen(false)
                 if (value === 'skills') setSkillFilter('overview')
               }}
               className={`h-7 rounded px-2.5 text-[12px] font-medium transition ${viewMode === value ? 'bg-ds-card text-ds-ink shadow-sm' : 'text-ds-muted hover:text-ds-ink'}`}
@@ -968,7 +986,7 @@ export function PluginMarketplaceView(): ReactElement {
           ))}
         </div>
 
-        <div className={`mt-3 grid gap-2 ${viewMode === 'plugins' ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(260px,1fr)_auto]'}`}>
+        <div className={`mt-3 grid gap-2 ${viewMode !== 'skills' ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(260px,1fr)_auto]'}`}>
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-faint" />
             <input
@@ -982,11 +1000,12 @@ export function PluginMarketplaceView(): ReactElement {
               }}
               placeholder={viewMode === 'skills'
                 ? text('pluginUnifiedSearchSkills', 'Search indexed Skills by name or capability')
+                : viewMode === 'connectors' ? text('connectorHubSearch', 'Search connectors')
                 : text('pluginUnifiedSearch', 'Search plugins, publishers, and capabilities')}
               className="h-10 w-full rounded-md border border-ds-border bg-ds-card pl-10 pr-3 text-[13px] outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
             />
           </label>
-          {viewMode === 'plugins' ? null : (
+          {viewMode !== 'skills' ? null : (
             <div className="flex h-10 items-center gap-2 rounded-md border border-ds-border bg-ds-card px-3 text-[12px] text-ds-muted">
               <Sparkles className="h-4 w-4 text-accent" />
               {text('pluginUnifiedSkillsRootCount', '{{count}} Skills indexed', { count: skills.length })}
@@ -1057,7 +1076,23 @@ export function PluginMarketplaceView(): ReactElement {
       ) : null}
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === 'skills' ? (
+        {viewMode === 'connectors' ? <ConnectorCatalog
+          entries={connectorEntries}
+          query={query}
+          refreshKey={connectionRefresh}
+          target={connectorTarget}
+          onTargetOpened={() => useChatStore.setState({ pluginConnectorTarget: null })}
+          name={entry => packageDisplayName(entry.package, text)}
+          summary={entry => packageDisplaySummary(entry.package, text)}
+          status={entry => packageStatusLabel(entry.package, installed.get(entry.package.id), installedServerForPackage(entry.package, mcpServers), diagnosticMap.get(entry.package.id), text, entry.reviewSha256)}
+          onDetails={entry => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }}
+          onRefresh={() => refresh()}
+        /> : viewMode === 'skills' ? (
+          <>
+          {skillCatalogEntries.length ? <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('connectorHubSkillCatalog', 'Discover skills')}>
+            <h2 className="mb-2 text-[14px] font-semibold">{text('connectorHubSkillCatalog', 'Discover skills')}</h2>
+            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
+          </section> : null}
           <LocalSkillsList
             skills={visibleSkills}
             allSkills={skills}
@@ -1076,6 +1111,7 @@ export function PluginMarketplaceView(): ReactElement {
               if (url) void window.workwise.openExternal(url)
             }}
           />
+          </>
         ) : loading && entries.length === 0 ? (
           <div className="flex h-full items-center justify-center text-ds-muted">
             <Loader2 className="h-5 w-5 animate-spin" />

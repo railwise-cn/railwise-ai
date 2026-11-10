@@ -118,9 +118,12 @@ export class LocalToolHost implements ToolHost {
       throw new Error('tool call aborted before start')
     }
     let tool: LocalTool
+    let originalProviderId: string
     try {
       await context.validateExecutionGrant?.()
-      tool = this.registry.resolveTool(call.toolName, context, call.providerId).tool
+      const resolved = this.registry.resolveTool(call.toolName, context, call.providerId)
+      tool = resolved.tool
+      originalProviderId = resolved.provider.id
     } catch (error) {
       const code = (error as { code?: unknown })?.code
       if (typeof code !== 'string' || !/^(sandbox_|execution_grant_|workspace_trust_)/.test(code)) throw error
@@ -210,6 +213,17 @@ export class LocalToolHost implements ToolHost {
     let result: Awaited<ReturnType<LocalTool['execute']>>
     try {
       await context.validateExecutionGrant?.()
+      // A connector can be disabled, refreshed or rebound while approval is
+      // pending. Approval covers this exact tool instance, never its replacement.
+      let currentTool
+      try {
+        currentTool = this.registry.resolveTool(activeCall.toolName, context, activeCall.providerId)
+      } catch {
+        throw Object.assign(new Error('Tool availability changed while awaiting dispatch. Check capabilities and request approval again.'), { code: 'tool_catalog_changed' })
+      }
+      if (currentTool.tool !== tool || currentTool.provider.id !== originalProviderId) {
+        throw Object.assign(new Error('The approved tool was replaced. Check capabilities and request approval again.'), { code: 'tool_catalog_changed' })
+      }
       context.assertExecution?.()
       if (needsApproval) context.recordExplicitApproval?.({ toolName: activeCall.toolName, requestHash: approvedRequestHash })
       const finishWork = context.beginExecutionWork?.()

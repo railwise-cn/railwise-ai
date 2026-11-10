@@ -39,6 +39,7 @@ function escaped(value:string):string { return encodeURIComponent(value) }
 export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):CapabilityToolProvider {
   const config=deps.config, fetcher=deps.fetch ?? fetch, now=deps.nowIso ?? (()=>new Date().toISOString())
   const credentialFor=async(workflow:boolean,scopes:string[],context:ToolHostContext,write:boolean):Promise<DingTalkCredential>=>{
+    if(context.executionGrant?.connectorIdentityFingerprints?.dingtalk)throw new RemoteFailure('connector_backend_changed',false)
     if(!config.enabled)throw new RemoteFailure('connector_disabled',false)
     const reference=workflow?config.workflowCredentialRef:config.credentialRef
     if(!reference)throw new RemoteFailure('connector_authorization_required',false)
