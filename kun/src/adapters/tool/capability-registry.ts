@@ -104,6 +104,9 @@ export class CapabilityRegistry {
     if (!this.canUseTool(toolName, context)) {
       throw new Error(`tool ${toolName} is not advertised by active tool policy`)
     }
+    if (!isToolAdvertisedInSandbox(record.tool, context)) {
+      throw new Error(`tool ${toolName} is not advertised in the active sandbox`)
+    }
     if (record.tool.shouldAdvertise && !record.tool.shouldAdvertise(context)) {
       throw new Error(`tool ${toolName} is not advertised in this turn context`)
     }
