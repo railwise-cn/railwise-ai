@@ -69,6 +69,19 @@ export class CapabilityRegistry {
     }
   }
 
+  /** Atomically replace one managed provider after trusted configuration refresh. */
+  replaceProvider(id: string, replacement?: CapabilityToolProvider): void {
+    if (replacement && replacement.id !== id) throw new Error('provider replacement identity mismatch')
+    for (const tool of replacement?.tools ?? []) {
+      const owner = this.tools.get(tool.name)?.provider.id
+      if (owner && owner !== id) throw new Error(`duplicate tool name: ${tool.name}`)
+    }
+    const previous = this.providers.get(id)
+    for (const tool of previous?.tools ?? []) this.tools.delete(tool.name)
+    this.providers.delete(id)
+    if (replacement) this.registerProvider(replacement)
+  }
+
   listTools(context?: ToolHostContext): CapabilityToolSpec[] {
     const specs: CapabilityToolSpec[] = []
     for (const record of this.tools.values()) {

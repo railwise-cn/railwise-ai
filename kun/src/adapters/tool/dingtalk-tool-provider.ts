@@ -67,8 +67,8 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
     if((parsed.code!==undefined && parsed.code!==0 && parsed.code!=='0')||parsed.success===false||parsed.result===false)throw new RemoteFailure('connector_remote_failed',false)
     return {body:parsed,requestId:response.headers.get('x-acs-request-id')??(typeof parsed.requestId==='string'?parsed.requestId:undefined)}
   }
-  const finish=(operation:string,target:string,data:Json,status:string,remoteOperationId?:string)=>({
-    output:{ok:true,provider:'dingtalk',operation,target,status:'succeeded',remoteOperationId,data,
+  const finish=(operation:string,target:string,data:Json,status:string,remoteRequestId?:string,remoteOperationId?:string)=>({
+    output:{ok:true,provider:'dingtalk',operation,target,status:'succeeded',...(remoteRequestId?{remoteRequestId}:{}),...(remoteOperationId?{remoteOperationId}:{}),data,
       evidence:{kind:'external_operation',provider:'dingtalk',operation,target,status,verified:true,verifiedAt:now(),resultHash:hash(data),...(remoteOperationId?{remoteOperationId}:{})}}
   })
   const readInstance=async(instanceId:string,credential:DingTalkCredential,context:ToolHostContext)=>{
@@ -111,12 +111,12 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
       const before=await request('GET',path,credential,context)
       if(before.body.id!==target || !rows(before.body.executorStatus).length&&!Array.isArray(before.body.executorIds))throw new RemoteFailure('connector_target_mismatch',false)
       if(Array.isArray(before.body.executorIds)&&!before.body.executorIds.some(id=>[credential.unionId,config.userId].includes(String(id))))throw new RemoteFailure('connector_target_not_owned',false)
-      if(before.body.done===true) return finish('complete',target,before.body,'done',`task:${target}:done`)
+      if(before.body.done===true) return finish('complete',target,before.body,'done')
       const update=await request('PUT',`${path}/executorStatus?operatorId=${escaped(config.userId!)}`,credential,context,{executorStatusList:[{id:config.userId!,isDone:true}]},true)
       let after:Json
       try {after=(await request('GET',path,credential,context)).body} catch {throw new RemoteFailure('connector_readback_unavailable',true)}
       if(after.id!==target||after.done!==true)throw new RemoteFailure('connector_readback_unverified',true)
-      return finish('complete',target,after,'done',update.requestId??`task:${target}:done`)
+      return finish('complete',target,after,'done',update.requestId)
     }),
     build('dingtalk_list_approvals','查询通过钉钉流程中心集成的 OA 待办（不是个人全部审批收件箱）。需要企业内部应用 qyapi_aflow 权限。',integratedList,true,[DINGTALK_SCOPES.integratedRead],false,async(args,credential,context)=>{
       const response=await request('GET',`/v1.0/workflow/processCentres/todoTasks?userId=${escaped(config.userId!)}&pageNumber=${args.pageNumber}&pageSize=${args.pageSize}`,credential,context)

@@ -290,6 +290,11 @@ export const RuntimeCapabilityManifest = z
     visionEvidence: RuntimeCapabilityState.optional(),
     workspaces: z.object({ flow: RuntimeCapabilityState, design: RuntimeCapabilityState, schedule: RuntimeCapabilityState }).optional(),
     lark: RuntimeCapabilityState.extend({ authState: LarkAuthState }).optional(),
+    dingtalk: RuntimeCapabilityState.extend({
+      credentialState: z.enum(['missing', 'invalid', 'valid']),
+      identityVerified: z.boolean(),
+      scopes: z.array(z.string())
+    }).optional(),
     uiActions: RuntimeCapabilityState
   })
   .strict()
@@ -345,6 +350,13 @@ export function buildRuntimeCapabilityManifest(input: {
     available?: boolean
     reason?: string
     authState?: LarkAuthState
+  }
+  dingtalk?: {
+    available?: boolean
+    reason?: string
+    credentialState?: 'missing' | 'invalid' | 'valid'
+    identityVerified?: boolean
+    scopes?: string[]
   }
 }): RuntimeCapabilityManifest {
   const config = KunCapabilitiesConfig.parse(input.config ?? {})
@@ -458,6 +470,17 @@ export function buildRuntimeCapabilityManifest(input: {
         input.lark?.reason ?? 'Lark CLI is not installed or authorised'
       ),
       authState: input.lark?.authState ?? config.lark.authState
+    },
+    dingtalk: {
+      ...providerCapabilityState(
+        config.dingtalk.enabled,
+        'DingTalk integration is disabled by config',
+        input.dingtalk?.available === true,
+        input.dingtalk?.reason ?? 'DingTalk credentials or authorization are unavailable'
+      ),
+      credentialState: input.dingtalk?.credentialState ?? 'missing',
+      identityVerified: input.dingtalk?.identityVerified ?? false,
+      scopes: input.dingtalk?.scopes ?? []
     },
     uiActions: available()
   })

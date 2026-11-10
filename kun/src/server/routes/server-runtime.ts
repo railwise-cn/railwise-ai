@@ -72,6 +72,11 @@ export type ServerRuntime = {
   taskViewService?: TaskViewService
   taskCoordinator?: TaskCoordinator
   taskControlService?:TaskControlService
+  configureDingTalk?: (input: unknown) => Promise<unknown>
+  beginDingTalkOAuth?: () => Promise<unknown>
+  completeDingTalkOAuth?: (callbackUrl: string) => Promise<unknown>
+  authorizeDingTalkWorkflow?: (input: unknown) => Promise<unknown>
+  refreshDingTalk?: () => Promise<unknown>
   taskContextRuntime?: TaskContextRuntime
   capacityManager?: CapacityManager
   taskController?: TaskController

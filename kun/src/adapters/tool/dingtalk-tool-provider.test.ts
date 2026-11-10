@@ -7,7 +7,7 @@ const config=DingTalkCapabilityConfig.parse({enabled:true,credentialRef:'user-re
 const credential:DingTalkCredential={accessToken:'private-token',unionId:'u',userId:'staff',kind:'internal-app',scopes,expiresAt:'2027-01-01T00:00:00Z'}
 const context={threadId:'thread',turnId:'turn',workspace:'/synthetic',approvalPolicy:'auto',sandboxMode:'workspace-write',abortSignal:new AbortController().signal,awaitApproval:async()=> 'allow'} as ToolHostContext
 const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','x-acs-request-id':'req-1'}})
-const fixture=(replies:Response[])=>{const fetcher=vi.fn(async()=>replies.shift()!);const provider=buildDingTalkToolProvider({config,getCredential:async()=>credential,fetch:fetcher as unknown as typeof fetch,nowIso:()=> '2026-11-10T00:00:00Z'});return {provider,fetcher,run:(name:string,args:Record<string,unknown>)=>provider.tools.find(t=>t.name===name)!.execute(args,context)}}
+const fixture=(replies:Response[])=>{const fetcher=vi.fn(async(_input:string|URL|Request,_init?:RequestInit)=>replies.shift()!);const provider=buildDingTalkToolProvider({config,getCredential:async()=>credential,fetch:fetcher as unknown as typeof fetch,nowIso:()=> '2026-11-10T00:00:00Z'});return {provider,fetcher,run:(name:string,args:Record<string,unknown>)=>provider.tools.find(t=>t.name===name)!.execute(args,context)}}
 
 describe('official DingTalk provider',()=>{
   it('advertises independent typed tools and explicit approval for every write',()=>{
@@ -36,10 +36,19 @@ describe('official DingTalk provider',()=>{
   it('completes a todo only after ownership check and exact target readback',async()=>{
     const f=fixture([response({id:'a',done:false,executorIds:['u']}),response({result:true}),response({id:'a',done:true})])
     const result=await f.run('dingtalk_complete_task',{taskId:'a'})
-    expect(result).toMatchObject({output:{ok:true,status:'succeeded',evidence:{target:'a',operation:'complete',status:'done',verified:true,remoteOperationId:'req-1'}}})
+    expect(result).toMatchObject({output:{ok:true,remoteRequestId:'req-1',status:'succeeded',evidence:{target:'a',operation:'complete',status:'done',verified:true}}})
+    expect((result.output as {evidence:{remoteOperationId?:string}}).evidence.remoteOperationId).toBeUndefined()
     const call=f.fetcher.mock.calls[1]!
     expect(String(call[0])).toBe('https://api.dingtalk.com/v1.0/todo/users/u/tasks/a/executorStatus?operatorId=staff')
     expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({executorStatusList:[{id:'staff',isDone:true}]})
+  })
+  it('does not invent a remote operation id when DingTalk omits its request id',async()=>{
+    const replies=[new Response(JSON.stringify({id:'a',done:false,executorIds:['u']})),new Response(JSON.stringify({result:true})),new Response(JSON.stringify({id:'a',done:true}))]
+    const provider=buildDingTalkToolProvider({config,getCredential:async()=>credential,fetch:vi.fn(async()=>replies.shift()!) as unknown as typeof fetch,nowIso:()=> '2026-11-10T00:00:00Z'})
+    const result=await provider.tools.find(t=>t.name==='dingtalk_complete_task')!.execute({taskId:'a'},context)
+    expect(result).toMatchObject({output:{ok:true,evidence:{verified:true}}})
+    expect(JSON.stringify(result)).not.toContain('task:a:done')
+    expect((result.output as {remoteOperationId?:string}).remoteOperationId).toBeUndefined()
   })
   it('keeps an accepted write unknown when readback does not prove completion',async()=>{
     const f=fixture([response({id:'a',done:false,executorIds:['u']}),response({result:true}),response({id:'a',done:false})])

@@ -6,6 +6,7 @@ import { registerSurveyContextMcpRoutes } from './survey-context-mcp.js'
 import { registerSurveyStandardBasisRoutes } from './survey-standard-basis.js'
 import { registerSurveyQualityScoringWorkspaceRoutes } from './survey-quality-scoring-workspace.js'
 import { Router } from '../router.js'
+import { jsonResponse } from '../response.js'
 import { registerSurveyMonitoringRoutes } from './survey-monitoring.js'
 import { getStatisticalDiagnostics } from './survey-statistics.js'
 import * as freeLevelingRoutes from './survey-free-leveling.js'
@@ -147,6 +148,44 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('GET', '/v1/runtime/tools', async (request) => {
     if (!authorize(request, runtime)) return ERRORS.unauthorized()
     return runtimeToolDiagnosticsJsonResponse(runtime)
+  })
+  router.add('POST', '/v1/connectors/dingtalk/configure', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.configureDingTalk) return ERRORS.unavailable('managed DingTalk connector configuration is unavailable')
+    try { return jsonResponse(await runtime.configureDingTalk(await request.json())) }
+    catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_configuration_invalid', message: '钉钉应用配置未保存，请检查输入和本机安全存储。' }, 400) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/oauth/start', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.beginDingTalkOAuth) return ERRORS.unavailable('managed DingTalk OAuth is unavailable')
+    if (request.body) return ERRORS.validation('DingTalk OAuth start does not accept a request body')
+    try { return jsonResponse(await runtime.beginDingTalkOAuth()) }
+    catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_oauth_failed', message: '无法开始钉钉授权，请检查应用配置和加密凭据。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/oauth/complete', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.completeDingTalkOAuth) return ERRORS.unavailable('managed DingTalk OAuth completion is unavailable')
+    try {
+      const body = await request.json() as { callbackUrl?: unknown }
+      if (typeof body?.callbackUrl !== 'string') return ERRORS.validation('callbackUrl is required')
+      return jsonResponse(await runtime.completeDingTalkOAuth(body.callbackUrl))
+    } catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_oauth_failed', message: '钉钉授权结果未能验证，请重新开始授权。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/workflow/authorize', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.authorizeDingTalkWorkflow) return ERRORS.unavailable('managed DingTalk workflow authorization is unavailable')
+    try { return jsonResponse(await runtime.authorizeDingTalkWorkflow(await request.json())) }
+    catch (error) { return jsonResponse({ code: error && typeof error === 'object' && 'code' in error ? String(error.code) : 'connector_authorization_failed', message: '企业审批应用授权未完成，请确认管理员授权信息和权限范围。' }, 409) }
+  })
+  router.add('POST', '/v1/connectors/dingtalk/refresh', async (request) => {
+    if (!authorize(request, runtime)) return ERRORS.unauthorized()
+    if (!runtime.refreshDingTalk) return ERRORS.unavailable('managed DingTalk connector refresh is unavailable')
+    if (request.headers.get('content-length') && Number(request.headers.get('content-length')) !== 0) {
+      return ERRORS.validation('DingTalk refresh does not accept a request body')
+    }
+    if (request.body) return ERRORS.validation('DingTalk refresh does not accept a request body')
+    try { return jsonResponse(await runtime.refreshDingTalk()) }
+    catch { return jsonResponse({ code: 'connector_refresh_failed', message: '无法读取或验证钉钉连接器配置，请检查本机配置和加密凭据后重试。' }, 409) }
   })
   router.add('GET', '/v1/engineering/projects', async (request) => authorize(request, runtime) ? engineeringRoutes.listProjects(runtime.engineeringService) : ERRORS.unauthorized())
   router.add('POST', '/v1/engineering/projects', async (request) => authorize(request, runtime) ? engineeringRoutes.createProject(runtime.engineeringService, request) : ERRORS.unauthorized())
