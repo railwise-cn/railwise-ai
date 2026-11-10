@@ -70,7 +70,15 @@ function toFetchRequest(incoming: IncomingMessage): Request {
       headers.set(key, raw)
     }
   }
-  const hasBody = method !== 'GET' && method !== 'HEAD'
+  // IncomingMessage is always a readable stream, including an empty POST.
+  // Preserve Fetch's null-body semantics for requests without payload framing;
+  // otherwise bodyless connector routes reject a legitimate empty POST.
+  // Chunked requests remain streaming, even when they eventually contain zero
+  // bytes. Do not peek or buffer input before routing and authorization.
+  const hasBody = method !== 'GET' && method !== 'HEAD' && (
+    incoming.headers['transfer-encoding'] !== undefined ||
+    Number(incoming.headers['content-length'] ?? 0) > 0
+  )
   const init: RequestInit & { duplex?: 'half' } = {
     method,
     headers
