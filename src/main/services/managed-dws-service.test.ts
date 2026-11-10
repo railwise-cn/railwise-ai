@@ -21,8 +21,11 @@ beforeEach(async () => {
   vi.stubEnv('WORKWISE_TOOLS_ROOT', join(root, 'tools'))
 })
 afterEach(async () => { services.forEach(service => service.cancel()); services.length = 0; vi.useRealTimers(); vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true }) })
+function fakeChild() {
+  return Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill: vi.fn(() => true) })
+}
 function fixture(mirror = true) {
-  const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill: vi.fn(() => true) })
+  const child = fakeChild()
   const start = vi.fn(() => child as unknown as ChildProcessWithoutNullStreams)
   const run = vi.fn(async (_path: string, args: string[], _env: NodeJS.ProcessEnv) => ({ ok: true, output: args[0] === 'version' ? 'dws version 1.0.67' : loggedOut }))
   const fetch = vi.fn(async (input: string | URL | Request) => {
@@ -83,6 +86,49 @@ describe('managed official DingTalk CLI', () => {
     expect(await f.service.checkLogin()).toMatchObject({ ok: true, state: 'succeeded', status: { state: 'installed', profile: 'corp-synthetic:user-synthetic', identityFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/), scopes: [] } })
     expect(f.start).toHaveBeenCalledOnce()
     expect(f.run.mock.calls.at(-1)?.[1]).toEqual(['auth', 'status', '--readonly', '--profile', 'corp-synthetic:user-synthetic', '--format', 'json'])
+  })
+  it.each(['missing', 'invalid', 'valid'] as const)('verifies an immediate zero exit before any authorization URL (%s result)', async resultKind => {
+    const f = fixture(); await f.service.install()
+    const begin = f.service.beginLogin()
+    await vi.waitFor(() => expect(f.start).toHaveBeenCalledOnce())
+    f.run.mockImplementation(async () => ({ ok: true, output: loggedIn }))
+    if (resultKind !== 'missing') f.child.stdout.write(resultKind === 'valid' ? finalLogin : '{}')
+    f.child.emit('close', 0)
+    const result = await begin
+    if (resultKind === 'valid') {
+      expect(result).toMatchObject({ ok: true, state: 'succeeded', status: { state: 'installed', profile: 'corp-synthetic:user-synthetic' } })
+      expect(f.run.mock.calls.at(-1)?.[1]).toContain('corp-synthetic:user-synthetic')
+    } else {
+      expect(result.ok).toBe(false)
+      expect(result).not.toHaveProperty('state', 'succeeded')
+      expect(result).not.toHaveProperty('status')
+    }
+    expect(f.start).toHaveBeenCalledOnce()
+  })
+  it.each(['cancel', 'replace'] as const)('does not return or refresh an old success after %s during exact-profile verification', async action => {
+    const f = fixture(); await f.service.install(); await login(f)
+    f.child.stdout.write(finalLogin); f.child.emit('close', 0)
+    let resolveDiagnosis!: (result: { ok: boolean; output: string }) => void
+    const diagnosis = new Promise<{ ok: boolean; output: string }>(resolve => { resolveDiagnosis = resolve })
+    f.run.mockImplementation(async (_path, args) => args.includes('--profile') ? diagnosis : { ok: true, output: loggedOut })
+    const check = f.service.checkLogin()
+    await vi.waitFor(() => expect(f.run.mock.calls.some(call => call[1].includes('corp-synthetic:user-synthetic'))).toBe(true))
+    if (action === 'cancel') {
+      expect(f.service.cancel()).toMatchObject({ state: 'cancelled' })
+    } else {
+      const replacement = fakeChild()
+      f.start.mockImplementationOnce(() => replacement as unknown as ChildProcessWithoutNullStreams)
+      const next = f.service.beginLogin()
+      await vi.waitFor(() => expect(f.start).toHaveBeenCalledTimes(2))
+      replacement.stderr.write('https://login.dingtalk.com/device?flow=second-synthetic\n')
+      expect(await next).toMatchObject({ state: 'waiting' })
+    }
+    resolveDiagnosis({ ok: true, output: loggedIn })
+    const result = await check
+    expect(result).toMatchObject({ ok: false })
+    expect(result).not.toHaveProperty('status')
+    expect(result).not.toHaveProperty('state', 'succeeded')
+    expect(await f.service.checkLogin()).toMatchObject({ state: action === 'cancel' ? 'cancelled' : 'waiting' })
   })
   it.each(['lost_result', 'wrong_identity', 'failed_process'])('does not use an existing logged-in account to hide %s', async failure => {
     const f = fixture(); await f.service.install(); await login(f)

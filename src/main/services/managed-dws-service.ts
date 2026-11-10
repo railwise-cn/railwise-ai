@@ -189,7 +189,7 @@ export class ManagedDwsService {
   }
   cancel(): ManagedDwsResult {
     this.generation++
-    if (this.pending?.state === 'waiting') this.stop(this.pending, 'cancelled')
+    if (this.pending && ['waiting', 'succeeded'].includes(this.pending.state)) this.stop(this.pending, 'cancelled')
     return { ok: true, state: 'cancelled' }
   }
   private snapshot(pending: Pending): ManagedDwsResult {
@@ -206,7 +206,7 @@ export class ManagedDwsService {
     assertDwsCredentialAccess()
     if (this.pending?.state === 'waiting') return this.snapshot(this.pending)
     if (this.pending && !this.pending.closed) return { ok: false, message: 'The previous DingTalk authorization process is still stopping. Check its result before reconnecting.' }
-    const generation = this.generation
+    const generation = ++this.generation
     const diagnosis = await this.diagnose()
     if (!diagnosis.ok || !diagnosis.status?.executablePath || diagnosis.status.state === 'error') return { ok: false, message: 'Install and diagnose the official DingTalk CLI before connecting. Unknown login state is preserved.' }
     if (generation !== this.generation) return { ok: true, state: 'cancelled' }
@@ -232,21 +232,42 @@ export class ManagedDwsService {
       })
       child.stdout.on('data', (bytes: Buffer) => { pending.output = (pending.output + bytes.toString('utf8')).slice(-64 * 1024) })
       child.once('error', () => { this.stop(pending, 'failed'); finish({ ok: false, message: 'The official DingTalk login process could not start.' }) })
-      child.once('close', code => { pending.closed = true; clearTimeout(pending.timer); if (pending.state === 'waiting') pending.state = code === 0 ? 'succeeded' : 'failed'; finish(this.snapshot(pending)) })
+      child.once('close', code => {
+        pending.closed = true
+        clearTimeout(pending.timer)
+        if (pending.state === 'waiting') pending.state = code === 0 ? 'succeeded' : 'failed'
+        if (pending.state === 'succeeded') {
+          // Even an immediate zero exit must prove this process's result and
+          // exact profile. Exit status alone is never an authorization receipt.
+          if (!settled) void this.verifyPendingLogin(pending, generation).then(finish)
+        } else finish(this.snapshot(pending))
+      })
     })
   }
   async checkLogin(): Promise<ManagedDwsResult> {
+    const pending = this.pending
+    if (!pending) return { ok: false, message: 'Start official DingTalk authorization first.' }
+    return this.verifyPendingLogin(pending, this.generation)
+  }
+  private async verifyPendingLogin(pending: Pending, generation: number): Promise<ManagedDwsResult> {
+    const isCurrent = (): boolean => this.pending === pending && this.generation === generation
+    const superseded = (): ManagedDwsResult => ({ ok: false, message: 'This DingTalk authorization check was cancelled or replaced. Check the current connection; no queued task was run.' })
     try {
       assertDwsCredentialAccess()
-      const pending = this.pending
-      if (!pending) return { ok: false, message: 'Start official DingTalk authorization first.' }
-      if (sha256(await readFile(pending.executablePath)) !== pending.executableHash) { if (pending.state === 'waiting') this.stop(pending, 'failed'); return { ok: false, message: 'DingTalk CLI changed during authorization. Check official account state before reconnecting.' } }
+      if (!isCurrent()) return superseded()
+      const binaryHash = sha256(await readFile(pending.executablePath))
+      if (!isCurrent()) return superseded()
+      if (binaryHash !== pending.executableHash) { if (pending.state === 'waiting') this.stop(pending, 'failed'); return { ok: false, message: 'DingTalk CLI changed during authorization. Check official account state before reconnecting.' } }
       const snapshot = this.snapshot(pending)
       if (pending.state !== 'succeeded') return snapshot
       let result: { success?: boolean; token_valid?: boolean; corp_id?: string; user_id?: string }
       try { result = JSON.parse(pending.output) as typeof result } catch { return { ok: false, message: 'The official login result could not be verified. No queued task was run.' } }
       if (result.success !== true || result.token_valid !== true || !result.corp_id || !result.user_id) return { ok: false, message: 'The official login process did not return a verified user identity.' }
       const diagnosis = await this.diagnose(`${result.corp_id}:${result.user_id}`)
+      // Cancellation and a subsequent login invalidate every in-flight read.
+      // Do not return status: IPC would otherwise refresh the old account into
+      // Runtime capabilities even after the user cancelled or changed flows.
+      if (!isCurrent() || pending.state !== 'succeeded') return superseded()
       if (!diagnosis.ok || diagnosis.status?.state !== 'installed' || diagnosis.status.corpId !== result.corp_id || diagnosis.status.userId !== result.user_id) return { ok: false, message: 'The authorized DingTalk identity could not be verified. No queued task was run.' }
       return { ...diagnosis, state: 'succeeded' }
     } catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'DingTalk authorization could not be verified.' } }
