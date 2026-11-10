@@ -63,7 +63,7 @@ describe('WorkWise 0.3.3 tender and Flow acceptance', () => {
     expect(await docx.file('word/document.xml')!.async('string')).toContain('第 87 页')
   })
 
-  it('runs schedule → retrieval → retrying Agent → DOCX → durable approval → archive with auditable history and redacted export', async () => {
+  it.each([false, true])('preserves scheduled DOCX delivery and durable approval; legacy archive=%s cannot claim a false success', async (includeLegacyArchive) => {
     const root = await workspace('flow')
     const store = attachmentStore(root)
     const attachment = await store.createDocument({ name: 'tender.pdf', data: syntheticTenderPdf(101), mimeType: 'application/pdf', kind: 'pdf', workspace: root })
@@ -72,7 +72,7 @@ describe('WorkWise 0.3.3 tender and Flow acceptance', () => {
 
     const databasePath = join(root, 'flow.sqlite')
     const repository = new FlowRepository(databasePath)
-    const graph = acceptanceFlow(root, attachment.id)
+    const graph = acceptanceFlow(root, attachment.id, includeLegacyArchive)
     repository.create(withoutPersistenceFields(graph))
     repository.publish(graph.id)
     repository.saveTriggerState({ flowId: graph.id, nodeId: 'schedule', enabled: true, nextRunAt: '2026-07-31T00:00:00.000Z', state: {} })
@@ -91,8 +91,13 @@ describe('WorkWise 0.3.3 tender and Flow acceptance', () => {
     const reopened = new FlowRepository(databasePath)
     const second = new FlowRuntimeService(reopened, buildFlowNodeRegistry(), adapters)
     await second.decide(runId, 'approval', 'approve', 'QA accepted after restart')
-    await vi.waitFor(() => expect(second.runDetails(runId)?.run.status).toBe('succeeded'))
-    expect(second.runDetails(runId)?.nodeRuns.find((item) => item.nodeId === 'archive')?.status).toBe('succeeded')
+    await vi.waitFor(() => expect(second.runDetails(runId)?.run.status).toBe(includeLegacyArchive ? 'failed' : 'succeeded'))
+    expect(second.runDetails(runId)?.nodeRuns.find((item) => item.nodeId === 'approval')?.status).toBe('succeeded')
+    if (includeLegacyArchive) {
+      expect(second.runDetails(runId)?.nodeRuns.find((item) => item.nodeId === 'archive')).toMatchObject({ status: 'failed', error: expect.stringContaining('归档') })
+    } else {
+      expect(second.runDetails(runId)?.nodeRuns.some((item) => item.nodeId === 'archive')).toBe(false)
+    }
     expect(second.history(graph.id).some((item) => item.id === runId)).toBe(true)
     const exported = JSON.stringify(second.exportRedacted(graph.id))
     expect(exported).not.toContain(root)
@@ -126,17 +131,18 @@ function node(id: string, type: string, config: Record<string, unknown> = {}): F
   return { id, type, label: id, position: { x: 0, y: 0 }, bindings: {}, config, policy: { ...policy }, disabled: false }
 }
 
-function acceptanceFlow(root: string, attachmentId: string): FlowDefinitionV1 {
+function acceptanceFlow(root: string, attachmentId: string, includeLegacyArchive: boolean): FlowDefinitionV1 {
   const nodes = [
     node('schedule', 'schedule_trigger', { kind: 'interval', everyMinutes: 60 }),
     node('retrieve', 'knowledge_retrieval', { attachmentId, query: '投标保证金 伍拾万元' }),
     { ...node('agent', 'agent', { prompt: '依据检索来源编制投标响应。' }), policy: { ...policy, retryAttempts: 1 } },
     node('docx', 'docx_output', { outputPath: 'bid.docx' }),
     node('approval', 'human_approval', { summary: '审批投标文件' }),
-    node('archive', 'archive')
+    ...(includeLegacyArchive ? [node('archive', 'archive')] : [])
   ]
   const edges = [
-    ['schedule', 'retrieve'], ['retrieve', 'agent'], ['agent', 'docx'], ['docx', 'approval'], ['approval', 'archive']
+    ['schedule', 'retrieve'], ['retrieve', 'agent'], ['agent', 'docx'], ['docx', 'approval'],
+    ...(includeLegacyArchive ? [['approval', 'archive']] : [])
   ].map(([sourceNodeId, targetNodeId], index) => ({ id: `edge-${index}`, sourceNodeId, sourcePortId: 'output', targetNodeId, targetPortId: 'input', branch: 'normal' as const }))
   return { schemaVersion: 1, id: 'flow-acceptance', name: 'Tender acceptance', description: '', revision: 1, nodes, edges, variables: { secretToken: 'acceptance-secret', sourcePath: root }, workspace: root, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }
 }
