@@ -255,6 +255,8 @@ export type CoreRuntimeCapabilityManifestJson = {
   visionEvidence?: CoreRuntimeCapabilityStateJson
   /** Optional so the GUI can disable persisted controls against older runtimes. */
   uiActions?: CoreRuntimeCapabilityStateJson
+  /** Navigation reflects executable workspaces, not preview surfaces. */
+  workspaces?: Partial<Record<'flow' | 'design' | 'schedule', CoreRuntimeCapabilityStateJson>>
 }
 
 export type CoreRuntimeInfoJson = {

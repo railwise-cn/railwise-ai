@@ -22,6 +22,11 @@ function props(activeRoute: ActiveRoute): ComponentProps<typeof WorkspaceSeconda
     activeRoute,
     onWriteOpen: vi.fn(),
     onTasksOpen: vi.fn(),
+    toolCapabilities: {
+      flow: { enabled: true, available: true, status: 'available' },
+      schedule: { enabled: true, available: true, status: 'available' },
+      design: { enabled: true, available: true, status: 'available' }
+    },
     onOpenPlugins: vi.fn(),
     onScheduleOpen: vi.fn(),
     onFlowOpen: vi.fn(),
@@ -74,5 +79,21 @@ describe('WorkspaceSecondaryNavigation', () => {
     expect(toolsMenu).not.toContain('Plugins')
     expect(html).toContain('aria-current="page"')
     expect(html.indexOf('id="workspace-tools-menu"')).toBeLessThan(html.indexOf('Plugins'))
+  })
+
+  it('hides unknown and unavailable execution entries while keeping configuration discoverable', () => {
+    const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, {
+      ...props('chat'), toolCapabilities: { flow: { enabled: true, available: false, status: 'unavailable' } }
+    }))
+    expect(html).not.toContain('workspace-tools-menu')
+    expect(html).toContain('Plugins')
+    expect(html).toContain('Write')
+  })
+
+  it('preserves an unavailable deep-linked surface without advertising other tools', () => {
+    const html = renderToStaticMarkup(createElement(WorkspaceSecondaryNavigation, { ...props('flow'), toolCapabilities: undefined }))
+    expect(html).toContain('Flow')
+    expect(html).not.toContain('Scheduled tasks')
+    expect(html).not.toContain('>Design<')
   })
 })

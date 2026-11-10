@@ -132,6 +132,7 @@ export const useChatStore = create<ChatState>((rawSet, get) => {
   workspaceRoot: '',
   workspaceLabel: i18n.t('common:workingDirectory'),
   runtimeConnection: 'idle',
+  runtimeCapabilities: null,
   codeWorkspaceRoots: [],
   threads: [],
   threadSearch: '',

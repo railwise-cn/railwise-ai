@@ -95,6 +95,7 @@ export function Sidebar({
 }: Props): ReactElement {
   const { t, i18n } = useTranslation('common')
   const workspaceRoot = useChatStore((s) => s.workspaceRoot)
+  const toolCapabilities = useChatStore((s) => s.runtimeCapabilities?.workspaces)
   const codeWorkspaceRoots = useChatStore((s) => s.codeWorkspaceRoots)
   const chooseWorkspace = useChatStore((s) => s.chooseWorkspace)
   const deleteWorkspace = useChatStore((s) => s.deleteWorkspace)
@@ -149,6 +150,7 @@ export function Sidebar({
         />
 
         <WorkspaceSecondaryNavigation
+          toolCapabilities={toolCapabilities}
           activeRoute={navigationRoute}
           onWriteOpen={onWriteOpen}
           onOpenPlugins={onOpenPlugins}

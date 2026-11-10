@@ -11,6 +11,7 @@ import type {
   UserInputAnswer
 } from '../agent/types'
 import type { LiveUsageProjection } from './live-usage-projection'
+import type { CoreRuntimeCapabilityManifestJson } from '../agent/runtime-contract'
 import type {
   ClawImAgentProfileV1,
   ClawImChannelV1,
@@ -144,6 +145,7 @@ export type ChatState = {
   workspaceRoot: string
   workspaceLabel: string
   runtimeConnection: RuntimeConnectionStatus
+  runtimeCapabilities?: CoreRuntimeCapabilityManifestJson | null
   codeWorkspaceRoots: string[]
   threads: NormalizedThread[]
   threadSearch: string

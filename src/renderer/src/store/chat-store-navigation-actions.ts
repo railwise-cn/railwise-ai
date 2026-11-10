@@ -300,6 +300,14 @@ export function createNavigationActions(
       const p = getProvider()
       await p.connect()
       set({ runtimeConnection: 'ready', error: null, runtimeErrorDetail: null })
+      try {
+        const info = await p.getRuntimeInfo?.()
+        set({ runtimeCapabilities: info?.capabilities ?? null })
+      } catch {
+        // Missing capability metadata must not advertise unverified tools or
+        // turn a healthy legacy runtime into an offline connection.
+        set({ runtimeCapabilities: null })
+      }
       void get().loadComposerModels()
       if (prev !== 'ready' || mode === 'user') {
         try {
@@ -316,6 +324,7 @@ export function createNavigationActions(
         stopTurnCompletionPoll()
         set({
           runtimeConnection: 'offline',
+          runtimeCapabilities: null,
           error: msg,
           runtimeErrorDetail: detail,
           ...(needsSettings
@@ -326,6 +335,7 @@ export function createNavigationActions(
         stopTurnCompletionPoll()
         set({
           runtimeConnection: 'offline',
+          runtimeCapabilities: null,
           error: msg,
           runtimeErrorDetail: detail,
           ...(needsSettings
