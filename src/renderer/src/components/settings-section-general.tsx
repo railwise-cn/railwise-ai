@@ -20,6 +20,8 @@ import type { SkillRootId } from '../lib/skill-root-preference'
 import { FolderOpen, Loader2, PencilLine, RefreshCw, Settings } from 'lucide-react'
 import { GuiUpdateControl } from './settings-gui-update'
 import { DocumentEngineSettingsCard } from './document-engine-settings-card'
+import { WorkspaceMigrationCard } from './workspace-migration-card'
+import { WorkspaceTrustControl } from './workspace-trust-control'
 import {
   InlineNoticeView,
   SectionJumpButton,
@@ -280,7 +282,10 @@ export function GeneralSettingsSection({ ctx }: { ctx: Record<string, any> }): R
                     </div>
                   }
                 />
+                <WorkspaceTrustControl workspaceRoot={form.workspaceRoot} t={t} />
               </SettingsCard>
+
+              <WorkspaceMigrationCard t={t} />
 
               <SettingsCard title={t('desktopBehavior')} className="mt-6">
                 <SettingRow

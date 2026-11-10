@@ -117,6 +117,7 @@ import {
   workspacePreviewPayloadSchema,
   workspaceTrustGetPayloadSchema,
   workspaceTrustSetPayloadSchema,
+  workspaceMigrationImportPayloadSchema,
   writeAgnesImageGenerationPayloadSchema,
   writeExportPayloadSchema,
   writeRichClipboardPayloadSchema,
@@ -227,6 +228,7 @@ import { runtimeThreadInterruptPath } from '../../shared/runtime-endpoints'
 import { atomicWriteFile as durableWriteFile } from '../services/durable-file'
 import { AgentProfileService } from '../services/agent-profile-service'
 import { WorkspaceTrustService } from '../services/workspace-trust-service'
+import { WorkspaceMigrationService } from '../services/workspace-migration-service'
 import { DocumentEngineService } from '../services/document-engine-service'
 import { ChatAttachmentImportService } from '../services/chat-attachment-import-service'
 import { WorkspacePreviewService } from '../services/workspace-preview-service'
@@ -282,6 +284,7 @@ type WorkspaceFileWatchRecord = {
 }
 
 type RegisterAppIpcHandlersOptions = {
+  workspaceMigrationService?: WorkspaceMigrationService
   store: JsonSettingsStore
   getMainWindow: () => BrowserWindow | null
   applySettingsPatch: (partial: AppSettingsPatch, expectedRevision?: number) => Promise<AppSettingsV1>
@@ -711,6 +714,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   const workspaceFileWatchers = new Map<string, WorkspaceFileWatchRecord>()
   const agentProfileService = new AgentProfileService()
   const workspaceTrustService = new WorkspaceTrustService()
+  const workspaceMigrationService = options.workspaceMigrationService ?? new WorkspaceMigrationService()
   const documentEngineService = new DocumentEngineService({
     resourcesPath: process.resourcesPath,
     developmentRoot: process.cwd()
@@ -949,6 +953,11 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('workspace-trust:get', async (_, payload: unknown) => {
     const request = parseIpcPayload('workspace-trust:get', workspaceTrustGetPayloadSchema, payload)
     return workspaceTrustService.get(request.workspaceRoot)
+  })
+  ipcMain.handle('workspace-migration:scan', async () => workspaceMigrationService.scan())
+  ipcMain.handle('workspace-migration:import-snapshot', async (_, payload: unknown) => {
+    const request = parseIpcPayload('workspace-migration:import-snapshot', workspaceMigrationImportPayloadSchema, payload)
+    return workspaceMigrationService.importSnapshot(request)
   })
   ipcMain.handle('workspace-trust:set', async (_, payload: unknown) => {
     const request = parseIpcPayload('workspace-trust:set', workspaceTrustSetPayloadSchema, payload)

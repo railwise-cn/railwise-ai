@@ -1,3 +1,4 @@
+import type { WorkspaceMigrationReport, WorkspaceImportRequest, WorkspaceImportResult } from './workspace-migration'
 import type {
   AppSettingsPatch,
   WorkWiseSettingsV2,
@@ -516,6 +517,8 @@ export type WorkWiseApi = {
     idempotencyKey: string
   }) => Promise<ThreadAgentSelectionV1>
   getWorkspaceTrust: (workspaceRoot: string) => Promise<WorkspaceTrustV1>
+  scanLegacyWorkspaces: () => Promise<WorkspaceMigrationReport>
+  importLegacyWorkspaceSnapshot: (request: WorkspaceImportRequest) => Promise<WorkspaceImportResult>
   setWorkspaceTrust: (request: {
     workspaceRoot: string
     level: WorkspaceTrustLevel

@@ -219,6 +219,8 @@ const api = {
     })
   },
   getWorkspaceTrust: (workspaceRoot) => ipcRenderer.invoke('workspace-trust:get', { workspaceRoot }),
+  scanLegacyWorkspaces: () => ipcRenderer.invoke('workspace-migration:scan'),
+  importLegacyWorkspaceSnapshot: (request) => ipcRenderer.invoke('workspace-migration:import-snapshot', request),
   setWorkspaceTrust: (request) => ipcRenderer.invoke('workspace-trust:set', request),
   listMcpServers: (workspaceRoot) => ipcRenderer.invoke('mcp-server:list', { workspaceRoot }),
   saveMcpServer: (request) => ipcRenderer.invoke('mcp-server:save', request),

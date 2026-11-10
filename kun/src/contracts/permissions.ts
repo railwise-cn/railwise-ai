@@ -32,4 +32,5 @@ export const ExecutionGrantSchema = z.object({
 export type ExecutionGrant = z.infer<typeof ExecutionGrantSchema>
 
 export type ExecutionScope = Pick<ExecutionGrant, 'networkAllowlist' | 'connectorScopes' | 'externalTargets'> &
+  Pick<Partial<ExecutionGrant>, 'allowedToolNames'> &
   Pick<Partial<ExecutionGrant>, 'allowedProviderIds' | 'pathAllowlist' | 'expiresAt'>

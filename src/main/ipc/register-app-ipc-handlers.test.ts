@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -106,6 +106,29 @@ describe('registerAppIpcHandlers', () => {
   beforeEach(() => {
     handlers.clear()
     vi.clearAllMocks()
+  })
+
+  it('exposes an isolated legacy workspace report and requires explicit snapshot consent', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const { WorkspaceMigrationService } = await import('../services/workspace-migration-service')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'workwise-migration-ipc-')))
+    const source = join(root, '.workgpt', 'default_workspace')
+    mkdirSync(source, { recursive: true })
+    writeFileSync(join(source, 'draft.md'), 'local data')
+    const service = new WorkspaceMigrationService({ home: root, stateRoot: join(root, 'state') })
+    registerAppIpcHandlers(registerOptions({ workspaceMigrationService: service }))
+    const report = await handlers.get('workspace-migration:scan')?.({ sender: { id: 1 } }) as Awaited<ReturnType<InstanceType<typeof WorkspaceMigrationService>['scan']>>
+    const legacy = report.entries.find(entry => entry.id === '.workgpt:default')!
+    expect(legacy.status).toBe('populated')
+    await expect(handlers.get('workspace-migration:import-snapshot')?.({ sender: { id: 1 } }, {
+      sourceId: legacy.id, expectedFingerprint: legacy.fingerprint, confirmed: false, idempotencyKey: 'blocked'
+    })).rejects.toMatchObject({ code: 'approval_required' })
+    const result = await handlers.get('workspace-migration:import-snapshot')?.({ sender: { id: 1 } }, {
+      sourceId: legacy.id, expectedFingerprint: legacy.fingerprint, confirmed: true, idempotencyKey: 'snapshot'
+    }) as Awaited<ReturnType<InstanceType<typeof WorkspaceMigrationService>['importSnapshot']>>
+    expect(result.status).toBe('completed')
+    expect(readFileSync(join(source, 'draft.md'), 'utf8')).toBe('local data')
+    rmSync(root, { recursive: true, force: true })
   })
 
   it('keeps the same workspace-watch IPC subscription across atomic saves and later deletion', async () => {

@@ -1837,7 +1837,7 @@ export class AgentLoop {
       threadId: thread.id, turnId, workspaceRoot: workspace.canonicalRoot,
       workspaceTrust: workspace.level, agentTrust, approvalPolicy: context.approvalPolicy,
       sandboxMode,
-      allowedToolNames: catalog.map(tool => tool.name),
+      allowedToolNames: catalog.map(tool => tool.name).filter(name => !scope?.allowedToolNames || scope.allowedToolNames.includes(name)),
       ...(context.allowedMcpProviderIds ? { allowedMcpProviderIds: [...context.allowedMcpProviderIds] } : {}),
       ...(scope?.allowedProviderIds ? { allowedProviderIds: [...scope.allowedProviderIds] } : {}),
       pathAllowlist: scope?.pathAllowlist ?? (trust === 'full-access' && sandboxMode === 'danger-full-access' ? ['*'] : workspace.canonicalRoot ? [workspace.canonicalRoot] : []),

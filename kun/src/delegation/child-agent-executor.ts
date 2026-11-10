@@ -1,4 +1,5 @@
 import type { WorkspaceTrustReader } from '../services/workspace-trust-reader.js'
+import type { ExecutionGrant, ExecutionScope } from '../contracts/permissions.js'
 import { InMemoryApprovalGate } from '../adapters/in-memory-approval-gate.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
@@ -44,6 +45,7 @@ import { resolveWorkspacePath } from '../adapters/tool/builtin-tool-utils.js'
 
 export type ChildAgentExecutorOptions = {
   workspaceTrust?: WorkspaceTrustReader
+  executionScope?: (threadId: string, turnId: string) => Promise<ExecutionScope>
   dataDir?: string
   parentContext?: (threadId: string, turnId: string) => Promise<ThreadRecord | null>
   approvalGate?: ApprovalGate
@@ -78,6 +80,10 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
     const threadStore = options.dataDir ? new FileThreadStore({ dataDir: options.dataDir }) : new InMemoryThreadStore()
     const parent = await options.parentContext?.(input.parentThreadId, input.parentTurnId)
     if (options.parentContext && !parent) throw new Error('parent authority is unavailable; child task cannot continue')
+    const parentGrant = parent?.turns.find(turn => turn.id === input.parentTurnId)?.executionGrant
+    if (options.workspaceTrust && options.parentContext && !parentGrant) {
+      throw Object.assign(new Error('Parent execution grant is unavailable; child permissions cannot be inferred.'), { code: 'execution_grant_scope' })
+    }
     const parentWorkspace = parent?.workspace
     const requestedWorkspace = input.workspace?.trim() || parentWorkspace || '~'
     if (parentWorkspace && !isWithinWorkspace(parentWorkspace, requestedWorkspace)) {
@@ -167,7 +173,20 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
     const usageEvents = await sessionStore.loadEventsSince(thread.id, 0)
     const previousUsage = [...usageEvents].reverse().find(event => event.kind === 'usage')
     if (previousUsage?.kind === 'usage') usage.seedThread(thread.id, previousUsage.usage)
-    const stagingDirectory = options.dataDir ? (await resolveWorkspacePath(join('.workwise','task-staging',input.childId),{threadId:thread.id,turnId:input.parentTurnId,workspace:thread.workspace,approvalPolicy:thread.approvalPolicy,sandboxMode:thread.sandboxMode,abortSignal:input.signal,awaitApproval:async()=> 'deny'})).absolutePath : undefined
+    const currentWorkspaceTrust = await options.workspaceTrust?.get(thread.workspace)
+    const parentWorkspaceTrust = parentGrant ? await options.workspaceTrust?.get(parentGrant.workspaceRoot) : undefined
+    if (parentGrant && parentWorkspaceTrust && (
+      parentWorkspaceTrust.revision !== parentGrant.workspaceRevision
+      || parentWorkspaceTrust.level !== parentGrant.workspaceTrust
+    )) throw Object.assign(new Error('Workspace trust changed before child dispatch.'), { code: 'execution_grant_revoked' })
+    const stagingAllowed = !options.workspaceTrust || (
+      currentWorkspaceTrust?.level !== 'read-only'
+      && parentGrant?.workspaceTrust !== 'read-only'
+      && parentGrant?.agentTrust !== 'read-only'
+      && thread.sandboxMode !== 'read-only'
+      && thread.sandboxMode !== 'external-sandbox'
+    )
+    const stagingDirectory = options.dataDir && stagingAllowed ? (await resolveWorkspacePath(join('.workwise','task-staging',input.childId),{threadId:thread.id,turnId:input.parentTurnId,workspace:thread.workspace,approvalPolicy:thread.approvalPolicy,sandboxMode:thread.sandboxMode,abortSignal:input.signal,awaitApproval:async()=> 'deny'})).absolutePath : undefined
     if (stagingDirectory) await mkdir(stagingDirectory, { recursive: true })
     const childInstructions = [
       stagingDirectory ? `Child staging directory: ${stagingDirectory}.` : '',
@@ -175,6 +194,11 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
     ].filter(Boolean).join('\n')
     const loop = new AgentLoop({
       ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
+      ...(parentGrant ? { executionScope: async (threadId: string, turnId: string) => intersectChildExecutionScope(
+        parentGrant,
+        thread.workspace,
+        await options.executionScope?.(threadId, turnId)
+      ) } : {}),
       threadStore,
       sessionStore,
       approvalGate: options.approvalGate ?? new InMemoryApprovalGate(),
@@ -342,4 +366,57 @@ function childHandoff(items: readonly TurnItem[], turnId: string, status: 'compl
     pendingOperationIds: unresolvedToolCalls(items).map(item => item.callId),
     status
   }
+}
+
+export function intersectChildExecutionScope(
+  parent: ExecutionGrant,
+  childWorkspace: string,
+  current?: ExecutionScope
+): ExecutionScope {
+  const workspace = canonicalWorkspace(childWorkspace)
+  const parentPaths = parent.pathAllowlist.includes('*') ? [workspace] : parent.pathAllowlist
+  const currentPaths = current?.pathAllowlist ?? ['*']
+  const childPaths = currentPaths.includes('*') ? [workspace] : currentPaths
+  const pathAllowlist = intersectPaths(parentPaths, childPaths).filter(path => isWithinWorkspace(workspace, path))
+  const allowedProviderIds = intersectOptional(parent.allowedProviderIds, current?.allowedProviderIds)
+  const allowedToolNames = intersectScope(parent.allowedToolNames ?? [], current?.allowedToolNames ?? ['*'])
+  const expiresAt = earliestExpiry(parent.expiresAt, current?.expiresAt)
+  return {
+    allowedToolNames,
+    ...(allowedProviderIds ? { allowedProviderIds } : {}),
+    pathAllowlist,
+    // A child may only use externally scoped access that remains present in
+    // the current provider configuration as well as the parent grant.
+    networkAllowlist: intersectScope(parent.networkAllowlist, current?.networkAllowlist ?? []),
+    connectorScopes: intersectScope(parent.connectorScopes, current?.connectorScopes ?? []),
+    externalTargets: intersectScope(parent.externalTargets, current?.externalTargets ?? []),
+    ...(expiresAt ? { expiresAt } : {})
+  }
+}
+
+function intersectPaths(parent: readonly string[], current: readonly string[]): string[] {
+  const result = new Set<string>()
+  for (const left of parent) for (const right of current) {
+    if (isWithinWorkspace(left, right)) result.add(canonicalWorkspace(right))
+    else if (isWithinWorkspace(right, left)) result.add(canonicalWorkspace(left))
+  }
+  return [...result]
+}
+
+function intersectScope(parent: readonly string[], child: readonly string[]): string[] {
+  if (parent.includes('*')) return [...child]
+  if (child.includes('*')) return [...parent]
+  return parent.filter(value => child.includes(value))
+}
+
+function intersectOptional(parent: readonly string[] | undefined, child: readonly string[] | undefined): string[] | undefined {
+  if (!parent) return child ? [...child] : undefined
+  if (!child) return [...parent]
+  return intersectScope(parent, child)
+}
+
+function earliestExpiry(parent: string | undefined, child: string | undefined): string | undefined {
+  if (!parent) return child
+  if (!child) return parent
+  return Date.parse(parent) <= Date.parse(child) ? parent : child
 }

@@ -20,6 +20,7 @@ import {
   workspaceEntryDeletePayloadSchema,
   workspaceEntryRenamePayloadSchema,
   workspacePreviewPayloadSchema,
+  workspaceMigrationImportPayloadSchema,
   writeExportPayloadSchema,
   writeRichClipboardPayloadSchema,
   writeInlineCompletionPayloadSchema
@@ -30,6 +31,11 @@ import {
 } from '../../shared/design-document'
 
 describe('app-ipc-schemas', () => {
+  it('validates explicit legacy workspace snapshot requests and SHA-256 baselines', () => {
+    expect(workspaceMigrationImportPayloadSchema.safeParse({ sourceId: '.workgpt:default', expectedFingerprint: 'a'.repeat(64), confirmed: true, idempotencyKey: 'migration-1' }).success).toBe(true)
+    expect(workspaceMigrationImportPayloadSchema.safeParse({ sourceId: '.workgpt:default', expectedFingerprint: 'not-a-hash', confirmed: true, idempotencyKey: 'migration-1' }).success).toBe(false)
+    expect(workspaceMigrationImportPayloadSchema.safeParse({ sourceId: '.workgpt:default', expectedFingerprint: 'a'.repeat(64), confirmed: false, idempotencyKey: 'migration-1' }).success).toBe(true)
+  })
   it('bounds native PPTX revision IPC payloads to typed bytes and fixed digests', () => {
     const base = {
       workspaceRoot: '/tmp/workspace',

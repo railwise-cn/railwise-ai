@@ -1782,6 +1782,13 @@ export const workspaceTrustGetPayloadSchema = z.object({
   workspaceRoot: trimmedString(MAX_PATH_LENGTH)
 }).strict()
 
+export const workspaceMigrationImportPayloadSchema = z.object({
+  sourceId: trimmedString(256),
+  expectedFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  confirmed: z.boolean(),
+  idempotencyKey: trimmedString(MAX_ID_LENGTH)
+}).strict()
+
 export const workspaceTrustSetPayloadSchema = z.object({
   workspaceRoot: trimmedString(MAX_PATH_LENGTH),
   level: trustLevelSchema,
