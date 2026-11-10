@@ -76,7 +76,7 @@ export class TaskCoordinator {
       const isTask=intent==='new'
       const capability = isTask ? (this.deps.preflightExternalTask ?? preflightExternalTask)(userText) : null
       if (capability && capability.status !== 'available') {
-        result={kind:'capability_required', capability, ...(task ? { task } : {})}
+        result={kind:'capability_required', capability, message: capability.message, ...(task ? { task } : {})}
         this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
         await this.recordResult(command,result)
         return result

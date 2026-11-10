@@ -66,7 +66,7 @@ describe('task commands before Turn allocation',()=>{
   it('preflights external work before allocating a model turn', async()=>{
     const f=await fixture()
     const result=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'dingtalk',request:{prompt:'处理钉钉里的待办事项'}})
-    expect(result).toMatchObject({kind:'capability_required',capability:{provider:'dingtalk',status:'unsupported'}})
+    expect(result).toMatchObject({kind:'capability_required',message:expect.stringContaining('钉钉连接器'),capability:{provider:'dingtalk',status:'unsupported'}})
     expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
     expect(f.runTurn).not.toHaveBeenCalled()
     expect(f.repository.list()).toHaveLength(0)

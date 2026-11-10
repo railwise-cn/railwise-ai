@@ -43,5 +43,5 @@ export type TaskCommandResult = (
   | { kind:'task_updated';action:'pause'|'cancel';task:TaskRun }
   | { kind: 'task_started' | 'chat_started'; task?: TaskRun; turn: StartTurnResponse }
   | { kind: 'attention_required'; task?: TaskRun; message: string; attentionId?: string }
-  | { kind: 'capability_required'; task?: TaskRun; capability: ExternalTaskCapability }
+  | { kind: 'capability_required'; task?: TaskRun; capability: ExternalTaskCapability; message: string }
 ) & { receipt?: {userMessageItemId:string;resultMessageItemId:string} }
