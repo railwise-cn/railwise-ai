@@ -122,6 +122,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
     return t('connectorHubUnverified')
   }
   const needle = query.trim().toLocaleLowerCase()
+  const larkPackages = entries.filter(entry => larkCatalogIds.has(entry.package.id))
   const natives = nativeConnectors.filter(id => !needle || [id, nativeName(id), nativeSummary(id), id === 'lark' ? 'feishu 飞书 lark' : 'dingtalk 钉钉'].some(value => value.toLocaleLowerCase().includes(needle)))
   const catalog = entries.filter(entry => !larkCatalogIds.has(entry.package.id) && entry.package.id !== 'dingtalk' && (!needle || [name(entry), summary(entry), entry.package.id, entry.package.publisher.name].some(value => value.toLocaleLowerCase().includes(needle))))
   const open = (id: NativeConnector, connect = false): void => { setAutoConnect(connect); setSelected(id) }
@@ -164,7 +165,14 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
           <p className="mt-3 rounded-lg border border-ds-border bg-ds-subtle px-3 py-2 text-[12px] leading-5 text-ds-muted">{t('connectorHubWriteBoundary')}</p>
           <h3 className="mt-5 text-[13px] font-semibold">{t('connectorHubTry')}</h3>
           <ul className="mt-2 list-inside list-disc space-y-2 text-[12px] text-ds-muted"><li>{t(selected === 'lark' ? 'connectorHubLarkExampleRead' : 'connectorHubDingTalkExampleRead')}</li><li>{t(selected === 'lark' ? 'connectorHubLarkExampleWrite' : 'connectorHubDingTalkExampleWrite')}</li></ul>
-          {selected === 'lark' ? <div className="mt-5"><ManagedLarkConnection onChanged={changed} autoConnect={autoConnect} initialState={lark?.state} /></div> : <><p className="mt-4 text-[12px] leading-5 text-ds-muted">{t('connectorHubDingTalkSetup')}</p><div className="mt-5"><ManagedDingTalkConnection onChanged={changed} autoConnect={autoConnect} /></div><details className="mt-6"><summary className="cursor-pointer py-2 text-[12px] font-medium text-ds-muted">{t('connectorHubAdvancedDingTalk')}</summary><DingTalkConnectorSettingsCard /></details></>}
+          {selected === 'lark' ? <>
+            <div className="mt-5"><ManagedLarkConnection onChanged={changed} autoConnect={autoConnect} initialState={lark?.state} /></div>
+            {larkPackages.length ? <details className="mt-6">
+              <summary className="cursor-pointer py-2 text-[12px] font-medium text-ds-muted">{t('connectorHubAdvancedPackages')}</summary>
+              <p className="mt-1 text-[12px] leading-5 text-ds-muted">{t('connectorHubAdvancedPackagesDescription')}</p>
+              <div className="mt-2 space-y-2">{larkPackages.map(entry => <button key={entry.key} type="button" onClick={() => { setSelected(null); onDetails(entry) }} className="flex w-full items-center justify-between gap-3 rounded-md border border-ds-border px-3 py-2 text-left text-[12px] hover:bg-ds-hover"><span>{t('connectorHubManagePackage', { name: name(entry) })}</span><ArrowRight className="h-3.5 w-3.5 shrink-0" /></button>)}</div>
+            </details> : null}
+          </> : <><p className="mt-4 text-[12px] leading-5 text-ds-muted">{t('connectorHubDingTalkSetup')}</p><div className="mt-5"><ManagedDingTalkConnection onChanged={changed} autoConnect={autoConnect} /></div><details className="mt-6"><summary className="cursor-pointer py-2 text-[12px] font-medium text-ds-muted">{t('connectorHubAdvancedDingTalk')}</summary><DingTalkConnectorSettingsCard /></details></>}
         </div>
       </aside>
     </div> : null}

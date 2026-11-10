@@ -336,6 +336,42 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceView unified catalog', () => {
+  it('preserves installed Lark OpenAPI package source, permissions, and update details behind native setup', async () => {
+    const larkPackage: MarketplacePackageV1 = {
+      ...MANAGED_KB,
+      id: 'lark-openapi-mcp',
+      name: 'Lark OpenAPI MCP',
+      permissions: [{ id: 'network.connect', kind: 'network', access: 'connect', default: 'review', reviewRequired: true, description: 'Connect only to the selected Lark service.', resources: ['https://open.feishu.cn'] }],
+      auth: { type: 'tool-managed', provider: 'lark-cli' },
+      installation: { mode: 'system-managed', installedByDefault: false, reinstallable: false }
+    }
+    const installed = { ...INSTALLED, packageId: larkPackage.id, version: 'legacy-0.5.4', source: larkPackage.source, sources: larkPackage.sources }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: [{ key: `${SOURCE.id}:${larkPackage.id}`, sourceId: SOURCE.id, package: larkPackage, conflicted: false }], conflicts: [] })
+    vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([installed])
+    vi.mocked(window.workwise.listPluginUpdateDiagnostics).mockResolvedValue([{ packageId: larkPackage.id, installedVersion: installed.version, catalogVersion: larkPackage.version, state: 'metadata-refresh', message: 'Original metadata review remains visible.' }])
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Connectors').click())
+    await act(async () => iconButton('View Feishu / Lark connection').click())
+    const advanced = [...container.querySelectorAll('summary')].find(item => item.textContent === 'Advanced package management')
+    expect(advanced).toBeDefined()
+    await act(async () => advanced?.click())
+    await act(async () => exactButton('Manage Lark OpenAPI MCP package').click())
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect([...container.querySelectorAll('h2')].some(item => item.textContent === 'Lark OpenAPI MCP')).toBe(true)
+    expect(container.textContent).toContain('legacy-0.5.4 / managed')
+    expect(container.textContent).toContain('Update diagnosis')
+    expect(container.textContent).toContain('Review metadata changes')
+    expect(container.textContent).toContain('Source')
+    expect(container.textContent).toContain('RailWise AI')
+    expect(container.textContent).toContain('Permissions')
+    expect(container.textContent).toContain('https://open.feishu.cn')
+    expect(container.textContent).toContain('Update policy')
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    expect(window.workwise.saveMcpServer).toBeUndefined()
+    expect(window.workwise.openExternal).not.toHaveBeenCalled()
+  })
+
   it('opens task capability deep links on the matching connector and consumes the navigation target', async () => {
     await act(async () => {
       useChatStore.getState().openPlugins(undefined, 'dingtalk')

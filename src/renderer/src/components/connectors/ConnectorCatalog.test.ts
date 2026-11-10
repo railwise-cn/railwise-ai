@@ -100,6 +100,21 @@ describe('ConnectorCatalog', () => {
     expect(props.onTargetOpened).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps original Lark package management reachable from the native connection details', async () => {
+    const entry = { key: 'official:lark-openapi-mcp', sourceId: 'official', conflicted: false, package: { id: 'lark-openapi-mcp', name: 'Lark OpenAPI MCP', summary: 'Original managed package.', publisher: { name: 'Lark' } } } as ComponentProps<typeof ConnectorCatalog>['entries'][number]
+    props.entries = [entry]
+    await render()
+    expect(container.textContent).not.toContain('Lark OpenAPI MCP')
+    await click('View Feishu / Lark connection')
+    const advanced = container.querySelector('details')
+    expect(advanced?.querySelector('summary')?.textContent).toBe('Advanced package management')
+    await act(async () => advanced?.querySelector('summary')?.click())
+    await click('Manage Lark OpenAPI MCP package')
+    expect(props.onDetails).toHaveBeenCalledWith(entry)
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(mocks.lark.mock.calls.every(([value]) => !value.autoConnect)).toBe(true)
+  })
+
   it('keeps generic catalog authorization unverified and delegates to existing package details', async () => {
     const entry = { key: 'test:service', sourceId: 'test', conflicted: false, package: { id: 'service', name: 'Research Service', summary: 'Read research resources.', publisher: { name: 'Example' } } } as ComponentProps<typeof ConnectorCatalog>['entries'][number]
     props.entries = [entry]
