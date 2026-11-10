@@ -26,7 +26,8 @@ const MARKETPLACE_TEXT_FALLBACKS: Record<string, string> = {
   pluginCliLarkTitle: 'Lark CLI',
   pluginSkillScanOversized: 'Skipped Skill “{{skill}}”: {{file}} exceeds the {{limit}} discovery limit. Remove the large file or move it outside the Skill package. Other Skills are unaffected.',
   pluginSkillScanUnsafeLink: 'Skipped Skill “{{skill}}”: {{file}} is a symbolic link or junction, which is not allowed. Replace it with a regular file. Other Skills are unaffected.',
-  pluginErrorOAuthClient: 'This MCP service needs an OAuth client ID before it can connect.'
+  pluginErrorOAuthClient: 'This MCP service needs an OAuth client ID before it can connect.',
+  pluginErrorPackageNetwork: 'This plugin is listed in the catalog, but its package download source is unavailable. Use a mirror or import a local package.'
 }
 
 function isJsonRecord(value: unknown): value is JsonRecord {
@@ -251,6 +252,9 @@ export function friendlyMarketplaceError(message: string, t: (key: string) => st
   }
   if (/OAuth client ID is missing and dynamic registration is unavailable/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorOAuthClient', MARKETPLACE_TEXT_FALLBACKS.pluginErrorOAuthClient)
+  }
+  if (/GitHub archive|codeload\.github|raw\.githubusercontent|api\.github|npm (?:view|install)|pypi\.org|files\.pythonhosted/i.test(normalized)) {
+    return marketplaceText(t, 'pluginErrorPackageNetwork', MARKETPLACE_TEXT_FALLBACKS.pluginErrorPackageNetwork)
   }
   if (/\bfetch failed\b|network|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(normalized)) {
     return marketplaceText(t, 'pluginErrorNetwork', 'The download source could not be reached.')

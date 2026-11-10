@@ -344,6 +344,18 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(container.querySelector('.backdrop-blur-xl')).toBeNull()
   })
 
+  it('keeps the built-in catalog visible when an auxiliary marketplace read fails', async () => {
+    vi.mocked(window.workwise.listCatalogSources).mockRejectedValueOnce(new Error('fetch failed'))
+    vi.mocked(window.workwise.listMcpServers).mockRejectedValueOnce(new Error('fetch failed'))
+
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+
+    expect(container.textContent).toContain('Browser Tools')
+    expect(container.textContent).toContain('Featured catalog remains available offline')
+    expect(container.textContent).not.toContain('The download source could not be reached')
+  })
+
   it('shows managed connectors as installed and managed in details', async () => {
     const managed = container.querySelector('button[aria-label="RailWise Knowledge Base"]')
     if (!(managed instanceof HTMLButtonElement)) throw new Error('Managed connector was not rendered.')
