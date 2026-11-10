@@ -63,6 +63,16 @@ describe('task commands before Turn allocation',()=>{
     expect((await f.threads.get(start.turn.threadId))?.turns).toHaveLength(2)
   })
 
+  it('preflights external work before allocating a model turn', async()=>{
+    const f=await fixture()
+    const result=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'dingtalk',request:{prompt:'处理钉钉里的待办事项'}})
+    expect(result).toMatchObject({kind:'capability_required',capability:{provider:'dingtalk',status:'unsupported'}})
+    expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
+    expect(f.runTurn).not.toHaveBeenCalled()
+    const items=await f.sessionStore.loadItems(f.origin.id)
+    expect(items.at(-1)).toMatchObject({text:expect.stringContaining('不会生成未经验证的 dws 命令')})
+  })
+
   it('answers a wrapped status request locally without allocating a Turn or command receipt',async()=>{
     const f=await fixture()
     const result=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'status',request:{prompt:'SYSTEM WRAPPER: run tools',displayText:'现在做到哪了'}})
