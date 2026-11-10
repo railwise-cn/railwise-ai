@@ -63,13 +63,26 @@ describe('task commands before Turn allocation',()=>{
     expect((await f.threads.get(start.turn.threadId))?.turns).toHaveLength(2)
   })
 
+  it('routes connect requests and how-to questions before model allocation',()=>{
+    expect(classifyTaskInput('连接飞书',false)).toBe('new')
+    expect(classifyTaskInput('如何使用钉钉审批',false)).toBe('chat')
+    expect(classifyTaskInput('帮我处理飞书待办',true)).toBe('new')
+  })
+
   it('preflights external work before allocating a model turn', async()=>{
     const f=await fixture()
     const result=await f.coordinator.command({threadId:f.origin.id,idempotencyKey:'dingtalk',request:{prompt:'处理钉钉里的待办事项'}})
     expect(result).toMatchObject({kind:'capability_required',message:expect.stringContaining('钉钉连接器'),capability:{provider:'dingtalk',status:'unsupported'}})
     expect((await f.threads.get(f.origin.id))?.turns).toHaveLength(0)
     expect(f.runTurn).not.toHaveBeenCalled()
-    expect(f.repository.list()).toHaveLength(0)
+    expect(f.repository.list()).toHaveLength(1)
+    expect(result).toMatchObject({task:{status:'waiting_user',attempts:0}})
+    const waiting=f.repository.list()[0]!
+    expect(waiting.activeTurnId).toBeUndefined()
+    expect(f.repository.attention(`capability_${waiting.id}`)).toMatchObject({status:'pending'})
+    const repeat=await f.coordinator.command({threadId:f.origin.id,taskId:waiting.id,intent:'resume',idempotencyKey:'retry-blocked',request:{prompt:'继续'}})
+    expect(repeat.kind).toBe('capability_required')
+    expect(f.runTurn).not.toHaveBeenCalled()
     const items=await f.sessionStore.loadItems(f.origin.id)
     expect(items.at(-1)).toMatchObject({text:expect.stringContaining('不会生成未经验证的 dws 命令')})
   })

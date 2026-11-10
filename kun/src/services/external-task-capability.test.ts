@@ -5,7 +5,7 @@ describe('external task capability preflight', () => {
   it('detects DingTalk and does not confuse it with the supported Lark integration', () => {
     expect(detectExternalTaskProvider('处理钉钉里的待办事项')).toBe('dingtalk')
     expect(preflightExternalTask('处理钉钉里的待办事项')).toMatchObject({
-      provider: 'dingtalk', status: 'unsupported', action: { kind: 'install' }
+      provider: 'dingtalk', status: 'unsupported', action: { kind: 'connect' }
     })
   })
 
@@ -20,8 +20,15 @@ describe('external task capability preflight', () => {
     expect(detectExternalTaskProvider('配置钉钉')).toBe('dingtalk')
   })
 
+  it('uses actual managed CLI state instead of assuming authentication',()=>{
+    expect(preflightExternalTask('处理飞书待办',{lark:{enabled:true,authState:'not_installed'}})?.status).toBe('not_installed')
+    expect(preflightExternalTask('处理飞书待办',{lark:{enabled:true,authState:'needs_login',executablePath:'/test/lark'}})?.status).toBe('needs_authorization')
+    expect(preflightExternalTask('处理飞书待办',{lark:{enabled:true,authState:'installed',executablePath:'/test/lark'}})?.status).toBe('available')
+  })
+
   it('leaves ordinary discussion alone', () => {
     expect(detectExternalTaskProvider('介绍一下飞书和钉钉的区别')).toBeNull()
+    expect(preflightExternalTask('如何使用钉钉审批')).toBeNull()
     expect(defaultExternalTaskCapability('dingtalk').message).toContain('不会生成未经验证的 dws 命令')
   })
 })

@@ -4,6 +4,7 @@ import { RuntimeErrorSeverity } from './errors.js'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import { DshUiBlock } from './dsh-ui.js'
 import { UiActionAudit } from './ui-actions.js'
+import { CapabilityPreflightSchema } from './harness.js'
 
 /**
  * Conversation items returned as part of a thread or turn.
@@ -58,6 +59,7 @@ export type UserTurnItem = z.infer<typeof UserTurnItem>
 export const AssistantTextTurnItem = TurnItemBase.extend({
   kind: z.literal('assistant_text'),
   text: z.string(),
+  capabilityCard: z.object({ threadId: z.string(), taskId: z.string(), attentionId: z.string().optional(), prompt: z.string(), capability: CapabilityPreflightSchema }).optional(),
   uiBlocks: z.array(DshUiBlock).max(20).optional()
 })
 export type AssistantTextTurnItem = z.infer<typeof AssistantTextTurnItem>

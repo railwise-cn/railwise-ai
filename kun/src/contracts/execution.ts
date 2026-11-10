@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { StartTurnRequest } from './turns.js'
 import type { TaskInput, TaskRun } from './tasks.js'
 import type { StartTurnResponse } from './turns.js'
-import type { ExternalTaskCapability } from '../services/external-task-capability.js'
+import type { CapabilityPreflight } from './harness.js'
 
 export const ProcessIdentitySchema = z.object({ pid: z.number().int().positive(), fingerprint: z.string().min(1) })
 export type ProcessIdentity = z.infer<typeof ProcessIdentitySchema>
@@ -43,5 +43,5 @@ export type TaskCommandResult = (
   | { kind:'task_updated';action:'pause'|'cancel';task:TaskRun }
   | { kind: 'task_started' | 'chat_started'; task?: TaskRun; turn: StartTurnResponse }
   | { kind: 'attention_required'; task?: TaskRun; message: string; attentionId?: string }
-  | { kind: 'capability_required'; task?: TaskRun; capability: ExternalTaskCapability; message: string }
+  | { kind: 'capability_required'; task?: TaskRun; attentionId?: string; capability: CapabilityPreflight; message: string }
 ) & { receipt?: {userMessageItemId:string;resultMessageItemId:string} }

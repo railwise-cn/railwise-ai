@@ -4,15 +4,16 @@ import type { TaskController } from './task-controller.js'
 import type { TaskRunRepository } from './task-run-repository.js'
 import type { ThreadService } from './thread-service.js'
 import type { TurnService } from './turn-service.js'
+import { preflightExternalTask, type ExternalTaskCapability } from './external-task-capability.js'
 
 export type TaskControlAction = 'resume' | 'retry' | 'pause' | 'cancel'
 export type TaskControlRequest = { expectedRevision:number; idempotencyKey:string; model?:string; reason?:string }
-export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse }
+export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capability?:ExternalTaskCapability }
 
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;nowIso():string}) {}
+  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?(text:string):ExternalTaskCapability|null|Promise<ExternalTaskCapability|null>;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
@@ -37,6 +38,14 @@ export class TaskControlService {
       if(current.revision!==data.expectedRevision)throw Object.assign(new Error('task revision conflict'),{code:'stale_request'})
       if((action==='resume'||action==='retry')&&await this.deps.isEngineeringTask?.(current))throw Object.assign(new Error('engineering_plan_typed_resume_required: continue or replan from the approved engineering plan'),{code:'invalid_state'})
       if(action==='retry'&&!['failed','cancelled'].includes(current.status))throw Object.assign(new Error('retry is only valid for failed or cancelled tasks'),{code:'invalid_state'})
+      if(action==='resume'||action==='retry') {
+        const capability=await (this.deps.preflightExternalTask ?? preflightExternalTask)(current.goal)
+        if(capability&&capability.status!=='available') {
+          // A blocked recheck is durable but does not allocate a Turn or mark an
+          // operation as executed. A fresh command can recheck after connection.
+          return {task:current,capability}
+        }
+      }
       repository.beginOperation({ownerId:taskId,idempotencyKey:data.idempotencyKey,kind:action,request:data,nowIso:nowIso()})
     }
     let preparedResume:{previous:TaskRun;revision:number}|undefined
@@ -73,6 +82,8 @@ export class TaskControlService {
       if(!next)throw new Error('task continuation was not created')
       if(action==='retry'&&next.id!==current.id&&!next.retryOfTaskId)next=repository.update(next.id,next.revision,task=>({...task,retryOfTaskId:current!.id,rootTaskId:current!.rootTaskId ?? current!.id}),{key:`retry-of:${current.id}`,kind:'task_retried',payload:{previousTaskId:current.id}})
       const result={task:next,turn:started}
+      const attention=repository.attention(`capability_${current.id}`)
+      if(attention?.status==='pending')repository.putAttention({...attention,status:'answered',revision:attention.revision+1,updatedAt:nowIso()})
       repository.finishOperation(taskId,data.idempotencyKey,{status:'succeeded',result},nowIso())
       if(!oldTurn)void this.deps.runTurn(started.threadId,started.turnId)
       return result

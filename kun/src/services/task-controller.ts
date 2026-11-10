@@ -1,3 +1,5 @@
+import { externalTaskIntent } from './external-task-capability.js'
+import { verifiedEffectReceipts, externalOperationForTool, externalTarget } from './external-effect-evidence.js'
 import { randomUUID as executionUUID } from 'node:crypto'
 import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
 import { processIdentity, inspectProcess } from './process-identity.js'
@@ -141,8 +143,27 @@ export class TaskController {
     const legacyUnexecutedReply = active?.status === 'queued' && active.attempts === 0 && priorTurn?.status === 'completed'
     if (active && intent !== 'new' && !consultation && !legacyUnexecutedReply) throw Object.assign(new Error('active task requires explicit supplement or new-task routing'), { code: 'task_intent_required' })
 
+    return this.createTask(input)
+  }
+
+  /** Save a blocked goal without allocating a fictitious Turn or execution attempt. */
+  createWaitingTask(input: { id: string; thread: ThreadRecord; request: StartTurnRequest; reason: string }): TaskRun {
+    const existing = this.repository.get(input.id)
+    if (existing) return existing
+    return this.repository.transact(() => {
+      const task = this.createTask(input)
+      return this.repository.update(task.id, task.revision, current => ({
+        ...current, status: 'waiting_user', waitingReason: input.reason,
+        nodes: current.nodes.map(node => ({ ...node, status: 'blocked' as const }))
+      }), { key: 'capability-blocked', kind: 'capability_required', payload: { reason: input.reason } })
+    })
+  }
+
+  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string }): TaskRun {
+    const now = this.nowIso()
+    const consultation = input.thread.domain === 'engineering' && !input.engineeringExecution
     const acceptance = acceptanceForPrompt(consultation ? 'Answer the Survey question or propose a plan for review.' : input.request.prompt)
-    const id = `task_${randomUUID()}`
+    const id = input.id ?? `task_${randomUUID()}`
     const nodes = nodeBlueprint(id, acceptance)
     const profile = input.thread.agentProfile
     const selectedModel = input.request.model ?? profile?.model ?? input.thread.model
@@ -350,16 +371,8 @@ export class TaskController {
     }
 
     if (task.acceptance.kind === 'effect') {
-      const receipts = this.repository.operations(task.id, 'tool')
-      const succeeded = receipts.some((receipt) => {
-        if (receipt.status !== 'succeeded') return false
-        const toolName = typeof receipt.request?.toolName === 'string' ? receipt.request.toolName : ''
-        if (!toolCanProveExternalEffect(toolName)) return false
-        const result = receipt.result
-        if (!result || typeof result !== 'object') return false
-        const item = (result as { item?: { isError?: unknown } }).item
-        return item?.isError !== true
-      })
+      const evidence = verifiedEffectReceipts(task, this.repository.operations(task.id, 'tool'))
+      const succeeded = evidence.length > 0
       if (!succeeded) {
         return this.waitForUser(
           task,
@@ -397,6 +410,7 @@ export class TaskController {
       waitingReason: undefined,
       stalledReason: undefined,
       finalResponse,
+      ...(task.acceptance.kind==='effect'?{resultEvidence:verifiedEffectReceipts(task,this.repository.operations(task.id,'tool'))}:{}),
       artifacts,
       noProgressCount: 0,
       nodes: current.nodes.map((node) => ({
@@ -567,7 +581,7 @@ export class TaskController {
       const key = `tool:${turnId}:${call.callId}`
       // Arguments can contain credentials or external message bodies. Only the
       // canonical digest belongs in the durable operation ledger.
-      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, argumentsHash: operationFingerprint(call.arguments) }, nowIso: this.nowIso() })
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, ...externalOperationForTool(call.toolName), target: externalTarget(call.arguments), turnId, argumentsHash: operationFingerprint(call.arguments) }, nowIso: this.nowIso() })
       if (!prepared.created) {
         if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
         if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })
@@ -582,7 +596,7 @@ export class TaskController {
     // An already-dispatched result is immutable evidence even after lease loss.
     const prior = this.repository.operation(token.taskId, key)
     if (!prior || prior.status === 'succeeded') return
-    this.repository.finishOperation(token.taskId, key, { status: result ? 'succeeded' : 'outcome_unknown', ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {}) }, this.nowIso())
+    this.repository.finishOperation(token.taskId, key, { status: !result ? 'outcome_unknown' : result.item.kind==='tool_result' && result.item.isError ? ((result.item.output as {status?:string}|undefined)?.status==='outcome_unknown'?'outcome_unknown':'failed') : 'succeeded', ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {}) }, this.nowIso())
   }
 
   beginWork(turnId: string, id: string, kind: string): () => void {
@@ -1122,6 +1136,7 @@ function shouldContinueActiveTask(prompt: string): boolean {
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
   const effect = !files && promptRequiresExternalEffect(prompt)
+  const intent = effect ? externalTaskIntent(prompt) : null
   const requiredFormats = requiredFileExtensionsForPrompt(prompt)
   return {
     kind: files ? 'files' : effect ? 'effect' : 'answer',
@@ -1129,7 +1144,8 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
     requireFinalResponse: true,
-    requireActionableArtifactCard: files
+    requireActionableArtifactCard: files,
+    ...(intent?.provider?{effect:{provider:intent.provider,operation:intent.operation ?? (intent.kind==='connect_provider'?'connect':'process'),target:intent.target,requiredScopes:[],requiresConfirmation:intent.mutation,successStatus:['succeeded'],verification:'provider_readback' as const}}:{})
   }
 }
 

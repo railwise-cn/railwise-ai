@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { WorkspaceReferenceSchema } from './workspace-references.js'
 import type { ContextBundle, HandoffPacket } from './task-context.js'
+import { ResultEvidenceSchema } from './harness.js'
 
 export const TaskRunStatusSchema = z.enum([
   'queued',
@@ -46,6 +47,9 @@ export const TaskAcceptanceSchema = z.object({
   minimumArtifacts: z.number().int().nonnegative().optional(),
   requireFinalResponse: z.boolean(),
   requireActionableArtifactCard: z.boolean()
+  ,effect: z.object({ provider: z.string(), operation: z.string(), target: z.string().optional(),
+    requiredScopes: z.array(z.string()).default([]), requiresConfirmation: z.boolean(), successStatus: z.array(z.string()).default(['succeeded']),
+    verification: z.literal('provider_readback') }).optional()
 })
 export type TaskAcceptance = z.infer<typeof TaskAcceptanceSchema>
 
@@ -127,6 +131,8 @@ export const OperationReceiptSchema = z.object({
   status: z.enum(['prepared', 'running', 'succeeded', 'failed', 'outcome_unknown']),
   request: z.record(z.string(), z.unknown()).optional(), result: z.unknown().optional(),
   createdAt: z.string(), updatedAt: z.string(), error: z.string().optional()
+  ,taskId: z.string().optional(), turnId: z.string().optional(), provider: z.string().optional(), toolName: z.string().optional(),
+  remoteOperationId: z.string().optional(), target: z.string().optional(), evidence: ResultEvidenceSchema.optional()
 })
 export type OperationReceipt = z.infer<typeof OperationReceiptSchema>
 
@@ -182,6 +188,7 @@ export const TaskRunSchema = z.object({
   nodes: z.array(TaskNodeSchema),
   artifacts: z.array(TaskArtifactSchema),
   finalResponse: z.string().optional(),
+  resultEvidence: z.array(ResultEvidenceSchema).optional(),
   stalledReason: z.string().optional(),
   waitingReason: z.string().optional(),
   createdAt: z.string().min(1),

@@ -371,7 +371,7 @@ describe('TaskController reliability boundaries', () => {
   })
 
   it('completes an external-effect task only after a successful effect receipt', async () => {
-    const { repository, sessionStore, controller, task, thread } = await fixture('连接钉钉并自动审批我的待办事项。')
+    const { repository, sessionStore, controller, task, thread } = await fixture('同意钉钉审批。')
     await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
       id: 'item_effect_done',
       threadId: task.threadId,
@@ -383,7 +383,7 @@ describe('TaskController reliability boundaries', () => {
     controller.beginAttempt(task.threadId, 'turn_reliability')
     const operation = controller.beginToolOperation('turn_reliability', {
       callId: 'call_dingtalk_approval',
-      toolName: 'dingtalk_approval',
+      toolName: 'dingtalk_approve',
       arguments: { taskId: 'synthetic-task' }
     })!
     controller.finishToolOperation(operation.token, operation.key, {
@@ -393,8 +393,8 @@ describe('TaskController reliability boundaries', () => {
         threadId: thread.id,
         turnId: 'turn_reliability',
         callId: 'call_dingtalk_approval',
-        toolName: 'dingtalk_approval',
-        output: { status: 'approved', operationId: 'synthetic-approval-1' }
+        toolName: 'dingtalk_approve',
+        output: { ok:true,status:'succeeded',evidence:{kind:'external_operation',provider:'dingtalk',operation:'approve',target:'synthetic-task',verified:true,verifiedAt:'2026-07-18T00:00:00Z',resultHash:'synthetic-hash',status:'approved',remoteOperationId:'synthetic-approval-1'} }
       })
     })
 
