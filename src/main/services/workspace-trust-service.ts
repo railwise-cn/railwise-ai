@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { SandboxMode } from '../../shared/app-settings'
 import type { WorkspaceTrustLevel, WorkspaceTrustV1 } from '../../shared/agent-workbench'
-import { atomicWriteFile, readRecoveredFile } from './durable-file'
+import { atomicWriteFile, readRecoveredFile, runSerialized } from './durable-file'
 import { canonicalizeContainmentRoot } from './canonical-containment'
 
 const TRUST_ORDER: WorkspaceTrustLevel[] = [
@@ -18,6 +19,7 @@ type TrustManifestV1 = {
   revision: number
   workspaces: WorkspaceTrustV1[]
   mutationResults: Record<string, WorkspaceTrustV1>
+  mutationFingerprints?: Record<string, string>
 }
 
 export type SetWorkspaceTrustRequest = {
@@ -69,6 +71,7 @@ function normalizeManifest(value: unknown): TrustManifestV1 {
     workspaces: raw.workspaces.filter((entry): entry is WorkspaceTrustV1 =>
       Boolean(entry && typeof entry.canonicalRoot === 'string' && TRUST_ORDER.includes(entry.level))
     ),
+    mutationFingerprints: raw.mutationFingerprints && typeof raw.mutationFingerprints === 'object' ? raw.mutationFingerprints : {},
     mutationResults: raw.mutationResults && typeof raw.mutationResults === 'object'
       ? Object.fromEntries(Object.entries(raw.mutationResults).filter(([, entry]) => {
           const candidate = entry as Partial<WorkspaceTrustV1> | undefined
@@ -110,10 +113,21 @@ export class WorkspaceTrustService {
   }
 
   async set(request: SetWorkspaceTrustRequest): Promise<WorkspaceTrustV1> {
+    return runSerialized(`workspace-trust:${this.manifestPath}`, () => this.setSerialized(request))
+  }
+
+  private async setSerialized(request: SetWorkspaceTrustRequest): Promise<WorkspaceTrustV1> {
     const canonicalRoot = await canonicalizeContainmentRoot(request.workspaceRoot)
     const manifest = await this.read()
+    const fingerprint = createHash('sha256').update(JSON.stringify({ canonicalRoot, level: request.level, expectedRevision: request.expectedRevision, confirmed: request.confirmed, source: request.source ?? 'user' })).digest('hex')
     if (request.idempotencyKey && manifest.mutationResults[request.idempotencyKey]) {
-      return manifest.mutationResults[request.idempotencyKey]!
+      const prior = manifest.mutationResults[request.idempotencyKey]!
+      const stored = manifest.mutationFingerprints?.[request.idempotencyKey]
+      // Old receipts had no fingerprint. Only replay an unambiguous matching
+      // result; never let a key for one workspace authorize a different one.
+      const legacyMatch = !stored && prior.canonicalRoot === canonicalRoot && prior.level === request.level && prior.source === (request.source ?? 'user') && prior.revision === request.expectedRevision + 1 && (!prior.confirmedAt || request.confirmed)
+      if (stored !== fingerprint && !legacyMatch) throw Object.assign(new Error('Workspace trust idempotency key conflicts with a different request.'), { code: 'idempotency_conflict' })
+      return prior
     }
     const index = manifest.workspaces.findIndex((entry) => entry.canonicalRoot === canonicalRoot)
     const current = index >= 0
@@ -152,7 +166,8 @@ export class WorkspaceTrustService {
       ...manifest,
       revision: manifest.revision + 1,
       workspaces,
-      mutationResults
+      mutationResults,
+      mutationFingerprints: request.idempotencyKey ? Object.fromEntries(Object.keys(mutationResults).map(key => [key, key === request.idempotencyKey ? fingerprint : manifest.mutationFingerprints?.[key]]).filter(([, value]) => typeof value === 'string')) : manifest.mutationFingerprints
     }, null, 2)}\n`)
     return next
   }
