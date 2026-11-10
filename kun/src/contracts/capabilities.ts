@@ -204,6 +204,17 @@ export const ImageGenCapabilityConfig = CapabilityToggleConfig.extend({
 }).strict()
 export type ImageGenCapabilityConfig = z.infer<typeof ImageGenCapabilityConfig>
 
+export const LarkAuthState = z.enum(['not_installed', 'needs_login', 'installed', 'error'])
+export type LarkAuthState = z.infer<typeof LarkAuthState>
+
+export const LarkCapabilityConfig = CapabilityToggleConfig.extend({
+  executablePath: z.string().min(1).optional(),
+  authState: LarkAuthState.default('not_installed'),
+  scopes: z.array(z.string().min(1)).default([]),
+  brand: z.enum(['feishu', 'lark']).optional()
+}).strict()
+export type LarkCapabilityConfig = z.infer<typeof LarkCapabilityConfig>
+
 export const KunCapabilitiesConfig = z
   .object({
     mcp: McpCapabilityConfig.default(() => McpCapabilityConfig.parse({})),
@@ -212,7 +223,8 @@ export const KunCapabilitiesConfig = z
     subagents: SubagentsCapabilityConfig.default(() => SubagentsCapabilityConfig.parse({})),
     attachments: AttachmentsCapabilityConfig.default(() => AttachmentsCapabilityConfig.parse({})),
     memory: MemoryCapabilityConfig.default(() => MemoryCapabilityConfig.parse({})),
-    imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({}))
+    imageGen: ImageGenCapabilityConfig.default(() => ImageGenCapabilityConfig.parse({})),
+    lark: LarkCapabilityConfig.default(() => LarkCapabilityConfig.parse({}))
   })
   .strict()
 export type KunCapabilitiesConfig = z.infer<typeof KunCapabilitiesConfig>
@@ -275,6 +287,7 @@ export const RuntimeCapabilityManifest = z
     }).strict(),
     visionEvidence: RuntimeCapabilityState.optional(),
     workspaces: z.object({ flow: RuntimeCapabilityState, design: RuntimeCapabilityState, schedule: RuntimeCapabilityState }).optional(),
+    lark: RuntimeCapabilityState.extend({ authState: LarkAuthState }).optional(),
     uiActions: RuntimeCapabilityState
   })
   .strict()
@@ -325,6 +338,11 @@ export function buildRuntimeCapabilityManifest(input: {
     enabled?: boolean
     available?: boolean
     reason?: string
+  }
+  lark?: {
+    available?: boolean
+    reason?: string
+    authState?: LarkAuthState
   }
 }): RuntimeCapabilityManifest {
   const config = KunCapabilitiesConfig.parse(input.config ?? {})
@@ -430,6 +448,15 @@ export function buildRuntimeCapabilityManifest(input: {
       input.visionEvidence?.available === true,
       input.visionEvidence?.reason ?? 'vision evidence analyzer is not configured'
     ),
+    lark: {
+      ...providerCapabilityState(
+        config.lark.enabled,
+        'Lark integration is disabled by config',
+        input.lark?.available === true,
+        input.lark?.reason ?? 'Lark CLI is not installed or authorised'
+      ),
+      authState: input.lark?.authState ?? config.lark.authState
+    },
     uiActions: available()
   })
 }

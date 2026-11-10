@@ -108,6 +108,7 @@ import { EngineeringAiOrchestrator } from '../engineering/engineering-ai-orchest
 import { buildEngineeringConversationTools } from '../adapters/tool/engineering-conversation-tools.js'
 import { EngineeringAiRepository } from '../engineering/engineering-ai-repository.js'
 import { buildRailwiseToolProviders } from '../adapters/tool/railwise-tool-provider.js'
+import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provider.js'
 import { SurveyService } from '../engineering/survey-service.js'
 import { SurveyAdvancedTrialsWorkspaceService } from '../engineering/survey-advanced-trials-workspace.js'
 import { SurveySamplingWorkspaceService } from '../engineering/survey-sampling-workspace.js'
@@ -527,6 +528,7 @@ export async function createKunServeRuntime(
     beforeMutation: (input: { absolutePath: string; relativePath: string; workspaceRoot: string; threadId: string }) =>
       gitCheckpointCoordinator.beforeMutation(input)
   })
+  const larkProvider = buildLarkCliToolProvider(options.capabilities?.lark)
   const baseToolProviders = [
     {
       id: 'builtin',
@@ -544,6 +546,7 @@ export async function createKunServeRuntime(
     ...imageGenProviders.providers,
     ...pptMasterProviders.providers,
     ...designProviders.providers,
+    ...(larkProvider ? [larkProvider] : []),
     ...buildRailwiseToolProviders(engineeringService, surveyService, () => engineeringAi)
   ]
   const childRegistry = new CapabilityRegistry(baseToolProviders)
@@ -637,6 +640,13 @@ export async function createKunServeRuntime(
       enabled: visionEvidenceRuntime.enabled,
       available: Boolean(visionEvidence),
       reason: visionEvidenceRuntime.reason
+    },
+    lark: {
+      available: Boolean(larkProvider),
+      authState: options.capabilities?.lark.authState,
+      reason: larkProvider ? undefined : options.capabilities?.lark.authState === 'needs_login'
+        ? 'Lark CLI requires authorization.'
+        : 'Lark CLI is not installed or unavailable.'
     }
   })
   const registry = new CapabilityRegistry([

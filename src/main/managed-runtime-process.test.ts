@@ -392,6 +392,32 @@ describe('syncManagedRuntimeConfig', () => {
     }
   })
 
+  it('passes the diagnosed Lark CLI state into the Runtime capability config', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const module = await import('./managed-runtime-process')
+
+    await module.syncManagedRuntimeConfig(tempRoot, defaultManagedRuntimeSettings(), {
+      larkCli: { state: 'installed', executablePath: '/managed/lark-cli', brand: 'feishu', scopes: ['task:task:read'] }
+    })
+
+    const parsed = JSON.parse(readFileSync(join(tempRoot, 'config.json'), 'utf8')) as any
+    expect(parsed.capabilities.lark).toMatchObject({
+      enabled: true,
+      authState: 'installed',
+      executablePath: '/managed/lark-cli'
+    })
+  })
+
+  it('clears stale Lark paths/scopes and preserves intentional disable during refresh', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const path = join(tempRoot, 'config.json')
+    writeFileSync(path, JSON.stringify({ keep: 'existing', capabilities: { lark: { enabled: false, executablePath: '/old', authState: 'installed', scopes: ['old'], brand: 'lark' } } }))
+    const module = await import('./managed-runtime-process')
+    await module.syncManagedLarkCapability(tempRoot, { state: 'not_installed' })
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ keep: 'existing', capabilities: { lark: { enabled: false, authState: 'not_installed', scopes: [] } } })
+    expect(JSON.parse(readFileSync(path, 'utf8')).capabilities.lark).not.toHaveProperty('executablePath')
+  })
+
   it('creates GUI-managed config with attachments enabled for image paste/upload', async () => {
     if (!tempRoot) throw new Error('temp root not initialized')
     const configPath = join(tempRoot, 'config.json')

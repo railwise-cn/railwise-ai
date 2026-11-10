@@ -66,7 +66,7 @@ import {
   runtimeAuthHeaders,
   runtimeRequestViaHost
 } from './runtime/managed-runtime-adapter'
-import { getManagedRuntimeActualPort } from './managed-runtime-process'
+import { getManagedRuntimeActualPort, resolveManagedRuntimeDataDir, syncManagedLarkCapability } from './managed-runtime-process'
 import { waitForRuntimeTurnsIdle } from './runtime/managed-runtime-idle'
 import { configureLogger, logError, logWarn, pruneOnStartup } from './logger'
 import { createClawRuntime, type ClawRuntime } from './claw-runtime'
@@ -1523,6 +1523,17 @@ app.whenReady().then(async () => {
       candidateRuntimePaths
         ? join(candidateRuntimePaths.workwiseHome, 'mcp.json')
         : resolveRuntimeMcpJsonPath(),
+    refreshManagedCapabilities: async (status) => {
+      if (status.id !== 'lark-cli') return
+      const settings = await store.load()
+      const runtime = resolveManagedRuntimeSettings(settings)
+      const dataDir = candidateRuntimePaths
+        ? join(candidateRuntimePaths.workwiseHome, 'runtime')
+        : resolveManagedRuntimeDataDir(runtime)
+      await syncManagedLarkCapability(dataDir, status)
+      const response = await runtimeRequest(settings, '/v1/connectors/lark/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('Runtime connector refresh failed')
+    },
     onRuntimeMcpConfigWritten: async () => {
       const settings = await store.load()
       queueRuntimeMcpConfigApply(settings)

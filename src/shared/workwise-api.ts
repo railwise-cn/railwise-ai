@@ -234,9 +234,14 @@ export type ManagedToolStatus = {
   executablePath?: string
   message?: string
   externalUrl?: string
+  scopes?: string[]
+  brand?: 'feishu' | 'lark'
 }
 export type ManagedToolResult =
   | { ok: true; status: ManagedToolStatus }
+  | { ok: false; message: string }
+export type ManagedLarkLoginResult =
+  | { ok: true; verificationUrl: string; userCode?: string; expiresAt: string }
   | { ok: false; message: string }
 export type ManagedToolListResult =
   | { ok: true; tools: ManagedToolStatus[] }
@@ -494,6 +499,8 @@ export type WorkWiseApi = {
   installManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   updateManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   diagnoseManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
+  beginManagedLarkLogin: () => Promise<ManagedLarkLoginResult>
+  completeManagedLarkLogin: () => Promise<ManagedToolResult>
   removeManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   listAgentProfiles: (workspaceRoot?: string) => Promise<AgentProfileSnapshotV1>
   saveAgentProfile: (request: {

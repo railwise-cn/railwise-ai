@@ -23,6 +23,8 @@ vi.mock('./system-network', () => ({
 
 import {
   _internals,
+  beginManagedLarkLogin,
+  completeManagedLarkLogin,
   diagnoseManagedTool,
   installManagedTool,
   listManagedTools,
@@ -119,7 +121,7 @@ beforeEach(() => {
   _internals.clearReleaseCache()
   _internals.setTargetPlatformForTests({ platform: 'darwin', arch: 'arm64' })
   _internals.setToolRunnerForTests(async (_path, args) => {
-    if (args.join(' ') === 'auth status') return { ok: false, output: 'not logged in' }
+    if (args[0] === 'auth' && args[1] === 'status') return { ok: false, output: 'not logged in' }
     return { ok: true, output: '1.2.3' }
   })
   systemFetchMock.mockReset()
@@ -129,6 +131,7 @@ afterEach(() => {
   _internals.setToolRunnerForTests()
   _internals.setTargetPlatformForTests()
   _internals.clearReleaseCache()
+  _internals.clearPendingLarkLogin()
   delete process.env.WORKWISE_TOOLS_ROOT
   if (originalHome === undefined) delete process.env.HOME
   else process.env.HOME = originalHome
@@ -136,6 +139,35 @@ afterEach(() => {
 })
 
 describe('managed-tool-service', () => {
+  it('does not mistake an exit-zero bot-only auth status for user authorization', () => {
+    expect(_internals.parseLarkIdentity(JSON.stringify({ identity: 'bot', brand: 'feishu', identities: { user: { available: false } } }))).toEqual({ available: false, scopes: [], brand: 'feishu' })
+    expect(_internals.parseLarkIdentity(JSON.stringify({ identity: 'user', brand: 'lark', identities: { user: { available: true, scope: 'task:task:read approval:task:read' } } }))).toEqual({ available: true, scopes: ['task:task:read', 'approval:task:read'], brand: 'lark' })
+    expect(_internals.parseLarkIdentity('not json').available).toBe(false)
+  })
+
+  it('keeps device codes in main process and completes only the current official flow', async () => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    const calls: string[][] = []
+    let connected = false
+    _internals.setToolRunnerForTests(async (_path, args) => {
+      calls.push(args)
+      if (args[0] === '--version') return { ok: true, output: '1.2.3' }
+      if (args[1] === 'status') return { ok: true, output: JSON.stringify({ identity: connected ? 'user' : 'none', brand: 'feishu', identities: { user: { available: connected, scope: 'task:task:read' } } }) }
+      if (args.includes('--no-wait')) return { ok: true, output: JSON.stringify({ device_code: 'private-code', verification_url: 'https://accounts.feishu.cn/oauth/device?user_code=test', expires_in: 600 }) }
+      connected = true
+      return { ok: true, output: '{}' }
+    })
+    const begin = await beginManagedLarkLogin()
+    expect(begin).toMatchObject({ ok: true, verificationUrl: 'https://accounts.feishu.cn/oauth/device?user_code=test' })
+    expect(JSON.stringify(begin)).not.toContain('private-code')
+    expect(await completeManagedLarkLogin()).toMatchObject({ ok: true, status: { state: 'installed', scopes: ['task:task:read'] } })
+    expect(calls.some(args => args.includes('--device-code') && args.includes('private-code'))).toBe(true)
+    expect(await completeManagedLarkLogin()).toMatchObject({ ok: false })
+  })
+
+
   it('selects the current platform asset with an explicit architecture name', () => {
     expect(_internals.platformAsset('officecli', '1.2.3', 'darwin', 'arm64')).toBe('officecli-mac-arm64')
     expect(_internals.platformAsset('officecli', '1.2.3', 'win32', 'x64')).toBe('officecli-win-x64.exe')

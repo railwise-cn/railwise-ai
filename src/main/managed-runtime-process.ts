@@ -29,6 +29,7 @@ import {
 import {
   AttachmentsCapabilityConfig,
   ImageGenCapabilityConfig,
+  LarkCapabilityConfig,
   McpCapabilityConfig,
   McpServerConfig,
   MemoryCapabilityConfig,
@@ -36,6 +37,7 @@ import {
   SubagentsCapabilityConfig,
   WebCapabilityConfig
 } from '../../kun/src/contracts/capabilities.js'
+import { diagnoseManagedTool } from './services/managed-tool-service'
 import {
   buildClawScheduleMcpArgs,
   GUI_SCHEDULE_MCP_SERVER_NAME,
@@ -449,10 +451,26 @@ export async function startManagedRuntimeChild(
     legacyPath: mcpConfigPath,
     credentialRoot: join(workwiseHome, 'credentials', 'mcp')
   } : {}).runtimeSnapshot()
+  const larkDiagnosis = await diagnoseManagedTool('lark-cli')
+  const larkCli = larkDiagnosis.ok
+    ? {
+        state: larkDiagnosis.status.state === 'installed'
+          ? 'installed' as const
+          : larkDiagnosis.status.state === 'needs_login'
+            ? 'needs_login' as const
+            : larkDiagnosis.status.state === 'error'
+              ? 'error' as const
+              : 'not_installed' as const,
+        ...(larkDiagnosis.status.executablePath ? { executablePath: larkDiagnosis.status.executablePath } : {}),
+        scopes: larkDiagnosis.status.scopes ?? [],
+        ...(larkDiagnosis.status.brand ? { brand: larkDiagnosis.status.brand } : {})
+      }
+    : { state: 'error' as const }
   await syncManagedRuntimeConfig(dataDir, runtime, {
     mcpConfigPath,
     mcpV2Servers: mcpV2.servers,
     skillRoots: options.skillRoots,
+    larkCli,
     scheduleMcp: {
       settings,
       launch: {
@@ -607,6 +625,22 @@ async function ensureBundledSpecialistSkillsForRuntime(
   }
 }
 
+/** Update only main-process diagnosed connector state without restarting active work. */
+export async function syncManagedLarkCapability(dataDir: string, status: { state: string; executablePath?: string; scopes?: string[]; brand?: 'feishu' | 'lark' }): Promise<void> {
+  const configPath = join(dataDir, 'config.json')
+  const existing = (await readJsonObjectIfExists(configPath)) ?? {}
+  const capabilities = objectValue(existing.capabilities)
+  const lark = objectValue(capabilities.lark)
+  await mkdir(dataDir, { recursive: true })
+  await durableWriteFile(configPath, `${JSON.stringify({ ...existing, capabilities: { ...capabilities, lark: {
+    enabled: lark.enabled === false ? false : true,
+    authState: ['installed', 'needs_login', 'error'].includes(status.state) ? status.state : 'not_installed',
+    ...(status.executablePath ? { executablePath: status.executablePath } : {}),
+    scopes: status.state === 'installed' ? status.scopes ?? [] : [],
+    ...(status.brand ? { brand: status.brand } : {})
+  } } }, null, 2)}\n`)
+}
+
 export async function syncManagedRuntimeConfig(
   dataDir: string,
   runtime: Pick<
@@ -621,6 +655,12 @@ export async function syncManagedRuntimeConfig(
     mcpConfigPath?: string
     mcpV2Servers?: Record<string, Record<string, unknown>>
     skillRoots?: string[]
+    larkCli?: {
+      state: 'not_installed' | 'needs_login' | 'installed' | 'error'
+      executablePath?: string
+      scopes?: string[]
+      brand?: 'feishu' | 'lark'
+    }
   }
 ): Promise<void> {
   const configPath = join(dataDir, 'config.json')
@@ -645,6 +685,7 @@ export async function syncManagedRuntimeConfig(
   const web = objectValue(capabilities.web)
   const skills = objectValue(capabilities.skills)
   const imageGen = objectValue(capabilities.imageGen)
+  const lark = objectValue(capabilities.lark)
   const storage = storageConfigForRuntime(runtime.storage)
   const mcpSearch = runtime.mcpSearch
   const skillCapability = await skillCapabilityConfigForRuntime(
@@ -695,6 +736,15 @@ export async function syncManagedRuntimeConfig(
       },
       skills: skillCapability,
       imageGen: imageGenConfigForRuntime(runtime.imageGeneration, imageGen),
+      lark: {
+        ...lark,
+        enabled: lark.enabled === false ? false : true,
+        authState: options?.larkCli?.state ?? 'not_installed',
+        // Diagnosis is authoritative. Never revive stale executable/auth/scope config.
+        executablePath: options?.larkCli?.executablePath,
+        scopes: options?.larkCli?.state === 'installed' ? options.larkCli.scopes ?? [] : [],
+        brand: options?.larkCli?.brand
+      },
       mcp: {
         ...mcp,
         ...(options?.scheduleMcp || mcpSearch.enabled || hasImportedEnabledMcpServer
@@ -1165,6 +1215,7 @@ function sanitizeRuntimeCapabilitiesConfig(value: unknown): Record<string, unkno
   }
   if ('memory' in raw) next.memory = parseRuntimeConfigSection(MemoryCapabilityConfig, raw.memory)
   if ('imageGen' in raw) next.imageGen = parseRuntimeConfigSection(ImageGenCapabilityConfig, raw.imageGen)
+  if ('lark' in raw) next.lark = parseRuntimeConfigSection(LarkCapabilityConfig, raw.lark)
   return next
 }
 

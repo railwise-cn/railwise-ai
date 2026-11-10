@@ -214,6 +214,8 @@ import {
 } from '../services/skill-service'
 import { installBundledAgentPack } from '../services/agent-pack-service'
 import {
+  beginManagedLarkLogin,
+  completeManagedLarkLogin,
   diagnoseManagedTool,
   installManagedTool,
   listManagedTools,
@@ -303,6 +305,7 @@ type RegisterAppIpcHandlersOptions = {
   getImDeliveryLedger?: () => ImDeliveryLedger | null
   getUserDataPath?: () => string
   resolveRuntimeConfigPath: () => string
+  refreshManagedCapabilities?: (status: import('../../shared/workwise-api').ManagedToolStatus) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
@@ -697,6 +700,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     getUserDataPath,
     resolveRuntimeConfigPath,
     onRuntimeMcpConfigWritten,
+    refreshManagedCapabilities,
     showTurnCompleteNotification,
     getAppVersion,
     readGuiUpdateState,
@@ -1687,30 +1691,52 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
 
   ipcMain.handle('tool:list-managed', async () => listManagedTools())
+  ipcMain.handle('tool:lark-login:begin', async () => beginManagedLarkLogin())
+  ipcMain.handle('tool:lark-login:complete', async () => {
+    const result = await completeManagedLarkLogin()
+    if (result.ok) {
+      notifySkillsChanged()
+      try { await refreshManagedCapabilities?.(result.status) } catch { return { ok: false, message: 'Account connected, but Runtime capabilities could not refresh. Retry the capability check.' } }
+    }
+    return result
+  })
 
   ipcMain.handle('tool:install-managed', async (_, payload: unknown) => {
     const id = parseIpcPayload('tool:install-managed', managedToolIdSchema, payload)
     const result = await installManagedTool(id)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) {
+      notifySkillsChanged()
+      if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
+    }
     return result
   })
 
   ipcMain.handle('tool:update-managed', async (_, payload: unknown) => {
     const id = parseIpcPayload('tool:update-managed', managedToolIdSchema, payload)
     const result = await updateManagedTool(id)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) {
+      notifySkillsChanged()
+      if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
+    }
     return result
   })
 
   ipcMain.handle('tool:diagnose-managed', async (_, payload: unknown) => {
     const id = parseIpcPayload('tool:diagnose-managed', managedToolIdSchema, payload)
-    return diagnoseManagedTool(id)
+    const result = await diagnoseManagedTool(id)
+    if (result.ok && id === 'lark-cli') {
+      try { await refreshManagedCapabilities?.(result.status) } catch { return { ok: false, message: 'Runtime capabilities could not refresh. Retry the capability check.' } }
+    }
+    return result
   })
 
   ipcMain.handle('tool:remove-managed', async (_, payload: unknown) => {
     const id = parseIpcPayload('tool:remove-managed', managedToolIdSchema, payload)
     const result = await removeManagedTool(id)
-    if (result.ok) notifySkillsChanged()
+    if (result.ok) {
+      notifySkillsChanged()
+      if (id === 'lark-cli') await refreshManagedCapabilities?.(result.status).catch(() => undefined)
+    }
     return result
   })
 

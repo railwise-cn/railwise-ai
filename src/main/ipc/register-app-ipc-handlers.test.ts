@@ -16,6 +16,8 @@ import {
 
 const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<unknown>>()
 const managedToolMocks = vi.hoisted(() => ({
+  beginLogin: vi.fn(async () => ({ ok: true, verificationUrl: 'https://accounts.feishu.cn/device', expiresAt: '2026-11-10T00:00:00.000Z' })),
+  completeLogin: vi.fn(async () => ({ ok: true, status: { id: 'lark-cli', state: 'installed', scopes: ['task:task:read'], brand: 'feishu' } })),
   list: vi.fn(async () => ({ ok: true, tools: [] })),
   install: vi.fn(async () => ({ ok: false, message: 'fixture' })),
   update: vi.fn(async () => ({ ok: false, message: 'fixture' })),
@@ -24,6 +26,8 @@ const managedToolMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../services/managed-tool-service', () => ({
+  beginManagedLarkLogin: managedToolMocks.beginLogin,
+  completeManagedLarkLogin: managedToolMocks.completeLogin,
   listManagedTools: managedToolMocks.list,
   installManagedTool: managedToolMocks.install,
   updateManagedTool: managedToolMocks.update,
@@ -948,6 +952,8 @@ describe('registerAppIpcHandlers', () => {
     registerAppIpcHandlers(registerOptions())
 
     for (const channel of [
+      'tool:lark-login:begin',
+      'tool:lark-login:complete',
       'tool:list-managed',
       'tool:install-managed',
       'tool:update-managed',
@@ -974,6 +980,15 @@ describe('registerAppIpcHandlers', () => {
     expect(managedToolMocks.update).toHaveBeenCalledWith('officecli')
     expect(managedToolMocks.diagnose).toHaveBeenCalledWith('ego-browser')
     expect(managedToolMocks.remove).toHaveBeenCalledWith('officecli')
+  })
+
+  it('refreshes the trusted Runtime capability snapshot after managed user login', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    const refresh = vi.fn(async () => undefined)
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedCapabilities: refresh })
+    expect(await handlers.get('tool:lark-login:begin')?.({})).toMatchObject({ ok: true })
+    expect(await handlers.get('tool:lark-login:complete')?.({})).toMatchObject({ ok: true, status: { state: 'installed' } })
+    expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ id: 'lark-cli', scopes: ['task:task:read'] }))
   })
 
   it('routes unified catalog and plugin operations through validated IPC payloads', async () => {

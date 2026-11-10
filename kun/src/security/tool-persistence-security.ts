@@ -9,6 +9,9 @@ const MAX_SAFE_PATH_CHARS = 320
 const SENSITIVE_OUTPUT_KEY = /^(?:arguments?|args?|authorization|cookie|cookies|headers?|request_?body|prompt|recipient|recipient_?id|chat_?id|channel_?id|conversation_?id|message_?body)$/i
 const COMMUNICATION_OUTPUT_KEY = /^(?:contents?|texts?|messages?|body|bodies|prompts?|inputs?|payloads?|echoed|recipients?|recipient_?ids?|chat_?ids?|channel_?ids?|conversation_?ids?|destinations?)$/i
 const COMMUNICATION_TOOL = /(?:^|[_-])(?:message|send|mail|email|wechat|weixin|feishu|lark|slack|discord|telegram|teams|im|echo)(?:$|[_-])/i
+const TYPED_CONNECTOR_TOOLS = new Set(['lark_task_list', 'lark_task_get', 'lark_task_complete', 'lark_approval_list', 'lark_approval_get', 'lark_approval_approve', 'lark_approval_reject'])
+const CONNECTOR_METADATA = new Set(['provider', 'operation', 'target', 'remoteOperationId', 'resultHash', 'verifiedAt', 'kind', 'status'])
+function safeConnectorId(value: unknown): string | undefined { return typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,512}$/.test(value) && redactSecretText(value) === value ? value : undefined }
 const BASH_TOOL = /(?:^|[_-])(?:bash|shell|terminal|command|exec|execute)(?:$|[_-])/i
 const URL_KEY = /(?:^|_)(?:url|uri|endpoint)(?:$|_)/i
 const PATH_KEYS = ['path', 'file_path', 'target_path', 'destination_path', 'directory', 'cwd'] as const
@@ -49,6 +52,16 @@ export function buildToolArgumentSummary(input: {
   const toolName = safeToolName(input.toolName)
   const args = input.arguments
   const lines = [`Run ${toolName}`]
+  if (TYPED_CONNECTOR_TOOLS.has(toolName)) {
+    lines.push('Provider: lark')
+    lines.push(`Action: ${toolName.split('_').at(-1)}`)
+    const target = safeConnectorId(args.taskId ?? args.instanceCode)
+    if (target) lines.push(`External target: ${target}`)
+    const instance = safeConnectorId(args.instanceCode)
+    if (instance && instance !== target) lines.push(`Approval instance: ${instance}`)
+    lines.push('Parameters: sensitive contents omitted')
+    return boundSummary(lines)
+  }
 
   if (BASH_TOOL.test(toolName)) {
     const action = safeAction(args.action)
@@ -121,10 +134,27 @@ export function sanitizeRuntimeEventForPersistence(event: RuntimeEvent): Runtime
 }
 
 export function sanitizeToolResultOutput(toolName: string, output: unknown): unknown {
-  return sanitizeOutputValue(redactSecrets(output), {
+  const sanitized = sanitizeOutputValue(redactSecrets(output), {
     communicationTool: COMMUNICATION_TOOL.test(toolName),
     seen: new WeakSet<object>()
   })
+  if (!TYPED_CONNECTOR_TOOLS.has(toolName) || !output || typeof output !== 'object' || Array.isArray(output)) return sanitized
+  const source = output as Record<string, unknown>
+  const result = sanitized as Record<string, unknown>
+  for (const key of CONNECTOR_METADATA) {
+    const value = safeConnectorId(source[key])
+    if (value) result[key] = value
+  }
+  if (source.evidence && typeof source.evidence === 'object' && !Array.isArray(source.evidence)) {
+    const evidence = source.evidence as Record<string, unknown>
+    const safeEvidence: Record<string, unknown> = { verified: evidence.verified === true }
+    for (const key of CONNECTOR_METADATA) {
+      const value = safeConnectorId(evidence[key])
+      if (value) safeEvidence[key] = value
+    }
+    result.evidence = safeEvidence
+  }
+  return result
 }
 
 function sanitizeOutputValue(
@@ -230,7 +260,9 @@ function normalizeArgumentSummary(toolName: string, summary: string | undefined)
   const lines = [`Run ${safeToolName(toolName)}`]
   for (const rawLine of summary.split(/\r?\n/).slice(1, 12)) {
     const line = rawLine.trim()
-    if (/^Target: <(?:workspace|outside-workspace|absolute-path|relative-path-outside-workspace)>/i.test(line)) {
+    if (TYPED_CONNECTOR_TOOLS.has(toolName) && (/^Provider: lark$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance): [A-Za-z0-9_.:-]{1,512}$/.test(line))) {
+      lines.push(line)
+    } else if (/^Target: <(?:workspace|outside-workspace|absolute-path|relative-path-outside-workspace)>/i.test(line)) {
       lines.push(clip(redactSecretText(line), MAX_SAFE_PATH_CHARS + 8))
     } else if (line.startsWith('Command:')) {
       lines.push(`Command: ${summarizeCommand(line.slice('Command:'.length)) || 'omitted'}`)

@@ -18,6 +18,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import JSZip from 'jszip'
 import type {
+  ManagedLarkLoginResult,
   ManagedToolId,
   ManagedToolListResult,
   ManagedToolResult,
@@ -460,8 +461,8 @@ type ToolRunner = (path: string, args: string[]) => Promise<{ ok: boolean; outpu
 
 const defaultToolRunner: ToolRunner = async (path, args) => {
   try {
-    const result = await execFileAsync(path, args, { timeout: 10_000, maxBuffer: 512 * 1024 })
-    return { ok: true, output: `${result.stdout || ''}${result.stderr || ''}`.trim() }
+    const result = await execFileAsync(path, args, { timeout: args.includes('--device-code') ? 120_000 : 15_000, maxBuffer: 512 * 1024 })
+    return { ok: true, output: String(result.stdout || '').trim() }
   } catch (error) {
     const value = error as { stdout?: string; stderr?: string; message?: string }
     return { ok: false, output: `${value.stdout || ''}${value.stderr || value.message || ''}`.trim() }
@@ -472,6 +473,55 @@ let toolRunner: ToolRunner = defaultToolRunner
 
 async function runTool(path: string, args: string[]): Promise<{ ok: boolean; output: string }> {
   return toolRunner(path, args)
+}
+
+
+// This fixed scope set is requested only after a user clicks Connect. No credentials or
+// device code cross IPC; the renderer receives only the official verification URL.
+const LARK_TASK_SCOPES = ['task:task:read', 'task:task:write', 'approval:task:read', 'approval:instance:read', 'approval:task:write']
+let pendingLarkLogin: { executablePath: string; deviceCode: string; expiresAt: number } | undefined
+let larkLoginCompleting = false
+
+function jsonRecord(output: string): Record<string, unknown> {
+  try { const value = JSON.parse(output); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} }
+}
+function parseLarkIdentity(output: string): { available: boolean; scopes: string[]; brand?: 'feishu' | 'lark' } {
+  const value = jsonRecord(output)
+  const identities = value.identities as { user?: { available?: boolean; scope?: string; verified?: boolean } } | undefined
+  const user = identities?.user
+  const available = value.identity === 'user' && user?.available === true && user.verified !== false && value.verified !== false
+  const scopes = available && typeof user?.scope === 'string' ? [...new Set(user.scope.split(/[\s,]+/).filter(Boolean))] : []
+  const brand = value.brand === 'feishu' || value.brand === 'lark' ? value.brand : undefined
+  return { available: available && Boolean(brand), scopes, ...(brand ? { brand } : {}) }
+}
+export async function beginManagedLarkLogin(): Promise<ManagedLarkLoginResult> {
+  if (larkLoginCompleting) return { ok: false, message: 'Authorization is already being completed.' }
+  const diagnosis = await diagnoseManagedTool('lark-cli')
+  if (!diagnosis.ok || !diagnosis.status.executablePath) return { ok: false, message: 'Install Lark CLI before connecting an account.' }
+  const result = await runTool(diagnosis.status.executablePath, ['auth', 'login', '--scope', LARK_TASK_SCOPES.join(' '), '--no-wait', '--json'])
+  const value = jsonRecord(result.output)
+  if (!result.ok || typeof value.device_code !== 'string' || typeof value.verification_url !== 'string' || typeof value.expires_in !== 'number' || value.expires_in <= 0) return { ok: false, message: 'The official Lark authorization flow could not be started. Check application configuration and network connectivity.' }
+  let url: URL
+  try { url = new URL(value.verification_url) } catch { return { ok: false, message: 'Invalid Lark authorization URL.' } }
+  if (url.protocol !== 'https:' || url.username || url.password || !['feishu.cn', 'larksuite.com'].some(domain => url.hostname === domain || url.hostname.endsWith(`.${domain}`))) return { ok: false, message: 'Untrusted Lark authorization URL.' }
+  const expiresAt = Date.now() + Math.min(value.expires_in, 1800) * 1000
+  pendingLarkLogin = { executablePath: diagnosis.status.executablePath, deviceCode: value.device_code, expiresAt }
+  return { ok: true, verificationUrl: url.toString(), expiresAt: new Date(expiresAt).toISOString(), ...(typeof value.user_code === 'string' ? { userCode: value.user_code } : {}) }
+}
+export async function completeManagedLarkLogin(): Promise<ManagedToolResult> {
+  const pending = pendingLarkLogin
+  if (!pending || pending.expiresAt <= Date.now()) { pendingLarkLogin = undefined; return { ok: false, message: 'Authorization expired. Connect again.' } }
+  if (larkLoginCompleting) return { ok: false, message: 'Authorization is already being completed.' }
+  larkLoginCompleting = true
+  try {
+    const result = await runTool(pending.executablePath, ['auth', 'login', '--device-code', pending.deviceCode, '--json'])
+    // Polling may have consumed the device code even if its final response was lost.
+    // Diagnose first; never replay the authorization operation automatically.
+    pendingLarkLogin = undefined
+    const diagnosis = await diagnoseManagedTool('lark-cli')
+    if (diagnosis.ok && diagnosis.status.state === 'installed') return diagnosis
+    return result.ok ? diagnosis : { ok: false, message: 'Authorization did not complete. Reconnect after checking the official authorization page.' }
+  } finally { larkLoginCompleting = false }
 }
 
 export async function diagnoseManagedTool(id: ManagedToolId): Promise<ManagedToolResult> {
@@ -491,8 +541,9 @@ export async function diagnoseManagedTool(id: ManagedToolId): Promise<ManagedToo
     const versionCheck = await runTool(record.executablePath, ['--version'])
     if (!versionCheck.ok) return { ok: true, status: { id, state: 'error', installedVersion: record.version, executablePath: record.executablePath, message: versionCheck.output } }
     if (id === 'lark-cli') {
-      const auth = await runTool(record.executablePath, ['auth', 'status'])
-      return { ok: true, status: { id, state: auth.ok ? 'installed' : 'needs_login', installedVersion: record.version, executablePath: record.executablePath, message: auth.ok ? auth.output : 'Run Lark OAuth setup before using account data.' } }
+      const auth = await runTool(record.executablePath, ['auth', 'status', '--json'])
+      const diagnosis = parseLarkIdentity(auth.ok ? auth.output : '')
+      return { ok: true, status: { id, state: diagnosis.available ? 'installed' : 'needs_login', installedVersion: record.version, executablePath: record.executablePath, scopes: diagnosis.scopes, ...(diagnosis.brand ? { brand: diagnosis.brand } : {}), message: diagnosis.available ? 'Lark user identity is ready.' : 'Connect a Lark user account before using task or approval data.' } }
     }
     return { ok: true, status: { id, state: 'installed', installedVersion: record.version, executablePath: record.executablePath, message: versionCheck.output } }
   } catch (error) {
@@ -650,6 +701,8 @@ export const _internals = {
   releaseAssetUrl,
   download,
   larkSkills: LARK_SKILLS,
+  parseLarkIdentity,
+  clearPendingLarkLogin: () => { pendingLarkLogin = undefined; larkLoginCompleting = false },
   officeSkills: OFFICE_SKILLS,
   clearReleaseCache: () => releaseVersionCache.clear(),
   setToolRunnerForTests: (runner?: ToolRunner) => {
