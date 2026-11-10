@@ -30,6 +30,7 @@ describe('turn completion guard', () => {
     expect(promptRequiresExternalEffect('连接钉钉并自动审批我的待办事项。')).toBe(true)
     expect(promptRequiresExternalEffect('请在飞书发送一条项目通知。')).toBe(true)
     expect(promptRequiresExternalEffect('解释一下钉钉审批流程。')).toBe(false)
+    expect(promptRequiresExternalEffect('如何在飞书发送一条项目通知？')).toBe(false)
     expect(toolCanProveExternalEffect('dingtalk_approval')).toBe(true)
     expect(toolCanProveExternalEffect('send_message')).toBe(true)
     expect(toolCanProveExternalEffect('read')).toBe(false)

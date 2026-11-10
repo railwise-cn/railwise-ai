@@ -188,7 +188,7 @@ export function promptRequiresFileDeliverable(prompt: string): boolean {
 
 export function promptRequiresExternalEffect(prompt: string): boolean {
   const normalized = completionIntentText(prompt).trim()
-  if (/^(?:解释|说明|介绍|什么是|为何|为什么|describe|explain|what is|why)/i.test(normalized)) return false
+  if (/^(?:解释|说明|介绍|什么是|为何|为什么|如何|怎么|怎样|describe|explain|what is|why|how to)/i.test(normalized)) return false
   return EXTERNAL_EFFECT_PATTERN.test(normalized)
 }
 
