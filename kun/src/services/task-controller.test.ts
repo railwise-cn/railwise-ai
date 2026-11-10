@@ -350,6 +350,62 @@ describe('TaskController reliability boundaries', () => {
     repository.close()
   })
 
+  it('waits for a verified external-effect receipt instead of completing a prose-only approval task', async () => {
+    const { repository, sessionStore, controller, task, thread } = await fixture('连接钉钉并自动审批我的待办事项。')
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'item_effect_blocked',
+      threadId: task.threadId,
+      turnId: 'turn_reliability',
+      text: '当前没有钉钉连接或授权，因此无法执行审批。我可以先提供操作方案。',
+      status: 'completed'
+    }))
+
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
+      kind: 'waiting_user',
+      task: { status: 'waiting_user', acceptance: { kind: 'effect' } },
+      reason: expect.stringContaining('外部操作没有已验证的工具回执')
+    })
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
+    repository.close()
+  })
+
+  it('completes an external-effect task only after a successful effect receipt', async () => {
+    const { repository, sessionStore, controller, task, thread } = await fixture('连接钉钉并自动审批我的待办事项。')
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'item_effect_done',
+      threadId: task.threadId,
+      turnId: 'turn_reliability',
+      text: '钉钉待办已审批完成。',
+      status: 'completed'
+    }))
+
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const operation = controller.beginToolOperation('turn_reliability', {
+      callId: 'call_dingtalk_approval',
+      toolName: 'dingtalk_approval',
+      arguments: { taskId: 'synthetic-task' }
+    })!
+    controller.finishToolOperation(operation.token, operation.key, {
+      approved: true,
+      item: makeToolResultItem({
+        id: 'item_dingtalk_result',
+        threadId: thread.id,
+        turnId: 'turn_reliability',
+        callId: 'call_dingtalk_approval',
+        toolName: 'dingtalk_approval',
+        output: { status: 'approved', operationId: 'synthetic-approval-1' }
+      })
+    })
+
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({
+      kind: 'completed',
+      task: { status: 'completed', acceptance: { kind: 'effect' } }
+    })
+    expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(1)
+    repository.close()
+  })
+
   it('enforces the duration budget and recovers an expired running lease after restart', async () => {
     const { repository, controller, task, setNow } = await fixture()
     const constrained = repository.update(task.id, task.revision, (current) => ({

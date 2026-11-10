@@ -25,8 +25,10 @@ import {
   looksLikeExternalCapabilityBlockedReply,
   looksLikeProgressOnlyReply,
   looksLikeWebAccessFailureReply,
+  promptRequiresExternalEffect,
   promptRequiresFileDeliverable,
   requiredFileExtensionsForPrompt,
+  toolCanProveExternalEffect,
   verifiedShellDeliverablePaths
 } from '../loop/turn-completion-guard.js'
 import { TaskLeaseLostError, TaskRunRepository, operationFingerprint, type TaskLeaseGuard } from './task-run-repository.js'
@@ -345,6 +347,28 @@ export class TaskController {
     if (task.templateId) {
       const delivery = verifyTaskDelivery(this.repository,task)
       if (!delivery.complete) return this.waitForUser(task,delivery.reasons.join('；'),finalResponse,`delivery:${task.revision}`,turnId)
+    }
+
+    if (task.acceptance.kind === 'effect') {
+      const receipts = this.repository.operations(task.id, 'tool')
+      const succeeded = receipts.some((receipt) => {
+        if (receipt.status !== 'succeeded') return false
+        const toolName = typeof receipt.request?.toolName === 'string' ? receipt.request.toolName : ''
+        if (!toolCanProveExternalEffect(toolName)) return false
+        const result = receipt.result
+        if (!result || typeof result !== 'object') return false
+        const item = (result as { item?: { isError?: unknown } }).item
+        return item?.isError !== true
+      })
+      if (!succeeded) {
+        return this.waitForUser(
+          task,
+          '外部操作没有已验证的工具回执，任务尚未完成。请先连接并授权目标服务，或核实上次操作结果后继续。',
+          finalResponse,
+          `effect-receipt:${task.revision}`,
+          turnId
+        )
+      }
     }
 
     const artifacts = task.acceptance.kind === 'files'
@@ -1097,10 +1121,11 @@ function shouldContinueActiveTask(prompt: string): boolean {
 
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
+  const effect = !files && promptRequiresExternalEffect(prompt)
   const requiredFormats = requiredFileExtensionsForPrompt(prompt)
   return {
-    kind: files ? 'files' : 'answer',
-    requiredNodeKinds: files ? ['execute', 'verify', 'deliver'] : ['deliver'],
+    kind: files ? 'files' : effect ? 'effect' : 'answer',
+    requiredNodeKinds: files || effect ? ['execute', 'verify', 'deliver'] : ['deliver'],
     ...(requiredFormats ? { requiredFormats: [...requiredFormats] } : {}),
     ...(files ? { minimumArtifacts: 1 } : {}),
     requireFinalResponse: true,

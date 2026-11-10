@@ -48,6 +48,15 @@ const PPT_SPECIFIC_DELIVERABLE_PATTERN =
 const HTML_DELIVERABLE_PATTERN =
   /(?:\bhtml?\b|网页演示|web presentation|browser presentation)/i
 
+// External side effects need a provider/tool receipt before a task can be
+// marked complete. A prose answer about an approval, message, or todo is not
+// evidence that the remote action happened.
+const EXTERNAL_EFFECT_PATTERN =
+  /(?:(?:钉钉|飞书|企业微信|微信|dingtalk|feishu|lark|wecom|slack|telegram|邮件|email).{0,120}(?:审批|待办|任务|消息|通知|发送|连接|处理|自动|approve|approval|todo|task|message|notify|send)|(?:审批|待办|任务|消息|通知|发送|连接).{0,120}(?:钉钉|飞书|企业微信|微信|dingtalk|feishu|lark|wecom|slack|telegram|邮件|email))/i
+
+const EXTERNAL_EFFECT_TOOL_PATTERN =
+  /(?:钉钉|飞书|企业微信|微信|dingtalk|feishu|lark|wecom|slack|telegram|email|mail|send|message|notify|approval|approve|todo|task|webhook|im)/i
+
 function pathExtension(value: string): string {
   const name = value.split(/[\\/]/).filter(Boolean).at(-1) ?? value
   if (!name.includes('.')) return ''
@@ -175,6 +184,16 @@ export function promptRequiresFileDeliverable(prompt: string): boolean {
     .trim()
   if (!normalized) return false
   return DELIVERY_ACTION_PATTERN.test(normalized) || EXPLICIT_FILE_ACTION_PATTERN.test(normalized)
+}
+
+export function promptRequiresExternalEffect(prompt: string): boolean {
+  const normalized = completionIntentText(prompt).trim()
+  if (/^(?:解释|说明|介绍|什么是|为何|为什么|describe|explain|what is|why)/i.test(normalized)) return false
+  return EXTERNAL_EFFECT_PATTERN.test(normalized)
+}
+
+export function toolCanProveExternalEffect(toolName: string): boolean {
+  return EXTERNAL_EFFECT_TOOL_PATTERN.test(toolName.trim())
 }
 
 export function requiredFileExtensionsForPrompt(prompt: string): readonly string[] | undefined {

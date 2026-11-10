@@ -40,7 +40,7 @@ export const TaskArtifactSchema = z.object({
 export type TaskArtifact = z.infer<typeof TaskArtifactSchema>
 
 export const TaskAcceptanceSchema = z.object({
-  kind: z.enum(['answer', 'files']),
+  kind: z.enum(['answer', 'files', 'effect']),
   requiredNodeKinds: z.array(TaskNodeKindSchema),
   requiredFormats: z.array(z.string().min(1)).optional(),
   minimumArtifacts: z.number().int().nonnegative().optional(),

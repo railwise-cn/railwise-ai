@@ -56,7 +56,7 @@ export type TaskArtifactV1 = {
 }
 
 export type TaskAcceptanceV1 = {
-  kind: 'answer' | 'files'
+  kind: 'answer' | 'files' | 'effect'
   requiredNodeKinds: TaskNodeKind[]
   requiredFormats?: string[]
   minimumArtifacts?: number

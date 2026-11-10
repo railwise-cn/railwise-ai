@@ -10,8 +10,10 @@ import {
   looksLikeExternalCapabilityBlockedReply,
   looksLikeProgressOnlyReply,
   looksLikeWebAccessFailureReply,
+  promptRequiresExternalEffect,
   promptRequiresFileDeliverable,
-  requiredFileExtensionsForPrompt
+  requiredFileExtensionsForPrompt,
+  toolCanProveExternalEffect
 } from './turn-completion-guard.js'
 
 describe('turn completion guard', () => {
@@ -22,6 +24,15 @@ describe('turn completion guard', () => {
     expect(promptRequiresFileDeliverable('请只输出四个普通相对路径，不要使用 Markdown 链接。')).toBe(false)
     expect(promptRequiresFileDeliverable('请输出文件名和下载链接')).toBe(false)
     expect(promptRequiresFileDeliverable('Please output the relative paths as Markdown links.')).toBe(false)
+  })
+
+  it('detects external side-effect requests separately from prose answers', () => {
+    expect(promptRequiresExternalEffect('连接钉钉并自动审批我的待办事项。')).toBe(true)
+    expect(promptRequiresExternalEffect('请在飞书发送一条项目通知。')).toBe(true)
+    expect(promptRequiresExternalEffect('解释一下钉钉审批流程。')).toBe(false)
+    expect(toolCanProveExternalEffect('dingtalk_approval')).toBe(true)
+    expect(toolCanProveExternalEffect('send_message')).toBe(true)
+    expect(toolCanProveExternalEffect('read')).toBe(false)
   })
 
   it('uses only marked user requests for file-delivery intent', () => {
