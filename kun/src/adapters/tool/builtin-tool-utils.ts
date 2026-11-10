@@ -1,3 +1,4 @@
+import { grantPathBlock } from './sandbox-policy.js'
 import { existsSync } from 'node:fs'
 import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
@@ -91,6 +92,8 @@ export async function resolveWorkspacePath(inputPath: string, context: ToolHostC
   }
   const root = workspaceRoot(context.workspace)
   const absolutePath = isAbsolute(inputPath) ? resolve(inputPath) : resolve(root, inputPath)
+  const scopeBlock = grantPathBlock(absolutePath, context)
+  if (scopeBlock) throw Object.assign(new Error(scopeBlock.message), { code: scopeBlock.code })
   const relativePath = relative(root, absolutePath)
   if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
     throw new Error(`path escapes the workspace root: ${inputPath}`)

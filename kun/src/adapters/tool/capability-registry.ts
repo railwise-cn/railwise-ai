@@ -4,7 +4,7 @@ import type {
   ToolProviderPolicy
 } from '../../ports/tool-host.js'
 import type { LocalTool } from './local-tool-host.js'
-import { isToolAdvertisedInSandbox } from './sandbox-policy.js'
+import { executionGrantBlock, isToolAdvertisedInSandbox } from './sandbox-policy.js'
 
 export type CapabilityToolRecord = {
   provider: ToolProviderPolicy
@@ -92,6 +92,8 @@ export class CapabilityRegistry {
 
   resolveTool(toolName: string, context: ToolHostContext, providerId?: string): CapabilityToolRecord {
     const record = this.tools.get(toolName)
+    const grantBlock = executionGrantBlock(context)
+    if (grantBlock) throw Object.assign(new Error(grantBlock.message), { code: grantBlock.code })
     if (!record) {
       throw new Error(`unknown tool: ${toolName}`)
     }
@@ -105,7 +107,7 @@ export class CapabilityRegistry {
       throw new Error(`tool ${toolName} is not advertised by active tool policy`)
     }
     if (!isToolAdvertisedInSandbox(record.tool, context)) {
-      throw new Error(`tool ${toolName} is not advertised in the active sandbox`)
+      throw Object.assign(new Error(`tool ${toolName} is not advertised in the active sandbox`), { code: 'sandbox_command_blocked' })
     }
     if (record.tool.shouldAdvertise && !record.tool.shouldAdvertise(context)) {
       throw new Error(`tool ${toolName} is not advertised in this turn context`)
@@ -121,8 +123,12 @@ export class CapabilityRegistry {
     if (!provider.enabled || !provider.available) return false
     const allowed = context?.allowedProviderIds
     if (allowed && !allowed.includes(provider.id)) return false
+    const granted = context?.executionGrant?.allowedProviderIds
+    if (granted && !granted.includes(provider.id)) return false
     const allowedMcp = context?.allowedMcpProviderIds
     if (provider.kind === 'mcp' && allowedMcp && !allowedMcp.includes(provider.id)) return false
+    const grantedMcp = context?.executionGrant?.allowedMcpProviderIds
+    if (provider.kind === 'mcp' && grantedMcp && !grantedMcp.includes(provider.id)) return false
     return true
   }
 
@@ -131,7 +137,9 @@ export class CapabilityRegistry {
       return false
     }
     const allowed = context?.allowedToolNames
-    return !allowed || allowed.includes(toolName)
+    if (allowed && !allowed.includes(toolName)) return false
+    const granted = context?.executionGrant?.allowedToolNames
+    return !granted || granted.includes(toolName)
   }
 }
 

@@ -6,6 +6,10 @@ import type { CapabilityPreflight } from './harness.js'
 
 export const ProcessIdentitySchema = z.object({ pid: z.number().int().positive(), fingerprint: z.string().min(1) })
 export type ProcessIdentity = z.infer<typeof ProcessIdentitySchema>
+
+export { ExecutionGrantSchema, WorkspaceTrustLevelSchema } from './permissions.js'
+export type { ExecutionGrant, WorkspaceTrustLevel } from './permissions.js'
+
 export const ExecutionSessionSchema = z.object({
   id: z.string(), taskId: z.string(), threadId: z.string(), originThreadId: z.string(),
   assignmentId: z.string().optional(), visibility: z.enum(['task', 'internal', 'legacy']),

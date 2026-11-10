@@ -27,7 +27,7 @@ import {
   ReadTracker,
   type ReadTrackerOptions
 } from './read-tracker.js'
-import { sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
+import { effectiveApprovalPolicy, sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
 import { defineLocalTool } from './local-tool-definition.js'
 
 /**
@@ -45,6 +45,8 @@ export type LocalTool = {
    * prompts unless the call is in an allow-list.
    */
   policy: 'auto' | 'on-request' | 'suggest' | 'never' | 'untrusted'
+  /** External writes must obtain a real user confirmation, even under legacy auto policy. */
+  requireExplicitApproval?: boolean
   /**
    * Optional gating predicate. When present, the tool is only listed
    * and only executed when `shouldAdvertise` returns true for the
@@ -114,6 +116,7 @@ export class LocalToolHost implements ToolHost {
     if (context.abortSignal.aborted) {
       throw new Error('tool call aborted before start')
     }
+    await context.validateExecutionGrant?.()
     const { tool } = this.registry.resolveTool(call.toolName, context, call.providerId)
     if (tool.policy === 'never') {
       throw new Error(`tool ${call.toolName} is disabled by policy`)
@@ -197,6 +200,7 @@ export class LocalToolHost implements ToolHost {
     }
     let result: Awaited<ReturnType<LocalTool['execute']>>
     try {
+      await context.validateExecutionGrant?.()
       context.assertExecution?.()
       const finishWork = context.beginExecutionWork?.()
       try { result = await tool.execute(activeCall.arguments, context, async (update) => {
@@ -221,7 +225,7 @@ export class LocalToolHost implements ToolHost {
       if (context.abortSignal.aborted) throw error
       const message = error instanceof Error ? error.message : String(error)
       return {
-        item: this.errorToolResult(context, activeCall, tool, message, 'tool_execution_failed'),
+        item: this.errorToolResult(context, activeCall, tool, message, typeof (error as { code?: unknown })?.code === 'string' ? (error as { code: string }).code : 'tool_execution_failed'),
         approved: true
       }
     }
@@ -280,7 +284,7 @@ export class LocalToolHost implements ToolHost {
     )
     if (sandboxBlock) return sandboxBlock
     if (this.isInteractiveGuiGateTool(call.toolName)) return null
-    if (context.approvalPolicy !== 'never') return null
+    if (effectiveApprovalPolicy(context) !== 'never') return null
     if (tool.policy === 'never') return null
     return {
       code: 'approval_policy_blocked',
@@ -290,8 +294,10 @@ export class LocalToolHost implements ToolHost {
 
   private requiresApproval(tool: LocalTool, call: ToolCallLike, context: ToolHostContext): boolean {
     if (this.isInteractiveGuiGateTool(call.toolName)) return false
-    if (tool.policy === 'never' || context.approvalPolicy === 'never') return false
-    switch (context.approvalPolicy) {
+    const approvalPolicy = effectiveApprovalPolicy(context)
+    if (tool.policy === 'never' || approvalPolicy === 'never') return false
+    if (tool.requireExplicitApproval || (context.executionGrant && tool.toolKind === 'command_execution')) return true
+    switch (approvalPolicy) {
       case 'auto':
         return false
       case 'on-request':

@@ -2,6 +2,7 @@ import type { ApprovalPolicy, SandboxMode } from '../contracts/policy.js'
 import type { ApprovalRequest } from '../domain/approval.js'
 import type { TurnItem } from '../contracts/items.js'
 import type { ModelCapabilityMetadata } from '../contracts/capabilities.js'
+import type { ExecutionGrant } from '../contracts/permissions.js'
 import type {
   UserInputRequest,
   UserInputResolution
@@ -100,9 +101,13 @@ export type ToolHostContext = {
   approvalPolicy: ApprovalPolicy
   /** Filesystem/command sandbox selected for this turn. Defaults at execution time for old callers. */
   sandboxMode?: SandboxMode
+  /** Immutable effective workspace/agent grant for this execution attempt. */
+  executionGrant?: ExecutionGrant
   abortSignal: AbortSignal
   /** Recheck the immutable task lease immediately before dispatch, after approvals. */
   assertExecution?: () => void
+  /** Recheck persisted workspace trust/revocation immediately before dispatch, including after approval. */
+  validateExecutionGrant?: () => Promise<void>
   beginExecutionWork?: () => (() => void) | undefined
   /** Resolves a pending approval with the user's decision. */
   awaitApproval: (approval: ApprovalRequest) => Promise<'allow' | 'deny'>

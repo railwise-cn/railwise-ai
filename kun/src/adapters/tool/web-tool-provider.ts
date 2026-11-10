@@ -1,3 +1,4 @@
+import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import type { KunCapabilitiesConfig, WebCapabilityConfig } from '../../contracts/capabilities.js'
 import type { WebFetchResult, WebProvider, WebSearchResult } from '../../ports/web-provider.js'
 import { sourceIdFor, UnavailableWebProvider } from '../../ports/web-provider.js'
@@ -132,6 +133,7 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
       if (!rawUrl) return toolError('invalid_url', 'url is required')
       const policy = validateUrlPolicy(rawUrl, config)
       if (!policy.ok) return toolError('policy_blocked', policy.reason, telemetry({ startedAt, policy: 'blocked', url: rawUrl }))
+      assertGrantAllowsNetwork(policy.url.href, context)
       if (!provider.fetch) return toolError('provider_unavailable', 'web fetch provider is unavailable')
       const maxBytesCap = config.maxFetchBytes ?? DEFAULT_WEB_MAX_BYTES
       const maxBytes = boundedInt(
