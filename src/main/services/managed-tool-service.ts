@@ -489,11 +489,14 @@ function managedLarkEnvironment(): NodeJS.ProcessEnv {
   return resolveLarkCliEnvironment(process.env)
 }
 const larkAppSetup = new ManagedLarkAppSetup(runTool, managedLarkEnvironment)
+let larkAppSetupRequestGeneration = 0
 process.once('exit', () => larkAppSetup.cancel())
 
 export async function beginManagedLarkAppSetup(): Promise<ManagedLarkAppSetupResult> {
+  const generation = larkAppSetupRequestGeneration
   if (larkCandidateCredentialsDisabled()) return { ok: false, message: 'Candidate credential access is disabled. Application setup has not started.' }
   const diagnosis = await diagnoseManagedTool('lark-cli')
+  if (generation !== larkAppSetupRequestGeneration) return { ok: true, state: 'cancelled' }
   if (!diagnosis.ok || !diagnosis.status.executablePath || diagnosis.status.state === 'not_installed' || diagnosis.status.state === 'error') return { ok: false, message: 'Install and diagnose Lark CLI before configuring an app.' }
   return larkAppSetup.begin(diagnosis.status.executablePath)
 }
@@ -501,7 +504,10 @@ export async function checkManagedLarkAppSetup(): Promise<ManagedLarkAppSetupRes
   if (larkCandidateCredentialsDisabled()) return { ok: false, message: 'Candidate credential access is disabled. No account configuration was read.' }
   return larkAppSetup.check()
 }
-export async function cancelManagedLarkAppSetup(): Promise<ManagedLarkAppSetupResult> { return larkAppSetup.cancel() }
+export async function cancelManagedLarkAppSetup(): Promise<ManagedLarkAppSetupResult> {
+  larkAppSetupRequestGeneration++
+  return larkAppSetup.cancel()
+}
 
 
 // This fixed scope set is requested only after a user clicks Connect. No credentials or

@@ -15,7 +15,7 @@ afterEach(async () => { setups.forEach(setup => setup.cancel()); setups.length =
 
 function fixture() {
   const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), pid: 12345, exitCode: null, signalCode: null, kill: vi.fn(() => true) })
-  const run = vi.fn(async () => missing)
+  const run = vi.fn(async (_path: string, _args: string[]) => missing)
   const launch = vi.fn(() => child as unknown as ChildProcessWithoutNullStreams)
   const setup = new ManagedLarkAppSetup(run, () => ({ LARKSUITE_CLI_CONFIG_DIR: join(root, 'isolated-config') }), launch)
   setups.push(setup)
@@ -54,10 +54,90 @@ describe('managed official Lark app initialization', () => {
     expect(f.launch).toHaveBeenCalledOnce()
     f.child.stdout.write(JSON.stringify({ appSecret: 'must-not-cross-ipc' }))
     f.child.emit('close', 0)
-    f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-new', brand: 'feishu' }) })
+    f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-new', brand: 'feishu', profile: args[4] }) })
     const completed = await f.setup.check()
     expect(completed).toEqual({ ok: true, state: 'configured' })
     expect(JSON.stringify([result, completed])).not.toContain('must-not-cross-ipc')
+    expect(f.run).toHaveBeenLastCalledWith(executable, ['config', 'show', '--profile', args[4], '--json'])
+  })
+
+  it.each(['missing', 'wrong_profile'])('does not report success when the process exits zero before a link and configuration is %s', async outcome => {
+    const f = fixture()
+    const result = f.setup.begin(executable)
+    await vi.waitFor(() => expect(f.launch).toHaveBeenCalledOnce())
+    if (outcome === 'wrong_profile') f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-existing', brand: 'feishu', profile: 'unrelated-existing-profile' }) })
+    f.child.emit('close', 0)
+    expect(await result).toMatchObject({ ok: false })
+    expect(await f.setup.check()).toMatchObject({ ok: true, state: 'failed' })
+  })
+
+  it('verifies this attempt’s exact named profile before accepting a zero exit without a link', async () => {
+    const f = fixture()
+    const result = f.setup.begin(executable)
+    await vi.waitFor(() => expect(f.launch).toHaveBeenCalledOnce())
+    const [, args] = f.launch.mock.calls[0] as unknown as [string, string[]]
+    f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-created', brand: 'feishu', profile: args[4] }) })
+    f.child.emit('close', 0)
+    expect(await result).toEqual({ ok: true, state: 'configured' })
+  })
+
+  it('does not report an existing configuration after cancellation while the initial check is pending', async () => {
+    const f = fixture()
+    let resolveCheck!: (value: { ok: boolean; output: string }) => void
+    f.run.mockImplementationOnce(() => new Promise(resolve => { resolveCheck = resolve }))
+    const result = f.setup.begin(executable)
+    await vi.waitFor(() => expect(f.run).toHaveBeenCalledOnce())
+    f.setup.cancel()
+    resolveCheck({ ok: true, output: JSON.stringify({ appId: 'cli-existing', brand: 'feishu' }) })
+    expect(await result).toEqual({ ok: true, state: 'cancelled' })
+    expect(f.launch).not.toHaveBeenCalled()
+  })
+
+  it('suppresses a late named-profile verification after cancellation and a newer setup request', async () => {
+    const f = fixture(); await start(f)
+    const [, args] = f.launch.mock.calls[0] as unknown as [string, string[]]
+    f.child.emit('close', 0)
+    let resolveCheck!: (value: { ok: boolean; output: string }) => void
+    f.run.mockImplementationOnce(() => new Promise(resolve => { resolveCheck = resolve }))
+    const checked = f.setup.check()
+    await vi.waitFor(() => expect(f.run).toHaveBeenCalledTimes(2))
+    expect(f.setup.cancel()).toEqual({ ok: true, state: 'cancelled' })
+    f.run.mockResolvedValue({ ok: true, output: JSON.stringify({ appId: 'cli-other-existing', brand: 'feishu' }) })
+    expect(await f.setup.begin(executable)).toEqual({ ok: true, state: 'configured' })
+    resolveCheck({ ok: true, output: JSON.stringify({ appId: 'cli-created', brand: 'feishu', profile: args[4] }) })
+    expect(await checked).toEqual({ ok: true, state: 'cancelled' })
+    expect(await f.setup.check()).toMatchObject({ ok: true, state: 'cancelled' })
+    expect(f.launch).toHaveBeenCalledOnce()
+  })
+
+  it('does not turn a zero exit into configured when cancellation arrives during its automatic verification', async () => {
+    const f = fixture()
+    const result = f.setup.begin(executable)
+    await vi.waitFor(() => expect(f.launch).toHaveBeenCalledOnce())
+    const [, args] = f.launch.mock.calls[0] as unknown as [string, string[]]
+    let resolveCheck!: (value: { ok: boolean; output: string }) => void
+    f.run.mockImplementationOnce(() => new Promise(resolve => { resolveCheck = resolve }))
+    f.child.emit('close', 0)
+    await vi.waitFor(() => expect(f.run).toHaveBeenCalledTimes(2))
+    f.setup.cancel()
+    resolveCheck({ ok: true, output: JSON.stringify({ appId: 'cli-created', brand: 'feishu', profile: args[4] }) })
+    expect(await result).toEqual({ ok: true, state: 'cancelled' })
+    expect(f.child.kill).not.toHaveBeenCalled()
+  })
+
+  it('expires a verification that returns after this attempt’s deadline', async () => {
+    const f = fixture(); await start(f)
+    const [, args] = f.launch.mock.calls[0] as unknown as [string, string[]]
+    f.child.emit('close', 0)
+    let resolveCheck!: (value: { ok: boolean; output: string }) => void
+    f.run.mockImplementationOnce(() => new Promise(resolve => { resolveCheck = resolve }))
+    const checked = f.setup.check()
+    await vi.waitFor(() => expect(f.run).toHaveBeenCalledTimes(2))
+    vi.useFakeTimers(); vi.setSystemTime(Date.now() + 16 * 60_000)
+    resolveCheck({ ok: true, output: JSON.stringify({ appId: 'cli-created', brand: 'feishu', profile: args[4] }) })
+    expect(await checked).toMatchObject({ ok: true, state: 'expired' })
+    expect(f.child.kill).not.toHaveBeenCalled()
+    expect(f.launch).toHaveBeenCalledOnce()
   })
 
   it('rejects foreign URL and cancels only the captured child', async () => {

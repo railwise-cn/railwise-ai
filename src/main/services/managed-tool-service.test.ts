@@ -25,6 +25,7 @@ import {
   _internals,
   beginManagedLarkLogin,
   beginManagedLarkAppSetup,
+  cancelManagedLarkAppSetup,
   completeManagedLarkLogin,
   diagnoseManagedTool,
   installManagedTool,
@@ -140,6 +141,24 @@ afterEach(() => {
 })
 
 describe('managed-tool-service', () => {
+  it('honors app-setup cancellation while the managed diagnosis is still pending', async () => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.2.3', executablePath, installedAt: new Date().toISOString() } }))
+    let resolveVersion!: (value: { ok: boolean; output: string }) => void
+    const runner = vi.fn(async (_path: string, args: string[]) => {
+      if (args[0] === '--version') return new Promise<{ ok: boolean; output: string }>(resolve => { resolveVersion = resolve })
+      if (args[0] === 'config') return { ok: true, output: JSON.stringify({ appId: 'cli-existing', brand: 'feishu' }) }
+      return { ok: true, output: '{}' }
+    })
+    _internals.setToolRunnerForTests(runner)
+    const result = beginManagedLarkAppSetup()
+    await vi.waitFor(() => expect(resolveVersion).toBeTypeOf('function'))
+    expect(await cancelManagedLarkAppSetup()).toEqual({ ok: true, state: 'cancelled' })
+    resolveVersion({ ok: true, output: '1.2.3' })
+    expect(await result).toEqual({ ok: true, state: 'cancelled' })
+    expect(runner.mock.calls.some(([, args]) => args[0] === 'config')).toBe(false)
+  })
   it('requires official app setup before user login and never substitutes auth for missing configuration', async () => {
     const executablePath = join(toolsRoot, 'lark-cli')
     writeFileSync(executablePath, 'fixture')
