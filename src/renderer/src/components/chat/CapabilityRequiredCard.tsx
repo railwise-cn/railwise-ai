@@ -130,7 +130,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
           <button type="button" disabled={pending} onClick={() => void run(() => managed(false))}>{t('capabilityDiagnose')}</button>
           {(capability.status !== 'not_installed' || managedState === 'needs_login' || managedState === 'installed') && loginApi.beginManagedLarkLogin ? <button type="button" disabled={pending} onClick={() => void run(beginLogin)}>{t('capabilityLoginLark')}</button> : null}
         </> : null}
-        <button type="button" disabled={pending} onClick={configure}>{action?.label || t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
+        <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>
         <button type="button" disabled={pending} onClick={() => void run(recheck)}>{t('capabilityRecheckResume')}</button>
         <button type="button" disabled={pending} onClick={() => void run(decline)}>{t('capabilityDecline')}</button>
       </div> : null}

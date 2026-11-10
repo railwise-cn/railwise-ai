@@ -120,7 +120,6 @@ export function SettingsView(): ReactElement {
   const [writeCompletionDebugSelectedId, setWriteCompletionDebugSelectedId] = useState<string | null>(null)
   const [writeDebugLoading, setWriteDebugLoading] = useState(false)
   const [writeDebugError, setWriteDebugError] = useState<string | null>(null)
-  const initializedCategory = useRef(false)
   const saveTimer = useRef<number | null>(null)
   const statusTimer = useRef<number | null>(null)
   const draftVersion = useRef(0)
@@ -214,14 +213,6 @@ export function SettingsView(): ReactElement {
     if (category !== 'write') return
     void loadWriteDebugEntries()
   }, [category, loadWriteDebugEntries])
-
-  useEffect(() => {
-    if (!form || initializedCategory.current) return
-    initializedCategory.current = true
-    if (!getActiveAgentApiKey(form).trim()) {
-      setCategory('providers')
-    }
-  }, [form])
 
   useEffect(() => {
     if (settingsSection === 'general') {

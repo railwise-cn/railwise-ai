@@ -62,7 +62,11 @@ describe('capability waiting card', () => {
 
   it('supports managed installation without constructing a shell command', async () => {
     api.installManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })
-    await render({ ...card, capability: { ...card.capability, status: 'not_installed' } })
+    await render({ ...card, capability: { ...card.capability, status: 'not_installed', resolution: { kind: 'install', route: 'marketplace', label: '安装 Lark CLI' } } })
+    expect([...container.querySelectorAll('button')].filter(item => item.textContent === '安装 Lark CLI')).toHaveLength(1)
+    await click('打开插件市场')
+    expect(state.openPlugins).toHaveBeenCalledOnce()
+    expect(api.installManagedTool).not.toHaveBeenCalled()
     await click('安装 Lark CLI')
     expect(api.installManagedTool).toHaveBeenCalledWith('lark-cli')
     expect(container.textContent).toContain('已安装，需要登录授权')
