@@ -36,11 +36,11 @@
 | 工作区信任接入 Runtime | 主进程 `WorkspaceTrustService`、Runtime `services/workspace-trust-reader.ts` 与 AgentLoop Grant 创建/再次核验连接；不因用户选中目录就授予写权限 | `workspace-trust-reader.test.ts`、主进程 `workspace-trust-service.test.ts`、`harness-preflight-context.test.ts` | 已接线。真实旧资料/路径组合迁移尚待验收 |
 | 最终权限取交集 | 工作区/Agent 信任、沙箱、工具和 MCP 白名单、Provider、路径/网络/scopes/精确动作目标共同限制；子任务收紧父范围 | `sandbox-policy.test.ts`、`harness-connector-runtime.test.ts`、Provider 精确目标检查 | 已接线。不是 OS 级全能力沙箱声明 |
 | 授权卡可解决实际阻断 | `CapabilityRequiredCard.tsx` 提供安装、诊断、Lark 登录、设置、工作区选择、拒绝和重新预检/继续原任务；任务待办复用同一卡片 | `CapabilityRequiredCard.test.ts`、`TaskWorkspaceView.dom.test.ts` | 已接线。已覆盖特定连接器/策略路径，不宣称所有网络、任意路径和错误都已拥有独立的一键修复 |
-| 有限期任务权限及版本检查 | `services/task-permission-service.ts`、`server/routes/tasks.ts`、preload 和 `TaskPermissionPanel.tsx` 允许显式审阅后，把当前独立任务的 `never` 调整为有限期 `on-request`；不改变发起聊天或全局信任；修改 Agent 后需重新核对 | `task-permission-service.test.ts`、`task-permissions.test.ts` | 已接线。这不是任意路径/网络/Provider 的通用提权器；不自动恢复任务 |
+| 有限期任务权限及版本检查 | `services/task-permission-service.ts`、`server/routes/tasks.ts`、preload 和 `TaskPermissionPanel.tsx` 允许显式审阅后，把当前独立任务的 `never` 调整为有限期 `on-request`；不改变发起聊天或全局信任；修改 Agent 后需重新核对 | `task-permission-service.test.ts`、`task-permissions.test.ts` | 部分接线。服务与 IPC 已实现，`TaskPermissionPanel` 仅有定义及 DOM 测试，尚无生产页面引用；用户侧限时任务授权入口仍缺失。任意路径/网络/Provider 授权继续待实现 |
 | 一次主机命令授权 | `scoped-host-shell-tool-provider.ts` 仅给非连接器任务有限入口；审批绑定完整命令哈希、任务、Turn、租约、Grant、版本和期限；复用已有 Shell Adapter | `scoped-host-shell-tool-provider.test.ts`、`task-controller-host-shell.test.ts`、`tests/host-shell-runtime.test.ts` | 已接线。普通 Bash 继续隐藏；连接器 effect 和子 Agent 不可用此入口代理平台操作 |
 | Shell 进程身份和未知结果 | 既有持久 Shell 会话保留 PID/指纹/输出；一次授权只能派发原命令，原会话可轮询/受限停止，不能写 stdin 或借旧授权执行新命令 | host-shell 测试覆盖拒绝、假审批、失效、失租、未知结果不重放和会话边界 | 已接线。跨平台 PID/进程组和崩溃实机验收待补 |
 | 双 Runtime、迟到提交 | 执行 attempt/fencing、当前 Grant 及权限版本、实际派发前的校验共同阻止旧执行重新用新授权；未知操作阻止“取消再重试”换账本绕过 | `task-controller.test.ts`、`task-permission-service.test.ts`、`task-retry-ledger.test.ts`、`external-operation-verification.test.ts` | 已有针对性回归；不等于已完成双实机 Runtime 长时验收 |
-| 不同阻断有不同代码 | 沙箱、路径、网络、scope、连接器缺失、审批拒绝、授权失效分别返回代码；UI 展示原因及可用范围 | 预检、沙箱、Provider、权限服务及卡片测试 | 已接线。当前 UI 主要在预检卡和权限审阅处显示权限，不宣称每个普通 Turn 前都弹出完整权限总览 |
+| 不同阻断有不同代码 | 沙箱、路径、网络、scope、连接器缺失、审批拒绝、授权失效分别返回代码；UI 展示原因及可用范围 | 预检、沙箱、Provider、权限服务及卡片测试 | 已接线。当前生产 UI 在预检阻断卡显示部分权限；权限审阅面板尚未挂载，每个 Turn 执行前的完整权限总览仍待实现 |
 
 计划中“授权一次任意工作区路径/网络范围”的通用卡片尚不能由当前有限任务审批和一次命令授权推断为全部交付。现有实现应按实际按钮和服务能力描述；需要扩大到新的路径或外部目标时继续使用明确的配置/范围审阅，不能暗中放宽 Grant。
 
@@ -90,6 +90,16 @@ DWS 已在 `0a94e6a7` 精确包通过当前账号的待办只读检查和授权�
 | 公开发布、版本号、Stable、官网 | 本记录未执行或证明任何公开发布操作 | 未发布，不宣称发行就绪 |
 
 本计划未修改 updater 或新增更新路径时，不因本 Harness 变更额外设真实 updater smoke 为默认门禁。若最终实现触及 updater/新路径，则按 AGENTS.md 对精确包补一次真实 smoke。也不恢复重复私有冻结、全 UI 矩阵、截图档案或独立 AI 审查为默认要求。
+
+## 再次逐项核对发现的实现缺口（2026-11-11）
+
+- 限时任务权限卡片的生产接线缺失。`TaskPermissionPanel.tsx` 仅有定义及 DOM 测试，实际页面未引用。`CapabilityRequiredCard` 的 grant 动作目前打开设置。上表原“已接线”已更正。
+- 任意工作区路径、网络范围的一次性授权及每次执行前的完整权限总览仍待实现。现有任务权限确认协议只调整审批策略、期限和版本。
+- Flow 统一任务命令入口尚未完成。通用 Agent 节点对钉钉/飞书动作返回阻断，普通文本节点直接调用模型；文档交付适配器直接创建 Turn。聊天与写作聊天已接入 TaskCoordinator。
+- 默认 DWS 扫码路径明确拒绝审批转交。高级 OpenAPI Provider 存在转交实现，默认扫码后的转交仍需打通。
+- `external-effect-evidence.ts` 的可信工具映射覆盖钉钉与飞书/Lark，计划所列邮件、其他 IM 发送及远端文件操作仍需统一完成验收。
+
+当前候选的两次真实单条待办读取由固定诊断入口执行。完整模型任务的授权、继续、执行、回读和完成状态，以及两平台写入验收仍待完成。中文 Windows、SSE 断线实机回放和完整凭据及资料迁移的验收缺口继续保留。本次核对检查了生产引用关系、当前 PR 和已有证据，源码实现未修改。
 
 ## 尚不能关闭的事项与下一步
 
