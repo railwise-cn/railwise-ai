@@ -540,7 +540,7 @@ export function createThreadActions(
         const resultId=result.receipt?.resultMessageItemId??`task-command-result-${crypto.randomUUID()}`
         const optimistic=optimisticUserId?state.blocks.find(block=>block.id===optimisticUserId):undefined
         const blocks=state.blocks.filter(block=>block.id!==userId&&block.id!==resultId&&block.id!==optimisticUserId)
-        return {blocks:[...blocks,...(appendUser||optimistic?[optimistic?{...optimistic,id:userId}:{kind:'user' as const,id:userId,text:overrides?.displayText??trimmedText,createdAt:new Date().toISOString()}]:[]),{kind:'assistant' as const,id:resultId,text:localText,createdAt:new Date().toISOString()}],error:null}
+        return {blocks:[...blocks,...(appendUser||optimistic?[optimistic?{...optimistic,id:userId}:{kind:'user' as const,id:userId,text:overrides?.displayText??trimmedText,createdAt:new Date().toISOString()}]:[]),{kind:'assistant' as const,id:resultId,text:localText,createdAt:new Date().toISOString(),...(result.kind==='capability_required' && result.task ? {capabilityCard:{threadId,taskId:result.task.id,attentionId:result.attentionId,prompt,capability:result.capability}}:{})}],error:null}
       })
       return true
     }

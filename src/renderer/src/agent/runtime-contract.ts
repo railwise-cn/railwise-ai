@@ -1,4 +1,5 @@
 import { GUI_PLAN_CREATE_PLAN_TOOL_NAME } from '@shared/gui-plan'
+import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 
 export type CoreThreadStatus = 'idle' | 'running' | 'archived' | 'deleted'
 export type CoreTurnStatus = 'queued' | 'running' | 'completed' | 'failed' | 'aborted'
@@ -379,6 +380,7 @@ export type CoreTurnItemJson = {
   kind: string
   text?: string
   uiBlocks?: unknown[]
+  capabilityCard?: ExternalTaskCapabilityCard
   displayText?: string
   toolName?: string
   callId?: string

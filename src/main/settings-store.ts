@@ -88,7 +88,9 @@ export function expandHomePath(
 }
 
 function normalizeWorkspaceRoot(raw: string | null | undefined, homeDirectory?: string): string {
-  return expandHomePath(raw, homeDirectory) || expandHomePath(DEFAULT_WORKSPACE_ROOT, homeDirectory)
+  // Empty is an intentional selection (e.g. after removing a workspace).
+  // Only first launch supplies DEFAULT_WORKSPACE_ROOT below.
+  return expandHomePath(raw, homeDirectory)
 }
 
 function normalizeWriteWorkspaceRoot(raw: string | null | undefined, homeDirectory?: string): string {
@@ -218,7 +220,7 @@ function serializeSettingsForDisk(settings: WorkWiseSettingsV2, workwiseHome?: s
 
 export async function ensureWorkspaceRootExists(workspaceRoot: string): Promise<string> {
   const normalized = normalizeWorkspaceRoot(workspaceRoot)
-  await mkdir(normalized, { recursive: true })
+  if (normalized) await mkdir(normalized, { recursive: true })
   return normalized
 }
 
@@ -270,7 +272,7 @@ const defaultSettings = (workwiseHome: string): WorkWiseSettingsV2 => ({
   agents: {
     kun: defaultManagedRuntimeSettings()
   },
-  workspaceRoot: normalizeWorkspaceRoot('', dirname(workwiseHome)),
+  workspaceRoot: normalizeWorkspaceRoot(DEFAULT_WORKSPACE_ROOT, dirname(workwiseHome)),
   log: {
     enabled: true,
     retentionDays: 2

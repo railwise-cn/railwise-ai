@@ -21,6 +21,18 @@ function makeSink(): ThreadEventSink {
 }
 
 describe('thread summary mapping', () => {
+  it('restores a capability action from persisted assistant metadata', () => {
+    const capabilityCard = {
+      threadId: 'thread-original', taskId: 'task-waiting', prompt: '处理钉钉待办',
+      capability: { provider: 'dingtalk' as const, status: 'unsupported' as const, message: '请先配置连接器' }
+    }
+    expect(chatBlockFromItem({
+      id: 'item-capability', threadId: 'thread-original', turnId: 'command-message',
+      role: 'assistant', status: 'completed', createdAt: '2026-11-10T00:00:00Z',
+      kind: 'assistant_text', text: '请先配置连接器', capabilityCard
+    })).toMatchObject({ kind: 'assistant', capabilityCard })
+  })
+
   it('preserves runtime message counts and previews for sidebar visibility', () => {
     expect(threadFromCore({
       id: 'thr_history',

@@ -750,7 +750,8 @@ function assistantTextBlockFromItem(item: CoreTurnItemJson): ChatBlock | null {
     id: item.id,
     createdAt: itemCreatedAt(item),
     text: item.text,
-    ...(Array.isArray(item.uiBlocks) ? { uiBlocks: item.uiBlocks } : {})
+    ...(Array.isArray(item.uiBlocks) ? { uiBlocks: item.uiBlocks } : {}),
+    ...(item.capabilityCard ? { capabilityCard: item.capabilityCard } : {})
   }
 }
 
