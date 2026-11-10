@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify, stripVTControlCharacters } from 'node:util'
 import { gunzipSync } from 'node:zlib'
+import { StringDecoder } from 'node:string_decoder'
 import JSZip from 'jszip'
 import type { ManagedDwsResult, ManagedDwsStatus } from '../../shared/managed-dws'
 import { assertDwsCredentialAccess, resolveDwsEnvironment } from '../../../kun/src/services/dws-cli-environment.js'
@@ -215,20 +216,38 @@ export class ManagedDwsService {
     const pending: Pending = { child, executablePath: diagnosis.status.executablePath, executableHash: diagnosis.status.executableHash!, state: 'waiting', expiresAt: Date.now() + 10 * 60_000, output: '', timer: setTimeout(() => this.stop(pending, 'expired'), 10 * 60_000) }
     pending.timer.unref(); this.pending = pending
     return new Promise(resolveResult => {
-      let settled = false; let stderr = ''
+      let settled = false
+      let stderr = ''
+      const stderrDecoder = new StringDecoder('utf8')
       const finish = (value: ManagedDwsResult): void => { if (!settled) { settled = true; clearTimeout(deadline); resolveResult(value) } }
       const deadline = setTimeout(() => { this.stop(pending, 'failed'); finish({ ok: false, message: 'The official DingTalk authorization page was not received. Check connectivity and retry.' }) }, 45_000)
       deadline.unref()
       child.stderr.on('data', (bytes: Buffer) => {
         if (pending.state !== 'waiting') return
-        stderr = stripVTControlCharacters((stderr + bytes.toString('utf8')).slice(-64 * 1024))
-        const code = /(?:授权码|[Uu]ser[_ ]?[Cc]ode)\s*[:：]\s*([A-Z0-9-]{4,32})/.exec(stderr)?.[1]
-        if (code) pending.userCode = code
-        for (const match of stderr.matchAll(/^(https:\/\/[^\s<>"']+)[\r\n]/gm)) {
-          const url = officialDingTalkURL(match[1])
-          if (!url) { this.stop(pending, 'failed'); finish({ ok: false, message: 'The official CLI returned an untrusted DingTalk authorization URL.' }); return }
-          pending.url = url; finish(this.snapshot(pending)); break
+        stderr = (stderr + stderrDecoder.write(bytes)).slice(-64 * 1024)
+        const lines = stderr.split('\n')
+        stderr = lines.pop() ?? ''
+        for (const rawLine of lines) {
+          const line = stripVTControlCharacters(rawLine).trim()
+          const code = /(?:授权码|[Uu]ser[_ ]?[Cc]ode)\s*[:：]\s*([A-Z0-9-]{4,32})/.exec(line)?.[1]
+          if (code) {
+            // The official CLI can retry device authorization in this same
+            // process. Retire the previous QR until this attempt's URL arrives.
+            pending.userCode = code
+            pending.url = undefined
+          }
+          if (pending.url || !/^https:\/\/[^\s<>"']+$/.test(line)) continue
+          const url = officialDingTalkURL(line)
+          if (!url) {
+            this.stop(pending, 'failed')
+            finish({ ok: false, message: 'The official CLI returned an untrusted DingTalk authorization URL.' })
+            return
+          }
+          // The first URL is the complete device link. The following manual
+          // entry URL must not replace it and discard the supplied user code.
+          pending.url = url
         }
+        if (pending.url) finish(this.snapshot(pending))
       })
       child.stdout.on('data', (bytes: Buffer) => { pending.output = (pending.output + bytes.toString('utf8')).slice(-64 * 1024) })
       child.once('error', () => { this.stop(pending, 'failed'); finish({ ok: false, message: 'The official DingTalk login process could not start.' }) })

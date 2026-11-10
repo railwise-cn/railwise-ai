@@ -87,6 +87,38 @@ describe('managed official DingTalk CLI', () => {
     expect(f.start).toHaveBeenCalledOnce()
     expect(f.run.mock.calls.at(-1)?.[1]).toEqual(['auth', 'status', '--readonly', '--profile', 'corp-synthetic:user-synthetic', '--format', 'json'])
   })
+  it('replaces the displayed device code and URL when the official process retries authorization', async () => {
+    const f = fixture(); await f.service.install()
+    const first = await login(f)
+    expect(first).toMatchObject({ userCode: 'SYNTHETIC', verificationUrl: expect.stringContaining('SYNTHETIC') })
+
+    f.child.stderr.write('  授权码: SECOND-CODE\n')
+    const between = await f.service.checkLogin()
+    expect(between).toMatchObject({ state: 'waiting', userCode: 'SECOND-CODE' })
+    expect(between).not.toHaveProperty('verificationUrl')
+    const retryUrl = 'https://login.dingtalk.com/oauth2/device?user_code=SECOND-CODE'
+    f.child.stderr.write(`${retryUrl}\nhttps://login.dingtalk.com/oauth2/device\n`)
+    expect(await f.service.checkLogin()).toMatchObject({ state: 'waiting', userCode: 'SECOND-CODE', verificationUrl: retryUrl })
+    expect(f.start).toHaveBeenCalledOnce()
+  })
+
+  it('parses complete UTF-8 and URL lines across stderr chunks', async () => {
+    const f = fixture(); await f.service.install()
+    const begin = f.service.beginLogin()
+    await vi.waitFor(() => expect(f.start).toHaveBeenCalledOnce())
+    const codeLine = Buffer.from('  授权码: CHUNK-CODE\r\n')
+    // Split inside the first Chinese character, as real pipe writes may do.
+    f.child.stderr.write(codeLine.subarray(0, 3))
+    f.child.stderr.write(codeLine.subarray(3))
+    const url = 'https://login.dingtalk.com/oauth2/device?user_code=CHUNK-CODE'
+    f.child.stderr.write(url.slice(0, 31))
+    const pending = await f.service.checkLogin()
+    expect(pending).toMatchObject({ state: 'waiting', userCode: 'CHUNK-CODE' })
+    expect(pending).not.toHaveProperty('verificationUrl')
+    f.child.stderr.write(`${url.slice(31)}\r\n`)
+    expect(await begin).toMatchObject({ state: 'waiting', userCode: 'CHUNK-CODE', verificationUrl: url })
+  })
+
   it.each(['missing', 'invalid', 'valid'] as const)('verifies an immediate zero exit before any authorization URL (%s result)', async resultKind => {
     const f = fixture(); await f.service.install()
     const begin = f.service.beginLogin()
