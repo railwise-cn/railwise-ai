@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createKunServeRuntime } from '../src/server/runtime-factory.js'
 import { KunCapabilitiesConfig } from '../src/contracts/capabilities.js'
+import { larkTestBinding } from './helpers/lark-identity.js'
 import { FileWorkspaceTrustReader } from '../src/services/workspace-trust-reader.js'
 
 const cleanup: Array<() => Promise<unknown>> = []
@@ -16,7 +17,7 @@ async function fixture() {
     baseUrl: 'http://127.0.0.1:1/v1', apiKey: '', endpointFormat: 'chat_completions',
     model: 'fixture', approvalPolicy: 'auto', sandboxMode: 'workspace-write', tokenEconomyMode: false,
     insecure: false, storage: { backend: 'file' },
-    capabilities: KunCapabilitiesConfig.parse({ lark: { enabled: true, authState: 'installed', executablePath: '/usr/bin/true', brand: 'feishu', scopes: ['task:task:read', 'task:task:write'] } })
+    capabilities: KunCapabilitiesConfig.parse({ lark: { enabled: true, authState: 'installed', executablePath: '/usr/bin/true', ...larkTestBinding, scopes: ['task:task:read', 'task:task:write'] } })
   })
   cleanup.push(async () => runtime.shutdown?.())
   const origin = await runtime.threadService.create({ workspace: root, model: 'fixture', mode: 'agent' })

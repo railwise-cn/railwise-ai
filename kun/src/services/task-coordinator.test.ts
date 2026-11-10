@@ -85,7 +85,7 @@ describe('task commands before Turn allocation',()=>{
     expect(repeat.kind).toBe('capability_required')
     expect(f.runTurn).not.toHaveBeenCalled()
     const items=await f.sessionStore.loadItems(f.origin.id)
-    expect(items.at(-1)).toMatchObject({text:expect.stringContaining('不会生成未经验证的 dws 命令')})
+    expect(items.at(-1)).toMatchObject({text:expect.stringContaining('不会通过未经验证的 Shell 命令代理平台操作')})
   })
 
   it('persists dual-provider requests before allocating a Turn, even with an explicit chat hint', async () => {
