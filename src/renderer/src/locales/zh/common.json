@@ -4341,5 +4341,17 @@
   "taskTimingQueued": "排队",
   "taskTimingHumanWait": "等待你",
   "taskTimingComplete": "自任务建立后记录；执行时间包括子任务实际用时。",
-  "taskTimingPartial": "仅显示开始记录后的数据；旧任务缺失的时间未作估计。"
+  "taskTimingPartial": "仅显示开始记录后的数据；旧任务缺失的时间未作估计。",
+  "pluginErrorPackageNetwork": "插件目录仍可查看，但该插件的安装包下载源暂时不可用。请使用镜像或导入本地安装包。",
+  "pluginUnifiedPartialOffline": "精选目录可离线使用，部分在线来源暂时不可用。",
+  "pluginUnifiedCatalogUnavailable": "插件目录暂时无法读取，请稍后重试。",
+  "pluginUnifiedSourceUnchanged": "{{name}} 已是最新。",
+  "pluginUnifiedSourceOfflineNotice": "{{name}} 暂时离线，继续使用上次核验过的缓存。",
+  "pluginUnifiedSourceFailed": "{{name}} 暂时无法同步，内置精选目录仍可使用。",
+  "pluginUnifiedSourceBundled": "已内置，可离线使用",
+  "pluginUnifiedSourceOffline": "暂时离线，使用上次核验过的缓存",
+  "pluginUnifiedSourceUnavailable": "在线来源暂时不可用",
+  "pluginUnifiedSourceSyncedState": "已同步",
+  "pluginUnifiedSourceSyncing": "同步中",
+  "pluginUnifiedSourceNotSynced": "尚未同步"
 }

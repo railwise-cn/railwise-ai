@@ -35,6 +35,7 @@ import type {
   InstalledPackageV1,
   MarketplaceIconV1,
   MarketplaceCatalogPackageEntryV1,
+  MarketplaceCatalogSyncResultV1,
   MarketplacePackageV1,
   MarketplaceProductTypeV1,
   PackagePermissionV1,
@@ -333,10 +334,49 @@ function marketplaceCategoryLabel(category: string, text: Text): string {
   return labels[category] ?? category
 }
 
-function sourceAudience(source: CatalogSourceV1 | undefined): AudienceFilter {
-  if (source?.trust === 'system' || source?.trust === 'official') return 'official'
+function sourceAudience(source: CatalogSourceV1 | undefined, sourceId?: string): AudienceFilter {
+  if (source?.id === 'workwise-official' || sourceId === 'workwise-official' || source?.trust === 'system' || source?.trust === 'official') return 'official'
   if (source?.scope === 'user') return 'personal'
   return 'team'
+}
+
+function catalogSourceStateLabel(source: CatalogSourceV1, text: Text): string {
+  if (source.id === 'workwise-official') {
+    return text('pluginUnifiedSourceBundled', 'Built in and available offline')
+  }
+  if (source.sync.state === 'error') {
+    return source.sync.lastSyncedAt
+      ? text('pluginUnifiedSourceOffline', 'Offline, using the last verified cache')
+      : text('pluginUnifiedSourceUnavailable', 'Online source unavailable')
+  }
+  if (source.sync.state === 'synced') return text('pluginUnifiedSourceSyncedState', 'Synchronized')
+  if (source.sync.state === 'syncing') return text('pluginUnifiedSourceSyncing', 'Synchronizing')
+  return text('pluginUnifiedSourceNotSynced', 'Not synchronized')
+}
+
+function catalogSyncNotice(
+  result: MarketplaceCatalogSyncResultV1,
+  sourceName: string,
+  text: Text
+): Notice {
+  if (result.status === 'offline') {
+    return {
+      tone: 'info',
+      message: text('pluginUnifiedSourceOfflineNotice', '{{name}} is temporarily offline. The last verified cache remains available.', { name: sourceName })
+    }
+  }
+  if (result.status === 'failed') {
+    return {
+      tone: 'error',
+      message: text('pluginUnifiedSourceFailed', '{{name}} could not be synchronized. The built-in catalog remains available.', { name: sourceName })
+    }
+  }
+  return {
+    tone: 'success',
+    message: result.status === 'unchanged'
+      ? text('pluginUnifiedSourceUnchanged', '{{name}} is already up to date.', { name: sourceName })
+      : text('pluginUnifiedSourceSynced', '{{name}} catalog synchronized.', { name: sourceName })
+  }
 }
 
 function normalizedSkillRoot(skill: SkillListItem): string {
@@ -414,56 +454,60 @@ export function PluginMarketplaceView(): ReactElement {
 
   const refresh = useCallback(async (showSpinner = false): Promise<void> => {
     if (showSpinner) setLoading(true)
-    try {
-      const [catalogSources, catalog, packageRecords, diagnostics, servers, skills, credentialStatuses] = await Promise.all([
-        window.workwise.listCatalogSources(),
-        window.workwise.listCatalogPackages(),
-        window.workwise.listInstalledPlugins(),
-        window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
-        window.workwise.listMcpServers(workspaceRoot || undefined),
-        window.workwise.listSkills(workspaceRoot || undefined).catch(() => null),
-        window.workwise.listCatalogCredentialStatuses()
-      ])
-      setSources(catalogSources)
-      setEntries(catalog.packages)
-      setInstalledPackages(packageRecords)
-      setUpdateDiagnostics(diagnostics)
-      setMcpServers(servers)
-      setCatalogCredentials(credentialStatuses)
-      if (skills?.ok) {
-        setSkills(skills.skills)
-        setSkillCount(skills.skills.length)
-        setSkillValidationErrors(skills.validationErrors)
-      }
-      if (catalog.conflicts.length > 0) {
-        setNotice({
-          tone: 'info',
-          message: text(
-            'pluginUnifiedCatalogConflicts',
-            '{{count}} package name conflicts are isolated by source.',
-            { count: catalog.conflicts.length }
-          )
-        })
-      }
-      const blocked = diagnostics.filter((item) => item.state === 'runtime-drift' || item.state === 'unavailable')
-      if (blocked.length > 0 && catalog.conflicts.length === 0) {
-        setNotice({
-          tone: 'info',
-          message: text(
-            'pluginUnifiedUpdateDiagnostics',
-            '{{count}} installed plugins need attention before updating: {{packages}}.',
-            { count: blocked.length, packages: blocked.map((item) => item.packageId).join(', ') }
-          )
-        })
-      }
-    } catch (error) {
-      setNotice({
-        tone: 'error',
-        message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t)
-      })
-    } finally {
-      setLoading(false)
+    const results = await Promise.allSettled([
+      window.workwise.listCatalogSources(),
+      window.workwise.listCatalogPackages(),
+      window.workwise.listInstalledPlugins(),
+      window.workwise.listPluginUpdateDiagnostics?.() ?? Promise.resolve([]),
+      window.workwise.listMcpServers(workspaceRoot || undefined),
+      window.workwise.listSkills(workspaceRoot || undefined),
+      window.workwise.listCatalogCredentialStatuses()
+    ])
+    const [sourcesResult, catalogResult, packagesResult, diagnosticsResult, serversResult, skillsResult, credentialsResult] = results
+    const failures: string[] = []
+    if (sourcesResult.status === 'fulfilled') setSources(sourcesResult.value)
+    else failures.push('sources')
+    if (catalogResult.status === 'fulfilled') setEntries(catalogResult.value.packages)
+    else failures.push('catalog')
+    if (packagesResult.status === 'fulfilled') setInstalledPackages(packagesResult.value)
+    else failures.push('installed')
+    if (diagnosticsResult.status === 'fulfilled') setUpdateDiagnostics(diagnosticsResult.value)
+    else failures.push('diagnostics')
+    if (serversResult.status === 'fulfilled') setMcpServers(serversResult.value)
+    else failures.push('mcp')
+    if (skillsResult.status === 'fulfilled' && skillsResult.value?.ok) {
+      setSkills(skillsResult.value.skills)
+      setSkillCount(skillsResult.value.skills.length)
+      setSkillValidationErrors(skillsResult.value.validationErrors)
+    } else if (skillsResult.status === 'rejected') {
+      failures.push('skills')
     }
+    if (credentialsResult.status === 'fulfilled') setCatalogCredentials(credentialsResult.value)
+    else failures.push('credentials')
+
+    const catalog = catalogResult.status === 'fulfilled' ? catalogResult.value : null
+    const diagnostics = diagnosticsResult.status === 'fulfilled' ? diagnosticsResult.value : []
+    const blocked = diagnostics.filter((item) => item.state === 'runtime-drift' || item.state === 'unavailable')
+    const hasCatalog = catalogResult.status === 'fulfilled' && catalogResult.value.packages.length > 0
+    if (failures.length > 0) {
+      setNotice({
+        tone: hasCatalog ? 'info' : 'error',
+        message: hasCatalog
+          ? text('pluginUnifiedPartialOffline', 'Featured catalog remains available offline while some online sources are unavailable.')
+          : text('pluginUnifiedCatalogUnavailable', 'The plugin catalog is temporarily unavailable. Try again later.')
+      })
+    } else if (catalog?.conflicts.length) {
+      setNotice({
+        tone: 'info',
+        message: text('pluginUnifiedCatalogConflicts', '{{count}} package name conflicts are isolated by source.', { count: catalog.conflicts.length })
+      })
+    } else if (blocked.length > 0) {
+      setNotice({
+        tone: 'info',
+        message: text('pluginUnifiedUpdateDiagnostics', '{{count}} installed plugins need attention before updating: {{packages}}.', { count: blocked.length, packages: blocked.map((item) => item.packageId).join(', ') })
+      })
+    }
+    setLoading(false)
   }, [t, text, workspaceRoot])
 
   useEffect(() => {
@@ -499,7 +543,7 @@ export function PluginMarketplaceView(): ReactElement {
       const record = installed.get(item.id)
       const server = installedServerForPackage(item, mcpServers)
       const added = isInstalled(item, installed, mcpServers)
-      if (sourceAudience(sourceMap.get(entry.sourceId)) !== audienceFilter) return false
+      if (sourceAudience(sourceMap.get(entry.sourceId), entry.sourceId) !== audienceFilter) return false
       if (sourceFilter !== 'all' && entry.sourceId !== sourceFilter) return false
       if (categoryFilter !== 'all' && marketplaceCollection(item) !== categoryFilter) return false
       if (statusFilter === 'recommended' && !isFeaturedPackage(item) && item.tier !== 'recommended') return false
@@ -534,7 +578,7 @@ export function PluginMarketplaceView(): ReactElement {
 
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => {
     const scoped = entries.filter((entry) => {
-      if (sourceAudience(sourceMap.get(entry.sourceId)) !== audienceFilter) return false
+      if (sourceAudience(sourceMap.get(entry.sourceId), entry.sourceId) !== audienceFilter) return false
       return sourceFilter === 'all' || entry.sourceId === sourceFilter
     })
     return {
@@ -1114,10 +1158,7 @@ export function PluginMarketplaceView(): ReactElement {
                 }
               }
               const result = await window.workwise.syncCatalogSource(source.id)
-              setNotice({
-                tone: result.status === 'failed' ? 'error' : 'success',
-                message: result.error || text('pluginUnifiedSourceAdded', '{{name}} catalog added.', { name: source.name })
-              })
+              setNotice(catalogSyncNotice(result, source.name, text))
               await refresh()
               return true
             } catch (error) {
@@ -1168,10 +1209,7 @@ export function PluginMarketplaceView(): ReactElement {
             setBusy(`source:${source.id}`)
             try {
               const result = await window.workwise.syncCatalogSource(source.id)
-              setNotice({
-                tone: result.status === 'failed' ? 'error' : 'success',
-                message: result.error || text('pluginUnifiedSourceSynced', '{{name}} catalog synchronized.', { name: source.name })
-              })
+              setNotice(catalogSyncNotice(result, source.name, text))
               await refresh()
             } catch (error) {
               setNotice({ tone: 'error', message: error instanceof Error ? error.message : String(error) })
@@ -1652,6 +1690,7 @@ function PluginRow({ entry, installed, server, reviewSha256, diagnostic, busy, t
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="truncate text-[14px] font-semibold">{packageDisplayName(item, text)}</span>
           <ProductTypeBadge item={item} text={text} />
+          {item.publisher.verified ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" aria-label={text('pluginUnifiedVerified', 'Verified publisher')} /> : null}
         </div>
         <p className="mt-1 line-clamp-1 text-[12px] text-ds-muted">{packageDisplaySummary(item, text)}</p>
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-ds-faint">
@@ -1718,12 +1757,12 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           ) : null}
         </div>
       </div>
-      {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source changed. Install the new package version to update its files.')}</p> : null}</DetailSection> : null}
+      {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>
         <DefinitionList values={[
           [text('pluginUnifiedVersion', 'Version'), installed ? `${installed.version} / ${item.version}` : item.version],
           [text('pluginUnifiedProductType', 'Product type'), productTypeLabel(productType(item), text)],
-          [text('pluginUnifiedPublisher', 'Publisher'), item.publisher.name],
+          [text('pluginUnifiedPublisher', 'Publisher'), `${item.publisher.name}${item.publisher.verified ? ` · ${text('pluginUnifiedVerified', 'Verified')}` : ''}`],
           [text('pluginUnifiedLicense', 'License'), item.license ?? text('pluginUnifiedUnknownLicense', 'Unknown')],
           [text('pluginUnifiedSource', 'Source'), sourceLabel(source, entry.sourceId, text)],
           [text('pluginUnifiedUpdatePolicy', 'Update policy'), updatePolicyLabel(item, text)]
@@ -1832,13 +1871,17 @@ function SourceDrawer({ sources, credentialStatuses, busy, text, workspaceAvaila
         {sources.map((source) => (
           <div key={source.id} className="px-5 py-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><div className="truncate text-[13px] font-semibold">{sourceLabel(source, source.id, text)}</div><div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-ds-faint"><span>{source.type}</span><span>·</span><span>{source.sync.state}</span></div></div>
+              <div className="min-w-0"><div className="truncate text-[13px] font-semibold">{sourceLabel(source, source.id, text)}</div><div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-ds-faint"><span>{source.type}</span><span>·</span><span>{source.trust}</span><span>·</span><span>{catalogSourceStateLabel(source, text)}</span></div></div>
               <div className="flex gap-1">{source.auth.type === 'token' ? <IconButton label={text('pluginUnifiedConfigureCredential', 'Configure credential')} disabled={busy === `credential:${source.id}`} onClick={() => { setCredentialSourceId(source.id); setCredentialToken('') }}>{busy === `credential:${source.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}</IconButton> : null}{source.sync.mode !== 'bundled' ? <IconButton label={text('pluginUnifiedSyncSource', 'Sync source')} disabled={busy === `source:${source.id}`} onClick={() => onSync(source)}>{busy === `source:${source.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</IconButton> : null}{source.scope !== 'system' ? <IconButton label={text('pluginUnifiedRemoveSource', 'Remove source')} disabled={busy === `source:${source.id}`} onClick={() => onRemove(source)}><Trash2 className="h-4 w-4" /></IconButton> : null}</div>
             </div>
             <p className="mt-2 break-all text-[11px] leading-4 text-ds-muted">{source.location}</p>
             {source.auth.type === 'token' ? <p className="mt-1 text-[10px] text-ds-faint">{credentialMap.get(source.id)?.configured ? text('pluginUnifiedCredentialConfigured', 'Credential configured') : text('pluginUnifiedCredentialMissing', 'Credential required')}</p> : null}
             {credentialSourceId === source.id ? <div className="mt-3 flex gap-2"><input type="password" autoFocus autoComplete="off" value={credentialToken} onChange={(event) => setCredentialToken(event.target.value)} placeholder={text('pluginUnifiedCatalogToken', 'Access token')} className="h-8 min-w-0 flex-1 rounded-md border border-ds-border bg-ds-card px-3 text-[11px] outline-none focus:border-accent/50" /><button type="button" disabled={!credentialToken.trim() || busy === `credential:${source.id}`} onClick={() => void onCredential(source, credentialToken).then((saved) => { if (saved) { setCredentialSourceId(''); setCredentialToken('') } })} className="h-8 rounded-md bg-ds-userbubble px-3 text-[11px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{text('pluginUnifiedSave', 'Save')}</button>{credentialMap.get(source.id)?.configured ? <button type="button" disabled={busy === `credential:${source.id}`} onClick={() => void onCredential(source, '').then((saved) => { if (saved) { setCredentialSourceId(''); setCredentialToken('') } })} className="h-8 rounded-md border border-ds-border px-3 text-[11px] font-medium hover:bg-ds-hover">{text('pluginUnifiedClear', 'Clear')}</button> : null}</div> : null}
-            {source.sync.error ? <p className="mt-2 text-[11px] text-red-700 dark:text-red-300">{source.sync.error}</p> : null}
+            {source.sync.error && source.id !== 'workwise-official' ? (
+              <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+                {catalogSourceStateLabel(source, text)}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>
@@ -1877,7 +1920,7 @@ function ReviewModal({ prepared, selections, scope, permissionUpdate, workspaceA
   const item = prepared.package
   return (
     <Modal title={text('pluginUnifiedReviewTitle', 'Review {{name}}', { name: item.name })} onClose={onClose}>
-      <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><PackageIcon className="mt-0.5 h-5 w-5 shrink-0 text-ds-muted" /><div><div className="text-[12px] font-semibold">{packageDisplayName(item, text)}</div><p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
+      <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div><p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
       {!prepared.compatibility.workwiseCompatible ? <div className="mt-3 flex gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-[12px] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><CircleAlert className="h-4 w-4 shrink-0" /><span>{prepared.compatibility.reasons.join(' ')}</span></div> : null}
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedPermissions', 'Permissions')}</h3><div className="mt-2 max-h-[230px] space-y-2 overflow-y-auto">{item.permissions.length ? item.permissions.map((permission) => <label key={permission.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-ds-border p-3"><input type="checkbox" checked={Boolean(selections[permission.id])} onChange={(event) => onSelection(permission.id, event.target.checked)} className="mt-0.5 h-4 w-4" /><div><div className="text-[12px] font-medium">{permissionKindLabel(permission.kind, text)} · {permissionAccessLabel(permission.access, text)}</div><p className="mt-0.5 text-[11px] leading-4 text-ds-muted">{permissionDescription(permission, text)}</p></div></label>) : <p className="text-[12px] text-ds-faint">{text('pluginUnifiedNoPermissions', 'No additional permissions declared.')}</p>}</div></div>
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedScope', 'Install scope')}</h3><div className="mt-2 inline-flex rounded-md bg-ds-subtle p-1">{(['user', 'workspace', 'team'] as const).map((value) => <button key={value} type="button" disabled={permissionUpdate || (value === 'workspace' && !workspaceAvailable)} onClick={() => onScope(value)} className={`h-8 rounded px-3 text-[11px] font-medium ${scope === value ? 'bg-ds-card shadow-sm' : 'text-ds-muted'} disabled:opacity-40`}>{text(`pluginUnifiedScope${value[0]!.toUpperCase()}${value.slice(1)}`, value)}</button>)}</div></div>

@@ -4341,5 +4341,17 @@
   "taskTimingQueued": "Queued",
   "taskTimingHumanWait": "Waiting for you",
   "taskTimingComplete": "Recorded since task creation; execution includes child work.",
-  "taskTimingPartial": "Recorded intervals only; missing historical time is not estimated."
+  "taskTimingPartial": "Recorded intervals only; missing historical time is not estimated.",
+  "pluginErrorPackageNetwork": "This plugin is listed in the catalog, but its package download source is unavailable. Use a mirror or import a local package.",
+  "pluginUnifiedPartialOffline": "Featured catalog remains available offline while some online sources are unavailable.",
+  "pluginUnifiedCatalogUnavailable": "The plugin catalog is temporarily unavailable. Try again later.",
+  "pluginUnifiedSourceUnchanged": "{{name}} is already up to date.",
+  "pluginUnifiedSourceOfflineNotice": "{{name}} is temporarily offline. The last verified cache remains available.",
+  "pluginUnifiedSourceFailed": "{{name}} could not be synchronized. The built-in catalog remains available.",
+  "pluginUnifiedSourceBundled": "Built in and available offline",
+  "pluginUnifiedSourceOffline": "Offline, using the last verified cache",
+  "pluginUnifiedSourceUnavailable": "Online source unavailable",
+  "pluginUnifiedSourceSyncedState": "Synchronized",
+  "pluginUnifiedSourceSyncing": "Synchronizing",
+  "pluginUnifiedSourceNotSynced": "Not synchronized"
 }
