@@ -145,7 +145,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
           <span className="min-w-0"><span className="block text-[14px] font-semibold">{nativeName(id)}</span><span className="mt-1 block text-[12px] leading-5 text-ds-muted">{nativeSummary(id)}</span></span>
         </button>
         <div className="mt-4 flex items-center justify-between gap-3">
-          <span className={`inline-flex items-center gap-1 text-[11px] ${isAvailable(id) ? 'text-emerald-700 dark:text-emerald-300' : 'text-ds-muted'}`}>{isAvailable(id) ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}{nativeStatus(id)}</span>
+          <span className={`inline-flex items-center gap-1 text-[11px] ${id === 'lark' && isAvailable(id) ? 'text-emerald-700 dark:text-emerald-300' : 'text-ds-muted'}`}>{id === 'lark' && isAvailable(id) ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}{nativeStatus(id)}</span>
           <button type="button" onClick={() => open(id, !isAvailable(id))} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{t(isAvailable(id) ? 'connectorHubManage' : 'connectorHubConnect')}<ArrowRight className="h-3.5 w-3.5" /></button>
         </div>
       </article>)}
@@ -162,6 +162,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
         <header className="flex min-h-14 items-center justify-between gap-3 border-b border-ds-border px-5"><h2 id="connector-hub-detail-title" className="text-[16px] font-semibold">{nativeName(selected)}</h2><button ref={closeRef} type="button" aria-label={t('connectorHubClose')} onClick={() => setSelected(null)} className="rounded-md p-2 hover:bg-ds-hover"><X className="h-4 w-4" /></button></header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
           <p className="mt-5 text-sm leading-6 text-ds-muted">{nativeSummary(selected)}</p>
+          {selected === 'dingtalk' ? <div className="mt-4"><ManagedDingTalkConnection onChanged={changed} autoConnect={autoConnect} /></div> : null}
           <p className="mt-3 rounded-lg border border-ds-border bg-ds-subtle px-3 py-2 text-[12px] leading-5 text-ds-muted">{t('connectorHubWriteBoundary')}</p>
           <h3 className="mt-5 text-[13px] font-semibold">{t('connectorHubTry')}</h3>
           <ul className="mt-2 list-inside list-disc space-y-2 text-[12px] text-ds-muted"><li>{t(selected === 'lark' ? 'connectorHubLarkExampleRead' : 'connectorHubDingTalkExampleRead')}</li><li>{t(selected === 'lark' ? 'connectorHubLarkExampleWrite' : 'connectorHubDingTalkExampleWrite')}</li></ul>
@@ -172,7 +173,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
               <p className="mt-1 text-[12px] leading-5 text-ds-muted">{t('connectorHubAdvancedPackagesDescription')}</p>
               <div className="mt-2 space-y-2">{larkPackages.map(entry => <button key={entry.key} type="button" onClick={() => { setSelected(null); onDetails(entry) }} className="flex w-full items-center justify-between gap-3 rounded-md border border-ds-border px-3 py-2 text-left text-[12px] hover:bg-ds-hover"><span>{t('connectorHubManagePackage', { name: name(entry) })}</span><ArrowRight className="h-3.5 w-3.5 shrink-0" /></button>)}</div>
             </details> : null}
-          </> : <><p className="mt-4 text-[12px] leading-5 text-ds-muted">{t('connectorHubDingTalkSetup')}</p><div className="mt-5"><ManagedDingTalkConnection onChanged={changed} autoConnect={autoConnect} /></div><details className="mt-6"><summary className="cursor-pointer py-2 text-[12px] font-medium text-ds-muted">{t('connectorHubAdvancedDingTalk')}</summary><DingTalkConnectorSettingsCard /></details></>}
+          </> : <><p className="mt-4 text-[12px] leading-5 text-ds-muted">{t('connectorHubDingTalkSetup')}</p><details className="mt-6"><summary className="cursor-pointer py-2 text-[12px] font-medium text-ds-muted">{t('connectorHubAdvancedDingTalk')}</summary><DingTalkConnectorSettingsCard /></details></>}
         </div>
       </aside>
     </div> : null}

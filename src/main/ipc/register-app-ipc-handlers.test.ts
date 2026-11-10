@@ -16,12 +16,24 @@ import {
 } from '../../shared/app-settings'
 
 const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<unknown>>()
+const desktopDingTalkMocks = vi.hoisted(() => ({ open: vi.fn(async () => ({ ok: true })) }))
+vi.mock('../services/dingtalk-desktop-service', () => ({ openDingTalkDesktop: desktopDingTalkMocks.open }))
 const dwsMocks = vi.hoisted(() => ({
   diagnose: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
   install: vi.fn(async () => ({ ok: true, status: { state: 'needs_login' } })),
   begin: vi.fn<() => Promise<ManagedDwsResult>>(async () => ({ ok: true, state: 'waiting', verificationUrl: 'https://login.dingtalk.com/device' })),
   check: vi.fn(async () => ({ ok: true, state: 'succeeded', status: { state: 'installed', identityFingerprint: 'synthetic-fingerprint' } })),
   cancel: vi.fn(async () => ({ ok: true, state: 'cancelled' }))
+}))
+const dwsReadCheck = vi.hoisted(() => vi.fn(async (_status: unknown) => ({
+  ok: true,
+  itemCount: 0,
+  checkedAt: '2026-11-11T00:00:00.000Z',
+  message: '待办读取已验证。'
+})))
+vi.mock('../services/dws-connection-check', () => ({
+  checkDingTalkTaskAccess: dwsReadCheck,
+  dwsTaskAccessFailure: (code: string) => ({ ok: false, code })
 }))
 vi.mock('../services/managed-dws-service', () => ({
   diagnoseManagedDingTalk: dwsMocks.diagnose,
@@ -990,6 +1002,18 @@ describe('registerAppIpcHandlers', () => {
     }))
   })
 
+  it('opens only the fixed DingTalk desktop target and rejects renderer-supplied paths', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions())
+    const handler = handlers.get('shell:open-dingtalk-desktop')!
+    expect(await handler({})).toEqual({ ok: true })
+    expect(desktopDingTalkMocks.open).toHaveBeenCalledOnce()
+    for (const payload of ['/Applications/Other.app', { path: '/tmp/Other.app' }, 'dingtalk://untrusted']) {
+      await expect(handler({}, payload)).rejects.toThrow(/Invalid payload/)
+    }
+    expect(desktopDingTalkMocks.open).toHaveBeenCalledOnce()
+  })
+
   it('registers every managed-tool IPC handler and validates tool ids', async () => {
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
 
@@ -1077,6 +1101,37 @@ describe('registerAppIpcHandlers', () => {
     expect(setEnabled.mock.calls).toEqual([[true], [false]])
     expect(dwsMocks.diagnose).not.toHaveBeenCalled()
     expect(dwsMocks.begin).not.toHaveBeenCalled()
+  })
+
+  it('offers a fixed read check after trusted diagnosis and rejects arbitrary input', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => ({ enabled: true }) })
+    expect(await handlers.get('tool:dingtalk:check-task-access')?.({})).toMatchObject({ ok: true, itemCount: 0 })
+    expect(dwsReadCheck).toHaveBeenCalledWith({ state: 'needs_login', enabled: true })
+    for (const payload of [{ pageSize: 100 }, { command: 'approve' }, 'read', null]) {
+      await expect(handlers.get('tool:dingtalk:check-task-access')?.({}, payload)).rejects.toThrow(/Invalid payload/)
+    }
+    expect(dwsReadCheck).toHaveBeenCalledOnce()
+  })
+
+  it('stops the business read when connector Runtime refresh fails', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => { throw new Error('refresh failed') } })
+    expect(await handlers.get('tool:dingtalk:check-task-access')?.({})).toMatchObject({ ok: false, code: 'connector_identity_unverified' })
+    expect(dwsReadCheck).not.toHaveBeenCalled()
+  })
+
+  it('shares a concurrent read diagnostic instead of dispatching a second query', async () => {
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    let finish!: (value: Awaited<ReturnType<typeof dwsReadCheck>>) => void
+    dwsReadCheck.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    registerAppIpcHandlers({ ...registerOptions(), refreshManagedDingTalkCapabilities: async () => ({ enabled: true }) })
+    const first = handlers.get('tool:dingtalk:check-task-access')?.({})
+    const second = handlers.get('tool:dingtalk:check-task-access')?.({})
+    await vi.waitFor(() => expect(dwsReadCheck).toHaveBeenCalledOnce())
+    finish({ ok: true, itemCount: 0, checkedAt: '2026-11-11T00:00:00.000Z', message: '待办读取已验证。' })
+    expect(await first).toEqual(await second)
+    expect(dwsMocks.diagnose).toHaveBeenCalledOnce()
   })
 
   it('returns persisted disabled state from a trusted refresh without replacing installation or identity diagnosis', async () => {

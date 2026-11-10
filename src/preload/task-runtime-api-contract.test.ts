@@ -18,10 +18,16 @@ describe('production preload task API and main IPC contract', () => {
         return { ok: true, status: 200, body: '{}' }
       }
       if (channel === 'runtime:sse:start') return sseStartPayloadSchema.parse(payload)
+      if (channel === 'shell:open-dingtalk-desktop') return { ok: true }
       throw new Error(`Unexpected task API channel: ${channel}`)
     })
     await import('./index')
     api = bridge.exposed.get('workwise') as WorkWiseApi
+  })
+
+  it('passes the fixed DingTalk desktop action without renderer-supplied launch arguments', async () => {
+    expect(await api.openDingTalkDesktop()).toEqual({ ok: true })
+    expect(bridge.invoke).toHaveBeenCalledWith('shell:open-dingtalk-desktop')
   })
 
   it('passes actual task list, detail, mutation, inbox, template and Shell requests through the desktop boundary', async () => {

@@ -72,11 +72,11 @@ describe('ConnectorCatalog', () => {
     mocks.runtimeRequest.mockResolvedValue({ ok: true, status: 200, body: JSON.stringify({ capabilities: { lark: { enabled: true, available: true, authState: 'installed' }, dingtalk: { enabled: true, available: true, credentialState: 'valid', identityVerified: true } } }) })
     await click('Check connections')
     expect(container.textContent?.match(/Verified capabilities available/g)).toHaveLength(1)
-    expect(container.textContent).toContain('Account connected · platform permissions checked when used')
+    expect(container.textContent).toContain('Login saved · task access untested')
     mocks.runtimeRequest.mockResolvedValue({ ok: false, status: 503, body: '{}' })
     await click('Check connections')
     expect(container.textContent).not.toContain('Verified capabilities available')
-    expect(container.textContent).not.toContain('Account connected · platform permissions checked when used')
+    expect(container.textContent).not.toContain('Login saved · task access untested')
   })
 
   it('opens a one-shot provider deep link without starting authorization', async () => {

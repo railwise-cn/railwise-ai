@@ -211,6 +211,7 @@ const api = {
   checkManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:check'),
   cancelManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:cancel'),
   diagnoseManagedDingTalk: () => ipcRenderer.invoke('tool:dingtalk:diagnose'),
+  checkManagedDingTalkTaskAccess: () => ipcRenderer.invoke('tool:dingtalk:check-task-access'),
   installManagedDingTalk: () => ipcRenderer.invoke('tool:dingtalk:install'),
   beginManagedDingTalkLogin: () => ipcRenderer.invoke('tool:dingtalk:login-begin'),
   checkManagedDingTalkLogin: () => ipcRenderer.invoke('tool:dingtalk:login-check'),
@@ -460,6 +461,7 @@ const api = {
   runDesktopCommand: (command) =>
     ipcRenderer.invoke('desktop:command', command),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
+  openDingTalkDesktop: () => ipcRenderer.invoke('shell:open-dingtalk-desktop'),
   showTurnCompleteNotification: (payload) => ipcRenderer.invoke('notification:turn-complete', payload),
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   getGuiUpdateState: () => ipcRenderer.invoke('gui:update-state'),

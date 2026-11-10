@@ -1,4 +1,5 @@
 import { claimTaskNotification } from '../services/task-notification-service'
+import { openDingTalkDesktop } from '../services/dingtalk-desktop-service'
 import { reviewDocumentCandidate, decideDocumentCandidate } from '../services/document-candidate-service'
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification, shell, type WebContents } from 'electron'
 import brand from '../../shared/product-brand.json'
@@ -227,6 +228,7 @@ import {
   updateManagedTool
 } from '../services/managed-tool-service'
 import { diagnoseManagedDingTalk, installManagedDingTalk, beginManagedDingTalkLogin, checkManagedDingTalkLogin, cancelManagedDingTalkLogin } from '../services/managed-dws-service'
+import { checkDingTalkTaskAccess, dwsTaskAccessFailure } from '../services/dws-connection-check'
 import { appCancellationRegistry } from '../cancellation-registry'
 import { runtimeThreadInterruptPath } from '../../shared/runtime-endpoints'
 import { atomicWriteFile as durableWriteFile } from '../services/durable-file'
@@ -1719,6 +1721,18 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     return result
   }
   ipcMain.handle('tool:dingtalk:diagnose', async () => refreshDingTalk(await diagnoseManagedDingTalk()))
+  let taskAccessCheck: Promise<import('../../shared/managed-dws').ManagedDwsTaskAccessResult> | undefined
+  ipcMain.handle('tool:dingtalk:check-task-access', async (_, payload: unknown) => {
+    parseIpcPayload('tool:dingtalk:check-task-access', z.undefined(), payload)
+    if (taskAccessCheck) return taskAccessCheck
+    const check = async () => {
+      const result = await refreshDingTalk(await diagnoseManagedDingTalk())
+      if (!result.ok) return dwsTaskAccessFailure('connector_identity_unverified')
+      return checkDingTalkTaskAccess(result.status)
+    }
+    taskAccessCheck = check()
+    try { return await taskAccessCheck } finally { taskAccessCheck = undefined }
+  })
   ipcMain.handle('tool:dingtalk:install', async () => refreshDingTalk(await installManagedDingTalk()))
   ipcMain.handle('tool:dingtalk:login-begin', async () => refreshDingTalk(await beginManagedDingTalkLogin()))
   ipcMain.handle('tool:dingtalk:login-check', async () => refreshDingTalk(await checkManagedDingTalkLogin()))
@@ -2484,6 +2498,10 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   ipcMain.handle('shell:open-external', async (_, url: unknown) => {
     const validatedUrl = parseIpcPayload('shell:open-external', shellOpenExternalUrlSchema, url)
     await shell.openExternal(validatedUrl)
+  })
+  ipcMain.handle('shell:open-dingtalk-desktop', async (_, payload: unknown) => {
+    parseIpcPayload('shell:open-dingtalk-desktop', z.undefined(), payload)
+    return openDingTalkDesktop()
   })
   ipcMain.handle('notification:task', async (_, payload: unknown) => {
     const data=z.object({key:z.string().min(1).max(512),taskId:z.string().min(1).max(256).optional(),flowId:z.string().min(1).max(256).optional(),flowRunId:z.string().min(1).max(256).optional(),kind:z.enum(['attention','artifact']),title:z.string().max(160),body:z.string().max(500)}).strict().refine(value=>Boolean(value.taskId || value.flowRunId),'A task or Flow destination is required.').parse(payload)

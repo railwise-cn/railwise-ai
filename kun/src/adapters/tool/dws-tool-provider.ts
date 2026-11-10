@@ -12,7 +12,7 @@ import { assertDwsCredentialAccess, resolveDwsEnvironment } from '../../services
 import { parseDwsIdentityBinding } from '../../services/dws-cli-identity.js'
 
 type Json=Record<string,unknown>
-export type DwsCommandResult={ok:boolean;output:unknown}
+export type DwsCommandResult={ok:boolean;output:unknown;errorCode?:string}
 export type DwsRunner=(path:string,args:string[],signal:AbortSignal,expectedHash:string)=>Promise<DwsCommandResult>
 const exec=promisify(execFile)
 const defaultRunner:DwsRunner=async(path,args,signal,expectedHash)=>{
@@ -22,7 +22,15 @@ const defaultRunner:DwsRunner=async(path,args,signal,expectedHash)=>{
   try{hash=createHash('sha256').update(await readFile(path)).digest('hex')}catch{throw fail('connector_executable_unverified')}
   if(hash!==expectedHash)throw fail('connector_executable_changed')
   try{const result=await exec(path,args,{env,signal,timeout:30_000,maxBuffer:4*1024*1024});return {ok:true,output:parse(String(result.stdout))}}
-  catch(error){const result=error as {stdout?:string;stderr?:string};return {ok:false,output:parse(String(result.stdout||result.stderr||''))}}
+  catch(error){
+    const result=error as {stdout?:string;stderr?:string;code?:string;killed?:boolean;name?:string}
+    const errorCode = result.killed || result.name === 'AbortError'
+      ? 'connector_request_timeout'
+      : ['ENOTFOUND','ECONNREFUSED','ECONNRESET','EAI_AGAIN'].includes(result.code ?? '')
+        ? 'connector_network_failed'
+        : undefined
+    return {ok:false,output:parse(String(result.stdout||result.stderr||'')),errorCode}
+  }
 }
 // Exact flags at upstream 63a7c4906c7d. No raw command, URL, user selector or token is accepted.
 // eslint-disable-next-line no-control-regex
@@ -113,9 +121,21 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
     }})
   return {id:'dingtalk',kind:'skill',enabled:true,available:true,tools:[
     define({name:'dingtalk_list_tasks',description:'读取当前已连接钉钉组织和账号的未完成待办；按页返回，不代表全部任务。',schema:list,operation:'list',execute:async(args,context)=>{
-      const raw=await run(['todo','task','list','--status','false','--page',String(args.page),'--size',String(args.pageSize)],context)
-      const cards=findArray(raw,['todoCards']);if(!cards)throw fail('connector_invalid_response')
-      return {todoCards:cards,page:args.page,pageSize:args.pageSize,raw}
+      const requestedSize = Number(args.pageSize)
+      const pageSize = Math.min(requestedSize, 20)
+      const cards: unknown[] = []
+      const pages: Json[] = []
+      // Upstream's >20 auto-page path drops its success envelope. Validate
+      // each normal page before merging, retaining the upstream start page.
+      for (let page = Number(args.page); cards.length < requestedSize; page++) {
+        const raw = await run(['todo','task','list','--status','false','--page',String(page),'--size',String(pageSize)],context)
+        const pageCards = findArray(raw,['todoCards'])
+        if (!pageCards) throw fail('connector_invalid_response')
+        pages.push(raw)
+        cards.push(...pageCards.slice(0, requestedSize - cards.length))
+        if (pageCards.length < pageSize) break
+      }
+      return {todoCards:cards,page:args.page,pageSize:args.pageSize,raw:pages.length === 1 ? pages[0] : {pages}}
     }}),
     define({name:'dingtalk_get_task',description:'按准确ID读取钉钉待办详情。',schema:todo,operation:'detail',execute:async(_args,context,target)=>readTodo(target,context)}),
     define({name:'dingtalk_complete_task',description:'用户确认后完成一个准确钉钉待办，回读验证结果。',schema:todo,operation:'complete',write:true,execute:async(_args,context,target)=>run(['todo','task','done','--task-id',target,'--status','true'],context)}),
@@ -136,13 +156,23 @@ function parse(value:string):unknown{try{return JSON.parse(value.trim())}catch{r
 function object(value:unknown):Json{return value&&typeof value==='object'&&!Array.isArray(value)?value as Json:{}}
 function business(response:DwsCommandResult):Json{
   const root=object(response.output)
-  if(!response.ok||root.ok===false||root.success===false||root.error||root.dry_run===true||root.outcome&&root.outcome!=='success')throw fail('connector_remote_failed')
+  if(!response.ok||root.ok===false||root.success===false||root.error||root.dry_run===true||root.outcome&&root.outcome!=='success')throw fail(remoteErrorCode(root,response.errorCode))
   if(root.ok!==true&&root.success!==true)throw fail('connector_invalid_response')
   const data=root.outcome==='success'?object(root.data):root
   if(data.success===false||data.error||data.errorCode!==undefined&&data.errorCode!==0&&data.errorCode!=='0')throw fail('connector_remote_failed')
   if(data.result&&typeof data.result==='object'&&!Array.isArray(data.result))return object(data.result)
   // Preserve a legitimate array result under result for bounded parsers.
   return data
+}
+function remoteErrorCode(root:Json, transportCode?:string):string {
+  const error = object(root.error)
+  const status = error.http_status
+  if (error.type === 'auth' || status === 401) return 'connector_authorization_required'
+  if (error.type === 'permission' || status === 403) return 'connector_access_denied'
+  if (status === 429) return 'connector_rate_limited'
+  if (status === 408 || status === 504) return 'connector_request_timeout'
+  if (error.subtype === 'network') return 'connector_network_failed'
+  return transportCode ?? 'connector_remote_failed'
 }
 function findArray(value:Json,keys:string[],depth=0):unknown[]|undefined{if(depth>4)return undefined;for(const key of keys)if(Array.isArray(value[key]))return value[key] as unknown[];for(const key of ['result','data']){if(Array.isArray(value[key]))return value[key] as unknown[];const found=findArray(object(value[key]),keys,depth+1);if(found)return found}return undefined}
 function findObject(value:Json,keys:string[],depth=0):Json|undefined{if(depth>4)return undefined;for(const key of keys){const found=object(value[key]);if(Object.keys(found).length)return found}for(const key of ['result','data']){const found=findObject(object(value[key]),keys,depth+1);if(found)return found}return undefined}

@@ -17,6 +17,9 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
   const [login, setLogin] = useState<Login>()
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
+  const [browserError, setBrowserError] = useState(false)
+  const [accessMessage, setAccessMessage] = useState('')
+  const authorizationRef = useRef<HTMLDivElement>(null)
   const busy = useRef(false)
   const started = useRef(false)
   const mounted = useRef(true)
@@ -39,7 +42,7 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     if (result.state) setLogin(result)
     if (result.message) setMessage(result.message)
     else if (result.state) setMessage(t(`managedDwsLogin_${result.state}`))
-    else if (result.status) setMessage(result.status.message ?? t(`managedDwsStatus_${result.status.state}`))
+    else if (result.status) setMessage(result.status.message ?? '')
     return result
   }, [t])
   const diagnose = useCallback(async (): Promise<ManagedDwsStatus | undefined> => {
@@ -48,7 +51,14 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     await changed.current?.()
     return result.status
   }, [apply, t])
+  const openAuthorization = useCallback(async (url: string): Promise<void> => {
+    setBrowserError(false)
+    try { await window.workwise.openExternal(url) }
+    catch { if (mounted.current) setBrowserError(true) }
+  }, [])
   const connect = useCallback(async (): Promise<void> => {
+    setBrowserError(false)
+    setAccessMessage('')
     let current = await diagnose()
     if (!mounted.current) return
     if (current?.enabled === false) { setMessage(t('managedDwsDisabled')); return }
@@ -60,13 +70,12 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     }
     if (!mounted.current) return
     if (!current || current.state === 'not_installed' || current.state === 'error') throw new Error(current?.message ?? t('managedDwsStatus_error'))
-    if (current.state === 'installed' && current.identityFingerprint) return
     if (!window.workwise.beginManagedDingTalkLogin) throw new Error(t('capabilityLoginUnavailable'))
     const result = await apply(await window.workwise.beginManagedDingTalkLogin())
     if (result.state === 'succeeded') await changed.current?.()
     // The main process accepts only the pinned official CLI's allowlisted URL.
-    if (mounted.current && result.state === 'waiting' && result.verificationUrl) await window.workwise.openExternal(result.verificationUrl)
-  }, [apply, diagnose, t])
+    if (mounted.current && result.state === 'waiting' && result.verificationUrl) await openAuthorization(result.verificationUrl)
+  }, [apply, diagnose, openAuthorization, t])
   const check = useCallback(async (): Promise<void> => {
     if (!window.workwise.checkManagedDingTalkLogin) throw new Error(t('capabilityLoginUnavailable'))
     const checked = await window.workwise.checkManagedDingTalkLogin()
@@ -88,22 +97,47 @@ export function ManagedDingTalkConnection({ onChanged, autoConnect = false }: Pr
     return () => clearInterval(timer)
   }, [check, login?.state, run])
   const waiting = login?.state === 'waiting'
+  useEffect(() => {
+    if (waiting && login.verificationUrl) authorizationRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [waiting, login?.verificationUrl])
 
   return <section aria-label={t('managedDwsTitle')} className="rounded-xl border border-ds-border bg-ds-surface p-4">
     <h3 className="font-semibold">{t('managedDwsTitle')}</h3>
     <p className="mt-1 text-xs leading-5 text-ds-muted">{t('managedDwsDescription')}</p>
     {status ? <p className="mt-3 text-xs">{status.enabled === false ? t('managedDwsDisabled') : t(`managedDwsStatus_${status.state}`)}</p> : null}
-    {waiting && login.verificationUrl ? <div className="mt-3 rounded-lg border border-ds-border p-3">
-      <div className="inline-block rounded-lg bg-white p-2"><QRCodeSVG value={login.verificationUrl} size={144} marginSize={1} title={t('managedDwsQrCode')} /></div>
+    {waiting && login.verificationUrl ? <div ref={authorizationRef} className="mt-3 rounded-lg border border-ds-border p-3">
+      <div className="inline-block rounded-lg bg-white p-2"><QRCodeSVG value={login.verificationUrl} size={208} marginSize={2} title={t('managedDwsQrCode')} /></div>
       {login.userCode ? <p className="mt-2 text-sm">{t('capabilityLoginCode', { code: login.userCode })}</p> : null}
       {login.expiresAt ? <p className="mt-1 text-xs text-ds-muted">{t('capabilityLoginExpires', { expiresAt: new Date(login.expiresAt).toLocaleString() })}</p> : null}
       <p className="mt-2 text-xs text-ds-muted">{t('managedDwsWaiting')}</p>
-      <button type="button" disabled={pending} onClick={() => void run(async () => { await window.workwise.openExternal(login.verificationUrl!) })} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('managedLarkOpenAuthorization')}</button>
+      {browserError ? <p role="alert" className="mt-2 text-sm">{t('managedDwsBrowserFailed')}</p> : null}
+      <label className="mt-2 block text-xs text-ds-muted">{t('managedDwsAuthorizationLink')}<input readOnly value={login.verificationUrl} className="mt-1 w-full rounded border border-ds-border bg-ds-card px-2 py-1.5" onFocus={event => event.currentTarget.select()} /></label>
+      <button type="button" disabled={pending} onClick={() => void run(async () => { await openAuthorization(login.verificationUrl!) })} className="mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('managedLarkOpenAuthorization')}</button>
+      <button type="button" disabled={pending} onClick={() => void run(async () => {
+        try { await navigator.clipboard.writeText(login.verificationUrl!); setMessage(t('managedDwsLinkCopied')) }
+        catch { setMessage(t('managedDwsCopyFailed')) }
+      })} className="ml-2 mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('managedDwsCopyLink')}</button>
     </div> : null}
     {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs leading-5">{message}</p> : null}
+    {accessMessage ? <p role="status" className="mt-3 whitespace-pre-wrap text-sm leading-5">{accessMessage}</p> : null}
     <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
-      <button type="button" disabled={pending || waiting || status?.enabled === false} onClick={() => void run(connect)}>{t('managedDwsConnect')}</button>
-      <button type="button" disabled={pending} onClick={() => void run(async () => { await diagnose() })}>{t('capabilityDiagnose')}</button>
+      <button type="button" disabled={pending || waiting || status?.enabled === false} onClick={() => void run(connect)}>{t(status?.state === 'installed' ? 'managedDwsReconnect' : 'managedDwsConnect')}</button>
+      <button type="button" disabled={pending} onClick={() => void run(async () => { await diagnose() })}>{t('managedDwsCheckLogin')}</button>
+      <button type="button" disabled={pending || waiting || status?.enabled === false} onClick={() => void run(async () => {
+        if (!window.workwise.checkManagedDingTalkTaskAccess) throw new Error(t('capabilityLoginUnavailable'))
+        setAccessMessage(t('managedDwsReadChecking'))
+        try {
+          const result = await window.workwise.checkManagedDingTalkTaskAccess()
+          setAccessMessage(result.ok ? t('managedDwsReadSuccess', { count: result.itemCount }) : result.message)
+        } catch {
+          setAccessMessage(t('managedDwsReadFailed'))
+        }
+      })}>{t('managedDwsTestAccess')}</button>
+      <button type="button" disabled={pending} onClick={() => void run(async () => {
+        if (!window.workwise.openDingTalkDesktop) throw new Error(t('managedDwsDesktop_unsupported'))
+        const result = await window.workwise.openDingTalkDesktop()
+        setMessage(t(result.ok ? 'managedDwsDesktopOpened' : `managedDwsDesktop_${result.code}`))
+      })}>{t('managedDwsOpenDesktop')}</button>
       {status?.enabled !== undefined && !waiting ? <button type="button" disabled={pending} onClick={() => void run(async () => {
         if (!window.workwise.setManagedDingTalkEnabled) throw new Error(t('capabilityLoginUnavailable'))
         await apply(await window.workwise.setManagedDingTalkEnabled(!status.enabled))

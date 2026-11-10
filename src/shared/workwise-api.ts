@@ -1,5 +1,5 @@
 import type { WorkspaceMigrationReport, WorkspaceImportRequest, WorkspaceImportResult } from './workspace-migration'
-import type { ManagedDwsResult } from './managed-dws'
+import type { ManagedDwsResult, ManagedDwsTaskAccessResult } from './managed-dws'
 import type {
   AppSettingsPatch,
   WorkWiseSettingsV2,
@@ -164,6 +164,9 @@ import type {
 export type RuntimeRequestResult = { ok: boolean; status: number; body: string }
 export type WorkspacePickResult = { canceled: boolean; path: string | null }
 export type PathOpenResult = { ok: boolean; message?: string }
+export type DingTalkDesktopResult =
+  | { ok: true }
+  | { ok: false; code: 'not_installed' | 'unsupported' | 'invalid_app' | 'open_failed'; message: string }
 export const DESKTOP_COMMANDS = [
   'undo',
   'redo',
@@ -520,6 +523,7 @@ export type WorkWiseApi = {
   checkManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
   cancelManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
   diagnoseManagedDingTalk: () => Promise<ManagedDwsResult>
+  checkManagedDingTalkTaskAccess: () => Promise<ManagedDwsTaskAccessResult>
   installManagedDingTalk: () => Promise<ManagedDwsResult>
   beginManagedDingTalkLogin: () => Promise<ManagedDwsResult>
   checkManagedDingTalkLogin: () => Promise<ManagedDwsResult>
@@ -749,6 +753,7 @@ export type WorkWiseApi = {
   ) => Promise<ScheduleTaskFromTextResult>
   runDesktopCommand: (command: DesktopCommand) => Promise<void>
   openExternal: (url: string) => Promise<void>
+  openDingTalkDesktop: () => Promise<DingTalkDesktopResult>
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>

@@ -71,6 +71,35 @@ describe('official typed DingTalk DWS provider',()=>{
   it('does not accept transport success, pending, preview or remote failure as evidence',()=>{
     for(const output of [{},{ok:true,outcome:'pending',data:{}},{ok:true,outcome:'success',dry_run:true,data:{}},{success:false},{success:true,errorCode:403},[]])expect(()=>_dwsToolProviderInternals.business({ok:true,output})).toThrow()
   })
+  it('validates normal upstream pages for sizes above 20 while preserving the starting page', async () => {
+    const runner = vi.fn(async (_path: string, _args: string[]) => ({ ok: true, output: { success: true, result: { todoCards: Array.from({length:20}, (_, i) => ({taskId:String(i)})) } } }))
+    const tool = buildDwsToolProvider(dwsTestConfig, withDwsTestIdentity(runner))!.tools[0]
+    const result = await tool.execute({page:3,pageSize:25}, context())
+    expect(result).toMatchObject({output:{status:'succeeded',data:{page:3,pageSize:25}}})
+    expect((result.output as {data:{todoCards:unknown[]}}).data.todoCards).toHaveLength(25)
+    expect(runner.mock.calls.map(call => call[1].slice(0, 9))).toEqual([
+      ['todo','task','list','--status','false','--page','3','--size','20'],
+      ['todo','task','list','--status','false','--page','4','--size','20']
+    ])
+  })
+  it('keeps an empty page successful and propagates a later page failure', async () => {
+    const empty = vi.fn(async () => ({ok:true,output:{success:true,result:{todoCards:[]}}}))
+    expect(await buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(empty))!.tools[0].execute({pageSize:100},context())).toMatchObject({output:{status:'succeeded',data:{todoCards:[]}}})
+    expect(empty).toHaveBeenCalledOnce()
+    const runner = vi.fn(async () => ({ok:true,output:{success:true,result:{todoCards:Array.from({length:20},()=>({taskId:'synthetic'}))}}}))
+      .mockResolvedValueOnce({ok:true,output:{success:true,result:{todoCards:Array.from({length:20},()=>({taskId:'synthetic'}))}}})
+      .mockResolvedValueOnce({ok:false,output:{success:false,result:{todoCards:[]}}})
+    expect(await buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools[0].execute({pageSize:25},context())).toMatchObject({isError:true,output:{code:'connector_remote_failed'}})
+  })
+  it.each([
+    [{type:'auth',http_status:401},'connector_authorization_required'],
+    [{type:'permission',http_status:403},'connector_access_denied'],
+    [{type:'api',http_status:429},'connector_rate_limited'],
+    [{type:'api',http_status:504},'connector_request_timeout'],
+    [{type:'api',subtype:'network'},'connector_network_failed']
+  ])('retains actionable official error categories', (error, expected) => {
+    expect(() => _dwsToolProviderInternals.business({ok:false,output:{ok:false,outcome:'failure',error}})).toThrow(expected)
+  })
   it('checks the actual executable hash before launch without reading credentials',async()=>{
     const root=mkdtempSync(join(tmpdir(),'dws-hash-')),path=join(root,'dws')
     writeFileSync(path,'synthetic binary')
