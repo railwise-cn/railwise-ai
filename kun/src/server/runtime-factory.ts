@@ -809,7 +809,11 @@ export async function createKunServeRuntime(
       insecure: options.insecure,
       startedAt,
       pid: process.pid,
-      capabilities,
+      capabilities: { ...capabilities, workspaces: {
+        flow: { status: 'available', enabled: true, available: Boolean(flowService) },
+        design: { status: designProviders.available ? 'available' : 'unavailable', enabled: true, available: designProviders.available, ...(designProviders.reason?{reason:designProviders.reason}:{}) },
+        schedule: { status: backgroundTaskScheduling ? 'available' : 'disabled', enabled: backgroundTaskScheduling, available: backgroundTaskScheduling }
+      } },
       resourceLimits: RUNTIME_RESOURCE_LIMITS_V1
     }),
     toolDiagnostics: async () => ({

@@ -40,7 +40,11 @@ export class TaskCoordinator {
     let intent = command.intent === 'auto' ? classifyTaskInput(userText,Boolean(task)) : command.intent
     if(intent==='status') { const result:TaskCommandResult={kind:'snapshot',task}; await this.recordResult(command,result); return result }
     const resolving = command.resolveAttentionId ? this.deps.repository.attention(command.resolveAttentionId) : null
-    if (command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id || resolving.payload?.kind !== 'task_input_intent' || !['supplement','new'].includes(intent))) throw Object.assign(new Error('attention decision does not match this task command'), {code:'scope_conflict'})
+    if (command.resolveAttentionId && (!resolving || resolving.threadId !== origin.id ||
+      !(resolving.payload?.kind === 'task_input_intent' && ['supplement','new'].includes(intent) ||
+        resolving.payload?.kind === 'capability_required' && intent === 'resume' && resolving.taskId === task?.id))) {
+      throw Object.assign(new Error('attention decision does not match this task command'), {code:'scope_conflict'})
+    }
     const receipt = this.deps.repository.execution.command(command.threadId,command.idempotencyKey,command)
     if(receipt.result) { const result=receipt.result as TaskCommandResult;await this.recordResult(command,result);return result }
     if (intent === 'ambiguous' && task && this.deps.classifyIntent) {
@@ -112,7 +116,10 @@ export class TaskCoordinator {
       await this.recordResult(command,result)
       return result
     }
-    if (resolving && result.kind !== 'attention_required') this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
+    if (resolving && result.kind !== 'attention_required' && result.kind !== 'capability_required') {
+      const latest=this.deps.repository.attention(resolving.id) ?? resolving
+      if(latest.status==='pending')this.deps.repository.putAttention({...latest,status:'answered',revision:latest.revision+1,updatedAt:this.deps.nowIso()})
+    }
     this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
     await this.recordResult(command,result)
     return result

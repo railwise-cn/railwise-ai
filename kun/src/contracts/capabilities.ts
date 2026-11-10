@@ -274,6 +274,7 @@ export const RuntimeCapabilityManifest = z
       model: z.string().optional()
     }).strict(),
     visionEvidence: RuntimeCapabilityState.optional(),
+    workspaces: z.object({ flow: RuntimeCapabilityState, design: RuntimeCapabilityState, schedule: RuntimeCapabilityState }).optional(),
     uiActions: RuntimeCapabilityState
   })
   .strict()
