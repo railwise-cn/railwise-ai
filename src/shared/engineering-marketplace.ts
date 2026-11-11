@@ -30,8 +30,39 @@ export const ZOTERO_PACKAGE = {
   wheelUrl: 'https://files.pythonhosted.org/packages/77/8c/84503b4469a2045587ccd2eb9b5b6579a679ac63c48abb18c23fa8b94c3e/zotero_mcp_server-0.17.0-py3-none-any.whl'
 } as const
 
-/** Explicit upstream installation decision for this exact reviewed artifact only. */
+export const AUTOCAD_UPSTREAM = {
+  ids: ['autocad-dwg-redraw', 'autocad-image-redraw'],
+  owner: 'pengxiaoan',
+  repository: 'autocad-dwg-redraw-skill',
+  commit: 'ed182ec5966caaaf1d82d6ad4015435a27a8a909',
+  sha256: '1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e'
+} as const
+
+/** User-requested upstream imports of these exact reviewed Skill directories. */
+export function isApprovedAutocadUpstreamSkill(item: MarketplacePackageV1): boolean {
+  const component = item.components[0]
+  const subpath = `skills/${item.id}`
+  const repository = `https://github.com/${AUTOCAD_UPSTREAM.owner}/${AUTOCAD_UPSTREAM.repository}`
+  return AUTOCAD_UPSTREAM.ids.some(id => id === item.id)
+    && item.version === AUTOCAD_UPSTREAM.commit && item.license === null
+    && item.installation.mode === 'upstream-only' && !item.installation.installedByDefault
+    && item.sources.length === 1
+    && [item.source, ...item.sources].every(source => source.kind === 'github'
+      && source.owner === AUTOCAD_UPSTREAM.owner && source.repository === AUTOCAD_UPSTREAM.repository
+      && source.location === `${repository}/tree/${AUTOCAD_UPSTREAM.commit}/${subpath}`
+      && source.requestedRef === AUTOCAD_UPSTREAM.commit && source.resolvedRef === AUTOCAD_UPSTREAM.commit
+      && source.subpath === subpath && source.digest?.algorithm === 'sha256'
+      && source.digest.value === AUTOCAD_UPSTREAM.sha256)
+    && item.components.length === 1 && component.type === 'skill'
+    && component.sourceId === item.source.id && component.skillNames?.length === 1 && component.skillNames[0] === item.id
+    && component.runtime.kind === 'github' && component.runtime.repository === repository
+    && component.runtime.resolvedCommit === AUTOCAD_UPSTREAM.commit && component.runtime.subpath === subpath
+    && component.runtime.install.strategy === 'managed-git' && component.runtime.install.verifyBeforeActivation
+}
+
+/** Explicit upstream installation decisions for reviewed artifacts only. */
 export function isApprovedUpstreamPackage(item: MarketplacePackageV1): boolean {
+  if (isApprovedAutocadUpstreamSkill(item)) return true
   const component = item.components[0]
   return item.id === ZOTERO_PACKAGE.id && item.version === ZOTERO_PACKAGE.version && item.license === ZOTERO_PACKAGE.license
     && item.installation.mode === 'upstream-only' && item.sources.length === 1

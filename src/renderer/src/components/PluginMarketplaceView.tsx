@@ -1758,9 +1758,11 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   const remote = item.components.some((component) => component.type === 'mcp' && component.runtime.kind === 'remote')
   const canAct = isCatalogInstallable(item) || remote || isHttpUrl(item.source.location)
   if (!canAct) return null
+  const installLabel = item.installation.mode === 'upstream-only'
+    ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   const label = sourceOnly ? text('pluginOpenSource', 'Open source') : blocked ? diagnosticLabel(diagnostic!, text) : update
     ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
-    : isCatalogInstallable(item) && !added ? text('pluginUnifiedInstall', 'Install')
+    : isCatalogInstallable(item) && !added ? installLabel
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
     : text('pluginOpenSource', 'Open source')
@@ -1869,6 +1871,7 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           [text('pluginUnifiedSource', 'Source'), sourceLabel(source, entry.sourceId, text)],
           [text('pluginUnifiedUpdatePolicy', 'Update policy'), updatePolicyLabel(item, text)]
         ]} />
+        {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
         {isHttpUrl(item.source.location) ? <button type="button" onClick={onOpenSource} className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"><ExternalLink className="h-3.5 w-3.5" />{text('pluginOpenSource', 'Open source')}</button> : null}
       </DetailSection>
       {item.usage ? (
@@ -2022,14 +2025,17 @@ function ReviewModal({ prepared, selections, scope, permissionUpdate, workspaceA
   onInstall: () => void
 }): ReactElement {
   const item = prepared.package
+  const installLabel = item.installation.mode === 'upstream-only'
+    ? text('pluginUnifiedInstallUpstream', 'Install from upstream') : text('pluginUnifiedInstall', 'Install')
   return (
     <Modal title={text('pluginUnifiedReviewTitle', 'Review {{name}}', { name: item.name })} onClose={onClose}>
       <div className="flex items-start gap-3 rounded-md border border-ds-border bg-ds-subtle p-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><div><div className="text-[12px] font-semibold">{text('pluginUnifiedVerifiedReview', 'Content and metadata review')}</div><p className="mt-1 break-all text-[10px] leading-4 text-ds-muted">SHA-256 {prepared.contentSha256}</p></div></div>
+      {item.installation.mode === 'upstream-only' && !item.license ? <p className="mt-3 text-[12px] leading-5 text-amber-700 dark:text-amber-300">{text('pluginUnifiedUndeclaredLicenseNotice', 'The upstream repository has no declared license. Installation uses its pinned source version.')}</p> : null}
       {!prepared.compatibility.workwiseCompatible ? <div className="mt-3 flex gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-[12px] text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><CircleAlert className="h-4 w-4 shrink-0" /><span>{prepared.compatibility.reasons.join(' ')}</span></div> : null}
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedPermissions', 'Permissions')}</h3><div className="mt-2 max-h-[230px] space-y-2 overflow-y-auto">{item.permissions.length ? item.permissions.map((permission) => <label key={permission.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-ds-border p-3"><input type="checkbox" checked={Boolean(selections[permission.id])} onChange={(event) => onSelection(permission.id, event.target.checked)} className="mt-0.5 h-4 w-4" /><div><div className="text-[12px] font-medium">{permissionKindLabel(permission.kind, text)} · {permissionAccessLabel(permission.access, text)}</div><p className="mt-0.5 text-[11px] leading-4 text-ds-muted">{permissionDescription(permission, text)}</p></div></label>) : <p className="text-[12px] text-ds-faint">{text('pluginUnifiedNoPermissions', 'No additional permissions declared.')}</p>}</div></div>
       <div className="mt-4"><h3 className="text-[11px] font-semibold uppercase text-ds-faint">{text('pluginUnifiedScope', 'Install scope')}</h3><div className="mt-2 inline-flex rounded-md bg-ds-subtle p-1">{(['user', 'workspace', 'team'] as const).map((value) => <button key={value} type="button" disabled={permissionUpdate || (value === 'workspace' && !workspaceAvailable)} onClick={() => onScope(value)} className={`h-8 rounded px-3 text-[11px] font-medium ${scope === value ? 'bg-ds-card shadow-sm' : 'text-ds-muted'} disabled:opacity-40`}>{text(`pluginUnifiedScope${value[0]!.toUpperCase()}${value.slice(1)}`, value)}</button>)}</div></div>
       {prepared.warnings.length ? <div className="mt-4 text-[11px] leading-4 text-amber-700 dark:text-amber-300">{prepared.warnings.join(' ')}</div> : null}
-      <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-9 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{text('pluginUnifiedCancel', 'Cancel')}</button><button type="button" disabled={busy || !prepared.compatibility.workwiseCompatible} onClick={onInstall} className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-md bg-ds-userbubble px-3 text-[12px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />{permissionUpdate ? text('pluginUnifiedApplyPermissions', 'Apply') : text('pluginUnifiedInstall', 'Install')}</>}</button></div>
+      <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-9 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{text('pluginUnifiedCancel', 'Cancel')}</button><button type="button" disabled={busy || !prepared.compatibility.workwiseCompatible} onClick={onInstall} className="inline-flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-md bg-ds-userbubble px-3 text-[12px] font-semibold text-ds-userbubbleFg disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" />{permissionUpdate ? text('pluginUnifiedApplyPermissions', 'Apply') : installLabel}</>}</button></div>
     </Modal>
   )
 }

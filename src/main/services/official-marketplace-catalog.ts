@@ -1,4 +1,4 @@
-import { ZOTERO_PACKAGE, OPTIONAL_ENGINEERING_SKILLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
+import { AUTOCAD_UPSTREAM, ZOTERO_PACKAGE, OPTIONAL_ENGINEERING_SKILLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import type {
   CatalogSourceV1,
   GithubPackageSourceV1,
@@ -25,8 +25,8 @@ import { evaluateMarketplaceLicense } from '../../shared/marketplace'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
 const SHA1_COMMIT = /^[0-9a-f]{40}$/
-const AUTOCAD_REDRAW_COMMIT = 'ed182ec5966caaaf1d82d6ad4015435a27a8a909'
-const AUTOCAD_REDRAW_ARCHIVE_SHA256 = '1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e'
+const AUTOCAD_REDRAW_COMMIT = AUTOCAD_UPSTREAM.commit
+const AUTOCAD_REDRAW_ARCHIVE_SHA256 = AUTOCAD_UPSTREAM.sha256
 const MCP_SERVERS_PYTHON_LICENSE_COMMIT = '76d64c822f5125032f89eb71dbdb94e42b434821'
 
 const PINNED_UPDATE = {
@@ -1125,15 +1125,15 @@ const officialPackages: MarketplacePackageV1[] = [
   ...([
     {
       id: 'autocad-dwg-redraw', name: 'AutoCAD DWG 重绘',
-      summary: '基于源 DWG 提取实体和绘图信息，生成重绘提示并核验新 DWG。依赖 Windows AutoCAD COM，当前提供固定版本上游入口。',
-      compatibility: { ...COMPATIBILITY, platforms: ['win32'], architectures: ['x64'] },
+      summary: '基于源 DWG 提取实体和绘图信息，生成重绘提示并核验新 DWG。可从固定上游安装技能，执行 DWG 流程依赖 Windows AutoCAD COM。',
+      compatibility: COMPATIBILITY,
       dependencies: [
         { id: 'python', kind: 'runtime', requirement: 'Python >=3.10', optional: false, managedBy: 'user' },
         { id: 'autocad', kind: 'system', requirement: '用户已安装并许可的 Windows AutoCAD，支持 COM 自动化', optional: false, managedBy: 'user' },
         { id: 'pywin32', kind: 'package', requirement: 'pywin32', optional: false, managedBy: 'user' }
       ],
       usage: {
-        howToUse: '从固定版本上游入口查看源码与使用条件，确认授权后选择本地 Skill 导入。执行前检查 Windows、AutoCAD COM、Python 与 pywin32，再选择源文件和独立输出目录并授权任务。源 DWG 模式可提取绘图信息、生成重绘提示、复制实体并对比 ModelSpace/PaperSpace、图层、块、文字、标注和引线。PDF 中间图需保留转换来源与限制。交付重绘 DWG、绘图提示 Markdown、源/目标实体核验记录及 AutoCAD 目视复核结果。\n上游未声明分发许可证，当前保留外部来源入口。脚本的 --restart-autocad 会强制结束 acad.exe，可能丢失未保存文档，需用户保存工作并单独确认重启。现有输出可能被覆盖，执行前须确认目标范围。',
+        howToUse: '点击“从上游安装”，核对来源、版本及权限后导入技能。安装保留完整脚本和参考资料，执行前按任务授权。执行前检查 Windows、AutoCAD COM、Python 与 pywin32，再选择源文件和独立输出目录并授权任务。源 DWG 模式可提取绘图信息、生成重绘提示、复制实体并对比 ModelSpace/PaperSpace、图层、块、文字、标注和引线。PDF 中间图需保留转换来源与限制。交付重绘 DWG、绘图提示 Markdown、源/目标实体核验记录及 AutoCAD 目视复核结果。\n上游未声明分发许可证，许可证状态保留为未知。由用户主动从固定上游下载，来源页可继续查看。脚本的 --restart-autocad 会强制结束 acad.exe，可能丢失未保存文档，需用户保存工作并单独确认重启。现有输出可能被覆盖，执行前须确认目标范围。',
         requirements: ['Windows 10/11 x64 与用户许可的 AutoCAD', 'Python >=3.10、pywin32', '源 DWG 或标明来源的 PDF 中间 DWG', '主机进程和输出目录授权。安装技能后单独授权执行'],
         examples: ['使用 autocad-dwg-redraw 读取我选定的源 DWG，生成重绘提示和实体清单。经确认后写入新的 outputs/redraw.dwg，并交付源/目标核验记录。']
       }
@@ -1148,7 +1148,7 @@ const officialPackages: MarketplacePackageV1[] = [
         { id: 'autocad', kind: 'system', requirement: '生成/检查 DWG 时需要 Windows AutoCAD COM 与 pywin32', optional: true, managedBy: 'user' }
       ],
       usage: {
-        howToUse: '从固定版本上游入口查看源码与使用条件，确认授权后选择本地 Skill 导入。先保留原图并检查清晰度、单位和尺度锚点，按已知、标定、推断、不可读记录几何证据，再校验规格并授权输出。Windows AutoCAD COM 路径支持 DWG 生成和检查。macOS/Linux 可使用 Python 图像描线或矢量 PDF 提取形成粗略 DXF 基线，并生成预览和视觉对比。尺寸精度需要权威尺寸和约束核验。\n交付可编辑 CAD 文件、规格与标定 JSON、输入检查和规格校验报告、PNG/PDF 预览、叠加/差异图、比较指标及来源/成果哈希清单。geometry-only 模式可省略注释。上游未声明分发许可证，当前保留外部来源入口。部分 DWG 转存脚本会删除已有输出，需确认覆盖范围或选择新路径。',
+        howToUse: '点击“从上游安装”，核对来源、版本及权限后导入技能。安装保留完整脚本和参考资料，执行前按任务授权。先保留原图并检查清晰度、单位和尺度锚点，按已知、标定、推断、不可读记录几何证据，再校验规格并授权输出。Windows AutoCAD COM 路径支持 DWG 生成和检查。macOS/Linux 可使用 Python 图像描线或矢量 PDF 提取形成粗略 DXF 基线，并生成预览和视觉对比。尺寸精度需要权威尺寸和约束核验。\n交付可编辑 CAD 文件、规格与标定 JSON、输入检查和规格校验报告、PNG/PDF 预览、叠加/差异图、比较指标及来源/成果哈希清单。geometry-only 模式可省略注释。上游未声明分发许可证，许可证状态保留为未知。由用户主动从固定上游下载，来源页可继续查看。部分 DWG 转存脚本会删除已有输出，需确认覆盖范围或选择新路径。',
         requirements: ['Python >=3.10、Pillow、NumPy、OpenCV、ezdxf、PyMuPDF', 'DWG 生成/检查另需用户许可的 Windows AutoCAD 与 pywin32', 'macOS/Linux 的 DXF 粗略基线需进一步复核', '原图、可读单位与尺度依据、明确输出目录。脚本执行另行授权'],
         examples: ['使用 autocad-image-redraw 检查这张图的单位、清晰度和尺度依据，生成 redraw-spec.json。授权后导出 CAD、预览与对比报告，并列出待确认尺寸。', '在 macOS 上对所选图片生成粗略 DXF 基线与 PNG/PDF 预览，保留推断标记和来源哈希，供后续人工复核。']
       }
@@ -1167,8 +1167,8 @@ const officialPackages: MarketplacePackageV1[] = [
     permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION, { ...PROCESS_EXECUTE_PERMISSION, id: 'autocad.process.execute', default: 'denied',
       description: '执行用户选定的本机 Python/CAD 脚本。AutoCAD 重启与输出覆盖分别需要确认，重启前应保存未完成文档。' }],
     auth: { type: 'none' }, updatePolicy: PINNED_UPDATE,
-    availability: { status: 'unavailable', reasonCode: 'upstream-license-unconfirmed', message: '上游固定版本未声明分发许可证，当前可查看来源和依赖说明。' },
-    installation: EXTERNAL_INSTALL
+    availability: { status: 'available' },
+    installation: { mode: 'upstream-only', installedByDefault: false, reinstallable: true }
   })),
   githubSkillPackage({
     id: 'browser-skill',

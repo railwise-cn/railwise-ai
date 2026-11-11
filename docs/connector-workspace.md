@@ -49,12 +49,12 @@
 | Zotero 本机文献 | `zotero-mcp` 使用固定上游 wheel、本机 API 和隔离配置。安装保留 `MIT AND AGPL-3.0-or-later` 声明，预置能力限定为文献库只读查询 |
 | 可选工程技能 | 资料盘点与来源索引、监测质检与图表、工程文档差异审阅、会议纪要与待办，由用户选择安装 |
 | 工程办公精选 | MarkItDown、Docling、OfficeCLI、AntV 图表及 Playwright 集中展示已有能力，继续使用各自安装、配置和任务权限入口 |
-| AutoCAD 社区技能来源 | `autocad-dwg-redraw` 与 `autocad-image-redraw` 固定到已审阅的上游版本。上游尚未声明分发许可证，当前提供外部来源及依赖说明，状态为 `unavailable / upstream-license-unconfirmed`。DWG 路径需要用户许可的 Windows AutoCAD COM，图片路径的跨平台 DXF 流程仍需实际环境核验 |
+| AutoCAD 社区技能 | `autocad-dwg-redraw` 与 `autocad-image-redraw` 由用户点击“从上游安装”，按固定 commit 和归档 SHA-256 下载到本机。上游尚未声明许可证，元数据保留 `license: null`。DWG 执行需要用户许可的 Windows AutoCAD COM，图片路径的跨平台 DXF 流程仍需实际环境核验 |
 | 数据库及其他本地工具 | `dbhub`、`redis-mcp`、`mongodb-mcp` 等按目标配置地址、凭据和范围。文件、浏览器、记忆、图表和检索工具按实际依赖和任务权限启用 |
 | 应用知识库 | `railwise-kb` 由应用管理，运行时核验可访问资料和项目范围 |
 | 待接入的远端来源 | `notion-mcp`、`linear-mcp` 继续标记为 `unavailable / oauth-discovery-pending`，保留来源与现有配置入口 |
 
-AutoCAD 两项来自 `pengxiaoan` 社区仓库。目录记录固定 commit、归档摘要、平台要求和脚本操作范围，已有本地 Skill 保留原状。执行仍需具备相应许可、依赖、选定资料与输出授权。[固定版本源码](https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909)
+AutoCAD 两项来自 `pengxiaoan` 社区仓库。本轮将之前仅可打开来源的条目改为用户主动的 `upstream-only` 安装，复用来源与权限审阅、内容摘要、完整文件暂存和原子安装。先前的未知许可证阻断来自目录策略，本次将用户上游导入与公司再分发分别处理。公司镜像及应用资源中排除这两项源码，安装仅从固定上游下载并保留原始文件和存在的声明，许可证状态保持未知。已有本地 Skill、旧配置及安装记录保留原状，用户可在市场选择安装或继续使用原有文件。安装可在支持的平台导入技能资料，实际脚本执行仍需具备相应许可、依赖、选定资料与输出授权。[固定版本源码](https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909)
 
 ### 固定依赖与国内下载
 

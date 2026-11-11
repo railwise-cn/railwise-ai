@@ -77,9 +77,9 @@ Zotero 的许可例外绑定包名 `zotero-mcp-server`、版本 `0.17.0`、唯�
 
 | 条目 | 新状态与原因 | 资料保留 | 用户操作 |
 | --- | --- | --- | --- |
-| `autocad-dwg-redraw`、`autocad-image-redraw` | 新增离线可浏览的技能详情与固定版本上游入口。所核对版本没有 LICENSE、COPYING、NOTICE 或脚本内授权声明，沿用许可证未知的 external-only 规则 | 上游作者 `pengxiaoan` 保留署名。已有用户技能、绘图、配置和权限维持原状态 | 查看对应固定版本和依赖说明，确认源码使用授权后选择本地技能导入，再针对实际任务授权运行 |
+| `autocad-dwg-redraw`、`autocad-image-redraw` | 原 external-only 条目改为用户主动的 upstream-only 安装。固定版本没有 LICENSE、COPYING、NOTICE 或脚本内授权声明，许可证状态保留为未知；精确上游导入使用独立的来源和摘要校验 | 上游作者 `pengxiaoan` 保留署名。已有用户技能、绘图、配置和权限维持原状态 | 点击“从上游安装”，审阅固定来源、依赖与权限后导入完整技能；脚本执行使用对应任务权限 |
 
-已检查版本为 `ed182ec5966caaaf1d82d6ad4015435a27a8a909`。上游 codeload ZIP 大小为 64,359 字节，SHA-256 为 `1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e`。本轮交付目录元数据、来源入口、依赖和使用说明。目录使用固定归档摘要记录核验来源，市场默认操作打开对应技能的固定版本页面。[上游固定版本](https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909)
+已检查版本为 `ed182ec5966caaaf1d82d6ad4015435a27a8a909`。上游 codeload ZIP 大小为 64,359 字节，SHA-256 为 `1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e`。本轮交付目录、安装预览与上游下载流程。下载后先验证固定归档摘要，再安装完整脚本和参考资料。公司镜像和应用资源排除这两项源码；安装入口使用上游固定版本归档。[上游固定版本](https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909)
 
 源 DWG 重绘与 DWG 生成、检查依赖 Windows AutoCAD COM、Python 3.10+ 和 pywin32。图片路径还需 Pillow、NumPy、OpenCV、ezdxf、PyMuPDF。macOS/Linux 的图片描线和矢量 PDF 路径生成粗略 DXF 基线，尺寸精度需要权威尺寸与约束核验。目录示例列出重绘 DWG、规格和标定 JSON、核验记录、PNG/PDF 预览及对比结果的适用交付范围。实际 CAD 执行与工程精度验收留待具备环境和明确任务范围后完成。
 

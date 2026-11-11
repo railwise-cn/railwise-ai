@@ -619,7 +619,7 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(container.textContent).toContain('Report Writing')
   })
 
-  it('shows AutoCAD skill details offline and opens only the fixed upstream source', async () => {
+  it('shows installable AutoCAD skills with offline metadata and a fixed upstream source link', async () => {
     const items = getOfficialMarketplaceCatalog().filter(item => item.id.startsWith('autocad-'))
     vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: items.map(item => ({
       key: `${SOURCE.id}:${item.id}`, sourceId: SOURCE.id, package: item, conflicted: false
@@ -630,17 +630,74 @@ describe('PluginMarketplaceView unified catalog', () => {
     await act(async () => exactButton('Skills').click())
     expect(container.textContent).toContain('AutoCAD DWG 重绘')
     expect(container.textContent).toContain('图片转 CAD 重绘')
+    expect(container.textContent).toContain('Available to install')
+    expect([...container.querySelectorAll('button')].filter(item => item.textContent === 'Install from upstream')).toHaveLength(2)
     const row = [...container.querySelectorAll('[role="button"]')].find(item => item.textContent?.includes('AutoCAD DWG 重绘'))
     if (!(row instanceof HTMLElement)) throw new Error('AutoCAD skill catalog row missing')
     await act(async () => row.click())
     expect(container.textContent).toContain('上游未声明分发许可证')
     expect(container.textContent).toContain('未保存文档')
     expect(container.textContent).toContain('pywin32')
+    expect(container.textContent).toContain('The upstream repository has no declared license.')
     await act(async () => exactButton('Open source').click())
     expect(window.workwise.openExternal).toHaveBeenCalledWith(items[0]!.source.location)
     expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
     expect(installPrepared).not.toHaveBeenCalled()
     expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+  })
+
+  it.each(['autocad-dwg-redraw', 'autocad-image-redraw'])('installs %s through the existing upstream preview and permission lifecycle', async id => {
+    const item = getOfficialMarketplaceCatalog().find(candidate => candidate.id === id)!
+    const installed: InstalledPackageV1 = { ...INSTALLED, packageId: item.id, version: item.version,
+      license: item.license, source: item.source, sources: item.sources, updatePolicy: item.updatePolicy,
+      components: item.components.map(component => ({ componentId: component.id, sourceId: component.sourceId })) }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: [{ key: `${SOURCE.id}:${id}`, sourceId: SOURCE.id,
+      package: item, reviewSha256: 'd'.repeat(64), conflicted: false }], conflicts: [] })
+    vi.mocked(window.workwise.prepareCatalogPlugin).mockResolvedValue({ schemaVersion: 1, id: `prepared-${id}`,
+      createdAt: '2026-11-11T00:00:00.000Z', expiresAt: '2026-11-11T00:30:00.000Z', format: 'catalog', package: item,
+      contentSha256: item.source.digest!.value, reviewSha256: 'd'.repeat(64), warnings: [],
+      compatibility: { workwiseCompatible: true, reasons: [] } })
+    installPrepared.mockImplementation(async () => {
+      vi.mocked(window.workwise.listInstalledPlugins).mockResolvedValue([INSTALLED, installed])
+      return installed
+    })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Skills').click())
+    await act(async () => { await i18n.changeLanguage('zh') })
+    const row = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find(candidate => candidate.textContent?.includes(item.name))!
+    expect(row.textContent).toContain('可安装')
+    await act(async () => row.click())
+    expect(container.textContent).toContain('上游未声明许可证')
+    for (const dependency of item.dependencies) expect(container.textContent).toContain(dependency.requirement)
+    expect(container.textContent).toContain(item.usage!.examples![0])
+    const action = [...container.querySelectorAll('button')].filter(candidate => candidate.textContent === '从上游安装').at(-1)!
+    await act(async () => action.click())
+    await settle()
+    expect(window.workwise.prepareCatalogPlugin).toHaveBeenCalledExactlyOnceWith({ sourceId: SOURCE.id, packageId: id })
+    expect(container.textContent).toContain(item.source.digest!.value)
+    expect(container.textContent).toContain('上游未声明许可证')
+    expect(installPrepared).not.toHaveBeenCalled()
+    const permissions = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    expect(permissions).toHaveLength(item.permissions.length)
+    expect(permissions.every(permission => !permission.checked)).toBe(true)
+    const readIndex = item.permissions.findIndex(permission => permission.id === 'filesystem.read')
+    await act(async () => permissions[readIndex]!.click())
+    const install = [...container.querySelectorAll('button')].filter(candidate => candidate.textContent === '从上游安装').at(-1)!
+    expect(install.disabled).toBe(false)
+    await act(async () => install.click())
+    await settle()
+    expect(installPrepared).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ preparedId: `prepared-${id}`,
+      reviewSha256: 'd'.repeat(64), expectedCurrentVersion: null, scope: 'workspace', workspaceRoot: '/tmp/workwise-marketplace-qa',
+      permissions: item.permissions.map(permission => ({ permissionId: permission.id, decision: permission.id === 'filesystem.read' ? 'granted' : 'denied' })) }))
+    expect(window.workwise.cancelPluginImport).toHaveBeenCalledWith(`prepared-${id}`)
+    expect(container.textContent).toContain(`已安装 ${item.name}`)
+    const installedRow = [...container.querySelectorAll<HTMLElement>('[role="button"]')].find(candidate => candidate.textContent?.includes(item.name))!
+    expect(installedRow.textContent).toContain('已安装')
+    expect(installedRow.textContent).toContain('权限')
+    expect(window.workwise.openExternal).not.toHaveBeenCalled()
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
+    expect((await window.workwise.listInstalledPlugins()).find(record => record.packageId === INSTALLED.packageId)).toBe(INSTALLED)
   })
 
   it('shows a clear usage guide, requirements, and example in Skill details', async () => {

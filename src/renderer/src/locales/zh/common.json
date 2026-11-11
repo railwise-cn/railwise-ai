@@ -1836,6 +1836,8 @@
   "pluginUnifiedUpdate": "更新",
   "pluginUnifiedReviewInstall": "审查并安装",
   "pluginUnifiedInstall": "安装",
+  "pluginUnifiedInstallUpstream": "从上游安装",
+  "pluginUnifiedUndeclaredLicenseNotice": "上游未声明许可证。安装来源为固定版本的上游仓库。",
   "pluginUnifiedConnect": "连接",
   "pluginUnifiedConnected": "已将 {{name}} 接入 MCP V2。",
   "pluginUnifiedManaged": "受管",

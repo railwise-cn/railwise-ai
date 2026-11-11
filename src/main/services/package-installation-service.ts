@@ -1,4 +1,4 @@
-import { isApprovedUpstreamPackage, isCatalogInstallable } from '../../shared/engineering-marketplace'
+import { isApprovedAutocadUpstreamSkill, isApprovedUpstreamPackage, isCatalogInstallable } from '../../shared/engineering-marketplace'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import {
@@ -1058,7 +1058,7 @@ export class PackageInstallationService {
       }
       return
     }
-    if (!paths.some(isLicensePath)) {
+    if (!paths.some(isLicensePath) && !isApprovedAutocadUpstreamSkill(item)) {
       throw new Error('Direct installations must preserve a LICENSE, NOTICE, or COPYING file.')
     }
   }

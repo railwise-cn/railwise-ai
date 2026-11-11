@@ -519,7 +519,7 @@ describe('official marketplace catalog', () => {
     })
   })
 
-  it('keeps both AutoCAD skills discoverable with fixed sources and an honest external-only license state', () => {
+  it('provides both AutoCAD Skills as fixed user-initiated upstream installs with an honest unknown license', () => {
     for (const id of ['autocad-dwg-redraw', 'autocad-image-redraw']) {
       const item = packageById(id)
       expect(item.productType).toBe('workflow')
@@ -531,9 +531,9 @@ describe('official marketplace catalog', () => {
       expect(item.publisher).toMatchObject({ id: 'pengxiaoan', verified: false })
       expect(item.license).toBeNull()
       expect(item.licenseEvidence).toEqual([])
-      expect(item.installation).toEqual({ mode: 'external', installedByDefault: false, reinstallable: false })
-      expect(item.availability).toMatchObject({ status: 'unavailable', reasonCode: 'upstream-license-unconfirmed' })
-      expect(isCatalogInstallable(item)).toBe(false)
+      expect(item.installation).toEqual({ mode: 'upstream-only', installedByDefault: false, reinstallable: true })
+      expect(item.availability).toEqual({ status: 'available' })
+      expect(isCatalogInstallable(item)).toBe(true)
       expect(evaluateMarketplaceLicense(item.license).disposition).toBe('external-only')
       expect(item.dependencies.every(dependency => dependency.managedBy === 'user')).toBe(true)
       expect(item.usage?.examples?.length).toBeGreaterThan(0)
@@ -541,7 +541,8 @@ describe('official marketplace catalog', () => {
       expect(item.permissions.find(permission => permission.kind === 'process')).toMatchObject({ default: 'denied', reviewRequired: true })
     }
     const dwg = packageById('autocad-dwg-redraw')
-    expect(dwg.compatibility.platforms).toEqual(['win32'])
+    expect(dwg.compatibility.platforms).toEqual(['darwin', 'win32', 'linux'])
+    expect(dwg.dependencies.find(dependency => dependency.id === 'autocad')?.requirement).toContain('Windows AutoCAD')
     expect(dwg.usage?.howToUse).toContain('--restart-autocad')
     expect(dwg.usage?.howToUse).toContain('未保存文档')
     expect(dwg.dependencies.some(dependency => dependency.id === 'pywin32' && !dependency.optional)).toBe(true)
@@ -871,7 +872,7 @@ describe('official marketplace catalog', () => {
         expect(evaluateMarketplaceLicense(item.license).disposition).toBe('direct-mirror')
       } else if (item.installation.mode === 'upstream-only') {
         expect(isApprovedUpstreamPackage(item)).toBe(true)
-        expect(evaluateMarketplaceLicense(item.license).disposition).toBe('rejected')
+        expect(evaluateMarketplaceLicense(item.license).disposition).toBe(item.license === null ? 'external-only' : 'rejected')
       } else {
         expect(item.installation.reinstallable).toBe(false)
       }

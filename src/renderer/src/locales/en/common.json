@@ -1836,6 +1836,8 @@
   "pluginUnifiedUpdate": "Update",
   "pluginUnifiedReviewInstall": "Review install",
   "pluginUnifiedInstall": "Install",
+  "pluginUnifiedInstallUpstream": "Install from upstream",
+  "pluginUnifiedUndeclaredLicenseNotice": "The upstream repository has no declared license. Installation uses its pinned source version.",
   "pluginUnifiedConnect": "Connect",
   "pluginUnifiedConnected": "{{name}} connected to MCP V2.",
   "pluginUnifiedManaged": "Managed",
