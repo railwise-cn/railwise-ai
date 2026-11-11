@@ -6,7 +6,7 @@ export type ExternalTaskCapability = CapabilityPreflight
 export type ExternalTaskPreflight = (text: string, thread?: ThreadRecord) => ExternalTaskCapability | null | Promise<ExternalTaskCapability | null>
 
 const KNOWLEDGE = /^(?:(?:请|帮我)\s*)?(?:如何|怎么|怎样|介绍|解释|什么是|对比|比较|how\s+(?:to|do|does)|what\s+is|explain|compare\b)/i
-const WORK = /待办|审批|任务|工单|处理|办理|代办|办结|同意|批准|拒绝|驳回|完成|查询|列出|查看|详情|发送|消息|转交|转办|approvals?|todo|task|complete|approve|reject|send|transfer|detail|list|show/i
+const WORK = /待办|审批|任务|工单|处理|办理|代办|办结|同意|批准|拒绝|驳回|完成|查询|列出|查看|详情|发送|消息|邮件|邮箱|上传|云盘|转交|转办|approvals?|todo|task|complete|approve|reject|send|upload|transfer|detail|list|show/i
 const CONNECT = /连接|接入|授权|登录|配置|安装|connect|authorize|login|setup|install/i
 
 /** Multiple providers require a durable, explicit choice; never fall back to unrestricted chat. */
@@ -25,9 +25,9 @@ export function externalTaskIntent(text: string): TaskIntent | null {
   const provider = ding ? 'dingtalk' : 'lark'
   const operation = /拒绝|驳回|reject/i.test(value) ? 'reject' : /转交|转办|transfer/i.test(value) ? 'transfer'
     : /同意|批准|自动审批|approve\b/i.test(value) ? 'approve' : /完成|complete\b/i.test(value) ? 'complete'
-    : /发送|send\b/i.test(value) ? 'send' : /详情|detail/i.test(value) ? 'detail' : /查询|列出|查看|列表|list\b|show\b/i.test(value) ? 'list' : undefined
+    : /上传|upload\b/i.test(value) ? 'upload' : /发送|发(?:一封)?邮件|发(?:一条)?消息|send\b/i.test(value) ? 'send' : /详情|detail/i.test(value) ? 'detail' : /查询|列出|查看|列表|list\b|show\b/i.test(value) ? 'list' : undefined
   return { kind: CONNECT.test(value) && !hasWorkIntent ? 'connect_provider' : 'external_task', provider, operation,
-    mutation: operation ? ['approve', 'reject', 'complete', 'send', 'transfer'].includes(operation) : /处理|办理|代办|办结/.test(value), confidence: 'rule' }
+    mutation: operation ? ['approve', 'reject', 'complete', 'send', 'transfer', 'upload'].includes(operation) : /处理|办理|代办|办结/.test(value), confidence: 'rule' }
 }
 export function detectExternalTaskProvider(text: string): ExternalTaskProvider | null {
   return externalTaskIntent(text)?.provider ?? null

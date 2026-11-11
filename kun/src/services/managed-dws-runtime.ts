@@ -26,12 +26,13 @@ export class ManagedDwsRuntime {
     try{assertDwsCredentialAccess()}catch{return block('blocked','candidate_credentials_disabled','本候选环境未开启凭据访问，未读取钉钉账号或执行平台操作。')}
     if(this.config.authState!=='installed')return block('needs_authorization','connector_authorization_required','请扫码登录官方钉钉连接器，完成后继续原任务。',connect,this.config.authState==='error'?'invalid':'missing')
     if(!this.toolProvider())return block('needs_authorization','connector_identity_unverified','钉钉账号、组织或连接器文件尚未核验，请重新检查连接。',connect,'unknown')
-    if(intent.operation==='send'||intent.operation==='transfer')return block('unsupported','connector_operation_unsupported','当前钉钉连接器支持待办与审批读取、完成、同意和拒绝；尚未开放发送消息或转交。',connect,'valid')
+    if(intent.operation==='send'||intent.operation==='upload')return block('unsupported','connector_operation_unsupported','当前钉钉连接器支持待办与审批读取、完成、同意、拒绝和转交。',connect,'valid')
     if(intent.kind==='connect_provider')return block('blocked','connector_already_authorized','钉钉账号已连接，可返回原任务继续。',{kind:'retry',route:'marketplace',label:'管理钉钉连接'},'valid')
     return {...base,status:'available',credentialState:'valid',toolId:'dingtalk',executablePath:this.config.executablePath,
       message:'钉钉组织和账号已登录；具体平台权限在工具执行时由官方连接器核验。写操作仍须确认并回读结果。'}
   }
   scope(externalTargets:readonly string[]=[]){return {networkAllowlist:['https://api.dingtalk.com','https://mcp.dingtalk.com'],connectorScopes:[],externalTargets:[...externalTargets],
+    connectorBackends: { dingtalk: 'dws' as const },
     ...(this.config.identityFingerprint?{connectorIdentityFingerprints:{dingtalk:this.config.identityFingerprint}}:{})}}
   async refresh(){
     if(!this.configPath)throw Object.assign(new Error('Managed DingTalk configuration is unavailable.'),{code:'connector_configuration_unavailable'})

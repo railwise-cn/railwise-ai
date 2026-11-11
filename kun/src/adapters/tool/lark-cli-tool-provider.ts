@@ -10,12 +10,13 @@ import { defineLocalTool } from './local-tool-definition.js'
 import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes } from './sandbox-policy.js'
 import { assertLarkCliCredentialAccess, resolveLarkCliEnvironment } from '../../services/lark-cli-environment.js'
 import { parseLarkIdentityBinding } from '../../services/lark-cli-identity.js'
+import { buildLarkDeliveryTools } from './lark-delivery-tools.js'
 
 const execFileAsync = promisify(execFile)
 export type LarkCommandResult = { ok: boolean; output: unknown; isError?: boolean }
-export type LarkCliRunner = (executablePath: string, args: string[], signal: AbortSignal, expectedExecutableHash?: string) => Promise<LarkCommandResult>
+export type LarkCliRunner = (executablePath: string, args: string[], signal: AbortSignal, expectedExecutableHash?: string, cwd?: string) => Promise<LarkCommandResult>
 
-const defaultRunner: LarkCliRunner = async (executablePath, args, signal, expectedExecutableHash) => {
+const defaultRunner: LarkCliRunner = async (executablePath, args, signal, expectedExecutableHash, cwd) => {
   assertLarkCliCredentialAccess()
   const env = resolveLarkCliEnvironment()
   if (!expectedExecutableHash) throw connectorFailure('connector_executable_unverified', 'Diagnose the managed Lark CLI before dispatch.')
@@ -24,7 +25,7 @@ const defaultRunner: LarkCliRunner = async (executablePath, args, signal, expect
   catch { throw connectorFailure('connector_executable_unverified', 'The diagnosed Lark CLI is no longer readable. Recheck the connector before continuing.') }
   if (actualHash !== expectedExecutableHash) throw connectorFailure('connector_executable_changed', 'The managed Lark CLI changed after diagnosis. Recheck the connector before continuing.')
   try {
-    const result = await execFileAsync(executablePath, args, { env, signal, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })
+    const result = await execFileAsync(executablePath, args, { env, signal, cwd, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })
     return normalizeLarkResult({ ok: true, output: parseJsonOutput(String(result.stdout ?? '')) })
   } catch (error) {
     const value = error as { stdout?: string; stderr?: string; message?: string }
@@ -54,12 +55,14 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
   const provider = 'lark'
   const apiRoot = config.brand === 'feishu' ? 'https://open.feishu.cn' : 'https://open.larksuite.com'
   const hasScopes = (required: readonly string[]) => required.every(scope => scopes.has(scope))
-  const run = async (args: string[], required: string[], context: ToolHostContext, action?: { operation: string; target: string }) => {
+  const run = async (args: string[], required: string[], context: ToolHostContext, action?: { operation: string; target: string }, cwd?: string) => {
     assertLarkCliCredentialAccess()
     if (context.abortSignal.aborted) throw new Error('Lark command aborted before start')
     const expectedIdentity = context.executionGrant?.connectorIdentityFingerprints?.['lark-cli']
     if (!expectedIdentity) throw connectorFailure('connector_identity_unverified', 'The current execution grant has no verified Lark account binding. Recheck authorization before continuing.')
     if (expectedIdentity !== config.identityFingerprint) throw connectorFailure('connector_identity_changed', 'The connected Lark account changed after the task grant was issued. Review the original task before continuing.')
+    const backend = context.executionGrant?.connectorBackends?.['lark-cli']
+    if (backend && backend !== 'lark-cli') throw connectorFailure('connector_backend_changed', 'The task is bound to another connector backend.')
     if (!hasScopes(required)) throw new Error('connector_scope_missing')
     assertGrantAllowsNetwork(apiRoot, context)
     assertGrantConnectorScopes(required, context)
@@ -72,11 +75,13 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
     if (!required.every(scope => live.scopes.includes(scope))) throw connectorFailure('connector_scope_missing', 'The current Lark account no longer has the required permissions.')
     await context.validateExecutionGrant?.()
     context.assertExecution?.()
-    return normalizeLarkResult(await runner(config.executablePath!, [...args, ...profileFlags], context.abortSignal, config.executableHash))
+    return normalizeLarkResult(await runner(config.executablePath!, [...args, ...profileFlags], context.abortSignal, config.executableHash, cwd))
   }
   type Spec = { name: string; description: string; schema: Record<string, unknown>; parse: z.ZodType<Record<string, unknown>>; scopes: string[]; operation: string; mutation?: boolean; args: (args: Record<string, unknown>) => string[] }
   const define = (spec: Spec) => defineLocalTool({
     name: spec.name, description: spec.description, inputSchema: spec.schema,
+    effect: { provider, operation: spec.operation, mutation: Boolean(spec.mutation), targetFields: ['taskId', 'instanceCode'], requiredScopes: spec.scopes,
+      ...(spec.mutation ? {readbackToolName: spec.operation === 'complete' ? 'lark_task_get' : 'lark_approval_get'} : {}) },
     policy: spec.mutation ? 'on-request' : 'auto',
     ...(spec.mutation ? { requireExplicitApproval: true } : {}),
     shouldAdvertise: () => hasScopes(spec.scopes),
@@ -120,8 +125,8 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
       }
       if (!remoteStatus) return failure({ code: 'remote_state_unverified', response: result.output }, 'outcome_unknown', provider, spec.operation, target)
       const resultHash = createHash('sha256').update(JSON.stringify(data)).digest('hex')
-      return { output: { ok: true, provider, operation: spec.operation, target, status: 'succeeded', data,
-        evidence: { kind: 'external_operation', provider, operation: spec.operation, target, verified: true, verifiedAt: new Date().toISOString(), resultHash, status: remoteStatus }
+      return { output: { ok: true, provider, backend: 'lark-cli', accountFingerprint: config.identityFingerprint, operation: spec.operation, target, status: 'succeeded', data,
+        evidence: { kind: 'external_operation', provider, backend: 'lark-cli', accountFingerprint: config.identityFingerprint, operation: spec.operation, target, verified: true, verifiedAt: new Date().toISOString(), resultHash, status: remoteStatus }
       } }
     }
   })
@@ -131,7 +136,8 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
     define({ name: 'lark_task_complete', description: 'Complete one task by GUID after explicit user approval; verify its final state.', schema: idSchema, parse: taskId, scopes: ['task:task:read', 'task:task:write'], operation: 'complete', mutation: true, args: args => ['task', '+complete', '--task-id', String(args.taskId), ...jsonFlags] }),
     define({ name: 'lark_approval_list', description: 'Read pending approvals, including task IDs and instance codes.', schema: { type: 'object', properties: { keyword: { type: 'string' }, pageToken: { type: 'string' } }, additionalProperties: false }, parse: approvalQuery, scopes: ['approval:task:read'], operation: 'list', args: args => ['approval', 'tasks', 'query', '--params', JSON.stringify({ topic: '1', ...(args.keyword ? { keyword: args.keyword } : {}), ...(args.pageToken ? { page_token: args.pageToken } : {}) }), ...jsonFlags] }),
     define({ name: 'lark_approval_get', description: 'Read approval instance details and the states of its approval tasks.', schema: instanceSchema, parse: instanceId, scopes: ['approval:instance:read'], operation: 'detail', args: args => ['approval', 'instances', 'get', '--params', JSON.stringify({ instance_code: args.instanceCode }), ...jsonFlags] }),
-    ...(['approve', 'reject'] as const).map(operation => define({ name: `lark_approval_${operation}`, description: `${operation === 'approve' ? 'Approve' : 'Reject'} an exact approval task after explicit user approval; verify the task state.`, schema: actionSchema, parse: approvalAction, scopes: ['approval:task:read', 'approval:task:write', 'approval:instance:read'], operation, mutation: true, args: args => ['approval', 'tasks', operation, '--data', JSON.stringify({ instance_code: args.instanceCode, task_id: args.taskId, ...(args.comment ? { comment: args.comment } : {}) }), ...jsonFlags, '--yes'] }))
+    ...(['approve', 'reject'] as const).map(operation => define({ name: `lark_approval_${operation}`, description: `${operation === 'approve' ? 'Approve' : 'Reject'} an exact approval task after explicit user approval; verify the task state.`, schema: actionSchema, parse: approvalAction, scopes: ['approval:task:read', 'approval:task:write', 'approval:instance:read'], operation, mutation: true, args: args => ['approval', 'tasks', operation, '--data', JSON.stringify({ instance_code: args.instanceCode, task_id: args.taskId, ...(args.comment ? { comment: args.comment } : {}) }), ...jsonFlags, '--yes'] })),
+    ...buildLarkDeliveryTools(config, run)
   ].filter(tool => tool.shouldAdvertise?.({} as ToolHostContext))
   if (tools.length === 0) return undefined
   return { id: 'lark-cli', kind: 'skill', enabled: true, available: true, tools }

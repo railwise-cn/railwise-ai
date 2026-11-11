@@ -75,7 +75,21 @@ describe('production official DingTalk runtime assembly', () => {
   }, 15_000)
 
   it.each([false, true])('never reads an unknown operation through a different DingTalk backend (original DWS: %s)', async originalDws => {
-    const f = await fixture({ dws: originalDws ? dwsTestConfig : { authState: 'not_installed' } })
+    const legacy = { enabled: true, credentialRef: 'synthetic-user', unionId: 'synthetic-union', userId: 'synthetic-user',
+      allowedWriteUserIds: ['synthetic-user'], userScopes: ['Todo.Todo.Read', 'Todo.Todo.Write'] }
+    const f = await fixture({ dws: originalDws ? dwsTestConfig : { authState: 'not_installed' }, ...(originalDws ? {} : { dingtalk: legacy }) })
+    if (!originalDws) {
+      const key = Buffer.alloc(32, 1)
+      vi.stubEnv('WORKWISE_FLOW_SECRET_STORE_KEY', key.toString('base64url'))
+      const secrets = new EncryptedFileFlowSecretStore(join(f.root, 'state', 'flow-secrets'), key)
+      await secrets.set('synthetic-user', Buffer.from(JSON.stringify({ kind: 'user', accessToken: 'synthetic-token', unionId: 'synthetic-union',
+        scopes: legacy.userScopes, expiresAt: new Date(Date.now() + 60_000).toISOString() })))
+      vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+        if (String(url) === 'https://api.dingtalk.com/v1.0/contact/users/me') return new Response(JSON.stringify({ unionId: 'synthetic-union' }))
+        if (String(url) === 'https://api.dingtalk.com/v1.0/todo/users/synthetic-union/tasks/list') return new Response(JSON.stringify({ todoCards: [] }))
+        throw new Error('unexpected network request')
+      }))
+    }
     const runtime = await createKunServeRuntime(options(f))
     cleanup.push(async () => runtime.shutdown?.())
     const thread = await runtime.threadService.create({ workspace: f.root, model: 'synthetic', mode: 'agent' })

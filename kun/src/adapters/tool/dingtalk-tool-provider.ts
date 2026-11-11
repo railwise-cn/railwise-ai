@@ -34,12 +34,18 @@ function object(value:unknown):Json { if (!value || typeof value!=='object' || A
 function rows(value:unknown):Json[] { return Array.isArray(value) ? value.filter(v=>v && typeof v==='object'&&!Array.isArray(v)) as Json[] : [] }
 function hash(value:unknown):string { return createHash('sha256').update(JSON.stringify(value)).digest('hex') }
 function escaped(value:string):string { return encodeURIComponent(value) }
+export function dingtalkOpenapiIdentity(config: DingTalkCapabilityConfig): string {
+  return hash(['dingtalk-openapi-v1', config.clientId, config.unionId, config.userId, config.credentialRef, config.workflowCredentialRef])
+}
 
 /** Fixed official OpenAPI routes, no Shell/CLI proxy and no model-supplied hosts. */
 export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):CapabilityToolProvider {
   const config=deps.config, fetcher=deps.fetch ?? fetch, now=deps.nowIso ?? (()=>new Date().toISOString())
   const credentialFor=async(workflow:boolean,scopes:string[],context:ToolHostContext,write:boolean):Promise<DingTalkCredential>=>{
-    if(context.executionGrant?.connectorIdentityFingerprints?.dingtalk)throw new RemoteFailure('connector_backend_changed',false)
+    const backend = context.executionGrant?.connectorBackends?.dingtalk
+    const identity = context.executionGrant?.connectorIdentityFingerprints?.dingtalk
+    if (backend && backend !== 'openapi' || !backend && identity) throw new RemoteFailure('connector_backend_changed', false)
+    if (backend === 'openapi' && identity !== dingtalkOpenapiIdentity(config)) throw new RemoteFailure('connector_identity_changed', false)
     if(!config.enabled)throw new RemoteFailure('connector_disabled',false)
     const reference=workflow?config.workflowCredentialRef:config.credentialRef
     if(!reference)throw new RemoteFailure('connector_authorization_required',false)
@@ -70,8 +76,8 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
     return parsed
   }
   const finish=(operation:string,target:string,data:Json,status:string)=>({
-    output:{ok:true,provider:'dingtalk',operation,target,status:'succeeded',data,
-      evidence:{kind:'external_operation',provider:'dingtalk',operation,target,status,verified:true,verifiedAt:now(),resultHash:hash(data)}}
+    output:{ok:true,provider:'dingtalk',backend:'openapi',accountFingerprint:dingtalkOpenapiIdentity(config),operation,target,status:'succeeded',data,
+      evidence:{kind:'external_operation',provider:'dingtalk',backend:'openapi',accountFingerprint:dingtalkOpenapiIdentity(config),operation,target,status,verified:true,verifiedAt:now(),resultHash:hash(data)}}
   })
   const readInstance=async(instanceId:string,credential:DingTalkCredential,context:ToolHostContext):Promise<Json>=>{
     const response=await request('GET',`/v1.0/workflow/processInstances?processInstanceId=${escaped(instanceId)}`,credential,context)
@@ -81,6 +87,9 @@ export function buildDingTalkToolProvider(deps:DingTalkProviderDependencies):Cap
   }
   const build=(name:string,description:string,schema:z.ZodType,workflow:boolean,scopes:string[],write:boolean,execute:(args:Json,credential:DingTalkCredential,context:ToolHostContext)=>Promise<{output:unknown;isError?:boolean}>):LocalTool=>({
     name,description,inputSchema:z.toJSONSchema(schema) as Json,toolKind:'tool_call',policy:write?'on-request':'auto',requireExplicitApproval:write,
+    effect: { provider: 'dingtalk', operation: name === 'dingtalk_complete_task' ? 'complete' : name === 'dingtalk_approve' ? 'approve' : name === 'dingtalk_reject' ? 'reject' : name === 'dingtalk_transfer' ? 'transfer' : name.includes('list') ? 'list' : 'detail',
+      mutation: write, targetFields: ['taskId', 'instanceId'], requiredScopes: scopes,
+      ...(write ? { readbackToolName: name === 'dingtalk_complete_task' ? 'dingtalk_get_task' : 'dingtalk_get_approval' } : {}) },
     shouldAdvertise:(context)=>config.enabled && Boolean(workflow?config.workflowCredentialRef:config.credentialRef) && scopes.every(scope=>(workflow?config.scopes:config.userScopes).includes(scope)) && (!context.executionGrant||scopes.every(scope=>context.executionGrant!.connectorScopes.includes(scope))) && (!write||Boolean(config.userId&&config.allowedWriteUserIds.includes(config.userId))),
     async execute(raw,context){
       try {

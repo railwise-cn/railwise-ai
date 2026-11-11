@@ -38,6 +38,7 @@ const id=z.string().trim().min(1).max(512).refine(value=>!/[\u0000-\u001f]/u.tes
 const approvalTask=id.refine(value=>/^\d+$/.test(value)&&Number.isSafeInteger(Number(value)))
 const todo=z.object({taskId:id}).strict(),instance=z.object({instanceId:id}).strict()
 const action=z.object({instanceId:id,taskId:approvalTask,remark:z.string().max(2000).optional()}).strict()
+const transfer = action.extend({ toUserId: id }).strict()
 const list=z.object({page:z.number().int().min(1).max(1000).default(1),pageSize:z.number().int().min(1).max(100).default(20)}).strict()
 
 /** The provider identity stays dingtalk; only one backend is registered at a time. */
@@ -49,6 +50,8 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
     const identity=context.executionGrant?.connectorIdentityFingerprints?.dingtalk
     if(!identity)throw fail('connector_identity_unverified')
     if(identity!==config.identityFingerprint)throw fail('connector_identity_changed')
+    const backend = context.executionGrant?.connectorBackends?.dingtalk
+    if (backend && backend !== 'dws') throw fail('connector_backend_changed')
     assertGrantAllowsNetwork('https://mcp.dingtalk.com',context)
     context.assertExecution?.()
     const auth=await runner(config.executablePath!,['auth','status','--readonly',...flags],context.abortSignal,config.executableHash!)
@@ -59,8 +62,8 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
     const response=await runner(config.executablePath!,[...args,...flags],context.abortSignal,config.executableHash!)
     return business(response)
   }
-  const evidence=(operation:string,target:string,data:Json,status:string)=>({output:{ok:true,status:'succeeded',provider:'dingtalk',backend:'dws',operation,target,data,
-    evidence:{kind:'external_operation',provider:'dingtalk',operation,target,verified:true,verifiedAt:new Date().toISOString(),status,resultHash:createHash('sha256').update(JSON.stringify(data)).digest('hex')}}})
+  const evidence=(operation:string,target:string,data:Json,status:string)=>({output:{ok:true,status:'succeeded',provider:'dingtalk',backend:'dws',accountFingerprint:config.identityFingerprint,operation,target,data,
+    evidence:{kind:'external_operation',provider:'dingtalk',backend:'dws',accountFingerprint:config.identityFingerprint,operation,target,verified:true,verifiedAt:new Date().toISOString(),status,resultHash:createHash('sha256').update(JSON.stringify(data)).digest('hex')}}})
   const readTodo=async(target:string,context:ToolHostContext)=>{
     const raw=await run(['todo','task','get','--task-id',target],context)
     const detail=findObject(raw,['todoDetailModel','todo','task'])??(stableId(raw)?raw:undefined)
@@ -76,7 +79,7 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
     if(!Object.keys(detail).length)throw fail('connector_invalid_response')
     return {processInstanceId:target,tasks:(source??[]).map(value=>{
       const task=object(value)
-      return {...task,taskId:String(task.taskId??task.task_id??task.id??''),status:task.status??task.taskStatus,result:task.result??task.taskResult}
+      return {...task,taskId:String(task.taskId??task.task_id??task.id??''),userId:task.userId??task.user_id??task.actionerUserId,status:task.status??task.taskStatus,result:task.result??task.taskResult}
     }),raw:detail}
   }
   const readTasks=async(target:string,context:ToolHostContext)=>{
@@ -88,6 +91,8 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
   }
   type Spec={name:string;description:string;schema:z.ZodType;operation:string;write?:boolean;execute:(args:Json,context:ToolHostContext,target:string)=>Promise<Json>}
   const define=(spec:Spec)=>defineLocalTool({name:spec.name,description:spec.description,inputSchema:z.toJSONSchema(spec.schema) as Json,
+    effect: { provider: 'dingtalk', operation: spec.operation, mutation: Boolean(spec.write), targetFields: ['taskId', 'instanceId'],
+      ...(spec.write ? { readbackToolName: spec.operation === 'complete' ? 'dingtalk_get_task' : 'dingtalk_get_approval' } : {}) },
     policy:spec.write?'on-request':'auto',...(spec.write?{requireExplicitApproval:true}:{}),
     async execute(raw,context){
       let dispatched=false
@@ -111,7 +116,7 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
           dispatched=true
           await spec.execute(args,dispatchContext,target)
           data=spec.operation==='complete'?await readTodo(target,dispatchContext):await readApproval(String(args.instanceId),dispatchContext)
-          const status=spec.operation==='complete'?data.done===true?'done':undefined:verifiedApproval(data,target,spec.operation)
+          const status=spec.operation==='complete'?data.done===true?'done':undefined:verifiedApproval(data,target,spec.operation,args.toUserId)
           if(!status)throw fail('connector_readback_unverified')
           return evidence(spec.operation,target,data,status)
         }
@@ -147,7 +152,13 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
     define({name:'dingtalk_get_approval',description:'读取钉钉审批实例及每个节点状态。',schema:instance,operation:'detail',execute:async(_args,context,target)=>readApproval(target,context)}),
     define({name:'dingtalk_get_approval_tasks',description:'读取当前账号在指定审批实例中可操作的精确taskId。',schema:instance,operation:'detail',execute:async(_args,context,target)=>({instanceId:target,taskIds:await readTasks(target,context)})}),
     ...(['approve','reject'] as const).map(operation=>define({name:`dingtalk_${operation}`,description:`用户逐项确认后${operation==='approve'?'同意':'拒绝'}准确审批节点，校验归属并回读节点结果。`,schema:action,operation,write:true,
-      execute:async(args,context,target)=>run(['oa','approval',operation,'--instance-id',String(args.instanceId),'--task-id',target,...(args.remark?['--remark',String(args.remark)]:[])],context)}))
+      execute:async(args,context,target)=>run(['oa','approval',operation,'--instance-id',String(args.instanceId),'--task-id',target,...(args.remark?['--remark',String(args.remark)]:[])],context)})),
+    define({
+      name: 'dingtalk_transfer', description: '经确认后将一个可操作审批节点转交给准确用户，回读原节点和新负责人。',
+      schema: transfer, operation: 'transfer', write: true,
+      execute: (args, context, target) => run(['oa', 'approval', 'redirect-task', '--task-id', target,
+        '--to-actioner-id', String(args.toUserId), ...(args.remark ? ['--remark', String(args.remark)] : [])], context)
+    })
   ]}
 }
 function fail(code:string){return Object.assign(new Error(code),{code})}
@@ -177,5 +188,14 @@ function remoteErrorCode(root:Json, transportCode?:string):string {
 function findArray(value:Json,keys:string[],depth=0):unknown[]|undefined{if(depth>4)return undefined;for(const key of keys)if(Array.isArray(value[key]))return value[key] as unknown[];for(const key of ['result','data']){if(Array.isArray(value[key]))return value[key] as unknown[];const found=findArray(object(value[key]),keys,depth+1);if(found)return found}return undefined}
 function findObject(value:Json,keys:string[],depth=0):Json|undefined{if(depth>4)return undefined;for(const key of keys){const found=object(value[key]);if(Object.keys(found).length)return found}for(const key of ['result','data']){const found=findObject(object(value[key]),keys,depth+1);if(found)return found}return undefined}
 function stableId(value:Json):string{return String(value.taskId??value.todoId??value.id??'')}
-function verifiedApproval(data:Json,target:string,operation:string):string|undefined{const task=(data.tasks as Json[]).find(item=>item.taskId===target);return task&&task.status==='COMPLETED'&&task.result===(operation==='approve'?'AGREE':'REFUSE')?'done':undefined}
+function verifiedApproval(data: Json, target: string, operation: string, toUserId?: unknown): string | undefined {
+  const tasks = data.tasks as Json[]
+  const task = tasks.find(item => item.taskId === target)
+  if (operation === 'transfer') {
+    const redirected = task && String(task.result).toUpperCase() === 'REDIRECTED'
+    const recipient = tasks.some(item => item.taskId !== target && item.userId === toUserId && ['NEW', 'RUNNING'].includes(String(item.status)))
+    return redirected && recipient ? 'REDIRECTED' : undefined
+  }
+  return task && task.status === 'COMPLETED' && task.result === (operation === 'approve' ? 'AGREE' : 'REFUSE') ? 'done' : undefined
+}
 export const _dwsToolProviderInternals={defaultRunner,business}

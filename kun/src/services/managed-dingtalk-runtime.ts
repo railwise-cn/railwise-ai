@@ -6,7 +6,7 @@ import { z } from 'zod'
 import type { CapabilityPreflight } from '../contracts/harness.js'
 import { DingTalkCapabilityConfig, type DingTalkCapabilityConfig as DingTalkConfig, type DingTalkCredential } from '../contracts/dingtalk.js'
 import { DingTalkAuthService, type ConnectorSecretStore } from '../connectors/dingtalk-auth.js'
-import { buildDingTalkToolProvider, DINGTALK_SCOPES } from '../adapters/tool/dingtalk-tool-provider.js'
+import { buildDingTalkToolProvider, DINGTALK_SCOPES, dingtalkOpenapiIdentity } from '../adapters/tool/dingtalk-tool-provider.js'
 import type { CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import { externalTaskIntent } from './external-task-capability.js'
 
@@ -50,6 +50,10 @@ export class ManagedDingTalkRuntime {
   setApply(apply: (provider?: CapabilityToolProvider) => void): void { this.apply = apply }
   state(): ManagedDingTalkState { return structuredClone(this.status) }
   toolProvider(): CapabilityToolProvider | undefined { return this.provider }
+  scope(externalTargets: readonly string[] = []) {
+    return { networkAllowlist: [API], connectorScopes: [...this.status.scopes], externalTargets: [...externalTargets],
+      connectorBackends: { dingtalk: 'openapi' as const }, connectorIdentityFingerprints: { dingtalk: dingtalkOpenapiIdentity(this.config) } }
+  }
   close(): void { if (this.expiryTimer) clearTimeout(this.expiryTimer); this.expiryTimer = undefined }
 
   async configure(input: unknown): Promise<{ configured: true; userScopes: string[] }> {

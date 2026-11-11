@@ -4,6 +4,7 @@ import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provide
 import type { CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import { preflightExternalTask, externalTaskIntent } from './external-task-capability.js'
 import { assertLarkCliCredentialAccess } from './lark-cli-environment.js'
+import { LARK_DELIVERY_SCOPES } from '../adapters/tool/lark-delivery-tools.js'
 
 /** Refreshes only trusted local configuration; callers cannot choose a CLI path. */
 export class ManagedLarkRuntime {
@@ -49,27 +50,33 @@ export class ManagedLarkRuntime {
         resolution
       }
     }
-    if (intent.operation === 'send' || intent.operation === 'transfer') {
+    if (intent.operation === 'transfer') {
       const resolution = { kind: 'retry' as const, route: 'marketplace', label: '查看飞书能力' }
       return {
         ...result,
         status: 'unsupported' as const,
         errorCode: 'connector_operation_unsupported',
-        message: `当前飞书连接器尚不支持${intent.operation === 'send' ? '发送消息' : '转交审批'}。`,
+        message: '当前飞书连接器尚不支持转交审批。',
         action: resolution,
         resolution
       }
     }
 
+    const delivery = intent.operation === 'upload' ? 'drive' : intent.operation === 'send' ? /邮件|邮箱|mail|email/i.test(text) ? 'mail' : 'im' : undefined
+    if (delivery && this.config.executableVersion !== '1.0.100') {
+      const resolution = { kind: 'install' as const, route: 'marketplace', label: '更新飞书连接器' }
+      return { ...result, status: 'blocked' as const, errorCode: 'connector_version_unsupported',
+        message: '此操作需要已验证的飞书连接器1.0.100，请先更新连接器。已有账号配置将继续保留。', action: resolution, resolution }
+    }
     const approval = /审批|approval|workflow/i.test(text) || ['approve', 'reject', 'transfer'].includes(intent.operation ?? '')
-    const requiredScopes = intent.mutation
+    const requiredScopes = delivery ? [...LARK_DELIVERY_SCOPES[delivery]] : intent.mutation
       ? approval
         ? ['approval:task:read', 'approval:task:write', 'approval:instance:read']
         : ['task:task:read', 'task:task:write']
       : approval
         ? intent.operation === 'detail' ? ['approval:instance:read'] : ['approval:task:read']
         : ['task:task:read']
-    const toolName = approval
+    const toolName = delivery ? `lark_${delivery}_${delivery === 'drive' ? 'upload' : 'send'}` : approval
       ? intent.operation === 'detail' ? 'lark_approval_get'
         : intent.operation === 'approve' ? 'lark_approval_approve'
           : intent.operation === 'reject' ? 'lark_approval_reject'
@@ -102,6 +109,7 @@ export class ManagedLarkRuntime {
         ? [this.config.brand === 'lark' ? 'https://open.larksuite.com' : 'https://open.feishu.cn']
         : [],
       connectorScopes: ready ? [...this.config.scopes] : [],
+      ...(ready ? { connectorBackends: { 'lark-cli': 'lark-cli' as const } } : {}),
       ...(ready && this.config.identityFingerprint ? {connectorIdentityFingerprints:{'lark-cli':this.config.identityFingerprint}} : {}),
       externalTargets: [...externalTargets]
     }

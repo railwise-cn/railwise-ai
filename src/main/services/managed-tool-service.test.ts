@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ManagedLarkAppSetup } from './managed-lark-app-setup'
 
 const systemFetchMock = vi.hoisted(() => vi.fn())
+const pinnedLarkRelease = vi.hoisted(() => ({ version: '1.2.3', sourceCommit: 'synthetic-commit', sourceUrl: 'https://api.github.com/repos/larksuite/cli/zipball/synthetic-commit', sourceSha256: '', assets: {} as Record<string, string> }))
+vi.mock('./managed-lark-release', () => ({ LARK_RELEASE: pinnedLarkRelease }))
 
 vi.mock('./system-network', () => ({
   systemFetch: systemFetchMock,
@@ -92,11 +94,17 @@ async function fixture(id: 'lark-cli' | 'officecli', version: string): Promise<F
 }
 
 function mockOfficialDownloads(fixtures: Record<'lark-cli' | 'officecli', Fixture>, egoSkills?: Buffer): void {
+  const lark = fixtures['lark-cli']
+  pinnedLarkRelease.version = lark.version
+  pinnedLarkRelease.assets = { [lark.assetName]: createHash('sha256').update(lark.asset).digest('hex') }
+  pinnedLarkRelease.sourceSha256 = createHash('sha256').update(lark.skills).digest('hex')
   systemFetchMock.mockImplementation(async (input: string | URL | Request) => {
     const url = String(input instanceof Request ? input.url : input)
     const id = url.includes('larksuite/cli') || url.includes('/lark-cli/') ? 'lark-cli' : 'officecli'
     const item = fixtures[id]
 
+    if (url === pinnedLarkRelease.sourceUrl) return response(lark.skills)
+    if (url === `https://github.com/larksuite/cli/releases/download/v${lark.version}/${lark.assetName}`) return response(lark.asset)
     if (url.includes('api.github.com/repos/')) {
       return response(JSON.stringify({
         tag_name: `v${item.version}`,
@@ -201,6 +209,38 @@ describe('managed-tool-service', () => {
     expect(_internals.parseLarkIdentity(JSON.stringify({ identity: 'bot', brand: 'feishu', identities: { user: { available: false } } }))).toEqual({ available: false, scopes: [], brand: 'feishu' })
     expect(_internals.parseLarkIdentity(JSON.stringify({ identity: 'user', appId: 'cli-existing', brand: 'lark', identities: { user: { available: true, openId: 'ou-synthetic', scope: 'task:task:read approval:task:read' } } }))).toMatchObject({ available: true, scopes: ['task:task:read', 'approval:task:read'], brand: 'lark', identityFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(_internals.parseLarkIdentity('not json').available).toBe(false)
+  })
+  it('requests an explicit capability and preserves the selected account and existing scopes', async () => {
+    const executablePath = join(toolsRoot, 'lark-cli')
+    writeFileSync(executablePath, 'fixture')
+    writeFileSync(join(toolsRoot, 'manifest.json'), JSON.stringify({ 'lark-cli': { version: '1.0.100', executablePath, installedAt: new Date().toISOString() } }))
+    let requested = ''
+    const runner = vi.fn(async (_path: string, args: string[]) => {
+      if (args[0] === '--version') return { ok: true, output: '1.0.100' }
+      if (args[0] === 'config') return { ok: true, output: JSON.stringify({ appId: 'cli-synthetic', profile: 'cli-synthetic', brand: 'feishu' }) }
+      if (args[1] === 'status') return { ok: true, output: JSON.stringify({ identity: 'user', appId: 'cli-synthetic', brand: 'feishu', identities: { user: { available: true, openId: 'ou-synthetic', scope: requested || larkScopes } } }) }
+      if (args.includes('--no-wait')) {
+        requested = args[args.indexOf('--scope') + 1]
+        return { ok: true, output: JSON.stringify({ device_code: 'private-device', verification_url: 'https://accounts.feishu.cn/device', expires_in: 600 }) }
+      }
+      return { ok: true, output: JSON.stringify({ event: 'authorization_complete', user_open_id: 'ou-synthetic', scope: requested, missing: [] }) }
+    })
+    _internals.setToolRunnerForTests(runner)
+    expect(await beginManagedLarkLogin({ capability: 'mail' })).toMatchObject({ ok: true })
+    expect(requested).toContain('mail:user_mailbox.message:send')
+    expect(requested).toContain('task:task:read')
+    expect(await beginManagedLarkLogin({ capability: 'drive' })).toMatchObject({ ok: false })
+    expect(runner.mock.calls.filter(call => call[1].includes('--no-wait'))).toHaveLength(1)
+    expect(await completeManagedLarkLogin()).toMatchObject({ ok: true, status: { installedVersion: '1.0.100', profile: 'cli-synthetic', userOpenId: 'ou-synthetic' } })
+    expect(readFileSync(join(toolsRoot, 'lark-account-selection.json'), 'utf8')).not.toContain('private-device')
+  })
+  it('pins the official release and each supported platform digest', async () => {
+    const { LARK_RELEASE } = await vi.importActual<typeof import('./managed-lark-release')>('./managed-lark-release')
+    expect(LARK_RELEASE.version).toBe('1.0.100')
+    expect(LARK_RELEASE.sourceCommit).toMatch(/^[a-f0-9]{40}$/)
+    expect(LARK_RELEASE.sourceSha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(Object.keys(LARK_RELEASE.assets)).toHaveLength(4)
+    for (const digest of Object.values(LARK_RELEASE.assets)) expect(digest).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it('carries the verified app profile through login and persistent runtime diagnosis despite a different CLI default', async () => {
@@ -455,6 +495,20 @@ describe('managed-tool-service', () => {
     await expect(removeManagedTool('officecli')).resolves.toMatchObject({ status: { state: 'not_installed' } })
     expect(existsSync(join(toolsRoot, 'manifest.json'))).toBe(true)
     expect(JSON.parse(readFileSync(join(toolsRoot, 'manifest.json'), 'utf8'))).toEqual({})
+  })
+  it('preserves an existing Lark Skill while installing the verified connector update', async () => {
+    const lark = await fixture('lark-cli', '1.2.3')
+    const office = await fixture('officecli', '1.2.3')
+    mockOfficialDownloads({ 'lark-cli': lark, officecli: office })
+    expect(await installManagedTool('lark-cli')).toMatchObject({ ok: true })
+    const path = join(managedToolsSkillRoot(), 'lark-task', 'SKILL.md')
+    writeFileSync(path, 'User-authored task guidance')
+    const next = await fixture('lark-cli', '1.2.4')
+    mockOfficialDownloads({ 'lark-cli': next, officecli: office })
+    _internals.setToolRunnerForTests(async (_path, args) => args[0] === '--version'
+      ? { ok: true, output: 'lark-cli v1.2.4' } : { ok: false, output: 'not logged in' })
+    expect(await installManagedTool('lark-cli')).toMatchObject({ ok: true, status: { installedVersion: '1.2.4', message: expect.stringContaining('preserved for review') } })
+    expect(readFileSync(path, 'utf8')).toBe('User-authored task guidance')
   })
 
   it('extracts the Windows Lark zip without depending on PowerShell argument forwarding', async () => {

@@ -61,6 +61,25 @@ describe('official typed DingTalk DWS provider',()=>{
     expect(await tool.execute({taskId:'todo-1'},context())).toMatchObject({isError:true,output:{status:'outcome_unknown',code:'connector_target_mismatch'}})
     expect(runner.mock.calls.filter(call=>call[1][2]==='done')).toHaveLength(1)
   })
+  it.each([true, false])('verifies transfer only when the old node and new recipient match (%s)', async recipientMatches => {
+    const runner = vi.fn(async (_path: string, args: string[]) => ({ ok: true, output: { success: true, result:
+      args[2] === 'tasks' ? { taskIds: ['42'] } : args[2] === 'detail' ? { processInstanceId: 'instance-1', tasks: [
+        { taskId: '42', result: 'REDIRECTED', status: 'COMPLETED' },
+        { taskId: '43', userId: recipientMatches ? 'recipient-1' : 'other', status: 'NEW' }
+      ] } : true } }))
+    const tool = buildDwsToolProvider(dwsTestConfig, withDwsTestIdentity(runner))!.tools.find(item => item.name === 'dingtalk_transfer')!
+    const result = await tool.execute({ instanceId: 'instance-1', taskId: '42', toUserId: 'recipient-1' }, context())
+    expect(result).toMatchObject({ output: { status: recipientMatches ? 'succeeded' : 'outcome_unknown' } })
+    expect(runner.mock.calls.filter(call => call[1][2] === 'redirect-task')).toHaveLength(1)
+    expect(runner.mock.calls[1][1].slice(0, 7)).toEqual(['oa', 'approval', 'redirect-task', '--task-id', '42', '--to-actioner-id', 'recipient-1'])
+  })
+  it('rejects an explicit backend mismatch before reading identity', async () => {
+    const runner = vi.fn()
+    const current = context()
+    current.executionGrant = { ...current.executionGrant!, connectorBackends: { dingtalk: 'openapi' } }
+    expect(await buildDwsToolProvider(dwsTestConfig, runner)!.tools[0].execute({}, current)).toMatchObject({ output: { code: 'connector_backend_changed' } })
+    expect(runner).not.toHaveBeenCalled()
+  })
   it('refuses unsafe approval IDs, raw URLs and unreviewed actions before business dispatch',async()=>{
     const runner=vi.fn(),tool=buildDwsToolProvider(dwsTestConfig,runner)!.tools.find(tool=>tool.name==='dingtalk_approve')!
     for(const args of [{instanceId:'i',taskId:'9007199254740993'},{instanceId:'i',taskId:'42',url:'https://invalid.example'}])expect(await tool.execute(args,context())).toMatchObject({isError:true})

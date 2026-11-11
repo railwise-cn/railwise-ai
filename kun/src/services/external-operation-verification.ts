@@ -9,12 +9,16 @@ import type { ThreadStore } from '../ports/thread-store.js'
 import { canonicalTrustRoot, type WorkspaceTrustReader } from './workspace-trust-reader.js'
 import type { TaskController } from './task-controller.js'
 import type { TaskRunRepository } from './task-run-repository.js'
-import { externalOperationForTool } from './external-effect-evidence.js'
+import { externalOperationForTool, receiptEffectDefinition } from './external-effect-evidence.js'
 import { externalTargetGrantKey } from '../adapters/tool/sandbox-policy.js'
+import { verifiedLarkDeliveryState } from '../adapters/tool/lark-delivery-tools.js'
 
 // eslint-disable-next-line no-control-regex
 const safeId = z.string().trim().min(1).max(512).refine(value => !/[\u0000-\u001f]/u.test(value))
-const locatorSchema = z.object({ taskId: safeId, instanceCode: safeId.optional(), instanceId: safeId.optional(), toUserId: safeId.optional() }).strict()
+const locatorSchema = z.object({ taskId: safeId.optional(), instanceCode: safeId.optional(), instanceId: safeId.optional(), toUserId: safeId.optional(),
+  messageId: safeId.optional(), recipient: z.email().max(320).optional(), chatId: safeId.optional(), senderId: safeId.optional(),
+  fileToken: safeId.optional(), folderToken: safeId.optional(), contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(), expectedHash: z.string().regex(/^[a-f0-9]{64}$/).optional()
+}).strict()
 type Locator = z.infer<typeof locatorSchema>
 type VerificationInput = { expectedRevision: number; idempotencyKey: string }
 export type OperationVerificationResult = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: ResultEvidence; errorCode?: string }
@@ -49,13 +53,15 @@ export class ExternalOperationVerificationService {
     const resolved = repository.verifiedOperationResolution(receipt)
     if (resolved) return { taskId, receiptId, status: 'verified', evidence: resolved.evidence }
     if (receipt.status !== 'outcome_unknown') throw failure('invalid_state', '仅可核验结果未知的操作。')
-    const spec = externalOperationForTool(String(receipt.request?.toolName ?? ''))
+    const toolName = String(receipt.request?.toolName ?? '')
+    const spec = receiptEffectDefinition(receipt) ?? this.deps.toolHost.describeEffect?.(toolName) ?? externalOperationForTool(toolName)
     const target = receipt.request?.target
-    if (!spec || !['complete', 'approve', 'reject', 'transfer'].includes(spec.operation) || receipt.request?.provider !== spec.provider ||
+    if (!spec || !['complete', 'approve', 'reject', 'transfer', 'send', 'upload'].includes(spec.operation) || receipt.request?.provider !== spec.provider ||
       receipt.request?.operation !== spec.operation || typeof target !== 'string' || !target) throw failure('verification_unsupported', '此操作缺少可靠的只读核验方式。')
-    const locator = locatorSchema.safeParse(receipt.request?.verificationLocator)
-    if (!locator.success || locator.data.taskId !== target) throw failure('verification_locator_missing', '旧回执缺少准确目标定位，不能自动核验或重放。')
-    const plan = readPlan(spec.provider, spec.operation, locator.data)
+    const recordedOutput = object(object(object(receipt.result).item).output)
+    const locator = locatorSchema.safeParse({ ...object(receipt.request?.verificationLocator), ...object(recordedOutput.verificationLocator) })
+    if (!locator.success || !locatorMatchesTarget(toolName, target, locator.data)) throw failure('verification_locator_missing', '旧回执缺少准确目标定位，不能自动核验或重放。')
+    const plan = readPlan(spec.provider, spec.operation, locator.data, toolName)
     if (!plan) throw failure('verification_locator_missing', '回执缺少审批实例定位，不能猜测核验目标。')
     const dispatchApproval = receipt.dispatchApproval
     const approved = (receipt.result as { approved?: boolean } | undefined)?.approved === true ||
@@ -68,6 +74,9 @@ export class ExternalOperationVerificationService {
     try {
       const originalGrant=ExecutionGrantSchema.safeParse(receipt.request?.executionGrant)
       if(!originalGrant.success)throw failure('execution_grant_missing','原操作缺少有效权限记录，无法核验。')
+      const bindingKey = spec.provider === 'lark' ? 'lark-cli' : spec.provider
+      if (recordedOutput.backend && originalGrant.data.connectorBackends?.[bindingKey] !== recordedOutput.backend) throw failure('connector_backend_changed', '操作回执与原授权的连接器后端不一致。')
+      if (recordedOutput.accountFingerprint && originalGrant.data.connectorIdentityFingerprints?.[bindingKey] !== recordedOutput.accountFingerprint) throw failure('connector_identity_changed', '操作回执与原授权的账号不一致。')
       await this.deps.refreshProvider(spec.provider,originalGrant.data)
       const context = await this.context(task, receipt, spec.provider, spec.operation, target, plan.toolName)
       const catalog = await this.deps.toolHost.listTools(context)
@@ -80,7 +89,9 @@ export class ExternalOperationVerificationService {
       if (read.item.kind !== 'tool_result' || read.item.isError || output.ok !== true || output.status !== 'succeeded' ||
         !readEvidence.success || !readEvidence.data.verified || readEvidence.data.kind !== 'external_operation' || readEvidence.data.provider !== spec.provider ||
         readEvidence.data.operation !== 'detail' || readEvidence.data.target !== plan.readTarget) throw failure('verification_readback_failed', '远端只读核验失败，原操作仍为结果未知。')
-      const status = verifiedState(spec.provider, spec.operation, target, locator.data, object(output.data))
+      const status = ['send', 'upload'].includes(spec.operation)
+        ? verifiedLarkDeliveryState(toolName, locator.data, object(output.data))
+        : verifiedState(spec.provider, spec.operation, target, locator.data, object(output.data))
       if (!status) throw failure('verification_state_unconfirmed', '尚未观察到目标操作的成功状态，原操作仍为结果未知。')
       const evidence = ResultEvidenceSchema.parse({ ...readEvidence.data, operation: spec.operation, target, status, verifiedAt: this.deps.nowIso() })
       // Recheck cancellation, workspace revocation and scope after the network call.
@@ -153,11 +164,20 @@ export class ExternalOperationVerificationService {
   }
 }
 
-function readPlan(provider: string, operation: string, locator: Locator) {
-  if (operation === 'complete') return { toolName: provider === 'lark' ? 'lark_task_get' : 'dingtalk_get_task', arguments: { taskId: locator.taskId }, readTarget: locator.taskId }
+function readPlan(provider: string, operation: string, locator: Locator, toolName: string) {
+  if (toolName === 'lark_mail_send' && locator.messageId && locator.recipient) return { toolName: 'lark_mail_send_status', arguments: { messageId: locator.messageId, recipient: locator.recipient }, readTarget: locator.messageId }
+  if (toolName === 'lark_im_send' && locator.messageId && locator.chatId && locator.contentHash && locator.senderId) return { toolName: 'lark_im_get_message', arguments: { messageId: locator.messageId, chatId: locator.chatId, contentHash: locator.contentHash }, readTarget: locator.messageId }
+  if (toolName === 'lark_drive_upload' && locator.fileToken && locator.expectedHash) return { toolName: 'lark_drive_verify_file', arguments: { fileToken: locator.fileToken, expectedHash: locator.expectedHash }, readTarget: locator.fileToken }
+  if (operation === 'complete' && locator.taskId) return { toolName: provider === 'lark' ? 'lark_task_get' : 'dingtalk_get_task', arguments: { taskId: locator.taskId }, readTarget: locator.taskId }
   if (provider === 'lark' && locator.instanceCode) return { toolName: 'lark_approval_get', arguments: { instanceCode: locator.instanceCode }, readTarget: locator.instanceCode }
   if (provider === 'dingtalk' && locator.instanceId && (operation !== 'transfer' || locator.toUserId)) return { toolName: 'dingtalk_get_approval', arguments: { instanceId: locator.instanceId }, readTarget: locator.instanceId }
   return undefined
+}
+function locatorMatchesTarget(toolName: string, target: string, locator: Locator): boolean {
+  if (toolName === 'lark_mail_send') return locator.recipient === target
+  if (toolName === 'lark_im_send') return locator.chatId === target
+  if (toolName === 'lark_drive_upload') return locator.folderToken === target
+  return locator.taskId === target
 }
 function verifiedState(provider: string, operation: string, target: string, locator: Locator, data: Record<string, unknown>): string | undefined {
   if (operation === 'complete') {

@@ -22,6 +22,7 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
   const [login, setLogin] = useState<Extract<ManagedLarkLoginResult, { ok: true }> | null>(null)
   const [appSetup, setAppSetup] = useState<Extract<ManagedLarkAppSetupResult, { ok: true }> | null>(null)
   const [appRequired, setAppRequired] = useState(false)
+  const [capability, setCapability] = useState<'tasks' | 'mail' | 'im' | 'drive'>('tasks')
   const started = useRef(false)
   const busy = useRef(false)
   const run = useCallback(async (operation: () => Promise<void>): Promise<void> => {
@@ -51,7 +52,7 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
   }, [api, onChanged, t])
   const beginLogin = useCallback(async (setupIfRequired = false): Promise<void> => {
     if (!api.beginManagedLarkLogin) throw new Error(t('capabilityLoginUnavailable'))
-    const result = await api.beginManagedLarkLogin()
+    const result = await api.beginManagedLarkLogin({ capability })
     if (!result.ok) {
       if (result.reason === 'app_configuration_required') {
         setAppRequired(true)
@@ -65,18 +66,29 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
     setLogin(result)
     // Main validates the official URL; no app secret or device code crosses IPC.
     await window.workwise.openExternal(result.verificationUrl)
-  }, [api, beginAppSetup, t])
+  }, [api, beginAppSetup, capability, t])
   const connect = useCallback(async (): Promise<void> => {
     let status = await managed(false)
     if (status.state === 'not_installed') status = await managed(true)
+    if (capability !== 'tasks' && status.installedVersion !== '1.0.100') status = await managed(true)
     if (status.state === 'error' || status.state === 'not_installed') throw new Error(status.message || t('capabilityManaged_error'))
     await beginLogin(true)
-  }, [beginLogin, managed, t])
+  }, [beginLogin, capability, managed, t])
   useEffect(() => {
     if (!autoConnect || started.current) return
     started.current = true
     void run(connect)
   }, [autoConnect, connect, run])
+  useEffect(() => {
+    if (!login) return
+    const remaining = Date.parse(login.expiresAt) - Date.now()
+    if (!Number.isFinite(remaining)) return
+    const timer = setTimeout(() => {
+      setLogin(null)
+      setMessage(t('managedLarkAuthorizationExpired'))
+    }, Math.max(0, Math.min(remaining, 2_147_483_647)))
+    return () => clearTimeout(timer)
+  }, [login, t])
   const checkAppSetup = async (cancel = false): Promise<void> => {
     const action = cancel ? api.cancelManagedLarkAppSetup : api.checkManagedLarkAppSetup
     if (!action) throw new Error(t('capabilityLoginUnavailable'))
@@ -103,6 +115,18 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
   return <section aria-label={t('managedLarkConnectionTitle')} className={compact ? 'mt-3 border-t border-ds-border pt-3' : 'rounded-xl border border-ds-border bg-ds-surface p-4'}>
     {!compact ? <h3 className="font-semibold">{t('managedLarkConnectionTitle')}</h3> : null}
     <p className="text-xs text-ds-muted">{t('managedLarkConnectionDescription')}</p>
+    <label className="mt-3 flex flex-col gap-1 text-xs">
+      <span>{t('managedLarkCapabilityLabel')}</span>
+      <select value={capability} disabled={pending || Boolean(login) || appSetup?.state === 'waiting'}
+        onChange={event => setCapability(event.target.value as typeof capability)}
+        className="rounded-md border border-ds-border bg-ds-surface px-2 py-2">
+        <option value="tasks">{t('managedLarkCapabilityTasks')}</option>
+        <option value="mail">{t('managedLarkCapabilityMail')}</option>
+        <option value="im">{t('managedLarkCapabilityIm')}</option>
+        <option value="drive">{t('managedLarkCapabilityDrive')}</option>
+      </select>
+    </label>
+    <p className="mt-1 text-xs text-ds-muted">{t('managedLarkCapabilityScopeHint')}</p>
     {appRequired ? <p className="mt-3 text-xs">{t('capabilityLarkAppRequired')}</p> : null}
     {authorization?.verificationUrl ? <div role="status" className="mt-3 rounded-lg border border-ds-border bg-ds-surface p-3">
       <div className="inline-block rounded-lg bg-white p-2"><QRCodeSVG value={authorization.verificationUrl} size={144} marginSize={1} title={t('managedLarkQrCode')} /></div>

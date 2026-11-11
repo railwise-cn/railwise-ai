@@ -32,6 +32,18 @@ describe('shared official Lark connection panel', () => {
     expect(api.beginManagedLarkLogin).not.toHaveBeenCalled()
     expect(api.beginManagedLarkAppSetup).not.toHaveBeenCalled()
   })
+  it('passes the selected mail capability only after the user connects', async () => {
+    api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'installed', installedVersion: '1.0.100' } })
+    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/device', expiresAt: new Date(Date.now() + 600_000).toISOString() })
+    await act(async () => { root.render(createElement(ManagedLarkConnection)) })
+    const select = container.querySelector('select')!
+    await act(async () => { select.value = 'mail'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(api.beginManagedLarkLogin).not.toHaveBeenCalled()
+    await click('连接飞书')
+    expect(api.beginManagedLarkLogin).toHaveBeenCalledWith({ capability: 'mail' })
+    expect(api.installManagedTool).not.toHaveBeenCalled()
+    expect(container.querySelector('svg')).not.toBeNull()
+  })
   it('connects through official install and app scan after an explicit connect click', async () => {
     api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'not_installed' } })
     api.installManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })
