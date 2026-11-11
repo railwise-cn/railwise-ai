@@ -2,7 +2,28 @@
 
 The provider is an independent RailWise adapter around the official `larksuite/cli` executable managed by the main process. It never accepts arbitrary command lines, executable paths, shell fragments or API URLs from model arguments. DingTalk is a separate provider and is never routed to this adapter.
 
-The CLI protocol was checked against upstream commit `1bfdcc2c1a0ed0296ddb6349d251bdd75145bc5a` on 2026-11-10:
+## Current contract at `668d4567`
+
+The managed release is Lark CLI `1.0.100`, with official binaries and companion Skills pinned to upstream commit `ac22a60a23d66c37d43a7ec6d9e99b99a4320356`. The shared dependency manifest supplies the download URL, digest and license records. Installation uses the RailWise download host first and verifies the same pinned bytes on the official fallback. Managed installation supplies 25 companion Skills from the pinned source archive, including `lark-meeting`. Existing Skill directories and account references remain available for review.
+
+Commit `668d456701210fe702eab015896f43848e9e97a5` corrects two contracts against that pinned CLI.
+
+- Application inspection calls `config show`, with `--profile` when a profile is selected. This command emits structured output directly. The unsupported `--json` argument has been removed from initial setup, login preparation and completion checks. `auth status --json` retains its supported account-diagnosis contract. [Pinned config command](https://github.com/larksuite/cli/blob/ac22a60a23d66c37d43a7ec6d9e99b99a4320356/cmd/config/show.go)
+- Typed IM delivery uses `im +messages-send --msg-type text --content <JSON>`. The JSON encoding preserves literal file/stdin markers and escapes `<` before upstream mention normalization. The CLI idempotency key is bounded to its 50-character limit. Approval remains bound to the full request hash, and message readback checks the target conversation, sender and content fingerprint. [Pinned message command](https://github.com/larksuite/cli/blob/ac22a60a23d66c37d43a7ec6d9e99b99a4320356/shortcuts/im/im_messages_send.go)
+
+The current typed tools cover task and approval reads, task completion, approval actions, mail sending, IM sending and Drive uploads. The connection panel lets the user select task, mail, message or Drive capabilities for authorization. Each operation uses the selected profile, diagnosed account identity, required scopes and execution grant. Writes require the exact approved target and durable receipt. Pending or unknown outcomes retain a read-only verification path.
+
+### Current validation boundary
+
+Fixed dependency cold-cache installation has passed through the company download host, including the Lark executable and its companion Skills. The exact CLI argument and message-encoding regressions use controlled fixtures. Source `668d4567` passed a production build, Desktop/KUN type checks and 3705 KUN tests. Desktop passed 4391 tests at checker-only follow-up `f407340e`, whose changes preserve the product code. Detailed source and package evidence remains in the implementation status record. [Implementation status](harness-implementation-status-2026-11-10.md)
+
+Current-account authorization, granted scopes, target-specific business operations and resumption of the original task require their own exact-package acceptance records. The historical DingTalk observations below retain their original platform and source identities.
+
+## Historical protocol review (2026-11-10)
+
+This section preserves the earlier implementation record. Its `config show --json` call was the argument mismatch corrected at `668d4567`.
+
+The earlier CLI protocol review used upstream commit `1bfdcc2c1a0ed0296ddb6349d251bdd75145bc5a` on 2026-11-10:
 
 - [Task list](https://github.com/larksuite/cli/blob/1bfdcc2c1a0ed0296ddb6349d251bdd75145bc5a/skills/lark-task/references/lark-task-get-my-tasks.md): `task +get-my-tasks --complete=false`.
 - [Task completion](https://github.com/larksuite/cli/blob/1bfdcc2c1a0ed0296ddb6349d251bdd75145bc5a/shortcuts/task/task_complete.go): target GUID, nonzero completion time and `done` state.
@@ -22,9 +43,11 @@ Mutation success requires a target-specific observed remote state. Task completi
 
 Focused automated tests cover argument validation, scope filtering, explicit write denial, approval readback, wrong target, malformed responses, bot-only identity, private device-code flow, persisted evidence and capability refresh. The Feishu/Lark synthetic fixtures establish the automated regression results for that implementation stage. Feishu/Lark account authorization and business operations still require configured-account acceptance. The later DingTalk checks are recorded separately below and in the implementation status.
 
-## Exact-package acceptance status
+## Historical exact-package acceptance
 
-The latest installed candidate is `0a94e6a73eab47144d1f9474c83a30566bff089c`, version `0.5.4`, macOS arm64, bundle `com.wangjiawei508.workwise.candidate.head0a94e6a73eab`. Signature, stapled notarization, Gatekeeper, DMG/ASAR hashes and isolated installation passed. The signed app was copied under its new name into the existing `682f4b17` isolated candidate root to reuse that candidate's login and data. The environment source marker was updated with a backup, and the copied app's signature and ASAR were checked again. Full hashes and run details are recorded in the implementation status. [Candidate build](https://github.com/railwise-cn/railwise-ai/actions/runs/42909030668)
+### Candidate `0a94e6a7`
+
+The installed candidate for this historical check was `0a94e6a73eab47144d1f9474c83a30566bff089c`, version `0.5.4`, macOS arm64, bundle `com.wangjiawei508.workwise.candidate.head0a94e6a73eab`. Signature, stapled notarization, Gatekeeper, DMG/ASAR hashes and isolated installation passed. The signed app was copied under its new name into the existing `682f4b17` isolated candidate root to reuse that candidate's login and data. The environment source marker was updated with a backup, and the copied app's signature and ASAR were checked again. Full hashes and run details are recorded in the implementation status. [Candidate build](https://github.com/railwise-cn/railwise-ai/actions/runs/42909030668)
 
 Chinese macOS UI checks passed for “测试待办读取”, “打开本机钉钉”, and “重新授权 / 切换账号”. The first UI-triggered read-only request returned a count of one. The desktop action opened the installed DingTalk client. Reauthorization displayed a 208px QR code, official URL field and copy action. Chrome loaded the official device page, then the official identity page with its QR-login tab and existing account. Acceptance stopped before final approval of the new grant, closed the new browser page and cancelled that login attempt. After cancellation, a second read check using the original account returned one, for two UI read checks in total. Approval writes, complete task execution, current-candidate Feishu/Lark account acceptance and Chinese Windows interaction remain pending.
 
