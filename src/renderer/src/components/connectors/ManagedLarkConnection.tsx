@@ -7,18 +7,20 @@ type ConnectionApi = Partial<Pick<WorkWiseApi, 'beginManagedLarkLogin' | 'comple
 export type ManagedLarkConnectionProps = {
   onChanged?: () => void | Promise<void>
   initialState?: ManagedToolState
+  initialSkillWarning?: string
   compact?: boolean
   /** Only set after an explicit user click on Connect, never on catalog load. */
   autoConnect?: boolean
 }
 
 /** Shared connection flow: official installation, app scan and user login. No task execution. */
-export function ManagedLarkConnection({ onChanged, initialState, compact = false, autoConnect = false }: ManagedLarkConnectionProps): ReactElement {
+export function ManagedLarkConnection({ onChanged, initialState, initialSkillWarning, compact = false, autoConnect = false }: ManagedLarkConnectionProps): ReactElement {
   const { t } = useTranslation('common')
   const api: ConnectionApi = window.workwise
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState('')
   const [state, setState] = useState<ManagedToolState | undefined>(initialState)
+  const [skillWarning, setSkillWarning] = useState(initialSkillWarning)
   const [login, setLogin] = useState<Extract<ManagedLarkLoginResult, { ok: true }> | null>(null)
   const [appSetup, setAppSetup] = useState<Extract<ManagedLarkAppSetupResult, { ok: true }> | null>(null)
   const [appRequired, setAppRequired] = useState(false)
@@ -37,7 +39,9 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
     const result = await (install ? window.workwise.installManagedTool('lark-cli') : window.workwise.diagnoseManagedTool('lark-cli'))
     if (!result.ok) throw new Error(result.message)
     setState(result.status.state)
-    setMessage(result.status.message ?? t(`capabilityManaged_${result.status.state}`))
+    setSkillWarning(result.status.skillWarning)
+    const statusMessage = result.status.message ?? t(`capabilityManaged_${result.status.state}`)
+    setMessage(result.status.skillWarning ? statusMessage.replace(result.status.skillWarning, '').trim() : statusMessage)
     await onChanged?.()
     return result.status
   }, [onChanged, t])
@@ -74,6 +78,9 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
     if (status.state === 'error' || status.state === 'not_installed') throw new Error(status.message || t('capabilityManaged_error'))
     await beginLogin(true)
   }, [beginLogin, capability, managed, t])
+  useEffect(() => {
+    setSkillWarning(initialSkillWarning)
+  }, [initialSkillWarning])
   useEffect(() => {
     if (!autoConnect || started.current) return
     started.current = true
@@ -142,10 +149,12 @@ export function ManagedLarkConnection({ onChanged, initialState, compact = false
       </> : <button type="button" disabled={pending} onClick={() => void run(finishLogin)} className="ml-2 mt-2 rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('capabilityLoginCompleted')}</button>}
     </div> : null}
     {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
+    {skillWarning ? <p role="status" className="mt-3 whitespace-pre-wrap rounded-md border border-amber-400/50 p-3 text-xs">{skillWarning}</p> : null}
     <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
       {!compact ? <button type="button" disabled={pending || appSetup?.state === 'waiting' || Boolean(login)} onClick={() => void run(connect)}>{t('managedLarkConnect')}</button> : null}
       {compact && state === 'not_installed' ? <button type="button" disabled={pending} onClick={() => void run(async () => { await managed(true) })}>{t('capabilityInstallLark')}</button> : null}
       <button type="button" disabled={pending} onClick={() => void run(async () => { await managed(false) })}>{t(compact ? 'capabilityDiagnose' : 'connectorHubCheckConnections')}</button>
+      {skillWarning ? <button type="button" disabled={pending || appSetup?.state === 'waiting' || Boolean(login)} onClick={() => void run(async () => { await managed(true) })}>{t('managedLarkRepairTools')}</button> : null}
       {appRequired && api.beginManagedLarkAppSetup ? <button type="button" disabled={pending || appSetup?.state === 'waiting'} onClick={() => void run(beginAppSetup)}>{t('capabilityLarkAppConfigure')}</button> : null}
       {compact && state !== 'not_installed' && api.beginManagedLarkLogin ? <button type="button" disabled={pending || appSetup?.state === 'waiting'} onClick={() => void run(() => beginLogin())}>{t('capabilityLoginLark')}</button> : null}
     </div>

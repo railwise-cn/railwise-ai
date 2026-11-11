@@ -4485,6 +4485,7 @@
   "connectorHubCustom": "自定义连接器",
   "connectorHubCheckFailed": "连接检查失败",
   "connectorHubDisabled": "当前已停用",
+  "managedLarkRepairTools": "修复配套工具",
   "connectorHubHeading": "技能与连接器",
   "connectorHubSections": "技能与连接器分类",
   "connectorHubTab": "连接器",

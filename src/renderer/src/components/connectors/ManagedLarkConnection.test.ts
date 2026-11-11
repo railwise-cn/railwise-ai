@@ -44,6 +44,18 @@ describe('shared official Lark connection panel', () => {
     expect(api.installManagedTool).not.toHaveBeenCalled()
     expect(container.querySelector('svg')).not.toBeNull()
   })
+  it('retains a companion Skill warning and repairs the same CLI version without starting login', async () => {
+    api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'installed', installedVersion: '1.0.100', skillWarning: '配套技能缺少 25 项' } })
+    api.installManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'installed', installedVersion: '1.0.100' } })
+    await act(async () => { root.render(createElement(ManagedLarkConnection)) })
+    await click('检查连接状态')
+    expect(container.textContent).toContain('配套技能缺少 25 项')
+    await click('修复配套工具')
+    expect(api.installManagedTool).toHaveBeenCalledExactlyOnceWith('lark-cli')
+    expect(container.textContent).not.toContain('配套技能缺少 25 项')
+    expect(api.beginManagedLarkLogin).not.toHaveBeenCalled()
+    expect(api.beginManagedLarkAppSetup).not.toHaveBeenCalled()
+  })
   it('connects through official install and app scan after an explicit connect click', async () => {
     api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'not_installed' } })
     api.installManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })

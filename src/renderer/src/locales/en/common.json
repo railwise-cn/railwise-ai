@@ -4485,6 +4485,7 @@
   "connectorHubCustom": "Custom connector",
   "connectorHubCheckFailed": "Connection check failed",
   "connectorHubDisabled": "Currently disabled",
+  "managedLarkRepairTools": "Repair companion tools",
   "connectorHubHeading": "Skills & connectors",
   "connectorHubSections": "Skills and connector sections",
   "connectorHubTab": "Connectors",

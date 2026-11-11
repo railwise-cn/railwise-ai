@@ -241,6 +241,9 @@ describe('managed-tool-service', () => {
     expect(LARK_RELEASE.sourceSha256).toMatch(/^[a-f0-9]{64}$/)
     expect(Object.keys(LARK_RELEASE.assets)).toHaveLength(4)
     for (const digest of Object.values(LARK_RELEASE.assets)) expect(digest).toMatch(/^[a-f0-9]{64}$/)
+    expect(_internals.larkSkills).toHaveLength(25)
+    expect(_internals.larkSkills).toContain('lark-meeting')
+    for (const name of ['lark-minutes', 'lark-vc-agent', 'lark-vc']) expect(_internals.larkSkills).not.toContain(name)
   })
 
   it('carries the verified app profile through login and persistent runtime diagnosis despite a different CLI default', async () => {
@@ -503,12 +506,35 @@ describe('managed-tool-service', () => {
     expect(await installManagedTool('lark-cli')).toMatchObject({ ok: true })
     const path = join(managedToolsSkillRoot(), 'lark-task', 'SKILL.md')
     writeFileSync(path, 'User-authored task guidance')
+    const legacySkill = join(managedToolsSkillRoot(), 'lark-minutes')
+    mkdirSync(legacySkill)
+    writeFileSync(join(legacySkill, 'SKILL.md'), 'User-reviewed legacy meeting instructions')
     const next = await fixture('lark-cli', '1.2.4')
     mockOfficialDownloads({ 'lark-cli': next, officecli: office })
     _internals.setToolRunnerForTests(async (_path, args) => args[0] === '--version'
       ? { ok: true, output: 'lark-cli v1.2.4' } : { ok: false, output: 'not logged in' })
     expect(await installManagedTool('lark-cli')).toMatchObject({ ok: true, status: { installedVersion: '1.2.4', message: expect.stringContaining('preserved for review') } })
+    expect(await diagnoseManagedTool('lark-cli')).toMatchObject({ ok: true, status: { skillWarning: expect.stringContaining('preserved for review') } })
     expect(readFileSync(path, 'utf8')).toBe('User-authored task guidance')
+    expect(readFileSync(join(legacySkill, 'SKILL.md'), 'utf8')).toBe('User-reviewed legacy meeting instructions')
+  })
+
+  it('repairs missing companion Skills at the already installed binary version and retains legacy user Skills', async () => {
+    const lark = await fixture('lark-cli', '1.2.3')
+    const office = await fixture('officecli', '1.2.3')
+    mockOfficialDownloads({ 'lark-cli': lark, officecli: office })
+    expect(await installManagedTool('lark-cli')).toMatchObject({ ok: true })
+    for (const name of _internals.larkSkills) rmSync(join(managedToolsSkillRoot(), name), { recursive: true })
+    const legacy = join(managedToolsSkillRoot(), 'lark-minutes')
+    mkdirSync(legacy)
+    writeFileSync(join(legacy, 'SKILL.md'), 'Existing user meeting instructions')
+    expect(await diagnoseManagedTool('lark-cli')).toMatchObject({ ok: true, status: { installedVersion: '1.2.3', skillWarning: expect.stringContaining('25') } })
+    const repaired = await updateManagedTool('lark-cli')
+    expect(repaired).toMatchObject({ ok: true, status: { installedVersion: '1.2.3', state: 'needs_login' } })
+    if (repaired.ok) expect(repaired.status.skillWarning).toBeUndefined()
+    for (const name of _internals.larkSkills) expect(existsSync(join(managedToolsSkillRoot(), name, 'SKILL.md'))).toBe(true)
+    expect(readFileSync(join(legacy, 'SKILL.md'), 'utf8')).toBe('Existing user meeting instructions')
+    expect((await listManagedTools()).ok).toBe(true)
   })
 
   it('extracts the Windows Lark zip without depending on PowerShell argument forwarding', async () => {

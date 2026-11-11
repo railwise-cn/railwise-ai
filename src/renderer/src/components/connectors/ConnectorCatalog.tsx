@@ -175,7 +175,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
           <h3 className="mt-5 text-[13px] font-semibold">{t('connectorHubTry')}</h3>
           <ul className="mt-2 list-inside list-disc space-y-2 text-[12px] text-ds-muted"><li>{t(selected === 'lark' ? 'connectorHubLarkExampleRead' : 'connectorHubDingTalkExampleRead')}</li><li>{t(selected === 'lark' ? 'connectorHubLarkExampleWrite' : 'connectorHubDingTalkExampleWrite')}</li></ul>
           {selected === 'lark' ? <>
-            <div className="mt-5"><ManagedLarkConnection onChanged={changed} autoConnect={autoConnect} initialState={lark?.state} /></div>
+            <div className="mt-5"><ManagedLarkConnection onChanged={changed} autoConnect={autoConnect} initialState={lark?.state} initialSkillWarning={lark?.skillWarning} /></div>
             {larkPackages.length ? <details className="mt-6">
               <summary className="cursor-pointer py-2 text-[12px] font-medium text-ds-muted">{t('connectorHubAdvancedPackages')}</summary>
               <p className="mt-1 text-[12px] leading-5 text-ds-muted">{t('connectorHubAdvancedPackagesDescription')}</p>

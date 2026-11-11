@@ -55,9 +55,9 @@ const releaseVersionCache = new Map<string, { release: ReleaseInfo; expiresAt: n
 const LARK_SKILLS = [
   'lark-approval', 'lark-apps', 'lark-attendance', 'lark-base', 'lark-calendar',
   'lark-contact', 'lark-doc', 'lark-drive', 'lark-event', 'lark-im', 'lark-mail',
-  'lark-markdown', 'lark-minutes', 'lark-note', 'lark-okr', 'lark-openapi-explorer',
+  'lark-markdown', 'lark-meeting', 'lark-note', 'lark-okr', 'lark-openapi-explorer',
   'lark-shared', 'lark-sheets', 'lark-skill-maker', 'lark-slides', 'lark-task',
-  'lark-vc-agent', 'lark-vc', 'lark-whiteboard', 'lark-wiki',
+  'lark-whiteboard', 'lark-wiki',
   'lark-workflow-meeting-summary', 'lark-workflow-standup-report'
 ]
 const OFFICE_SKILLS = [
@@ -668,20 +668,22 @@ export async function diagnoseManagedTool(id: ManagedToolId): Promise<ManagedToo
     const manifest = await readManifest()
     const record = manifest[id]
     if (!record || !existsSync(record.executablePath)) return { ok: true, status: { id, state: 'not_installed' } }
+    const missingSkills = id === 'lark-cli' ? LARK_SKILLS.filter(name => !existsSync(join(managedToolsSkillRoot(), name, 'SKILL.md'))) : []
+    const skillWarning = record.skillWarning ?? (missingSkills.length ? `配套技能缺少 ${missingSkills.length} 项，请使用“修复配套工具”补齐。` : undefined)
     const versionCheck = await runTool(record.executablePath, ['--version'])
     if (!versionCheck.ok) return { ok: true, status: { id, state: 'error', installedVersion: record.version, executablePath: record.executablePath, message: versionCheck.output } }
     if (id === 'lark-cli') {
       const actualVersion = /\bv?(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\b/.exec(versionCheck.output)?.[1]
-      if (actualVersion !== record.version) return { ok: true, status: { id, state: 'error', installedVersion: record.version, executablePath: record.executablePath,
+      if (actualVersion !== record.version) return { ok: true, status: { id, state: 'error', installedVersion: record.version, executablePath: record.executablePath, skillWarning,
         message: 'The Lark CLI version no longer matches its verified installation record. Reinstall the managed connector before continuing.' } }
-      if (larkCandidateCredentialsDisabled()) return { ok: true, status: { id, state: 'needs_login', installedVersion: record.version, executablePath: record.executablePath, scopes: [], message: 'Candidate credential access is disabled. No account configuration or Keychain was read.' } }
+      if (larkCandidateCredentialsDisabled()) return { ok: true, status: { id, state: 'needs_login', installedVersion: record.version, executablePath: record.executablePath, scopes: [], skillWarning, message: 'Candidate credential access is disabled. No account configuration or Keychain was read.' } }
       const selection = await readSelectedLarkAccount()
       const auth = await runTool(record.executablePath, ['auth', 'status', ...(selection ? ['--profile', selection.profile] : []), '--json'])
       const diagnosis = parseLarkIdentity(auth.ok ? auth.output : '')
       const executableHash = createHash('sha256').update(await readFile(record.executablePath)).digest('hex')
       const matchesSelection = !selection || diagnosis.identityFingerprint === selection.identityFingerprint
       const ready = diagnosis.available && matchesSelection
-      return { ok: true, status: { id, state: ready ? 'installed' : 'needs_login', installedVersion: record.version, executablePath: record.executablePath, executableHash, scopes: ready ? diagnosis.scopes : [], ...(diagnosis.brand ? { brand: diagnosis.brand } : {}), ...(ready && diagnosis.appId ? { appId: diagnosis.appId, profile: selection?.profile ?? diagnosis.appId } : {}), ...(ready && diagnosis.userOpenId ? { userOpenId: diagnosis.userOpenId } : {}), ...(ready && diagnosis.identityFingerprint ? { identityFingerprint: diagnosis.identityFingerprint } : {}), message: ready ? 'Lark user identity is ready.' : 'Connect the selected Lark user account before using task or approval data.' } }
+      return { ok: true, status: { id, state: ready ? 'installed' : 'needs_login', installedVersion: record.version, executablePath: record.executablePath, executableHash, skillWarning, scopes: ready ? diagnosis.scopes : [], ...(diagnosis.brand ? { brand: diagnosis.brand } : {}), ...(ready && diagnosis.appId ? { appId: diagnosis.appId, profile: selection?.profile ?? diagnosis.appId } : {}), ...(ready && diagnosis.userOpenId ? { userOpenId: diagnosis.userOpenId } : {}), ...(ready && diagnosis.identityFingerprint ? { identityFingerprint: diagnosis.identityFingerprint } : {}), message: ready ? 'Lark user identity is ready.' : 'Connect the selected Lark user account before using task or approval data.' } }
     }
     return { ok: true, status: { id, state: 'installed', installedVersion: record.version, executablePath: record.executablePath, message: versionCheck.output } }
   } catch (error) {

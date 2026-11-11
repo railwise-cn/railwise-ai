@@ -239,6 +239,7 @@ export type ManagedToolStatus = {
   latestVersion?: string
   executablePath?: string
   message?: string
+  skillWarning?: string
   externalUrl?: string
   scopes?: string[]
   brand?: 'feishu' | 'lark'
