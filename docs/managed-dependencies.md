@@ -16,7 +16,7 @@ Existing managed uv archives and runtime records remain readable. When the uv ar
 
 The Release workflow input `stage_dependency_mirror=true` runs only the dependency staging job. The job reads the committed manifest and uploads public upstream resources to R2 and the existing website download directory. Application packages, release records, updater feeds and website version data use separate workflow modes.
 
-R2 creation uses a conditional write followed by a full hash check. Website finalization uses a new hard link into the content-addressed location. An existing matching object is verified and retained. Conflicting content fails staging. The job verifies every public download and records the source commit, manifest hash and resource hashes in `dependency-mirror-evidence.json`.
+R2 creation uses a conditional write followed by a full hash check. The website server pulls verified R2 objects through the existing parallel range-download worker. SSH transfers only the temporary download manifest and worker script. The existing RailWise AI download alias resolves to the compatible storage namespace. Website finalization uses a new hard link into the content-addressed location. An existing matching object is verified and retained. Conflicting content fails staging. The job verifies every public download and records the source commit, manifest hash and resource hashes in `dependency-mirror-evidence.json`.
 
 License and corresponding source resources are staged alongside the runtimes. Upstream identities and license declarations stay in the committed manifest, including uv MIT/Apache-2.0, CPython Python-2.0, python-build-standalone MPL-2.0 and Lark CLI MIT. Distributed runtime archives retain their upstream bundled notices.
 

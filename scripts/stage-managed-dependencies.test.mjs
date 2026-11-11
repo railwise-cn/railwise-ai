@@ -53,11 +53,11 @@ test('existing R2 objects are verified, conflicts fail and absence permits creat
 test('website finalization preserves immutable objects and fails conflicting content', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dependency-stage-test-'))
   try {
-    const root = join(directory, 'downloads')
-    const base = join(root, 'railwise-ai', 'dependencies')
+    const root = join(directory, 'downloads', 'workwise')
+    const base = join(root, 'dependencies')
     async function stage(suffix) {
-      const path = join(base, `.stage-${suffix}`)
-      const source = join(path, file.mirrorPath)
+      const path = join(base, `.deploy-${suffix}`, 'payload')
+      const source = join(path, file.id)
       await mkdir(join(source, '..'), { recursive: true })
       await writeFile(source, bytes)
       await writeFile(join(path, 'manifest.json'), JSON.stringify({ files: [file] }))
@@ -73,6 +73,15 @@ test('website finalization preserves immutable objects and fails conflicting con
     assert.throws(() => execute(conflictingStage), /Immutable dependency conflict/)
     assert.equal(await readFile(target, 'utf8'), 'existing conflict')
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('remote transfer reuses verified R2 objects and preserves the public namespace mapping', async () => {
+  const script = await readFile(new URL('./stage-managed-dependencies.mjs', import.meta.url), 'utf8')
+  assert.match(script, /ensurePublicDownloadAlias/)
+  assert.match(script, /\$\{ssh.root\}\/dependencies\/\.deploy-/)
+  assert.match(script, /getSignedUrl/)
+  assert.match(script, /waitForRemoteR2Download/)
+  assert.doesNotMatch(script, /copyDirectory/)
 })
 
 test('dependency workflow excludes every application job', async () => {

@@ -1076,4 +1076,9 @@ export const _internals = {
 }
 
 /** Shared pinned SSH transport for immutable public dependency assets. */
-export const websiteStaticTransport = { readSshConfig, runRemote, copyDirectory }
+export const websiteStaticTransport = {
+  readSshConfig, runRemote, copyFile, ensurePublicDownloadAlias,
+  r2DownloadWorker: R2_DOWNLOAD_WORKER,
+  startR2DownloadScript: START_R2_STAGE_DOWNLOAD_SCRIPT,
+  waitForRemoteR2Download
+}

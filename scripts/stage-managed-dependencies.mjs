@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { websiteStaticTransport } from './deploy-website-release.mjs'
 
 const manifestPath = fileURLToPath(new URL('../src/shared/managed-dependencies.json', import.meta.url))
@@ -71,13 +72,13 @@ python3 - "$1" "$2" <<'PY'
 import hashlib,json,os,pathlib,shutil,sys
 root=pathlib.Path(sys.argv[1]).resolve()
 stage=pathlib.Path(sys.argv[2]).resolve()
-base=root/'railwise-ai'/'dependencies'
-if stage.parent != base.resolve() or not stage.name.startswith('.stage-'): raise RuntimeError('Invalid dependency staging directory')
+base=root/'dependencies'
+if stage.name!='payload' or stage.parent.parent != base.resolve() or not stage.parent.name.startswith('.deploy-'): raise RuntimeError('Invalid dependency staging directory')
 manifest=json.loads((stage/'manifest.json').read_text())
 for item in manifest['files']:
     rel=pathlib.PurePosixPath(item['mirrorPath'])
     if '..' in rel.parts or rel.is_absolute(): raise RuntimeError('Unsafe dependency path')
-    source=stage.joinpath(*rel.parts)
+    source=stage/item['id']
     target=base.joinpath(*rel.parts)
     if source.is_symlink() or not source.is_file(): raise RuntimeError('Invalid staged dependency')
     data=source.read_bytes()
@@ -91,7 +92,7 @@ for item in manifest['files']:
         try: os.link(source,target)
         except FileExistsError:
             if target.is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest()!=item['sha256']: raise RuntimeError('Concurrent dependency conflict')
-shutil.rmtree(stage)
+shutil.rmtree(stage.parent)
 PY`
 
 export async function stageManagedDependencies() {
@@ -106,23 +107,32 @@ export async function stageManagedDependencies() {
   const receipt = { schema: 'railwise.dependency-mirror-evidence.v1', sourceHead: process.env.GITHUB_SHA ?? '', manifestSha256: sha(manifestBytes), files: [] }
   try {
     await writeFile(join(directory, 'manifest.json'), manifestBytes)
+    const downloads = []
     for (const file of manifest.files) {
-      const bytes = await checkedBytes(await fetch(file.sourceUrl, { signal: AbortSignal.timeout(120_000) }), file)
-      const path = join(directory, ...file.mirrorPath.split('/'))
-      await mkdir(dirname(path), { recursive: true })
-      await writeFile(path, bytes)
       const key = `railwise-ai/dependencies/${file.mirrorPath}`
       if (!await r2Matches(client, process.env.R2_BUCKET, key, file)) {
+        const bytes = await checkedBytes(await fetch(file.sourceUrl, { signal: AbortSignal.timeout(120_000) }), file)
         try { await client.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key, Body: bytes, IfNoneMatch: '*', CacheControl: 'public,max-age=31536000,immutable', Metadata: { sha256: file.sha256 } })) }
         catch (error) { if (error?.$metadata?.httpStatusCode !== 412) throw error }
         await r2Matches(client, process.env.R2_BUCKET, key, file)
       }
+      downloads.push({ name: file.id, size: file.size,
+        url: await getSignedUrl(client, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }), { expiresIn: 3600 }) })
       console.log(`Verified immutable dependency ${file.id}`)
     }
     const ssh = websiteStaticTransport.readSshConfig()
-    const remote = `${ssh.root}/railwise-ai/dependencies/.stage-${randomUUID()}`
+    websiteStaticTransport.ensurePublicDownloadAlias(ssh)
+    const remote = `${ssh.root}/dependencies/.deploy-${randomUUID()}/payload`
     websiteStaticTransport.runRemote(ssh, 'set -euo pipefail\nmkdir -p -- "$1"\nchmod 700 -- "$1"\n', [remote])
-    websiteStaticTransport.copyDirectory(ssh, directory, remote)
+    const transferManifest = join(directory, 'downloads.json')
+    const workerPath = join(directory, 'r2-download-worker.py')
+    await writeFile(transferManifest, JSON.stringify(downloads), { mode: 0o600 })
+    await writeFile(workerPath, websiteStaticTransport.r2DownloadWorker, { mode: 0o700 })
+    websiteStaticTransport.copyFile(ssh, transferManifest, `${remote}/.r2-downloads.json`)
+    websiteStaticTransport.copyFile(ssh, workerPath, `${remote}/.r2-download-worker.py`)
+    websiteStaticTransport.copyFile(ssh, join(directory, 'manifest.json'), `${remote}/manifest.json`)
+    websiteStaticTransport.runRemote(ssh, websiteStaticTransport.startR2DownloadScript, [`${remote}/.r2-downloads.json`, remote])
+    await websiteStaticTransport.waitForRemoteR2Download(ssh, remote, { timeoutMs: 25 * 60_000 })
     websiteStaticTransport.runRemote(ssh, finalizeWebsite, [ssh.root, remote])
     for (const file of manifest.files) {
       const url = `${manifest.publicBase}/${file.mirrorPath.split('/').map(encodeURIComponent).join('/')}`
