@@ -46,7 +46,7 @@ export function verifyTaskDelivery(repository: TaskRunRepository, task: TaskRun)
     require(valid, `候选草稿已变化或不可读取：${value.path}`)
     verifySources(candidate)
     if (valid) result.files.push({ path: value.path, format: 'md', sha256: value.candidateHash })
-    for (const format of ['docx', 'pdf']) {
+    for (const format of (task.deliveryFormats ?? ['md', 'docx', 'pdf']).filter(format => format !== 'md')) {
       const receipt = operations.find(item => item.kind === 'document_export' && item.status === 'succeeded'
         && item.request?.format === format && item.request?.expectedHash === value.candidateHash
         && typeof item.request?.sourcePath === 'string' && resolve(task.workspaceRoot, String(item.request.sourcePath)) === resolve(task.workspaceRoot, value.path as string))

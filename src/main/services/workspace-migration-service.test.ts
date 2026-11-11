@@ -4,12 +4,51 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { WorkspaceMigrationService } from './workspace-migration-service'
+import Database from 'better-sqlite3'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 async function home(): Promise<string> { const root = await mkdtemp(join(tmpdir(), 'railwise-workspace-migration-')); roots.push(root); return root }
 
 describe('WorkspaceMigrationService', () => {
+  it.each(['.workgpt', '.workwise', '.kun', '.deepseekgui'])('imports a consistent live WAL database and preserves plugin, MCP, Skill and credential references from %s', async namespace => {
+    const root = await home()
+    const source = join(root, namespace, 'default_workspace')
+    await mkdir(join(source, '.workwise', 'skills', 'custom'), { recursive: true })
+    const files = {
+      '.workwise/plugins.json': JSON.stringify({ plugins: [{ id: 'synthetic-custom', enabled: true, source: 'local' }] }),
+      '.workwise/mcp.json': JSON.stringify({ servers: [{ id: 'synthetic-mcp', credentialRef: 'keychain:synthetic-reference' }] }),
+      '.workwise/skills/custom/SKILL.md': '# 用户技能\n保留用户原文。',
+      'draft.md': '# 用户草稿\n原始资料。'
+    }
+    for (const [path, content] of Object.entries(files)) await writeFile(join(source, path), content)
+    const databasePath = join(source, 'tasks.sqlite3')
+    const database = new Database(databasePath)
+    database.pragma('journal_mode=WAL')
+    database.exec('CREATE TABLE tasks(id TEXT PRIMARY KEY, state TEXT)')
+    database.prepare('INSERT INTO tasks VALUES (?, ?)').run('synthetic-task', 'waiting_user')
+    try {
+      const service = new WorkspaceMigrationService({ home: root, stateRoot: join(root, 'migration-state') })
+      const item = (await service.scan()).entries.find(entry => entry.id === `${namespace}:default`)!
+      expect(item.status).toBe('populated')
+      const request = { sourceId: item.id, expectedFingerprint: item.fingerprint!, confirmed: true, idempotencyKey: 'with-live-database' }
+      const result = await service.importSnapshot(request)
+      expect(result).toMatchObject({ status: 'completed', fileCount: 5 })
+      const copied = new Database(join(result.snapshotPath, 'tasks.sqlite3'), { readonly: true, fileMustExist: true })
+      try {
+        expect(copied.pragma('quick_check', { simple: true })).toBe('ok')
+        expect(copied.prepare('SELECT * FROM tasks').get()).toEqual({ id: 'synthetic-task', state: 'waiting_user' })
+      } finally { copied.close() }
+      for (const [path, content] of Object.entries(files)) {
+        expect(await readFile(join(source, path), 'utf8')).toBe(content)
+        expect(await readFile(join(result.snapshotPath, path), 'utf8')).toBe(content)
+      }
+      expect(database.prepare('SELECT state FROM tasks').get()).toEqual({ state: 'waiting_user' })
+      expect(await service.importSnapshot(request)).toEqual(result)
+      database.prepare('UPDATE tasks SET state = ?').run('paused')
+      await expect(service.importSnapshot({ ...request, idempotencyKey: 'stale-database' })).rejects.toMatchObject({ code: 'source_version_conflict' })
+    } finally { database.close() }
+  })
   it('reports the four namespaces, verified directory aliases, identical copies and conflicting content', async () => {
     const root = await home()
     const current = join(root, '.workwise', 'default_workspace')
@@ -87,7 +126,7 @@ describe('WorkspaceMigrationService', () => {
     expect(await readFile(join(source, 'draft.md'), 'utf8')).toBe('after')
   })
 
-  it('blocks links, special files, and live databases instead of making an inconsistent snapshot', async () => {
+  it('blocks links, special files, and invalid databases while preserving sources', async () => {
     const root = await home()
     const database = join(root, '.kun', 'default_workspace')
     await mkdir(database, { recursive: true })
@@ -98,7 +137,7 @@ describe('WorkspaceMigrationService', () => {
     await symlink(join(root, 'outside'), linked, 'dir')
     const service = new WorkspaceMigrationService({ home: root, stateRoot: join(root, 'state') })
     const report = await service.scan()
-    expect(report.entries.find(entry => entry.id === '.kun:default')).toMatchObject({ status: 'blocked', reason: expect.stringContaining('Database requires a consistent backup') })
+    expect(report.entries.find(entry => entry.id === '.kun:default')).toMatchObject({ status: 'blocked', reason: expect.stringContaining('Database consistent backup failed') })
     expect(report.entries.find(entry => entry.id === '.deepseekgui:write')).toMatchObject({ status: 'blocked', reason: expect.stringContaining('link') })
 
     const outsideLink = join(root, '.workgpt', 'default_workspace')

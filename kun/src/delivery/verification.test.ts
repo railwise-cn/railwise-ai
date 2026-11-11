@@ -20,6 +20,9 @@ describe('task delivery final version verification', () => {
       await writeFile(join(root, 'draft-v2.md'), '# 合成\n新正文')
       receipt('draft', 'document_candidate', {}, { path: 'draft.md', candidateHash: sha('# 合成\n旧正文'), sources: [] })
       receipt('draft-v2', 'document_candidate', {}, { path: 'draft-v2.md', candidateHash: sha('# 合成\n新正文'), sources: [], supersedesCandidatePath: 'draft.md', supersedesCandidateHash: sha('# 合成\n旧正文') })
+      expect(verifyTaskDelivery(repository, { ...task, deliveryFormats: ['md'] })).toMatchObject({ complete: true, files: [{ path: 'draft-v2.md', format: 'md' }] })
+      expect(verifyTaskDelivery(repository, task).complete).toBe(false)
+      expect(verifyTaskDelivery(repository, { ...task, deliveryFormats: ['md', 'docx'] }).complete).toBe(false)
       for (const format of ['docx', 'pdf']) {
         const bytes = `synthetic ${format} receipt fixture, not a renderer test`
         await writeFile(join(root, `draft-v2.${format}`), bytes)

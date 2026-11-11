@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
-import { lstat, mkdir, open, readFile, readdir, realpath } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
+import Database from 'better-sqlite3'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { WorkspaceImportRequest, WorkspaceImportResult, WorkspaceMigrationEntry, WorkspaceMigrationReport, WorkspaceNamespace } from '../../shared/workspace-migration'
 import { atomicWriteFile, runSerialized } from './durable-file'
@@ -11,7 +12,7 @@ const WORKSPACES = [{ kind: 'default', directory: 'default_workspace' }, { kind:
 const MAX_FILES = 20_000
 const MAX_BYTES = 512 * 1024 * 1024
 
-type InventoryFile = { path: string; size: number; hash: string; ino: number; dev: number; mtimeMs: number }
+type InventoryFile = { path: string; size: number; hash: string; ino: number; dev: number; mtimeMs: number; database?: boolean }
 type Inventory = { files: InventoryFile[]; directories: string[]; bytes: number; fingerprint: string }
 type ImportReceipt = { requestHash: string; state: 'prepared' | 'complete' | 'failed'; result: WorkspaceImportResult }
 
@@ -127,16 +128,28 @@ async function inventoryTree(root: string): Promise<Inventory> {
   let bytes = 0
   if (!(await lstat(root)).isDirectory()) throw coded('migration_not_directory', 'Workspace path is not a directory.')
   const walk = async (directory: string): Promise<void> => {
-    for (const name of (await readdir(directory)).sort()) {
+    const names = (await readdir(directory)).sort()
+    for (const name of names) {
       const absolute = join(directory, name)
       const path = relative(root, absolute).split(sep).join('/')
       const info = await lstat(absolute)
       if (info.isSymbolicLink() || (!info.isDirectory() && !info.isFile())) throw coded('migration_unsafe_entry', `Unsupported link or special file: ${path}`)
       if (info.isDirectory()) { directories.push(path); await walk(absolute); continue }
-      // Live SQLite files require their owner's consistent backup API; copying
-      // the database/WAL independently would falsely claim a usable snapshot.
-      if (/\.(?:sqlite3?|db)(?:-wal|-shm)?$/i.test(name) || /-(?:wal|shm)$/i.test(name)) throw coded('migration_database_requires_backup', `Database requires a consistent backup before import: ${path}`)
+      if (/-(?:wal|shm)$/i.test(name)) {
+        const databaseName = name.replace(/-(?:wal|shm)$/i, '')
+        if (names.includes(databaseName) && isDatabaseName(databaseName)) continue
+        throw coded('migration_database_requires_backup', `Database sidecar has no recognized main database: ${path}`)
+      }
       if (files.length >= MAX_FILES || bytes + info.size > MAX_BYTES) throw coded('migration_size_limit', 'Workspace exceeds the local scan limit (20,000 files / 512 MiB). Use a smaller workspace or a verified offline backup.')
+      if (isDatabaseName(name)) {
+        const content = await consistentDatabaseSnapshot(absolute)
+        const after = await lstat(absolute)
+        if (after.ino !== info.ino || after.dev !== info.dev || !inside(root, await realpath(absolute))) throw coded('source_version_conflict', `Database path changed during inspection: ${path}`)
+        if (bytes + content.length > MAX_BYTES) throw coded('migration_size_limit', 'Consistent database snapshot exceeds the local scan limit.')
+        bytes += content.length
+        files.push({ path, size: content.length, hash: digest(content), ino: info.ino, dev: info.dev, mtimeMs: after.mtimeMs, database: true })
+        continue
+      }
       const handle = await open(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
       let hash: string
       try {
@@ -158,6 +171,15 @@ async function inventoryTree(root: string): Promise<Inventory> {
 
 async function copyVerified(sourceRoot: string, targetRoot: string, file: InventoryFile): Promise<void> {
   const absolute = join(sourceRoot, file.path)
+  if (file.database) {
+    const info = await lstat(absolute)
+    if (!info.isFile() || info.ino !== file.ino || info.dev !== file.dev || !inside(sourceRoot, await realpath(absolute))) throw coded('source_version_conflict', `Database path changed before backup: ${file.path}`)
+    const content = await consistentDatabaseSnapshot(absolute)
+    if (content.length !== file.size || digest(content) !== file.hash) throw coded('source_version_conflict', `Database changed before backup: ${file.path}`)
+    const output = await open(join(targetRoot, file.path), 'wx', 0o600)
+    try { await output.writeFile(content); await output.sync() } finally { await output.close() }
+    return
+  }
   const handle = await open(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
     const info = await handle.stat()
@@ -170,6 +192,32 @@ async function copyVerified(sourceRoot: string, targetRoot: string, file: Invent
     const output = await open(target, 'wx', 0o600)
     try { await output.writeFile(content); await output.sync() } finally { await output.close() }
   } finally { await handle.close() }
+}
+function isDatabaseName(name: string): boolean { return /\.(?:sqlite3?|db)$/i.test(name) }
+
+/** SQLite backup includes committed WAL pages and leaves the original database in place. */
+async function consistentDatabaseSnapshot(source: string): Promise<Buffer> {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'railwise-workspace-backup-'))
+  let database: Database.Database | undefined
+  try {
+    database = new Database(source, { readonly: true, fileMustExist: true, timeout: 5_000 })
+    const pages = database.pragma('page_count', { simple: true }) as number
+    const pageSize = database.pragma('page_size', { simple: true }) as number
+    if (pages * pageSize > MAX_BYTES) throw new Error('Database exceeds the workspace snapshot size limit.')
+    const destination = join(temporaryRoot, 'snapshot.sqlite3')
+    await database.backup(destination)
+    if ((await lstat(destination)).size > MAX_BYTES) throw new Error('Database snapshot exceeds the workspace snapshot size limit.')
+    const snapshot = new Database(destination, { readonly: true, fileMustExist: true })
+    try {
+      if (snapshot.pragma('quick_check', { simple: true }) !== 'ok') throw new Error('SQLite integrity verification failed.')
+    } finally { snapshot.close() }
+    return await readFile(destination)
+  } catch (error) {
+    throw coded('migration_database_requires_backup', `Database consistent backup failed: ${message(error)}`)
+  } finally {
+    database?.close()
+    await rm(temporaryRoot, { recursive: true, force: true })
+  }
 }
 function digest(value: string | Buffer): string { return createHash('sha256').update(value).digest('hex') }
 function canonicalPath(path: string): string {

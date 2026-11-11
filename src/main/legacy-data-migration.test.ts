@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import Database from 'better-sqlite3'
 import {
   migrateLegacyHomeDataDirs,
   migrateLegacyUserDataDir,
@@ -25,6 +26,48 @@ afterEach(async () => {
 })
 
 describe('legacy data import', () => {
+  it('imports committed WAL state through the synchronous startup path and retains credential references', async () => {
+    const root = await makeTempRoot()
+    const source = join(root, 'WorkGPT')
+    const target = join(root, 'RailWise AI')
+    await mkdir(source)
+    await writeFile(join(source, 'workgpt-settings.json'), JSON.stringify({ version: 1, credentialRef: 'keychain:synthetic' }))
+    const database = new Database(join(source, 'History'))
+    database.pragma('journal_mode=WAL')
+    database.exec('CREATE TABLE task_history(id TEXT, status TEXT)')
+    database.prepare('INSERT INTO task_history VALUES (?, ?)').run('synthetic', 'waiting_user')
+    try {
+      const result = migrateLegacyUserDataDir({ userDataPath: target })
+      expect(result.outcome).toBe('imported')
+      expect(result.files?.find(file => file.path === 'History')?.database).toBe(true)
+      expect(verifyImportedUserData(target)).toBe(true)
+      const copy = new Database(join(target, 'History'), { readonly: true, fileMustExist: true })
+      try { expect(copy.prepare('SELECT * FROM task_history').get()).toEqual({ id: 'synthetic', status: 'waiting_user' }) }
+      finally { copy.close() }
+      expect(JSON.parse(await readFile(join(target, 'workgpt-settings.json'), 'utf8')).credentialRef).toBe('keychain:synthetic')
+      expect(database.prepare('SELECT status FROM task_history').get()).toEqual({ status: 'waiting_user' })
+      expect(migrateLegacyUserDataDir({ userDataPath: target }).outcome).toBe('target-exists')
+    } finally { database.close() }
+  })
+
+  it('selects populated legacy home data and preserves conflicting namespace sources', async () => {
+    const root = await makeTempRoot()
+    await mkdir(join(root, '.kun', 'default_workspace'), { recursive: true })
+    await mkdir(join(root, '.workgpt', 'default_workspace'), { recursive: true })
+    await writeFile(join(root, '.workgpt', 'default_workspace', 'user.md'), 'user content')
+    const first = migrateLegacyHomeDataDirs({ homeDir: root })
+    expect(first.find(item => item.legacyPath === join(root, '.kun', 'default_workspace'))?.outcome).toBe('skipped-empty')
+    expect(await readFile(join(root, '.workwise', 'default_workspace', 'user.md'), 'utf8')).toBe('user content')
+    const conflictRoot = await makeTempRoot()
+    for (const namespace of ['.kun', '.workgpt']) {
+      await mkdir(join(conflictRoot, namespace, 'write_workspace'), { recursive: true })
+      await writeFile(join(conflictRoot, namespace, 'write_workspace', 'draft.md'), namespace)
+    }
+    const conflicts = migrateLegacyHomeDataDirs({ homeDir: conflictRoot })
+    expect(conflicts.filter(item => item.outcome === 'conflict')).toHaveLength(2)
+    await expect(lstat(join(conflictRoot, '.workwise', 'write_workspace'))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await readFile(join(conflictRoot, '.workgpt', 'write_workspace', 'draft.md'), 'utf8')).toBe('.workgpt')
+  })
   it('copies user data into WorkWise without moving or linking the source', async () => {
     const appData = await makeTempRoot()
     const source = join(appData, 'WorkGPT')

@@ -184,6 +184,7 @@ export type TaskRunV1 = {
   repositoryRoot?: string
   goal: string
   templateId?: string
+  deliveryFormats?: Array<'md' | 'docx' | 'pdf'>
   status: TaskRunStatus
   acceptance: TaskAcceptanceV1
   agentId: string
@@ -271,12 +272,14 @@ export type TaskTemplateV1 = {
   stages: string[]
   outputs: string[]
   requiredInputs: string[]
+  availability?: { draftAvailable: boolean; model?: string; exportStatus: 'configured' | 'unavailable' }
 }
 export type TaskTemplateStartV1 = {
   workspaceRoot: string
   goal: string
   sourcePaths?: string[]
   outputDirectory?: string
+  outputFormats?: Array<'md' | 'docx' | 'pdf'>
   model?: string
   providerId?: string
   idempotencyKey: string
@@ -351,6 +354,8 @@ export type McpServerConfigV2 = {
   source: 'user' | 'skill' | 'managed-tool' | 'migration'
   credentialRef?: McpCredentialReferenceV1
   credentialEnvironmentVariables?: string[]
+  managedPreset?: 'amap-readonly' | 'zotero-readonly'
+  readOnlyTools?: string[]
   oauth?: {
     resource?: string
     authorizationUrl?: string

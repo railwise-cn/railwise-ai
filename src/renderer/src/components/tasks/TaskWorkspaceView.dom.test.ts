@@ -126,6 +126,18 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('keeps Markdown draft delivery available when the document export bridge is unconfigured', async () => {
+    await click('Research and documents')
+    expect(container.textContent).toContain('The export service is unconfigured')
+    const form = container.querySelector<HTMLFormElement>('form[role="dialog"]')!
+    await input(form.querySelectorAll('textarea')[0], 'Prepare a cited synthetic draft')
+    for (const format of ['DOCX', 'PDF']) {
+      const label = [...form.querySelectorAll('label')].find(item => item.textContent === format)!
+      await act(async () => label.querySelector<HTMLInputElement>('input')!.click())
+    }
+    await click('Start task')
+    expect(window.workwise.startTaskTemplate).toHaveBeenCalledWith('research-document', expect.objectContaining({ outputFormats: ['md'] }))
+  })
   it('requires an explicit single-platform request before resolving a dual-provider decision', async () => {
     tasks = []
     inbox = [{id:'provider-choice',ownerKind:'task',ownerId:'original-conversation',threadId:'original-conversation',workspaceRoot:'/workspace',

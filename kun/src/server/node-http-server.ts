@@ -100,14 +100,29 @@ async function writeFetchResponse(outgoing: ServerResponse, response: Response):
     return
   }
   const reader = response.body.getReader()
+  let closed = false
+  const cancel = () => {
+    closed = true
+    void reader.cancel().catch(() => { /* A transport close can race a completed stream. */ })
+  }
+  outgoing.once('close', cancel)
+  outgoing.flushHeaders()
   try {
-    while (true) {
+    while (!closed) {
       const { done, value } = await reader.read()
       if (done) break
-      if (value) outgoing.write(Buffer.from(value))
+      if (value && !closed && !outgoing.write(Buffer.from(value))) {
+        await new Promise<void>(resolve => {
+          const resume = () => { outgoing.off('drain', resume); outgoing.off('close', resume); resolve() }
+          outgoing.once('drain', resume)
+          outgoing.once('close', resume)
+          if (outgoing.destroyed) resume()
+        })
+      }
     }
   } finally {
-    outgoing.end()
+    outgoing.off('close', cancel)
+    if (!outgoing.destroyed) outgoing.end()
     reader.releaseLock()
   }
 }
