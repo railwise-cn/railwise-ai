@@ -68,11 +68,13 @@ describe('TaskController reliability boundaries', () => {
     ['请发送一条合成测试消息到飞书。用户已明确同意这一次发送。', 'send'],
     ['请先批准飞书审批，再上传测试文件。', 'approve']
   ])('persists the same external effect as the action classifier (%s)', async (prompt, operation) => {
-    const { task } = await fixture(prompt)
-    expect(task.acceptance).toMatchObject({
-      requiresExternalEffects: true,
-      effect: { provider: 'lark', operation, requiresConfirmation: true, verification: 'provider_readback' }
-    })
+    const { task, repository } = await fixture(prompt)
+    try {
+      expect(task.acceptance).toMatchObject({
+        requiresExternalEffects: true,
+        effect: { provider: 'lark', operation, requiresConfirmation: true, verification: 'provider_readback' }
+      })
+    } finally { repository.close() }
   })
 
   it.each(['exact', 'unknown', 'missing_hash', 'arguments', 'provider', 'target', 'account', 'backend', 'workspace', 'scope', 'denied', 'forged_transfer'])('transfers an undispatched approval only for the exact reviewed operation (%s)', async variation => {
