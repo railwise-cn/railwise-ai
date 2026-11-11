@@ -492,6 +492,33 @@ describe('TaskController reliability boundaries', () => {
     repository.close()
   })
 
+  it.each(['current', 'previous_turn', 'unregistered', 'unsafe_code'])('preserves the cause of a failed external read (%s)', async variation => {
+    const { repository, sessionStore, controller, task } = await fixture('请查询我当前未完成的飞书待办。')
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'failed-read-final', threadId: task.threadId, turnId: 'turn_reliability',
+      text: '飞书返回的数据无法解析，当前读取失败。', status: 'completed'
+    }))
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const toolName = variation === 'unregistered' ? 'untrusted_read' : 'lark_task_list'
+    repository.beginOperation({ ownerId: task.id, idempotencyKey: 'failed-list', kind: 'tool',
+      request: { turnId: variation === 'previous_turn' ? 'previous-turn' : 'turn_reliability',
+        toolName, provider: 'lark', operation: 'list', target: 'current_user' }, nowIso: '2026-07-18T00:00:00Z' })
+    repository.finishOperation(task.id, 'failed-list', { status: 'failed', result: {
+      approved: true, item: makeToolResultItem({ id: 'failed-read', threadId: task.threadId, turnId: 'turn_reliability',
+        callId: 'failed-call', toolName, isError: true,
+        output: { code: 'connector_request_failed', data: { code: variation === 'unsafe_code' ? 'private response text' : 'invalid_connector_response' } } })
+    } }, '2026-07-18T00:00:01Z')
+    const decision = await controller.assessCandidate(task.threadId, 'turn_reliability')
+    expect(decision).toMatchObject({ kind: 'waiting_user', task: { status: 'waiting_user' } })
+    if (variation === 'current') expect(decision.task.waitingReason).toContain('外部操作执行失败（invalid_connector_response）')
+    else if (variation === 'unsafe_code') {
+      expect(decision.task.waitingReason).toContain('外部操作执行失败。')
+      expect(decision.task.waitingReason).not.toContain('private response text')
+    } else expect(decision.task.waitingReason).toContain('目标集合及逐项验证回执')
+    expect(repository.events(task.id).some(event => event.kind === 'task_completed')).toBe(false)
+    repository.close()
+  })
+
   it('persists transport uncertainty and rejects the same mutation under a new call id', async () => {
     const { repository, controller, task } = await fixture()
     controller.beginAttempt(task.threadId, 'turn_reliability')

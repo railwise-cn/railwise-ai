@@ -123,6 +123,33 @@ describe('verified typed Lark CLI provider', () => {
     await expect(provider.tools.find(tool => tool.name === 'lark_task_get')!.execute({ taskId: '' }, context())).rejects.toThrow()
   })
 
+  it('verifies the official 1.0.100 empty list response without treating a nil slice as a failed query', async () => {
+    const runner = vi.fn(async () => ({ ok: true, output: { ok: true, identity: 'user', data: { items: null, has_more: false, page_token: '' } } }))
+    const tool = buildLarkCliToolProvider(config(), withLarkTestIdentity(runner))!.tools.find(tool => tool.name === 'lark_task_list')!
+    expect(await tool.execute({}, context())).toMatchObject({ output: {
+      ok: true, status: 'succeeded', provider: 'lark', operation: 'list', target: 'current_user',
+      data: { items: [], has_more: false, page_token: '' },
+      evidence: { provider: 'lark', operation: 'list', target: 'current_user', status: 'read', verified: true }
+    } })
+    expect(runner).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { has_more: false, page_token: '' },
+    { items: null },
+    { items: null, has_more: true, page_token: 'next' },
+    { items: null, has_more: false, page_token: 'unexpected' },
+    { items: null, has_more: 'false', page_token: '' },
+    { items: {}, has_more: false, page_token: '' }
+  ])('keeps malformed or incomplete list data unverified %j', async data => {
+    const runner = vi.fn(async () => ({ ok: true, output: { ok: true, identity: 'user', data } }))
+    const tool = buildLarkCliToolProvider(config(), withLarkTestIdentity(runner))!.tools.find(tool => tool.name === 'lark_task_list')!
+    const result = await tool.execute({}, context())
+    expect(result).toMatchObject({ isError: true, output: { status: 'failed', data: { code: 'invalid_connector_response' } } })
+    expect(result.output).not.toHaveProperty('evidence')
+    expect(runner).toHaveBeenCalledOnce()
+  })
+
   it('always requests explicit confirmation for writes even under runtime auto policy', async () => {
     const runner = vi.fn(async (_path: string, _args: string[], _signal: AbortSignal) => ({ ok: true, output: { code: 0, data: { guid: 'guid-1', status: 'done', completed_at: '100' } } }))
     const provider = buildLarkCliToolProvider(config(), withLarkTestIdentity(runner))!

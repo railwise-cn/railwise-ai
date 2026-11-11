@@ -463,6 +463,21 @@ export class TaskController {
       const evidence = this.verifiedTaskEffects(task)
       const succeeded = evidence.length > 0
       if (!succeeded) {
+        const failed = this.repository.operations(task.id, 'tool').reverse().find(receipt => {
+          if (receipt.status !== 'failed' || receipt.request?.turnId !== turnId) return false
+          const effect = this.resolveToolEffect(String(receipt.request.toolName ?? ''))
+          return effect && receipt.request.provider === effect.provider && receipt.request.operation === effect.operation
+        })
+        if (failed) {
+          const output = (failed.result as ToolHostResult | undefined)?.item
+          const error = output?.kind === 'tool_result'
+            ? output.output as { code?: unknown; data?: { code?: unknown } } | undefined : undefined
+          const code = error?.data?.code ?? error?.code
+          const reason = typeof code === 'string' && /^[a-z_][a-z0-9_]{0,79}$/.test(code)
+            ? `外部操作执行失败（${code}）。请查看操作回执，解决失败原因后继续原任务。`
+            : '外部操作执行失败。请查看操作回执，解决失败原因后继续原任务。'
+          return this.waitForUser(task, reason, finalResponse, `effect-failed:${failed.id}`, turnId)
+        }
         return this.waitForUser(
           task,
           '外部操作尚无完整、已确认的目标集合及逐项验证回执。请补充执行平台和具体目标，并核验每项操作结果。',

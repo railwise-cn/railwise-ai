@@ -95,6 +95,10 @@ export function buildLarkCliToolProvider(config: LarkCapabilityConfig | undefine
         return failure(result.output, spec.mutation && !remoteRejected ? 'outcome_unknown' : 'failed', provider, spec.operation, target)
       }
       let data = dataOf(result.output)
+      // The pinned CLI serializes its nil output slice as null for an empty final page.
+      if (spec.name === 'lark_task_list' && data.items === null && data.has_more === false && data.page_token === '') {
+        data = { ...data, items: [] }
+      }
       let remoteStatus: string | undefined
       if (spec.operation === 'complete') {
         remoteStatus = verifiedTaskState(data, target)
