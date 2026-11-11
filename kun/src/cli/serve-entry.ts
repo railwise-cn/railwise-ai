@@ -46,9 +46,12 @@ async function serveMain(argv: readonly string[]): Promise<number> {
   }
   process.stdout.write(`${KUN_READY_PREFIX}${JSON.stringify(startupInfo)}\n`)
   process.stdout.write(JSON.stringify(startupInfo, null, 2) + '\n')
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    let stopping = false
     const stop = () => {
-      void handle.close().finally(resolve)
+      if (stopping) return
+      stopping = true
+      void handle.close().then(resolve, reject)
     }
     process.once('SIGTERM', stop)
     process.once('SIGINT', stop)

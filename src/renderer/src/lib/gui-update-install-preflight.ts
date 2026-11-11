@@ -50,16 +50,9 @@ export async function preflightAndInstallGuiUpdate(): Promise<GuiUpdateInstallRe
       message: preflight.message ?? '无法检查正在运行的任务，应用仍保持打开。'
     }
   }
-  if (preflight.activeWork.length > 0) {
-    const list = preflight.activeWork
-      .map((item) => `• ${item.kind.toUpperCase()} · ${item.label} (${item.status})${item.recoverable ? '' : ' · 不可恢复'}`)
-      .join('\n')
-    const confirmed = window.confirm(
-      `以下工作仍在运行。重启会先建立可恢复检查点并停止运行时；不可恢复节点会被中止。\n\n${list}\n\n是否继续“重启并更新”？`
-    )
-    if (!confirmed) {
-      return { ok: false, currentVersion, code: 'install_failed', message: '已取消更新，应用和任务保持运行。' }
-    }
+  const unsafe = preflight.activeWork.filter(item => !item.recoverable)
+  if (unsafe.length) {
+    return { ok: false, currentVersion, code: 'install_failed', message: `以下工作暂时无法安全暂停，请等待结束后重试升级：${unsafe.map(item => item.label).join('、')}。更新包已保留。` }
   }
   const release: Array<() => void> = []
   let handedOff = false
@@ -81,7 +74,10 @@ export async function preflightAndInstallGuiUpdate(): Promise<GuiUpdateInstallRe
     if (registrations.some(([, handler]) => handler.guard && !handler.guard.isReady())) {
       return { ok: false, currentVersion, code: 'install_failed', message: '编辑内容已变化，应用仍保持打开，请保存后重试。' }
     }
-    const result = await window.workwise.installGuiUpdate({ confirmActiveWork: preflight.activeWork.length > 0 })
+    const result = await window.workwise.installGuiUpdate({
+      confirmActiveWork: preflight.activeWork.length > 0,
+      ...(preflight.activeWork.length && preflight.snapshotId ? { confirmedSnapshotId: preflight.snapshotId } : {})
+    })
     handedOff = result.ok
     return result
   } finally {

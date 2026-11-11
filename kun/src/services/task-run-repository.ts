@@ -199,6 +199,12 @@ export class TaskRunRepository {
     return rows.map((row) => this.parseRun(row))
   }
 
+  /** Unbounded durable state for shutdown, independent of user-facing pagination. */
+  listUnfinished(): TaskRun[] {
+    const rows = this.db.prepare("SELECT * FROM task_runs WHERE status NOT IN ('completed', 'failed', 'cancelled') ORDER BY id").all() as TaskRunRow[]
+    return rows.map(row => this.parseRun(row))
+  }
+
   update(
     taskId: string,
     expectedRevision: number,
@@ -398,6 +404,11 @@ export class TaskRunRepository {
       ? this.db.prepare('SELECT * FROM shell_sessions WHERE task_id = ? ORDER BY updated_at DESC').all(taskId)
       : this.db.prepare('SELECT * FROM shell_sessions ORDER BY updated_at DESC LIMIT 500').all()) as ShellSessionRow[]
     return rows.map((row) => ShellSessionSchema.parse(JSON.parse(row.data_json)))
+  }
+
+  listActiveShellSessions(): ShellSession[] {
+    const rows = this.db.prepare("SELECT * FROM shell_sessions WHERE status IN ('starting', 'running') ORDER BY id").all() as ShellSessionRow[]
+    return rows.map(row => ShellSessionSchema.parse(JSON.parse(row.data_json)))
   }
 
   updateShellSession(

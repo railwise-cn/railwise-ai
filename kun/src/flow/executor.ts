@@ -10,11 +10,38 @@ export type FlowNodeAdapter = (context: FlowAdapterContext) => Promise<FlowAdapt
 type NodeExecutionResult = FlowAdapterResult | { kind: 'error'; error: string; output: unknown }
 
 export class FlowExecutor {
+  private admissionSuspended = false
+  private readonly pendingAdapters = new Set<Promise<unknown>>()
+  private readonly executions = new Set<Promise<void>>()
+
+  setAdmissionSuspended(suspended: boolean): void { this.admissionSuspended = suspended }
+
+  async awaitIdle(): Promise<void> {
+    await Promise.allSettled([...this.executions, ...this.pendingAdapters])
+  }
+
+  private assertAdmission(): void {
+    if (this.admissionSuspended) throw new Error('Runtime is preparing an update.')
+  }
+
+  private trackAdapter<T>(promise: Promise<T>): Promise<T> {
+    this.pendingAdapters.add(promise)
+    void promise.then(() => this.pendingAdapters.delete(promise), () => this.pendingAdapters.delete(promise))
+    return promise
+  }
+
+  private dispatch(run: FlowRunV1, definition: FlowDefinitionV1): void {
+    const execution = this.execute(run, definition)
+    this.executions.add(execution)
+    void execution.then(() => this.executions.delete(execution), () => this.executions.delete(execution))
+  }
+
   private readonly active = new Map<string, AbortController>()
   private readonly interrupting = new Set<string>()
   constructor(private readonly repository: FlowRepository, private readonly adapters: ReadonlyMap<string, FlowNodeAdapter>, private readonly nowIso: () => string = () => new Date().toISOString()) {}
 
   async start(flowId: string, input: unknown, invocationStack: string[] = []): Promise<FlowRunV1> {
+    this.assertAdmission()
     if (invocationStack.includes(flowId)) throw new Error('recursive Flow invocation rejected')
     if (invocationStack.length >= 3) throw new Error('Flow invocation depth exceeds three')
     const draft = this.repository.get(flowId); if (!draft?.publishedVersionId) throw new Error('Flow is not published')
@@ -29,21 +56,22 @@ export class FlowExecutor {
   dispatchQueued(runId: string): FlowRunV1 {
     const run = this.repository.getRun(runId)
     if (!run) throw new Error(`run not found: ${runId}`)
-    if (run.status !== 'queued' || this.active.has(runId)) return run
+    if (this.admissionSuspended || run.status !== 'queued' || this.active.has(runId)) return run
     const version = this.repository.getVersion(run.versionId)
     if (!version || version.flowId !== run.flowId) throw new Error('Accepted Flow version is missing')
     const claimed = this.repository.claimRun(runId, ['queued'])
-    if (claimed) void this.execute(claimed, version.definition)
+    if (claimed) this.dispatch(claimed, version.definition)
     return this.repository.getRun(runId) ?? run
   }
 
   async testNode(definition: FlowDefinitionV1, nodeId: string, input: unknown): Promise<FlowAdapterResult> {
+    this.assertAdmission()
     const node = definition.nodes.find((item) => item.id === nodeId); if (!node) throw new Error(`node not found: ${nodeId}`)
     assertFlowNodeExecutable(node.type)
     const adapter = this.adapters.get(node.type); if (!adapter) throw new Error(`node adapter unavailable: ${node.type}`)
     const controller = new AbortController()
     const run = { id: `test_${randomUUID()}`, flowId: definition.id, versionId: 'draft', status: 'running', input, invocationStack: [], startedAt: this.nowIso(), updatedAt: this.nowIso() } as FlowRunV1
-    return withTimeout(adapter({ run, definition, node, input, signal: controller.signal }), node.policy.timeoutMs, controller)
+    return withTimeout(this.trackAdapter(adapter({ run, definition, node, input, signal: controller.signal })), node.policy.timeoutMs, controller)
   }
 
   cancel(runId: string): boolean {
@@ -60,6 +88,7 @@ export class FlowExecutor {
   }
 
   async resume(runId: string): Promise<FlowRunV1> {
+    this.assertAdmission()
     if (this.active.has(runId)) throw new Error('Flow run is already executing')
     const run = this.repository.getRun(runId); if (!run) throw new Error(`run not found: ${runId}`)
     const version = this.repository.getVersion(run.versionId); if (!version) throw new Error('Flow version not found')
@@ -67,7 +96,7 @@ export class FlowExecutor {
     if (run.status === 'interrupted' && run.checkpoint?.resumable === false) throw new Error('Flow cannot resume because the interrupted node is not resumable')
     const claimed = this.repository.claimRun(run.id, ['paused', 'interrupted', 'waiting_approval', 'failed'])
     if (!claimed) throw new Error('Flow run was claimed by another Runtime')
-    void this.execute(claimed, version.definition)
+    this.dispatch(claimed, version.definition)
     return claimed
   }
 
@@ -172,7 +201,7 @@ export class FlowExecutor {
       const controller = new AbortController(); const abort = () => controller.abort(); parentSignal.addEventListener('abort', abort, { once: true })
       try {
         assertFlowNodeExecutable(node.type)
-        const result = await withTimeout(adapter({ run, definition, node, input, signal: controller.signal }), node.policy.timeoutMs, controller)
+        const result = await withTimeout(this.trackAdapter(adapter({ run, definition, node, input, signal: controller.signal })), node.policy.timeoutMs, controller)
         this.repository.saveNodeRun({ ...nodeRun, status: result.kind === 'wait' ? (result.reason === 'approval' ? 'waiting_approval' : 'paused') : 'succeeded', ...(result.kind === 'output' ? { output: bounded(result.output) } : {}), completedAt: this.nowIso() })
         return result
       } catch (error) {

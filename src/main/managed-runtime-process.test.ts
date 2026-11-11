@@ -101,6 +101,32 @@ afterEach(async () => {
 })
 
 describe('startManagedRuntimeChild', () => {
+  it('keeps a slow clean shutdown alive after update timeout and verifies it on retry', async () => {
+    const script = writeScript('slow-update-stop.js', [
+      "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 200))",
+      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+      "setInterval(() => {}, 1000)"
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 25 })).rejects.toThrow('更新包已保留')
+    expect(module.isManagedRuntimeChildRunning()).toBe(true)
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 1000 })).resolves.toBeUndefined()
+    expect(module.isManagedRuntimeChildRunning()).toBe(false)
+  })
+
+  it('blocks update installation when Runtime reports a failed shutdown', async () => {
+    const script = writeScript('failed-update-stop.js', [
+      "process.on('SIGTERM', () => process.exit(17))",
+      "process.stdout.write('KUN_READY ' + JSON.stringify({ service: 'kun', mode: 'serve', port: 8899 }) + '\\n')",
+      "setInterval(() => {}, 1000)"
+    ].join('\n'))
+    const module = await import('./managed-runtime-process')
+    await module.startManagedRuntimeChild(createSettings(script), { autoInstallBundledAgentPack: false })
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true, timeoutMs: 1000 })).rejects.toThrow('未正常退出')
+    await expect(module.stopManagedRuntimeChildAndWait({ requireCleanExit: true })).rejects.toThrow('无法确认')
+  })
+
   it('waits for the explicit runtime ready marker before resolving', async () => {
     const script = writeScript(
       'ready-child.js',

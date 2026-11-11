@@ -85,6 +85,16 @@ function terminalReason(
  * directly.
  */
 export class TurnService {
+  private admissionSuspended = false
+
+  setAdmissionSuspended(suspended: boolean): void { this.admissionSuspended = suspended }
+
+  async awaitPendingStarts(): Promise<void> { await Promise.allSettled([...this.startQueues.values()]) }
+
+  private assertAdmission(): void {
+    if (this.admissionSuspended) throw Object.assign(new Error('Runtime is preparing an update.'), { code: 'runtime_updating' })
+  }
+
   private readonly deps: TurnServiceDeps
   private readonly workspaceReferences: Pick<WorkspaceReferenceService, 'validateReferences'>
   private readonly inflightTurns = new Map<string, AbortController>()
@@ -117,6 +127,7 @@ export class TurnService {
     engineeringPlanId?: string
     continuationTaskId?: string
   }): Promise<StartTurnResponse> {
+    this.assertAdmission()
     const previous = this.startQueues.get(input.threadId) ?? Promise.resolve()
     const run = previous.catch(() => undefined).then(() => this.startTurnInternal(input))
     const guard = run.then(() => undefined, () => undefined)
@@ -448,6 +459,7 @@ export class TurnService {
     engineeringPlanId?: string
     continuationTaskId?: string
   }): Promise<StartTurnResponse> {
+    this.assertAdmission()
     const thread = await this.deps.threadStore.get(input.threadId)
     if (!thread) throw new Error(`thread not found: ${input.threadId}`)
     if (input.request.taskIntent === 'status') throw Object.assign(new Error('Use task-commands status to read a task without starting a Turn.'), { code: 'task_intent_required' })

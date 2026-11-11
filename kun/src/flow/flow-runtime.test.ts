@@ -53,6 +53,32 @@ describe('Flow registry and validation', () => {
 })
 
 describe('Flow repository and executor', () => {
+  it('waits for the actual adapter after checkpointing an interrupted Flow', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-flow-update-'))
+    const repository = new FlowRepository(join(root, 'flow.sqlite'))
+    const graph = definition([node('agent', 'agent')])
+    repository.create(draftInput(graph)); repository.publish(graph.id)
+    let finish!: () => void
+    const executor = new FlowExecutor(repository, new Map([['agent', async () => {
+      await new Promise<void>(resolve => { finish = resolve })
+      return { kind: 'output' as const, output: 'settled' }
+    }]]))
+    try {
+      const run = await executor.start(graph.id, {})
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+      executor.setAdmissionSuspended(true)
+      executor.checkpointActiveRuns()
+      let idle = false
+      const waiting = executor.awaitIdle().then(() => { idle = true })
+      await vi.waitFor(() => expect(repository.getRun(run.id)?.status).toBe('interrupted'))
+      expect(idle).toBe(false)
+      await expect(executor.start(graph.id, {})).rejects.toThrow('preparing an update')
+      finish()
+      await waiting
+      expect(idle).toBe(true)
+    } finally { repository.close() }
+  })
+
   it('enforces optimistic revisions and immutable content-hashed versions', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-flow-repo-')); const repository = new FlowRepository(join(root, 'flow.sqlite'))
     const created = repository.create(draftInput(definition([node('trigger', 'manual_trigger')])))

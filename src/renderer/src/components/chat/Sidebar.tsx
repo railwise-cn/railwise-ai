@@ -1,3 +1,4 @@
+import { SidebarUpdateControl } from '../sidebar/SidebarUpdateControl'
 import type { ReactElement } from 'react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -123,6 +124,7 @@ export function Sidebar({
       onCollapse={onToggleSidebar}
       footer={
         <div className="space-y-1">
+          <SidebarUpdateControl />
           <SidebarCommandRow
             icon={<Smartphone className="h-4 w-4" strokeWidth={1.75} />}
             label={t('claw')}

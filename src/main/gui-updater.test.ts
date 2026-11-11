@@ -111,6 +111,18 @@ describe('installGuiUpdate', () => {
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true)
   })
 
+  it('retains the verified download after shutdown failure and coalesces install retries', async () => {
+    const module = await import('./gui-updater')
+    const cleanup = vi.fn().mockRejectedValueOnce(new Error('shutdown timed out')).mockResolvedValue(undefined)
+    module.initializeGuiUpdater(() => null, () => 'stable', cleanup)
+    updater.emit('update-downloaded', { version: '0.2.0' })
+    await expect(module.installGuiUpdate()).resolves.toMatchObject({ ok: false, message: 'shutdown timed out' })
+    expect(updater.quitAndInstall).not.toHaveBeenCalled()
+    await Promise.all([module.installGuiUpdate(), module.installGuiUpdate()])
+    expect(updater.downloadUpdate).not.toHaveBeenCalled()
+    expect(updater.quitAndInstall).toHaveBeenCalledTimes(1)
+  })
+
   it('uses silent replacement only for the assisted Windows installer', async () => {
     const module = await import('./gui-updater')
     expect(module._internals.shouldInstallSilently('win32')).toBe(true)

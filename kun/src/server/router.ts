@@ -13,6 +13,7 @@ export type RouteHandler = (
  * extension paths (`/v1/threads/:id/turns/:turnId`) explicit.
  */
 export class Router {
+  constructor(private readonly beforeRequest?: (request: Request) => Response | JsonResponse | undefined) {}
   private readonly routes: Array<{
     method: string
     pattern: string
@@ -47,7 +48,7 @@ export class Router {
           break
         }
       }
-      if (matches) return { handler: route.handler, params }
+      if (matches) return { handler: (request, context) => this.beforeRequest?.(request) ?? route.handler(request, context), params }
     }
     return undefined
   }

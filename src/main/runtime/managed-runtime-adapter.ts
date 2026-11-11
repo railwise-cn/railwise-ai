@@ -52,8 +52,8 @@ export const managedRuntimeAdapter = {
     return startManagedRuntimeChild(settings, managedRuntimeStartOptions)
   },
 
-  stopAndWait(): Promise<void> {
-    return stopManagedRuntimeChildAndWait()
+  stopAndWait(options?: { requireCleanExit?: boolean; timeoutMs?: number }): Promise<void> {
+    return stopManagedRuntimeChildAndWait(options)
   },
 
   isChildRunning(): boolean {
