@@ -3,6 +3,7 @@ import { inspectProcess } from './process-identity.js'
 import { existsSync, mkdirSync } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
+import type { ImDeliveryObservation } from '../contracts/im-delivery.js'
 import Database, { type Database as BetterSqliteDatabase } from 'better-sqlite3'
 import {
   AttentionItemSchema,
@@ -147,6 +148,27 @@ export class TaskRunRepository {
   findByTurn(turnId:string):TaskRun|null {
     const row=this.db.prepare("SELECT * FROM task_runs WHERE json_extract(data_json,'$.activeTurnId')=? ORDER BY updated_at DESC,id DESC LIMIT 1").get(turnId) as TaskRunRow|undefined
     return row?this.parseRun(row):null
+  }
+
+  recordImDeliveryObservation(observation: ImDeliveryObservation): { linked: boolean; receiptId?: string } {
+    return this.transact(() => {
+      const row = this.db.prepare(`SELECT task_runs.* FROM task_runs
+        WHERE thread_id = ? AND (json_extract(data_json, '$.activeTurnId') = ? OR EXISTS
+          (SELECT 1 FROM execution_attempts WHERE task_id = task_runs.id AND turn_id = ?))
+        ORDER BY updated_at DESC LIMIT 1`).get(observation.runtimeThreadId, observation.runtimeTurnId, observation.runtimeTurnId) as TaskRunRow | undefined
+      if (!row) return { linked: false }
+      const task = this.parseRun(row)
+      const { status, observedAt, remoteOperationId, clientOperationId: _clientOperationId, ...request } = observation
+      const key = `im-delivery:${observation.operationId}`
+      const { receipt } = this.beginOperation({ ownerId: task.id, kind: 'im_delivery', idempotencyKey: key, request, nowIso: observedAt })
+      if (receipt.remoteOperationId && remoteOperationId && receipt.remoteOperationId !== remoteOperationId) throw Object.assign(new Error('IM operation has conflicting remote IDs.'), { code: 'idempotency_conflict' })
+      // A delayed start or failure notification cannot erase a known delivery.
+      if (receipt.status === 'succeeded' || status === 'started' && receipt.status !== 'prepared') return { linked: true, receiptId: receipt.id }
+      this.finishOperation(task.id, key, { status: status === 'started' ? 'running' : status,
+        ...(remoteOperationId ? { remoteOperationId } : {}), result: observation }, observedAt)
+      this.appendEventInternal(task.id, `${key}:${status}`, 'im_delivery_observed', observation, observedAt)
+      return { linked: true, receiptId: receipt.id }
+    })
   }
 
   findActiveByOrigin(threadId: string): TaskRun | null {
@@ -617,7 +639,7 @@ export class TaskRunRepository {
 
   finishOperation(ownerId: string, key: string, patch: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] }, nowIso?: string): OperationReceipt
   finishOperation(ownerId: string, key: string, status: OperationReceipt['status'], result?: unknown): OperationReceipt
-  finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
+  finishOperation(ownerId: string, key: string, patchOrStatus: { status: OperationReceipt['status']; result?: unknown; error?: string; remoteOperationId?: string; dispatchApproval?: OperationReceipt['dispatchApproval'] } | OperationReceipt['status'], nowOrResult?: string | unknown): OperationReceipt {
     const previous = this.operation(ownerId, key)
     if (!previous) throw Object.assign(new Error('operation not found'), { code: 'not_found' })
     const patch = typeof patchOrStatus === 'string'
@@ -630,7 +652,7 @@ export class TaskRunRepository {
   }
 
   unsettledOperations(ownerId: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>).map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item => ['running', 'outcome_unknown'].includes(item.status) && !this.verifiedOperationResolution(item))
+    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>).map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item => item.kind !== 'im_delivery' && ['running', 'outcome_unknown'].includes(item.status) && !this.verifiedOperationResolution(item))
   }
   verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
     const resolution = receipt.resolution

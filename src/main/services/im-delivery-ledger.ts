@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3'
 import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import type { ImDeliveryObservation } from '../../../kun/src/contracts/im-delivery.js'
 import type { ClawImProvider } from '../../shared/app-settings-types'
 import {
   IM_LEDGER_LEASE_MS,
@@ -9,7 +10,7 @@ import {
   IM_LEDGER_RETENTION_MS
 } from '../../shared/im-communication'
 
-export type ImLedgerStatusV1 = 'received' | 'turn_starting' | 'turn_started' | 'result_ready' | 'delivering' | 'delivered' | 'delivery_failed' | 'failed'
+export type ImLedgerStatusV1 = 'received' | 'turn_starting' | 'turn_started' | 'result_ready' | 'delivering' | 'delivered' | 'delivery_failed' | 'delivery_unknown' | 'failed'
 
 const MAX_DELIVERY_RETRIES = 8
 const LEDGER_PRUNE_INTERVAL_MS = 24 * 60 * 60_000
@@ -41,6 +42,10 @@ export type ImLedgerMessageV1 = {
 }
 
 type Row = Record<string, unknown>
+export type ImDeliveryOperation = {
+  operationId: string; recordId: string; phase: 'upload' | 'send'; requestHash: string;
+  status: 'started' | 'succeeded' | 'outcome_unknown'; remoteOperationId?: string
+}
 type LedgerPatch = Partial<{
   [K in keyof Pick<
     ImLedgerMessageV1,
@@ -103,6 +108,14 @@ export class ImDeliveryLedger {
         cursor TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         PRIMARY KEY(provider, account_id)
+      );
+      CREATE TABLE IF NOT EXISTS im_delivery_operations (
+        operation_id TEXT PRIMARY KEY, record_id TEXT NOT NULL,
+        data_json TEXT NOT NULL, FOREIGN KEY(record_id) REFERENCES im_messages(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS im_runtime_outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, payload_json TEXT NOT NULL,
+        fingerprint TEXT NOT NULL UNIQUE, acknowledged_at TEXT
       );
     `)
   }
@@ -236,8 +249,8 @@ export class ImDeliveryLedger {
     return this.updateWithLease(id, {
       status: 'result_ready',
       resultJson,
-      runtimeThreadId: runtime?.threadId ?? null,
-      runtimeTurnId: runtime?.turnId ?? null,
+      ...(runtime?.threadId ? { runtimeThreadId: runtime.threadId } : {}),
+      ...(runtime?.turnId ? { runtimeTurnId: runtime.turnId } : {}),
       errorMessage: null,
       nextAttemptAt: null
     }, now, leaseRunId, ['received', 'turn_starting', 'turn_started', 'result_ready'])
@@ -281,6 +294,75 @@ export class ImDeliveryLedger {
     ])
   }
 
+  markDeliveryUnknown(id: string, message: string, leaseRunId?: string): ImLedgerMessageV1 | undefined {
+    return this.updateWithLease(id, { status: 'delivery_unknown', errorMessage: message, nextAttemptAt: null, leaseRunId: null, leaseUntil: null },
+      new Date().toISOString(), leaseRunId, ['result_ready', 'delivering', 'delivery_unknown'])
+  }
+
+  deliveryOperation(operationId: string): ImDeliveryOperation | undefined {
+    const row = this.db.prepare('SELECT data_json FROM im_delivery_operations WHERE operation_id = ?').get(operationId) as Row | undefined
+    return row ? JSON.parse(String(row.data_json)) as ImDeliveryOperation : undefined
+  }
+  hasDeliveryOperations(recordId: string): boolean {
+    return Boolean(this.db.prepare('SELECT 1 FROM im_delivery_operations WHERE record_id=? LIMIT 1').get(recordId))
+  }
+
+  /** Commit intent before crossing the transport boundary. An existing start is never replayed. */
+  beginDeliveryOperation(recordId: string, operationId: string, phase: 'upload' | 'send', requestHash: string): { operation: ImDeliveryOperation; created: boolean } {
+    return this.db.transaction(() => {
+      const existing = this.deliveryOperation(operationId)
+      if (existing) {
+        if (existing.recordId !== recordId || existing.phase !== phase || existing.requestHash !== requestHash) throw Object.assign(new Error('IM delivery key is bound to another request.'), { code: 'idempotency_conflict' })
+        return { operation: existing, created: false }
+      }
+      const record = this.getById(recordId)
+      if (!record || record.status !== 'delivering') throw new Error('IM delivery is not ready for dispatch.')
+      const operation: ImDeliveryOperation = { operationId, recordId, phase, requestHash, status: 'started' }
+      this.db.prepare('INSERT INTO im_delivery_operations(operation_id,record_id,data_json) VALUES (?,?,?)').run(operationId, recordId, JSON.stringify(operation))
+      this.enqueueObservation(record, operation)
+      return { operation, created: true }
+    })()
+  }
+
+  finishDeliveryOperation(operationId: string, status: 'succeeded' | 'outcome_unknown', remoteOperationId?: string): ImDeliveryOperation {
+    return this.db.transaction(() => {
+      const previous = this.deliveryOperation(operationId)
+      if (!previous) throw new Error('IM delivery operation is missing.')
+      if (previous.status === 'succeeded') {
+        if (remoteOperationId && previous.remoteOperationId !== remoteOperationId) throw new Error('IM delivery returned conflicting remote operations.')
+        return previous
+      }
+      if (status === 'succeeded' && !remoteOperationId) throw new Error('IM delivery requires a remote operation ID.')
+      const next = { ...previous, status, ...(remoteOperationId ? { remoteOperationId } : {}) }
+      this.db.prepare('UPDATE im_delivery_operations SET data_json=? WHERE operation_id=?').run(JSON.stringify(next), operationId)
+      this.enqueueObservation(this.getById(previous.recordId)!, next)
+      return next
+    })()
+  }
+
+  pendingRuntimeObservations(): Array<{ id: number; fingerprint: string; observation: ImDeliveryObservation }> {
+    return (this.db.prepare('SELECT id,fingerprint,payload_json FROM im_runtime_outbox WHERE acknowledged_at IS NULL ORDER BY id LIMIT 50').all() as Row[])
+      .map(row => ({ id: Number(row.id), fingerprint: String(row.fingerprint), observation: JSON.parse(String(row.payload_json)) as ImDeliveryObservation }))
+  }
+
+  acknowledgeRuntimeObservation(id: number, fingerprint: string): void {
+    this.db.prepare('UPDATE im_runtime_outbox SET acknowledged_at=? WHERE id=? AND fingerprint=?').run(new Date().toISOString(), id, fingerprint)
+  }
+
+  private enqueueObservation(record: ImLedgerMessageV1, operation: ImDeliveryOperation): void {
+    if (!record.runtimeThreadId || !record.runtimeTurnId || !['feishu', 'weixin'].includes(record.provider)) return
+    const hash = (value: string) => createHash('sha256').update(value).digest('hex')
+    const observation: ImDeliveryObservation = {
+      operationId: operation.operationId, phase: operation.phase, purpose: 'assistant_reply', provider: record.provider as 'feishu' | 'weixin',
+      accountFingerprint: hash(`${record.provider}:${record.accountId}`), targetFingerprint: hash(`${record.provider}:${record.accountId}:${record.chatId}`),
+      requestHash: operation.requestHash, runtimeThreadId: record.runtimeThreadId, runtimeTurnId: record.runtimeTurnId,
+      status: operation.status, ...(operation.remoteOperationId ? record.provider === 'weixin'
+        ? { clientOperationId: operation.remoteOperationId } : { remoteOperationId: operation.remoteOperationId } : {}), observedAt: new Date().toISOString()
+    }
+    const fingerprint = hash(JSON.stringify({ ...observation, observedAt: undefined }))
+    this.db.prepare('INSERT OR IGNORE INTO im_runtime_outbox(payload_json,fingerprint) VALUES (?,?)').run(JSON.stringify(observation), fingerprint)
+  }
+
   markDeliveryRetry(
     id: string,
     message: string,
@@ -313,7 +395,7 @@ export class ImDeliveryLedger {
           status = CASE WHEN status = 'received' THEN 'turn_starting' ELSE status END
       WHERE id = @id
         AND (lease_until IS NULL OR lease_until < @now OR lease_run_id = @runId)
-        AND status NOT IN (${TERMINAL_STATUSES})
+        AND status NOT IN (${TERMINAL_STATUSES}, 'delivery_unknown')
         AND (next_attempt_at IS NULL OR next_attempt_at <= @now)
     `).run({ id, runId, leaseUntil, now })
     if (result.changes === 0) return undefined
@@ -328,7 +410,7 @@ export class ImDeliveryLedger {
       SET lease_until = @leaseUntil, updated_at = @now
       WHERE id = @id
         AND lease_run_id = @runId
-        AND status NOT IN (${TERMINAL_STATUSES})
+        AND status NOT IN (${TERMINAL_STATUSES}, 'delivery_unknown')
     `).run({ id, runId, leaseUntil, now })
     if (result.changes === 0) return undefined
     const row = this.db.prepare('SELECT * FROM im_messages WHERE id = ?').get(id) as Row | undefined
@@ -372,7 +454,7 @@ export class ImDeliveryLedger {
     const rows = this.db.prepare(`SELECT status, COUNT(*) AS count FROM im_messages WHERE provider = ? AND account_id = ? GROUP BY status`).all(provider, accountId) as Array<{ status: string; count: number }>
     const pending = rows.filter((row) => row.status === 'received').reduce((sum, row) => sum + row.count, 0)
     const processing = rows.filter((row) => row.status === 'turn_starting' || row.status === 'turn_started').reduce((sum, row) => sum + row.count, 0)
-    const delivery = rows.filter((row) => row.status === 'result_ready' || row.status === 'delivering').reduce((sum, row) => sum + row.count, 0)
+    const delivery = rows.filter((row) => row.status === 'result_ready' || row.status === 'delivering' || row.status === 'delivery_unknown').reduce((sum, row) => sum + row.count, 0)
     return { pending, processing, delivery }
   }
 

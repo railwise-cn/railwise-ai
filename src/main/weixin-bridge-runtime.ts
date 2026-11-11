@@ -1288,7 +1288,11 @@ async function retryWithStableClientId<T>(
   signal?: AbortSignal
 ): Promise<T> {
   const clientId = requestedClientId?.trim() || generateMessageId()
-  return retryWithDelays(() => operation(clientId), delaysMs, signal)
+  // A client ID alone does not establish the provider's deduplication window.
+  // Delivery failures are recorded for verification instead of replaying writes.
+  void delaysMs
+  throwIfWeixinRetryAborted(signal)
+  return operation(clientId)
 }
 
 async function sendMessageWeixinWithRetry(

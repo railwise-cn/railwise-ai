@@ -367,7 +367,7 @@ describe('weixin bridge runtime', () => {
         message: 'upload failed'
       }]
     })
-    expect(sendMedia).toHaveBeenCalledTimes(4)
+    expect(sendMedia).toHaveBeenCalledTimes(2)
     expect(attemptedIds[0]).toBe('ww_delivery-file-1')
     expect(new Set(attemptedIds.slice(1))).toEqual(new Set(['ww_delivery-file-2']))
     expect(new Set(attemptedRunIds)).toEqual(new Set(['run-1']))
@@ -712,7 +712,7 @@ describe('weixin bridge runtime', () => {
     expect(operation).toHaveBeenCalledTimes(2)
   })
 
-  it('reuses one stable outbound client id across WeChat send retries', async () => {
+  it('uses one outbound client id and stops after an uncertain WeChat send', async () => {
     const attemptedIds: string[] = []
     const operation = vi.fn(async (clientId: string) => {
       attemptedIds.push(clientId)
@@ -721,7 +721,8 @@ describe('weixin bridge runtime', () => {
     })
     await expect(
       weixinBridgeRuntimeInternals.retryWithStableClientId(undefined, operation, [0, 0, 0])
-    ).resolves.toEqual({ messageId: 'delivered' })
+    ).rejects.toThrow('temporary failure')
+    expect(operation).toHaveBeenCalledOnce()
     expect(new Set(attemptedIds).size).toBe(1)
     expect(attemptedIds[0]).toBeTruthy()
   })

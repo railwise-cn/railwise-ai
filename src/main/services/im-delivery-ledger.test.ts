@@ -5,6 +5,35 @@ import { join } from 'node:path'
 import { ImDeliveryLedger } from './im-delivery-ledger'
 
 describe('ImDeliveryLedger', () => {
+  it('persists per-operation outcomes and a restartable Runtime outbox without replaying unknown sends', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-im-outbox-'))
+    const path = join(root, 'messages.sqlite')
+    let ledger = new ImDeliveryLedger(path)
+    const record = ledger.receive({ provider: 'feishu', accountId: 'app', channelId: 'channel', remoteMessageId: 'input', chatId: 'chat',
+      senderId: 'sender', threadId: 'remote', prompt: 'synthetic', payloadJson: '{}', idempotencyKey: 'input' })
+    ledger.markResultReady(record.id, '{}', { threadId: 'thread', turnId: 'turn' })
+    ledger.markDelivering(record.id)
+    expect(ledger.beginDeliveryOperation(record.id, 'outbound:upload', 'upload', 'a'.repeat(64)).created).toBe(true)
+    ledger.finishDeliveryOperation('outbound:upload', 'succeeded', 'file-key')
+    ledger.beginDeliveryOperation(record.id, 'outbound:send', 'send', 'b'.repeat(64))
+    ledger.close()
+    ledger = new ImDeliveryLedger(path)
+    expect(ledger.beginDeliveryOperation(record.id, 'outbound:upload', 'upload', 'a'.repeat(64))).toMatchObject({ created: false, operation: { status: 'succeeded', remoteOperationId: 'file-key' } })
+    expect(ledger.beginDeliveryOperation(record.id, 'outbound:send', 'send', 'b'.repeat(64))).toMatchObject({ created: false, operation: { status: 'started' } })
+    expect(() => ledger.beginDeliveryOperation(record.id, 'outbound:send', 'send', 'c'.repeat(64))).toThrow('another request')
+    ledger.finishDeliveryOperation('outbound:send', 'outcome_unknown')
+    ledger.markDeliveryUnknown(record.id, 'response lost')
+    expect(ledger.listRecoverable('2099-01-01T00:00:00.000Z')).toEqual([])
+    const pending = ledger.pendingRuntimeObservations()
+    expect(pending.map(item => item.observation.status)).toEqual(['started', 'succeeded', 'started', 'outcome_unknown'])
+    for (const item of pending) expect(item.observation).toMatchObject({ purpose: 'assistant_reply', runtimeThreadId: 'thread', runtimeTurnId: 'turn' })
+    expect(JSON.stringify(pending)).not.toContain('synthetic')
+    ledger.acknowledgeRuntimeObservation(pending[0].id, 'wrong-hash')
+    expect(ledger.pendingRuntimeObservations()).toHaveLength(4)
+    ledger.acknowledgeRuntimeObservation(pending[0].id, pending[0].fingerprint)
+    expect(ledger.pendingRuntimeObservations()).toHaveLength(3)
+    ledger.close()
+  })
   it('restricts the ledger directory and database to the current user', async () => {
     const root = await mkdtemp(join(tmpdir(), 'workwise-im-ledger-permissions-'))
     const directory = join(root, 'communication')
