@@ -155,7 +155,8 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
       let page = Math.floor(offset / transportSize) + 1
       let skip = offset % transportSize
       const values: unknown[] = []
-      const pages: Json[] = []
+      const transportPages: {page:number;count:number;hash:string}[] = []
+      let firstRaw: Json = {}
       let hasMore = false
       while (values.length <= requestedSize) {
         if (!Number.isSafeInteger(page)) throw fail('connector_invalid_request')
@@ -164,7 +165,8 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
         if (!items || items.length > transportSize || items.length === 0 && raw.hasMore === true) {
           throw fail('connector_invalid_response')
         }
-        pages.push(raw)
+        if (transportPages.length === 0) firstRaw = raw
+        transportPages.push({page,count:items.length,hash:createHash('sha256').update(JSON.stringify(raw)).digest('hex')})
         values.push(...items.slice(skip))
         if (values.length > requestedSize) {
           hasMore = true
@@ -179,8 +181,11 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
         page += 1
         skip = 0
       }
-      return {values:values.slice(0, requestedSize),page:args.page,pageSize:args.pageSize,hasMore,
-        raw:pages.length === 1 ? pages[0] : {...pages[0], pages}}
+      const window = values.slice(0, requestedSize)
+      // Legacy raw is a normalized request window. Transport diagnostics retain
+      // only page numbers, counts and hashes, excluding skipped/lookahead bodies.
+      return {values:window,page:args.page,pageSize:args.pageSize,hasMore,
+        raw:normalizeApprovalWindow(firstRaw, window, hasMore),transportPages}
     }}),
     define({name:'dingtalk_get_approval',description:'读取钉钉审批实例及每个节点状态。',schema:instance,operation:'detail',execute:async(_args,context,target)=>readApproval(target,context)}),
     define({name:'dingtalk_get_approval_tasks',description:'读取当前账号在指定审批实例中可操作的精确taskId。',schema:instance,operation:'detail',execute:async(_args,context,target)=>({instanceId:target,taskIds:await readTasks(target,context)})}),
@@ -220,6 +225,16 @@ function remoteErrorCode(root:Json, transportCode?:string):string {
 }
 function findArray(value:Json,keys:string[],depth=0):unknown[]|undefined{if(depth>4)return undefined;for(const key of keys)if(Array.isArray(value[key]))return value[key] as unknown[];for(const key of ['result','data']){if(Array.isArray(value[key]))return value[key] as unknown[];const found=findArray(object(value[key]),keys,depth+1);if(found)return found}return undefined}
 function findObject(value:Json,keys:string[],depth=0):Json|undefined{if(depth>4)return undefined;for(const key of keys){const found=object(value[key]);if(Object.keys(found).length)return found}for(const key of ['result','data']){const found=findObject(object(value[key]),keys,depth+1);if(found)return found}return undefined}
+function normalizeApprovalWindow(raw:Json, values:unknown[], hasMore:boolean, depth=0):Json {
+  if (depth > 4) throw fail('connector_invalid_response')
+  const normalized: Json = {...raw, values, hasMore}
+  delete normalized.pages
+  for (const key of ['result', 'data']) {
+    if (Array.isArray(raw[key])) normalized[key] = values
+    else if (raw[key] && typeof raw[key] === 'object') normalized[key] = normalizeApprovalWindow(object(raw[key]), values, hasMore, depth + 1)
+  }
+  return normalized
+}
 function stableId(value:Json):string{return String(value.taskId??value.todoId??value.id??'')}
 function verifiedApproval(data: Json, target: string, operation: string, toUserId?: unknown): string | undefined {
   const tasks = data.tasks as Json[]

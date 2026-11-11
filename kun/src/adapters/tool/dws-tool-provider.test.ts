@@ -143,6 +143,9 @@ describe('official typed DingTalk DWS provider',()=>{
     expect(await buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools[0].execute({pageSize:25},context())).toMatchObject({isError:true,output:{code:'connector_remote_failed'}})
   })
   it.each([
+    {page:1,pageSize:1,total:6,start:0,count:1,hasMore:true,pages:[1]},
+    {page:5,pageSize:1,total:6,start:4,count:1,hasMore:true,pages:[1]},
+    {page:6,pageSize:1,total:6,start:5,count:1,hasMore:false,pages:[1]},
     {page:1,pageSize:100,total:68,start:0,count:68,hasMore:false,pages:[1,2,3,4]},
     {page:2,pageSize:25,total:68,start:25,count:25,hasMore:true,pages:[2,3]},
     {page:3,pageSize:25,total:68,start:50,count:18,hasMore:false,pages:[3,4]},
@@ -164,6 +167,20 @@ describe('official typed DingTalk DWS provider',()=>{
     const result = await tool.execute({page:sample.page,pageSize:sample.pageSize},context())
     expect(result).toMatchObject({output:{status:'succeeded',data:{page:sample.page,pageSize:sample.pageSize,hasMore:sample.hasMore,values:Array.from({length:sample.count},(_,index)=>({id:String(sample.start+index)})),raw:{upstreamMarker:'preserved'}},evidence:{verified:true,operation:'list',target:'current_user'}}})
     expect(runner.mock.calls.map(call=>Number(call[1][call[1].indexOf('--page')+1]))).toEqual(sample.pages)
+    const data = (result.output as {data:{values:unknown[];hasMore:boolean;raw:Record<string,unknown>;transportPages:{page:number;count:number;hash:string}[]}}).data
+    expect(data.raw.values).toEqual(data.values)
+    expect(data.raw.hasMore).toBe(data.hasMore)
+    expect(data.raw).not.toHaveProperty('pages')
+    expect(data.transportPages.map(item=>item.page)).toEqual(sample.pages)
+    for (const item of data.transportPages) {
+      expect(Object.keys(item).sort()).toEqual(['count','hash','page'])
+      expect(item.hash).toMatch(/^[a-f0-9]{64}$/)
+      expect(item.count).toBeLessThanOrEqual(20)
+    }
+    for (const match of JSON.stringify(data).matchAll(/"id":"(\d+)"/g)) {
+      expect(Number(match[1])).toBeGreaterThanOrEqual(sample.start)
+      expect(Number(match[1])).toBeLessThan(sample.start + sample.count)
+    }
   })
   it.each([{total:20,hasMore:false},{total:21,hasMore:true}])('uses bounded lookahead when approval hasMore is absent ($total items)',async sample=>{
     const runner=vi.fn(async(_path:string,args:string[])=>{
@@ -171,8 +188,21 @@ describe('official typed DingTalk DWS provider',()=>{
       return {ok:true,output:{success:true,result:{values:Array.from({length:Math.max(0,Math.min(20,sample.total-start))},(_,index)=>({id:String(start+index)}))}}}
     })
     const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
-    expect(await tool.execute({page:1,pageSize:20},context())).toMatchObject({output:{data:{hasMore:sample.hasMore,values:Array.from({length:20},(_,id)=>({id:String(id)})),raw:{values:expect.any(Array),pages:expect.any(Array)}}}})
+    const result = await tool.execute({page:1,pageSize:20},context())
+    const values = Array.from({length:20},(_,id)=>({id:String(id)}))
+    expect(result).toMatchObject({output:{data:{hasMore:sample.hasMore,values,raw:{values,hasMore:sample.hasMore},transportPages:[{page:1,count:20},{page:2,count:sample.total-20}]}}})
+    expect(JSON.stringify(result)).not.toContain('"id":"20"')
+    expect((result.output as {data:{raw:Record<string,unknown>}}).data.raw).not.toHaveProperty('pages')
     expect(runner).toHaveBeenCalledTimes(2)
+  })
+  it('normalizes nested legacy values while retaining metadata and excluding upstream page bodies',async()=>{
+    const values = Array.from({length:6},(_,id)=>({id:String(id)}))
+    const runner=vi.fn(async()=>({ok:true,output:{success:true,result:{data:{values,hasMore:false,totalCount:6},requestId:'synthetic-request',pages:[{values}]}}}))
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
+    const result=await tool.execute({page:3,pageSize:1},context())
+    expect(result).toMatchObject({output:{data:{values:[{id:'2'}],hasMore:true,raw:{values:[{id:'2'}],hasMore:true,requestId:'synthetic-request',data:{values:[{id:'2'}],hasMore:true,totalCount:6}}}}})
+    expect((result.output as {data:{raw:Record<string,unknown>}}).data.raw).not.toHaveProperty('pages')
+    expect([...JSON.stringify(result).matchAll(/"id":"(\d+)"/g)].map(match=>match[1])).toEqual(['2','2','2'])
   })
   it('keeps approval business errors and malformed empty responses failed across pagination',async()=>{
     const failures=[
