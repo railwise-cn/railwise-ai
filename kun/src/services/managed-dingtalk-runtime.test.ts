@@ -81,6 +81,8 @@ describe('ManagedDingTalkRuntime', () => {
     expect(state).toMatchObject({ available: true, identityVerified: true, scopes: appScopes })
     expect(runtime.toolProvider()?.tools.map(tool => tool.name)).toEqual(['dingtalk_get_approval', 'dingtalk_approve', 'dingtalk_reject', 'dingtalk_transfer'])
     expect(await runtime.preflight('同意钉钉审批')).toMatchObject({ status: 'available', approvalState: 'required' })
+    expect(await runtime.preflight('同意钉钉审批并完成待办 A')).toMatchObject({ status: 'needs_authorization', errorCode: 'connector_scope_missing' })
+    expect(await runtime.preflight('同意钉钉审批并上传文件')).toMatchObject({ status: 'unsupported' })
   })
 
   it('stores the application secret outside config and completes OAuth into an encrypted credential reference', async () => {

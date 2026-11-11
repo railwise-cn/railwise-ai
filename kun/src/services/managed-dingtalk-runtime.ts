@@ -100,13 +100,23 @@ export class ManagedDingTalkRuntime {
       workspaceState: 'unknown' as const, sandboxState: 'allowed' as const,
       approvalState: intent.mutation ? 'required' as const : 'not_required' as const, checkedAt: this.status.checkedAt }
     const connect = { kind: 'connect' as const, route: 'settings', label: '配置钉钉连接器' }
-    if (intent.operation === 'send') return { ...base, status: 'unsupported', credentialState: this.status.credentialState,
-      errorCode: 'connector_operation_unsupported', message: '当前钉钉连接器尚不支持发送消息。请使用待办或审批能力。', action: connect, resolution: connect }
+    if ((intent.operations ?? [intent.operation]).some(operation => operation === 'send' || operation === 'upload')) return { ...base, status: 'unsupported', credentialState: this.status.credentialState,
+      errorCode: 'connector_operation_unsupported', message: '当前钉钉连接器支持待办与审批读取、完成、同意、拒绝和转交。', action: connect, resolution: connect }
     if (!this.config.enabled) return { ...base, status: 'blocked', credentialState: 'missing', errorCode: 'connector_disabled',
       message: '钉钉连接器尚未启用，请先完成配置。', action: connect, resolution: connect }
     if (intent.kind === 'connect_provider') return { ...base, status: 'needs_authorization', credentialState: this.status.credentialState,
       errorCode: 'connector_authorization_required', message: '请先在钉钉连接器设置中完成应用配置和授权。', action: connect, resolution: connect }
     const approval = /审批|approval|workflow/i.test(text) || ['approve', 'reject', 'transfer'].includes(intent.operation ?? '')
+    if (approval && intent.operations?.includes('complete')) {
+      const todoScopes = [DINGTALK_SCOPES.todoRead, DINGTALK_SCOPES.todoWrite]
+      const todoCredential = await this.readCredential(this.config.credentialRef, 'user', todoScopes, false)
+      if (todoCredential.credentialState !== 'valid' || !todoCredential.identityVerified ||
+        todoScopes.some(scope => !this.config.userScopes.includes(scope) || !todoCredential.scopes.includes(scope))) {
+        return { ...base, status: 'needs_authorization', credentialState: todoCredential.credentialState,
+          errorCode: 'connector_scope_missing', requiredScopes: todoScopes,
+          message: '此组合任务还需要已核验的钉钉待办读写授权。', action: connect, resolution: connect }
+      }
+    }
     const required = approval
       ? [...(intent.operation === 'detail' || intent.mutation ? [] : [DINGTALK_SCOPES.integratedRead]), ...(intent.operation === 'detail' || intent.mutation ? [DINGTALK_SCOPES.workflowRead] : []), ...(intent.mutation ? [DINGTALK_SCOPES.workflowWrite] : [])]
       : [DINGTALK_SCOPES.todoRead, ...(intent.mutation ? [DINGTALK_SCOPES.todoWrite] : [])]

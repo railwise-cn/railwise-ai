@@ -14,6 +14,8 @@ describe('managed official DingTalk preflight',()=>{
     expect(runtime.preflight('查询钉钉待办')).toMatchObject({status:'available',credentialState:'valid'})
     expect(runtime.scope()).toMatchObject({connectorScopes:[],connectorIdentityFingerprints:{dingtalk:dwsTestConfig.identityFingerprint}})
     expect(runtime.preflight('转交钉钉审批')).toMatchObject({status:'available',approvalState:'required',toolId:'dingtalk'})
+    expect(runtime.preflight('同意钉钉审批并上传文件')).toMatchObject({status:'unsupported',errorCode:'connector_operation_unsupported'})
+    expect(runtime.preflight('同意钉钉审批并完成待办 A')).toMatchObject({status:'available',approvalState:'required'})
     expect(runtime.scope()).toMatchObject({connectorBackends:{dingtalk:'dws'}})
     vi.stubEnv('WORKWISE_CANDIDATE','1');vi.stubEnv('WORKWISE_CANDIDATE_CREDENTIAL_ACCESS','0')
     expect(runtime.preflight('查询钉钉待办')).toMatchObject({status:'blocked',errorCode:'candidate_credentials_disabled'})

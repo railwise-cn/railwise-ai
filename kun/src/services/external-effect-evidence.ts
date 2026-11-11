@@ -45,6 +45,10 @@ export function externalTarget(args: Record<string, unknown>, toolName?: string,
   }
   return (definition ?? (toolName ? externalOperationForTool(toolName) : undefined))?.operation === 'list' ? 'current_user' : undefined
 }
+/** Older unreviewed contracts may predate the persisted combined-operation field. */
+export function requestedEffectOperations(task: TaskRun): string[] {
+  return task.acceptance.effect?.requiredOperations ?? externalTaskIntent(task.goal)?.operations ?? []
+}
 export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt[], trustedAttemptTurnIds: ReadonlySet<string> = new Set(), resolveEffect: ToolEffectResolver = externalOperationForTool): ResultEvidence[] {
   const intent = externalTaskIntent(task.goal)
   const accepted = task.acceptance.effect
@@ -58,7 +62,7 @@ export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt
   // A broad process request has no finite acceptance boundary until its
   // reviewed target set is persisted as requiredEffects. One successful write
   // receipt cannot prove that every requested item was handled.
-  if (required.length === 0 || !task.activeTurnId) return []
+  if (required.length === 0 || !task.activeTurnId || requestedEffectOperations(task).some(operation => !required.some(effect => effect.operation === operation))) return []
 
   const verified = receipts.flatMap(receipt => {
     const resolution = resolutionEvidence(receipt, receipts)

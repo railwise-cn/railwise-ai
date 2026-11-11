@@ -59,7 +59,7 @@ export type LocalTool = {
    */
   shouldAdvertise?: (context: ToolHostContext) => boolean
   /** Pure argument checks run before asking the user to approve a request. */
-  validateArguments?: (args: Record<string, unknown>) => void
+  validateArguments?: (args: Record<string, unknown>, context: ToolHostContext) => void
   execute: (
     args: Record<string, unknown>,
     context: ToolHostContext,
@@ -173,10 +173,11 @@ export class LocalToolHost implements ToolHost {
     }
     const activeCall = preHookDecision.call
     try {
-      tool.validateArguments?.(activeCall.arguments)
+      tool.validateArguments?.(activeCall.arguments, context)
     } catch (error) {
+      const code = (error as { code?: unknown })?.code
       return {
-        item: this.errorToolResult(context, activeCall, tool, error instanceof Error ? error.message : String(error), 'invalid_tool_arguments'),
+        item: this.errorToolResult(context, activeCall, tool, error instanceof Error ? error.message : String(error), typeof code === 'string' ? code : 'invalid_tool_arguments'),
         approved: false
       }
     }

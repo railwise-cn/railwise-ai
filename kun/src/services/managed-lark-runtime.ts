@@ -4,6 +4,7 @@ import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provide
 import type { CapabilityToolProvider } from '../adapters/tool/capability-registry.js'
 import { preflightExternalTask, externalTaskIntent } from './external-task-capability.js'
 import { assertLarkCliCredentialAccess } from './lark-cli-environment.js'
+import { requiredExternalToolNames } from './contextual-external-task-preflight.js'
 import { LARK_DELIVERY_SCOPES } from '../adapters/tool/lark-delivery-tools.js'
 
 /** Refreshes only trusted local configuration; callers cannot choose a CLI path. */
@@ -50,7 +51,8 @@ export class ManagedLarkRuntime {
         resolution
       }
     }
-    if (intent.operation === 'transfer') {
+    const operations = intent.operations ?? [intent.operation]
+    if (operations.includes('transfer')) {
       const resolution = { kind: 'retry' as const, route: 'marketplace', label: '查看飞书能力' }
       return {
         ...result,
@@ -62,30 +64,23 @@ export class ManagedLarkRuntime {
       }
     }
 
-    const delivery = intent.operation === 'upload' ? 'drive' : intent.operation === 'send' ? /邮件|邮箱|mail|email/i.test(text) ? 'mail' : 'im' : undefined
-    if (delivery && this.config.executableVersion !== '1.0.100') {
+    if (operations.some(operation => operation === 'upload' || operation === 'send') && this.config.executableVersion !== '1.0.100') {
       const resolution = { kind: 'install' as const, route: 'marketplace', label: '更新飞书连接器' }
       return { ...result, status: 'blocked' as const, errorCode: 'connector_version_unsupported',
         message: '此操作需要已验证的飞书连接器1.0.100，请先更新连接器。已有账号配置将继续保留。', action: resolution, resolution }
     }
-    const approval = /审批|approval|workflow/i.test(text) || ['approve', 'reject', 'transfer'].includes(intent.operation ?? '')
-    const requiredScopes = delivery ? [...LARK_DELIVERY_SCOPES[delivery]] : intent.mutation
-      ? approval
-        ? ['approval:task:read', 'approval:task:write', 'approval:instance:read']
-        : ['task:task:read', 'task:task:write']
-      : approval
-        ? intent.operation === 'detail' ? ['approval:instance:read'] : ['approval:task:read']
-        : ['task:task:read']
-    const toolName = delivery ? `lark_${delivery}_${delivery === 'drive' ? 'upload' : 'send'}` : approval
-      ? intent.operation === 'detail' ? 'lark_approval_get'
-        : intent.operation === 'approve' ? 'lark_approval_approve'
-          : intent.operation === 'reject' ? 'lark_approval_reject'
-            : intent.mutation ? 'lark_approval_approve' : 'lark_approval_list'
-      : intent.operation === 'detail' ? 'lark_task_get'
-        : intent.operation === 'complete' || intent.mutation ? 'lark_task_complete' : 'lark_task_list'
     const provider = buildLarkCliToolProvider(this.config)
+    const toolNames = requiredExternalToolNames(text)
+    const requiredTools = toolNames.map(name => provider?.tools.find(tool => tool.name === name))
+    const requiredScopes = [...new Set(operations.flatMap(operation => {
+      const delivery = operation === 'upload' ? 'drive' : operation === 'send' ? /邮件|邮箱|mail|email/i.test(text) ? 'mail' : 'im' : undefined
+      if (delivery) return [...LARK_DELIVERY_SCOPES[delivery]]
+      const approval = operation !== 'complete' && (/审批|approval|workflow/i.test(text) || ['approve', 'reject', 'transfer'].includes(operation ?? ''))
+      return intent.mutation ? approval ? ['approval:task:read', 'approval:task:write', 'approval:instance:read'] : ['task:task:read', 'task:task:write']
+        : approval ? operation === 'detail' ? ['approval:instance:read'] : ['approval:task:read'] : ['task:task:read']
+    }))]
     const missingScopes = requiredScopes.filter(scope => !this.config.scopes.includes(scope))
-    const toolMissing = !provider?.tools.some(tool => tool.name === toolName)
+    const toolMissing = requiredTools.some(tool => !tool)
     if (missingScopes.length || toolMissing) {
       const resolution = { kind: 'connect' as const, route: 'marketplace', label: '重新授权飞书' }
       return {

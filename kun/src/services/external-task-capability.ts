@@ -35,6 +35,25 @@ export function externalProviderAmbiguity(text: string): boolean {
   return !KNOWLEDGE.test(value) && (WORK.test(value) || CONNECT.test(value)) && /钉钉|dingtalk/i.test(value) && /飞书|lark|feishu/i.test(value)
 }
 
+function writeOperation(text: string): NonNullable<TaskIntent['operations']>[number] | undefined {
+  return /拒绝|驳回|\breject\b/i.test(text) ? 'reject' : /转交|转办|\btransfer\b/i.test(text) ? 'transfer'
+    : /同意|批准|自动审批|\bapprove\b/i.test(approvalActionText(text)) ? 'approve'
+    : /上传|\bupload(?:ing)?\b/i.test(text) ? 'upload'
+    : /发送|发(?:一封)?邮件|发(?:一条)?消息|\bsend(?:ing)?\b/i.test(text) ? 'send'
+    : /完成|\bcomplete\b/i.test(text) ? 'complete' : undefined
+}
+
+/** Preserve explicit sequential/conjoined platform actions without counting a report's completion as a todo write. */
+function combinedOperations(text: string, primary: ReturnType<typeof writeOperation>) {
+  const clauses = text.split(/[，,。；;\n]|并且?|然后|随后|接着|再(?!次)|后|\b(?:and|then)\b/i)
+  const operations = clauses.flatMap(clause => {
+    const operation = writeOperation(clause)
+    if (!operation || (operation === 'complete' && primary !== 'complete' && !/待办|\b(?:todo|task)\b|任务\s*[A-Za-z0-9“「]/i.test(clause))) return []
+    return [operation]
+  })
+  return [...new Set(primary ? [primary, ...operations] : operations)]
+}
+
 /** Deterministic classification before any model/tool execution. */
 export function externalTaskIntent(text: string): TaskIntent | null {
   const value = text.trim()
@@ -46,15 +65,12 @@ export function externalTaskIntent(text: string): TaskIntent | null {
   const readOperation = /详情|\bdetail/i.test(value) ? 'detail'
     : /查询|列出|查看|读取|列表|有哪些|\b(?:list|show|read)\b/i.test(value) ? 'list' : undefined
   const actionText = readOperation ? value.replace(QUERY_STATE, ' ').replace(NEGATED_QUERY_ACTION, ' ') : value
-  const writeOperation = /拒绝|驳回|\breject\b/i.test(actionText) ? 'reject' : /转交|转办|\btransfer\b/i.test(actionText) ? 'transfer'
-    : /同意|批准|自动审批|\bapprove\b/i.test(approvalActionText(actionText)) ? 'approve'
-    : /上传|\bupload(?:ing)?\b/i.test(actionText) ? 'upload'
-    : /发送|发(?:一封)?邮件|发(?:一条)?消息|\bsend(?:ing)?\b/i.test(actionText) ? 'send'
-    : /完成|\bcomplete\b/i.test(actionText) ? 'complete' : undefined
+  const primaryWrite = writeOperation(actionText)
+  const operations = combinedOperations(actionText, primaryWrite)
   const genericMutation = /处理|办理|代办|办结/.test(actionText)
-  const operation = writeOperation ?? (genericMutation ? undefined : readOperation)
+  const operation = primaryWrite ?? (genericMutation ? undefined : readOperation)
   return { kind: CONNECT.test(value) && !hasWorkIntent ? 'connect_provider' : 'external_task', provider, operation,
-    mutation: Boolean(writeOperation || genericMutation), confidence: 'rule' }
+    ...(operations.length > 1 ? { operations } : {}), mutation: Boolean(primaryWrite || genericMutation), confidence: 'rule' }
 
 }
 export function detectExternalTaskProvider(text: string): ExternalTaskProvider | null {

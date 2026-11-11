@@ -1,7 +1,7 @@
 import { authorizedArtifactWrites } from './task-artifact-proof.js'
 import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalTaskIntent } from './external-task-capability.js'
-import { verifiedEffectReceipts, externalOperationForTool, externalTarget } from './external-effect-evidence.js'
+import { verifiedEffectReceipts, externalOperationForTool, externalTarget, requestedEffectOperations } from './external-effect-evidence.js'
 import { ExecutionGrantSchema, HostShellAuthorizationSchema, type ExecutionGrant } from '../contracts/permissions.js'
 import { randomUUID as executionUUID } from 'node:crypto'
 import type { ExecutionToken, InputDelivery, ProcessIdentity } from '../contracts/execution.js'
@@ -253,21 +253,40 @@ export class TaskController {
 
   getTask(taskId: string): TaskRun | null { return this.repository.get(taskId) }
 
+  /** Read-only validation shared by the pre-approval preview and transactional confirmation. */
+  validateEffectScopeOperations(turnId: string, effects: readonly RequiredEffect[]): void {
+    const keys = effects.map(effect => JSON.stringify([effect.provider, effect.operation, effect.target]))
+    if (!effects.length || effects.length > 8 || new Set(keys).size !== keys.length) {
+      throw Object.assign(new Error('Review between one and eight distinct external actions.'), { code: 'effect_scope_invalid' })
+    }
+    const token = this.attemptTokens.get(turnId)
+    if (!token) throw Object.assign(new Error('No active external task.'), { code: 'effect_scope_required' })
+    this.assertToken(token)
+    const task = this.repository.get(token.taskId)!
+    const acceptance = task.acceptance.effect
+    const operations = requestedEffectOperations(task)
+    if (!acceptance || task.authority?.revokedAt || effects.some(effect => effect.provider !== acceptance.provider ||
+      !['detail', 'approve', 'reject', 'complete', 'transfer', 'send', 'upload'].includes(effect.operation) ||
+      (operations.length ? effect.operation !== 'detail' && !operations.includes(effect.operation)
+        : !['process', 'connect', effect.operation].includes(acceptance.operation)))) {
+      throw Object.assign(new Error('Every reviewed action must belong to the requested task operations and provider.'), { code: 'effect_scope_conflict' })
+    }
+    if (operations.some(operation => !effects.some(effect => effect.operation === operation))) {
+      throw Object.assign(new Error(`Confirm the complete requested action set (${operations.join(', ')}).`), { code: 'effect_scope_incomplete' })
+    }
+  }
+
   /** Persist a finite user-reviewed effect set before any mutating dispatch. */
   confirmEffectScope(turnId: string, expectedRevision: number, idempotencyKey: string, effects: RequiredEffect[]): TaskRun {
     const token = this.attemptTokens.get(turnId)
     if (!token) throw Object.assign(new Error('No active task execution for effect scope confirmation.'), { code: 'effect_scope_required' })
     if (!idempotencyKey.trim() || effects.length < 1 || effects.length > 8) throw Object.assign(new Error('Review between one and eight exact external actions.'), { code: 'effect_scope_invalid' })
     const requiredEffects = effects.map(effect => RequiredEffectSchema.parse(effect))
-    const keys = requiredEffects.map(effect => JSON.stringify([effect.provider, effect.operation, effect.target]))
-    if (new Set(keys).size !== keys.length) throw Object.assign(new Error('The reviewed effect set contains duplicate actions.'), { code: 'effect_scope_invalid' })
     return this.repository.transact(() => {
       this.assertToken(token)
       const task = this.repository.get(token.taskId)!
-      const acceptance = task.acceptance.effect
-      if (!acceptance || task.authority?.revokedAt || requiredEffects.some(effect => effect.provider !== acceptance.provider || !['detail', 'approve', 'reject', 'complete', 'transfer', 'send', 'upload'].includes(effect.operation) || (acceptance.operation !== 'process' && acceptance.operation !== 'connect' && effect.operation !== acceptance.operation))) {
-        throw Object.assign(new Error('Every reviewed action must belong to this task provider.'), { code: 'effect_scope_conflict' })
-      }
+      const acceptance = task.acceptance.effect!
+      this.validateEffectScopeOperations(turnId, requiredEffects)
       const key = `effect-scope:${idempotencyKey}`
       const request = { turnId, expectedRevision, requiredEffects }
       const existing = this.repository.operation(task.id, key)
@@ -843,6 +862,9 @@ export class TaskController {
     const task = this.repository.get(token.taskId)!
     const accepted = task.acceptance.effect
     const required = accepted?.requiredEffects ?? (accepted?.target ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
+    if (requestedEffectOperations(task).some(expected => !required.some(effect => effect.operation === expected))) {
+      throw Object.assign(new Error('The confirmed scope omits a requested operation and requires review.'), { code: 'effect_scope_incomplete' })
+    }
     if (task.authority?.revokedAt || !required.some(item => item.provider === provider && item.operation === operation && item.target === target)) {
       throw Object.assign(new Error('Review and confirm the complete finite external action set with confirm_external_effect_scope before this mutation.'), { code: 'effect_scope_required' })
     }
@@ -1497,7 +1519,18 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
     ...(effect ? { requiresExternalEffects: true } : {}),
-    ...(intent?.provider?{effect:{provider:intent.provider,operation:intent.operation ?? (intent.kind==='connect_provider'?'connect':'process'),target:intent.target ?? (intent.operation === 'list' ? 'current_user' : undefined),requiredScopes:[],requiresConfirmation:intent.mutation,successStatus:['succeeded'],verification:'provider_readback' as const}}:{})
+    ...(intent?.provider ? {
+      effect: {
+        provider: intent.provider,
+        operation: intent.operation ?? (intent.kind === 'connect_provider' ? 'connect' : 'process'),
+        ...(intent.operations ? { requiredOperations: intent.operations } : {}),
+        target: intent.target ?? (intent.operation === 'list' ? 'current_user' : undefined),
+        requiredScopes: [],
+        requiresConfirmation: intent.mutation,
+        successStatus: ['succeeded'],
+        verification: 'provider_readback' as const
+      }
+    } : {})
   }
 }
 

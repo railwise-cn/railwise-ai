@@ -38,6 +38,22 @@ export function buildExternalEffectScopeToolProviders(tasks: TaskController): Ca
     const task = tasks.activeTask(context.threadId)
     return task?.activeTurnId === context.turnId && task.acceptance.effect ? task : null
   }
+  const reviewedEffects = (request: z.infer<typeof requestSchema>, context: ToolHostContext): RequiredEffect[] => {
+    const task = current(context)
+    if (!task) throw Object.assign(new Error('No active external task for this Turn.'), { code: 'effect_scope_required' })
+    return request.effects.map(item => {
+      const spec = tasks.describeToolEffect(item.tool_name)
+      if (!spec || spec.operation === 'list') throw Object.assign(new Error('This tool does not define a trusted target operation.'), { code: 'effect_scope_required' })
+      const providerId = spec.providerId ?? (spec.provider === 'lark' ? 'lark-cli' : spec.provider)
+      const grant = context.executionGrant
+      if (spec.provider !== task.acceptance.effect!.provider || !grant || (grant.allowedProviderIds && !grant.allowedProviderIds.includes(providerId)) || (grant.allowedToolNames && !grant.allowedToolNames.includes(item.tool_name))) {
+        throw Object.assign(new Error('An action is outside the current task grant.'), { code: 'execution_grant_scope' })
+      }
+      const scopes = spec.requiredScopes ?? ACTIONS[item.tool_name as keyof typeof ACTIONS]?.scopes ?? []
+      assertGrantConnectorScopes(scopes, context)
+      return { provider: spec.provider, operation: spec.operation, target: item.target, requiredScopes: [...scopes], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' }
+    })
+  }
   return [{ id: 'effect-scope', kind: 'built-in', enabled: true, available: true, tools: [
     defineLocalTool({
       name: 'get_external_effect_scope',
@@ -46,7 +62,7 @@ export function buildExternalEffectScopeToolProviders(tasks: TaskController): Ca
       shouldAdvertise: context => Boolean(current(context)),
       execute: async (_args, context) => {
         const task = current(context)
-        return task ? { output: { taskId: task.id, revision: task.acceptance.effect!.scopeRevision ?? 0, taskRevision: task.revision, provider: task.acceptance.effect!.provider, requiredEffects: task.acceptance.effect!.requiredEffects ?? [], scopeConfirmationId: task.acceptance.effect!.scopeConfirmationId } }
+        return task ? { output: { taskId: task.id, revision: task.acceptance.effect!.scopeRevision ?? 0, taskRevision: task.revision, provider: task.acceptance.effect!.provider, requiredOperations: task.acceptance.effect!.requiredOperations, requiredEffects: task.acceptance.effect!.requiredEffects ?? [], scopeConfirmationId: task.acceptance.effect!.scopeConfirmationId } }
           : { output: { code: 'effect_scope_required' }, isError: true }
       }
     }),
@@ -54,25 +70,17 @@ export function buildExternalEffectScopeToolProviders(tasks: TaskController): Ca
       name: 'confirm_external_effect_scope',
       description: 'After reading real provider tasks, ask the user to review the entire finite set of exact detail reads or write actions for this task (up to eight). The user must explicitly confirm every listed provider/action/target. For detail reads, target is the task GUID or approval instance ID, and only read scopes are required. Lists use current_user and do not belong in this set. Persist the set BEFORE any mutation; completion requires verified receipts for ALL entries. The confirmed set cannot be replaced or reduced. This does not grant connector permissions or bypass each write confirmation.',
       inputSchema: z.toJSONSchema(requestSchema) as Record<string, unknown>, policy: 'on-request', requireExplicitApproval: true,
-      validateArguments: raw => { requestSchema.parse(raw) },
+      validateArguments: (raw, context) => {
+        const request = requestSchema.parse(raw)
+        tasks.validateEffectScopeOperations(context.turnId, reviewedEffects(request, context))
+      },
       shouldAdvertise: context => Boolean(current(context)),
       execute: async (raw, context) => {
         const request = requestSchema.parse(raw)
         if (context.explicitApproval?.toolName !== 'confirm_external_effect_scope' || context.explicitApproval.requestHash !== createHash('sha256').update(JSON.stringify(raw)).digest('hex')) throw Object.assign(new Error('A real approval of this exact finite action set is required.'), { code: 'effect_scope_confirmation_required' })
         const task = current(context)
         if (!task) throw Object.assign(new Error('No active external task for this Turn.'), { code: 'effect_scope_required' })
-        const effects: RequiredEffect[] = request.effects.map(item => {
-          const spec = tasks.describeToolEffect(item.tool_name)
-          if (!spec || spec.operation === 'list') throw Object.assign(new Error('This tool does not define a trusted target operation.'), { code: 'effect_scope_required' })
-          const providerId = spec.providerId ?? (spec.provider === 'lark' ? 'lark-cli' : spec.provider)
-          const grant = context.executionGrant
-          if (spec.provider !== task.acceptance.effect!.provider || !grant || (grant.allowedProviderIds && !grant.allowedProviderIds.includes(providerId)) || (grant.allowedToolNames && !grant.allowedToolNames.includes(item.tool_name))) {
-            throw Object.assign(new Error('An action is outside the current task grant.'), { code: 'execution_grant_scope' })
-          }
-          const scopes = spec.requiredScopes ?? ACTIONS[item.tool_name as keyof typeof ACTIONS]?.scopes ?? []
-          assertGrantConnectorScopes(scopes, context)
-          return { provider: spec.provider, operation: spec.operation, target: item.target, requiredScopes: [...scopes], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' }
-        })
+        const effects = reviewedEffects(request, context)
         const updated = tasks.confirmEffectScope(context.turnId, request.expected_revision, request.idempotency_key, effects)
         return { output: { taskId: updated.id, revision: updated.acceptance.effect!.scopeRevision, taskRevision: updated.revision, scopeConfirmationId: updated.acceptance.effect!.scopeConfirmationId, requiredEffects: updated.acceptance.effect!.requiredEffects, status: 'scope_confirmed' } }
       }

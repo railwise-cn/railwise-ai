@@ -57,6 +57,28 @@ async function fixture(prompt = '帮我处理飞书待办。', resolveToolEffect
 }
 
 describe('finite reviewed external effect scope', () => {
+  it('rejects an incomplete combined scope before showing an approval card', async () => {
+    const f = await fixture('请先批准飞书审批，再上传测试文件。', name => {
+      if (name === 'lark_approval_approve') return { provider: 'lark', operation: 'approve', mutation: true, targetFields: ['taskId'], requiredScopes: [] }
+      if (name === 'lark_drive_upload') return { provider: 'lark', operation: 'upload', mutation: true, targetFields: ['folderToken'], requiredScopes: [] }
+      return undefined
+    })
+    const context = { ...f.context, executionGrant: { ...f.context.executionGrant!, allowedToolNames: [
+      'get_external_effect_scope', 'confirm_external_effect_scope', 'lark_approval_approve', 'lark_drive_upload'
+    ] } }
+    const request = { expected_revision: 0, idempotency_key: 'mixed', effects: [{ tool_name: 'lark_approval_approve', target: 'task-a' }] }
+    const incomplete = await f.host.execute({ callId: 'incomplete', toolName: 'confirm_external_effect_scope', arguments: request }, context)
+    expect(incomplete).toMatchObject({ approved: false, item: { isError: true, output: { code: 'effect_scope_incomplete' } } })
+    expect(f.awaitApproval).not.toHaveBeenCalled()
+    expect(f.repository.operations(f.task.id, 'effect_scope')).toHaveLength(0)
+    const complete = await f.host.execute({ callId: 'complete', toolName: 'confirm_external_effect_scope', arguments: {
+      ...request, effects: [...request.effects, { tool_name: 'lark_drive_upload', target: 'folder-a' }]
+    } }, context)
+    expect(complete.item).toMatchObject({ output: { status: 'scope_confirmed' } })
+    expect(f.awaitApproval).toHaveBeenCalledOnce()
+    expect(f.repository.get(f.task.id)?.acceptance.effect?.requiredEffects).toHaveLength(2)
+  })
+
   it('returns malformed scope arguments to the model before creating a user approval', async () => {
     const f = await fixture()
     for (const effects of [[], [{ tool_name: 'lark_drive_upload', target: 'folder-token/RailWise-验收.txt' }]]) {

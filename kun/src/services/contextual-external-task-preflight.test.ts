@@ -23,12 +23,24 @@ function fixture(providerConfig = config) {
 }
 
 describe('external task preflight uses trusted execution context', () => {
+  it('requires the union of tools and scopes before a combined task starts', async () => {
+    const prompt = '请先批准飞书审批，再上传测试文件。'
+    expect(requiredExternalToolNames(prompt)).toEqual(['lark_approval_approve', 'lark_drive_upload'])
+    const approvalScopes = ['approval:task:read', 'approval:task:write', 'approval:instance:read']
+    const partial = fixture(LarkCapabilityConfig.parse({ ...config, executableVersion: '1.0.100', scopes: approvalScopes }))
+    expect(await partial.preflight(prompt, partial.thread)).toMatchObject({ status: 'needs_authorization', requiredScopes: expect.arrayContaining([...approvalScopes, ...LARK_DELIVERY_SCOPES.drive]) })
+    const complete = fixture(LarkCapabilityConfig.parse({ ...config, executableVersion: '1.0.100', scopes: [...approvalScopes, ...LARK_DELIVERY_SCOPES.drive] }))
+    expect(await complete.preflight(prompt, complete.thread)).toMatchObject({ status: 'available', requiredScopes: expect.arrayContaining([...approvalScopes, ...LARK_DELIVERY_SCOPES.drive]) })
+    expect(partial.runner).not.toHaveBeenCalled()
+    expect(complete.runner).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['请上传测试文件到飞书云盘。', 'lark_drive_upload'],
     ['请通过飞书上传审批附件。用户已明确批准这一个文件的一次上传并回读。', 'lark_drive_upload'],
     ['请通过飞书发送审批通知。用户已明确同意这条消息的发送。', 'lark_im_send'],
     ['请通过飞书发送测试邮件。用户已明确批准此次发送。', 'lark_mail_send'],
-    ['请先批准飞书审批，再上传文件。', 'lark_approval_approve']
+    ['请先批准飞书审批。', 'lark_approval_approve']
   ])('selects the actual typed connector tool for the classified action (%s)', (prompt, tool) => {
     expect(requiredExternalToolNames(prompt!)).toEqual([tool])
   })

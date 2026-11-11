@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { externalTarget, verifiedEffectReceipts } from './external-effect-evidence.js'
+import { externalOperationForTool, externalTarget, verifiedEffectReceipts } from './external-effect-evidence.js'
 import { TaskAcceptanceSchema, type OperationReceipt, type TaskRun } from '../contracts/tasks.js'
 
 const turnId = 'turn-current'
@@ -52,6 +52,20 @@ const processTask = {
 } as TaskRun
 
 describe('trusted external operation acceptance', () => {
+  it('requires both approve and upload evidence and rejects a shortened legacy scope', () => {
+    const approve = { provider: 'lark', operation: 'approve', target: 'a' }
+    const upload = { provider: 'lark', operation: 'upload', target: 'folder' }
+    const mixed = { ...task, goal: '请先批准飞书审批，再上传文件。', acceptance: { ...task.acceptance,
+      effect: { ...task.acceptance.effect!, requiredOperations: ['approve', 'upload'], target: undefined, requiredEffects: [approve, upload] } } } as TaskRun
+    const resolver = (name: string) => name === 'lark_drive_upload'
+      ? { provider: 'lark', operation: 'upload', mutation: true, targetFields: ['folderToken'] } : externalOperationForTool(name)
+    const uploadReceipt = receipt({ operation: 'upload', toolName: 'lark_drive_upload', target: 'folder' })
+    expect(verifiedEffectReceipts(mixed, [receipt()], new Set(), resolver)).toEqual([])
+    expect(verifiedEffectReceipts(mixed, [receipt(), uploadReceipt], new Set(), resolver)).toHaveLength(2)
+    const legacy = { ...mixed, acceptance: { ...mixed.acceptance, effect: { ...mixed.acceptance.effect!, requiredOperations: undefined, requiredEffects: [approve] } } } as TaskRun
+    expect(verifiedEffectReceipts(legacy, [receipt()], new Set(), resolver)).toEqual([])
+  })
+
   it('validates an explicit multi-target contract while retaining the legacy single-target shape', () => {
     const common = { requiredNodeKinds: ['execute'], requireFinalResponse: true, requireActionableArtifactCard: false }
     expect(TaskAcceptanceSchema.parse({ kind: 'effect', ...common, effect: { provider: 'lark', operation: 'approve', target: 'a', requiredScopes: [], requiresConfirmation: true, verification: 'provider_readback' } }).effect?.target).toBe('a')

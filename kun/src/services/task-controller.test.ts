@@ -11,6 +11,8 @@ import { RuntimeSpanService } from './runtime-span-service.js'
 import { createApprovalRequest } from '../domain/approval.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
 import { makeAssistantTextItem, makeToolResultItem } from '../domain/item.js'
+import type { ToolEffectResolver } from '../ports/tool-effect.js'
+import { externalOperationForTool } from './external-effect-evidence.js'
 
 const cleanup: string[] = []
 const PERSISTENCE_TEST_TIMEOUT_MS = 15_000
@@ -20,7 +22,7 @@ afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-async function fixture(prompt = '完成可靠性测试。') {
+async function fixture(prompt = '完成可靠性测试。', resolveToolEffect?: ToolEffectResolver) {
   const root = await mkdtemp(join(tmpdir(), 'workwise-task-controller-'))
   cleanup.push(root)
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
@@ -41,7 +43,8 @@ async function fixture(prompt = '完成可靠性测试。') {
     sessionStore,
     nowIso: () => now,
     ownerId: 'test-runtime',
-    spans
+    spans,
+    resolveToolEffect
   })
   const task = controller.ensureTask({
     thread,
@@ -62,6 +65,56 @@ async function fixture(prompt = '完成可靠性测试。') {
 }
 
 describe('TaskController reliability boundaries', () => {
+  it('completes a mixed task only after both persisted operation receipts are verified', async () => {
+    const f = await fixture('请先批准飞书审批，再上传测试文件。', name => name === 'lark_drive_upload'
+      ? { provider: 'lark', operation: 'upload', mutation: true, targetFields: ['folderToken'] } : externalOperationForTool(name))
+    try {
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      f.controller.confirmEffectScope('turn_reliability', 0, 'all-actions', ['approve', 'upload'].map(operation => ({
+        provider: 'lark', operation, target: operation === 'approve' ? 'approval-task' : 'folder', requiredScopes: [],
+        requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback'
+      })))
+      const record = (operation: 'approve' | 'upload') => {
+        const target = operation === 'approve' ? 'approval-task' : 'folder'
+        const toolName = operation === 'approve' ? 'lark_approval_approve' : 'lark_drive_upload'
+        const call = { callId: `mixed-${operation}`, toolName, arguments: operation === 'approve' ? { taskId: target } : { folderToken: target } }
+        const pending = f.controller.beginToolOperation('turn_reliability', call)!
+        f.controller.finishToolOperation(pending.token, pending.key, { approved: true, item: makeToolResultItem({
+          id: `result-${operation}`, threadId: f.thread.id, turnId: 'turn_reliability', callId: call.callId, toolName,
+          output: { ok: true, status: 'succeeded', evidence: { kind: 'external_operation', provider: 'lark', operation, target,
+            verified: true, status: 'done', resultHash: `hash-${operation}`, verifiedAt: '2026-07-18T00:00:00Z' } }
+        }) })
+      }
+      record('approve')
+      await f.sessionStore.appendItem(f.thread.id, makeAssistantTextItem({ id: 'mixed-final', threadId: f.thread.id,
+        turnId: 'turn_reliability', text: '组合任务处理结果。', status: 'completed' }))
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'waiting_user' })
+      expect(f.repository.events(f.task.id).some(event => event.kind === 'task_completed')).toBe(false)
+      f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+      record('upload')
+      expect(await f.controller.assessCandidate(f.thread.id, 'turn_reliability')).toMatchObject({ kind: 'completed' })
+      expect(f.repository.get(f.task.id)?.resultEvidence).toHaveLength(2)
+    } finally { f.repository.close() }
+  })
+
+  it('requires every explicitly requested operation in a mixed external scope', async () => {
+    const { controller, repository, thread, task } = await fixture('请先批准飞书审批，再上传测试文件。')
+    try {
+      controller.beginAttempt(thread.id, 'turn_reliability')
+      const approve = { provider: 'lark', operation: 'approve', target: 'approval-task', requiredScopes: [], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' as const }
+      const upload = { ...approve, operation: 'upload', target: 'drive-folder' }
+      expect(() => controller.confirmEffectScope('turn_reliability', 0, 'incomplete', [approve])).toThrow(/complete|全部|requested/)
+      expect(repository.operations(task.id, 'effect_scope')).toHaveLength(0)
+      expect(controller.confirmEffectScope('turn_reliability', 0, 'complete', [approve, upload]).acceptance.effect?.requiredEffects).toEqual([approve, upload])
+      expect(() => controller.confirmEffectScope('turn_reliability', 1, 'shorten', [approve])).toThrow()
+      const current = repository.get(task.id)!
+      repository.update(task.id, current.revision, value => ({ ...value, acceptance: { ...value.acceptance,
+        effect: { ...value.acceptance.effect!, requiredOperations: undefined, requiredEffects: [approve] } } }))
+      expect(() => controller.assertExternalTarget('turn_reliability', 'lark', 'approve', 'approval-task')).toThrow(/omits a requested operation/)
+      expect(repository.get(task.id)?.acceptance.effect?.requiredEffects).toEqual([approve])
+    } finally { repository.close() }
+  })
+
   it.each([
     ['请上传测试文件到飞书云盘。', 'upload'],
     ['请通过飞书连接器，将已准备好的单个合成测试文件上传一次到我个人云盘根目录。用户已明确批准这一个测试文件的一次上传并回读。', 'upload'],

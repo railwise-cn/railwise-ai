@@ -8,6 +8,7 @@ export const TaskIntentSchema = z.object({
   kind: z.enum(['chat', 'status', 'external_task', 'connect_provider', 'workspace_action']),
   provider: ExternalTaskProviderSchema.optional(),
   operation: z.enum(['list', 'detail', 'approve', 'reject', 'complete', 'send', 'transfer', 'upload']).optional(),
+  operations: z.array(z.enum(['approve', 'reject', 'complete', 'send', 'transfer', 'upload'])).min(2).optional(),
   target: z.string().optional(), mutation: z.boolean(), confidence: z.enum(['rule', 'model_fallback'])
 })
 export type TaskIntent = z.infer<typeof TaskIntentSchema>

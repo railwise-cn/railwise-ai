@@ -66,6 +66,7 @@ export const TaskAcceptanceSchema = z.object({
   effect: z.object({
     provider: z.string(),
     operation: z.string(),
+    requiredOperations: z.array(z.string().min(1)).min(2).optional(),
     target: z.string().optional(),
     requiredScopes: z.array(z.string()).default([]),
     requiresConfirmation: z.boolean(),
