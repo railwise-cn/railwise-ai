@@ -115,7 +115,7 @@ function verifyPackagedCanvas(resourcesDirectory, platform, arch, root = resolve
   const archive = join(resourcesDirectory, 'app.asar')
   asar.uncache(archive)
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'))
-  return verifyCanvasRuntimePackages(path => asar.extractFile(archive, path), lock, platform, arch)
+  return verifyCanvasRuntimePackages(path => asar.extractFile(archive, join(...path.split('/'))), lock, platform, arch)
 }
 
 function canvasSmokeScript(resourcesDirectory, root = resolve(__dirname, '..')) {
