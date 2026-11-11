@@ -26,7 +26,7 @@ const now = '2026-11-10T08:00:00.000Z'
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now) })
 afterEach(async () => { vi.useRealTimers(); for (const { root, repository } of stores.splice(0)) { repository.close(); await rm(root, { recursive: true, force: true }) } })
 
-async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'complete' | 'approve' | 'transfer'; approved?: boolean; remote?: Record<string, unknown> } = {}) {
+async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'complete' | 'approve' | 'transfer'; approved?: boolean; retryBeforeDispatch?: boolean; remote?: Record<string, unknown> } = {}) {
   const provider = options.provider ?? 'lark', operation = options.operation ?? 'complete'
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-readback-')))
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
@@ -36,15 +36,27 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
   thread.turns.push(createTurnRecord({ id: 'turn', threadId: thread.id, prompt: '处理待办', createdAt: now, status: 'completed' }))
   await threadStore.upsert(thread)
   const controller = new TaskController({ repository, threadStore, sessionStore, nowIso: () => now })
-  const task = controller.ensureTask({ thread, turnId: 'turn', request: { prompt: provider === 'lark' ? '处理飞书待办和审批' : '处理钉钉待办和审批' } })
+  let task = controller.ensureTask({ thread, turnId: 'turn', request: { prompt: provider === 'lark' ? '处理飞书待办和审批' : '处理钉钉待办和审批' } })
   controller.beginAttempt(thread.id, 'turn')
   const target = operation === 'complete' ? 'todo-42' : '42'
   controller.confirmEffectScope('turn', 0, 'approved-scope', [RequiredEffectSchema.parse({ provider, operation, target })])
+  let turnId='turn'
+  if(options.retryBeforeDispatch) {
+    controller.recordAttemptFailure(thread.id,'turn','max_tokens','Synthetic failure before dispatch')
+    const source=repository.get(task.id)!
+    turnId='retry-turn'
+    thread.turns.push(createTurnRecord({id:turnId,threadId:thread.id,prompt:source.goal,createdAt:now,status:'completed'}))
+    await threadStore.upsert(thread)
+    task=controller.createRetryTask({id:'retry-task',sourceTaskId:source.id,expectedRevision:source.revision,thread,request:{prompt:source.goal}})
+    task=controller.ensureTask({thread,turnId,continuationTaskId:task.id,request:{prompt:'Retry'}})
+    controller.beginAttempt(thread.id,turnId)
+  }
+
   const scopes = provider === 'lark' ? ['task:task:read', 'task:task:write', 'approval:task:read', 'approval:task:write', 'approval:instance:read'] : ['Todo.Todo.Read', 'Todo.Todo.Write', 'Workflow.Instance.Read', 'Workflow.Instance.Write']
   const toolName = provider === 'lark' ? operation === 'complete' ? 'lark_task_complete' : 'lark_approval_approve'
     : operation === 'complete' ? 'dingtalk_complete_task' : operation === 'approve' ? 'dingtalk_approve' : 'dingtalk_transfer'
   const readToolName = provider === 'lark' ? operation === 'complete' ? 'lark_task_get' : 'lark_approval_get' : operation === 'complete' ? 'dingtalk_get_task' : 'dingtalk_get_approval'
-  const grant = ExecutionGrantSchema.parse({ id: 'original-grant', taskId: task.id, threadId: thread.id, turnId: 'turn', workspaceRoot: root,
+  const grant = ExecutionGrantSchema.parse({ id: 'original-grant', taskId: task.id, threadId: thread.id, turnId, workspaceRoot: root,
     workspaceTrust: 'workspace-write', agentTrust: 'full-access', sandboxMode: 'workspace-write', approvalPolicy: 'auto',
     allowedProviderIds: [provider === 'lark' ? 'lark-cli' : provider], allowedToolNames: [toolName, readToolName],
     networkAllowlist: [provider === 'lark' ? 'https://open.feishu.cn' : 'https://api.dingtalk.com'], connectorScopes: scopes,
@@ -53,7 +65,7 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
   const args = operation === 'complete' ? { taskId: target } : provider === 'lark' ? { taskId: target, instanceCode: 'instance-42' }
     : { taskId: target, instanceId: 'instance-42', ...(operation === 'transfer' ? { toUserId: 'recipient-1' } : {}) }
   const call = { callId: 'write', toolName, providerId: provider === 'lark' ? 'lark-cli' : provider, arguments: args }
-  const started = controller.beginToolOperation('turn', call, grant)!
+  const started = controller.beginToolOperation(turnId, call, grant)!
   if (options.approved !== false) {
     controller.recordToolApproval(started.token, started.key, { toolName, requestHash: createHash('sha256').update(JSON.stringify(args)).digest('hex') })
     controller.recordToolDispatch(started.token, started.key)
@@ -88,6 +100,17 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
 }
 
 describe('typed unknown-operation readback', () => {
+  it('verifies a retried operation using the original finite scope receipt without copying it',async()=>{
+    const f=await fixture({retryBeforeDispatch:true})
+    const retry=f.repository.get(f.task.id)!
+    expect(retry.retryOfTaskId).toBeDefined()
+    expect(f.repository.operations(retry.id,'effect_scope')).toEqual([])
+    expect(f.repository.operations(retry.retryOfTaskId!,'effect_scope')).toHaveLength(1)
+    expect(f.receipt.request?.executionGrant).toMatchObject({taskId:retry.id,turnId:'retry-turn'})
+    expect(await f.service.verify(retry.id,f.receipt.id,f.input())).toMatchObject({status:'verified'})
+    expect(f.execute).toHaveBeenCalledOnce()
+  })
+
   it.each(['lark', 'dingtalk'] as const)('verifies %s completion with one readonly tool, preserves unknown evidence, and does not resume', async provider => {
     const f = await fixture({ provider })
     const input = f.input()

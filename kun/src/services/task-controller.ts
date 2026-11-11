@@ -174,11 +174,27 @@ export class TaskController {
     })
   }
 
-  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string }): TaskRun {
+  /** Prepare the retry contract before a Turn or model can run. The original ledger stays authoritative. */
+  createRetryTask(input: { id: string; sourceTaskId: string; expectedRevision: number; thread: ThreadRecord; request: StartTurnRequest }): TaskRun {
+    return this.repository.transact(() => {
+      const existing = this.repository.get(input.id)
+      if (existing) return existing
+      const source = this.repository.get(input.sourceTaskId)
+      if (!source || source.revision !== input.expectedRevision) throw Object.assign(new Error('Retry source changed.'), { code: 'stale_request' })
+      if (!['failed', 'cancelled'].includes(source.status) || source.threadId !== input.thread.id || source.workspaceRoot !== input.thread.workspace ||
+          this.repository.currentExecution(source.id)?.id !== source.id) throw Object.assign(new Error('Retry source is no longer the terminal execution in this workspace.'), { code: 'invalid_state' })
+      const retry = this.createTask({ ...input, retrySource: source })
+      return this.repository.update(retry.id, retry.revision, task => task,
+        { key: `retry-of:${source.id}`, kind: 'task_retried', payload: { retryOfTaskId: source.id, rootTaskId: retry.rootTaskId }, createdAt: this.nowIso() })
+    })
+  }
+
+  private createTask(input: { id?: string; thread: ThreadRecord; turnId?: string; request: StartTurnRequest; engineeringExecution?: boolean; engineeringPlanId?: string; retrySource?: TaskRun }): TaskRun {
     const now = this.nowIso()
     const consultation = input.thread.domain === 'engineering' && !input.engineeringExecution
-    const taskGoal = input.request.displayText?.trim() || input.request.prompt
-    const acceptance = acceptanceForPrompt(consultation ? 'Answer the Survey question or propose a plan for review.' : taskGoal)
+    const source = input.retrySource
+    const taskGoal = source?.goal ?? (input.request.displayText?.trim() || input.request.prompt)
+    const acceptance = source ? structuredClone(source.acceptance) : acceptanceForPrompt(consultation ? 'Answer the Survey question or propose a plan for review.' : taskGoal)
     const id = input.id ?? `task_${randomUUID()}`
     const nodes = nodeBlueprint(id, acceptance)
     const profile = input.thread.agentProfile
@@ -187,8 +203,10 @@ export class TaskController {
     const created = this.repository.create({
       id,
       threadId: input.thread.id,
-      originThreadId: input.request.taskOriginThreadId,
-      visibility: input.request.taskVisibility ?? (consultation ? 'chat' : 'task'),
+      originThreadId: source?.originThreadId ?? input.request.taskOriginThreadId,
+      visibility: source?.visibility ?? input.request.taskVisibility ?? (consultation ? 'chat' : 'task'),
+      ...(source ? { retryOfTaskId: source.id, rootTaskId: source.rootTaskId ?? source.id, parentTaskId: source.parentTaskId,
+        templateId: source.templateId, deliveryFormats: source.deliveryFormats, flowRunId: source.flowRunId, flowId: source.flowId, repositoryRoot: source.repositoryRoot } : {}),
       activeTurnId: input.turnId,
       childTaskIds: [],
       workspaceRoot: input.thread.workspace,
@@ -205,10 +223,12 @@ export class TaskController {
         toolAllowlist: profile?.toolAllowlist, mcpAllowlist: profile?.mcpAllowlist,
         approvalPolicy: input.request.approvalPolicy ?? input.thread.approvalPolicy,
         sandboxMode: input.request.sandboxMode ?? input.thread.sandboxMode,
-        externalTargets: [], grantedAt: now
+        externalTargets: [], grantedAt: now,
+        ...(source?.authority ? { source: source.authority.source, toolAllowlist: source.authority.toolAllowlist, mcpAllowlist: source.authority.mcpAllowlist,
+          externalTargets: [...source.authority.externalTargets], approvalPolicy: source.authority.approvalPolicy, sandboxMode: source.authority.sandboxMode } : {})
       },
       executionMs: 0,
-      budget: {
+      budget: source ? structuredClone(source.budget) : {
         maxAttempts: profile?.budget.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         maxDurationMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS,
         ...(input.request.taskOriginThreadId || input.request.taskIntent==='new' ? { version: 2 as const, maxExecutionMs: profile?.budget.maxDurationMs ?? DEFAULT_MAX_DURATION_MS } : {}),
@@ -218,7 +238,7 @@ export class TaskController {
       replans: 0,
       noProgressCount: 0,
       nodes,
-      artifacts: [],
+      artifacts: source ? structuredClone(source.artifacts) : [],
       createdAt: now,
       updatedAt: now,
       revision: 0
@@ -333,7 +353,7 @@ export class TaskController {
     const intent = externalTaskIntent(task.goal)
     if (!accepted?.requiresConfirmation || intent?.mutation || intent?.operation !== 'list' || intent.provider !== accepted.provider ||
         accepted.scopeConfirmationId || accepted.requiredEffects?.length || accepted.target && accepted.target !== 'current_user') return undefined
-    const supplementalWrite = this.repository.inputs(task.id).some(input => input.kind === 'supplement' &&
+    const supplementalWrite = this.taskInputs(task.id).some(input => input.kind === 'supplement' &&
       externalTaskIntent(`${accepted.provider} ${input.text}`)?.mutation)
     if (supplementalWrite) return undefined
     const unverifiedHistory = this.repository.operations(task.id, 'tool').some(receipt => {
@@ -684,8 +704,9 @@ export class TaskController {
     if (!token) return []
     this.assertToken(token)
     const task = this.repository.get(token.taskId)!
-    for (const input of this.repository.inputs(task.id, true)) this.repository.execution.enqueue(input.id, task.id, token.sessionId)
-    const inputs = new Map(this.repository.inputs(task.id, true).map(input => [input.id, input]))
+    const pending = this.taskInputs(task.id, true)
+    for (const input of pending) this.repository.execution.enqueue(input.id, task.id, token.sessionId)
+    const inputs = new Map(pending.map(input => [input.id, input]))
     return this.repository.execution.pending(token.sessionId).flatMap(delivery => inputs.has(delivery.inputId) ? [{ delivery, input: inputs.get(delivery.inputId)! }] : [])
   }
 
@@ -998,9 +1019,38 @@ export class TaskController {
     this.repository.execution.recordCost(task.rootTaskId ?? task.parentTaskId ?? task.id, id, costUsd)
   }
 
+  /** Preserve queued supplements across retry sessions using their original durable input IDs. */
+  taskInputs(taskId: string, pendingOnly = false): TaskInput[] {
+    const task = this.repository.get(taskId)
+    if (!task) return []
+    const inputs: TaskInput[] = []
+    const visited = new Set<string>()
+    let current: TaskRun | null = task
+    while (current) {
+      if (visited.has(current.id) || current.threadId !== task.threadId || current.workspaceRoot !== task.workspaceRoot ||
+          (current.rootTaskId ?? current.id) !== (task.rootTaskId ?? task.id)) {
+        throw Object.assign(new Error('Task input retry lineage is invalid.'), { code: 'task_input_scope_conflict' })
+      }
+      visited.add(current.id)
+      if (current.id === task.id) inputs.unshift(...this.repository.inputs(current.id, pendingOnly))
+      else {
+        // Human answers belong to their original question/attempt. A retry may
+        // carry only supplements that were already queued before failure.
+        if (current.status !== 'failed') break
+        const failedAt = Date.parse(current.finishedAt ?? current.updatedAt)
+        inputs.unshift(...this.repository.inputs(current.id, pendingOnly).filter(input => input.kind === 'supplement' &&
+          Date.parse(input.createdAt) <= failedAt))
+      }
+      const parentId: string | undefined = current.retryOfTaskId
+      current = parentId ? this.repository.get(parentId) : null
+      if (parentId && !current) throw Object.assign(new Error('Task input retry history is missing.'), { code: 'task_input_scope_conflict' })
+    }
+    return inputs
+  }
+
   pendingInputs(threadId: string): TaskInput[] {
     const task = this.repository.findActiveByThread(threadId)
-    return task && task.status !== 'paused' ? this.repository.inputs(task.id, true) : []
+    return task && task.status !== 'paused' ? this.taskInputs(task.id, true) : []
   }
 
   consumeInput(inputId: string): void { this.repository.consumeInput(inputId, this.nowIso()) }

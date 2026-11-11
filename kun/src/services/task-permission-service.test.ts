@@ -39,7 +39,69 @@ async function fixture(toolEffects: ToolEffectDefinition[] = []) {
   return {root,repository,threadStore,origin,hidden,task,controller,service,request,advance:(seconds:number)=>{now=new Date(Date.parse(now)+seconds*1000).toISOString()},setWorkspace:(next:WorkspaceTrustSnapshot)=>{workspace=next},rejectWrite:(value:boolean)=>{rejectWrite=value}}
 }
 
+
+async function retryTask(f:Awaited<ReturnType<typeof fixture>>,status:'failed'|'cancelled'='failed') {
+  const source=f.repository.get(f.task.id)!
+  if(status==='cancelled')f.controller.cancelTask(source.id,source.revision,'synthetic cancellation')
+  else f.repository.update(source.id,source.revision,task=>({...task,status:'failed'}))
+  const terminal=f.repository.get(source.id)!
+  return f.controller.createRetryTask({id:'retry-task',sourceTaskId:terminal.id,expectedRevision:terminal.revision,
+    thread:(await f.threadStore.get(f.hidden.id))!,request:{prompt:terminal.goal}})
+}
+
 describe('task-only finite approval permission',()=>{
+  it('retains an unexpired failed-task permission by original ownership and consumes it only once across retries',async()=>{
+    const f=await fixture()
+    const confirmed=await f.service.confirm(f.task.id,{...await f.request(),duration:'next_operation',scope:{readPaths:[f.root],providerIds:['lark-cli']}})
+    const original=confirmed.task.authority!.taskApprovalGrant!
+    const retry=await retryTask(f)
+    expect(retry.authority?.taskApprovalGrant).toBeUndefined()
+    expect(await f.service.executionRestriction(f.hidden.id)).toEqual({taskPermissionId:original.id,expiresAt:original.expiresAt,permissionScope:original.scope,permissionDuration:'next_operation'})
+    expect((await f.service.snapshot(retry.id)).grant).toMatchObject({id:original.id,status:'active'})
+    await f.service.claimOperation(f.hidden.id,original.id,'retry-operation')
+    expect(f.repository.get(f.task.id)!.authority!.taskApprovalGrant).toMatchObject({taskId:f.task.id,consumedOperationId:'retry-operation',expiresAt:original.expiresAt})
+    expect(f.repository.get(retry.id)!.authority!.taskApprovalGrant).toBeUndefined()
+    await expect(f.service.claimOperation(f.hidden.id,original.id,'different-operation')).rejects.toMatchObject({code:'task_permission_consumed'})
+  })
+
+  it.each(['cancelled','revoked','expired','consumed','workspace','agent'] as const)('keeps %s permissions unusable through retry',async reason=>{
+    const f=await fixture()
+    const confirmed=await f.service.confirm(f.task.id,{...await f.request(),duration:'next_operation'})
+    const permissionId=confirmed.permission.grant!.id
+    if(reason==='consumed')await f.service.claimOperation(f.hidden.id,permissionId,'old-operation')
+    if(reason==='expired')f.advance(901)
+    if(reason==='workspace')f.setWorkspace({canonicalRoot:f.root,level:'workspace-write',revision:4})
+    if(reason==='agent')await f.threadStore.upsert({...((await f.threadStore.get(f.hidden.id))!),agentRevision:8})
+    if(reason==='revoked')f.repository.update(f.task.id,confirmed.task.revision,task=>({...task,authority:{...task.authority!,revokedAt:'2026-11-10T00:00:01Z'}}))
+    const retry=await retryTask(f,reason==='cancelled'?'cancelled':'failed')
+    await expect(f.service.executionRestriction(f.hidden.id)).rejects.toMatchObject({code:reason==='expired'?'task_permission_expired':reason==='consumed'?'task_permission_consumed':'task_permission_revoked'})
+    expect((await f.service.snapshot(retry.id)).grant?.status).toBe(reason==='expired'?'expired':reason==='consumed'?'consumed':'invalid')
+    expect(f.repository.get(f.task.id)?.authority?.taskApprovalGrant?.id).toBe(permissionId)
+  })
+
+  it('allows a fresh explicit retry permission to replace an expired inherited permission without modifying the ancestor',async()=>{
+    const f=await fixture()
+    const confirmed=await f.service.confirm(f.task.id,await f.request())
+    f.advance(901)
+    const retry=await retryTask(f)
+    f.repository.update(retry.id,retry.revision,task=>({...task,status:'waiting_user'}))
+    const review=await f.service.snapshot(retry.id)
+    expect(review.canConfirm).toBe(true)
+    const renewed=await f.service.confirm(retry.id,{expectedRevision:review.taskRevision,scopeHash:review.scopeHash,idempotencyKey:'renew-retry',confirmed:true,approvalPolicy:'on-request',ttlSeconds:60})
+    expect(renewed.permission.grant?.id).not.toBe(confirmed.permission.grant?.id)
+    expect(f.repository.get(f.task.id)!.authority!.taskApprovalGrant?.expiresAt).toBe(confirmed.permission.grant?.expiresAt)
+    await expect(f.service.executionRestriction(f.hidden.id)).resolves.toMatchObject({taskPermissionId:renewed.permission.grant?.id})
+    await expect(f.service.executionRestriction(f.hidden.id,confirmed.permission.grant!.id)).rejects.toMatchObject({code:'task_permission_revoked'})
+  })
+
+  it('refuses permission inheritance after the reviewed retry contract changes',async()=>{
+    const f=await fixture()
+    await f.service.confirm(f.task.id,await f.request())
+    const retry=await retryTask(f)
+    f.repository.update(retry.id,retry.revision,task=>({...task,goal:'另一个任务的目标'}))
+    await expect(f.service.executionRestriction(f.hidden.id)).rejects.toMatchObject({code:'task_permission_revoked'})
+  })
+
   it('shows registered tool scope requirements for mixed file and effect tasks', async () => {
     const f = await fixture([{ provider: 'lark', operation: 'send', mutation: true, targetFields: ['recipient'], requiredScopes: ['mail:user_mailbox.message:send'] }])
     f.repository.update(f.task.id, f.task.revision, task => ({ ...task, acceptance: { ...task.acceptance, kind: 'files', effect: {

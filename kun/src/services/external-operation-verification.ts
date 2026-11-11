@@ -8,7 +8,7 @@ import type { ToolHost, ToolHostContext } from '../ports/tool-host.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import { canonicalTrustRoot, type WorkspaceTrustReader } from './workspace-trust-reader.js'
 import type { TaskController } from './task-controller.js'
-import type { TaskRunRepository } from './task-run-repository.js'
+import { operationFingerprint, type TaskRunRepository } from './task-run-repository.js'
 import { externalOperationForTool, receiptEffectDefinition } from './external-effect-evidence.js'
 import { externalTargetGrantKey } from '../adapters/tool/sandbox-policy.js'
 import { verifiedLarkDeliveryState } from '../adapters/tool/lark-delivery-tools.js'
@@ -155,7 +155,21 @@ export class ExternalOperationVerificationService {
     if (grant.externalTargets.includes(externalTargetGrantKey(provider, operation, target))) return true
     const accepted = task.acceptance.effect
     if (!accepted?.scopeConfirmationId || accepted.scopeConfirmationId !== receipt.request?.scopeConfirmationId || accepted.scopeRevision !== receipt.request?.scopeRevision) return false
-    const confirmation = this.deps.repository.operations(task.id, 'effect_scope').find(item => item.id === accepted.scopeConfirmationId && item.status === 'succeeded')
+    // A retry keeps the finite confirmation in its original ledger. It never
+    // copies that receipt or widens the accepted target set.
+    const visited = new Set<string>()
+    let owner = task
+    let confirmation: OperationReceipt | undefined
+    while (!visited.has(owner.id)) {
+      visited.add(owner.id)
+      confirmation = this.deps.repository.operations(owner.id, 'effect_scope').find(item => item.id === accepted.scopeConfirmationId && item.status === 'succeeded')
+      if (confirmation || !owner.retryOfTaskId) break
+      const parent = this.deps.repository.get(owner.retryOfTaskId)
+      if (!parent || parent.threadId !== task.threadId || parent.workspaceRoot !== task.workspaceRoot || parent.goal !== task.goal ||
+        (parent.rootTaskId ?? parent.id) !== (task.rootTaskId ?? task.id) ||
+        operationFingerprint(parent.acceptance) !== operationFingerprint(task.acceptance)) return false
+      owner = parent
+    }
     const result = object(confirmation?.result)
     return result.confirmationId === accepted.scopeConfirmationId && Array.isArray(result.requiredEffects) && result.requiredEffects.some(raw => {
       const item = object(raw)

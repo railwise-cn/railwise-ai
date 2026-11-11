@@ -29,7 +29,7 @@ export class TaskPermissionService {
 
   async snapshot(taskId:string):Promise<TaskPermissionSnapshot> {
     const scope=await this.scope(taskId)
-    return this.describe(scope)
+    return this.describe(scope, await this.permissionScope(scope.task))
   }
 
   async confirm(taskId:string,raw:TaskPermissionConfirmation):Promise<TaskPermissionResult> {
@@ -45,10 +45,10 @@ export class TaskPermissionService {
     const task=this.deps.repository.findActiveByThread(threadId)
     if(!task){if(expectedPermissionId)fail('task_permission_revoked','The task permission no longer has an active task.');return {}}
     if(task.authority?.revokedAt)fail('task_permission_revoked','Task authority was revoked.')
-    const grant=task.authority?.taskApprovalGrant
-    if(!grant){if(expectedPermissionId)fail('task_permission_revoked','The scoped task permission was removed.');return {}}
-    const scope=await this.scope(task.id)
-    const state=this.grantState(scope,grant)
+    const permission=await this.permissionScope(task)
+    if(!permission){if(expectedPermissionId)fail('task_permission_revoked','The scoped task permission was removed.');return {}}
+    const {grant,scope}=permission
+    const state=permission.revoked?'invalid':this.grantState(scope,grant)
     if(state==='consumed' && expectedPermissionId !== grant.id)fail('task_permission_consumed','本次操作授权已使用，请重新核对任务权限。')
     if(state!=='active' && state!=='consumed')fail(state==='expired'?'task_permission_expired':'task_permission_revoked',state==='expired'?'当前任务的临时审批权限已到期，请重新确认后重查原任务。':'当前任务权限范围已变化或尚未完成确认，请重新核对权限卡片。')
     if(expectedPermissionId&&expectedPermissionId!==grant.id)fail('task_permission_revoked','A different task permission replaced this execution grant.')
@@ -61,9 +61,11 @@ export class TaskPermissionService {
     const task = this.deps.repository.findActiveByThread(threadId)
     if (!task) return fail('task_permission_revoked', 'The permission task no longer exists.')
     this.deps.repository.transact(() => {
-      const current = this.deps.repository.get(task.id)!
-      const grant = current.authority?.taskApprovalGrant
-      if (!grant || grant.id !== permissionId || current.authority?.revokedAt) return fail('task_permission_revoked', 'Task permission changed before dispatch.')
+      const active = this.deps.repository.get(task.id)!
+      const inherited = this.permissionOwner(active)
+      const current = inherited?.owner
+      const grant = current?.authority?.taskApprovalGrant
+      if (!current || !grant || grant.id !== permissionId || inherited?.revoked) return fail('task_permission_revoked', 'Task permission changed before dispatch.')
       if (Date.parse(grant.expiresAt) <= Date.parse(this.deps.nowIso())) return fail('task_permission_expired', 'Task permission expired before dispatch.')
       if (grant.duration !== 'next_operation') return
       if (grant.consumedOperationId === operationId) return
@@ -83,7 +85,7 @@ export class TaskPermissionService {
       if(prior.status==='succeeded')return prior.result as TaskPermissionResult
       return fail('outcome_unknown','The previous permission confirmation is incomplete. Recheck the task scope and use a new confirmation key; no execution has been resumed.')
     }
-    const scope=await this.scope(taskId),description=this.describe(scope)
+    const scope=await this.scope(taskId),description=this.describe(scope, await this.permissionScope(scope.task))
     if(scope.task.revision!==request.expectedRevision||description.scopeHash!==request.scopeHash)fail('stale_request','Task, workspace or Agent permissions changed. Reload the permission card before confirming.')
     if(!description.canConfirm)fail('task_permission_blocked',description.reason??'This task cannot receive a scoped approval permission.')
     const permissionScope = request.scope ? await normalizePermissionScope(request.scope) : undefined
@@ -132,8 +134,36 @@ export class TaskPermissionService {
     }
   }
 
-  private async scope(taskId:string) {
-    const task=this.deps.repository.currentExecution(taskId)
+  /** Retry permissions stay owned by their original task, including expiry and one-operation consumption. */
+  private permissionOwner(task:TaskRun):{owner:TaskRun;revoked:boolean}|undefined {
+    const visited=new Set<string>()
+    let current=task,revoked=false
+    while (true) {
+      if(visited.has(current.id))return fail('task_permission_revoked','Task permission retry lineage contains a cycle.')
+      visited.add(current.id)
+      revoked ||= Boolean(current.authority?.revokedAt)
+      if(current.authority?.taskApprovalGrant)return {owner:current,revoked}
+      if(!current.retryOfTaskId)return undefined
+      const parent=this.deps.repository.get(current.retryOfTaskId)
+      if(!parent || parent.threadId!==current.threadId || parent.workspaceRoot!==current.workspaceRoot ||
+        parent.goal!==current.goal || parent.originThreadId!==current.originThreadId ||
+        (current.rootTaskId??current.id)!==(parent.rootTaskId??parent.id) ||
+        operationFingerprint({workspace:parent.authority?.workspaceRoot,sandbox:parent.authority?.sandboxMode,source:parent.authority?.source,tools:parent.authority?.toolAllowlist,mcp:parent.authority?.mcpAllowlist,targets:parent.authority?.externalTargets})!==
+          operationFingerprint({workspace:current.authority?.workspaceRoot,sandbox:current.authority?.sandboxMode,source:current.authority?.source,tools:current.authority?.toolAllowlist,mcp:current.authority?.mcpAllowlist,targets:current.authority?.externalTargets})) {
+        return fail('task_permission_revoked','Task permission retry lineage no longer matches its reviewed scope.')
+      }
+      current=parent
+    }
+  }
+
+  private async permissionScope(task:TaskRun) {
+    const inherited=this.permissionOwner(task)
+    if(!inherited)return undefined
+    return {grant:inherited.owner.authority!.taskApprovalGrant!,scope:await this.scope(inherited.owner.id,true),revoked:inherited.revoked}
+  }
+
+  private async scope(taskId:string, historical=false) {
+    const task=historical?this.deps.repository.get(taskId):this.deps.repository.currentExecution(taskId)
     if(!task||task.id!==taskId) return fail('not_found','The exact active task was not found; reload its current task card.')
     const thread=await this.deps.threads.get(task.threadId)
     if(!thread)return fail('not_found','The task execution context was not found.')
@@ -145,8 +175,8 @@ export class TaskPermissionService {
     return {task,thread,workspace,binding}
   }
 
-  private describe(scope:Awaited<ReturnType<TaskPermissionService['scope']>>):TaskPermissionSnapshot {
-    const {task,thread,workspace}=scope,grant=task.authority?.taskApprovalGrant
+  private describe(scope:Awaited<ReturnType<TaskPermissionService['scope']>>,permission:Awaited<ReturnType<TaskPermissionService['permissionScope']>>):TaskPermissionSnapshot {
+    const {task,thread,workspace}=scope,grant=permission?.grant
     const agentTrust=thread.agentProfile?.trustLevel??'full-access'
     const trustOrder:WorkspaceTrustLevel[]=['read-only','workspace-write','trusted','full-access']
     const trust=trustOrder[Math.min(trustOrder.indexOf(workspace.level),trustOrder.indexOf(agentTrust))]!
@@ -176,7 +206,7 @@ export class TaskPermissionService {
     const priorProviders=priorGrant?.allowedProviderIds?.filter(id=>id==='lark-cli'||id==='dingtalk')??[]
     const priorProvider=priorTurn?.externalTaskProvider??(priorProviders.length===1?(priorProviders[0]==='lark-cli'?'lark':'dingtalk'):undefined)
     if(priorGrant&&priorProvider&&priorGrant.connectorScopes.length)connectorScopeSources.push({provider:priorProvider,scopes:[...priorGrant.connectorScopes],source:'last_execution_grant',issuedAt:priorGrant.issuedAt,...(priorGrant.expiresAt?{expiresAt:priorGrant.expiresAt}:{})})
-    const state=grant?this.grantState(scope,grant):undefined
+    const state=permission?(permission.revoked?'invalid':this.grantState(permission.scope,permission.grant)):undefined
     let reason:string|undefined
     if(!task.originThreadId||task.originThreadId===task.threadId||thread.relation!=='side'||thread.parentThreadId!==task.originThreadId)reason='只能为当前任务的独立执行上下文确认权限，不能修改普通聊天或发起会话。'
     else if(task.parentTaskId || task.authority?.source === 'inherited')reason='子任务继承父任务的范围，请在父任务中核对并确认权限。'
