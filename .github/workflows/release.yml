@@ -3,6 +3,11 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      stage_dependency_mirror:
+        description: 'Stage and verify only the committed immutable public uv/Python/Lark dependency manifest on R2 and the official download host.'
+        required: false
+        type: boolean
+        default: false
       publish_release:
         description: 'Publish the tagged build to GitHub Release, Stable updater feeds, and the official download page. Requires exact-version user approval and a committed acceptance evidence manifest; production-release uses the configured repository governance mode.'
         required: false
@@ -113,9 +118,65 @@ env:
   WORKWISE_GITHUB_REPO: railwise-cn/railwise-ai
 
 jobs:
+  stage-managed-dependencies:
+    name: Stage verified immutable managed dependencies
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.stage_dependency_mirror == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: managed-dependency-mirror
+      cancel-in-progress: false
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      WORKWISE_WEBSITE_SSH_HOST: ${{ secrets.WORKWISE_WEBSITE_SSH_HOST }}
+      WORKWISE_WEBSITE_SSH_PORT: ${{ secrets.WORKWISE_WEBSITE_SSH_PORT }}
+      WORKWISE_WEBSITE_SSH_USER: ${{ secrets.WORKWISE_WEBSITE_SSH_USER }}
+      WORKWISE_WEBSITE_SSH_PRIVATE_KEY: ${{ secrets.WORKWISE_WEBSITE_SSH_PRIVATE_KEY }}
+      WORKWISE_WEBSITE_SSH_KNOWN_HOSTS: ${{ secrets.WORKWISE_WEBSITE_SSH_KNOWN_HOSTS }}
+      WORKWISE_WEBSITE_RELEASE_ROOT: ${{ secrets.WORKWISE_WEBSITE_RELEASE_ROOT }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci --ignore-scripts
+      - name: Validate the committed dependency manifest and staging protections
+        run: node --test scripts/stage-managed-dependencies.test.mjs
+      - name: Prepare pinned website SSH transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_dir="${RUNNER_TEMP}/railwise-dependency-ssh"
+          install -d -m 700 "${ssh_dir}"
+          export SSH_KEY_PATH="${ssh_dir}/deploy-key"
+          export SSH_KNOWN_HOSTS_PATH="${ssh_dir}/known_hosts"
+          node - <<'NODE'
+          const fs = require('node:fs')
+          fs.writeFileSync(process.env.SSH_KEY_PATH, `${process.env.WORKWISE_WEBSITE_SSH_PRIVATE_KEY.trim()}\n`, { mode: 0o600 })
+          fs.writeFileSync(process.env.SSH_KNOWN_HOSTS_PATH, `${process.env.WORKWISE_WEBSITE_SSH_KNOWN_HOSTS.trim()}\n`, { mode: 0o600 })
+          NODE
+          {
+            echo "WORKWISE_WEBSITE_SSH_KEY_PATH=${SSH_KEY_PATH}"
+            echo "WORKWISE_WEBSITE_SSH_KNOWN_HOSTS_PATH=${SSH_KNOWN_HOSTS_PATH}"
+          } >> "${GITHUB_ENV}"
+      - name: Stage immutable upstream resources and verify public download hashes
+        run: node scripts/stage-managed-dependencies.mjs --stage
+      - name: Preserve precise dependency delivery evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: managed-dependency-mirror-${{ github.sha }}
+          path: dependency-mirror-evidence.json
+          if-no-files-found: warn
+
   release-approval-gate:
     name: Stable release approval and acceptance evidence
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.candidate_only != true && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance != true && inputs.cleanup_acceptance_run_id == '' && inputs.repair_website_cache != true && inputs.rollback_stable_tag == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.candidate_only != true && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance != true && inputs.cleanup_acceptance_run_id == '' && inputs.repair_website_cache != true && inputs.rollback_stable_tag == '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -143,14 +204,14 @@ jobs:
         run: node scripts/verify-release-approval.mjs
 
   private-updater-acceptance:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true }}
     permissions:
       contents: read
     uses: ./.github/workflows/private-updater-acceptance.yml
     secrets: inherit
 
   isolated-survey-candidate:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate == true }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate == true }}
     permissions:
       contents: read
     uses: ./.github/workflows/isolated-survey-candidate.yml
@@ -158,7 +219,7 @@ jobs:
 
   native-updater-acceptance:
     name: Native updater acceptance
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance == true && inputs.cleanup_acceptance_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance == true && inputs.cleanup_acceptance_run_id == '' }}
     uses: ./.github/workflows/updater-acceptance-e2e.yml
     with:
       base_version: ${{ inputs.acceptance_base_version }}
@@ -167,7 +228,7 @@ jobs:
 
   cleanup-updater-acceptance:
     name: Cleanup updater acceptance
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.cleanup_acceptance_run_id != '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.cleanup_acceptance_run_id != '' }}
     uses: ./.github/workflows/updater-acceptance-cleanup.yml
     with:
       run_id: ${{ inputs.cleanup_acceptance_run_id }}
@@ -178,7 +239,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.repair_website_cache_mode == 'apply' && 'production-release' || 'release-inspection' }}
@@ -232,7 +293,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
     runs-on: ubuntu-latest
     environment:
       name: production-release
@@ -313,7 +374,7 @@ jobs:
 
   prepare:
     name: Prepare release version
-    if: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.private_updater_acceptance == true || inputs.isolated_survey_candidate == true || inputs.run_updater_acceptance == true || inputs.cleanup_acceptance_run_id != '' || inputs.repair_website_cache == true || inputs.rollback_stable_tag != '')) }}
+    if: ${{ inputs.stage_dependency_mirror != true && !(github.event_name == 'workflow_dispatch' && (inputs.private_updater_acceptance == true || inputs.isolated_survey_candidate == true || inputs.run_updater_acceptance == true || inputs.cleanup_acceptance_run_id != '' || inputs.repair_website_cache == true || inputs.rollback_stable_tag != '')) }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -348,7 +409,7 @@ jobs:
 
   stability:
     name: Two-hour pre-release stability
-    if: ${{ inputs.publish_release != true && !(github.event_name == 'workflow_dispatch' && inputs.skip_stability == true) }}
+    if: ${{ inputs.stage_dependency_mirror != true && inputs.publish_release != true && !(github.event_name == 'workflow_dispatch' && inputs.skip_stability == true) }}
     runs-on: ubuntu-latest
     needs: prepare
     timeout-minutes: 130
@@ -370,7 +431,7 @@ jobs:
 
   build-document-sidecars:
     name: MarkItDown ${{ matrix.platform }} ${{ matrix.arch }}
-    if: ${{ always() && inputs.publish_release != true && needs.prepare.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.prepare.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
     needs: [prepare, stability]
     strategy:
       fail-fast: false
@@ -452,7 +513,7 @@ jobs:
 
   build-macos:
     name: Build macOS
-    if: ${{ always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
     runs-on: macos-latest
     needs: [prepare, stability, build-document-sidecars]
     env:
@@ -633,7 +694,7 @@ jobs:
 
   build-windows:
     name: Build Windows
-    if: ${{ always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
     # node-gyp 11.x supports the VS 2022 toolchain used to rebuild
     # better-sqlite3 for Electron ABI 148. Pin the release image so a
     # windows-latest Visual Studio upgrade cannot break installer builds.
@@ -716,7 +777,7 @@ jobs:
 
   exact-package-windows-install-smoke:
     name: Private exact-package Windows install smoke
-    if: ${{ always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' }}
     runs-on: windows-2022
     timeout-minutes: 15
     needs: [prepare, build-windows]
@@ -765,7 +826,7 @@ jobs:
 
   exact-package-updater-smoke:
     name: Private exact-package updater smoke
-    if: ${{ always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' }}
     runs-on: macos-15
     timeout-minutes: 65
     needs: [prepare, build-macos]
@@ -817,7 +878,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: production-release
@@ -1153,7 +1214,7 @@ jobs:
 
   verify-candidate:
     name: Verify three-client candidate
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.candidate_only == true && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || inputs.skip_stability == true) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && inputs.candidate_only == true && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || inputs.skip_stability == true) }}
     runs-on: ubuntu-latest
     needs:
       - prepare
@@ -1196,7 +1257,7 @@ jobs:
 
   verify-candidate-macos:
     name: Verify final candidate on macOS
-    if: ${{ always() && needs.verify-candidate.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && needs.verify-candidate.result == 'success' }}
     runs-on: macos-26
     needs:
       - prepare

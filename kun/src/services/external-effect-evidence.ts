@@ -1,6 +1,7 @@
 import { ResultEvidenceSchema, type ResultEvidence } from '../contracts/harness.js'
 import type { OperationReceipt, TaskRun } from '../contracts/tasks.js'
 import { externalTaskIntent } from './external-task-capability.js'
+import type { ToolEffectDefinition, ToolEffectResolver } from '../ports/tool-effect.js'
 
 /** A resolution can only be accepted with its separately persisted readback receipt. */
 function resolutionEvidence(receipt: OperationReceipt, receipts: OperationReceipt[]): ResultEvidence | undefined {
@@ -25,15 +26,26 @@ const TOOL_OPERATIONS: Record<string, {provider: string; operation: string}> = {
   dingtalk_get_approval_tasks: {provider:'dingtalk',operation:'detail'},
   dingtalk_reject: {provider: 'dingtalk', operation: 'reject'}, dingtalk_transfer: {provider: 'dingtalk', operation: 'transfer'}
 }
-export function externalOperationForTool(name: string): {provider: string; operation: string} | undefined { return TOOL_OPERATIONS[name] }
-export function externalTarget(args: Record<string, unknown>, toolName?: string): string | undefined {
-  for (const key of ['task_id', 'taskId', 'task_guid', 'approval_id', 'approvalId', 'instanceCode', 'instance_id', 'instanceId', 'target']) {
+export function externalOperationForTool(name: string): ToolEffectDefinition | undefined {
+  const legacy = TOOL_OPERATIONS[name]
+  return legacy ? { ...legacy, mutation: !['list', 'detail'].includes(legacy.operation), targetFields: ['task_id', 'taskId', 'task_guid', 'approval_id', 'approvalId', 'instanceCode', 'instance_id', 'instanceId', 'target'] } : undefined
+}
+/** Descriptors are persisted by the host with the original request, outside model-controlled arguments. */
+export function receiptEffectDefinition(receipt: OperationReceipt): ToolEffectDefinition | undefined {
+  const value = receipt.request?.effectDefinition as Partial<ToolEffectDefinition> | undefined
+  if (!value || typeof value.provider !== 'string' || value.provider !== receipt.request?.provider ||
+    typeof value.operation !== 'string' || value.operation !== receipt.request?.operation || typeof value.mutation !== 'boolean' ||
+    !Array.isArray(value.targetFields) || !value.targetFields.every(field => typeof field === 'string')) return undefined
+  return value as ToolEffectDefinition
+}
+export function externalTarget(args: Record<string, unknown>, toolName?: string, definition?: ToolEffectDefinition): string | undefined {
+  for (const key of definition?.targetFields ?? ['task_id', 'taskId', 'task_guid', 'approval_id', 'approvalId', 'instanceCode', 'instance_id', 'instanceId', 'target']) {
     const value = args[key]
     if (typeof value === 'string' && value.trim()) return value.trim()
   }
-  return toolName && externalOperationForTool(toolName)?.operation === 'list' ? 'current_user' : undefined
+  return (definition ?? (toolName ? externalOperationForTool(toolName) : undefined))?.operation === 'list' ? 'current_user' : undefined
 }
-export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt[], trustedAttemptTurnIds: ReadonlySet<string> = new Set()): ResultEvidence[] {
+export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt[], trustedAttemptTurnIds: ReadonlySet<string> = new Set(), resolveEffect: ToolEffectResolver = externalOperationForTool): ResultEvidence[] {
   const intent = externalTaskIntent(task.goal)
   const accepted = task.acceptance.effect
   const required = accepted?.requiredEffects?.length
@@ -57,9 +69,9 @@ export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt
     const turnId = requestTurnId ?? receiptTurnId
     if (!turnId || (turnId !== task.activeTurnId && !trustedAttemptTurnIds.has(turnId)) || (receiptTurnId && receiptTurnId !== turnId)) return []
     const toolName = typeof request?.toolName === 'string' ? request.toolName : ''
-    const spec = externalOperationForTool(toolName)
+    const spec = resolveEffect(toolName)
     if (!spec || request?.provider !== spec.provider) return []
-    const expectedProviderId = spec.provider === 'lark' ? 'lark-cli' : 'dingtalk'
+    const expectedProviderId = spec.providerId ?? (spec.provider === 'lark' ? 'lark-cli' : spec.provider)
     if (request.providerId !== undefined && request.providerId !== expectedProviderId) return []
     if (request.operation !== spec.operation || (receipt.provider && receipt.provider !== spec.provider)
       || (receipt.toolName && receipt.toolName !== toolName)) return []
@@ -77,9 +89,14 @@ export function verifiedEffectReceipts(task: TaskRun, receipts: OperationReceipt
     const evidence = parsed.data
     if (!evidence.verified || evidence.kind !== 'external_operation' || evidence.provider !== spec.provider || evidence.operation !== spec.operation) return []
     if (evidence.target !== request.target) return []
+    const grant = request.executionGrant as { connectorIdentityFingerprints?: Record<string, string>; connectorBackends?: Record<string, string> } | undefined
+    const account = grant?.connectorIdentityFingerprints?.[expectedProviderId]
+    const backend = grant?.connectorBackends?.[expectedProviderId]
+    if (account && evidence.accountFingerprint !== account) return []
+    if (backend && evidence.backend !== backend) return []
     // Writes require a specific target, verified provider readback, and explicit
     // confirmation. A transport request ID is not a remote operation ID.
-    if (['approve', 'reject', 'complete', 'send', 'transfer'].includes(spec.operation) &&
+    if (spec.mutation &&
       (!request?.target || !evidence.status || !evidence.resultHash || result.approved !== true)) return []
     return [evidence]
   })

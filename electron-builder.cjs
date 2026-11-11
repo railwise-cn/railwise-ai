@@ -186,6 +186,7 @@ const builderConfig = {
   asar: true,
   asarUnpack: [
     'src/asset/skills/**/*',
+    'src/asset/optional-skills/**/*',
     '**/node_modules/better-sqlite3/**/*',
     '**/node_modules/bindings/**/*',
     '**/node_modules/file-uri-to-path/**/*'
@@ -202,6 +203,7 @@ const builderConfig = {
   files: [
     'out/**/*',
     'src/asset/skills/**/*',
+    'src/asset/optional-skills/**/*',
     ...asarBlockedSkillFilters(),
     'package.json',
     // Main AppFileWalker always skips root node_modules, even for positive

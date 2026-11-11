@@ -11,6 +11,7 @@ import {
   managedUvAsset,
   type ManagedUvAssetV1
 } from './managed-uv-runtime-service'
+import { managedDependency } from './managed-dependency-download'
 
 const roots: string[] = []
 
@@ -48,8 +49,8 @@ function responseBody(bytes: Buffer): ArrayBuffer {
 describe('ManagedUvRuntimeService', () => {
   it('pins every supported platform asset to the audited uv release', () => {
     expect(managedUvAsset('darwin', 'arm64')).toMatchObject({
-      name: 'uv-aarch64-apple-darwin.tar.gz',
-      sha256: '546f7f8a6c70ff13a3a9d2bc958db3427298cebf3e0cb756f9177133b7068843'
+      name: 'uv-0.12.3-py3-none-macosx_11_0_arm64.whl',
+      sha256: '7c99f2524fe4b11d74dec85cef9b4d8b725d142dec04cd237f1c06fbdae1ee54'
     })
     expect(managedUvAsset('darwin', 'x64').sha256).toHaveLength(64)
     expect(managedUvAsset('win32', 'arm64').sha256).toHaveLength(64)
@@ -62,6 +63,7 @@ describe('ManagedUvRuntimeService', () => {
   it('installs from a verified archive, pins Python, and repairs a modified binary', async () => {
     const runtimeRoot = await root()
     const { bytes, asset } = await fixture()
+    const pythonAsset = { ...managedDependency('python-win32-x64'), size: bytes.length, sha256: asset.sha256 }
     const fetchMock = vi.fn(async () => new Response(responseBody(bytes), {
       status: 200,
       headers: { 'content-length': String(bytes.byteLength) }
@@ -75,6 +77,10 @@ describe('ManagedUvRuntimeService', () => {
       if (args[0] === '--version') return { stdout: `uv ${MANAGED_UV_VERSION} fixture\n` }
       if (args[0] === 'python' && args[1] === 'install') {
         expect(options.env?.UV_PYTHON_INSTALL_MIRROR).toBeUndefined()
+        const metadata = JSON.parse(await readFile(options.env?.UV_PYTHON_DOWNLOADS_JSON_URL ?? '', 'utf8'))
+        expect(Object.values(metadata)).toEqual([expect.objectContaining({
+          build: '20260211', sha256: asset.sha256, url: expect.stringMatching(/^file:\/\//)
+        })])
         pythonPath = join(runtimeRoot, 'python', 'cpython-test', 'python.exe')
         await mkdir(join(runtimeRoot, 'python', 'cpython-test'), { recursive: true })
         await writeFile(pythonPath, 'managed-python')
@@ -89,6 +95,7 @@ describe('ManagedUvRuntimeService', () => {
       platform: 'win32',
       arch: 'x64',
       asset,
+      pythonAsset,
       fetch: fetchMock as typeof fetch,
       run
     })
@@ -103,7 +110,7 @@ describe('ManagedUvRuntimeService', () => {
     await writeFile(installed.uvPath, 'modified')
     const repaired = await service.ensure()
     expect(await readFile(repaired.uvPath, 'utf8')).toBe('trusted-uv-binary')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('rejects an archive before extraction when its SHA-256 differs', async () => {

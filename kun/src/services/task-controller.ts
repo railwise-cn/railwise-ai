@@ -1,3 +1,5 @@
+import { authorizedArtifactWrites } from './task-artifact-proof.js'
+import type { ToolEffectResolver } from '../ports/tool-effect.js'
 import { externalTaskIntent } from './external-task-capability.js'
 import { verifiedEffectReceipts, externalOperationForTool, externalTarget } from './external-effect-evidence.js'
 import { HostShellAuthorizationSchema, type ExecutionGrant } from '../contracts/permissions.js'
@@ -63,6 +65,7 @@ export type TaskControllerDeps = {
   sessionStore: SessionStore
   nowIso: () => string
   ownerId?: string
+  resolveToolEffect?: ToolEffectResolver
   spans?: RuntimeSpanService
   completionGuard?: (input: { thread?: ThreadRecord; turn?: Turn; task: TaskRun }) => { reason: string; fingerprint: string; retryable?: boolean } | null
 }
@@ -79,11 +82,16 @@ type SharedWorkBudgetState={aborts:Map<string,(reason:string)=>void>;active:Map<
 const sharedWorkBudgets=new WeakMap<TaskRunRepository,SharedWorkBudgetState>()
 
 export class TaskController {
+  private admissionSuspended = false
+
+  setAdmissionSuspended(suspended: boolean): void { this.admissionSuspended = suspended }
+
   private readonly repository: TaskRunRepository
   private readonly threadStore: ThreadStore
   private readonly sessionStore: SessionStore
   private readonly nowIso: () => string
   private readonly ownerId: string
+  private readonly resolveToolEffect: ToolEffectResolver
   private readonly spans?: RuntimeSpanService
   private readonly completionGuard?: TaskControllerDeps['completionGuard']
   private readonly leases = new Map<string, { leaseRevision: number; turnId?: string }>()
@@ -109,6 +117,7 @@ export class TaskController {
     this.ownerId = deps.ownerId ?? `runtime-${process.pid}-${randomUUID()}`
     this.spans = deps.spans
     this.completionGuard = deps.completionGuard
+    this.resolveToolEffect = deps.resolveToolEffect ?? externalOperationForTool
   }
 
   ensureTask(input: {
@@ -255,7 +264,7 @@ export class TaskController {
       this.assertToken(token)
       const task = this.repository.get(token.taskId)!
       const acceptance = task.acceptance.effect
-      if (task.acceptance.kind !== 'effect' || !acceptance || task.authority?.revokedAt || requiredEffects.some(effect => effect.provider !== acceptance.provider || !['detail', 'approve', 'reject', 'complete', 'transfer'].includes(effect.operation) || (acceptance.operation !== 'process' && acceptance.operation !== 'connect' && effect.operation !== acceptance.operation))) {
+      if (!acceptance || task.authority?.revokedAt || requiredEffects.some(effect => effect.provider !== acceptance.provider || !['detail', 'approve', 'reject', 'complete', 'transfer', 'send', 'upload'].includes(effect.operation) || (acceptance.operation !== 'process' && acceptance.operation !== 'connect' && effect.operation !== acceptance.operation))) {
         throw Object.assign(new Error('Every reviewed action must belong to this task provider.'), { code: 'effect_scope_conflict' })
       }
       const key = `effect-scope:${idempotencyKey}`
@@ -361,20 +370,28 @@ export class TaskController {
   }
 
   async assessCandidate(threadId: string, turnId: string): Promise<TaskCandidateDecision> {
-    const task = this.repository.findActiveByThread(threadId)
+    let task = this.repository.findActiveByThread(threadId)
     if (!task) {
       throw Object.assign(new Error(`active task not found for thread ${threadId}`), { code: 'not_found' })
     }
     if (task.status === 'paused') return { kind: 'waiting_user', task, reason: task.waitingReason ?? '任务已暂停。' }
     const hostShell = this.hostShellState(task)
     const unsettled = [...this.repository.unsettledOperations(task.id).filter(operation => operation.kind === 'tool'), ...hostShell.unknown]
-    if (unsettled.length) return this.stallUnknown(task,unsettled.map(operation=>operation.id))
     const [thread, items] = await Promise.all([
       this.threadStore.get(threadId),
       this.sessionStore.loadItems(threadId)
     ])
     const capturedToken = this.attemptTokens.get(turnId)
     if (capturedToken) this.assertToken(capturedToken)
+    const taskTurns = new Set(this.repository.execution.attempts(task.id).map(attempt => attempt.turnId))
+    taskTurns.add(turnId)
+    const artifacts = task.acceptance.kind === 'files'
+      ? await this.collectArtifacts(task, items.filter(item => taskTurns.has(item.turnId)), turnId)
+      : task.artifacts
+    if (JSON.stringify(artifacts) !== JSON.stringify(task.artifacts)) {
+      task = this.updateExecution(task.id, task.revision, current => ({ ...current, artifacts, updatedAt: this.nowIso() }))
+    }
+    if (unsettled.length) return this.stallUnknown(task, unsettled.map(operation => operation.id))
     if (hostShell.pending.length) return this.retry(task,'已授权命令仍有待核验回执，请使用 host_shell_session 只读轮询原命令，不能重新执行或仅用文字交付。',`host-shell-pending:${hostShell.pending.map(operation => operation.id).join(',')}`,turnId)
     if (this.repository.listShellSessions(task.id).some(session => ['running','starting','outcome_unknown'].includes(session.status))) return this.retry(task,'命令进程尚未确认完成，请轮询已有命令并核实其结果后交付。',`shell-pending:${task.attempts}`,turnId)
     const turn = thread?.turns.find((candidate) => candidate.id === turnId)
@@ -417,13 +434,13 @@ export class TaskController {
       if (!delivery.complete) return this.waitForUser(task,delivery.reasons.join('；'),finalResponse,`delivery:${task.revision}`,turnId)
     }
 
-    if (task.acceptance.kind === 'effect') {
+    if (task.acceptance.effect || task.acceptance.kind === 'effect' || task.acceptance.requiresExternalEffects) {
       const evidence = this.verifiedTaskEffects(task)
       const succeeded = evidence.length > 0
       if (!succeeded) {
         return this.waitForUser(
           task,
-          '外部操作尚无完整、已确认的目标集合及逐项验证回执，任务不能标记完成。请先明确要处理的具体待办，再核验每项结果。',
+          '外部操作尚无完整、已确认的目标集合及逐项验证回执。请补充执行平台和具体目标，并核验每项操作结果。',
           finalResponse,
           `effect-receipt:${task.revision}`,
           turnId
@@ -431,9 +448,6 @@ export class TaskController {
       }
     }
 
-    const artifacts = task.acceptance.kind === 'files'
-      ? await this.collectArtifacts(task, turnItems, turnId)
-      : []
     if (task.acceptance.kind === 'files') {
       const validArtifacts = artifacts.filter((artifact) => artifact.validation === 'valid')
       const minimum = task.acceptance.minimumArtifacts ?? 1
@@ -457,7 +471,7 @@ export class TaskController {
       waitingReason: undefined,
       stalledReason: undefined,
       finalResponse,
-      ...(task.acceptance.kind==='effect'?{resultEvidence:this.verifiedTaskEffects(task)}:{}),
+      ...(task.acceptance.effect || task.acceptance.kind === 'effect' ?{resultEvidence:this.verifiedTaskEffects(task)}:{}),
       artifacts,
       noProgressCount: 0,
       nodes: current.nodes.map((node) => ({
@@ -654,21 +668,31 @@ export class TaskController {
     })
   }
 
+  describeToolEffect(toolName: string) { return this.resolveToolEffect(toolName) }
+
   beginToolOperation(turnId: string, call: ToolCallLike, executionGrant?: ExecutionGrant): { key: string; token: ExecutionToken; prior?: ToolHostResult } | undefined {
     const token = this.attemptTokens.get(turnId)
     if (!token) return undefined
     return this.repository.transact(() => {
       this.assertToken(token)
       const key = `tool:${turnId}:${call.callId}`
-      const effect = externalOperationForTool(call.toolName)
-      const target = externalTarget(call.arguments, call.toolName)
-      if (effect && ['approve', 'reject', 'complete', 'send', 'transfer'].includes(effect.operation)) {
+      const argumentsHash = operationFingerprint(call.arguments)
+      const unresolved = this.repository.operations(token.taskId, 'tool').find(receipt =>
+        receipt.idempotencyKey !== key && receipt.status === 'outcome_unknown' &&
+        receipt.request?.toolName === call.toolName && receipt.request?.argumentsHash === argumentsHash &&
+        !this.repository.verifiedOperationResolution(receipt))
+      if (unresolved) {
+        throw Object.assign(new Error('The same tool request has an unknown outcome. Verify its outcome against the original receipt before dispatching again.'), { code: 'outcome_unknown' })
+      }
+      const effect = this.resolveToolEffect(call.toolName)
+      const target = externalTarget(call.arguments, call.toolName, effect)
+      if (effect?.mutation) {
         const task = this.repository.get(token.taskId)!
         this.assertExternalTarget(turnId, effect.provider, effect.operation, target ?? '')
         // Tool call IDs change when a task resumes. The finite reviewed action
         // is still the same action; never repeat it just because a model emits
         // a new call ID or changes the arguments after a successful dispatch.
-        const prior = this.repository.operations(task.id, 'tool').find(receipt => receipt.request?.provider === effect.provider && receipt.request?.operation === effect.operation && receipt.request?.target === target)
+        const prior = this.repository.operations(task.id, 'tool').find(receipt => receipt.request?.provider === effect.provider && receipt.request?.operation === effect.operation && receipt.request?.target === target && !(receipt.status === 'failed' && receipt.request?.turnId !== turnId && (receipt.result as { approved?: boolean } | undefined)?.approved === false))
         if (prior) {
           if (prior.request?.toolName !== call.toolName || prior.request?.argumentsHash !== operationFingerprint(call.arguments)) {
             throw Object.assign(new Error('This reviewed target already has a different operation request. Inspect its receipt before changing the action.'), { code: 'idempotency_conflict' })
@@ -686,14 +710,22 @@ export class TaskController {
       // canonical digest belongs in the durable operation ledger.
       const scope = effect ? this.repository.get(token.taskId)?.acceptance.effect : undefined
       const verificationLocator = effect ? externalVerificationLocator(call.arguments) : undefined
-      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, providerId: call.providerId, ...effect, target, turnId, argumentsHash: operationFingerprint(call.arguments), ...(effect ? { approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex') } : {}), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
+      const prepared = this.repository.beginOperation({ ownerId: token.taskId, idempotencyKey: key, kind: 'tool', request: { toolName: call.toolName, callId: call.callId, dispatchTracking: 'host-v1', providerId: call.providerId, ...effect, ...(effect ? { effectDefinition: effect } : {}), target, turnId, argumentsHash: operationFingerprint(call.arguments), ...(effect ? { approvalRequestHash: createHash('sha256').update(JSON.stringify(call.arguments)).digest('hex') } : {}), ...(verificationLocator ? { verificationLocator } : {}), ...(executionGrant ? { executionGrant } : {}), ...(scope?.scopeConfirmationId ? { scopeConfirmationId: scope.scopeConfirmationId, scopeRevision: scope.scopeRevision } : {}) }, nowIso: this.nowIso() })
       if (!prepared.created) {
         if (prepared.receipt.status === 'succeeded' && prepared.receipt.result) return { key, token, prior: prepared.receipt.result as ToolHostResult }
         if (['running', 'outcome_unknown'].includes(prepared.receipt.status)) throw Object.assign(new Error('Previous tool outcome must be verified before another dispatch.'), { code: 'outcome_unknown' })
         if (prepared.receipt.status === 'failed') throw Object.assign(new Error('Failed tool operation requires a new explicit attempt.'), { code: 'operation_failed' })
       }
-      this.repository.finishOperation(token.taskId, key, { status: 'running' }, this.nowIso())
       return { key, token }
+    })
+  }
+
+  recordToolDispatch(token: ExecutionToken, key: string): void {
+    this.repository.transact(() => {
+      this.assertToken(token)
+      const receipt = this.repository.operation(token.taskId, key)
+      if (!receipt || receipt.status !== 'prepared') throw Object.assign(new Error('This tool operation has already entered dispatch.'), { code: 'outcome_unknown' })
+      this.repository.finishOperation(token.taskId, key, { status: 'running' }, this.nowIso())
     })
   }
 
@@ -715,9 +747,26 @@ export class TaskController {
     const task = this.repository.get(token.taskId)!
     const accepted = task.acceptance.effect
     const required = accepted?.requiredEffects ?? (accepted?.target ? [{ provider: accepted.provider, operation: accepted.operation, target: accepted.target }] : [])
-    if (task.authority?.revokedAt || task.acceptance.kind !== 'effect' || !required.some(item => item.provider === provider && item.operation === operation && item.target === target)) {
+    if (task.authority?.revokedAt || !required.some(item => item.provider === provider && item.operation === operation && item.target === target)) {
       throw Object.assign(new Error('Review and confirm the complete finite external action set with confirm_external_effect_scope before this mutation.'), { code: 'effect_scope_required' })
     }
+  }
+
+  private settleUndispatched(taskId: string): void {
+    const attempt = this.repository.execution.latestAttempt(taskId)
+    const lease = this.repository.getLease(taskId)
+    if (attempt?.status === 'running' && inspectProcess(attempt.process) !== 'exited' && lease && Date.parse(lease.expiresAt) > Date.parse(this.nowIso())) return
+    const task = this.repository.get(taskId)!
+    this.repository.transact(() => {
+      for (const receipt of this.repository.operations(taskId, 'tool')) {
+        if (receipt.status !== 'prepared' || receipt.request?.dispatchTracking !== 'host-v1') continue
+        this.repository.finishOperation(taskId, receipt.idempotencyKey, { status: 'failed', error: 'operation_not_dispatched',
+          result: { approved: false, item: makeToolResultItem({ id: `item_${receipt.request.callId}`, threadId: task.threadId,
+            turnId: String(receipt.request.turnId), callId: String(receipt.request.callId), toolName: String(receipt.request.toolName),
+            output: { code: 'operation_not_dispatched', status: 'failed' }, isError: true }) }
+        }, this.nowIso())
+      }
+    })
   }
 
   private verifiedTaskEffects(task: TaskRun) {
@@ -725,14 +774,26 @@ export class TaskController {
     const trustedTurns = new Set(this.repository.execution.attempts(task.id)
       .filter(attempt => attempt.sessionId === session?.id && attempt.taskId === task.id)
       .map(attempt => attempt.turnId))
-    return verifiedEffectReceipts(task, this.repository.operations(task.id), trustedTurns)
+    return verifiedEffectReceipts(task, this.repository.operations(task.id), trustedTurns, this.resolveToolEffect)
   }
 
   finishToolOperation(token: ExecutionToken, key: string, result?: ToolHostResult): void {
     // An already-dispatched result is immutable evidence even after lease loss.
     const prior = this.repository.operation(token.taskId, key)
     if (!prior || prior.status === 'succeeded') return
-    this.repository.finishOperation(token.taskId, key, { status: !result ? 'outcome_unknown' : result.item.kind==='tool_result' && result.item.isError ? ((result.item.output as {status?:string}|undefined)?.status==='outcome_unknown'?'outcome_unknown':'failed') : 'succeeded', ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {}) }, this.nowIso())
+    if (!result && prior.status === 'prepared' && prior.request?.dispatchTracking === 'host-v1') {
+      const task = this.repository.get(token.taskId)!
+      result = { approved: false, item: makeToolResultItem({ id: `item_${prior.request.callId}`, threadId: task.threadId,
+        turnId: token.turnId, callId: String(prior.request.callId), toolName: String(prior.request.toolName),
+        output: { code: 'operation_not_dispatched', status: 'failed' }, isError: true }) }
+    }
+    const output = result?.item.kind === 'tool_result' ? result.item.output as { status?: string; code?: string } | undefined : undefined
+    const unknown = !result || output?.status === 'outcome_unknown' || output?.code === 'outcome_unknown' || output?.status === 'pending'
+    const failed = result?.approved === false || result?.item.kind === 'tool_result' && result.item.isError
+    this.repository.finishOperation(token.taskId, key, {
+      status: unknown ? 'outcome_unknown' : failed ? 'failed' : 'succeeded',
+      ...(result ? { result: { ...result, item: sanitizeTurnItemForPersistence(result.item) } } : {})
+    }, this.nowIso())
   }
 
   /** Attach trusted readback evidence without overwriting the original unknown dispatch or resuming execution. */
@@ -834,6 +895,7 @@ export class TaskController {
     if (!['paused', 'stalled', 'waiting_user', 'waiting_approval', 'retrying'].includes(task.status)) {
       throw Object.assign(new Error(`task cannot resume from ${task.status}`), { code: 'invalid_state' })
     }
+    this.settleUndispatched(task.id)
     const hostShell = this.hostShellState(task)
     if (hostShell.unknown.length || this.repository.unsettledOperations(taskId).some(operation => operation.kind === 'tool') || this.repository.listShellSessions(taskId).some(session => ['outcome_unknown','running','starting'].includes(session.status) && !hostShell.knownSessionIds.has(session.id))) throw Object.assign(new Error('Verify outstanding operation and process outcomes before resuming this task.'), {code:'outcome_unknown'})
     const now = this.nowIso()
@@ -903,6 +965,7 @@ export class TaskController {
       }
       const lease = this.repository.getLease(task.id)
       if (lastAttempt) this.repository.execution.finishOrphanedWork(lastAttempt.executionId, Math.min(Date.parse(now), Date.parse(lastAttempt.finishedAt ?? lease?.expiresAt ?? task.updatedAt)))
+      this.settleUndispatched(task.id)
       const unknownShell = this.repository.listShellSessions(task.id).some(session => ['running', 'starting', 'outcome_unknown'].includes(session.status))
       const unknown = this.repository.unsettledOperations(task.id)
       if (unknown.length || unknownShell) {
@@ -934,6 +997,7 @@ export class TaskController {
   }
 
   private async runWatchdogTick(): Promise<void> {
+    if (this.admissionSuspended) return
     if (this.watchdogRunning) return
     this.watchdogRunning = true
     try {
@@ -1190,10 +1254,13 @@ export class TaskController {
 
   private async collectArtifacts(task: TaskRun, items: TurnItem[], turnId: string): Promise<TaskArtifact[]> {
     const paths = [
+      ...task.artifacts.map(artifact => artifact.absolutePath ?? artifact.relativePath),
       ...items.flatMap(declaredFileOutputPaths),
       ...verifiedShellDeliverablePaths(items, turnId)
     ]
     const root = await realpath(task.workspaceRoot).catch(() => resolve(task.workspaceRoot))
+    const thread = await this.threadStore.get(task.threadId)
+    const authorizedWrites = await authorizedArtifactWrites(task, this.repository.operations(task.id, 'tool'), thread?.turns ?? [])
     const required = task.acceptance.requiredFormats?.map((value) => value.toLowerCase())
     const artifacts: TaskArtifact[] = []
     const seenTargets=new Set<string>()
@@ -1206,7 +1273,9 @@ export class TaskController {
       seenTargets.add(targetKey)
       const extension = extname(rawPath).slice(1).toLowerCase()
       const inside = relativePath !== '' && relativePath !== '..' && !relativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) && !isAbsolute(relativePath)
-      const info = canonical && inside ? await stat(canonical).catch(() => null) : null
+      const externalWrite = !inside ? authorizedWrites.get(canonical) : undefined
+      const allowed = inside || Boolean(externalWrite)
+      const info = canonical && allowed ? await stat(canonical).catch(() => null) : null
       const validFormat = !required || required.includes(extension)
       const validationSpanId = artifactValidationSpanId(task.id, rawPath)
       this.spans?.start({
@@ -1228,11 +1297,16 @@ export class TaskController {
             message: error instanceof Error ? error.message : String(error)
           }))
         : null
-      const valid = Boolean(validation?.valid)
+      const previous = task.artifacts.find(artifact => artifact.absolutePath ? artifact.absolutePath === absolutePath : artifact.relativePath === relativePath)
+      const writtenThisTurn = externalWrite ? externalWrite.turnId === turnId && externalWrite.sha256 === validation?.sha256 : items.filter(item => item.turnId === turnId).flatMap(declaredFileOutputPaths)
+        .some(path => resolve(root, path) === absolutePath)
+      const changedOutsideExecution = Boolean(previous?.sha256 && previous.sha256 !== validation?.sha256 && !writtenThisTurn)
+      const receiptMismatch = Boolean(externalWrite && externalWrite.sha256 !== validation?.sha256)
+      const valid = Boolean(validation?.valid) && !changedOutsideExecution && !receiptMismatch
       this.spans?.finish(validationSpanId, {
         status: valid ? 'ok' : 'error',
         ...(!valid ? {
-          errorCode: !inside
+          errorCode: !allowed
             ? 'unsafe_path'
             : !info?.isFile()
               ? 'artifact_not_found'
@@ -1247,22 +1321,27 @@ export class TaskController {
         }
       })
       artifacts.push({
-        id: `artifact_${createHash('sha256').update(`${task.id}:${relativePath}`).digest('hex').slice(0, 16)}`,
-        relativePath: inside ? relativePath : rawPath,
+        id: previous?.id ?? `artifact_${createHash('sha256').update(`${task.id}:${inside ? relativePath : absolutePath}`).digest('hex').slice(0, 16)}`,
+        relativePath: inside ? relativePath : externalWrite ? relative(externalWrite.authorizedRoot, canonical) || canonical.split(/[\\/]/).at(-1)! : previous?.relativePath ?? rawPath,
+        ...(!inside && (externalWrite || previous?.absolutePath) ? {
+          absolutePath: externalWrite?.absolutePath ?? previous?.absolutePath,
+          authorizedRoot: externalWrite?.authorizedRoot ?? previous?.authorizedRoot,
+          executionGrantId: externalWrite?.executionGrantId ?? previous?.executionGrantId
+        } : {}),
         format: extension || undefined,
         sizeBytes: validation?.sizeBytes ?? info?.size,
-        sha256: validation?.sha256 || undefined,
+        sha256: externalWrite?.sha256 ?? (changedOutsideExecution ? previous?.sha256 : previous?.absolutePath ? previous.sha256 : validation?.sha256 || undefined),
         validation: valid ? 'valid' : 'invalid',
-        validationMessage: valid
+        validationMessage: changedOutsideExecution || receiptMismatch ? '成果文件在上次验证后发生变化，请重新审阅。' : valid
           ? undefined
-          : !inside
-            ? '成果路径不在工作区内。'
+          : !allowed
+            ? '成果路径缺少对应执行授权或成功写入回执。'
             : !info?.isFile()
               ? '成果文件不存在或不是普通文件。'
               : validFormat
                 ? validation?.message ?? '成果文件未通过格式验证。'
                 : `成果格式 .${extension || 'unknown'} 不符合要求。`,
-        createdAt: this.nowIso()
+        createdAt: previous?.createdAt ?? this.nowIso()
       })
     }
     return artifacts
@@ -1307,7 +1386,7 @@ function makeToolResultForVerifiedResolution(task: TaskRun, turnId: string, call
 
 function acceptanceForPrompt(prompt: string): TaskAcceptance {
   const files = promptRequiresFileDeliverable(prompt)
-  const effect = !files && promptRequiresExternalEffect(prompt)
+  const effect = promptRequiresExternalEffect(prompt)
   const intent = effect ? externalTaskIntent(prompt) : null
   const requiredFormats = requiredFileExtensionsForPrompt(prompt)
   return {
@@ -1317,6 +1396,7 @@ function acceptanceForPrompt(prompt: string): TaskAcceptance {
     ...(files ? { minimumArtifacts: 1 } : {}),
     requireFinalResponse: true,
     requireActionableArtifactCard: files,
+    ...(effect ? { requiresExternalEffects: true } : {}),
     ...(intent?.provider?{effect:{provider:intent.provider,operation:intent.operation ?? (intent.kind==='connect_provider'?'connect':'process'),target:intent.target ?? (intent.operation === 'list' ? 'current_user' : undefined),requiredScopes:[],requiresConfirmation:intent.mutation,successStatus:['succeeded'],verification:'provider_readback' as const}}:{})
   }
 }

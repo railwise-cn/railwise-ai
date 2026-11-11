@@ -117,6 +117,7 @@ describe('TaskController reliability boundaries', () => {
     const operation=controller.beginToolOperation('turn_reliability',{callId:'external',toolName:'send_message',arguments:{token:'secret-token',message:'private body'}})!
     expect(JSON.stringify(repository.operation(task.id,operation.key))).not.toContain('secret-token')
     expect(JSON.stringify(repository.operation(task.id,operation.key))).not.toContain('private body')
+    controller.recordToolDispatch(operation.token, operation.key)
     controller.finishToolOperation(operation.token,operation.key)
     const stalled=controller.recordAttemptFailure(thread.id,'turn_reliability','tool_exception','connection dropped')!
     expect(stalled.kind).toBe('stalled')
@@ -128,6 +129,21 @@ describe('TaskController reliability boundaries', () => {
     expect(repository.operation(task.id,operation.key)?.status).toBe('succeeded')
     expect(JSON.stringify(repository.operation(task.id,operation.key)?.result)).not.toContain('private body')
     expect(repository.get(task.id)?.status).toBe('stalled')
+    repository.close()
+  })
+
+  it('distinguishes a cancelled approval from a dispatched operation with a lost reply', async () => {
+    const { repository, controller, task } = await fixture()
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const waiting = controller.beginToolOperation('turn_reliability', { callId: 'awaiting-approval', toolName: 'pending_write', arguments: {} })!
+    expect(repository.operation(task.id, waiting.key)?.status).toBe('prepared')
+    controller.finishToolOperation(waiting.token, waiting.key)
+    expect(repository.operation(task.id, waiting.key)).toMatchObject({ status: 'failed', result: { approved: false, item: { output: { code: 'operation_not_dispatched' } } } })
+    const started = controller.beginToolOperation('turn_reliability', { callId: 'actual-dispatch', toolName: 'pending_write', arguments: { target: 'test' } })!
+    controller.recordToolDispatch(started.token, started.key)
+    expect(repository.operation(task.id, started.key)?.status).toBe('running')
+    controller.finishToolOperation(started.token, started.key)
+    expect(repository.operation(task.id, started.key)?.status).toBe('outcome_unknown')
     repository.close()
   })
 
@@ -367,6 +383,34 @@ describe('TaskController reliability boundaries', () => {
       reason: expect.stringContaining('目标集合及逐项验证回执')
     })
     expect(repository.events(task.id).filter(event => event.kind === 'task_completed')).toHaveLength(0)
+    repository.close()
+  })
+
+  it('requires verified effects when the task also delivers files', async () => {
+    const { repository, sessionStore, controller, task } = await fixture('生成 Markdown 报告并发送到飞书。')
+    expect(task.acceptance).toMatchObject({ kind: 'files', requiresExternalEffects: true, effect: { provider: 'lark' } })
+    await sessionStore.appendItem(task.threadId, makeAssistantTextItem({
+      id: 'mixed-final', threadId: task.threadId, turnId: 'turn_reliability',
+      text: '报告已生成，包含来源和统计结果。', status: 'completed'
+    }))
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    await expect(controller.assessCandidate(task.threadId, 'turn_reliability')).resolves.toMatchObject({ kind: 'waiting_user' })
+    expect(repository.events(task.id).some(event => event.kind === 'task_completed')).toBe(false)
+    repository.close()
+  })
+
+  it('persists transport uncertainty and rejects the same mutation under a new call id', async () => {
+    const { repository, controller, task } = await fixture()
+    controller.beginAttempt(task.threadId, 'turn_reliability')
+    const call = { callId: 'first', toolName: 'mcp_fixture_send', arguments: { target: 'test' } }
+    const operation = controller.beginToolOperation('turn_reliability', call)!
+    controller.finishToolOperation(operation.token, operation.key, {
+      approved: true,
+      item: makeToolResultItem({ id: 'uncertain', threadId: task.threadId, turnId: 'turn_reliability', callId: call.callId,
+        toolName: call.toolName, output: { code: 'outcome_unknown' }, isError: true })
+    })
+    expect(repository.operation(task.id, operation.key)?.status).toBe('outcome_unknown')
+    expect(() => controller.beginToolOperation('turn_reliability', { ...call, callId: 'second' })).toThrow(/unknown outcome/)
     repository.close()
   })
 

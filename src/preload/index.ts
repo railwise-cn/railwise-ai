@@ -205,7 +205,7 @@ const api = {
   installManagedTool: (id) => ipcRenderer.invoke('tool:install-managed', id),
   updateManagedTool: (id) => ipcRenderer.invoke('tool:update-managed', id),
   diagnoseManagedTool: (id) => ipcRenderer.invoke('tool:diagnose-managed', id),
-  beginManagedLarkLogin: () => ipcRenderer.invoke('tool:lark-login:begin'),
+  beginManagedLarkLogin: (input) => ipcRenderer.invoke('tool:lark-login:begin', input),
   completeManagedLarkLogin: () => ipcRenderer.invoke('tool:lark-login:complete'),
   beginManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:begin'),
   checkManagedLarkAppSetup: () => ipcRenderer.invoke('tool:lark-app-setup:check'),
@@ -249,6 +249,7 @@ const api = {
   cancelMcpAuthorization: (serverId, state) =>
     ipcRenderer.invoke('mcp-server:cancel-authorization', { serverId, state }),
   setMcpServerCredential: (request) => ipcRenderer.invoke('mcp-server:set-credential', request),
+  openTaskArtifact: (request) => ipcRenderer.invoke('task-artifact:open', request),
   listDocumentEngines: () => ipcRenderer.invoke('document-engine:list'),
   installDocumentEngine: (id) => ipcRenderer.invoke('document-engine:install', id),
   diagnoseDocumentEngine: (id) => ipcRenderer.invoke('document-engine:diagnose', id),

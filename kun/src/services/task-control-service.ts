@@ -126,10 +126,10 @@ export class TaskControlService {
         const resolution=repository.verifiedOperationResolution(receipt)
         if(['prepared','running','outcome_unknown'].includes(receipt.status)&&!resolution)throw Object.assign(new Error('原任务或其重试历史仍有待核实操作，不能通过创建新任务重放。请先核实原回执。'),{code:'outcome_unknown'})
         const toolName=typeof receipt.request?.toolName==='string'?receipt.request.toolName:receipt.toolName??''
-        const spec=externalOperationForTool(toolName)
+        const spec=this.deps.tasks.describeToolEffect(toolName) ?? externalOperationForTool(toolName)
         const operation=spec?.operation??(typeof receipt.request?.operation==='string'?receipt.request.operation:'')
-        const externalWrite=receipt.kind==='tool'&&(['approve','reject','complete','send','transfer'].includes(operation)||!spec&&toolCanProveExternalEffect(toolName))
-        const knownNotDispatched=receipt.status==='failed'&&!receipt.dispatchApproval&&(receipt.result as {approved?:boolean}|undefined)?.approved===false
+        const externalWrite=receipt.kind==='tool'&&(['approve','reject','complete','send','transfer','upload'].includes(operation)||!spec&&toolCanProveExternalEffect(toolName))
+        const knownNotDispatched=receipt.status==='failed'&&(receipt.result as {approved?:boolean}|undefined)?.approved===false
         if(externalWrite&&!knownNotDispatched&&(receipt.status==='succeeded'||receipt.status==='failed'||['running','outcome_unknown'].includes(receipt.status)||resolution||receipt.dispatchApproval)) {
           throw Object.assign(new Error('原任务已派发过外部写操作，整任务重试可能重复处理同一目标。请保留原回执并核实结果；如需不同操作，请新建目标明确且重新授权的独立任务。'),{code:'external_effect_retry_blocked'})
         }

@@ -32,7 +32,7 @@ describe('TaskDeliveryCoordinator durable recovery', () => {
       message: '请选择格式', payload: { questions: [] }, status: 'pending', createdAt: '2026-11-09T00:00:01.000Z', updatedAt: '2026-11-09T00:00:01.000Z'
     })
     repository.resolveHumanRequest('question-recovery', { status: 'submitted', answers: [{ id: 'format', label: '格式', value: 'PDF' }] }, 'answered', '2026-11-09T00:00:02.000Z')
-    const started: Array<{ prompt: string; turnId: string }> = []
+    const started: Array<{ taskId: string; intent: string }> = []
     const runtime = {
       flowService: { flushSourceEvents: async () => undefined, repository: { pendingOutbox: () => [], getRun: () => null } },
       taskRepository: repository,
@@ -40,10 +40,11 @@ describe('TaskDeliveryCoordinator durable recovery', () => {
       turnService: {
         getAbortController: () => undefined,
         finishTurn: async () => undefined,
-        startTurn: async (input: { request: { prompt: string } }) => {
-          const turnId = 'turn-recovery'
-          started.push({ prompt: input.request.prompt, turnId })
-          return { threadId: 'thread-human-recovery', turnId, userMessageItemId: 'item' }
+      },
+      taskCoordinator: {
+        command: async (input: { taskId: string; intent: string }) => {
+          started.push(input)
+          return { kind: 'task_started', task: repository.get(input.taskId) }
         }
       },
       runTurn: async (_threadId: string, _turnId: string) => 'completed' as const,
@@ -52,7 +53,7 @@ describe('TaskDeliveryCoordinator durable recovery', () => {
     const coordinator = new TaskDeliveryCoordinator(runtime)
     await coordinator.tick()
     expect(started).toHaveLength(1)
-    expect(started[0]?.prompt).toContain('"PDF"')
+    expect(started[0]).toMatchObject({ taskId: 'task-human-recovery', intent: 'resume' })
     expect(repository.pendingOutbox('human_answer')).toHaveLength(0)
     // Starting a continuation is not proof that the worker checkpoint consumed the answer.
     expect(repository.inputs('task-human-recovery', true)).toHaveLength(1)

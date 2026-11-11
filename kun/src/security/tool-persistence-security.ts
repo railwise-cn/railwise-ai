@@ -10,9 +10,10 @@ const MAX_SAFE_PATH_CHARS = 320
 const SENSITIVE_OUTPUT_KEY = /^(?:arguments?|args?|authorization|cookie|cookies|headers?|request_?body|prompt|recipient|recipient_?id|chat_?id|channel_?id|conversation_?id|message_?body)$/i
 const COMMUNICATION_OUTPUT_KEY = /^(?:contents?|texts?|messages?|body|bodies|prompts?|inputs?|payloads?|echoed|recipients?|recipient_?ids?|chat_?ids?|channel_?ids?|conversation_?ids?|destinations?)$/i
 const COMMUNICATION_TOOL = /(?:^|[_-])(?:message|send|mail|email|wechat|weixin|feishu|lark|slack|discord|telegram|teams|im|echo)(?:$|[_-])/i
-const TYPED_CONNECTOR_TOOLS = new Set(['lark_task_list', 'lark_task_get', 'lark_task_complete', 'lark_approval_list', 'lark_approval_get', 'lark_approval_approve', 'lark_approval_reject'])
-const CONNECTOR_METADATA = new Set(['provider', 'operation', 'target', 'remoteOperationId', 'resultHash', 'verifiedAt', 'kind', 'status'])
-function safeConnectorId(value: unknown): string | undefined { return typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,512}$/.test(value) && redactSecretText(value) === value ? value : undefined }
+const TYPED_CONNECTOR_TOOLS = new Set(['lark_task_list', 'lark_task_get', 'lark_task_complete', 'lark_approval_list', 'lark_approval_get', 'lark_approval_approve', 'lark_approval_reject',
+  'lark_mail_send', 'lark_mail_send_status', 'lark_im_send', 'lark_im_get_message', 'lark_drive_upload', 'lark_drive_verify_file'])
+const CONNECTOR_METADATA = new Set(['provider', 'operation', 'target', 'backend', 'accountFingerprint', 'remoteOperationId', 'resultHash', 'verifiedAt', 'kind', 'status'])
+function safeConnectorId(value: unknown): string | undefined { return typeof value === 'string' && /^[A-Za-z0-9_.:@+-]{1,512}$/.test(value) && redactSecretText(value) === value ? value : undefined }
 const BASH_TOOL = /(?:^|[_-])(?:bash|shell|terminal|command|exec|execute)(?:$|[_-])/i
 const URL_KEY = /(?:^|_)(?:url|uri|endpoint)(?:$|_)/i
 const PATH_KEYS = ['path', 'file_path', 'target_path', 'destination_path', 'directory', 'cwd'] as const
@@ -53,6 +54,17 @@ export function buildToolArgumentSummary(input: {
   const toolName = safeToolName(input.toolName)
   const args = input.arguments
   const lines = [`Run ${toolName}`]
+  if (toolName === 'lark_mail_send' || toolName === 'lark_im_send') {
+    const target = safeConnectorId(args.recipient ?? args.chatId)
+    const content = toolName === 'lark_mail_send' ? args.body : args.text
+    if (!target || typeof content !== 'string' || content.length > 64_000) return `${lines[0]}\nParameters: invalid delivery request`
+    return [...lines, 'Provider: lark', 'Action: send', `External target: ${target}`,
+      ...(typeof args.subject === 'string' ? [`Subject (JSON): ${JSON.stringify(redactSecretText(args.subject))}`] : []),
+      `Content (JSON): ${JSON.stringify(redactSecretText(content))}`,
+      `Content SHA256: ${createHash('sha256').update(content).digest('hex')}`,
+      `Request SHA256: ${createHash('sha256').update(JSON.stringify(args)).digest('hex')}`
+    ].join('\n')
+  }
   if (toolName === 'request_host_shell') {
     const command = typeof args.command === 'string' && args.command.length <= 1024 ? args.command : ''
     const workspace = typeof input.workspace === 'string' && input.workspace.length <= 2048 ? input.workspace : ''
@@ -81,7 +93,7 @@ export function buildToolArgumentSummary(input: {
       const provider = name.startsWith('lark_') ? 'lark' : name.startsWith('dingtalk_') ? 'dingtalk' : ''
       const operation = /^(?:lark_(?:task|approval)_get|dingtalk_get_(?:task|approval))$/.test(name) ? 'detail' : name === 'dingtalk_complete_task' ? 'complete' : name.split('_').at(-1)
       const target = safeConnectorId(item.target)
-      if (!provider || !operation || !['detail', 'approve', 'reject', 'complete', 'transfer'].includes(operation) || !target || target.length > 64) return boundSummary([lines[0]!, 'Scope: Invalid action set; no confirmation can be recorded'])
+      if (!provider || !operation || !['detail', 'approve', 'reject', 'complete', 'transfer', 'send', 'upload'].includes(operation) || !target || target.length > 320) return boundSummary([lines[0]!, 'Scope: Invalid action set; no confirmation can be recorded'])
       lines.push(`Action ${index + 1}: ${provider} ${operation} ${target}`)
     }
     return boundSummary(lines)
@@ -89,10 +101,14 @@ export function buildToolArgumentSummary(input: {
   if (TYPED_CONNECTOR_TOOLS.has(toolName)) {
     lines.push('Provider: lark')
     lines.push(`Action: ${toolName.split('_').at(-1)}`)
-    const target = safeConnectorId(args.taskId ?? args.instanceCode)
+    const target = safeConnectorId(args.taskId ?? args.instanceCode ?? args.chatId ?? args.folderToken ?? args.fileToken ?? args.messageId)
     if (target) lines.push(`External target: ${target}`)
     const instance = safeConnectorId(args.instanceCode)
     if (instance && instance !== target) lines.push(`Approval instance: ${instance}`)
+    if (toolName === 'lark_drive_upload') {
+      if (typeof args.path === 'string') lines.push(`Target: ${summarizeWorkspacePath(args.path, input.workspace)}`)
+      if (typeof args.expectedHash === 'string' && /^[a-f0-9]{64}$/.test(args.expectedHash)) lines.push(`Content SHA256: ${args.expectedHash}`)
+    }
     lines.push('Parameters: sensitive contents omitted')
     return boundSummary(lines)
   }
@@ -187,6 +203,16 @@ export function sanitizeToolResultOutput(toolName: string, output: unknown): unk
       if (value) safeEvidence[key] = value
     }
     result.evidence = safeEvidence
+  }
+  if (source.verificationLocator && typeof source.verificationLocator === 'object' && !Array.isArray(source.verificationLocator)) {
+    const locator = source.verificationLocator as Record<string, unknown>
+    const fields = toolName === 'lark_mail_send' ? ['messageId', 'recipient']
+      : toolName === 'lark_im_send' ? ['messageId', 'chatId', 'contentHash', 'senderId']
+        : toolName === 'lark_drive_upload' ? ['fileToken', 'folderToken', 'expectedHash'] : []
+    result.verificationLocator = Object.fromEntries(fields.flatMap(key => {
+      const value = safeConnectorId(locator[key])
+      return value ? [[key, value]] : []
+    }))
   }
   return result
 }
@@ -291,6 +317,23 @@ function normalizeArgumentSummary(toolName: string, summary: string | undefined)
   if (!summary?.trim()) {
     return buildToolArgumentSummary({ toolName, arguments: {} })
   }
+  if (toolName === 'lark_mail_send' || toolName === 'lark_im_send') {
+    const lines = summary.split(/\r?\n/)
+    const fields = lines.slice(1)
+    const contentLine = fields.find(line => line.startsWith('Content (JSON): '))
+    let contentValid = false
+    try {
+      const value = JSON.parse(contentLine?.slice('Content (JSON): '.length) ?? 'null')
+      contentValid = typeof value === 'string' && value.length <= 64_000
+    } catch { /* Legacy summaries cannot authorize a full delivery. */ }
+    const valid = summary.length <= 400_000 && lines[0] === `Run ${toolName}` && contentValid &&
+      fields.includes('Provider: lark') && fields.includes('Action: send') &&
+      fields.some(line => /^External target: [A-Za-z0-9_.:@+-]{1,512}$/.test(line)) &&
+      fields.some(line => /^Request SHA256: [a-f0-9]{64}$/.test(line)) &&
+      fields.every(line => /^(?:Provider: lark|Action: send|External target: [A-Za-z0-9_.:@+-]{1,512}|(?:Content|Request) SHA256: [a-f0-9]{64})$/.test(line) ||
+        /^(?:Subject|Content) \(JSON\): ".*"$/.test(line))
+    if (valid) return lines.map(redactSecretText).join('\n')
+  }
   if (toolName === 'request_host_shell') {
     const lines = summary.split(/\r?\n/)
     const valid = lines.length === 10 && lines[0] === 'Run request_host_shell'
@@ -306,9 +349,9 @@ function normalizeArgumentSummary(toolName: string, summary: string | undefined)
   const lines = [`Run ${safeToolName(toolName)}`]
   for (const rawLine of summary.split(/\r?\n/).slice(1, 12)) {
     const line = rawLine.trim()
-    if (toolName === 'confirm_external_effect_scope' && (/^Scope: Entire task is limited to these [1-8] actions$/.test(line) || /^Effect scope revision: [0-9]+$/.test(line) || /^Action [1-8]: (?:lark|dingtalk) (?:detail|approve|reject|complete|transfer) [A-Za-z0-9_.:-]{1,64}$/.test(line))) {
+    if (toolName === 'confirm_external_effect_scope' && (/^Scope: Entire task is limited to these [1-8] actions$/.test(line) || /^Effect scope revision: [0-9]+$/.test(line) || /^Action [1-8]: (?:lark|dingtalk) (?:detail|approve|reject|complete|transfer|send|upload) [A-Za-z0-9_.:@+-]{1,320}$/.test(line))) {
       lines.push(redactSecretText(line))
-    } else if (TYPED_CONNECTOR_TOOLS.has(toolName) && (/^Provider: lark$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance): [A-Za-z0-9_.:-]{1,512}$/.test(line))) {
+    } else if (TYPED_CONNECTOR_TOOLS.has(toolName) && (/^Provider: lark$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance): [A-Za-z0-9_.:@+-]{1,512}$/.test(line) || /^(?:Content|Request) SHA256: [a-f0-9]{64}$/.test(line))) {
       lines.push(line)
     } else if (/^Target: <(?:workspace|outside-workspace|absolute-path|relative-path-outside-workspace)>/i.test(line)) {
       lines.push(clip(redactSecretText(line), MAX_SAFE_PATH_CHARS + 8))

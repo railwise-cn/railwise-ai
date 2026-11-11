@@ -42,6 +42,15 @@ beforeEach(async()=>{
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();Reflect.deleteProperty(window,'workwise');await i18n.changeLanguage('en')})
 
 describe('task permission authority overview',()=>{
+  it('clears historical write paths after the Agent ceiling becomes read-only', async () => {
+    api.getTaskPermissions.mockResolvedValue({ ...snapshot, grant: { id: 'previous', status: 'invalid', confirmedAt: '2026-11-10T00:00:00.000Z', expiresAt: '2026-11-10T00:15:00.000Z', scope: { writePaths: ['/previous/output'] } } })
+    await click('查看当前任务权限')
+    await click('调整本次路径与平台范围')
+    const writePaths = container.querySelector<HTMLTextAreaElement>('textarea:disabled')
+    expect(writePaths).not.toBeNull()
+    expect(writePaths!.value).toBe('')
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
   it('only loads on request and distinguishes ceilings, task requirements and historical scopes from executable tools',async()=>{
     expect(api.getTaskPermissions).not.toHaveBeenCalled()
     await click('查看当前任务权限')

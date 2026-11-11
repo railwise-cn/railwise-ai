@@ -457,6 +457,9 @@ function toGuiInfo(updateInfo: UpdateInfo, hasUpdate: boolean, manualOnly = fals
 }
 
 function emitGuiUpdateState(state: GuiUpdateState): void {
+  if (state.status === 'error' && downloaded && lastInfo?.downloaded && !lastInfo.withdrawn) {
+    state = { ...state, info: lastInfo }
+  }
   lastState = state
   const win = getMainWindow?.()
   if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return

@@ -1,3 +1,6 @@
+import { registerRuntimeUpdateRoutes } from './runtime-update.js'
+import { registerRuntimeMcpRoutes } from './runtime-mcp.js'
+import { recordImDelivery } from './im-delivery.js'
 import { randomUUID } from 'node:crypto'
 import { StartTurnRequest } from '../../contracts/turns.js'
 import { taskFeedResponse } from '../../services/task-view-service.js'
@@ -75,7 +78,7 @@ import { flowRoutes } from './flows.js'
 import { isAuthorized, bearerToken } from '../auth.js'
 import { ERRORS } from './runtime-error.js'
 import type { ServerRuntime } from './server-runtime.js'
-import { appendTaskInput, cancelTask, getTask, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
+import { appendTaskInput, cancelTask, getTask, getTaskArtifactProof, getTaskDiagnostics, getTaskEvents, getTaskInputs, getTaskPermissions, confirmTaskPermissions, getTaskOperationReceipts, verifyTaskOperationReceipt, getTaskInbox, getTaskSubscriptions, subscribeTaskSource, listTasks, pauseTask, resumeTask, retryTask } from './tasks.js'
 import { externalProviderAmbiguity } from '../../services/external-task-capability.js'
 import { classifyTaskInput } from '../../services/task-coordinator.js'
 import { listShellSessions, terminateShellSession } from './shell-sessions.js'
@@ -115,7 +118,17 @@ import { registerTaskDeliveryRoutes } from './task-delivery.js'
  * - `GET /v1/usage` (auth)
  */
 export function buildRouter(runtime: ServerRuntime): Router {
-  const router = new Router()
+  const router = new Router(request => {
+    if (runtime.updateLifecycle?.isSuspended() && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+      && new URL(request.url).pathname !== '/v1/runtime/update/prepare') {
+      return ERRORS.unavailable('应用正在准备升级，已停止接收新的执行。')
+    }
+    return undefined
+  })
+  registerRuntimeUpdateRoutes(router, runtime, request => authorize(request, runtime))
+  registerRuntimeMcpRoutes(router, runtime, request => authorize(request, runtime))
+  router.add('POST', '/v1/threads/:id/delivery-observations', (request, ctx) => authorize(request, runtime)
+    ? recordImDelivery(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   registerTaskDeliveryRoutes(router, runtime, request => authorize(request, runtime))
   registerSurveyContextMcpRoutes(router, {
     getHost: () => runtime.surveyContextMcp,
@@ -377,6 +390,7 @@ export function buildRouter(runtime: ServerRuntime): Router {
   router.add('GET', '/v1/inbox', async request => authorize(request, runtime) ? getTaskInbox(runtime, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/events', async (request, ctx) => authorize(request, runtime) ? getTaskEvents(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/receipts', async (request, ctx) => authorize(request, runtime) ? getTaskOperationReceipts(runtime, ctx.params.id) : ERRORS.unauthorized())
+  router.add('GET', '/v1/tasks/:id/artifacts/:artifact/proof', async (request, ctx) => authorize(request, runtime) ? getTaskArtifactProof(runtime, ctx.params.id, ctx.params.artifact) : ERRORS.unauthorized())
   router.add('GET', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? getTaskPermissions(runtime, ctx.params.id) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/permissions', async (request, ctx) => authorize(request, runtime) ? confirmTaskPermissions(runtime, ctx.params.id, request) : ERRORS.unauthorized())
   router.add('POST', '/v1/tasks/:id/receipts/:receipt/verify', async (request, ctx) => authorize(request, runtime) ? verifyTaskOperationReceipt(runtime, ctx.params.id, ctx.params.receipt, request) : ERRORS.unauthorized())

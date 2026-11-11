@@ -31,7 +31,6 @@ import type {
 } from '../../shared/workwise-api'
 import type { WorkspaceFileSaveAsResult } from '../../shared/workspace-file'
 import type {
-  GuiUpdateActiveWorkItem,
   GuiUpdateDownloadResult,
   GuiUpdateInfo,
   GuiUpdateInstallPreflight,
@@ -243,6 +242,7 @@ import { RepoMapService } from '../services/repo-map-service'
 import { McpConfigService } from '../services/mcp-config-service'
 import { CatalogCredentialService } from '../services/catalog-credential-service'
 import { activatePluginPackage } from '../services/plugin-activation-service'
+import { openVerifiedTaskArtifact } from '../services/task-artifact-open'
 import { MarketplaceCatalogService } from '../services/marketplace-catalog-service'
 import { PluginManagementService } from '../services/plugin-management-service'
 import type { CatalogSourceV1 } from '../../shared/marketplace'
@@ -317,11 +317,13 @@ type RegisterAppIpcHandlersOptions = {
   refreshManagedCapabilities?: (status: import('../../shared/workwise-api').ManagedToolStatus) => Promise<void>
   refreshManagedDingTalkCapabilities?: (status: import('../../shared/managed-dws').ManagedDwsStatus) => Promise<void | { enabled: boolean }>
   setManagedDingTalkEnabled?: (enabled: boolean) => Promise<import('../../shared/managed-dws').ManagedDwsResult>
+  onMcpServersChanged?: (snapshot: import('../services/mcp-config-service').McpRuntimeSnapshotV1) => Promise<void>
   onRuntimeMcpConfigWritten?: (path: string, content: string) => Promise<void> | void
   showTurnCompleteNotification: (
     payload: TurnCompleteNotificationPayload
   ) => Promise<SystemNotificationResult>
   getAppVersion: () => string
+  onGuiUpdatePrepared?: () => void
   readGuiUpdateState: () => Promise<GuiUpdateState>
   loadGuiUpdaterModule: () => Promise<GuiUpdaterModule>
   resolveLogDirectory: () => string
@@ -349,58 +351,19 @@ function safeSaveAsFileName(input: string | undefined, fallback = 'generated-fil
 async function collectGuiUpdateActiveWork(
   runtimeRequest: RegisterAppIpcHandlersOptions['runtimeRequest']
 ): Promise<GuiUpdateInstallPreflight> {
-  const active: GuiUpdateActiveWorkItem[] = []
   try {
-    const tasks = await runtimeRequest('/v1/tasks?limit=500', 'GET')
-    if (tasks.ok) {
-      const values = JSON.parse(tasks.body) as Array<Record<string, unknown>>
-      for (const task of Array.isArray(values) ? values : []) {
-        const status = typeof task.status === 'string' ? task.status : ''
-        if (['completed', 'failed', 'cancelled'].includes(status)) continue
-        active.push({
-          kind: 'agent',
-          id: String(task.id ?? ''),
-          label: String(task.goal ?? task.id ?? 'Agent task'),
-          status,
-          recoverable: true
-        })
-      }
-    }
-
-    const flowsResponse = await runtimeRequest('/v1/flows', 'GET')
-    if (flowsResponse.ok) {
-      const payload = JSON.parse(flowsResponse.body) as { flows?: Array<Record<string, unknown>> }
-      for (const flow of payload.flows ?? []) {
-        const flowId = String(flow.id ?? '')
-        if (!flowId) continue
-        const history = await runtimeRequest(`/v1/flows/${encodeURIComponent(flowId)}/history?limit=20`, 'GET')
-        if (!history.ok) continue
-        const historyPayload = JSON.parse(history.body) as { runs?: Array<Record<string, unknown>> }
-        const nodes = Array.isArray(flow.nodes) ? flow.nodes as Array<Record<string, unknown>> : []
-        const scheduled = nodes.some((node) => node.type === 'schedule_trigger')
-        for (const run of historyPayload.runs ?? []) {
-          const status = typeof run.status === 'string' ? run.status : ''
-          if (!['queued', 'running', 'waiting_approval', 'paused'].includes(status)) continue
-          active.push({
-            kind: scheduled ? 'schedule' : 'flow',
-            id: String(run.id ?? flowId),
-            label: String(flow.name ?? flowId),
-            status,
-            recoverable: status !== 'running' || nodes.every((node) => {
-              const policy = node.policy as Record<string, unknown> | undefined
-              return policy?.resumable !== false
-            })
-          })
-        }
-      }
-    }
-    return { ok: true, activeWork: active }
+    const response = await runtimeRequest('/v1/runtime/update', 'GET')
+    if (!response.ok) throw new Error(runtimeResponseMessage(response))
+    return z.object({
+      ok: z.literal(true),
+      snapshotId: z.string().regex(/^[a-f0-9]{64}$/),
+      activeWork: z.array(z.object({
+        kind: z.enum(['agent', 'flow', 'schedule']), id: z.string().min(1), label: z.string(),
+        status: z.string(), recoverable: z.boolean()
+      }).strict())
+    }).strict().parse(JSON.parse(response.body))
   } catch (error) {
-    return {
-      ok: false,
-      activeWork: active,
-      message: error instanceof Error ? error.message : String(error)
-    }
+    return { ok: false, activeWork: [], message: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -737,6 +700,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   const gitCheckpointService = new GitCheckpointService()
   const repoMapService = new RepoMapService()
   const mcpConfigService = options.mcpConfigService ?? new McpConfigService()
+  const notifyMcpServersChanged = async (): Promise<void> => {
+    if (options.onMcpServersChanged) await options.onMcpServersChanged(await mcpConfigService.runtimeSnapshot())
+  }
   const catalogCredentialService = options.catalogCredentialService ?? new CatalogCredentialService()
   const marketplaceCatalogService = options.marketplaceCatalogService ?? new MarketplaceCatalogService({
     resolveWorkspaceRoot: async () => (await store.load()).workspaceRoot,
@@ -865,6 +831,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
 
   ipcMain.handle('runtime:request', async (_, payload: unknown) => {
     const request = parseIpcPayload('runtime:request', runtimeRequestPayloadSchema, payload)
+    if (new URL(request.path, 'http://runtime').pathname === '/v1/runtime/mcp-config') throw new Error('MCP 配置仅能通过连接器设置更新。')
     const method = (request.method ?? 'GET').toUpperCase()
     const deleteThread = method === 'DELETE'
       ? /^\/v1\/threads\/([^/?]+)$/.exec(request.path)
@@ -984,9 +951,21 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     const request = parseIpcPayload('mcp-server:list', mcpServerListPayloadSchema, payload)
     return mcpConfigService.list(request.workspaceRoot)
   })
+  ipcMain.handle('task-artifact:open', async (_, payload: unknown) => {
+    const request = parseIpcPayload('task-artifact:open', z.object({ taskId: z.string().trim().min(1).max(256), artifactId: z.string().trim().min(1).max(256) }).strict(), payload)
+    return openVerifiedTaskArtifact(request, { runtimeRequest, openPath: path => shell.openPath(path) })
+  })
   ipcMain.handle('mcp-server:save', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:save', mcpServerSavePayloadSchema, payload)
-    return mcpConfigService.save(request)
+    if (request.config.managedPreset === 'zotero-readonly') {
+      const current = (await mcpConfigService.list(request.config.workspaceRoot)).find(item => item.id === request.config.id)
+      if (current?.managedPreset !== 'zotero-readonly' || request.config.command !== current.command || JSON.stringify(request.config.args ?? []) !== JSON.stringify(current.args ?? [])) {
+        throw new Error('Zotero 只读连接仅能通过已核验的插件安装创建，保留现有配置。')
+      }
+    }
+    const saved = await mcpConfigService.save(request)
+    await notifyMcpServersChanged()
+    return saved
   })
   ipcMain.handle('mcp-server:test', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:test', mcpServerActionPayloadSchema, payload)
@@ -994,7 +973,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('mcp-server:authorize', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:authorize', mcpServerAuthorizePayloadSchema, payload)
-    return mcpConfigService.authorize(request)
+    const result = await mcpConfigService.authorize(request)
+    if (result.authorized) await notifyMcpServersChanged()
+    return result
   })
   ipcMain.handle('mcp-server:wait-authorization', async (_, payload: unknown) => {
     const request = parseIpcPayload(
@@ -1002,7 +983,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       mcpServerAuthorizationStatePayloadSchema,
       payload
     )
-    return mcpConfigService.waitForAuthorization(request)
+    const result = await mcpConfigService.waitForAuthorization(request)
+    if (result.authorized) await notifyMcpServersChanged()
+    return result
   })
   ipcMain.handle('mcp-server:cancel-authorization', async (_, payload: unknown) => {
     const request = parseIpcPayload(
@@ -1014,7 +997,9 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
   })
   ipcMain.handle('mcp-server:set-credential', async (_, payload: unknown) => {
     const request = parseIpcPayload('mcp-server:set-credential', mcpServerCredentialPayloadSchema, payload)
-    return mcpConfigService.setCredential(request)
+    const saved = await mcpConfigService.setCredential(request)
+    await notifyMcpServersChanged()
+    return saved
   })
   ipcMain.handle('catalog:list-sources', async () => marketplaceCatalogService.listSources())
   ipcMain.handle('catalog:list-packages', async () => marketplaceCatalogService.listPackages())
@@ -1130,6 +1115,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       })
     )
     notifySkillsChanged()
+    await notifyMcpServersChanged()
     return installed
   })
   ipcMain.handle('plugin:rollback', async (_, payload: unknown) => {
@@ -1145,6 +1131,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       })
     )
     notifySkillsChanged()
+    await notifyMcpServersChanged()
     return installed
   })
   ipcMain.handle('plugin:update-permissions', async (_, payload: unknown) => {
@@ -1742,7 +1729,7 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
     if (!setManagedDingTalkEnabled) return { ok: false, message: 'DingTalk enablement is unavailable. No settings or tasks were changed.' }
     return setManagedDingTalkEnabled(enabled)
   })
-  ipcMain.handle('tool:lark-login:begin', async () => beginManagedLarkLogin())
+  ipcMain.handle('tool:lark-login:begin', async (_event, input) => beginManagedLarkLogin(input))
   ipcMain.handle('tool:lark-app-setup:begin', async () => beginManagedLarkAppSetup())
   ipcMain.handle('tool:lark-app-setup:check', async () => checkManagedLarkAppSetup())
   ipcMain.handle('tool:lark-app-setup:cancel', async () => cancelManagedLarkAppSetup())
@@ -2540,24 +2527,41 @@ export function registerAppIpcHandlers(options: RegisterAppIpcHandlersOptions): 
       ).channel
     )
   })
+  let updatePrepared = false
+  let installRequest: Promise<GuiUpdateInstallResult> | undefined
   ipcMain.handle('gui:update-install-preflight', async (): Promise<GuiUpdateInstallPreflight> =>
-    collectGuiUpdateActiveWork(runtimeRequest)
+    updatePrepared ? { ok: true, activeWork: [] } : collectGuiUpdateActiveWork(runtimeRequest)
   )
   ipcMain.handle('gui:update-install', async (_, payload: unknown): Promise<GuiUpdateInstallResult> => {
     const request = parseIpcPayload(
       'gui:update-install',
-      z.object({ confirmActiveWork: z.boolean().optional() }).strict(),
+      z.object({ confirmActiveWork: z.boolean().optional(), confirmedSnapshotId: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict(),
       payload ?? {}
     )
-    const preflight = await collectGuiUpdateActiveWork(runtimeRequest)
-    if (!preflight.ok) {
-      return { ok: false, currentVersion: getAppVersion(), message: preflight.message ?? 'Update preflight failed.', code: 'install_failed' }
-    }
-    if (preflight.activeWork.length > 0 && request.confirmActiveWork !== true) {
-      return { ok: false, currentVersion: getAppVersion(), message: 'Active work must be confirmed before restarting.', code: 'install_failed' }
-    }
-    const module = await loadGuiUpdaterModule()
-    return module.installGuiUpdate()
+    if (installRequest) return installRequest
+    installRequest = (async (): Promise<GuiUpdateInstallResult> => {
+      try {
+        const module = await loadGuiUpdaterModule()
+        const state = module.getGuiUpdateState()
+        if (!(state.info?.ok && state.info.downloaded) && state.status !== 'downloaded') {
+          return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: '更新包尚未下载完成。' }
+        }
+        if (!updatePrepared) {
+          const prepared = await runtimeRequest('/v1/runtime/update/prepare', 'POST', JSON.stringify({
+            ...(request.confirmActiveWork && request.confirmedSnapshotId ? { confirmedSnapshotId: request.confirmedSnapshotId } : {})
+          }))
+          if (!prepared.ok) throw new Error(runtimeResponseMessage(prepared))
+          const result = JSON.parse(prepared.body) as { ok?: unknown }
+          if (result.ok !== true) throw new Error('Runtime 未确认安全停止，应用仍保持打开。')
+          updatePrepared = true
+          options.onGuiUpdatePrepared?.()
+        }
+        return await module.installGuiUpdate()
+      } catch (error) {
+        return { ok: false, currentVersion: getAppVersion(), code: 'install_failed', message: error instanceof Error ? error.message : String(error) }
+      }
+    })().finally(() => { installRequest = undefined })
+    return installRequest
   })
 
   ipcMain.handle('log:error', async (_, payload: unknown) => {

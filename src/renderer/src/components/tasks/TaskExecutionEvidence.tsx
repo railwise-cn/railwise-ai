@@ -7,12 +7,13 @@ function dateLabel(value: string): string {
   return Number.isFinite(date.getTime()) ? date.toLocaleString() : value
 }
 
-export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, onConfigureProvider }: {
+export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, onConfigureProvider, onConfigureReplyDelivery }: {
   task: TaskRunV1
   relatedTasks: TaskRunV1[]
   receipts: TaskOperationReceiptV1[]
   onVerify?: (receipt: TaskOperationReceiptV1) => Promise<TaskOperationVerificationV1>
   onConfigureProvider?: (provider: string) => void
+  onConfigureReplyDelivery?: () => void
 }): ReactElement | null {
   const { t } = useTranslation('common')
   const [verifying, setVerifying] = useState<string | null>(null)
@@ -27,6 +28,8 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
     } catch (error) { setMessages(current => ({ ...current, [receipt.id]: error instanceof Error ? error.message : String(error) })) }
     finally { setVerifying(null) }
   }
+  const deliveries = receipts.filter(receipt => receipt.purpose === 'assistant_reply')
+  const effects = receipts.filter(receipt => receipt.purpose !== 'assistant_reply')
   const effect = task.acceptance.effect
   const evidence = [...new Map(relatedTasks.flatMap(item => item.resultEvidence ?? []).map(item =>
     [JSON.stringify([item.provider, item.operation, item.target, item.resultHash]), item] as const)).values()]
@@ -43,7 +46,7 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {item.targetVersion ? <div><dt className="inline font-medium">{t('taskEffectTargetVersion')}: </dt><dd className="inline">{item.targetVersion}</dd></div> : null}
     </dl>
   </details>
-  return <section aria-label={t('taskEffectExecution')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+  return <>{effect || evidence.length || effects.length ? <section aria-label={t('taskEffectExecution')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
     <h3 className="text-xs font-semibold">{t('taskEffectExecution')}</h3>
     {effect ? <div className="mt-2 text-xs">
       <p><span className="text-ds-muted">{t('taskEffectProvider')}: </span>{provider(effect.provider)}</p>
@@ -56,8 +59,8 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       <p className={`mt-1 ${item.verified ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>{t(item.verified ? 'taskEffectVerified' : 'taskEffectUnverified')} · {dateLabel(item.verifiedAt)}</p>
       {evidenceDetails(item)}
     </li>)}</ul> : <p className="mt-1 text-xs text-ds-muted">{t('taskEffectNoEvidence')}</p>}
-    <h4 className="mt-3 text-xs font-semibold text-ds-muted">{t('taskEffectReceipts')} ({receipts.length})</h4>
-    {receipts.length ? <ul className="mt-2 space-y-2">{receipts.map(receipt => <li key={receipt.id} className="rounded-lg border border-ds-border p-2 text-xs">
+    <h4 className="mt-3 text-xs font-semibold text-ds-muted">{t('taskEffectReceipts')} ({effects.length})</h4>
+    {effects.length ? <ul className="mt-2 space-y-2">{effects.map(receipt => <li key={receipt.id} className="rounded-lg border border-ds-border p-2 text-xs">
       <p className="break-all">{provider(receipt.provider)} · {operation(receipt.operation)} · {receipt.target || t('taskEffectTargetPending')}</p>
       <p className={`mt-1 ${receipt.status === 'failed' ? 'text-red-700 dark:text-red-300' : receipt.status === 'outcome_unknown' && !receipt.resolution ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'}`}>{t(receipt.resolution ? 'taskEffectReadbackVerified' : receipt.status === 'succeeded' && receipt.evidence?.verified ? 'taskEffectVerified' : `taskReceiptStatus_${receipt.status}`)} · {dateLabel(receipt.resolution?.resolvedAt ?? receipt.updatedAt)}</p>
       {receipt.errorCode ? <p className="mt-1 break-all text-ds-muted">{t('taskEffectErrorCode')}: {receipt.errorCode}</p> : null}
@@ -75,5 +78,16 @@ export function TaskExecutionEvidence({ task, relatedTasks, receipts, onVerify, 
       {receipt.resolution ? <><p className="mt-1 text-ds-muted">{t('taskEffectOriginalUnknownPreserved')}</p>{evidenceDetails(receipt.resolution.evidence)}</> : null}
       <details className="mt-2 text-[11px] text-ds-muted"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><dl className="mt-2 space-y-1 break-all"><div><dt className="inline font-medium">{t('taskEffectReceiptReference')}: </dt><dd className="inline">{receipt.id}</dd></div><div><dt className="inline font-medium">{t('taskEffectRequestHash')}: </dt><dd className="inline">{receipt.requestHash}</dd></div></dl></details>
     </li>)}</ul> : <p className="mt-1 text-xs text-ds-muted">{t('taskEffectNotExecuted')}</p>}
-  </section>
+  </section> : null}
+    {deliveries.length ? <section aria-label={t('taskReplyDelivery')} className="mb-4 rounded-xl border border-ds-border bg-ds-card p-3">
+      <h3 className="text-xs font-semibold">{t('taskReplyDelivery')}</h3>
+      <ul className="mt-2 space-y-2">{deliveries.map(receipt => <li key={receipt.id} className="rounded-lg border border-ds-border p-2 text-xs">
+        <p>{receipt.provider === 'feishu' ? provider('lark') : t('taskReplyWeixin')} · {t(receipt.phase === 'upload' ? 'taskReplyAttachment' : 'taskReplyMessage')}</p>
+        <p className="mt-1 text-ds-muted">{t(receipt.status === 'succeeded' ? 'taskReplyAccepted' : receipt.status === 'outcome_unknown' ? 'taskReplyUnknown' : `taskReceiptStatus_${receipt.status}`)} · {dateLabel(receipt.updatedAt)}</p>
+        {receipt.status === 'outcome_unknown' ? <p className="mt-1 text-amber-700 dark:text-amber-300">{t('taskReplyCheckPlatform')}</p> : null}
+        {receipt.remoteOperationId ? <details className="mt-2 text-ds-muted"><summary className="cursor-pointer">{t('taskEffectReceiptDetails')}</summary><p className="mt-1 break-all">{receipt.remoteOperationId}</p></details> : null}
+      </li>)}</ul>
+      {onConfigureReplyDelivery ? <button type="button" onClick={onConfigureReplyDelivery} className="mt-3 rounded-md border border-ds-border px-3 py-1.5 text-xs">{t('taskReplyConfigure')}</button> : null}
+    </section> : null}
+  </>
 }

@@ -368,7 +368,7 @@ export type PackageAvailabilityV1 =
 
 export type PackageInstallationV1 =
   | {
-      mode: 'direct-mirror'
+      mode: 'direct-mirror' | 'upstream-only'
       installedByDefault: boolean
       reinstallable: true
     }

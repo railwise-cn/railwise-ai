@@ -86,12 +86,17 @@ export const McpServerConfig = z
     enabled: z.boolean().default(true),
     transport: McpTransportKind,
     command: z.string().min(1).optional(),
+    cwd: z.string().min(1).optional(),
     args: z.array(z.string()).default([]),
     url: z.string().min(1).optional(),
     headers: StringRecord.default({}),
     env: StringRecord.default({}),
     trustScope: McpTrustScope.default('workspace'),
     trustedWorkspaceRoots: z.array(z.string().min(1)).default([]),
+    toolPolicy: z.object({
+      allowedTools: z.array(z.string().min(1)),
+      readOnlyTools: z.array(z.string().min(1)).default([])
+    }).optional(),
     timeoutMs: z.number().int().positive().default(30_000)
   })
   .strict()
@@ -211,6 +216,7 @@ export type LarkAuthState = z.infer<typeof LarkAuthState>
 
 export const LarkCapabilityConfig = CapabilityToggleConfig.extend({
   executablePath: z.string().min(1).optional(),
+  executableVersion: z.string().min(1).optional(),
   authState: LarkAuthState.default('not_installed'),
   scopes: z.array(z.string().min(1)).default([]),
   brand: z.enum(['feishu', 'lark']).optional(),

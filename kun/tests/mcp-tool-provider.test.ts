@@ -6,6 +6,7 @@ import {
   isMcpServerTrusted,
   normalizeMcpToolName,
   resolveMcpSecrets,
+  resolveMcpServerUrl,
   type McpClientLike
 } from '../src/adapters/tool/mcp-tool-provider.js'
 import { REDACTED_SECRET } from '../src/config/secret-redaction.js'
@@ -76,6 +77,37 @@ describe('MCP secret references', () => {
 })
 
 describe('MCP tool provider', () => {
+  it('exposes only the reviewed local connector tools and rejects hidden writes', async () => {
+    const config = KunCapabilitiesConfig.parse({ mcp: { enabled: true, servers: { zotero: {
+      transport: 'stdio', command: 'node', trustScope: 'user',
+      toolPolicy: { allowedTools: ['read'], readOnlyTools: ['read'] }
+    } } } })
+    let calls = 0
+    const built = await buildMcpToolProviders(config.mcp, { clientFactory: async () => ({
+      listTools: async () => ({ tools: [{ name: 'read' }, { name: 'delete', annotations: { readOnlyHint: true } }] }),
+      callTool: async () => { calls += 1; return {} }, close: async () => undefined
+    }) })
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(built.providers) })
+    expect((await host.listTools(buildContext('/tmp/project'))).map(tool => tool.name)).toEqual(['mcp_zotero_read'])
+    await expect(host.execute({ callId: 'hidden', toolName: 'mcp_zotero_delete', arguments: {} }, buildContext('/tmp/project'))).rejects.toThrow('unknown tool')
+    expect(calls).toBe(0)
+    await built.close()
+  })
+
+  it('resolves a credential reference only within a fixed endpoint query', () => {
+    const prior = process.env.RAILWISE_MCP_QUERY_FIXTURE
+    process.env.RAILWISE_MCP_QUERY_FIXTURE = 'synthetic value&more'
+    try {
+      const resolved = new URL(resolveMcpServerUrl('https://mcp.example.test/mcp?key=${RAILWISE_MCP_QUERY_FIXTURE}'))
+      expect(resolved.origin).toBe('https://mcp.example.test')
+      expect(resolved.searchParams.get('key')).toBe('synthetic value&more')
+      expect(() => resolveMcpServerUrl('https://mcp.example.test/mcp?key=${RAILWISE_MISSING_QUERY_FIXTURE}')).toThrow('credential is unavailable')
+    } finally {
+      if (prior === undefined) delete process.env.RAILWISE_MCP_QUERY_FIXTURE
+      else process.env.RAILWISE_MCP_QUERY_FIXTURE = prior
+    }
+  })
+
   it('normalizes stable MCP tool names', () => {
     expect(normalizeMcpToolName('GitHub Server', 'Search Issues')).toBe('mcp_github_server_search_issues')
   })
@@ -367,7 +399,7 @@ describe('MCP tool provider', () => {
     expect(callOptions[0]?.signal).toBe(controller.signal)
   })
 
-  it('reconnects and retries once when an MCP tool call fails', async () => {
+  it('reconnects and retries once for an application-reviewed read-only tool', async () => {
     let factories = 0
     let closes = 0
     const config = KunCapabilitiesConfig.parse({
@@ -384,6 +416,7 @@ describe('MCP tool provider', () => {
       }
     })
     const built = await buildMcpToolProviders(config.mcp, {
+      readOnlyTools: { github: ['read'] },
       clientFactory: async () => {
         factories += 1
         const instance = factories
@@ -421,6 +454,30 @@ describe('MCP tool provider', () => {
     expect(result.item.kind === 'tool_result' ? result.item.output : {}).toMatchObject({
       result: { ok: true, instance: 2 }
     })
+  })
+
+  it('keeps an uncertain write as one dispatch even when the server advertises idempotency', async () => {
+    let calls = 0
+    let connections = 0
+    const config = KunCapabilitiesConfig.parse({ mcp: { enabled: true, servers: {
+      fixture: { transport: 'stdio', command: 'node', trustScope: 'user' }
+    } } })
+    const built = await buildMcpToolProviders(config.mcp, {
+      clientFactory: async () => {
+        connections += 1
+        return {
+          listTools: async () => ({ tools: [{ name: 'send', annotations: { idempotentHint: true, readOnlyHint: true } }] }),
+          callTool: async () => { calls += 1; throw new Error('connection closed after response was lost') },
+          close: async () => undefined
+        }
+      }
+    })
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(built.providers) })
+    const result = await host.execute({ callId: 'write', toolName: 'mcp_fixture_send', arguments: {} }, buildContext('/tmp/project'))
+    expect(calls).toBe(1)
+    expect(connections).toBe(1)
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: true, output: { code: 'outcome_unknown' } })
+    await built.close()
   })
 
   it('surfaces deterministic MCP protocol errors as tool results without reconnecting', async () => {

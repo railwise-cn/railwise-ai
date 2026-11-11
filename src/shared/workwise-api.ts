@@ -517,7 +517,7 @@ export type WorkWiseApi = {
   installManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   updateManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
   diagnoseManagedTool: (id: ManagedToolId) => Promise<ManagedToolResult>
-  beginManagedLarkLogin: () => Promise<ManagedLarkLoginResult>
+  beginManagedLarkLogin: (input?: { capability?: 'tasks' | 'mail' | 'im' | 'drive' }) => Promise<ManagedLarkLoginResult>
   completeManagedLarkLogin: () => Promise<ManagedToolResult>
   beginManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
   checkManagedLarkAppSetup: () => Promise<ManagedLarkAppSetupResult>
@@ -561,6 +561,7 @@ export type WorkWiseApi = {
     idempotencyKey: string
   }) => Promise<McpServerConfigV2>
   testMcpServer: (serverId: string, workspaceRoot?: string) => Promise<McpServerStatusV1>
+  openTaskArtifact: (request: { taskId: string; artifactId: string }) => Promise<{ ok: true } | { ok: false; message: string }>
   authorizeMcpServer: (request: {
     serverId: string
     workspaceRoot?: string

@@ -31,6 +31,9 @@ export const TaskNodeStatusSchema = z.enum([
 export const TaskArtifactSchema = z.object({
   id: z.string().min(1),
   relativePath: z.string().min(1),
+  absolutePath: z.string().min(1).optional(),
+  authorizedRoot: z.string().min(1).optional(),
+  executionGrantId: z.string().min(1).optional(),
   mediaType: z.string().optional(),
   format: z.string().optional(),
   sizeBytes: z.number().int().nonnegative().optional(),
@@ -59,6 +62,7 @@ export const TaskAcceptanceSchema = z.object({
   minimumArtifacts: z.number().int().nonnegative().optional(),
   requireFinalResponse: z.boolean(),
   requireActionableArtifactCard: z.boolean(),
+  requiresExternalEffects: z.boolean().optional(),
   effect: z.object({
     provider: z.string(),
     operation: z.string(),
@@ -184,6 +188,7 @@ export const TaskRunSchema = z.object({
   flowRunId: z.string().optional(),
   flowId: z.string().optional(),
   templateId: z.string().optional(),
+  deliveryFormats: z.array(z.enum(['md', 'docx', 'pdf'])).min(1).optional(),
   authority: TaskAuthoritySchema.optional(),
   executionMs: z.number().nonnegative().optional(),
   executionStartedAt: z.string().optional(),

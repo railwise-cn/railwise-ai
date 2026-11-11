@@ -5,7 +5,6 @@ import type { ApplicationMenuAction } from '../shared/workwise-api'
 
 export const WORKWISE_GITHUB_URL = 'https://github.com/railwise-cn/railwise-ai'
 export const WORKWISE_PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
-export const WORKWISE_AUTHOR_URL = 'https://github.com/wangjiawei508'
 export const WORKWISE_PRODUCT_INTRO_URL =
   'https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md'
 export const WORKWISE_RELEASES_URL = `${WORKWISE_GITHUB_URL}/releases`
@@ -66,7 +65,6 @@ type MenuLabels = {
     title: string
     center: string
     productHome: string
-    authorHome: string
     productIntro: string
     github: string
     releases: string
@@ -123,7 +121,6 @@ const LABELS: Record<AppSettingsV1['locale'], MenuLabels> = {
       title: '帮助',
       center: '帮助中心',
       productHome: `${brand.platform} 主页`,
-      authorHome: '个人主页',
       productIntro: '软件介绍',
       github: 'GitHub 项目',
       releases: '版本与下载',
@@ -178,7 +175,6 @@ const LABELS: Record<AppSettingsV1['locale'], MenuLabels> = {
       title: 'Help',
       center: 'Help Center',
       productHome: `${brand.platform} Homepage`,
-      authorHome: 'Personal Homepage',
       productIntro: 'Software Introduction',
       github: 'GitHub Project',
       releases: 'Releases & Downloads',
@@ -275,7 +271,6 @@ export function buildApplicationMenuTemplate(
       submenu: [
         { label: l.help.center, click: send('help-center') },
         { label: l.help.productHome, click: open(WORKWISE_PRODUCT_URL) },
-        { label: l.help.authorHome, click: open(WORKWISE_AUTHOR_URL) },
         { label: l.help.productIntro, click: open(WORKWISE_PRODUCT_INTRO_URL) },
         { type: 'separator' },
         { label: l.help.github, click: open(WORKWISE_GITHUB_URL) },

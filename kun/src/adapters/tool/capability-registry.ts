@@ -4,6 +4,8 @@ import type {
   ToolProviderPolicy
 } from '../../ports/tool-host.js'
 import type { LocalTool } from './local-tool-host.js'
+import type { ToolEffectDefinition } from '../../ports/tool-effect.js'
+import { externalOperationForTool } from '../../services/external-effect-evidence.js'
 import { executionGrantBlock, isToolAdvertisedInSandbox, sandboxBlockForTool } from './sandbox-policy.js'
 
 export type CapabilityToolRecord = {
@@ -82,6 +84,21 @@ export class CapabilityRegistry {
     if (replacement) this.registerProvider(replacement)
   }
 
+  /** Validate a complete provider generation before publishing either index. */
+  validateMcpProviders(replacements: readonly CapabilityToolProvider[]): CapabilityRegistry {
+    if (replacements.some(provider => provider.kind !== 'mcp' || !provider.id.startsWith('mcp:'))) throw new Error('MCP replacement contains another provider kind')
+    const retained = [...this.providers.values()].filter(provider => provider.kind !== 'mcp')
+    return new CapabilityRegistry([...retained, ...replacements])
+  }
+
+  replaceMcpProviders(replacements: readonly CapabilityToolProvider[]): void {
+    const next = this.validateMcpProviders(replacements)
+    this.providers.clear()
+    this.tools.clear()
+    for (const [id, provider] of next.providers) this.providers.set(id, provider)
+    for (const [name, tool] of next.tools) this.tools.set(name, tool)
+  }
+
   listTools(context?: ToolHostContext): CapabilityToolSpec[] {
     const specs: CapabilityToolSpec[] = []
     for (const record of this.tools.values()) {
@@ -133,16 +150,35 @@ export class CapabilityRegistry {
     return [...this.providers.values()].map(providerPolicy)
   }
 
+  describeEffect(toolName: string): ToolEffectDefinition | undefined {
+    const record = this.tools.get(toolName)
+    if (!record) return undefined
+    const effect = record.tool.effect ?? externalOperationForTool(toolName)
+    if (!effect) return undefined
+    const expectedProvider = effect.providerId ?? (effect.provider === 'lark' ? 'lark-cli' : effect.provider)
+    if (record.provider.id !== expectedProvider) return undefined
+    return { ...effect, providerId: record.provider.id }
+  }
+
+  describeAllEffects(): ToolEffectDefinition[] {
+    return [...this.tools.keys()].flatMap(name => {
+      const effect = this.describeEffect(name)
+      return effect ? [effect] : []
+    })
+  }
+
   private canUseProvider(provider: ToolProviderPolicy, context?: ToolHostContext): boolean {
     if (!provider.enabled || !provider.available) return false
     const allowed = context?.allowedProviderIds
     if (allowed && !allowed.includes(provider.id)) return false
     const granted = context?.executionGrant?.allowedProviderIds
     if (granted && !granted.includes(provider.id)) return false
+    // Search routes to individual servers, where both MCP allowlists and the
+    // immutable server fingerprint are checked again before lookup or dispatch.
     const allowedMcp = context?.allowedMcpProviderIds
-    if (provider.kind === 'mcp' && allowedMcp && !allowedMcp.includes(provider.id)) return false
+    if (provider.kind === 'mcp' && allowedMcp && (provider.id === 'mcp:search' ? allowedMcp.length === 0 : !allowedMcp.includes(provider.id))) return false
     const grantedMcp = context?.executionGrant?.allowedMcpProviderIds
-    if (provider.kind === 'mcp' && grantedMcp && !grantedMcp.includes(provider.id)) return false
+    if (provider.kind === 'mcp' && grantedMcp && (provider.id === 'mcp:search' ? grantedMcp.length === 0 : !grantedMcp.includes(provider.id))) return false
     return true
   }
 

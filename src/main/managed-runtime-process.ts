@@ -72,6 +72,7 @@ import { McpConfigService } from './services/mcp-config-service'
 import type { TaskDocumentExportBridge } from './services/task-document-export-service'
 
 let child: ChildProcess | null = null
+let lastManagedRuntimeExit: { code: number | null; signal: NodeJS.Signals | null } | undefined
 let childLogCapture: RuntimeLogCapture | null = null
 let lastResolvedBinary: string | null = null
 let actualManagedRuntimePort: number | null = null
@@ -469,6 +470,7 @@ export async function startManagedRuntimeChild(
               ? 'error' as const
               : 'not_installed' as const,
         ...(larkDiagnosis.status.executablePath ? { executablePath: larkDiagnosis.status.executablePath } : {}),
+        ...(larkDiagnosis.status.installedVersion ? { executableVersion: larkDiagnosis.status.installedVersion } : {}),
         scopes: larkDiagnosis.status.scopes ?? [],
         ...(larkDiagnosis.status.identityFingerprint ? {identityFingerprint:larkDiagnosis.status.identityFingerprint} : {}),
         ...(larkDiagnosis.status.appId ? {appId:larkDiagnosis.status.appId} : {}),
@@ -567,12 +569,14 @@ export async function startManagedRuntimeChild(
     throw error
   }
   const startedChild = child
+  lastManagedRuntimeExit = undefined
   const startedLogCapture = createRuntimeLogCapture(startedChild.pid)
   childLogCapture = startedLogCapture
   startedLogCapture.logLifecycle(`spawned on port ${runtime.port} using data dir ${dataDir}`)
   startedChild.stdout?.on('data', startedLogCapture.captureStdout)
   startedChild.stderr?.on('data', startedLogCapture.captureStderr)
   child.on('exit', (code, signal) => {
+    if (child === startedChild) lastManagedRuntimeExit = { code, signal }
     void startedExportBridge.close()
     if (documentExportBridge === startedExportBridge) documentExportBridge = null
     startedLogCapture.logLifecycle(
@@ -675,6 +679,7 @@ async function updateManagedConnectorConfig(
 export async function syncManagedLarkCapability(dataDir: string, status: {
   state: string
   executablePath?: string
+  installedVersion?: string
   scopes?: string[]
   brand?: 'feishu' | 'lark'
   identityFingerprint?: string
@@ -690,6 +695,7 @@ export async function syncManagedLarkCapability(dataDir: string, status: {
       enabled: lark.enabled !== false,
       authState: ['installed', 'needs_login', 'error'].includes(status.state) ? status.state : 'not_installed',
       ...(status.executablePath ? { executablePath: status.executablePath } : {}),
+      ...(status.installedVersion ? { executableVersion: status.installedVersion } : {}),
       scopes: status.state === 'installed' ? status.scopes ?? [] : [],
       ...(status.state === 'installed' && status.identityFingerprint ? {
         identityFingerprint: status.identityFingerprint,
@@ -767,6 +773,7 @@ export async function syncManagedRuntimeConfig(
     larkCli?: {
       state: 'not_installed' | 'needs_login' | 'installed' | 'error'
       executablePath?: string
+      executableVersion?: string
       scopes?: string[]
       brand?: 'feishu' | 'lark'
       identityFingerprint?:string
@@ -857,6 +864,7 @@ export async function syncManagedRuntimeConfig(
         authState: options?.larkCli?.state ?? 'not_installed',
         // Diagnosis is authoritative. Never revive stale executable/auth/scope config.
         executablePath: options?.larkCli?.executablePath,
+        executableVersion: options?.larkCli?.executableVersion,
         scopes: options?.larkCli?.state === 'installed' ? options.larkCli.scopes ?? [] : [],
         identityFingerprint: options?.larkCli?.state === 'installed' ? options.larkCli.identityFingerprint : undefined,
         appId: options?.larkCli?.state === 'installed' ? options.larkCli.appId : undefined,
@@ -981,6 +989,17 @@ async function readGuiManagedMcpServers(path: string): Promise<Record<string, un
     .filter((entry): entry is readonly [string, Record<string, unknown>] => entry !== null)
 
   return Object.fromEntries(normalizedEntries)
+}
+
+export async function loadManagedMcpConfigForRefresh(
+  dataDir: string,
+  mcpConfigPath: string,
+  servers: Record<string, Record<string, unknown>>
+): Promise<import('../../kun/src/contracts/capabilities.js').McpCapabilityConfig> {
+  const saved = sanitizeRuntimeConfigSections(await readJsonObjectIfExists(join(dataDir, 'config.json')))
+  const current = objectValue(objectValue(saved?.capabilities).mcp)
+  const merged = { ...objectValue(current.servers), ...await readGuiManagedMcpServers(mcpConfigPath), ...servers }
+  return McpCapabilityConfig.parse({ ...current, enabled: Object.values(merged).some(server => objectValue(server).enabled !== false), servers: merged })
 }
 
 function mcpServersFromGuiConfig(config: Record<string, unknown>): Record<string, unknown> {
@@ -1364,8 +1383,11 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {}
 }
 
-export async function stopManagedRuntimeChildAndWait(): Promise<void> {
+export async function stopManagedRuntimeChildAndWait(options: { requireCleanExit?: boolean; timeoutMs?: number } = {}): Promise<void> {
   if (!child) {
+    if (options.requireCleanExit && (!lastManagedRuntimeExit || lastManagedRuntimeExit.code !== 0 || lastManagedRuntimeExit.signal)) {
+      throw new Error('无法确认 Runtime 已正常保存并退出，更新包已保留。')
+    }
     await documentExportBridge?.close()
     documentExportBridge = null
     actualManagedRuntimePort = null
@@ -1386,14 +1408,21 @@ export async function stopManagedRuntimeChildAndWait(): Promise<void> {
       /* already gone */
     }
   }
-  const exited = await waitForChildExit(stoppingChild, RUNTIME_STOP_GRACE_MS)
+  const exited = await waitForChildExit(stoppingChild, options.timeoutMs ?? RUNTIME_STOP_GRACE_MS)
+  if (options.requireCleanExit && !exited) {
+    throw new Error('Runtime 仍在保存并停止，更新包已保留，请稍后重试。')
+  }
   if (!exited) {
     try {
       if (pid) process.kill(pid, 'SIGKILL')
     } catch {
       /* already gone */
     }
-    await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
+    const forcedExit = await waitForChildExit(stoppingChild, RUNTIME_STOP_FORCE_MS)
+    if (!forcedExit) throw new Error('Runtime process exit could not be confirmed.')
+  }
+  if (options.requireCleanExit && stoppingChild.exitCode !== 0) {
+    throw new Error('Runtime 未正常退出，更新已停止。请检查日志后重试。')
   }
   if (child === stoppingChild) child = null
   await documentExportBridge?.close()

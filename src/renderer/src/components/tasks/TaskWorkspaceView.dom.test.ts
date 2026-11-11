@@ -126,6 +126,20 @@ afterEach(async () => {
 })
 
 describe('TaskWorkspaceView', () => {
+  it('opens an authorized external artifact by task identity and displays its file name', async () => {
+    const openTaskArtifact = vi.fn(async () => ({ ok: true as const }))
+    Object.assign(window.workwise, { openTaskArtifact })
+    tasks[0].artifacts = [{ id: 'artifact-external', relativePath: 'reports/result.md', absolutePath: '/authorized-private/reports/result.md', authorizedRoot: '/authorized-private', executionGrantId: 'grant-private', validation: 'valid', sha256: 'a'.repeat(64), createdAt: now }]
+    await act(async () => refreshTaskState())
+    await settle()
+    await click('Monthly report')
+    await click('result.md')
+    expect(openTaskArtifact).toHaveBeenCalledWith({ taskId: 't1', artifactId: 'artifact-external' })
+    expect(onOpenArtifact).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('/authorized-private')
+    expect(container.textContent).not.toContain('grant-private')
+  })
+
   it('keeps Markdown draft delivery available when the document export bridge is unconfigured', async () => {
     await click('Research and documents')
     expect(container.textContent).toContain('The export service is unconfigured')

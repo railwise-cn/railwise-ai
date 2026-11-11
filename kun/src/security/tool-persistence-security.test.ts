@@ -3,6 +3,24 @@ import { createHash } from 'node:crypto'
 import { buildToolArgumentSummary, sanitizeToolResultOutput, sanitizeTurnItemForPersistence } from './tool-persistence-security.js'
 
 describe('typed connector evidence persistence', () => {
+  it('preserves delivery locator and account evidence while omitting message contents', () => {
+    const output = sanitizeToolResultOutput('lark_mail_send', {
+      ok: false, status: 'outcome_unknown', provider: 'lark', backend: 'lark-cli', accountFingerprint: 'a'.repeat(64), operation: 'send', target: 'test@example.com',
+      verificationLocator: { messageId: 'mail-1', recipient: 'test@example.com', body: 'private body', arbitrary: 'private' },
+      data: { body: 'private body' }
+    })
+    expect(output).toMatchObject({ target: 'test@example.com', backend: 'lark-cli', accountFingerprint: 'a'.repeat(64), verificationLocator: { messageId: 'mail-1', recipient: 'test@example.com' } })
+    expect(JSON.stringify(output)).not.toContain('private')
+  })
+  it('shows the complete message and exact target at approval time', () => {
+    const body = '经用户确认的工程内容'.repeat(200)
+    const summary = buildToolArgumentSummary({ toolName: 'lark_mail_send', arguments: { recipient: 'test@example.com', subject: '报告', body } })
+    expect(summary).toContain(body)
+    expect(summary).toContain('External target: test@example.com')
+    expect(summary).toContain(`Content SHA256: ${createHash('sha256').update(body).digest('hex')}`)
+    const persisted = sanitizeTurnItemForPersistence({ id: 'delivery', kind: 'approval', turnId: 't', threadId: 'th', approvalId: 'a', toolName: 'lark_mail_send', summary } as never) as { summary: string }
+    expect(persisted.summary).toBe(summary)
+  })
   it('preserves the complete exact command approval, workspace, lifetime and hashes without truncation', () => {
     const command = `printf '${'c'.repeat(950)}'`, workspace = '/workspace/本地项目'
     const args = { command, ttl_seconds: 120, timeout_seconds: 30, idempotency_key: 'one-only' }

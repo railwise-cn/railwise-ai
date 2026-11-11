@@ -1,3 +1,6 @@
+import { McpConfigService, type McpRuntimeSnapshotV1 } from './services/mcp-config-service'
+import { loadManagedMcpConfigForRefresh } from './managed-runtime-process'
+import { createGuiUpdateShutdown } from './gui-update-shutdown'
 import brand from '../shared/product-brand.json'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, shell, Tray, type MessageBoxOptions } from 'electron'
 import { randomBytes } from 'node:crypto'
@@ -348,6 +351,7 @@ let logDir = ''
 let clawRuntime: ClawRuntime | null = null
 let scheduleRuntime: ScheduleRuntime | null = null
 let managedRuntimesStoppedForQuit = false
+let updateRuntimePrepared = false
 let appBehavior: AppBehaviorConfigV1 = normalizeAppBehaviorSettings()
 let tray: Tray | null = null
 let currentLocale: AppSettingsV1['locale'] = 'en'
@@ -427,7 +431,7 @@ function emitClawChannelActivity(payload: { channelId: string; threadId: string 
   mainWindow.webContents.send('claw:channel-activity', payload)
 }
 
-async function stopManagedRuntimesForQuit(): Promise<void> {
+async function stopManagedRuntimes(requireCleanExit = false): Promise<void> {
   if (managedRuntimesStoppedForQuit) return
   if (!gracefulShutdownPromise) {
     gracefulShutdownPromise = (async () => {
@@ -445,13 +449,31 @@ async function stopManagedRuntimesForQuit(): Promise<void> {
       await imHealthService?.flush()
       imDeliveryLedger?.close()
       imDeliveryLedger = null
-      await managedRuntimeAdapter.stopAndWait()
+      await managedRuntimeAdapter.stopAndWait(requireCleanExit ? { requireCleanExit: true, timeoutMs: 30_000 } : undefined)
       await candidateServiceReservations?.close()
       candidateServiceReservations = null
-    })()
+    })().catch(error => {
+      gracefulShutdownPromise = null
+      throw error
+    })
   }
+  await gracefulShutdownPromise
+  managedRuntimesStoppedForQuit = true
+}
+
+const stopManagedRuntimesForUpdate = createGuiUpdateShutdown(async () => {
+  // Native updater and acceptance callers also pass through the Runtime fence.
+  if (!updateRuntimePrepared) {
+    const response = await runtimeRequest(await store.load(), '/v1/runtime/update/prepare', { method: 'POST', body: '{}' })
+    if (!response.ok || JSON.parse(response.body).ok !== true) throw new Error('运行任务尚未确认安全停止，请从升级按钮重新检查。')
+    updateRuntimePrepared = true
+  }
+  await stopManagedRuntimes(true)
+})
+
+async function stopManagedRuntimesForQuit(): Promise<void> {
   const timeout = new Promise<void>((resolve) => setTimeout(resolve, 5_000))
-  await Promise.race([gracefulShutdownPromise, timeout])
+  await Promise.race([stopManagedRuntimes(), timeout])
   managedRuntimesStoppedForQuit = true
 }
 
@@ -463,7 +485,7 @@ async function loadGuiUpdaterModule(): Promise<GuiUpdaterModule> {
           module.initializeGuiUpdater(
             () => mainWindow,
             async () => (await store.load()).guiUpdate.channel,
-            stopManagedRuntimesForQuit,
+            stopManagedRuntimesForUpdate,
             showGuiUpdateAvailableNotification
           )
           guiUpdaterInitialized = true
@@ -866,29 +888,6 @@ function queueRuntimeSettingsApply(prev: AppSettingsV1, next: AppSettingsV1): vo
   runtimeSettingsApplyPromise = task
 }
 
-function queueRuntimeMcpConfigApply(settings: AppSettingsV1): void {
-  lastAppliedSettings = settings
-
-  const previousTask = runtimeSettingsApplyPromise ?? Promise.resolve()
-  const task = previousTask
-    .catch(() => undefined)
-    .then(async () => {
-      const current = lastAppliedSettings ?? settings
-      await restartManagedRuntimeForMcpConfigChange(current)
-    })
-    .catch((error: unknown) => {
-      logWarn('mcp-config', 'Failed to apply RailWise AI Runtime MCP config change in background', {
-        message: error instanceof Error ? error.message : String(error)
-      })
-    })
-    .finally(() => {
-      if (runtimeSettingsApplyPromise === task) {
-        runtimeSettingsApplyPromise = null
-      }
-    })
-
-  runtimeSettingsApplyPromise = task
-}
 
 async function waitForQueuedRuntimeSettingsApply(): Promise<void> {
   if (!runtimeSettingsApplyPromise) return
@@ -907,6 +906,7 @@ function runtimeFingerprint(settings: AppSettingsV1): string {
 }
 
 async function ensureRuntime(settings: AppSettingsV1): Promise<void> {
+  if (updateRuntimePrepared) throw new Error('应用正在完成更新，Runtime 保持停止。')
   const fingerprint = runtimeFingerprint(settings)
   const pending = runtimeEnsurePromise
   if (pending) {
@@ -1165,26 +1165,6 @@ async function restartManagedRuntimeForSettingsChange(
   }
 }
 
-async function restartManagedRuntimeForMcpConfigChange(settings: AppSettingsV1): Promise<void> {
-  const runtime = resolveManagedRuntimeSettings(settings)
-  const adapter = managedRuntimeAdapter
-  const wasRunning = adapter.isChildRunning()
-
-  if (!wasRunning) return
-  await waitForManagedRuntimeReadyBeforeStop(settings, 'mcp-config')
-  await adapter.stopAndWait()
-  if (!runtime.autoStart) return
-
-  try {
-    await adapter.ensureRunning(settings)
-    const healthy = await waitForRuntimeHealth(settings, 20_000)
-    if (!healthy) {
-      console.warn('[workwise] RailWise AI Runtime restart did not become healthy after MCP config change')
-    }
-  } catch (e) {
-    console.warn('[workwise] RailWise AI Runtime restart failed after MCP config change:', e)
-  }
-}
 
 async function waitForManagedRuntimeReadyBeforeStop(
   settings: AppSettingsV1,
@@ -1493,8 +1473,34 @@ app.whenReady().then(async () => {
     return fetchUpstreamModelIds(settings, key)
   }
 
+  const mcpConfigService = new McpConfigService(candidateRuntimePaths ? {
+    manifestPath: join(candidateRuntimePaths.workwiseHome, 'mcp-v2.json'),
+    legacyPath: join(candidateRuntimePaths.workwiseHome, 'mcp.json'),
+    credentialRoot: join(candidateRuntimePaths.workwiseHome, 'credentials', 'mcp')
+  } : {})
+  let mcpApplyRevision = Date.now()
+  let mcpApplyQueue = Promise.resolve()
+  const applyMcpServers = (snapshot: McpRuntimeSnapshotV1): Promise<void> => {
+    const apply = mcpApplyQueue.catch(() => undefined).then(async () => {
+      const settings = await store.load()
+      const dataDir = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'runtime') : resolveManagedRuntimeDataDir(resolveManagedRuntimeSettings(settings))
+      const path = candidateRuntimePaths ? join(candidateRuntimePaths.workwiseHome, 'mcp.json') : resolveRuntimeMcpJsonPath()
+      const config = await loadManagedMcpConfigForRefresh(dataDir, path, snapshot.servers)
+      const response = await runtimeRequest(settings, '/v1/runtime/mcp-config', {
+        method: 'POST', body: JSON.stringify({ config, environment: snapshot.environment, revision: ++mcpApplyRevision })
+      })
+      const result = response.ok ? JSON.parse(response.body) as { ok?: unknown } : undefined
+      if (!response.ok || result?.ok !== true) throw new Error('连接配置已保存，但 Runtime 尚未完成更新。请重试检查或启用。')
+    })
+    mcpApplyQueue = apply
+    return apply
+  }
+
   registerAppIpcHandlers({
     store,
+    mcpConfigService,
+    onMcpServersChanged: applyMcpServers,
+    onGuiUpdatePrepared: () => { updateRuntimePrepared = true },
     getMainWindow: () => mainWindow,
     applySettingsPatch,
     runtimeRequest: async (path, method, body) => {
@@ -1554,8 +1560,7 @@ app.whenReady().then(async () => {
       return { ok: true, status }
     },
     onRuntimeMcpConfigWritten: async () => {
-      const settings = await store.load()
-      queueRuntimeMcpConfigApply(settings)
+      await applyMcpServers(await mcpConfigService.runtimeSnapshot())
     },
     showTurnCompleteNotification,
     getAppVersion: () => app.getVersion(),

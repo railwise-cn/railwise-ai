@@ -30,12 +30,14 @@ import {
 } from './read-tracker.js'
 import { effectiveApprovalPolicy, sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
 import { defineLocalTool } from './local-tool-definition.js'
+import type { ToolEffectDefinition } from '../../ports/tool-effect.js'
 
 /**
  * A single registered tool. Tools are pure functions that observe the
  * abort signal and may be guarded by an approval policy.
  */
 export type LocalTool = {
+  effect?: ToolEffectDefinition
   name: string
   description: string
   inputSchema: Record<string, unknown>
@@ -107,6 +109,10 @@ export class LocalToolHost implements ToolHost {
 
   diagnostics() {
     return this.registry.diagnostics()
+  }
+
+  describeEffect(toolName: string): ToolEffectDefinition | undefined {
+    return this.registry.describeEffect(toolName)
   }
 
   async execute(
@@ -226,8 +232,13 @@ export class LocalToolHost implements ToolHost {
       }
       context.assertExecution?.()
       if (needsApproval) context.recordExplicitApproval?.({ toolName: activeCall.toolName, requestHash: approvedRequestHash })
+      await context.claimTaskPermission?.()
+      context.assertExecution?.()
+      if (context.abortSignal.aborted) throw new Error('Tool call aborted before dispatch')
       const finishWork = context.beginExecutionWork?.()
-      try { result = await tool.execute(activeCall.arguments, {
+      try {
+        context.recordToolDispatch?.()
+        result = await tool.execute(activeCall.arguments, {
         ...context,
         explicitApproval: needsApproval ? { callId: activeCall.callId, toolName: activeCall.toolName, requestHash: approvedRequestHash } : undefined
       }, async (update) => {

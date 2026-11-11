@@ -1074,3 +1074,6 @@ export const _internals = {
   PROMOTE_SCRIPT,
   CLEANUP_ACCEPTANCE_SCRIPT
 }
+
+/** Shared pinned SSH transport for immutable public dependency assets. */
+export const websiteStaticTransport = { readSshConfig, runRemote, copyDirectory }

@@ -43,6 +43,8 @@ describe('external task capability preflight', () => {
   })
 
   it('recognizes direct sends, transfers, and detail reads as platform operations', () => {
+    expect(externalTaskIntent('完成报告并通过飞书发送邮件')).toMatchObject({ provider: 'lark', operation: 'send' })
+    expect(externalTaskIntent('完成报告并上传到飞书云盘')).toMatchObject({ provider: 'lark', operation: 'upload' })
     expect(externalTaskIntent('帮我发送飞书消息')).toMatchObject({ provider: 'lark', operation: 'send', mutation: true })
     expect(externalTaskIntent('转交钉钉审批')).toMatchObject({ provider: 'dingtalk', operation: 'transfer', mutation: true })
     expect(externalTaskIntent('查看飞书审批详情')).toMatchObject({ provider: 'lark', operation: 'detail', mutation: false })

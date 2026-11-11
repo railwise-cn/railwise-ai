@@ -1526,7 +1526,7 @@ export function MessageBubble({ block, nested = false, professionalSurface = fal
             {t('approvalTool', { name: block.toolName })}
           </div>
         ) : null}
-        <p className="mt-2 whitespace-pre-wrap text-[14px] text-ds-ink">{block.summary}</p>
+        <p className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap break-words text-[14px] text-ds-ink">{block.summary}</p>
         {block.errorMessage ? (
           <p className="mt-2 text-[12px] text-red-700 dark:text-red-300">{block.errorMessage}</p>
         ) : null}

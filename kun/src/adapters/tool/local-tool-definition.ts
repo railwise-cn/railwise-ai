@@ -19,6 +19,7 @@ export function defineLocalTool(
     inputSchema: tool.inputSchema,
     toolKind: tool.toolKind ?? 'tool_call',
     execute: tool.execute,
+    ...(tool.effect ? { effect: tool.effect } : {}),
     ...(tool.requireExplicitApproval ? { requireExplicitApproval: true } : {}),
     ...(tool.shouldAdvertise ? { shouldAdvertise: tool.shouldAdvertise } : {})
   }

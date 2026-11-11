@@ -21,19 +21,18 @@ const ACTIONS = {
   dingtalk_get_task: { provider: 'dingtalk', operation: 'detail', scopes: [DINGTALK_SCOPES.todoRead] },
   dingtalk_get_approval: { provider: 'dingtalk', operation: 'detail', scopes: [DINGTALK_SCOPES.workflowRead] }
 } as const
-const toolNames = Object.keys(ACTIONS) as [keyof typeof ACTIONS, ...Array<keyof typeof ACTIONS>]
 // This bound ensures every target is fully visible in the persisted approval.
 const requestSchema = z.object({
   expected_revision: z.number().int().nonnegative().describe('The effect scope revision from get_external_effect_scope, not the general TaskRun revision.'),
   idempotency_key: z.string().trim().min(1).max(200),
-  effects: z.array(z.object({ tool_name: z.enum(toolNames), target: z.string().regex(/^[A-Za-z0-9_.:-]{1,64}$/) }).strict()).min(1).max(8)
+  effects: z.array(z.object({ tool_name: z.string().trim().min(1).max(200), target: z.string().trim().min(1).max(512).refine(value => !/[\r\n\t]/.test(value)) }).strict()).min(1).max(8)
 }).strict()
 
 /** The approval fixes the whole task's finite success set; it is not a provider grant. */
 export function buildExternalEffectScopeToolProviders(tasks: TaskController): CapabilityToolProvider[] {
   const current = (context: ToolHostContext) => {
     const task = tasks.activeTask(context.threadId)
-    return task?.activeTurnId === context.turnId && task.acceptance.kind === 'effect' && task.acceptance.effect ? task : null
+    return task?.activeTurnId === context.turnId && task.acceptance.effect ? task : null
   }
   return [{ id: 'effect-scope', kind: 'built-in', enabled: true, available: true, tools: [
     defineLocalTool({
@@ -58,14 +57,16 @@ export function buildExternalEffectScopeToolProviders(tasks: TaskController): Ca
         const task = current(context)
         if (!task) throw Object.assign(new Error('No active external task for this Turn.'), { code: 'effect_scope_required' })
         const effects: RequiredEffect[] = request.effects.map(item => {
-          const spec = ACTIONS[item.tool_name]
-          const providerId = spec.provider === 'lark' ? 'lark-cli' : 'dingtalk'
+          const spec = tasks.describeToolEffect(item.tool_name)
+          if (!spec || spec.operation === 'list') throw Object.assign(new Error('This tool does not define a trusted target operation.'), { code: 'effect_scope_required' })
+          const providerId = spec.providerId ?? (spec.provider === 'lark' ? 'lark-cli' : spec.provider)
           const grant = context.executionGrant
           if (spec.provider !== task.acceptance.effect!.provider || !grant || (grant.allowedProviderIds && !grant.allowedProviderIds.includes(providerId)) || (grant.allowedToolNames && !grant.allowedToolNames.includes(item.tool_name))) {
             throw Object.assign(new Error('An action is outside the current task grant.'), { code: 'execution_grant_scope' })
           }
-          assertGrantConnectorScopes(spec.scopes, context)
-          return { provider: spec.provider, operation: spec.operation, target: item.target, requiredScopes: [...spec.scopes], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' }
+          const scopes = spec.requiredScopes ?? ACTIONS[item.tool_name as keyof typeof ACTIONS]?.scopes ?? []
+          assertGrantConnectorScopes(scopes, context)
+          return { provider: spec.provider, operation: spec.operation, target: item.target, requiredScopes: [...scopes], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback' }
         })
         const updated = tasks.confirmEffectScope(context.turnId, request.expected_revision, request.idempotency_key, effects)
         return { output: { taskId: updated.id, revision: updated.acceptance.effect!.scopeRevision, taskRevision: updated.revision, scopeConfirmationId: updated.acceptance.effect!.scopeConfirmationId, requiredEffects: updated.acceptance.effect!.requiredEffects, status: 'scope_confirmed' } }

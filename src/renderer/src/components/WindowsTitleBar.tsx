@@ -16,7 +16,6 @@ type TitleBarTranslate = (key: string, options?: Record<string, unknown>) => str
 
 const WORKWISE_GITHUB_URL = 'https://github.com/railwise-cn/railwise-ai'
 const WORKWISE_PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
-const WORKWISE_AUTHOR_URL = 'https://github.com/wangjiawei508'
 const WORKWISE_PRODUCT_INTRO_URL =
   'https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md'
 const WORKWISE_RELEASES_URL = `${WORKWISE_GITHUB_URL}/releases`
@@ -46,7 +45,6 @@ export type WindowsTitleBarActions = {
   openSettings: MenuAction
   openHelp: MenuAction
   openProductHome: MenuAction
-  openAuthorHome: MenuAction
   openProductIntro: MenuAction
   openGithubHome: MenuAction
   openReleases: MenuAction
@@ -155,7 +153,6 @@ export function buildWindowsTitleBarMenuSections(
       items: [
         { id: 'help-center', label: t('windowsMenuHelpCenter'), onSelect: actions.openHelp },
         { id: 'product-home', label: t('windowsMenuProductHome'), onSelect: actions.openProductHome },
-        { id: 'author-home', label: t('windowsMenuAuthorHome'), onSelect: actions.openAuthorHome },
         { id: 'product-intro', label: t('windowsMenuProductIntro'), onSelect: actions.openProductIntro },
         { kind: 'separator', id: 'help-1' },
         { id: 'github-home', label: t('windowsMenuGithubHome'), onSelect: actions.openGithubHome },
@@ -225,7 +222,6 @@ export function WindowsTitleBar({ platform, actions }: Props): ReactElement | nu
     openSettings: () => openSettings('general'),
     openHelp: () => openSettings('help'),
     openProductHome: () => defaultOpenExternal(WORKWISE_PRODUCT_URL),
-    openAuthorHome: () => defaultOpenExternal(WORKWISE_AUTHOR_URL),
     openProductIntro: () => defaultOpenExternal(WORKWISE_PRODUCT_INTRO_URL),
     openGithubHome: () => defaultOpenExternal(WORKWISE_GITHUB_URL),
     openReleases: () => defaultOpenExternal(WORKWISE_RELEASES_URL),

@@ -7,7 +7,7 @@ export type ExternalTaskProvider = z.infer<typeof ExternalTaskProviderSchema>
 export const TaskIntentSchema = z.object({
   kind: z.enum(['chat', 'status', 'external_task', 'connect_provider', 'workspace_action']),
   provider: ExternalTaskProviderSchema.optional(),
-  operation: z.enum(['list', 'detail', 'approve', 'reject', 'complete', 'send', 'transfer']).optional(),
+  operation: z.enum(['list', 'detail', 'approve', 'reject', 'complete', 'send', 'transfer', 'upload']).optional(),
   target: z.string().optional(), mutation: z.boolean(), confidence: z.enum(['rule', 'model_fallback'])
 })
 export type TaskIntent = z.infer<typeof TaskIntentSchema>
@@ -34,6 +34,8 @@ export const ResultEvidenceSchema = z.object({
   kind: z.enum(['external_operation', 'file', 'tool_result', 'human_confirmation']),
   provider: z.string(), operation: z.string(), target: z.string().min(1), status: z.string().min(1),
   verified: z.boolean(), verifiedAt: z.string(), remoteOperationId: z.string().min(1).optional(),
+  backend: z.enum(['dws', 'openapi', 'lark-cli']).optional(),
+  accountFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   resultHash: z.string().min(1), sourceVersion: z.string().optional(), targetVersion: z.string().optional()
 })
 export type ResultEvidence = z.infer<typeof ResultEvidenceSchema>

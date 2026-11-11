@@ -32,7 +32,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
     setSnapshot(permission); setTask(current); setConfirmed(false)
     const scope = permission.grant?.scope
     setScopeFields({ readPaths: (scope?.readPaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
-      writePaths: (scope?.writePaths ?? (permission.sandboxMode !== 'read-only' && permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
+      writePaths: permission.sandboxMode === 'read-only' ? '' : (scope?.writePaths ?? (permission.workspaceRoot ? [permission.workspaceRoot] : [])).join('\n'),
       networkOrigins: scope?.networkOrigins?.join('\n') ?? '', providerIds: scope?.providerIds?.join('\n') ?? '', externalTargets: scope?.externalTargets?.join('\n') ?? '' })
     const [agents, thread] = await Promise.all([
       window.workwise.listAgentProfiles(permission.workspaceRoot),

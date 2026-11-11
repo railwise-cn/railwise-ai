@@ -24,8 +24,8 @@ export function externalTaskIntent(text: string): TaskIntent | null {
   const hasWorkIntent = WORK.test(value)
   const provider = ding ? 'dingtalk' : 'lark'
   const operation = /拒绝|驳回|reject/i.test(value) ? 'reject' : /转交|转办|transfer/i.test(value) ? 'transfer'
-    : /同意|批准|自动审批|approve\b/i.test(value) ? 'approve' : /完成|complete\b/i.test(value) ? 'complete'
-    : /上传|upload\b/i.test(value) ? 'upload' : /发送|发(?:一封)?邮件|发(?:一条)?消息|send\b/i.test(value) ? 'send' : /详情|detail/i.test(value) ? 'detail' : /查询|列出|查看|列表|list\b|show\b/i.test(value) ? 'list' : undefined
+    : /同意|批准|自动审批|approve\b/i.test(value) ? 'approve'
+    : /上传|upload\b/i.test(value) ? 'upload' : /发送|发(?:一封)?邮件|发(?:一条)?消息|send\b/i.test(value) ? 'send' : /完成|complete\b/i.test(value) ? 'complete' : /详情|detail/i.test(value) ? 'detail' : /查询|列出|查看|列表|list\b|show\b/i.test(value) ? 'list' : undefined
   return { kind: CONNECT.test(value) && !hasWorkIntent ? 'connect_provider' : 'external_task', provider, operation,
     mutation: operation ? ['approve', 'reject', 'complete', 'send', 'transfer', 'upload'].includes(operation) : /处理|办理|代办|办结/.test(value), confidence: 'rule' }
 }

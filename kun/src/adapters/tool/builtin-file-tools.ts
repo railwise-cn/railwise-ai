@@ -1,4 +1,5 @@
 import { dirname } from 'node:path'
+import { createHash } from 'node:crypto'
 import type { LocalTool } from './local-tool-host.js'
 import { defineLocalTool } from './local-tool-definition.js'
 import {
@@ -66,7 +67,8 @@ export function createWriteLocalTool(_options: WriteLocalToolOptions = {}): Loca
           output: {
             path: absolutePath,
             relative_path: relativePath,
-            bytes_written: Buffer.byteLength(content, 'utf8')
+            bytes_written: Buffer.byteLength(content, 'utf8'),
+            sha256: createHash('sha256').update(content, 'utf8').digest('hex')
           }
         }
       })
@@ -147,6 +149,7 @@ export function createEditLocalTool(_options: EditLocalToolOptions = {}): LocalT
             relative_path: relativePath,
             replacements: edits.length,
             bytes_written: Buffer.byteLength(next, 'utf8'),
+            sha256: createHash('sha256').update(next, 'utf8').digest('hex'),
             diff,
             patch,
             first_changed_line: firstChangedLine(baseContent, newContent)

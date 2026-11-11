@@ -46,6 +46,9 @@ export type RevisionMutation = {
 export type TaskArtifactV1 = {
   id: string
   relativePath: string
+  absolutePath?: string
+  authorizedRoot?: string
+  executionGrantId?: string
   mediaType?: string
   format?: string
   sizeBytes?: number
@@ -62,6 +65,7 @@ export type TaskAcceptanceV1 = {
   minimumArtifacts?: number
   requireFinalResponse: boolean
   requireActionableArtifactCard: boolean
+  requiresExternalEffects?: boolean
   effect?: Omit<TaskRequiredEffectV1, 'target'> & { target?: string; requiredEffects?: TaskRequiredEffectV1[] }
 }
 
@@ -91,6 +95,8 @@ export type TaskResultEvidenceV1 = {
 
 /** Read-only projection: raw requests, results, credentials and execution IDs stay in Runtime. */
 export type TaskOperationReceiptV1 = {
+  purpose?: 'assistant_reply'
+  phase?: 'upload' | 'send'
   id: string
   taskId: string
   provider: string
@@ -383,6 +389,7 @@ export type McpServerStatusV1 = {
   authorized: boolean
   latencyMs?: number
   message?: string
+  errorCode?: 'missing_credentials' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable'
   authorizationUrl?: string
   authorizationState?: string
   authorizationCallback?: 'loopback' | 'manual'

@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { createHash } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -12,6 +13,7 @@ import { redactSecretText } from '../../config/secret-redaction.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import type { CapabilityToolProvider } from './capability-registry.js'
 import { LocalToolHost, type LocalTool } from './local-tool-host.js'
+import { assertGrantAllowsNetwork } from './sandbox-policy.js'
 import {
   createMcpSearchProvider,
   mcpSearchDiagnostic,
@@ -67,15 +69,21 @@ export type McpServerDiagnostic = {
 }
 
 export type McpToolProviderBuildResult = {
+  authorityFingerprints: Record<string, string>
   providers: CapabilityToolProvider[]
   diagnostics: McpServerDiagnostic[]
   search: McpSearchRuntimeDiagnostic
   connectedServers: number
   toolCount: number
   close: () => Promise<void>
+  retire: () => void
 }
 
 export type McpToolProviderOptions = {
+  /** Trusted main-process credential snapshot, held only by this generation. */
+  environment?: Readonly<Record<string, string>>
+  /** Reviewed application policy. Server-provided hints alone do not authorize replay. */
+  readOnlyTools?: Readonly<Record<string, readonly string[]>>
   clientFactory?: (serverId: string, server: McpServerConfig) => Promise<McpClientLike>
   nowIso?: () => string
   /**
@@ -87,8 +95,16 @@ export type McpToolProviderOptions = {
 }
 
 const DEFAULT_MCP_STARTUP_CONNECT_TIMEOUT_MS = 10_000
+const executionContext = new AsyncLocalStorage<ToolHostContext>()
 
 type McpConnectionState = {
+  configurationFingerprint: string
+  authorityFingerprint: string
+  retired: boolean
+  pendingCalls: Set<Promise<unknown>>
+  retiredClients: Set<Promise<void>>
+  reconnecting?: Promise<McpClientLike>
+  readOnlyTools: ReadonlySet<string>
   serverId: string
   server: McpServerConfig
   client: McpClientLike
@@ -112,7 +128,6 @@ export async function buildMcpToolProviders(
   const catalogState: McpSearchCatalogState = { records: [] }
   const mcp = config
   const nowIso = options.nowIso ?? (() => new Date().toISOString())
-  const clientFactory = options.clientFactory ?? createSdkMcpClient
   if (!mcp?.enabled) {
     return {
       providers,
@@ -134,7 +149,9 @@ export async function buildMcpToolProviders(
       }),
       connectedServers: 0,
       toolCount: 0,
-      close: async () => undefined
+      authorityFingerprints: {},
+      close: async () => undefined,
+      retire: () => undefined
     }
   }
 
@@ -158,8 +175,17 @@ export async function buildMcpToolProviders(
         return { serverId, server, status: 'disabled' }
       }
       const attempt = (async () => {
+        const environment = mcpCredentialEnvironment(server, options.environment)
+        const clientFactory = options.clientFactory ?? ((id: string, configuration: McpServerConfig) => createSdkMcpClient(id, configuration, environment))
+        const authorityFingerprint = mcpAuthorityFingerprint(server, environment)
         const client = await clientFactory(serverId, server)
         const state: McpConnectionState = {
+          configurationFingerprint: authorityFingerprint,
+          authorityFingerprint,
+          retired: false,
+          pendingCalls: new Set(),
+          retiredClients: new Set(),
+          readOnlyTools: new Set(server.toolPolicy?.readOnlyTools ?? options.readOnlyTools?.[serverId] ?? []),
           serverId,
           server,
           client,
@@ -167,8 +193,14 @@ export async function buildMcpToolProviders(
           nowIso,
           lastConnectedAt: nowIso()
         }
-        const listed = await refreshMcpConnectionCatalog(state)
-        return { state, listed }
+        try {
+          const listed = await refreshMcpConnectionCatalog(state)
+          if (server.toolPolicy && listed.length === 0) throw new Error('The configured connector did not provide any of its reviewed tools.')
+          return { state, listed }
+        } catch (error) {
+          await client.close().catch(() => undefined)
+          throw error
+        }
       })()
       try {
         const result = await raceStartupTimeout(attempt, startupTimeoutMs, serverId)
@@ -248,10 +280,17 @@ export async function buildMcpToolProviders(
       advertisedToolCount,
       state: catalogState
     }),
-    connectedServers,
-    toolCount,
+    get connectedServers() { return diagnostics.filter(server => server.status === 'connected').length },
+    get toolCount() { return diagnostics.filter(server => server.available).reduce((total, server) => total + server.toolCount, 0) },
+    get authorityFingerprints() { return Object.fromEntries(connected.map(state => [`mcp:${state.serverId}`, state.authorityFingerprint])) },
+    retire: () => { for (const state of connected) state.retired = true },
     close: async () => {
-      await Promise.all(connected.map((state) => state.client.close().catch(() => undefined)))
+      for (const state of connected) state.retired = true
+      await Promise.all(connected.map(async state => {
+        await Promise.allSettled([...state.pendingCalls])
+        await Promise.allSettled([...state.retiredClients])
+        await state.client.close().catch(() => undefined)
+      }))
     }
   }
 }
@@ -269,9 +308,48 @@ export function isMcpServerTrusted(server: McpServerConfig, workspace: string): 
   })
 }
 
-async function createSdkMcpClient(serverId: string, server: McpServerConfig): Promise<McpClientLike> {
-  const client = new Client({ name: `workwise-${serverId}`, version: '0.1.0' })
-  const transport = createTransport(server)
+function allowsMcpNetwork(server: McpServerConfig, context: ToolHostContext): boolean {
+  if (!server.url) return true
+  try { assertGrantAllowsNetwork(server.url, context); return true } catch { return false }
+}
+
+function mcpAuthorityFingerprint(server: McpServerConfig, environment?: Readonly<Record<string, string>>): string {
+  return createHash('sha256').update(JSON.stringify({ ...server, env: resolveMcpSecrets(server.env, environment),
+    headers: resolveMcpSecrets(server.headers, environment), url: server.url ? resolveMcpServerUrl(server.url, environment) : undefined })).digest('hex')
+}
+
+function mcpCredentialEnvironment(server: McpServerConfig, snapshot?: Readonly<Record<string, string>>): Record<string, string> {
+  const values = [...Object.values(server.env), ...Object.values(server.headers)]
+  if (server.url) values.push(...new URL(server.url).searchParams.values())
+  const environment: Record<string, string> = {}
+  for (const value of values) {
+    const match = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/.exec(value)
+    if (!match) continue
+    const key = match[1]!
+    // V2 deletions must revoke old injected credentials. Explicit legacy env
+    // references keep their existing reader, captured once for this generation.
+    const secret = snapshot?.[key] ?? (snapshot && key.startsWith('WORKWISE_MCP_SECRET_') ? undefined : process.env[key])
+    if (secret !== undefined) environment[key] = secret
+  }
+  return environment
+}
+
+function matchesMcpAuthority(state: McpConnectionState, context: ToolHostContext): boolean {
+  if (state.retired || state.diagnostic?.available === false) return false
+  const providerId = `mcp:${state.serverId}`
+  for (const allowed of [context.allowedMcpProviderIds, context.executionGrant?.allowedMcpProviderIds]) {
+    if (allowed && !allowed.includes(providerId) && !allowed.includes(state.serverId)) return false
+  }
+  return !context.executionGrant || context.executionGrant.connectorIdentityFingerprints?.[providerId] === state.authorityFingerprint
+}
+
+function assertMcpAuthority(state: McpConnectionState, context: ToolHostContext): void {
+  if (!matchesMcpAuthority(state, context)) throw Object.assign(new Error('MCP configuration or account changed. Resume the task with a newly authorized execution.'), { code: 'connector_configuration_changed' })
+}
+
+async function createSdkMcpClient(serverId: string, server: McpServerConfig, environment?: Readonly<Record<string, string>>): Promise<McpClientLike> {
+  const client = new Client({ name: `railwise-ai-${serverId}`, version: '0.1.0' })
+  const transport = createTransport(server, environment)
   await client.connect(transport, { timeout: server.timeoutMs })
   return {
     listTools: (options) => {
@@ -281,49 +359,66 @@ async function createSdkMcpClient(serverId: string, server: McpServerConfig): Pr
         timeout: options?.timeout
       })
     },
-    callTool: (input, options) => client.callTool(input, undefined, options),
+    callTool: (input, options) => client.callTool(input, undefined, { signal: options?.signal, timeout: options?.timeout }),
     close: () => client.close()
   }
 }
 
-function createTransport(server: McpServerConfig): Transport {
-  const env = resolveMcpSecrets(server.env)
-  const headers = resolveMcpSecrets(server.headers)
+function createTransport(server: McpServerConfig, environment?: Readonly<Record<string, string>>): Transport {
+  const env = resolveMcpSecrets(server.env, environment)
+  const headers = resolveMcpSecrets(server.headers, environment)
   switch (server.transport) {
     case 'stdio':
       return new StdioClientTransport({
         command: server.command ?? '',
         args: server.args,
+        cwd: server.cwd,
         env,
         stderr: 'pipe'
       })
     case 'streamable-http':
-      return new StreamableHTTPClientTransport(new URL(server.url ?? ''), {
-        requestInit: { headers }
+      return new StreamableHTTPClientTransport(new URL(resolveMcpServerUrl(server.url ?? '', environment)), {
+        requestInit: { headers }, fetch: scopedMcpFetch(headers)
       })
     case 'sse':
-      return new SSEClientTransport(new URL(server.url ?? ''), {
+      return new SSEClientTransport(new URL(resolveMcpServerUrl(server.url ?? '', environment)), {
         requestInit: { headers },
-        eventSourceInit: { fetch: fetchWithHeaders(headers) }
+        fetch: scopedMcpFetch(headers),
+        eventSourceInit: { fetch: scopedMcpFetch(headers) }
       })
   }
 }
 
-export function resolveMcpSecrets(values: Record<string, string>): Record<string, string> {
+/** Only complete query values can reference secrets. The configured origin and path stay fixed. */
+export function resolveMcpServerUrl(value: string, environment: Readonly<Record<string, string | undefined>> = process.env): string {
+  const url = new URL(value)
+  for (const [key, query] of url.searchParams) {
+    const match = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/.exec(query)
+    if (!match) continue
+    const secret = environment[match[1]!]
+    if (!secret) throw Object.assign(new Error('The connector credential is unavailable. Configure this connection and retry.'), { code: 'connector_credentials_missing' })
+    url.searchParams.set(key, secret)
+  }
+  return url.href
+}
+
+export function resolveMcpSecrets(values: Record<string, string>, environment: Readonly<Record<string, string | undefined>> = process.env): Record<string, string> {
   return Object.fromEntries(Object.entries(values).map(([key, value]) => {
     const match = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/.exec(value)
     if (!match) return [key, value]
-    return [key, process.env[match[1]!] ?? '']
+    return [key, environment[match[1]!] ?? '']
   }))
 }
 
-function fetchWithHeaders(headers: Record<string, string>): typeof fetch {
+function scopedMcpFetch(headers: Record<string, string>): typeof fetch {
   return (input, init) => {
+    const context = executionContext.getStore()
+    if (context) assertGrantAllowsNetwork(input instanceof Request ? input.url : String(input), context)
     const mergedHeaders = new Headers(init?.headers)
     for (const [key, value] of Object.entries(headers)) {
       mergedHeaders.set(key, value)
     }
-    return fetch(input, { ...init, headers: mergedHeaders })
+    return fetch(input, { ...init, headers: mergedHeaders, redirect: 'error' })
   }
 }
 
@@ -336,19 +431,19 @@ function createMcpLocalTool(
     description: descriptor.description ?? `MCP tool ${descriptor.name} from ${state.serverId}`,
     inputSchema: descriptor.inputSchema ?? { type: 'object' },
     policy: policyFromAnnotations(descriptor.annotations),
-    shouldAdvertise: (context: ToolHostContext) => isMcpServerTrusted(state.server, context.workspace),
+    shouldAdvertise: (context: ToolHostContext) => matchesMcpAuthority(state, context) && isMcpServerTrusted(state.server, context.workspace) && allowsMcpNetwork(state.server, context),
     execute: async (args, context) => {
+      assertMcpAuthority(state, context)
       if (!isMcpServerTrusted(state.server, context.workspace)) {
         return {
           output: { error: `MCP server ${state.serverId} is not trusted for this workspace` },
           isError: true
         }
       }
-      const result = await callMcpToolWithReconnect(
-        state,
-        { name: descriptor.name, arguments: args },
-        context.abortSignal
-      )
+      if (state.server.url) assertGrantAllowsNetwork(state.server.url, context)
+      const result = await executionContext.run(context, () => callMcpToolWithReconnect(
+        state, { name: descriptor.name, arguments: args }, context.abortSignal
+      ))
       return {
         output: {
           serverId: state.serverId,
@@ -380,9 +475,14 @@ function createMcpSearchCatalogRecord(
     toolId: `${state.serverId}/${descriptor.name}`,
     serverId: state.serverId,
     server: state.server,
+    isAvailable: context => matchesMcpAuthority(state, context),
     client: {
-      callTool: (input, options) =>
-        callMcpToolWithReconnect(state, input, options?.signal, options?.timeout)
+      callTool: (input, options) => {
+        if (!options?.context) throw new Error('MCP execution context is required')
+        assertMcpAuthority(state, options.context)
+        if (state.server.url) assertGrantAllowsNetwork(state.server.url, options.context)
+        return executionContext.run(options.context, () => callMcpToolWithReconnect(state, input, options.signal, options.timeout))
+      }
     },
     descriptor,
     normalizedName: normalizeMcpToolName(state.serverId, descriptor.name),
@@ -391,11 +491,19 @@ function createMcpSearchCatalogRecord(
 }
 
 async function refreshMcpConnectionCatalog(state: McpConnectionState): Promise<McpToolDescriptor[]> {
-  const listed = await listAllMcpTools(state.client, state.server.timeoutMs)
-  const nextFingerprint = catalogFingerprint(listed.map((tool) => tool.name))
+  if (state.retired) throw Object.assign(new Error('MCP configuration has been replaced.'), { code: 'connector_configuration_changed' })
+  const pending = listAllMcpTools(state.client, state.server.timeoutMs)
+  state.pendingCalls.add(pending)
+  let discovered: McpToolDescriptor[]
+  try { discovered = await pending } finally { state.pendingCalls.delete(pending) }
+  const listed = state.server.toolPolicy
+    ? discovered.filter(tool => state.server.toolPolicy!.allowedTools.includes(tool.name))
+    : discovered
+  const nextFingerprint = catalogFingerprint(listed.map(tool => JSON.stringify({ name: tool.name, inputSchema: tool.inputSchema, annotations: tool.annotations })))
   state.catalogDrift = Boolean(state.catalogFingerprint && state.catalogFingerprint !== nextFingerprint)
   state.catalogFingerprint = nextFingerprint
-  state.lastError = undefined
+  state.authorityFingerprint = createHash('sha256').update(`${state.configurationFingerprint}:${nextFingerprint}`).digest('hex')
+  clearMcpConnectionError(state)
   return listed
 }
 
@@ -405,6 +513,16 @@ async function callMcpToolWithReconnect(
   signal: AbortSignal | undefined,
   timeout = state.server.timeoutMs
 ): Promise<unknown> {
+  if (state.retired) throw Object.assign(new Error('MCP configuration changed. Start a newly authorized execution.'), { code: 'connector_configuration_changed' })
+  const pending = callCurrentMcpTool(state, input, signal, timeout)
+  state.pendingCalls.add(pending)
+  try { return await pending } finally { state.pendingCalls.delete(pending) }
+}
+
+async function callCurrentMcpTool(state: McpConnectionState, input: { name: string; arguments: Record<string, unknown> }, signal: AbortSignal | undefined, timeout: number): Promise<unknown> {
+  if (state.server.toolPolicy && !state.server.toolPolicy.allowedTools.includes(input.name)) {
+    throw Object.assign(new Error('This connector tool is outside its configured capability scope.'), { code: 'execution_grant_scope' })
+  }
   try {
     const result = await state.client.callTool(input, { signal, timeout })
     observeMcpToolResult(state, result)
@@ -412,11 +530,13 @@ async function callMcpToolWithReconnect(
   } catch (error) {
     setMcpConnectionError(state, errorMessage(error))
     if (signal?.aborted) throw error
-    // Deterministic server-side failures (validation errors, bad
-    // arguments) come back identically on a fresh connection; tearing
-    // down a healthy session for them just loses server state. Only
-    // transport-looking failures earn a reconnect + retry.
     if (!looksLikeMcpTransportError(error)) throw error
+    if (!state.readOnlyTools.has(input.name)) {
+      throw Object.assign(new Error('MCP connection failed after dispatch. Verify the original operation before retrying.'), {
+        code: 'outcome_unknown', cause: error
+      })
+    }
+    if (state.retired) throw Object.assign(new Error('MCP configuration changed while the connection was interrupted.'), { code: 'connector_configuration_changed' })
     const client = await reconnectMcpConnection(state)
     try {
       const result = await client.callTool(input, { signal, timeout })
@@ -472,12 +592,24 @@ async function raceStartupTimeout<T extends { state: McpConnectionState }>(
 }
 
 async function reconnectMcpConnection(state: McpConnectionState): Promise<McpClientLike> {
-  await state.client.close().catch(() => undefined)
-  const client = await state.clientFactory(state.serverId, state.server)
-  state.client = client
-  state.lastConnectedAt = state.nowIso()
-  clearMcpConnectionError(state)
-  return client
+  if (state.reconnecting) return state.reconnecting
+  const previous = state.client
+  const pending = (async () => {
+    const client = await state.clientFactory(state.serverId, state.server)
+    if (state.retired) {
+      await client.close().catch(() => undefined)
+      throw Object.assign(new Error('MCP configuration was revoked during reconnect.'), { code: 'connector_configuration_changed' })
+    }
+    state.client = client
+    state.lastConnectedAt = state.nowIso()
+    clearMcpConnectionError(state)
+    const close = Promise.allSettled([...state.pendingCalls]).then(() => previous.close()).catch(() => undefined)
+    state.retiredClients.add(close)
+    void close.finally(() => state.retiredClients.delete(close))
+    return client
+  })()
+  state.reconnecting = pending
+  try { return await pending } finally { state.reconnecting = undefined }
 }
 
 function observeMcpToolResult(state: McpConnectionState, result: unknown): void {

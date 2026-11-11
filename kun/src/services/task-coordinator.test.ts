@@ -64,6 +64,25 @@ describe('task commands before Turn allocation',()=>{
     expect((await f.threads.get(start.turn.threadId))?.turns).toHaveLength(2)
   })
 
+  it('keeps an unresolved delivery in its original task when the user supplies the platform', async () => {
+    const f = await fixture()
+    const started = await f.coordinator.command({ threadId: f.origin.id, intent: 'new', idempotencyKey: 'draft', request: { prompt: '生成报告并发送邮件给客户' } })
+    if (started.kind !== 'task_started') throw new Error('expected task')
+    const task = started.task!
+    f.repository.update(task.id, task.revision, current => ({ ...current, status: 'waiting_user', acceptance: { ...current.acceptance, requiresExternalEffects: true } }))
+    await f.turns.finishTurn({ threadId: started.turn.threadId, turnId: started.turn.turnId, status: 'completed' })
+    const request = { threadId: f.origin.id, idempotencyKey: 'select-provider', request: { prompt: '通过飞书发送邮件' } }
+    vi.spyOn(f.repository.execution, 'finishCommand').mockImplementationOnce(() => { throw new Error('simulated interruption after input commit') })
+    await expect(f.coordinator.command(request)).rejects.toThrow('simulated interruption')
+    const bound = await f.coordinator.command(request)
+    expect(bound).toMatchObject({ kind: 'capability_required', task: { id: task.id, acceptance: { kind: 'files', effect: { provider: 'lark', operation: 'send' } } } })
+    expect(f.repository.list()).toHaveLength(1)
+    expect(f.repository.inputs(task.id)).toHaveLength(1)
+    expect(f.runTurn).toHaveBeenCalledTimes(1)
+    await f.coordinator.command(request)
+    expect(f.repository.inputs(task.id)).toHaveLength(1)
+  })
+
   it('routes connect requests and how-to questions before model allocation',()=>{
     expect(classifyTaskInput('连接飞书',false)).toBe('new')
     expect(classifyTaskInput('如何使用钉钉审批',false)).toBe('chat')

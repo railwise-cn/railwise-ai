@@ -18,6 +18,41 @@ describe('task delivery production assembly with synthetic model protocol', () =
     vi.spyOn(FileWorkspaceTrustReader.prototype, 'get').mockImplementation(async workspace => ({ canonicalRoot: await realpath(workspace), level: 'workspace-write', revision: 1 }))
   })
   afterEach(() => vi.restoreAllMocks())
+  it('routes a business Flow through durable preflight and reuses the waiting task on replay', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'railwise-flow-preflight-'))
+    let runtime: ServerRuntime | undefined
+    try {
+      runtime = await createKunServeRuntime({ host: '127.0.0.1', port: 0, dataDir: join(root, 'runtime'), runtimeToken: 'synthetic-only',
+        apiKey: '', baseUrl: 'http://127.0.0.1:1/v1', model: 'synthetic-protocol', approvalPolicy: 'auto', sandboxMode: 'workspace-write',
+        tokenEconomyMode: false, insecure: false, storage: { backend: 'file' }, capabilities: KunCapabilitiesConfig.parse({}) })
+      const policy = { timeoutMs: 10_000, retryAttempts: 2, retryBackoffMs: 0, concurrencyLimit: 1, errorBehavior: 'fail' as const,
+        resumable: true, breakpoint: false }
+      const graph = { schemaVersion: 1 as const, id: 'preflight-flow', name: '钉钉待办', description: '', workspace: root, variables: {},
+        nodes: [
+          { id: 'start', type: 'manual_trigger', label: '开始', position: { x: 0, y: 0 }, bindings: {}, config: {}, policy, disabled: false },
+          { id: 'agent', type: 'agent', label: '查询待办', position: { x: 200, y: 0 }, bindings: {}, config: { prompt: '帮我处理钉钉待办' }, policy, disabled: false }
+        ], edges: [{ id: 'start-agent', sourceNodeId: 'start', sourcePortId: 'output', targetNodeId: 'agent', targetPortId: 'input', branch: 'normal' as const }] }
+      runtime.flowService!.create(graph)
+      expect(runtime.flowService!.publish(graph.id).published).toBe(true)
+      const flow = await runtime.flowService!.run(graph.id, {})
+      await expect.poll(() => runtime!.flowService!.repository.getRun(flow.id)?.status).toBe('paused')
+      const first = runtime.taskRepository!.list({ workspaceRoot: root })
+      expect(first).toHaveLength(1)
+      expect(first[0]).toMatchObject({ status: 'waiting_user', flowRunId: flow.id, flowId: graph.id })
+      expect(first[0].activeTurnId).toBeUndefined()
+      const execution = await runtime.threadService.get(first[0].threadId)
+      expect(execution?.turns).toHaveLength(0)
+      expect(runtime.flowService!.repository.pendingOutbox('delivery_task')).toHaveLength(1)
+      await runtime.flowService!.resume(flow.id)
+      await expect.poll(() => runtime!.flowService!.repository.getRun(flow.id)?.status).toBe('paused')
+      expect(runtime.taskRepository!.list({ workspaceRoot: root }).map(task => task.id)).toEqual([first[0].id])
+      expect((await runtime.threadService.get(first[0].threadId))?.turns).toHaveLength(0)
+    } finally {
+      await runtime?.shutdown?.()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('starts a fresh task from a completed hidden execution and regenerates an exact old candidate through the real tool boundary', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-regenerate-production-'))
     let runtime: ServerRuntime | undefined
@@ -142,9 +177,13 @@ describe('task delivery production assembly with synthetic model protocol', () =
       const graph = deliveryFlow(templateId, { workspaceRoot: root, goal: '根据固定合成资料交付可审阅草稿', sourcePaths: [sourcePath] }, `fixture:${templateId}`)
       runtime.flowService!.create(graph); expect(runtime.flowService!.publish(graph.id).published).toBe(true)
       const flow = await runtime.flowService!.run(graph.id, {})
-      const executionThreadId = `thr_delivery_${createHash('sha256').update(`${flow.id}:delivery`).digest('hex').slice(0, 24)}`
+      const originThreadId = `thr_delivery_${createHash('sha256').update(`${flow.id}:delivery`).digest('hex').slice(0, 24)}`
       await expect.poll(() => called, { timeout: 10_000 }).toContain('export_document')
-      const executing = runtime.taskRepository!.list({ threadId: executionThreadId, limit: 1 })[0]!
+      const link = runtime.flowService!.repository.operation(`${flow.id}:delivery`, 'task-start')!.result as { taskId: string; threadId: string }
+      const executing = runtime.taskRepository!.get(link.taskId)!
+      const executionThreadId = link.threadId
+      expect(executing.originThreadId).toBe(originThreadId)
+      expect(executionThreadId).not.toBe(originThreadId)
       expect(executing.goal).toBe('根据固定合成资料交付可审阅草稿')
       const execution = await runtime.threadService.get(executionThreadId)
       expect(execution?.turns.find(turn => turn.id === executing.activeTurnId)?.prompt).toContain('source_refs')

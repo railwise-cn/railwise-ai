@@ -67,7 +67,9 @@ describe('external effect durable recovery', () => {
     controller.confirmEffectScope('turn-1', 0, 'confirmed-set', [RequiredEffectSchema.parse({ provider: 'lark', operation: 'complete', target: 'synthetic-42' })])
     const call = { callId: 'unknown-1', toolName: 'lark_task_complete', providerId: 'lark-cli', arguments: { taskId: 'synthetic-42' } }
     const operation = controller.beginToolOperation('turn-1', call)!
+    controller.recordToolDispatch(operation.token, operation.key)
     controller.finishToolOperation(operation.token, operation.key)
+    expect(repository.operation(task.id, operation.key)?.status).toBe('outcome_unknown')
     expect(() => controller.beginToolOperation('turn-1', { ...call, callId: 'unknown-2' })).toThrow(/Verify its outcome/)
     expect(repository.operations(task.id, 'tool')).toHaveLength(1)
     repository.close()

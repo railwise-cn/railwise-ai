@@ -14,17 +14,22 @@ import { TaskControlService } from './task-control-service.js'
 import { preflightExternalTask, externalTaskIntent, externalProviderAmbiguity, type ExternalTaskPreflight } from './external-task-capability.js'
 import { externalPreflightThreadContext } from './contextual-external-task-preflight.js'
 
+export type TaskCommandDispatchOptions = {
+  /** Internal integration hook. Persist source linkage and outbox before any worker dispatch. */
+  prepareTask?: (task: TaskRun) => Promise<void> | void
+}
+
 export class TaskCoordinator {
   private readonly pending = new Map<string, Promise<TaskCommandResult>>()
   private flushingMessages = false
   private readonly controls:TaskControlService
   constructor(private readonly deps: { repository: TaskRunRepository; threads: ThreadService; threadStore: ThreadStore; turns: TurnService; tasks: TaskController; controls?:TaskControlService; context?: TaskContextRuntime; attachments?:AttachmentStore; classifyIntent?: (text:string,task:TaskRun) => Promise<'supplement'|'new'|'chat'|'ambiguous'>; preflightExternalTask?: ExternalTaskPreflight; runTurn(threadId:string,turnId:string):unknown; nowIso():string }) {this.controls=deps.controls ?? new TaskControlService(deps)}
-  async command(raw: TaskCommand): Promise<TaskCommandResult> {
+  async command(raw: TaskCommand, options: TaskCommandDispatchOptions = {}): Promise<TaskCommandResult> {
     const command = TaskCommandSchema.parse(raw)
     const queueKey = `${command.threadId}:${command.idempotencyKey}`
     const pending = this.pending.get(queueKey)
-    if(pending) { await pending; return this.command(raw) }
-    const promise = this.execute(command)
+    if(pending) { await pending; return this.command(raw, options) }
+    const promise = this.execute(command, options)
     this.pending.set(queueKey,promise)
     try { return await promise } finally { this.pending.delete(queueKey) }
   }
@@ -32,13 +37,15 @@ export class TaskCoordinator {
     if(taskId) return this.deps.repository.currentExecution(taskId)
     return this.deps.repository.findActiveByOrigin(threadId) ?? this.deps.repository.findActiveByThread(threadId)
   }
-  private async execute(command: ReturnType<typeof TaskCommandSchema.parse>): Promise<TaskCommandResult> {
+  private async execute(command: ReturnType<typeof TaskCommandSchema.parse>, options: TaskCommandDispatchOptions): Promise<TaskCommandResult> {
     const origin = await this.deps.threads.get(command.threadId)
     if(!origin) throw Object.assign(new Error('thread not found'),{code:'not_found'})
     const task = this.resolveTask(command.threadId,command.taskId)
     if(task && task.workspaceRoot !== origin.workspace) throw Object.assign(new Error('task belongs to another workspace'),{code:'scope_conflict'})
     const userText = command.request.displayText ?? command.request.prompt
     let intent = command.intent === 'auto' ? classifyTaskInput(userText,Boolean(task)) : command.intent
+    if (command.intent === 'auto' && task?.acceptance.requiresExternalEffects && (!task.acceptance.effect || this.deps.repository.inputs(task.id).some(input => input.sourceId === 'provider-selection' && input.idempotencyKey === command.idempotencyKey)) &&
+      ['waiting_user', 'paused', 'stalled'].includes(task.status) && /^(?:请)?(?:使用|用|通过|在).*(?:钉钉|飞书|dingtalk|lark|feishu)/i.test(userText)) intent = 'supplement'
     // An explicit chat hint cannot bypass provider admission for an action.
     if (intent === 'chat' && externalTaskIntent(userText)) intent = 'new'
     if(intent==='status') return {kind:'snapshot',task}
@@ -52,7 +59,12 @@ export class TaskCoordinator {
     }
     if (command.selectedExternalProvider && resolving?.payload?.kind !== 'external_provider_choice') throw Object.assign(new Error('Provider selection requires its original pending decision.'), { code: 'scope_conflict' })
     const receipt = this.deps.repository.execution.command(command.threadId,command.idempotencyKey,command)
-    if(receipt.result) { const result=receipt.result as TaskCommandResult;await this.recordResult(command,result);return result }
+    if (receipt.result) {
+      const result = receipt.result as TaskCommandResult
+      if (result.task) await options.prepareTask?.(this.deps.repository.get(result.task.id) ?? result.task)
+      await this.recordResult(command, result)
+      return result
+    }
     if (externalProviderAmbiguity(userText) && !['pause', 'resume', 'cancel'].includes(intent)) {
       const id = `provider_choice_${createHash('sha256').update(`${command.threadId}:${command.idempotencyKey}`).digest('hex').slice(0,32)}`
       const now = this.deps.nowIso()
@@ -94,7 +106,36 @@ export class TaskCoordinator {
       else {
         const executionThread = await this.deps.threadStore.get(task.threadId)
         if (!executionThread) throw Object.assign(new Error('task execution thread not found'), { code: 'not_found' })
-        const capability = this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(userText, executionThread) : preflightExternalTask(userText)
+        const unresolvedEffect = task.acceptance.requiresExternalEffects && !task.acceptance.effect
+        const priorBinding = this.deps.repository.inputs(task.id).find(input => input.sourceId === 'provider-selection' && input.idempotencyKey === command.idempotencyKey)
+        const supplementText = unresolvedEffect || priorBinding ? `${task.goal}\n${userText}` : userText
+        const capability = this.deps.preflightExternalTask ? await this.deps.preflightExternalTask(supplementText, executionThread) : preflightExternalTask(supplementText)
+        if (capability && (unresolvedEffect || priorBinding) && ['waiting_user', 'paused', 'stalled'].includes(task.status)) {
+          await this.validateReferences(command, origin.workspace, task.threadId)
+          const selected = externalTaskIntent(supplementText)!
+          const saved = this.deps.repository.transact(() => {
+            if (priorBinding) return { task: this.deps.repository.get(task.id)!, input: priorBinding }
+            const bound = this.deps.repository.update(task.id, command.expectedRevision ?? task.revision, current => ({
+              ...current, acceptance: { ...current.acceptance, effect: { provider: capability.provider, operation: selected.operation ?? 'process',
+                requiredScopes: capability.requiredScopes ?? [], requiresConfirmation: selected.mutation,
+                successStatus: ['succeeded'], verification: 'provider_readback' } }, updatedAt: this.deps.nowIso()
+            }))
+            return this.deps.tasks.appendInput(bound.id, bound.revision, command.idempotencyKey, userText, 'supplement', 'provider-selection',
+              { attachmentIds: command.request.attachmentIds, workspaceReferences: command.request.workspaceReferences })
+          })
+          if (capability.status !== 'available') {
+            const attentionId = `capability_${task.id}`
+            const now = this.deps.nowIso()
+            this.deps.repository.putAttention({ id: attentionId, ownerKind: 'task', ownerId: task.id, taskId: task.id,
+              threadId: origin.id, workspaceRoot: origin.workspace, kind: 'blocked', title: '连接并授权目标服务', message: capability.message,
+              status: 'pending', revision: 0, createdAt: now, updatedAt: now,
+              payload: { kind: 'capability_required', capability, request: command.request } })
+            result = { kind: 'capability_required', task: saved.task, attentionId, capability, message: capability.message }
+          } else result = { kind: 'input_queued', task: saved.task, input: saved.input }
+          this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
+          await this.recordResult(command, result)
+          return result
+        }
         const providerChanged = capability && task.acceptance.effect?.provider !== capability.provider
         const activeTurn = task.activeTurnId
           ? (await this.deps.threadStore.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)
@@ -137,7 +178,8 @@ export class TaskCoordinator {
           threadId: origin.id, workspaceRoot: origin.workspace, kind: 'blocked', title: '连接并授权目标服务', message: capability.message,
           status: 'pending', revision: 0, createdAt: now, updatedAt: now,
           payload: { kind: 'capability_required', capability, request: command.request } })
-        result = { kind: 'capability_required', task: waiting, attentionId, capability, message: capability.message }
+        await options.prepareTask?.(waiting)
+        result = { kind: 'capability_required', task: this.deps.repository.get(waiting.id) ?? waiting, attentionId, capability, message: capability.message }
         if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:now})
         this.deps.repository.execution.finishCommand(command.threadId, command.idempotencyKey, result)
         await this.recordResult(command, result)
@@ -147,8 +189,11 @@ export class TaskCoordinator {
       const oldTurn=(await this.deps.threads.get(executionThreadId))?.turns.find(turn=>turn.idempotencyKey===turnKey)
       const turn=await this.deps.turns.startTurn({threadId:executionThreadId,...(capability?.status==='available'?{externalTaskProvider:capability.provider}:{}),request:{...command.request,idempotencyKey:turnKey,taskIntent:isTask?'new':undefined,taskVisibility:isTask?'task':'chat',...(isTask?{taskOriginThreadId:origin.id}:{})}})
       const linked=this.deps.repository.findByTurn(turn.turnId)
-      if (linked && isTask) this.deps.context?.subscribeTask(linked, origin.id)
-      result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:linked}:{}),turn}
+      if (linked && isTask) {
+        await options.prepareTask?.(linked)
+        this.deps.context?.subscribeTask(linked, origin.id)
+      }
+      result={kind:isTask?'task_started':'chat_started',...(linked&&isTask?{task:this.deps.repository.get(linked.id) ?? linked}:{}),turn}
       if (resolving) this.deps.repository.putAttention({...resolving,status:'answered',revision:resolving.revision+1,updatedAt:this.deps.nowIso()})
       this.deps.repository.execution.finishCommand(command.threadId,command.idempotencyKey,result)
       if(!oldTurn)void this.deps.runTurn(turn.threadId,turn.turnId)

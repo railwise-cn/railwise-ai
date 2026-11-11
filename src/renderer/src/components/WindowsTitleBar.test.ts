@@ -15,7 +15,6 @@ function testActions(): WindowsTitleBarActions {
     openSettings: vi.fn(),
     openHelp: vi.fn(),
     openProductHome: vi.fn(),
-    openAuthorHome: vi.fn(),
     openProductIntro: vi.fn(),
     openGithubHome: vi.fn(),
     openReleases: vi.fn(),
@@ -76,7 +75,6 @@ describe('WindowsTitleBar', () => {
     await item('maximize').onSelect()
     await item('help-center').onSelect()
     await item('product-home').onSelect()
-    await item('author-home').onSelect()
     await item('product-intro').onSelect()
     await item('github-home').onSelect()
     await item('releases').onSelect()
@@ -91,7 +89,6 @@ describe('WindowsTitleBar', () => {
     expect(actions.runDesktopCommand).toHaveBeenCalledWith('toggleMaximize')
     expect(actions.openHelp).toHaveBeenCalledTimes(1)
     expect(actions.openProductHome).toHaveBeenCalledTimes(1)
-    expect(actions.openAuthorHome).toHaveBeenCalledTimes(1)
     expect(actions.openProductIntro).toHaveBeenCalledTimes(1)
     expect(actions.openGithubHome).toHaveBeenCalledTimes(1)
     expect(actions.openReleases).toHaveBeenCalledTimes(1)

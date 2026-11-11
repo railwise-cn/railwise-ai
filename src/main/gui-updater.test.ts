@@ -123,6 +123,20 @@ describe('installGuiUpdate', () => {
     expect(updater.quitAndInstall).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a verified downloaded package actionable when a later feed check is offline', async () => {
+    const previous = process.env.WORKWISE_ALLOW_UNSIGNED_UPDATES
+    process.env.WORKWISE_ALLOW_UNSIGNED_UPDATES = '1'
+    try {
+      const module = await import('./gui-updater')
+      module.initializeGuiUpdater(() => null, () => 'stable', async () => undefined)
+      updater.emit('update-downloaded', { version: '0.2.0' })
+      updater.checkForUpdates.mockRejectedValue(new Error('network offline'))
+      await expect(module.checkGuiUpdate('stable')).resolves.toMatchObject({ ok: false })
+      expect(module.getGuiUpdateState()).toMatchObject({ status: 'error', info: { ok: true, downloaded: true, latestVersion: '0.2.0' } })
+      await expect(module.installGuiUpdate()).resolves.toEqual({ ok: true })
+    } finally { if (previous === undefined) delete process.env.WORKWISE_ALLOW_UNSIGNED_UPDATES; else process.env.WORKWISE_ALLOW_UNSIGNED_UPDATES = previous }
+  })
+
   it('uses silent replacement only for the assisted Windows installer', async () => {
     const module = await import('./gui-updater')
     expect(module._internals.shouldInstallSilently('win32')).toBe(true)

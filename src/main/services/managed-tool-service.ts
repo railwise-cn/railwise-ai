@@ -32,6 +32,7 @@ import { resolveLarkCliEnvironment } from '../../../kun/src/services/lark-cli-en
 import { parseLarkIdentityBinding } from '../../../kun/src/services/lark-cli-identity.js'
 import { LARK_RELEASE } from './managed-lark-release'
 import { LARK_DELIVERY_SCOPES } from '../../../kun/src/adapters/tool/lark-delivery-tools.js'
+import { downloadManagedDependency, findManagedDependency } from './managed-dependency-download'
 
 const execFileAsync = promisify(execFile)
 const MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
@@ -384,7 +385,8 @@ async function installGithubSkillBundle(
   pinnedSource?: { url: string; sha256: string }
 ): Promise<void> {
   const archiveUrl = pinnedSource?.url ?? `https://codeload.github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/zip/${encodeURIComponent(ref)}`
-  const archive = await download(archiveUrl, MAX_SKILL_BUNDLE_DOWNLOAD_BYTES)
+  const dependency = pinnedSource ? findManagedDependency(archiveUrl) : undefined
+  const archive = dependency ? await downloadManagedDependency(dependency) : await download(archiveUrl, MAX_SKILL_BUNDLE_DOWNLOAD_BYTES)
   if (pinnedSource && createHash('sha256').update(archive).digest('hex') !== pinnedSource.sha256) {
     throw new Error('Official Skill source checksum verification failed. Existing Skills were preserved.')
   }
@@ -707,8 +709,9 @@ export async function installManagedTool(id: ManagedToolId): Promise<ManagedTool
     const checksumName = id === 'lark-cli' ? 'checksums.txt' : 'SHA256SUMS'
     const assetUrl = release.assets.get(assetName) ?? releaseAssetUrl(repo, version, assetName)
     const checksumUrl = release.assets.get(checksumName) ?? releaseAssetUrl(repo, version, checksumName)
+    const dependency = id === 'lark-cli' ? findManagedDependency(assetUrl) : undefined
     const [assetBytes, checksumBytes] = await Promise.all([
-      download(assetUrl),
+      dependency ? downloadManagedDependency(dependency) : download(assetUrl),
       id === 'lark-cli' ? Promise.resolve(undefined) : download(checksumUrl)
     ])
     const expected = id === 'lark-cli' ? LARK_RELEASE.assets[assetName] : checksumFor(checksumBytes!.toString('utf8'), assetName)

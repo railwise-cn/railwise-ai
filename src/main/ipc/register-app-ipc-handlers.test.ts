@@ -390,30 +390,63 @@ describe('registerAppIpcHandlers', () => {
     expect(showTurnCompleteNotification).toHaveBeenCalledWith(expect.objectContaining({ activeThread: true }))
   })
 
-  it('requires explicit confirmation when update preflight finds active Agent work', async () => {
+  it('requires the confirmed Runtime snapshot and performs one fenced install', async () => {
     const installGuiUpdate = vi.fn(async () => ({ ok: true as const }))
-    const runtimeRequest = vi.fn(async (path: string) => {
-      if (path.startsWith('/v1/tasks')) {
-        return { ok: true, status: 200, body: JSON.stringify([{ id: 'task-1', goal: '编制投标文件', status: 'running' }]) }
+    const snapshotId = 'a'.repeat(64)
+    const activeWork = [{ kind: 'agent', id: 'task-1', label: '编制投标文件', status: 'running', recoverable: true }]
+    const runtimeRequest = vi.fn(async (path: string, _method: string, body?: string) => {
+      if (path === '/v1/runtime/update') return { ok: true, status: 200, body: JSON.stringify({ ok: true, activeWork, snapshotId }) }
+      if (path === '/v1/runtime/update/prepare') {
+        const accepted = JSON.parse(body ?? '{}').confirmedSnapshotId === snapshotId
+        return { ok: accepted, status: accepted ? 200 : 409, body: JSON.stringify(accepted ? { ok: true, activeWork, snapshotId } : { message: 'Active work changed' }) }
       }
-      if (path === '/v1/flows') return { ok: true, status: 200, body: JSON.stringify({ flows: [] }) }
       return { ok: false, status: 404, body: '{}' }
     })
     const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
     registerAppIpcHandlers(registerOptions({
       runtimeRequest: runtimeRequest as never,
-      loadGuiUpdaterModule: vi.fn(async () => ({ installGuiUpdate })) as never
+      loadGuiUpdaterModule: vi.fn(async () => ({ installGuiUpdate, getGuiUpdateState: () => ({ status: 'downloaded' }) })) as never
     }))
-
-    const preflight = await handlers.get('gui:update-install-preflight')?.({})
-    expect(preflight).toMatchObject({
-      ok: true,
-      activeWork: [{ kind: 'agent', id: 'task-1', status: 'running', recoverable: true }]
-    })
-    await expect(handlers.get('gui:update-install')?.({}, {})).resolves.toMatchObject({ ok: false })
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: true, activeWork, snapshotId })
+    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true })).resolves.toMatchObject({ ok: false })
     expect(installGuiUpdate).not.toHaveBeenCalled()
-    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true })).resolves.toEqual({ ok: true })
+    await expect(handlers.get('gui:update-install')?.({}, { confirmActiveWork: true, confirmedSnapshotId: snapshotId })).resolves.toEqual({ ok: true })
     expect(installGuiUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects renderer-supplied paths at the task artifact opening boundary', async () => {
+    const runtimeRequest = vi.fn()
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ runtimeRequest }))
+    await expect(handlers.get('task-artifact:open')?.({}, { taskId: 'task', artifactId: 'artifact', absolutePath: '/arbitrary/file.md' })).rejects.toThrow('Invalid payload')
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
+  it('applies saved MCP settings through a main-owned snapshot and blocks renderer config injection', async () => {
+    const snapshot = { revision: 1, servers: {}, environment: { SYNTHETIC_KEY: 'fixture-only' } }
+    const saved = { id: 'amap', revision: 1 }
+    const mcpConfigService = { save: vi.fn(async () => saved), runtimeSnapshot: vi.fn(async () => snapshot) }
+    const onMcpServersChanged = vi.fn(async () => undefined)
+    const runtimeRequest = vi.fn()
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ mcpConfigService: mcpConfigService as never, onMcpServersChanged, runtimeRequest }))
+    await expect(handlers.get('mcp-server:save')?.({}, {
+      config: { id: 'amap', name: 'Amap', scope: 'global', transport: 'http', url: 'https://mcp.amap.com/mcp', timeoutMs: 5000, source: 'managed-tool', managedPreset: 'amap-readonly', toolPolicy: {}, enabled: false },
+      expectedRevision: 0, idempotencyKey: 'save-synthetic-mcp'
+    })).resolves.toEqual(saved)
+    expect(onMcpServersChanged).toHaveBeenCalledWith(snapshot)
+    await expect(handlers.get('runtime:request')?.({}, { path: '/v1/runtime/mcp-config', method: 'POST', body: '{}' })).rejects.toThrow(/not allowed|仅能通过连接器设置/)
+    expect(runtimeRequest).not.toHaveBeenCalled()
+  })
+
+  it('blocks update preflight on an unavailable or malformed Runtime snapshot', async () => {
+    const runtimeRequest = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, body: JSON.stringify({ message: 'Runtime unavailable' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, body: JSON.stringify({ ok: true, activeWork: [] }) })
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ runtimeRequest }))
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: false, message: 'Runtime unavailable' })
+    await expect(handlers.get('gui:update-install-preflight')?.({})).resolves.toMatchObject({ ok: false })
   })
 
   it('preserves heading, page, table, worksheet, and slide provenance in attachment sections', async () => {

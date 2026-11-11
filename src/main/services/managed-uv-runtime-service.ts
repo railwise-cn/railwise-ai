@@ -21,6 +21,8 @@ import { readBoundedResponseBuffer } from './bounded-response'
 import { isCanonicalPathContained } from './canonical-containment'
 import { atomicWriteFile, runSerialized } from './durable-file'
 import { systemFetch } from './system-network'
+import { pathToFileURL } from 'node:url'
+import { downloadManagedDependency, managedDependency, managedPythonDownload, type ManagedDependency } from './managed-dependency-download'
 
 export const MANAGED_UV_VERSION = '0.12.3'
 export const MANAGED_PYTHON_VERSION = '3.12.12'
@@ -40,6 +42,7 @@ export type ManagedUvAssetV1 = {
   executable: 'uv' | 'uv.exe'
   archive: 'tar.gz' | 'zip'
   target: string
+  dependencyId?: string
 }
 
 export type ManagedUvRuntimeV1 = {
@@ -67,6 +70,7 @@ export type ManagedUvRuntimeServiceOptions = {
   asset?: ManagedUvAssetV1
   uvVersion?: string
   pythonVersion?: string
+  pythonAsset?: ManagedDependency
 }
 
 type RuntimeManifestV1 = {
@@ -79,49 +83,13 @@ type RuntimeManifestV1 = {
   binarySha256: string
 }
 
-const UV_ASSETS: Record<string, ManagedUvAssetV1> = {
-  'darwin-arm64': {
-    name: 'uv-aarch64-apple-darwin.tar.gz',
-    sha256: '546f7f8a6c70ff13a3a9d2bc958db3427298cebf3e0cb756f9177133b7068843',
-    executable: 'uv',
-    archive: 'tar.gz',
-    target: 'aarch64-apple-darwin'
-  },
-  'darwin-x64': {
-    name: 'uv-x86_64-apple-darwin.tar.gz',
-    sha256: '4c9f52262a14da336e4a42ed24992d12d0c956acde87619e4611d321dffa602b',
-    executable: 'uv',
-    archive: 'tar.gz',
-    target: 'x86_64-apple-darwin'
-  },
-  'win32-arm64': {
-    name: 'uv-aarch64-pc-windows-msvc.zip',
-    sha256: '4343217d668727b8a8eb5cad92389a1d2eeead93c89940d1b955ba1bb15462eb',
-    executable: 'uv.exe',
-    archive: 'zip',
-    target: 'aarch64-pc-windows-msvc'
-  },
-  'win32-x64': {
-    name: 'uv-x86_64-pc-windows-msvc.zip',
-    sha256: 'b23350c79e8ad0192b8124af13a0f17e8d4e4549524785e1aef389ae5a06990e',
-    executable: 'uv.exe',
-    archive: 'zip',
-    target: 'x86_64-pc-windows-msvc'
-  },
-  'linux-arm64': {
-    name: 'uv-aarch64-unknown-linux-gnu.tar.gz',
-    sha256: 'bb66cb52e7b1823aed1183630d8d8e5c958840d584a4c55ec10a4cfc168dcca2',
-    executable: 'uv',
-    archive: 'tar.gz',
-    target: 'aarch64-unknown-linux-gnu'
-  },
-  'linux-x64': {
-    name: 'uv-x86_64-unknown-linux-gnu.tar.gz',
-    sha256: '600cf9a742aca00d292673b16b5acffaa7b8c269a364ad0c2e79498dcb1fe101',
-    executable: 'uv',
-    archive: 'tar.gz',
-    target: 'x86_64-unknown-linux-gnu'
-  }
+const UV_TARGETS: Record<string, string> = {
+  'darwin-arm64': 'aarch64-apple-darwin',
+  'darwin-x64': 'x86_64-apple-darwin',
+  'win32-arm64': 'aarch64-pc-windows-msvc',
+  'win32-x64': 'x86_64-pc-windows-msvc',
+  'linux-arm64': 'aarch64-unknown-linux-gnu',
+  'linux-x64': 'x86_64-unknown-linux-gnu'
 }
 
 function sha256(bytes: Buffer): string {
@@ -193,9 +161,10 @@ export function managedUvAsset(
   platform: NodeJS.Platform = process.platform,
   arch: NodeJS.Architecture = process.arch
 ): ManagedUvAssetV1 {
-  const asset = UV_ASSETS[`${platform}-${arch}`]
-  if (!asset) throw new Error(`Managed uv is not supported on ${platform}/${arch}.`)
-  return { ...asset }
+  const target = UV_TARGETS[`${platform}-${arch}`]
+  if (!target) throw new Error(`Managed uv is not supported on ${platform}/${arch}.`)
+  const asset = managedDependency(`uv-${platform}-${arch}`)
+  return { name: asset.name, sha256: asset.sha256, executable: platform === 'win32' ? 'uv.exe' : 'uv', archive: 'zip', target, dependencyId: asset.id }
 }
 
 export class ManagedUvRuntimeService {
@@ -206,10 +175,14 @@ export class ManagedUvRuntimeService {
   private readonly uvVersion: string
   private readonly pythonVersion: string
   private readonly platform: NodeJS.Platform
+  private readonly target: string
+  private readonly pythonAsset: ManagedDependency
 
   constructor(options: ManagedUvRuntimeServiceOptions = {}) {
     this.rootDirectory = resolve(options.rootDirectory ?? join(homedir(), '.workwise', 'runtimes', 'uv'))
     this.platform = options.platform ?? process.platform
+    this.target = `${this.platform}-${options.arch ?? process.arch}`
+    this.pythonAsset = options.pythonAsset ?? managedDependency(`python-${this.target}`)
     this.asset = options.asset ?? managedUvAsset(this.platform, options.arch ?? process.arch)
     this.fetchImpl = options.fetch ?? ((input, init) => systemFetch(input, init))
     this.run = options.run ?? defaultRun
@@ -260,7 +233,10 @@ export class ManagedUvRuntimeService {
       'UV_NATIVE_TLS',
       'UV_PYTHON_INSTALL_MIRROR',
       'UV_PYTHON_CPYTHON_BUILD_STANDALONE_MIRROR',
-      'UV_PYPY_INSTALL_MIRROR'
+      'UV_PYPY_INSTALL_MIRROR',
+      'UV_PYTHON_DOWNLOADS_JSON_URL',
+      'UV_PYTHON_CPYTHON_BUILD',
+      'UV_NO_VERIFY_HASHES'
     ]) {
       delete environment[key]
     }
@@ -276,18 +252,9 @@ export class ManagedUvRuntimeService {
       if (sha256(bytes) === this.asset.sha256) return archivePath
       await rm(archivePath, { force: true })
     }
-    const url = `https://github.com/astral-sh/uv/releases/download/${encodeURIComponent(this.uvVersion)}/${encodeURIComponent(this.asset.name)}`
-    assertUvDownloadUrl(url, 'Managed uv download URL')
-    const response = await this.fetchImpl(url, {
-      headers: { 'User-Agent': 'WorkWise' },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
-    })
-    if (!response.ok) throw new Error(`Managed uv download failed (${response.status}).`)
-    assertUvDownloadUrl(response.url || url, 'Managed uv download response URL')
-    const declared = Number(response.headers.get('content-length') ?? '0')
-    if (declared > MAX_UV_ARCHIVE_BYTES) throw new Error('Managed uv archive exceeds 64 MiB.')
-    const bytes = await readBoundedResponseBuffer(response, MAX_UV_ARCHIVE_BYTES, 'Managed uv archive')
+    const bytes = this.asset.dependencyId
+      ? await downloadManagedDependency(managedDependency(this.asset.dependencyId), this.fetchImpl)
+      : await this.downloadLegacyUvArchive()
     if (sha256(bytes) !== this.asset.sha256) throw new Error('Managed uv archive SHA-256 verification failed.')
     const temporary = `${archivePath}.next-${randomUUID()}`
     try {
@@ -304,6 +271,15 @@ export class ManagedUvRuntimeService {
       throw error
     }
     return archivePath
+  }
+
+  private async downloadLegacyUvArchive(): Promise<Buffer> {
+    const url = `https://github.com/astral-sh/uv/releases/download/${encodeURIComponent(this.uvVersion)}/${encodeURIComponent(this.asset.name)}`
+    assertUvDownloadUrl(url, 'Managed uv download URL')
+    const response = await this.fetchImpl(url, { headers: { 'User-Agent': 'RailWise AI' }, redirect: 'follow', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+    if (!response.ok) throw new Error(`Managed uv download failed (${response.status}).`)
+    assertUvDownloadUrl(response.url || url, 'Managed uv download response URL')
+    return readBoundedResponseBuffer(response, MAX_UV_ARCHIVE_BYTES, 'Managed uv archive')
   }
 
   private async ensureUvExecutable(archivePath: string): Promise<string> {
@@ -373,7 +349,7 @@ export class ManagedUvRuntimeService {
       'Managed uv archive'
     ), { checkCRC32: true })
     const entries = Object.values(zip.files)
-    if (entries.length === 0 || entries.length > 32) throw new Error('Managed uv ZIP has an invalid entry count.')
+    if (entries.length === 0 || entries.length > 64) throw new Error('Managed uv ZIP has an invalid entry count.')
     for (const entry of entries) {
       const original = (entry as typeof entry & { unsafeOriginalName?: string }).unsafeOriginalName ?? entry.name
       if (!safeArchivePath(original)) throw new Error(`Managed uv ZIP contains an unsafe path: ${original}`)
@@ -399,7 +375,7 @@ export class ManagedUvRuntimeService {
   private async extractTar(archivePath: string, target: string): Promise<void> {
     const listing = await this.run('tar', ['-tzf', archivePath], { timeoutMs: 30_000 })
     const entries = listing.stdout.split(/\r?\n/).filter(Boolean)
-    if (entries.length === 0 || entries.length > 32 || entries.some((entry) => !safeArchivePath(entry))) {
+    if (entries.length === 0 || entries.length > 64 || entries.some((entry) => !safeArchivePath(entry))) {
       throw new Error('Managed uv TAR contains an unsafe or invalid path listing.')
     }
     await this.run('tar', ['-xzf', archivePath, '-C', target], { timeoutMs: 30_000 })
@@ -408,9 +384,23 @@ export class ManagedUvRuntimeService {
   private async ensurePython(uvPath: string): Promise<string> {
     const pythonInstallDirectory = join(this.rootDirectory, 'python')
     await mkdir(pythonInstallDirectory, { recursive: true, mode: 0o700 })
+    if (this.pythonVersion !== MANAGED_PYTHON_VERSION) throw new Error('This Python version has no verified download manifest.')
+    const archiveDirectory = join(this.rootDirectory, 'archives', this.pythonAsset.version)
+    const archivePath = join(archiveDirectory, this.pythonAsset.name)
+    await mkdir(archiveDirectory, { recursive: true, mode: 0o700 })
+    const cached = await pathExists(archivePath) ? await readBoundedFile(archivePath, this.pythonAsset.size + 1, 'Managed Python archive') : undefined
+    if (!cached || cached.length !== this.pythonAsset.size || sha256(cached) !== this.pythonAsset.sha256) {
+      const bytes = await downloadManagedDependency(this.pythonAsset, this.fetchImpl)
+      await atomicWriteFile(archivePath, bytes)
+    }
+    const locked = managedPythonDownload(this.target)
+    const metadataPath = join(this.rootDirectory, 'python-downloads.json')
+    await atomicWriteFile(metadataPath, JSON.stringify({ [locked.key]: { ...locked.metadata, url: pathToFileURL(archivePath).href, sha256: this.pythonAsset.sha256 } }))
     const environment = {
       ...this.runtimeEnvironment(),
-      UV_PYTHON_DOWNLOADS: 'automatic'
+      UV_PYTHON_DOWNLOADS: 'automatic',
+      UV_PYTHON_DOWNLOADS_JSON_URL: metadataPath,
+      UV_PYTHON_CPYTHON_BUILD: locked.metadata.build
     }
     await this.run(uvPath, [
       'python',

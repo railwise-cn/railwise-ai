@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyGuiUpdate, useGuiUpdateStore } from './gui-update-store'
+import { applyGuiUpdate, checkGuiUpdate, useGuiUpdateStore } from './gui-update-store'
 import type { GuiUpdateInfo } from '@shared/gui-update'
 
 const info: Extract<GuiUpdateInfo, { ok: true }> = { ok: true, currentVersion: '0.5.4', latestVersion: '0.5.5', hasUpdate: true, releaseUrl: 'https://railwise.cn/download', channel: 'stable' }
@@ -49,6 +49,16 @@ describe('one-click update controller', () => {
     await applyGuiUpdate()
     expect(window.workwise.installGuiUpdate).not.toHaveBeenCalled()
     expect(useGuiUpdateStore.getState().error).toBe('Runtime unavailable')
+  })
+
+  it('keeps the verified download available through a failed metadata check', async () => {
+    window.workwise.checkGuiUpdate = vi.fn(async () => ({ ok: false as const, currentVersion: '0.5.4', message: 'offline' }))
+    vi.mocked(window.workwise.getGuiUpdateState).mockResolvedValue({ status: 'error', message: 'offline', info: { ...info, downloaded: true } })
+    await checkGuiUpdate('stable')
+    expect(useGuiUpdateStore.getState().state.info).toMatchObject({ ok: true, downloaded: true })
+    await applyGuiUpdate()
+    expect(window.workwise.downloadGuiUpdate).not.toHaveBeenCalled()
+    expect(window.workwise.installGuiUpdate).toHaveBeenCalledOnce()
   })
 
   it('opens the official manual download without trying to install', async () => {

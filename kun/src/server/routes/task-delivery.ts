@@ -11,6 +11,7 @@ import type { ServerRuntime } from './server-runtime.js'
 
 const Parameters = z.object({ workspaceRoot: z.string().trim().min(1).max(4096), goal: z.string().trim().min(1).max(20_000),
   sourcePaths: z.array(z.string().trim().min(1).max(4096)).max(100).default([]), outputDirectory: z.string().trim().min(1).max(4096).optional(),
+  outputFormats: z.array(z.enum(['md', 'docx', 'pdf'])).min(1).max(3).optional(),
   model: z.string().trim().min(1).max(256).optional(), providerId: z.string().trim().min(1).max(200).optional() })
 const Start = Parameters.extend({ idempotencyKey: z.string().trim().min(1).max(256) }).strict()
 const Save = Parameters.extend({ name: z.string().trim().min(1).max(160).optional() }).strict()
@@ -32,7 +33,18 @@ async function canonicalParameters(parameters: TaskDeliveryParameters): Promise<
 }
 
 export function registerTaskDeliveryRoutes(router: Router, runtime: ServerRuntime, authorized: (request: Request) => boolean): void {
-  router.add('GET', '/v1/task-templates', request => authorized(request) ? jsonResponse({ templates: TASK_DELIVERY_TEMPLATES.map(({ instruction: _instruction, ...item }) => item) }) : ERRORS.unauthorized())
+  router.add('GET', '/v1/task-templates', async request => {
+    if (!authorized(request)) return ERRORS.unauthorized()
+    const tools = await runtime.toolHost?.listTools() ?? []
+    let exportConfigured = false
+    try {
+      const url = new URL(process.env.RAILWISE_DOCUMENT_EXPORT_URL ?? '')
+      exportConfigured = url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) && !url.username && !url.password && Boolean(process.env.RAILWISE_DOCUMENT_EXPORT_TOKEN)
+    } catch { /* The catalog describes configuration without making a network request. */ }
+    const availability = { draftAvailable: Boolean(runtime.flowService && tools.some(tool => tool.name === 'propose_document')),
+      model: runtime.info().model, exportStatus: exportConfigured ? 'configured' : 'unavailable' }
+    return jsonResponse({ templates: TASK_DELIVERY_TEMPLATES.map(({ instruction: _instruction, ...item }) => ({ ...item, availability })) })
+  })
   router.add('POST', '/v1/task-templates/:id/start', async (request, context) => {
     if (!authorized(request)) return ERRORS.unauthorized()
     if (!runtime.flowService) return ERRORS.unavailable('Flow Runtime is unavailable')
@@ -52,7 +64,8 @@ export function registerTaskDeliveryRoutes(router: Router, runtime: ServerRuntim
       const existing = repository.listRuns(graph.id, 1)[0]
       const run = existing ?? await runtime.flowService.run(graph.id, { goal: parameters.goal })
       const threadId = `thr_delivery_${createHash('sha256').update(`${run.id}:delivery`).digest('hex').slice(0, 24)}`
-      const result = { threadId, taskId: runtime.taskRepository?.list({ threadId, limit: 1 })[0]?.id, flowId: graph.id, flowRunId: run.id }
+      const linked = repository.operation(`${run.id}:delivery`, 'task-start')?.result as { threadId?: string; taskId?: string } | undefined
+      const result = { threadId: linked?.threadId ?? threadId, taskId: linked?.taskId ?? runtime.taskRepository?.list({ threadId, limit: 1 })[0]?.id, flowId: graph.id, flowRunId: run.id }
       repository.finishOperation(graph.id, idempotencyKey, 'succeeded', result)
       return jsonResponse(result, 202)
     } catch (error) { return deliveryError(error) }

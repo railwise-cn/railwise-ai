@@ -18,6 +18,7 @@ import type { ApprovalGate } from '../../ports/approval-gate.js'
 import type { UserInputGate } from '../../ports/user-input-gate.js'
 import type { WorkspaceInspector } from '../../ports/workspace-inspector.js'
 import type { ToolHost, ToolProviderPolicy } from '../../ports/tool-host.js'
+import type { McpConfigurationUpdate, McpConfigurationResult } from '../../services/managed-mcp-runtime.js'
 import type { RuntimeEventRecorder } from '../../services/runtime-event-recorder.js'
 import type { RuntimeInfoResponse } from '../../contracts/runtime-info.js'
 import type { McpServerDiagnostic } from '../../adapters/tool/mcp-tool-provider.js'
@@ -68,6 +69,7 @@ export type RuntimeToolDiagnostics = {
  * file-backed adapters without leaking concrete types into routes.
  */
 export type ServerRuntime = {
+  updateLifecycle?: import('../../services/runtime-update-lifecycle.js').RuntimeUpdateLifecycle
   threadService: ThreadService
   turnService: TurnService
   uiActionService?: UiActionService
@@ -99,6 +101,7 @@ export type ServerRuntime = {
   workspaceInspector: WorkspaceInspector
   workspaceReferenceService: WorkspaceReferenceService
   toolHost?: ToolHost
+  refreshMcpConfiguration?: (request: McpConfigurationUpdate) => Promise<McpConfigurationResult>
   attachmentStore?: AttachmentStore
   memoryStore?: MemoryStore
   flowService?: FlowRuntimeService

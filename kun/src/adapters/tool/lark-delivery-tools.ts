@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { copyFile, mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { copyFile, mkdtemp, realpath, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { z } from 'zod'
@@ -34,7 +35,6 @@ const uploadInput = z.object({ path: z.string().min(1).max(4096), folderToken: i
 const mailReadInput = z.object({ messageId: identifier, recipient }).strict()
 const imReadInput = z.object({ messageId: identifier, chatId: identifier, contentHash: digest }).strict()
 const fileReadInput = z.object({ fileToken: identifier, expectedHash: digest }).strict()
-const MAX_FILE_BYTES = 32 * 1024 * 1024
 
 /** Narrow user-identity delivery commands. Every mutation has a separate readback tool. */
 export function buildLarkDeliveryTools(config: LarkCapabilityConfig, run: Run): LocalTool[] {
@@ -62,8 +62,8 @@ export function buildLarkDeliveryTools(config: LarkCapabilityConfig, run: Run): 
       await read(['drive', '+download', '--file-token', String(args.fileToken), '--output', './content'], readScopes.drive, context, temporary)
       const path = join(temporary, 'content')
       const info = await stat(path)
-      if (!info.isFile() || info.size > MAX_FILE_BYTES) throw failure('connector_file_size_exceeded')
-      const contentHash = hashBytes(await readFile(path))
+      if (!info.isFile()) throw failure('connector_file_size_exceeded')
+      const contentHash = await hashFile(path, context.abortSignal)
       return { fileToken: args.fileToken, contentHash, size: info.size }
     } finally { await rm(temporary, { recursive: true, force: true }) }
   }
@@ -97,7 +97,7 @@ export function buildLarkDeliveryTools(config: LarkCapabilityConfig, run: Run): 
   return [
     readTool({ name: 'lark_mail_send_status', description: '只读查询指定已发送邮件的逐收件人投递状态。', schema: mailReadInput, scopes: readScopes.mail, target: 'messageId', read: readMail }),
     readTool({ name: 'lark_im_get_message', description: '只读核验指定飞书会话中的准确消息及正文指纹。', schema: imReadInput, scopes: readScopes.im, target: 'messageId', read: readMessage }),
-    readTool({ name: 'lark_drive_verify_file', description: '只读下载准确远端文件到临时目录，计算指纹并清理临时副本，支持32MB以内文件。', schema: fileReadInput, scopes: readScopes.drive, target: 'fileToken', read: readFileHash }),
+    readTool({ name: 'lark_drive_verify_file', description: '只读下载准确远端文件到临时目录，计算指纹并清理临时副本。', schema: fileReadInput, scopes: readScopes.drive, target: 'fileToken', read: readFileHash }),
     defineLocalTool({
       name: 'lark_mail_send', description: '经明确确认后，以当前用户向一个准确邮箱发送纯文本邮件，并查询投递状态。',
       inputSchema: z.toJSONSchema(mailInput) as Json, policy: 'on-request', requireExplicitApproval: true,
@@ -153,7 +153,7 @@ export function buildLarkDeliveryTools(config: LarkCapabilityConfig, run: Run): 
       }
     }),
     defineLocalTool({
-      name: 'lark_drive_upload', description: '经确认后将32MB以内本地文件上传到准确飞书文件夹。检查本地预期SHA-256，并下载远端副本核验。',
+      name: 'lark_drive_upload', description: '经确认后将本地文件上传到准确飞书文件夹。检查本地预期SHA-256，并下载远端副本核验。',
       inputSchema: z.toJSONSchema(uploadInput) as Json, policy: 'on-request', requireExplicitApproval: true,
       effect: { provider: 'lark', operation: 'upload', mutation: true, targetFields: ['folderToken'], requiredScopes: LARK_DELIVERY_SCOPES.drive, readbackToolName: 'lark_drive_verify_file' },
       shouldAdvertise: () => LARK_DELIVERY_SCOPES.drive.every(scope => config.scopes.includes(scope)),
@@ -167,11 +167,11 @@ export function buildLarkDeliveryTools(config: LarkCapabilityConfig, run: Run): 
           const blocked = grantPathBlock(source, context)
           if (blocked) throw failure(blocked.code)
           const info = await stat(source)
-          if (!info.isFile() || info.size > MAX_FILE_BYTES) throw failure('connector_file_size_exceeded')
+          if (!info.isFile()) throw failure('connector_file_size_exceeded')
           temporary = await mkdtemp(join(tmpdir(), 'railwise-lark-upload-'))
           const staged = join(temporary, 'content')
           await copyFile(source, staged)
-          if (hashBytes(await readFile(staged)) !== args.expectedHash) throw failure('connector_source_changed')
+          if (await hashFile(staged, context.abortSignal) !== args.expectedHash) throw failure('connector_source_changed')
           const sent = await run(['drive', '+upload', '--file', './content', '--name', basename(source), '--folder-token', args.folderToken, ...jsonFlags],
             [...LARK_DELIVERY_SCOPES.drive], dispatchContext(context, () => { dispatched = true }), { operation: 'upload', target: args.folderToken }, temporary)
           if (!sent.ok) return failed('upload', args.folderToken, 'connector_upload_unconfirmed', dispatched)
@@ -217,4 +217,8 @@ function dataOf(value: unknown): Json { const envelope = object(value); return e
 function failure(code: string): Error { return Object.assign(new Error(code), { code }) }
 function errorCode(error: unknown): string { return typeof object(error).code === 'string' ? String(object(error).code) : 'connector_request_failed' }
 function hashText(value: string): string { return createHash('sha256').update(value).digest('hex') }
-function hashBytes(value: Buffer): string { return createHash('sha256').update(value).digest('hex') }
+async function hashFile(path: string, signal: AbortSignal): Promise<string> {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path, { signal })) hash.update(chunk)
+  return hash.digest('hex')
+}

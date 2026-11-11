@@ -1834,6 +1834,8 @@ const mcpServerConfigV2Schema = z.object({
     storage: z.enum(['keychain', 'dpapi', 'safe-storage', 'session'])
   }).strict().optional(),
   credentialEnvironmentVariables: z.array(trimmedString(128)).max(32).optional(),
+  managedPreset: z.enum(['amap-readonly', 'zotero-readonly']).optional(),
+  readOnlyTools: z.array(trimmedString(128)).max(128).optional(),
   oauth: z.object({
     resource: optionalTrimmedString(MAX_URL_LENGTH),
     authorizationUrl: optionalTrimmedString(MAX_URL_LENGTH),
