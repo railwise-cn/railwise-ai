@@ -64,6 +64,7 @@ import {
   readSddThreadRegistry
 } from '../sdd/sdd-thread-registry'
 import {
+  cancelStartupRuntimeProbe,
   clearBusyWatchdog,
   resetBusyRecoveryAttempts,
   scheduleStartupRuntimeProbe,
@@ -106,6 +107,76 @@ let clawChannelActivityUnsubscribe: (() => void) | null = null
 export function createNavigationActions(
   { set, get, sseAbortRef }: StoreActionContext
 ): Pick<ChatState, 'openCode' | 'openWrite' | 'ensureWriteThreadForWorkspace' | 'createWriteThread' | 'selectWriteThread' | 'probeRuntime' | 'boot' | 'chooseWorkspace' | 'clearWorkspace' | 'deleteWorkspace' | 'refreshThreads' | 'setThreadSearch' | 'setShowArchivedThreads'> {
+  const probeRuntime = async (mode: 'user' | 'background', signal?: AbortSignal): Promise<boolean> => {
+    const prev = get().runtimeConnection
+    if (mode === 'user') set({ runtimeConnection: 'checking' })
+    try {
+      if (typeof window.workwise === 'undefined') {
+        throw new Error(
+          'Preload bridge missing (window.workwise). Restart the app or check BrowserWindow preload path.'
+        )
+      }
+      await rendererRuntimeClient.getSettings({ forceRefresh: true })
+      if (signal?.aborted) return false
+      const p = getProvider()
+      await p.connect()
+      if (signal?.aborted) return false
+      set({ runtimeConnection: 'ready', error: null, runtimeErrorDetail: null })
+      try {
+        const info = await p.getRuntimeInfo?.()
+        if (signal?.aborted) return false
+        set({ runtimeCapabilities: info?.capabilities ?? null })
+      } catch {
+        // Missing capability metadata must not advertise unverified tools or
+        // turn a healthy legacy runtime into an offline connection.
+        if (signal?.aborted) return false
+        set({ runtimeCapabilities: null })
+      }
+      void get().loadComposerModels()
+      if (prev !== 'ready' || mode === 'user') {
+        try {
+          await get().refreshThreads()
+        } catch {
+          /* refreshThreads sets state */
+        }
+      }
+    } catch (e) {
+      if (signal?.aborted) return false
+      const msg = formatRuntimeError(e)
+      const detail = runtimeErrorDetail(e)
+      const needsSettings = shouldOpenSettingsForError(e)
+      const code = getRuntimeErrorCode(e)
+      const transient = code
+        ? ['runtime_offline', 'runtime_timeout', 'timeout', 'fetch_failed', 'runtime_unhealthy'].includes(code)
+        : /timed?\s*out|timeout|ECONNREFUSED|ECONNRESET|network (?:error|request failed)/i.test(e instanceof Error ? e.message : String(e))
+      if (mode === 'user') {
+        stopTurnCompletionPoll()
+        set({
+          runtimeConnection: 'offline',
+          runtimeCapabilities: null,
+          error: msg,
+          runtimeErrorDetail: detail,
+          ...(needsSettings
+            ? { route: 'settings' as const, settingsSection: 'agents' as const }
+            : {})
+        })
+      } else if (prev === 'ready') {
+        stopTurnCompletionPoll()
+        set({
+          runtimeConnection: 'offline',
+          runtimeCapabilities: null,
+          error: msg,
+          runtimeErrorDetail: detail,
+          ...(needsSettings
+            ? { route: 'settings' as const, settingsSection: 'agents' as const }
+            : {})
+        })
+      }
+      return transient
+    }
+    return false
+  }
+
   return {
   openCode: async () => {
     const state = get()
@@ -288,62 +359,8 @@ export function createNavigationActions(
   },
 
   probeRuntime: async (mode = 'user') => {
-    const prev = get().runtimeConnection
-    if (mode === 'user') set({ runtimeConnection: 'checking' })
-    try {
-      if (typeof window.workwise === 'undefined') {
-        throw new Error(
-          'Preload bridge missing (window.workwise). Restart the app or check BrowserWindow preload path.'
-        )
-      }
-      const settings = await rendererRuntimeClient.getSettings({ forceRefresh: true })
-      const p = getProvider()
-      await p.connect()
-      set({ runtimeConnection: 'ready', error: null, runtimeErrorDetail: null })
-      try {
-        const info = await p.getRuntimeInfo?.()
-        set({ runtimeCapabilities: info?.capabilities ?? null })
-      } catch {
-        // Missing capability metadata must not advertise unverified tools or
-        // turn a healthy legacy runtime into an offline connection.
-        set({ runtimeCapabilities: null })
-      }
-      void get().loadComposerModels()
-      if (prev !== 'ready' || mode === 'user') {
-        try {
-          await get().refreshThreads()
-        } catch {
-          /* refreshThreads sets state */
-        }
-      }
-    } catch (e) {
-      const msg = formatRuntimeError(e)
-      const detail = runtimeErrorDetail(e)
-      const needsSettings = shouldOpenSettingsForError(e)
-      if (mode === 'user') {
-        stopTurnCompletionPoll()
-        set({
-          runtimeConnection: 'offline',
-          runtimeCapabilities: null,
-          error: msg,
-          runtimeErrorDetail: detail,
-          ...(needsSettings
-            ? { route: 'settings' as const, settingsSection: 'agents' as const }
-            : {})
-        })
-      } else if (prev === 'ready') {
-        stopTurnCompletionPoll()
-        set({
-          runtimeConnection: 'offline',
-          runtimeCapabilities: null,
-          error: msg,
-          runtimeErrorDetail: detail,
-          ...(needsSettings
-            ? { route: 'settings' as const, settingsSection: 'agents' as const }
-            : {})
-        })
-      }
-    }
+    cancelStartupRuntimeProbe()
+    await probeRuntime(mode)
   },
 
   boot: async () => {
@@ -414,7 +431,7 @@ export function createNavigationActions(
         if (fromStorage && !get().composerProviderId) {
           set({ composerModel: fromStorage })
         }
-        scheduleStartupRuntimeProbe(get)
+        scheduleStartupRuntimeProbe(signal => probeRuntime('user', signal))
       } catch (e) {
         set({
           error: formatRuntimeError(e),

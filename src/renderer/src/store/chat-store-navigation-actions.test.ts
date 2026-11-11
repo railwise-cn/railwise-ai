@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NormalizedThread } from '../agent/types'
 import type { ChatState, ChatStoreGet, ChatStoreSet } from './chat-store-types'
 
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../agent/registry', () => ({ getProvider: mocks.getProvider }))
+vi.mock('../lib/apply-theme', () => ({ applyTheme: vi.fn(), applyUiFontScale: vi.fn() }))
 vi.mock('./chat-store-runtime', async (importOriginal) => ({
   ...await importOriginal<typeof import('./chat-store-runtime')>(),
   readWriteWorkspaceRoots: mocks.readWriteWorkspaceRoots
@@ -16,6 +17,7 @@ vi.mock('./chat-store-runtime', async (importOriginal) => ({
 import { createNavigationActions } from './chat-store-navigation-actions'
 import { createThreadActions } from './chat-store-thread-actions'
 import { rendererRuntimeClient } from '../agent/runtime-client'
+import { WorkWiseRuntimeProvider } from '../agent/managed-runtime'
 import type { WorkWiseSettingsV2 } from '@shared/app-settings'
 
 function deferred<T>() {
@@ -63,6 +65,89 @@ function buildHarness(initialThreads: NormalizedThread[]) {
   Object.assign(state, createNavigationActions(context), createThreadActions(context))
   return { state, sseAbortRef }
 }
+
+describe('startup runtime recovery through navigation actions', () => {
+  function startupState() {
+    const { state } = buildHarness([])
+    Object.assign(state, { runtimeConnection: 'idle', route: 'chat', composerPickList: [], applyI18nFromSettings: vi.fn(async () => undefined),
+      loadComposerModels: vi.fn(async () => undefined), refreshThreads: vi.fn(async () => undefined) })
+    return state
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.restoreAllMocks()
+    mocks.getProvider.mockReset()
+    const windowTarget = Object.assign(new EventTarget(), { workwise: {} })
+    vi.stubGlobal('window', windowTarget)
+    vi.spyOn(rendererRuntimeClient, 'getSettings').mockResolvedValue({
+      revision: 18, workspaceRoot: '', locale: 'zh', theme: 'dark', uiFontScale: 'medium', claw: { channels: [] }
+    } as unknown as WorkWiseSettingsV2)
+  })
+  afterEach(async () => {
+    window.dispatchEvent(new Event('beforeunload'))
+    await vi.runOnlyPendingTimersAsync()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it.each(['runtime_offline', 'timeout'])('recovers after an initial transient %s without a model request', async code => {
+    const connect = vi.fn().mockRejectedValueOnce(new Error(JSON.stringify({ code, message: 'runtime is starting' }))).mockResolvedValue(undefined)
+    const startTurn = vi.fn()
+    mocks.getProvider.mockReturnValue({ connect, startTurn, getRuntimeInfo: vi.fn(async () => ({ capabilities: {} })) })
+    const state = startupState()
+    await state.boot()
+    await vi.advanceTimersByTimeAsync(900)
+    expect(connect).toHaveBeenCalledTimes(1)
+    expect(state.runtimeConnection).toBe('offline')
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(connect).toHaveBeenCalledTimes(2)
+    expect(state.runtimeConnection).toBe('ready')
+    expect(state.refreshThreads).toHaveBeenCalledOnce()
+    expect(startTurn).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(connect).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['runtime_auth_required', 'runtime_port_conflict', 'missing_api_key', 'model_provider_unavailable'])('stops automatic probing for persistent %s', async code => {
+    const connect = vi.fn().mockRejectedValue(new Error(JSON.stringify({ code, message: 'configuration requires attention' })))
+    mocks.getProvider.mockReturnValue({ connect })
+    const state = startupState()
+    await state.boot()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(connect).toHaveBeenCalledOnce()
+    expect(state.runtimeConnection).toBe('offline')
+  })
+
+  it('lets a manual probe replace startup work without a late failure overriding success', async () => {
+    let failStartup!: (error: Error) => void
+    const connect = vi.fn().mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { failStartup = reject })).mockResolvedValue(undefined)
+    mocks.getProvider.mockReturnValue({ connect })
+    const state = startupState()
+    await state.boot()
+    await vi.advanceTimersByTimeAsync(900)
+    await state.probeRuntime('user')
+    expect(state.runtimeConnection).toBe('ready')
+    failStartup(new Error(JSON.stringify({ code: 'runtime_offline' })))
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(state.runtimeConnection).toBe('ready')
+    expect(state.error).toBeNull()
+    expect(connect).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps local health and thread reads available for an existing profile without a model key', async () => {
+    const runtimeRequest = vi.spyOn(rendererRuntimeClient, 'runtimeRequest').mockResolvedValue({ ok: true, status: 200, body: '{}' })
+    mocks.getProvider.mockReturnValue(new WorkWiseRuntimeProvider())
+    const state = startupState()
+    await state.boot()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(state.runtimeConnection).toBe('ready')
+    expect(state.refreshThreads).toHaveBeenCalledOnce()
+    expect(runtimeRequest.mock.calls).toEqual([
+      ['/health', 'GET'], ['/v1/threads?limit=1', 'GET'], ['/v1/runtime/info', 'GET']
+    ])
+  })
+})
 
 describe('chat-store-navigation-actions thread refresh races', () => {
   beforeEach(() => {

@@ -2,6 +2,8 @@ import type { ChatBlock } from '../agent/types'
 import type { ChatState, ChatStoreGet, ChatStoreSet } from './chat-store-types'
 
 let startupRuntimeProbeTimer: ReturnType<typeof setTimeout> | null = null
+let startupRuntimeProbeController: AbortController | null = null
+const STARTUP_RUNTIME_PROBE_DELAYS = [900, 1500, 3000, 5000, 5000]
 let busyWatchdogTimer: ReturnType<typeof setTimeout> | null = null
 let busyRecoveryAttempts = 0
 let turnCompletionPollTimer: ReturnType<typeof setInterval> | null = null
@@ -49,14 +51,38 @@ type TurnCompletionPollOptions = {
   ) => void | Promise<void>
 }
 
-export function scheduleStartupRuntimeProbe(get: ChatStoreGet): void {
-  if (startupRuntimeProbeTimer) {
-    clearTimeout(startupRuntimeProbeTimer)
-  }
-  startupRuntimeProbeTimer = setTimeout(() => {
+export function cancelStartupRuntimeProbe(): void {
+  if (startupRuntimeProbeTimer) clearTimeout(startupRuntimeProbeTimer)
+  startupRuntimeProbeTimer = null
+  startupRuntimeProbeController?.abort()
+  startupRuntimeProbeController = null
+  if (typeof window !== 'undefined') window.removeEventListener?.('beforeunload', cancelStartupRuntimeProbe)
+}
+
+/** A true result requests another health probe within the finite startup budget. */
+export function scheduleStartupRuntimeProbe(probe: (signal: AbortSignal) => Promise<boolean>): void {
+  cancelStartupRuntimeProbe()
+  const controller = new AbortController()
+  startupRuntimeProbeController = controller
+  if (typeof window !== 'undefined') window.addEventListener?.('beforeunload', cancelStartupRuntimeProbe, { once: true })
+  let attempt = 0
+  const tick = async (): Promise<void> => {
     startupRuntimeProbeTimer = null
-    void get().probeRuntime('user')
-  }, 900)
+    let retry = false
+    try {
+      retry = await probe(controller.signal)
+    } catch {
+      // The probe owns its error presentation.
+    }
+    if (controller.signal.aborted || startupRuntimeProbeController !== controller) return
+    attempt += 1
+    if (!retry || attempt >= STARTUP_RUNTIME_PROBE_DELAYS.length) {
+      cancelStartupRuntimeProbe()
+      return
+    }
+    startupRuntimeProbeTimer = setTimeout(() => { void tick() }, STARTUP_RUNTIME_PROBE_DELAYS[attempt])
+  }
+  startupRuntimeProbeTimer = setTimeout(() => { void tick() }, STARTUP_RUNTIME_PROBE_DELAYS[0])
 }
 
 export function clearBusyWatchdog(): void {
