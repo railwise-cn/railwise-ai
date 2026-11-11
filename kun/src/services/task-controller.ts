@@ -735,12 +735,13 @@ export class TaskController {
       const approvedRequests = this.repository.humanRequests('approval', false)
       for (const previous of this.repository.operations(token.taskId, 'tool')) {
         const output = (previous.result as ToolHostResult | undefined)?.item
+        const originalRequestHash = previous.request?.approvalRequestHash
         if (previous.id === current.id || previous.status !== 'failed' || previous.request?.dispatchTracking !== 'host-v1' ||
             output?.kind !== 'tool_result' || (output.output as { code?: string } | undefined)?.code !== 'operation_not_dispatched' ||
             previous.request.toolName !== current.request?.toolName || previous.request.providerId !== current.request?.providerId ||
             previous.request.target !== current.request?.target || previous.request.scopeConfirmationId !== current.request?.scopeConfirmationId ||
             previous.request.scopeRevision !== current.request?.scopeRevision || previous.request.argumentsHash !== current.request?.argumentsHash ||
-            previous.request.approvalRequestHash !== approval.requestHash) continue
+            typeof originalRequestHash !== 'string' || !/^[a-f0-9]{64}$/.test(originalRequestHash)) continue
         const priorGrant = ExecutionGrantSchema.safeParse(previous.request.executionGrant)
         if (!priorGrant.success || priorGrant.data.taskId !== token.taskId ||
             approvalAuthorityFingerprint(priorGrant.data) !== approvalAuthorityFingerprint(grant.data)) continue
@@ -753,7 +754,7 @@ export class TaskController {
             request.threadId === approval.threadId &&
             request.turnId === previous.request?.turnId && original?.toolName === approval.toolName &&
             (original.callId === previous.request?.callId || request.id === `appr_${previous.request?.callId}`) &&
-            (!original.requestHash || original.requestHash === approval.requestHash)
+            (!original.requestHash || original.requestHash === originalRequestHash)
         })
         if (!source) continue
         const transferKey = `approval-transfer:${source.id}`

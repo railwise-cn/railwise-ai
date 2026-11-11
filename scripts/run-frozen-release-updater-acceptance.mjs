@@ -549,7 +549,7 @@ export async function main() {
     equal(readFileSync(join(paths.profile, 'frozen-release-sentinel.json')).toString(), beforeSentinel.toString(), 'Independent user-data sentinel')
     report.dataReadback = fixture(installed, 'verify', root, paths, env, run, build.sourceHead, 'verify-data.json', baseVersion, targetVersion)
     report.dataRestartReadback = fixture(installed, 'verify', root, paths, env, run, build.sourceHead, 'verify-restart-data.json', baseVersion, targetVersion)
-    validateUpdaterServiceEvidence(report, { sourceHead: build.sourceHead, version: targetVersion, baseVersion })
+    validateUpdaterServiceEvidence(report, { sourceHead: build.sourceHead, version: targetVersion, baseVersion, requireTaskContinuity: true })
     assertRetainedFiles(beforeRefs, snapshotFiles(paths.workwise))
     report.configReferences = { status: 'byte-preserved', kinds: ['disabled MCP', 'plugin manifest reference', 'Skill text', 'inert credential reference'], scope: 'Stored bytes only; updater acceptance exits before configuration activation. No real credential, plugin activation or complete catalog migration is certified.' }
     report.separateSentinelPreserved = true; report.feedRequests = feed.requests; report.frozenManifestSha256 = feed.manifestSha256

@@ -15,19 +15,21 @@ function options(root: string) {
 
 describe('update handoff through production Runtime and SQLite', () => {
   it.each([
-    { toolName: 'write', repeatExit: false, prompt: '保存合成资料到 summary.md', arguments: { path: 'summary.md', content: '# 合成资料' } },
-    { toolName: 'write', repeatExit: true, prompt: '保存合成资料到 summary.md', arguments: { path: 'summary.md', content: '# 合成资料' } },
-    { toolName: 'request_host_shell', repeatExit: false, prompt: '执行一次合成只读命令检查', arguments: { command: 'printf railwise-synthetic', timeout_seconds: 5, ttl_seconds: 60, idempotency_key: 'synthetic-shell' } }
-  ])('stops a real host approval wait for $toolName safely and restores its pending request (second exit $repeatExit)', async ({ toolName, repeatExit, prompt, arguments: toolArguments }) => {
+    { toolName: 'write', reorderArguments: false, repeatExit: false, prompt: '保存合成资料到 summary.md', arguments: { path: 'summary.md', content: '# 合成资料' } },
+    { toolName: 'write', reorderArguments: false, repeatExit: true, prompt: '保存合成资料到 summary.md', arguments: { path: 'summary.md', content: '# 合成资料' } },
+    { toolName: 'write', reorderArguments: true, repeatExit: false, prompt: '保存合成资料到 summary.md', arguments: { path: 'summary.md', content: '# 合成资料' } },
+    { toolName: 'request_host_shell', reorderArguments: false, repeatExit: false, prompt: '执行一次合成只读命令检查', arguments: { command: 'printf railwise-synthetic', timeout_seconds: 5, ttl_seconds: 60, idempotency_key: 'synthetic-shell' } }
+  ])('stops a real host approval wait for $toolName safely and restores its pending request (second exit $repeatExit, reordered arguments $reorderArguments)', async ({ toolName, repeatExit, reorderArguments, prompt, arguments: toolArguments }) => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-update-approval-')))
     let modelCalls = 0
     const model = createServer(async (request, response) => {
       for await (const _chunk of request) { /* Consume the synthetic model request. */ }
       modelCalls++
+      const argumentsForTurn = reorderArguments && modelCalls > 1 ? Object.fromEntries(Object.entries(toolArguments).reverse()) : toolArguments
       const chunk = modelCalls > (repeatExit ? 3 : 2)
         ? { id: 'synthetic-final', choices: [{ index: 0, delta: { content: '已执行并核验本次任务。合成资料已写入 summary.md。' }, finish_reason: 'stop' }] }
         : { id: 'synthetic-approval-turn', choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'synthetic-write', type: 'function',
-        function: { name: toolName, arguments: JSON.stringify(toolArguments) } }] }, finish_reason: 'tool_calls' }] }
+        function: { name: toolName, arguments: JSON.stringify(argumentsForTurn) } }] }, finish_reason: 'tool_calls' }] }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       response.end(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`)
     })
@@ -101,6 +103,10 @@ describe('update handoff through production Runtime and SQLite', () => {
       const receipts = runtime.taskRepository!.operations(taskId, 'tool')
       expect(receipts).toHaveLength(repeatExit ? 3 : 2)
       expect(receipts.at(-1)!.status).toBe('succeeded')
+      if (reorderArguments) {
+        expect(receipts[0]!.request!.argumentsHash).toBe(receipts.at(-1)!.request!.argumentsHash)
+        expect(receipts[0]!.request!.approvalRequestHash).not.toBe(receipts.at(-1)!.request!.approvalRequestHash)
+      }
       const resumedGrant = receipts.at(-1)!.request!.executionGrant as { id: string; turnId: string; taskId: string }
       expect(resumedGrant.id).not.toBe(originalGrant.id)
       expect(resumedGrant.taskId).toBe(taskId)
