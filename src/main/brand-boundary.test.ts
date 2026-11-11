@@ -12,7 +12,7 @@ describe('RailWise AI brand boundary', () => {
     })).not.toThrow()
   })
 
-  it('preserves historical package identities only in release evidence', () => {
+  it.each(['docs/qa/release-gates/review.md', 'docs/qa/harness-implementation-status-2026-11-10.md'])('preserves exact compatibility identities only in QA evidence (%s)', evidencePath => {
     const root = mkdtempSync(join(tmpdir(), 'railwise-brand-evidence-'))
     try {
       for (const dir of ['src', 'scripts', '.github', 'docs/qa/release-gates', 'release', 'website']) mkdirSync(join(root, dir), { recursive: true })
@@ -30,7 +30,7 @@ describe('RailWise AI brand boundary', () => {
           writeFileSync(path, '')
         }
       }
-      const evidence = join(root, 'docs/qa/release-gates/review.md')
+      const evidence = join(root, evidencePath)
       const run = (): void => { execFileSync(process.execPath, [script], { cwd: root, stdio: 'pipe' }) }
       const legacyId = 'com.wangjiawei508.' + 'work' + 'gpt'
       writeFileSync(evidence, `Bundle ID: ${legacyId}\nApp ID: ${legacyId}.candidate.head9527ec5f1bcb\n`)

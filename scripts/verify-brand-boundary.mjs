@@ -140,7 +140,7 @@ for (const absolute of files) {
         line.includes("com.wangjiawei508.workgpt")
       ) continue
       // Acceptance records must retain the exact identity of historical packages.
-      if (rel.startsWith('docs/qa/release-gates/') && rule.name === 'old product name') {
+      if (rel.startsWith('docs/qa/') && rule.name === 'old product name') {
         const withoutPackageIdentity = line.replace(/\bcom\.wangjiawei508\.workgpt(?:\.candidate\.head[a-f0-9]{12})?\b/g, '')
         rule.pattern.lastIndex = 0
         if (!rule.pattern.test(withoutPackageIdentity)) continue
