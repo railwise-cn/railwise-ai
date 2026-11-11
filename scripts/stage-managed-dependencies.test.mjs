@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { checkedBytes, finalizeWebsite, inspectWebsiteStage, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
+import { checkedBytes, finalizeWebsite, inspectPublishedDependencies, inspectWebsiteStage, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
 
 const manifest = JSON.parse(await readFile(new URL('../src/shared/managed-dependencies.json', import.meta.url), 'utf8'))
 const bytes = Buffer.from('exact upstream dependency')
@@ -13,16 +13,16 @@ const file = { id: 'fixture', component: 'fixture', version: '1.0.0', name: 'fix
 file.mirrorPath = `${file.component}/${file.version}/${file.sha256}/${file.name}`
 
 test('committed manifest pins all runtime targets, sources, licenses and Python metadata', () => {
-  assert.equal(validateManifest(manifest).files.length, 25)
+  assert.equal(validateManifest(manifest).files.length, 31)
   for (const [target, entry] of Object.entries(manifest.pythonDownloads)) {
     const runtime = manifest.files.find(item => item.id === `python-${target}`)
     assert.equal(entry.metadata.sha256, runtime.sha256)
     assert.equal(entry.metadata.url, runtime.sourceUrl)
     assert.equal(entry.metadata.build, '20260211')
   }
-  for (const component of ['uv', 'cpython', 'lark-cli']) {
+  for (const component of ['uv', 'cpython', 'lark-cli', 'officecli']) {
     const runtimes = manifest.files.filter(item => item.component === component && item.role === 'runtime')
-    assert.equal(runtimes.length, component === 'lark-cli' ? 4 : 6)
+    assert.equal(runtimes.length, ['lark-cli', 'officecli'].includes(component) ? 4 : 6)
   }
 })
 
@@ -72,6 +72,27 @@ test('website finalization preserves immutable objects and fails conflicting con
     const conflictingStage = await stage('conflict')
     assert.throws(() => execute(conflictingStage), /Immutable dependency conflict/)
     assert.equal(await readFile(target, 'utf8'), 'existing conflict')
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('incremental staging verifies published resources and transfers only missing files', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dependency-incremental-test-'))
+  try {
+    const root = join(directory, 'downloads', 'workwise')
+    const target = join(root, 'dependencies', file.mirrorPath)
+    await mkdir(join(target, '..'), { recursive: true })
+    await writeFile(target, bytes)
+    const missing = { ...file, id: 'missing', mirrorPath: 'fixture/1.0.0/missing.bin' }
+    const metadata = Buffer.from(JSON.stringify({ files: [file, missing] })).toString('base64')
+    const inspect = () => JSON.parse(execFileSync('bash', ['-s', '--', root, metadata], { input: inspectPublishedDependencies, stdio: ['pipe', 'pipe', 'pipe'] }).toString())
+    assert.deepEqual(inspect(), { present: ['fixture'], missing: ['missing'] })
+    const stage = join(root, 'dependencies', '.deploy-reuse', 'payload')
+    await mkdir(stage, { recursive: true })
+    await writeFile(join(stage, 'manifest.json'), JSON.stringify({ files: [file] }))
+    execFileSync('bash', ['-s', '--', root, stage], { input: finalizeWebsite, stdio: ['pipe', 'pipe', 'pipe'] })
+    assert.deepEqual(await readFile(target), bytes)
+    await writeFile(target, 'changed')
+    assert.throws(inspect, /Immutable dependency conflict/)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 

@@ -4,7 +4,8 @@
   "upstreamRevisions": {
     "uv": "507230998c9541d67814b57463ac00e454ff6991",
     "pythonBuildStandalone": "6b6905a3fe672117cff7563e2c0a375a92fd1c5a",
-    "lark": "ac22a60a23d66c37d43a7ec6d9e99b99a4320356"
+    "lark": "ac22a60a23d66c37d43a7ec6d9e99b99a4320356",
+    "officecli": "c56512c8c7b76fe284f09940e4cd492470099d3e"
   },
   "files": [
     {
@@ -436,6 +437,106 @@
         "lark-source"
       ],
       "mirrorPath": "lark-cli/1.0.100/69bdaad4925567165086109b2ee02352dc81dc6b90e994095b14638e5cb8709e/lark-cli-1.0.100-windows-arm64.zip"
+    },
+    {
+      "id": "office-license",
+      "component": "officecli",
+      "version": "1.0.160",
+      "role": "license",
+      "name": "OfficeCLI-LICENSE",
+      "sourceUrl": "https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/c56512c8c7b76fe284f09940e4cd492470099d3e/LICENSE",
+      "license": "Apache-2.0",
+      "size": 11375,
+      "sha256": "7e282402a5a6db33995fe638bb3fe79013f9884d8f7d15a42e481c1e86aadda1",
+      "mirrorPath": "officecli/1.0.160/7e282402a5a6db33995fe638bb3fe79013f9884d8f7d15a42e481c1e86aadda1/OfficeCLI-LICENSE"
+    },
+    {
+      "id": "office-source",
+      "component": "officecli",
+      "version": "1.0.160",
+      "role": "source",
+      "name": "OfficeCLI-v1.0.160-source.zip",
+      "sourceUrl": "https://api.github.com/repos/iOfficeAI/OfficeCLI/zipball/c56512c8c7b76fe284f09940e4cd492470099d3e",
+      "license": "Apache-2.0",
+      "size": 78771838,
+      "sha256": "f689997c01d6418c20d2129eb979cf09dd9ece16ef10250c15bb716bfc9536f5",
+      "mirrorPath": "officecli/1.0.160/f689997c01d6418c20d2129eb979cf09dd9ece16ef10250c15bb716bfc9536f5/OfficeCLI-v1.0.160-source.zip"
+    },
+    {
+      "id": "office-darwin-arm64",
+      "component": "officecli",
+      "version": "1.0.160",
+      "role": "runtime",
+      "target": "darwin-arm64",
+      "name": "officecli-mac-arm64",
+      "sourceUrl": "https://github.com/iOfficeAI/OfficeCLI/releases/download/v1.0.160/officecli-mac-arm64",
+      "license": "Apache-2.0",
+      "size": 33924976,
+      "sha256": "fe2b31c6c27534dfbbf155386b6b9105420f9315bbb606335ec61490d171386d",
+      "licenseIds": [
+        "office-license"
+      ],
+      "sourceIds": [
+        "office-source"
+      ],
+      "mirrorPath": "officecli/1.0.160/fe2b31c6c27534dfbbf155386b6b9105420f9315bbb606335ec61490d171386d/officecli-mac-arm64"
+    },
+    {
+      "id": "office-darwin-x64",
+      "component": "officecli",
+      "version": "1.0.160",
+      "role": "runtime",
+      "target": "darwin-x64",
+      "name": "officecli-mac-x64",
+      "sourceUrl": "https://github.com/iOfficeAI/OfficeCLI/releases/download/v1.0.160/officecli-mac-x64",
+      "license": "Apache-2.0",
+      "size": 34903936,
+      "sha256": "55b27f6d422f9e0bcd2aa40abb262606110ff957a4a5253db7a8ba0460cd81c7",
+      "licenseIds": [
+        "office-license"
+      ],
+      "sourceIds": [
+        "office-source"
+      ],
+      "mirrorPath": "officecli/1.0.160/55b27f6d422f9e0bcd2aa40abb262606110ff957a4a5253db7a8ba0460cd81c7/officecli-mac-x64"
+    },
+    {
+      "id": "office-win32-arm64",
+      "component": "officecli",
+      "version": "1.0.160",
+      "role": "runtime",
+      "target": "win32-arm64",
+      "name": "officecli-win-arm64.exe",
+      "sourceUrl": "https://github.com/iOfficeAI/OfficeCLI/releases/download/v1.0.160/officecli-win-arm64.exe",
+      "license": "Apache-2.0",
+      "size": 33988532,
+      "sha256": "65129df43a4eb8199f3ebf6b17b56c5311242f53c5f725f60efb0a94f8952d74",
+      "licenseIds": [
+        "office-license"
+      ],
+      "sourceIds": [
+        "office-source"
+      ],
+      "mirrorPath": "officecli/1.0.160/65129df43a4eb8199f3ebf6b17b56c5311242f53c5f725f60efb0a94f8952d74/officecli-win-arm64.exe"
+    },
+    {
+      "id": "office-win32-x64",
+      "component": "officecli",
+      "version": "1.0.160",
+      "role": "runtime",
+      "target": "win32-x64",
+      "name": "officecli-win-x64.exe",
+      "sourceUrl": "https://github.com/iOfficeAI/OfficeCLI/releases/download/v1.0.160/officecli-win-x64.exe",
+      "license": "Apache-2.0",
+      "size": 33546152,
+      "sha256": "c590ca9d464f2b03362825b0f2615efcae33ce3fc0edaeeef29f7ddacb4c5424",
+      "licenseIds": [
+        "office-license"
+      ],
+      "sourceIds": [
+        "office-source"
+      ],
+      "mirrorPath": "officecli/1.0.160/c590ca9d464f2b03362825b0f2615efcae33ce3fc0edaeeef29f7ddacb4c5424/officecli-win-x64.exe"
     }
   ],
   "pythonDownloads": {

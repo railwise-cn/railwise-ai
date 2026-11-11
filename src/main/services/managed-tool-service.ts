@@ -31,14 +31,14 @@ import { ManagedLarkAppSetup, larkAppConfiguration, officialLarkURL } from './ma
 import { resolveLarkCliEnvironment } from '../../../kun/src/services/lark-cli-environment.js'
 import { parseLarkIdentityBinding } from '../../../kun/src/services/lark-cli-identity.js'
 import { LARK_RELEASE } from './managed-lark-release'
+import { OFFICE_RELEASE } from './managed-office-release'
 import { LARK_DELIVERY_SCOPES } from '../../../kun/src/adapters/tool/lark-delivery-tools.js'
-import { downloadManagedDependency, findManagedDependency } from './managed-dependency-download'
+import { downloadManagedDependency, findManagedDependency, managedDependency } from './managed-dependency-download'
 
 const execFileAsync = promisify(execFile)
 const MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
 const MAX_SKILL_BUNDLE_DOWNLOAD_BYTES = 96 * 1024 * 1024
 const EGO_URL = 'https://lite.ego.app/'
-const RELEASE_CACHE_TTL_MS = 30 * 60 * 1_000
 const DOWNLOAD_ATTEMPTS = 3
 const DOWNLOAD_TIMEOUT_MS = 60_000
 
@@ -50,7 +50,6 @@ type ToolManifest = Record<string, {
 }>
 
 type ReleaseInfo = { version: string; tag: string; assets: Map<string, string> }
-const releaseVersionCache = new Map<string, { release: ReleaseInfo; expiresAt: number }>()
 
 const LARK_SKILLS = [
   'lark-approval', 'lark-apps', 'lark-attendance', 'lark-base', 'lark-calendar',
@@ -131,60 +130,19 @@ async function writeManifest(manifest: ToolManifest): Promise<void> {
   await durableWriteFile(manifestPath(), `${JSON.stringify(manifest, null, 2)}\n`)
 }
 
-async function fetchLatestRelease(repo: string): Promise<ReleaseInfo> {
-  try {
-    const apiResponse = await systemFetch(`https://api.github.com/repos/${repo}/releases/latest`, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'RailWise AI',
-        'X-GitHub-Api-Version': '2022-11-28'
-      },
-      signal: AbortSignal.timeout(30_000)
-    })
-    if (apiResponse.ok) {
-      const payload = await apiResponse.json() as {
-        tag_name?: unknown
-        assets?: Array<{ name?: unknown; browser_download_url?: unknown }>
-      }
-      const tag = typeof payload.tag_name === 'string' ? payload.tag_name.trim() : ''
-      const version = tag.replace(/^v/, '')
-      if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error('Release version is invalid.')
-      const assets = new Map<string, string>()
-      for (const asset of payload.assets ?? []) {
-        if (typeof asset.name === 'string' && typeof asset.browser_download_url === 'string') {
-          assets.set(asset.name, asset.browser_download_url)
-        }
-      }
-      return { version, tag, assets }
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Release version is invalid.') throw error
-    // The public release redirect is a rate-limit-safe fallback.
-  }
-  let response: Response
-  try {
-    response = await systemFetch(`https://github.com/${repo}/releases/latest`, {
-      headers: { Accept: 'text/html', 'User-Agent': 'RailWise AI' },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(30_000)
-    })
-  } catch (error) {
-    throw new Error(describeNetworkFailure(error, `GitHub (${repo})`), { cause: error })
-  }
-  if (!response.ok) throw new Error(`Unable to read ${repo} release (${response.status}).`)
-  const version = response.url
-    ? releaseVersionFromUrl(response.url)
-    : releaseVersionFromHtml(await response.text())
-  return { version, tag: `v${version}`, assets: new Map() }
+async function latestReleaseFor(id: Exclude<ManagedToolId, 'ego-browser'>): Promise<ReleaseInfo> {
+  const release = id === 'lark-cli' ? LARK_RELEASE : OFFICE_RELEASE
+  return { version: release.version, tag: `v${release.version}`, assets: new Map() }
 }
 
-async function latestReleaseFor(id: Exclude<ManagedToolId, 'ego-browser'>): Promise<ReleaseInfo> {
-  if (id === 'lark-cli') return { version: LARK_RELEASE.version, tag: `v${LARK_RELEASE.version}`, assets: new Map() }
-  const cached = releaseVersionCache.get(id)
-  if (cached && cached.expiresAt > Date.now()) return cached.release
-  const release = await fetchLatestRelease(repoFor(id))
-  releaseVersionCache.set(id, { release, expiresAt: Date.now() + RELEASE_CACHE_TTL_MS })
-  return release
+function newerManagedVersion(candidate: string, installed: string): boolean {
+  const next = /^(\d+)\.(\d+)\.(\d+)/.exec(candidate)?.slice(1).map(Number)
+  const current = /^(\d+)\.(\d+)\.(\d+)/.exec(installed)?.slice(1).map(Number)
+  if (!next || !current) return false
+  for (let index = 0; index < 3; index++) {
+    if (next[index] !== current[index]) return next[index] > current[index]
+  }
+  return false
 }
 
 async function latestVersionFor(id: Exclude<ManagedToolId, 'ego-browser'>): Promise<string> {
@@ -472,7 +430,10 @@ async function installCompanionSkills(id: ManagedToolId, version?: string): Prom
     })
   } else if (id === 'officecli') {
     if (!version) throw new Error('OfficeCLI release version is missing.')
-    await installGithubSkillBundle('iOfficeAI', 'OfficeCLI', `v${version}`, OFFICE_SKILLS)
+    if (version !== OFFICE_RELEASE.version) throw new Error('This OfficeCLI version has no verified companion Skill bundle. Existing Skills were preserved.')
+    await installGithubSkillBundle('iOfficeAI', 'OfficeCLI', OFFICE_RELEASE.sourceCommit, OFFICE_SKILLS, {
+      url: OFFICE_RELEASE.sourceUrl, sha256: OFFICE_RELEASE.sourceSha256
+    })
   } else {
     await installGithubSkillBundle('citrolabs', 'ego-lite', 'main', ['ego-browser'])
   }
@@ -708,15 +669,15 @@ export async function installManagedTool(id: ManagedToolId): Promise<ManagedTool
     const release = await latestReleaseFor(id)
     const version = release.version
     const assetName = platformAsset(id, version)
-    const checksumName = id === 'lark-cli' ? 'checksums.txt' : 'SHA256SUMS'
+    const installed = (await readManifest())[id]
+    if (id === 'officecli' && installed && newerManagedVersion(installed.version, version)) return diagnoseManagedTool(id)
     const assetUrl = release.assets.get(assetName) ?? releaseAssetUrl(repo, version, assetName)
-    const checksumUrl = release.assets.get(checksumName) ?? releaseAssetUrl(repo, version, checksumName)
-    const dependency = id === 'lark-cli' ? findManagedDependency(assetUrl) : undefined
-    const [assetBytes, checksumBytes] = await Promise.all([
+    const dependency = findManagedDependency(assetUrl)
+    const [assetBytes, licenseBytes] = await Promise.all([
       dependency ? downloadManagedDependency(dependency) : download(assetUrl),
-      id === 'lark-cli' ? Promise.resolve(undefined) : download(checksumUrl)
+      id === 'officecli' && dependency ? downloadManagedDependency(managedDependency('office-license')) : Promise.resolve(undefined)
     ])
-    const expected = id === 'lark-cli' ? LARK_RELEASE.assets[assetName] : checksumFor(checksumBytes!.toString('utf8'), assetName)
+    const expected = (id === 'lark-cli' ? LARK_RELEASE : OFFICE_RELEASE).assets[assetName]
     if (!expected) throw new Error(`No verified checksum is registered for ${assetName}.`)
     const actual = createHash('sha256').update(assetBytes).digest('hex')
     if (actual !== expected) throw new Error(`Checksum verification failed for ${assetName}.`)
@@ -733,6 +694,7 @@ export async function installManagedTool(id: ManagedToolId): Promise<ManagedTool
     let movedNew = false
     try {
       const executable = await extractAsset(id, assetName, assetBytes, temp)
+      if (licenseBytes) await writeFile(join(temp, 'LICENSE'), licenseBytes)
       let skillWarning = ''
       await installCompanionSkills(id, version).catch((error) => {
         skillWarning = companionSkillWarning(error)
@@ -817,7 +779,7 @@ export async function listManagedTools(): Promise<ManagedToolListResult> {
       try {
         const latestVersion = await latestVersionFor(status.id)
         status.latestVersion = latestVersion
-        if (latestVersion !== status.installedVersion && status.state === 'installed') {
+        if (newerManagedVersion(latestVersion, status.installedVersion) && status.state === 'installed') {
           status.state = 'update_available'
         }
       } catch {
@@ -847,7 +809,6 @@ export const _internals = {
   managedLarkEnvironment,
   clearPendingLarkLogin: () => { pendingLarkLogin = undefined; larkLoginCompleting = false; larkAppSetupRequestGeneration++; larkAppSetup.cancel() },
   officeSkills: OFFICE_SKILLS,
-  clearReleaseCache: () => releaseVersionCache.clear(),
   setToolRunnerForTests: (runner?: ToolRunner) => {
     if (process.env.NODE_ENV !== 'test') throw new Error('Managed tool test runner is only available in tests.')
     toolRunner = runner ?? defaultToolRunner

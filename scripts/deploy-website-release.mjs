@@ -402,7 +402,8 @@ for item in downloads:
     seen.add(name)
     validated.append((name, url, size))
 
-chunk_size = 16 * 1024 * 1024
+chunk_size = int(sys.argv[3]) if len(sys.argv) > 3 else 16 * 1024 * 1024
+if chunk_size < 256 * 1024 or chunk_size > 16 * 1024 * 1024: raise RuntimeError('Invalid R2 download chunk size')
 jobs = []
 parts_by_name = {}
 for name, url, size in validated:
@@ -464,6 +465,7 @@ manifest.unlink()
 const START_R2_STAGE_DOWNLOAD_SCRIPT = String.raw`set -euo pipefail
 manifest="$1"
 payload="$2"
+chunk_size="\${3:-16777216}"
 worker="$payload/.r2-download-worker.py"
 status="$payload/.r2-download.status"
 log="$payload/.r2-download.log"
@@ -480,14 +482,15 @@ nohup setsid bash -c '
   payload="$3"
   log="$4"
   status="$5"
-  python3 "$worker" "$manifest" "$payload" >"$log" 2>&1
+  chunk_size="$6"
+  python3 "$worker" "$manifest" "$payload" "$chunk_size" >"$log" 2>&1
   code=$?
   state=failure
   if [[ "$code" -eq 0 ]]; then state=success; fi
   temporary="$status.tmp.$$"
   printf "%s %s\n" "$state" "$code" >"$temporary"
   mv -- "$temporary" "$status"
-' workwise-r2-download "$worker" "$manifest" "$payload" "$log" "$status" </dev/null >/dev/null 2>&1 &
+' workwise-r2-download "$worker" "$manifest" "$payload" "$log" "$status" "$chunk_size" </dev/null >/dev/null 2>&1 &
 pid=$!
 if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then exit 70; fi
 printf '%s\n' "$pid" >"$pid_file"

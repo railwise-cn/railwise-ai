@@ -80,20 +80,40 @@ for item in manifest['files']:
     if '..' in rel.parts or rel.is_absolute(): raise RuntimeError('Unsafe dependency path')
     source=stage/item['id']
     target=base.joinpath(*rel.parts)
-    if source.is_symlink() or not source.is_file(): raise RuntimeError('Invalid staged dependency')
-    data=source.read_bytes()
-    if len(data)!=item['size'] or hashlib.sha256(data).hexdigest()!=item['sha256']: raise RuntimeError('Staged integrity mismatch')
     target.parent.mkdir(parents=True,exist_ok=True)
     if os.path.commonpath([str(base.resolve()),str(target.parent.resolve())]) != str(base.resolve()): raise RuntimeError('Dependency target escaped storage')
     if target.exists() or target.is_symlink():
         if target.is_symlink() or not target.is_file() or target.stat().st_size!=item['size'] or hashlib.sha256(target.read_bytes()).hexdigest()!=item['sha256']: raise RuntimeError('Immutable dependency conflict')
-    else:
-        os.chmod(source,0o644)
-        try: os.link(source,target)
-        except FileExistsError:
-            if target.is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest()!=item['sha256']: raise RuntimeError('Concurrent dependency conflict')
+        continue
+    if source.is_symlink() or not source.is_file(): raise RuntimeError('Invalid staged dependency')
+    data=source.read_bytes()
+    if len(data)!=item['size'] or hashlib.sha256(data).hexdigest()!=item['sha256']: raise RuntimeError('Staged integrity mismatch')
+    os.chmod(source,0o644)
+    try: os.link(source,target)
+    except FileExistsError:
+        if target.is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest()!=item['sha256']: raise RuntimeError('Concurrent dependency conflict')
 shutil.rmtree(stage.parent)
 PY`
+
+export const inspectPublishedDependencies = String.raw`set -euo pipefail
+python3 - "$1" "$2" <<'PY_REMOTE'
+import base64,hashlib,json,os,pathlib,sys
+base=pathlib.Path(sys.argv[1]).resolve()/'dependencies'
+manifest=json.loads(base64.b64decode(sys.argv[2]))
+present=[]
+missing=[]
+for item in manifest['files']:
+    rel=pathlib.PurePosixPath(item['mirrorPath'])
+    if '..' in rel.parts or rel.is_absolute(): raise RuntimeError('Unsafe dependency path')
+    target=base.joinpath(*rel.parts)
+    if os.path.commonpath([str(base.resolve()),str(target.parent.resolve())]) != str(base.resolve()): raise RuntimeError('Dependency target escaped storage')
+    if not target.exists() and not target.is_symlink():
+        missing.append(item['id'])
+        continue
+    if target.is_symlink() or not target.is_file() or target.stat().st_size!=item['size'] or hashlib.sha256(target.read_bytes()).hexdigest()!=item['sha256']: raise RuntimeError('Immutable dependency conflict')
+    present.append(item['id'])
+print(json.dumps({'present':present,'missing':missing}))
+PY_REMOTE`
 
 export const inspectWebsiteStage = String.raw`set -euo pipefail
 python3 - "$1" "$2" <<'PY_REMOTE'
@@ -160,6 +180,11 @@ export async function stageManagedDependencies() {
   try {
     await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)
     await writeFile(join(directory, 'manifest.json'), manifestBytes)
+    const ssh = websiteStaticTransport.readSshConfig()
+    websiteStaticTransport.ensurePublicDownloadAlias(ssh)
+    const published = JSON.parse(websiteStaticTransport.runRemote(ssh, inspectPublishedDependencies, [ssh.root, manifestBytes.toString('base64')]))
+    const pendingIds = new Set(published.missing)
+    console.log(`Verified ${published.present.length} existing website resources; ${pendingIds.size} resources need transfer.`)
     const downloads = []
     for (const file of manifest.files) {
       const key = `railwise-ai/dependencies/${file.mirrorPath}`
@@ -169,30 +194,30 @@ export async function stageManagedDependencies() {
         catch (error) { if (error?.$metadata?.httpStatusCode !== 412) throw error }
         await r2Matches(client, process.env.R2_BUCKET, key, file)
       }
-      downloads.push({ name: file.id, size: file.size,
+      if (pendingIds.has(file.id)) downloads.push({ name: file.id, size: file.size,
         url: await getSignedUrl(client, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }), { expiresIn: 3600 }) })
       console.log(`Verified immutable dependency ${file.id}`)
     }
-    const ssh = websiteStaticTransport.readSshConfig()
-    websiteStaticTransport.ensurePublicDownloadAlias(ssh)
-    const remote = `${ssh.root}/dependencies/.deploy-${receipt.stagingId}/payload`
-    console.log(`Dependency website staging ${receipt.stagingId}`)
-    websiteStaticTransport.runRemote(ssh, 'set -euo pipefail\nmkdir -p -- "$1"\nchmod 700 -- "$1"\n', [remote])
-    const transferManifest = join(directory, 'downloads.json')
-    const workerPath = join(directory, 'r2-download-worker.py')
-    await writeFile(transferManifest, JSON.stringify(downloads), { mode: 0o600 })
-    await writeFile(workerPath, websiteStaticTransport.r2DownloadWorker, { mode: 0o700 })
-    websiteStaticTransport.copyFile(ssh, transferManifest, `${remote}/.r2-downloads.json`)
-    websiteStaticTransport.copyFile(ssh, workerPath, `${remote}/.r2-download-worker.py`)
-    websiteStaticTransport.copyFile(ssh, join(directory, 'manifest.json'), `${remote}/manifest.json`)
-    websiteStaticTransport.runRemote(ssh, websiteStaticTransport.startR2DownloadScript, [`${remote}/.r2-downloads.json`, remote])
-    let reportedAt = 0
-    await websiteStaticTransport.waitForRemoteR2Download(ssh, remote, { timeoutMs: 25 * 60_000, onProgress: async () => {
-      if (Date.now() - reportedAt < 60_000) return
-      reportedAt = Date.now()
-      console.log(`Dependency download progress ${websiteStaticTransport.runRemote(ssh, inspectWebsiteStage, [remote, receipt.manifestSha256]).trim()}`)
-    } })
-    websiteStaticTransport.runRemote(ssh, finalizeWebsite, [ssh.root, remote])
+    if (downloads.length) {
+      const remote = `${ssh.root}/dependencies/.deploy-${receipt.stagingId}/payload`
+      console.log(`Dependency website staging ${receipt.stagingId}`)
+      websiteStaticTransport.runRemote(ssh, 'set -euo pipefail\nmkdir -p -- "$1"\nchmod 700 -- "$1"\n', [remote])
+      const transferManifest = join(directory, 'downloads.json')
+      const workerPath = join(directory, 'r2-download-worker.py')
+      await writeFile(transferManifest, JSON.stringify(downloads), { mode: 0o600 })
+      await writeFile(workerPath, websiteStaticTransport.r2DownloadWorker, { mode: 0o700 })
+      websiteStaticTransport.copyFile(ssh, transferManifest, `${remote}/.r2-downloads.json`)
+      websiteStaticTransport.copyFile(ssh, workerPath, `${remote}/.r2-download-worker.py`)
+      websiteStaticTransport.copyFile(ssh, join(directory, 'manifest.json'), `${remote}/manifest.json`)
+      websiteStaticTransport.runRemote(ssh, websiteStaticTransport.startR2DownloadScript, [`${remote}/.r2-downloads.json`, remote, String(1024 * 1024)])
+      let reportedAt = 0
+      await websiteStaticTransport.waitForRemoteR2Download(ssh, remote, { timeoutMs: 25 * 60_000, onProgress: async () => {
+        if (Date.now() - reportedAt < 60_000) return
+        reportedAt = Date.now()
+        console.log(`Dependency download progress ${websiteStaticTransport.runRemote(ssh, inspectWebsiteStage, [remote, receipt.manifestSha256]).trim()}`)
+      } })
+      websiteStaticTransport.runRemote(ssh, finalizeWebsite, [ssh.root, remote])
+    }
     await verifyPublicDependencies(manifest, receipt)
     receipt.status = 'verified'
     await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)

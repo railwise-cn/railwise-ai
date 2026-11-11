@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile)
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
 
 describe.runIf(enabled)('immutable managed dependency cold-cache acceptance', () => {
-  it('installs uv, Python, Lark and companion Skills using only the company mirror', async () => {
+  it('installs uv, Python, Lark, OfficeCLI and companion Skills using only the company mirror', async () => {
     const parent = resolve(process.env.RAILWISE_DEPENDENCY_ACCEPTANCE_ROOT || tmpdir())
     await mkdir(parent, { recursive: true })
     const directory = await mkdtemp(join(parent, 'mirror-cold-cache-'))
@@ -43,13 +43,20 @@ describe.runIf(enabled)('immutable managed dependency cold-cache acceptance', ()
     expect(lark.status).toMatchObject({ state: 'needs_login', installedVersion: '1.0.100', scopes: [] })
     expect(existsSync(join(managedToolsSkillRoot(), 'lark-doc', 'SKILL.md'))).toBe(true)
     expect(existsSync(join(managedToolsSkillRoot(), 'lark-mail', 'SKILL.md'))).toBe(true)
+    const office = await installManagedTool('officecli')
+    if (!office.ok) throw new Error(office.message)
+    expect(office.status).toMatchObject({ state: 'installed', installedVersion: '1.0.160' })
+    expect(existsSync(join(managedToolsSkillRoot(), 'officecli-pptx', 'SKILL.md'))).toBe(true)
+    expect(existsSync(join(managedToolsSkillRoot(), 'officecli-docx', 'SKILL.md'))).toBe(true)
+    expect(await readFile(join(directory, 'tools', 'officecli', '1.0.160', 'LICENSE'), 'utf8')).toContain('Apache License')
     const manifest = JSON.parse(await readFile(join(directory, 'tools', 'manifest.json'), 'utf8'))
     expect(manifest['lark-cli'].skillWarning).toBeUndefined()
-    expect(downloads).toHaveLength(4)
+    expect(manifest.officecli.skillWarning).toBeUndefined()
+    expect(downloads).toHaveLength(7)
     await writeFile(join(directory, 'evidence.json'), `${JSON.stringify({
       schema: 'railwise.dependency-cold-cache-evidence.v1', at: new Date().toISOString(),
       platform: process.platform, arch: process.arch, uvVersion: uv.stdout.trim(), pythonVersion: python.stdout.trim(),
-      larkVersion: lark.status.installedVersion, companionSkillsInstalled: true,
+      larkVersion: lark.status.installedVersion, officeVersion: office.status.installedVersion, companionSkillsInstalled: true,
       credentialAccess: false, upstreamFallbackAllowed: false, downloads
     }, null, 2)}\n`)
     console.log(`Cold-cache dependency evidence ${join(directory, 'evidence.json')}`)

@@ -17,6 +17,8 @@ import { ManagedLarkAppSetup } from './managed-lark-app-setup'
 const systemFetchMock = vi.hoisted(() => vi.fn())
 const pinnedLarkRelease = vi.hoisted(() => ({ version: '1.2.3', sourceCommit: 'synthetic-commit', sourceUrl: 'https://api.github.com/repos/larksuite/cli/zipball/synthetic-commit', sourceSha256: '', assets: {} as Record<string, string> }))
 vi.mock('./managed-lark-release', () => ({ LARK_RELEASE: pinnedLarkRelease }))
+const pinnedOfficeRelease = vi.hoisted(() => ({ version: '1.2.3', sourceCommit: 'synthetic-office-commit', sourceUrl: 'https://api.github.com/repos/iOfficeAI/OfficeCLI/zipball/synthetic-office-commit', sourceSha256: '', assets: {} as Record<string, string> }))
+vi.mock('./managed-office-release', () => ({ OFFICE_RELEASE: pinnedOfficeRelease }))
 
 vi.mock('./system-network', () => ({
   systemFetch: systemFetchMock,
@@ -94,6 +96,10 @@ async function fixture(id: 'lark-cli' | 'officecli', version: string): Promise<F
 }
 
 function mockOfficialDownloads(fixtures: Record<'lark-cli' | 'officecli', Fixture>, egoSkills?: Buffer): void {
+  const office = fixtures.officecli
+  pinnedOfficeRelease.version = office.version
+  pinnedOfficeRelease.assets = { [office.assetName]: office.checksum.split(/\s+/)[0] }
+  pinnedOfficeRelease.sourceSha256 = createHash('sha256').update(office.skills).digest('hex')
   const lark = fixtures['lark-cli']
   pinnedLarkRelease.version = lark.version
   pinnedLarkRelease.assets = { [lark.assetName]: createHash('sha256').update(lark.asset).digest('hex') }
@@ -103,6 +109,8 @@ function mockOfficialDownloads(fixtures: Record<'lark-cli' | 'officecli', Fixtur
     const id = url.includes('larksuite/cli') || url.includes('/lark-cli/') ? 'lark-cli' : 'officecli'
     const item = fixtures[id]
 
+    if (url === pinnedOfficeRelease.sourceUrl) return response(office.skills)
+    if (url === `https://github.com/iOfficeAI/OfficeCLI/releases/download/v${office.version}/${office.assetName}`) return response(office.asset)
     if (url === pinnedLarkRelease.sourceUrl) return response(lark.skills)
     if (url === `https://github.com/larksuite/cli/releases/download/v${lark.version}/${lark.assetName}`) return response(lark.asset)
     if (url.includes('api.github.com/repos/')) {
@@ -131,7 +139,6 @@ beforeEach(() => {
   originalHome = process.env.HOME
   process.env.HOME = toolsRoot
   process.env.WORKWISE_TOOLS_ROOT = toolsRoot
-  _internals.clearReleaseCache()
   _internals.setTargetPlatformForTests({ platform: 'darwin', arch: 'arm64' })
   _internals.setToolRunnerForTests(async (_path, args) => {
     if (args[0] === 'auth' && args[1] === 'status') return { ok: false, output: 'not logged in' }
@@ -144,7 +151,6 @@ afterEach(() => {
   vi.restoreAllMocks()
   _internals.setToolRunnerForTests()
   _internals.setTargetPlatformForTests()
-  _internals.clearReleaseCache()
   _internals.clearPendingLarkLogin()
   delete process.env.WORKWISE_TOOLS_ROOT
   if (originalHome === undefined) delete process.env.HOME
@@ -550,6 +556,22 @@ describe('managed-tool-service', () => {
     expect(existsSync(join(managedToolsBinDir(), 'lark-cli.exe'))).toBe(true)
   })
 
+  it.each(['1.2.4', '1.2.4-beta.1'])('preserves newer OfficeCLI %s when the application pins an older verified release', async (installedVersion) => {
+    const lark = await fixture('lark-cli', '1.2.3')
+    const newer = await fixture('officecli', installedVersion)
+    mockOfficialDownloads({ 'lark-cli': lark, officecli: newer })
+    expect(await installManagedTool('officecli')).toMatchObject({ ok: true, status: { installedVersion } })
+    const active = join(managedToolsBinDir(), 'officecli')
+    const content = readFileSync(active)
+    const older = await fixture('officecli', '1.2.3')
+    mockOfficialDownloads({ 'lark-cli': lark, officecli: older })
+    systemFetchMock.mockClear()
+    expect(await updateManagedTool('officecli')).toMatchObject({ ok: true, status: { installedVersion, state: 'installed' } })
+    expect(systemFetchMock).not.toHaveBeenCalled()
+    expect(readFileSync(active)).toEqual(content)
+    expect(await listManagedTools()).toMatchObject({ ok: true, tools: expect.arrayContaining([expect.objectContaining({ id: 'officecli', state: 'installed', installedVersion })]) })
+  })
+
   it('keeps the previous tool when an update checksum fails', async () => {
     const lark = await fixture('lark-cli', '1.2.3')
     const office = await fixture('officecli', '1.2.3')
@@ -560,8 +582,7 @@ describe('managed-tool-service', () => {
 
     const broken = await fixture('officecli', '1.2.4')
     broken.checksum = `${'0'.repeat(64)}  ${broken.assetName}\n`
-    _internals.clearReleaseCache()
-    mockOfficialDownloads({ 'lark-cli': lark, officecli: broken })
+      mockOfficialDownloads({ 'lark-cli': lark, officecli: broken })
 
     await expect(updateManagedTool('officecli')).resolves.toMatchObject({
       ok: false,
