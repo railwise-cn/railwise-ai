@@ -18,6 +18,7 @@ const { verifyCandidateSourceTree } = require('./candidate-source-provenance.cjs
 const { verifyMacRuntimeEntitlements } = require('./mac-notarize.cjs')._internals
 const { verifyBundledDependencyArtifacts } = require('./dependency-artifact-policy.cjs')
 const { verifyPackagedMarkdownRendering } = require('./verify-packaged-markdown-rendering.cjs')
+const { verifyPackagedCanvas } = require('./runtime-package-packaging.cjs')
 
 const MAC_ENTITLEMENTS_PATH = join(__dirname, '..', 'build', 'entitlements.mac.plist')
 
@@ -220,6 +221,8 @@ async function afterPack(context) {
   console.log('[after-pack] Dependency developer-artifact check passed.')
   const markdownAssets = verifyPackagedMarkdownRendering(packedResourcesDir(context))
   console.log(`[after-pack] Offline Markdown rendering assets verified: ${markdownAssets.assets} assets, ${markdownAssets.notices} notices.`)
+  const canvas = verifyPackagedCanvas(packedResourcesDir(context), normalizePlatform(context.electronPlatformName), normalizeArch(context.arch))
+  console.log(`[after-pack] Locked canvas packages verified: ${canvas.packages} for ${canvas.platform}-${canvas.arch}.`)
   maybeAdhocSignMacApp(context)
 }
 

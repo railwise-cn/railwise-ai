@@ -2,6 +2,7 @@ const { execFileSync } = require('node:child_process')
 const { existsSync, readdirSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 const productBrand = require('../src/shared/product-brand.json')
+const { canvasSmokeScript } = require('./runtime-package-packaging.cjs')
 
 const root = resolve(process.argv[2] || 'dist')
 const target = process.argv[3]
@@ -17,7 +18,8 @@ function sqliteSmokeScript(modulePath) {
     `database.exec('CREATE TABLE qa (value INTEGER); INSERT INTO qa VALUES (1)')`,
     `if (database.prepare('SELECT value FROM qa').get().value !== 1) process.exit(71)`,
     `database.close()`,
-    `console.log('WORKWISE_PACKAGED_SQLITE_OK ABI=' + process.versions.modules)`
+    `console.log('WORKWISE_PACKAGED_SQLITE_OK ABI=' + process.versions.modules)`,
+    canvasSmokeScript(resolve(modulePath, '../../..'))
   ].join(';')
 }
 
