@@ -165,7 +165,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
       </article>)}
     </div>
     {readonlyEntry ? <ReadonlyConnectorSetup entry={readonlyEntry} onClose={() => setReadonlyEntry(null)} onChanged={changed} onInstall={() => { const entry = readonlyEntry; setReadonlyEntry(null); if (onInstall) onInstall(entry); else onDetails(entry) }} /> : null}
-    {selected ? <div className="fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.currentTarget === event.target) setSelected(null) }}>
+    {selected ? <div className="ds-connector-overlay fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.currentTarget === event.target) setSelected(null) }}>
       <aside role="dialog" aria-modal="true" aria-labelledby="connector-hub-detail-title" className="absolute inset-y-0 right-0 flex w-full max-w-[640px] flex-col border-l border-ds-border bg-ds-card shadow-xl">
         <header className="flex min-h-14 items-center justify-between gap-3 border-b border-ds-border px-5"><h2 id="connector-hub-detail-title" className="text-[16px] font-semibold">{nativeName(selected)}</h2><button ref={closeRef} type="button" aria-label={t('connectorHubClose')} onClick={() => setSelected(null)} className="rounded-md p-2 hover:bg-ds-hover"><X className="h-4 w-4" /></button></header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">

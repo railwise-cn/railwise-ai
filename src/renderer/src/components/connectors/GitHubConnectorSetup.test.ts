@@ -36,6 +36,7 @@ async function typeToken(value = 'synthetic-token') {
 describe('GitHub connection setup', () => {
   it('opens actionable scope guidance without starting OAuth or changing configuration', async () => {
     await render()
+    expect(container.querySelector('[role="dialog"]')?.parentElement?.classList.contains('ds-connector-overlay')).toBe(true)
     expect(container.textContent).toContain('具体仓库')
     expect(container.textContent).toContain('有效期')
     expect(button('检查连接').disabled).toBe(true)

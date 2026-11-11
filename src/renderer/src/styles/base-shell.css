@@ -254,6 +254,10 @@ html {
   background: var(--ds-bg-main);
 }
 
+.ds-windows-app-frame .ds-connector-overlay {
+  top: var(--ds-windows-titlebar-height, 40px);
+}
+
 .ds-windows-titlebar {
   position: relative;
   z-index: 80;

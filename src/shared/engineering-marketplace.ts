@@ -18,7 +18,7 @@ export const AMAP_READ_TOOLS = [
 ] as const
 
 export const ZOTERO_READ_TOOLS = [
-  'zotero_search_items', 'zotero_search_by_tag', 'zotero_get_item_metadata', 'zotero_get_item_fulltext',
+  'zotero_search_items', 'zotero_get_item_metadata', 'zotero_get_item_fulltext',
   'zotero_get_collections', 'zotero_get_collection_items', 'zotero_get_item_children',
   'zotero_get_tags', 'zotero_get_recent', 'zotero_get_notes', 'zotero_get_annotations'
 ] as const

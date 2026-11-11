@@ -71,7 +71,7 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
     finally { setBusy(false) }
   }
 
-  return <div className="fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.currentTarget === event.target) onClose() }}>
+  return <div className="ds-connector-overlay fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.currentTarget === event.target) onClose() }}>
     <aside role="dialog" aria-modal="true" aria-label={entry.package.name} className="absolute inset-y-0 right-0 w-full max-w-[600px] overflow-y-auto border-l border-ds-border bg-ds-card p-5 shadow-xl">
       <header className="flex items-center justify-between"><h2 className="text-base font-semibold">{entry.package.name}</h2><button ref={closeRef} type="button" onClick={onClose} aria-label="关闭连接详情" className="rounded p-2 hover:bg-ds-hover"><X className="h-4 w-4" /></button></header>
       <p className="mt-5 text-sm leading-6 text-ds-muted">{entry.package.summary}</p>

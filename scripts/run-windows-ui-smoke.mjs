@@ -108,7 +108,10 @@ async function connectCdp(url) {
       if (!node) return null;
       node.scrollIntoView({block:'center',inline:'center'});
       const bounds = node.getBoundingClientRect();
-      return {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
+      const point = {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
+      const hit = document.elementFromPoint(point.x, point.y);
+      if (!hit || !node.contains(hit)) throw new Error('UI target is covered: ' + (node.getAttribute('aria-label') || node.textContent.trim()));
+      return point;
     })()`
     const point = await wait(expression, label ?? selector)
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point })

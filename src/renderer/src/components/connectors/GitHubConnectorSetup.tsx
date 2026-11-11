@@ -137,7 +137,7 @@ export function GitHubConnectorSetup({ workspaceRoot, onClose, onChanged, onAdva
     } finally { setBusy(false) }
   }
 
-  return <div className="fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+  return <div className="ds-connector-overlay fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <aside role="dialog" aria-modal="true" aria-label="GitHub 连接" className="absolute inset-y-0 right-0 w-full max-w-[640px] overflow-y-auto border-l border-ds-border bg-ds-card p-5 shadow-xl">
       <header className="flex items-center justify-between"><h2 className="text-base font-semibold">连接 GitHub</h2><button ref={closeRef} type="button" aria-label="关闭 GitHub 连接详情" onClick={onClose} className="rounded p-2 hover:bg-ds-hover"><X className="h-4 w-4" /></button></header>
       <p className="mt-4 text-sm leading-6 text-ds-muted">使用 GitHub 官方托管 MCP 服务。创建有期限、限定仓库范围的个人访问令牌后，在本机保存并验证。</p>
