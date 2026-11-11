@@ -91,7 +91,8 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
   }
   type Spec={name:string;description:string;schema:z.ZodType;operation:string;write?:boolean;execute:(args:Json,context:ToolHostContext,target:string)=>Promise<Json>}
   const define=(spec:Spec)=>defineLocalTool({name:spec.name,description:spec.description,inputSchema:z.toJSONSchema(spec.schema) as Json,
-    effect: { provider: 'dingtalk', operation: spec.operation, mutation: Boolean(spec.write), targetFields: ['taskId', 'instanceId'],
+    // DWS owns platform authorization. An explicit empty set prevents legacy scope fallback.
+    effect: { provider: 'dingtalk', operation: spec.operation, mutation: Boolean(spec.write), targetFields: ['taskId', 'instanceId'], requiredScopes: [],
       ...(spec.write ? { readbackToolName: spec.operation === 'complete' ? 'dingtalk_get_task' : 'dingtalk_get_approval' } : {}) },
     policy:spec.write?'on-request':'auto',...(spec.write?{requireExplicitApproval:true}:{}),
     async execute(raw,context){
@@ -170,7 +171,7 @@ function business(response:DwsCommandResult):Json{
   if(!response.ok||root.ok===false||root.success===false||root.error||root.dry_run===true||root.outcome&&root.outcome!=='success')throw fail(remoteErrorCode(root,response.errorCode))
   if(root.ok!==true&&root.success!==true)throw fail('connector_invalid_response')
   const data=root.outcome==='success'?object(root.data):root
-  if(data.success===false||data.error||data.errorCode!==undefined&&data.errorCode!==0&&data.errorCode!=='0')throw fail('connector_remote_failed')
+  if(data.success===false||data.error||data.errorCode!=null&&data.errorCode!==0&&data.errorCode!=='0')throw fail('connector_remote_failed')
   if(data.result&&typeof data.result==='object'&&!Array.isArray(data.result))return object(data.result)
   // Preserve a legitimate array result under result for bounded parsers.
   return data

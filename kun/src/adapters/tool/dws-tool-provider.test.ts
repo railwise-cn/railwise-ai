@@ -42,7 +42,7 @@ describe('official typed DingTalk DWS provider',()=>{
   })
   it('completes an exact todo once and verifies the same target through the official get response',async()=>{
     let reads=0
-    const runner=vi.fn(async(_path:string,args:string[])=>({ok:true,output:{success:true,result:args[2]==='get'?{todoDetailModel:{taskId:'todo-1',isDone:++reads>1}}:true}}))
+    const runner=vi.fn(async(_path:string,args:string[])=>({ok:true,output:{success:true,errorCode:null,errorMsg:null,result:args[2]==='get'?{todoDetailModel:{taskId:'todo-1',isDone:++reads>1}}:true}}))
     const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_complete_task')!
     expect(await tool.execute({taskId:'todo-1'},context())).toMatchObject({output:{status:'succeeded',data:{id:'todo-1',done:true},evidence:{operation:'complete',target:'todo-1',status:'done',verified:true}}})
     expect(runner.mock.calls.map(call=>call[1].slice(0,3))).toEqual([['todo','task','get'],['todo','task','done'],['todo','task','get']])
@@ -89,6 +89,16 @@ describe('official typed DingTalk DWS provider',()=>{
   })
   it('does not accept transport success, pending, preview or remote failure as evidence',()=>{
     for(const output of [{},{ok:true,outcome:'pending',data:{}},{ok:true,outcome:'success',dry_run:true,data:{}},{success:false},{success:true,errorCode:403},[]])expect(()=>_dwsToolProviderInternals.business({ok:true,output})).toThrow()
+  })
+  it('accepts a null error code only within an explicit successful official envelope', () => {
+    const detail = { todoDetailModel: { taskId: 'synthetic-task', subject: 'RailWise 验收', isDone: false } }
+    expect(_dwsToolProviderInternals.business({ ok: true, output: { success: true, errorCode: null, errorMsg: null, result: detail } })).toEqual(detail)
+    for (const output of [
+      { errorCode: null, result: detail },
+      { success: false, errorCode: null, result: detail },
+      { success: true, errorCode: 403, result: detail },
+      { success: true, errorCode: 'null', result: detail }
+    ]) expect(() => _dwsToolProviderInternals.business({ ok: true, output })).toThrow()
   })
   it('validates normal upstream pages for sizes above 20 while preserving the starting page', async () => {
     const runner = vi.fn(async (_path: string, _args: string[]) => ({ ok: true, output: { success: true, result: { todoCards: Array.from({length:20}, (_, i) => ({taskId:String(i)})) } } }))

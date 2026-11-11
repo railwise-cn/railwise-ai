@@ -13,14 +13,17 @@ import { TaskRunRepository } from '../../services/task-run-repository.js'
 import { verifiedEffectReceipts } from '../../services/external-effect-evidence.js'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
+import type { ToolEffectResolver } from '../../ports/tool-effect.js'
 import { CapabilityRegistry } from './capability-registry.js'
 import { LocalToolHost } from './local-tool-host.js'
 import { buildExternalEffectScopeToolProviders } from './external-effect-scope-tool-provider.js'
+import { buildDwsToolProvider } from './dws-tool-provider.js'
+import { dwsTestConfig } from '../../../tests/helpers/dws-identity.js'
 
 const cleanup: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanup.splice(0)) await close() })
 
-async function fixture(prompt = '帮我处理飞书待办。') {
+async function fixture(prompt = '帮我处理飞书待办。', resolveToolEffect?: ToolEffectResolver) {
   const root = await mkdtemp(join(tmpdir(), 'railwise-effect-scope-'))
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
   cleanup.push(async () => { repository.close(); await rm(root, { recursive: true, force: true }) })
@@ -28,7 +31,7 @@ async function fixture(prompt = '帮我处理飞书待办。') {
   const thread = createThreadRecord({ id: 'thread', title: 'effect scope fixture', workspace: root, model: 'fixture' })
   await threadStore.upsert(thread)
   const nowIso = () => '2026-11-10T00:00:00.000Z'
-  const tasks = new TaskController({ repository, threadStore, sessionStore, nowIso })
+  const tasks = new TaskController({ repository, threadStore, sessionStore, nowIso, resolveToolEffect })
   const task = tasks.ensureTask({ thread, turnId: 'turn', request: { prompt } })
   tasks.beginAttempt(thread.id, 'turn')
   const providers = buildExternalEffectScopeToolProviders(tasks)
@@ -54,6 +57,35 @@ async function fixture(prompt = '帮我处理飞书待办。') {
 }
 
 describe('finite reviewed external effect scope', () => {
+  it('confirms an exact DWS task using its real descriptor without inventing OpenAPI scopes', async () => {
+    const runner = vi.fn()
+    const provider = buildDwsToolProvider(dwsTestConfig, runner)!
+    const registry = new CapabilityRegistry([provider])
+    const f = await fixture('请完成钉钉待办，准确 taskId 为 synthetic-task。', name => registry.describeEffect(name))
+    const host = new LocalToolHost({ registry: new CapabilityRegistry([...f.providers, provider]) })
+    const context: ToolHostContext = { ...f.context, executionGrant: { ...f.context.executionGrant!,
+      allowedProviderIds: ['effect-scope', 'dingtalk'],
+      allowedToolNames: ['get_external_effect_scope', 'confirm_external_effect_scope', 'dingtalk_complete_task'],
+      connectorScopes: [], connectorBackends: { dingtalk: 'dws' },
+      connectorIdentityFingerprints: { dingtalk: dwsTestConfig.identityFingerprint! } } }
+    const args = { expected_revision: 0, idempotency_key: 'dws-review', effects: [{ tool_name: 'dingtalk_complete_task', target: 'synthetic-task' }] }
+    expect(f.task.acceptance.effect).toMatchObject({ provider: 'dingtalk', operation: 'complete' })
+    expect(f.task.acceptance.effect!.target).toBeUndefined()
+    expect(() => f.tasks.assertExternalTarget('turn', 'dingtalk', 'complete', 'synthetic-task')).toThrow(/confirm_external_effect_scope/)
+    const denied = await host.execute({ callId: 'deny-dws-review', toolName: 'confirm_external_effect_scope', arguments: args }, { ...context, awaitApproval: async () => 'deny' })
+    expect(denied.approved).toBe(false)
+    expect(f.repository.get(f.task.id)!.acceptance.effect!.requiredEffects).toBeUndefined()
+    const result = await host.execute({ callId: 'allow-dws-review', toolName: 'confirm_external_effect_scope', arguments: args }, context)
+    expect(result.item).toMatchObject({ output: { status: 'scope_confirmed', requiredEffects: [
+      { provider: 'dingtalk', operation: 'complete', target: 'synthetic-task', requiredScopes: [] }
+    ] } })
+    expect(f.awaitApproval).toHaveBeenCalledOnce()
+    expect(f.awaitApproval.mock.calls[0]![0].summary).toContain('Action 1: dingtalk complete synthetic-task')
+    expect(() => f.tasks.assertExternalTarget('turn', 'dingtalk', 'complete', 'synthetic-task')).not.toThrow()
+    expect(() => f.tasks.assertExternalTarget('turn', 'dingtalk', 'complete', 'another-task')).toThrow(/confirm_external_effect_scope/)
+    expect(runner).not.toHaveBeenCalled()
+  })
+
   it('blocks mutations until the entire finite set receives a real explicit approval', async () => {
     const f = await fixture()
     expect(() => f.complete('a')).toThrow(/confirm_external_effect_scope/)
