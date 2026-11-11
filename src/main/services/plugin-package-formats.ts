@@ -1,3 +1,4 @@
+import { isCatalogInstallable } from '../../shared/engineering-marketplace'
 import {
   createHash,
   createPublicKey,
@@ -1194,7 +1195,7 @@ export function installPreparedPluginPackage(
 ): Promise<InstalledPackageV1> {
   if (!prepared.compatibility.workwiseCompatible ||
       prepared.package.availability.status !== 'available' ||
-      prepared.package.installation.mode !== 'direct-mirror') {
+      !isCatalogInstallable(prepared.package)) {
     throw new Error('Prepared plugin package is not eligible for direct installation.')
   }
   return service.install({

@@ -1,0 +1,17 @@
+{
+  "request": "审阅方案正文差异，保留待确认依据。",
+  "inputs": [
+    "baseline.md",
+    "candidate.md"
+  ],
+  "expected": {
+    "changedSections": [
+      "控制条件",
+      "监测频次"
+    ],
+    "pending": [
+      "控制值调整依据"
+    ],
+    "automaticFileReplacement": false
+  }
+}

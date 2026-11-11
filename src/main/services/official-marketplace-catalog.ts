@@ -1,3 +1,4 @@
+import { ZOTERO_PACKAGE, OPTIONAL_ENGINEERING_SKILLS, isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import type {
   CatalogSourceV1,
   GithubPackageSourceV1,
@@ -302,6 +303,7 @@ type WheelArtifact = {
   version: string
   sha256: string
   executable: string
+  args?: string[]
 }
 
 const NPM_ARTIFACTS = {
@@ -533,7 +535,7 @@ function wheelRuntime(artifact: WheelArtifact): UvPackageRuntimeV1 {
     packageName: artifact.packageName,
     version: artifact.version,
     executable: artifact.executable,
-    args: [],
+    args: artifact.args ?? [],
     install: {
       strategy: 'managed-wheel',
       verify: 'sha256-before-activation',
@@ -569,6 +571,31 @@ const officialPackages: MarketplacePackageV1[] = [
     availability: { status: 'available' },
     installation: EXTERNAL_INSTALL
   }),
+  definePackage({
+    id: 'amap-maps', name: '高德地图', productType: 'connector',
+    summary: '通过高德官方 MCP 查询地点、路线、距离和天气。Key 在本机受保护存储中保存，仅开放已核对的只读工具。',
+    tier: 'recommended', categories: ['engineering'], version: 'official-http',
+    publisher: publisher('amap', '高德开放平台', 'https://developer.amap.com/api/mcp-server/gettingstarted', true),
+    license: null, source: simpleSource('remote', 'https://developer.amap.com/api/mcp-server/gettingstarted'),
+    components: [{ id: 'amap-maps-server', name: '高德地图', type: 'mcp', runtime: { kind: 'remote', transport: 'streamable-http', endpoint: 'https://mcp.amap.com/mcp' } }],
+    permissions: [{ id: 'amap.read', kind: 'network', access: 'read', default: 'review', reviewRequired: true, description: '查询高德官方地图服务。', resources: ['https://mcp.amap.com'] }],
+    auth: { type: 'token', provider: 'amap', environmentVariables: [] },
+    dependencies: [], updatePolicy: MANUAL_UPDATE, availability: { status: 'available' }, installation: EXTERNAL_INSTALL,
+    usage: { howToUse: '在连接器详情中填写高德 Web 服务 Key，检查连接后查询地点或规划路线。', requirements: ['高德 Web 服务 Key'], examples: ['查询指定项目地址附近的地铁站。'] }
+  }),
+  (() => {
+    const item = wheelMcpPackage({ id: ZOTERO_PACKAGE.id, name: 'Zotero 本机文献',
+      summary: '读取本机 Zotero 的文献、集合、笔记和全文。社区连接器独立安装，保留完整混合许可证，仅开放只读工具。',
+      artifact: { packageName: ZOTERO_PACKAGE.packageName, version: ZOTERO_PACKAGE.version, sha256: ZOTERO_PACKAGE.sha256, executable: 'zotero-mcp', args: ['serve'] },
+      publisher: publisher('54yyyu', 'Zotero MCP 社区', 'https://github.com/54yyyu/zotero-mcp', false),
+      license: ZOTERO_PACKAGE.license, categories: ['documents', 'engineering'], permissions: [{ id: 'zotero.local.read', kind: 'network', access: 'read', default: 'review', reviewRequired: true, description: '读取已开启本地 API 的 Zotero 文献库。', resources: ['http://127.0.0.1:23119'] }] })
+    return { ...item, productType: 'connector' as const, installation: { mode: 'upstream-only' as const, installedByDefault: false, reinstallable: true as const },
+      usage: { howToUse: '安装此固定版本后，打开 Zotero 并在高级设置中允许本机应用连接。随后在连接器详情中检查只读工具。', requirements: ['运行中的 Zotero 本地 API', 'MIT AND AGPL-3.0-or-later 上游许可证'], examples: ['搜索文献库中关于盾构施工监测的资料，并列出来源。'] } }
+  })(),
+  ...OPTIONAL_ENGINEERING_SKILLS.map(skill => managedSkillPackage({ ...skill,
+    publisher: publisher('railwise', 'RailWise AI', 'https://github.com/railwise-cn/railwise-ai', true),
+    location: 'https://github.com/railwise-cn/railwise-ai', license: 'MIT', category: 'engineering', tier: 'recommended', installedByDefault: false
+  })),
   npmMcpPackage({
     id: 'playwright-mcp',
     name: 'Playwright MCP',
@@ -1330,6 +1357,7 @@ function managedSkillPackage(options: {
   category: string
   tier: MarketplacePackageV1['tier']
   version?: string
+  installedByDefault?: boolean
   permissions?: PackagePermissionV1[]
 }): MarketplacePackageV1 {
   return definePackage({
@@ -1354,7 +1382,7 @@ function managedSkillPackage(options: {
     auth: { type: 'none' },
     updatePolicy: SYSTEM_UPDATE,
     availability: { status: 'managed', managedBy: 'RailWise AI' },
-    installation: { ...SYSTEM_MANAGED_INSTALL, installedByDefault: true }
+    installation: { ...SYSTEM_MANAGED_INSTALL, installedByDefault: options.installedByDefault ?? true }
   })
 }
 
@@ -1548,6 +1576,8 @@ function assertCatalogInvariants(): void {
       )) {
         throw new Error(`${item.id} has an install mode inconsistent with its runtime.`)
       }
+    } else if (installationMode === 'upstream-only') {
+      if (!isApprovedUpstreamPackage(item)) throw new Error(`${item.id} upstream installation is not approved.`)
     } else if (item.installation.reinstallable) {
       throw new Error(`${item.id} cannot be reinstallable in ${installationMode} mode.`)
     }

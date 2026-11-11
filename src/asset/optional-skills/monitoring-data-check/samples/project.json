@@ -1,0 +1,12 @@
+{
+  "name": "合成监测样例",
+  "monitoringType": "deformation",
+  "unit": "mm",
+  "thresholds": {
+    "default": 10
+  },
+  "taskContext": {
+    "standard": "仅用于合成样例",
+    "standardVersion": "fixture-v1"
+  }
+}

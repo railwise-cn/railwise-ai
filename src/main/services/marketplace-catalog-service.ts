@@ -1,3 +1,4 @@
+import { isApprovedUpstreamPackage } from '../../shared/engineering-marketplace'
 import { createHash } from 'node:crypto'
 import { execFile as execFileCallback } from 'node:child_process'
 import { constants } from 'node:fs'
@@ -779,7 +780,7 @@ function assertPackageShape(
     throw new Error(id + ' availability status is invalid.')
   }
   const installation = requiredRecord(value.installation, id + ' installation')
-  if (!new Set(['direct-mirror', 'external', 'system-managed']).has(String(installation.mode)) ||
+  if (!new Set(['direct-mirror', 'upstream-only', 'external', 'system-managed']).has(String(installation.mode)) ||
       typeof installation.installedByDefault !== 'boolean' ||
       typeof installation.reinstallable !== 'boolean') {
     throw new Error(id + ' installation metadata is invalid.')
@@ -793,6 +794,7 @@ function assertPackageShape(
   if (installation.mode === 'system-managed' && installation.reinstallable) {
     throw new Error(id + ' system-managed packages cannot be reinstallable.')
   }
+  if (installation.mode === 'upstream-only' && !isApprovedUpstreamPackage(value as unknown as MarketplacePackageV1)) throw new Error(id + ' upstream installation is not approved.')
   return clone(value as unknown as MarketplacePackageV1)
 }
 

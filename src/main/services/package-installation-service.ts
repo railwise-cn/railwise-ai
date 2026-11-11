@@ -1,3 +1,4 @@
+import { isApprovedUpstreamPackage, isCatalogInstallable } from '../../shared/engineering-marketplace'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import {
@@ -1014,10 +1015,10 @@ export class PackageInstallationService {
         marketplacePackageReviewSha256(item) !== request.reviewSha256.toLowerCase()) {
       throw new Error('Package review is stale; permissions and provenance must be reviewed again.')
     }
-    if (item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') {
+    if (item.availability.status !== 'available' || !isCatalogInstallable(item)) {
       throw new Error('Package is not available for a direct RailWise AI installation.')
     }
-    if (evaluateMarketplaceLicense(item.license).disposition !== 'direct-mirror') {
+    if (evaluateMarketplaceLicense(item.license).disposition !== 'direct-mirror' && !isApprovedUpstreamPackage(item)) {
       throw new Error('Package license is not approved for direct installation.')
     }
     if (item.version.trim().toLowerCase() === 'latest') {

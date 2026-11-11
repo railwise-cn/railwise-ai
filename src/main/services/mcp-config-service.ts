@@ -1,3 +1,4 @@
+import { AMAP_READ_TOOLS, ZOTERO_READ_TOOLS } from '../../shared/engineering-marketplace'
 import { createHash, randomBytes } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createServer, type Server } from 'node:http'
@@ -6,6 +7,9 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { safeStorage } from 'electron'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import brand from '../../shared/product-brand.json'
 import type {
   McpCredentialReferenceV1,
@@ -98,6 +102,7 @@ export type SetMcpServerCredentialRequest = {
 }
 
 export type McpRuntimeSnapshotV1 = {
+  revision: number
   servers: Record<string, Record<string, unknown>>
   environment: Record<string, string>
 }
@@ -272,8 +277,26 @@ export class McpConfigService {
       const trust = server.scope === 'workspace' && server.workspaceRoot
         ? { trustScope: 'workspace', trustedWorkspaceRoots: [server.workspaceRoot] }
         : { trustScope: 'user', trustedWorkspaceRoots: [] }
+      const toolPolicy = server.toolPolicy['*'] === 'deny' ? {
+        allowedTools: Object.entries(server.toolPolicy).filter(([name, decision]) => name !== '*' && decision === 'allow').map(([name]) => name),
+        readOnlyTools: server.readOnlyTools ?? []
+      } : undefined
       if (server.transport === 'stdio') {
         const env: Record<string, string> = {}
+        let cwd = server.cwd
+        if (server.managedPreset === 'zotero-readonly') {
+          const profile = join(dirname(this.manifestPath), 'connector-profiles', 'zotero-readonly')
+          await mkdir(profile, { recursive: true, mode: 0o700 })
+          cwd = profile
+          Object.assign(env, {
+            HOME: profile, USERPROFILE: profile, APPDATA: profile, LOCALAPPDATA: profile,
+            XDG_CONFIG_HOME: join(profile, '.config'), XDG_CACHE_HOME: join(profile, '.cache'),
+            ZOTERO_LOCAL: 'true', ZOTERO_LOCAL_WRITE: 'false', ZOTERO_NO_CLAUDE: 'true', ZOTERO_MCP_TOOLSETS: 'none',
+            PYTHON_DOTENV_DISABLED: '1', ZOTERO_API_KEY: '', ZOTERO_LOCAL_API_KEY: '', ZOTERO_LOCAL_SERVER_ID: '',
+            ZOTERO_LIBRARY_ID: '', ZOTERO_WEBDAV_URL: '', ZOTERO_WEBDAV_USERNAME: '', ZOTERO_WEBDAV_PASSWORD: '',
+            OPENAI_API_KEY: '', GOOGLE_API_KEY: '', GEMINI_API_KEY: '', HF_TOKEN: ''
+          })
+        }
         for (const key of server.credentialEnvironmentVariables ?? []) {
           const variable = runtimeCredentialVariable(server.id, key)
           env[key] = `\${${variable}}`
@@ -284,14 +307,21 @@ export class McpConfigService {
           transport: 'stdio',
           command: server.command,
           args: server.args ?? [],
+          cwd,
           env,
+          ...(toolPolicy ? { toolPolicy } : {}),
           ...trust,
           timeoutMs: server.timeoutMs
         }
         continue
       }
       const headers: Record<string, string> = {}
-      if (credential) {
+      let url = server.url
+      if (server.managedPreset === 'amap-readonly') {
+        const variable = runtimeCredentialVariable(server.id, 'amap_key')
+        url = `https://mcp.amap.com/mcp?key=\${${variable}}`
+        if (credential) environment[variable] = credential.accessToken
+      } else if (credential) {
         const variable = runtimeCredentialVariable(server.id, 'authorization')
         headers.Authorization = `\${${variable}}`
         environment[variable] = `${credential.tokenType ?? 'Bearer'} ${credential.accessToken}`
@@ -299,13 +329,14 @@ export class McpConfigService {
       servers[server.id] = {
         enabled: server.enabled,
         transport: 'streamable-http',
-        url: server.url,
+        url,
         headers,
+        ...(toolPolicy ? { toolPolicy } : {}),
         ...trust,
         timeoutMs: server.timeoutMs
       }
     }
-    return { servers, environment }
+    return { revision: manifest.revision, servers, environment }
   }
 
   async save(request: SaveMcpServerRequest): Promise<McpServerConfigV2> {
@@ -343,6 +374,13 @@ export class McpConfigService {
         if (!request.config.url) throw Object.assign(new Error('HTTP MCP server requires a URL.'), { code: 'invalid_state' })
         assertHttpUrl(request.config.url, 'MCP server URL')
       }
+      if (request.config.managedPreset) {
+        const isAmap = request.config.managedPreset === 'amap-readonly'
+        const allowed = isAmap ? [...AMAP_READ_TOOLS] : [...ZOTERO_READ_TOOLS]
+        if (isAmap && (request.config.transport !== 'http' || request.config.url !== 'https://mcp.amap.com/mcp')) throw new Error('高德连接必须使用官方固定服务地址。')
+        if (!isAmap && (request.config.transport !== 'stdio' || request.config.credentialRef || request.config.credentialEnvironmentVariables?.length)) throw new Error('Zotero 只读连接使用隔离本机配置。')
+        request = { ...request, config: { ...request.config, toolPolicy: { '*': 'deny', ...Object.fromEntries(allowed.map(name => [name, 'allow' as const])) }, readOnlyTools: allowed } }
+      }
       const oauth = request.config.oauth ? await this.resolveOAuth(request.config.oauth) : undefined
       const next: McpServerConfigV2 = {
         ...request.config,
@@ -367,6 +405,7 @@ export class McpConfigService {
     if (!server) return { id: serverId, state: 'error', authorized: false, message: 'MCP server was not found.' }
     const startedAt = Date.now()
     try {
+      if (server.managedPreset) return await this.testReadonlyConnector(server, startedAt)
       if (server.transport === 'stdio') {
         if (server.cwd && server.workspaceRoot) {
           const cwd = await canonicalizeContainmentRoot(server.cwd)
@@ -398,6 +437,43 @@ export class McpConfigService {
         message: error instanceof Error ? error.message : String(error)
       }
     }
+  }
+
+  private async testReadonlyConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {
+    const client = new Client({ name: 'railwise-connector-check', version: '1.0.0' })
+    try {
+      const snapshot = await this.runtimeSnapshot()
+      const entry = snapshot.servers[server.id]
+      if (server.managedPreset === 'amap-readonly') {
+        const credential = await this.readCredential(server.credentialRef)
+        if (!credential) return { id: server.id, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请填写高德 Web 服务 Key。' }
+        const url = new URL('https://mcp.amap.com/mcp')
+        url.searchParams.set('key', credential.accessToken)
+        await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { redirect: 'error' } }), { timeout: server.timeoutMs })
+      } else {
+        const local = await fetch('http://127.0.0.1:23119/api/users/0/collections?limit=1', { redirect: 'error', signal: AbortSignal.timeout(5_000) })
+        await local.body?.cancel()
+        if (!local.ok) throw Object.assign(new Error('Zotero 本机 API 尚未启用。请在 Zotero 高级设置中允许本机应用连接。'), { code: 'local_api_unavailable' })
+        await client.connect(new StdioClientTransport({
+          command: server.command!, args: server.args ?? [], cwd: entry.cwd as string,
+          env: entry.env as Record<string, string>, stderr: 'ignore'
+        }), { timeout: server.timeoutMs })
+      }
+      const tools = await client.listTools({}, { timeout: server.timeoutMs })
+      const allowed = new Set(server.readOnlyTools ?? [])
+      const count = tools.tools.filter(tool => allowed.has(tool.name)).length
+      if (!count) throw Object.assign(new Error('连接已建立，但没有发现已核对的只读工具。请检查服务版本和配置。'), { code: 'tool_manifest_mismatch' })
+      return { id: server.id, state: 'connected', authorized: true, latencyMs: Date.now() - startedAt, message: `已发现 ${count} 项只读工具。` }
+    } catch (error) {
+      // Transport exceptions may include the Amap URL with its query credential.
+      const code = (error as { code?: unknown }).code
+      if (code === 'tool_manifest_mismatch' || code === 'local_api_unavailable') {
+        return { id: server.id, state: 'error', authorized: false, errorCode: code, latencyMs: Date.now() - startedAt, message: (error as Error).message }
+      }
+      return { id: server.id, state: 'error', authorized: false, latencyMs: Date.now() - startedAt,
+        errorCode: 'connection_failed',
+        message: server.managedPreset === 'amap-readonly' ? '高德连接检查失败。请核对 Web 服务 Key、网络及高德控制台授权。' : 'Zotero 连接检查失败。请打开 Zotero、启用本机 API，并核对连接器安装结果。' }
+    } finally { await client.close().catch(() => undefined) }
   }
 
   async authorize(request: AuthorizeMcpServerRequest): Promise<McpServerStatusV1> {

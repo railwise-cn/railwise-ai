@@ -336,6 +336,16 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceView unified catalog', () => {
+  it('opens Skills by default and orders connectors last while keeping connector deep links', async () => {
+    await act(async () => root.render(createElement(PluginMarketplaceView, { key: 'default-tabs' })))
+    await settle()
+    const tabs = [...container.querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="Skills and connector sections"] > [role="tab"]')]
+    expect(tabs.map(tab => tab.textContent)).toEqual(['Skills', 'Plugins', 'Connectors'])
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+    expect(container.textContent).toContain('资料盘点与来源索引')
+    expect(window.workwise.installPreparedPlugin).not.toHaveBeenCalled()
+  })
+
   it('preserves installed Lark OpenAPI package source, permissions, and update details behind native setup', async () => {
     const larkPackage: MarketplacePackageV1 = {
       ...MANAGED_KB,

@@ -1,3 +1,4 @@
+import { ReadonlyConnectorSetup } from './ReadonlyConnectorSetup'
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, CheckCircle2, Link2, PlugZap, RefreshCw, X } from 'lucide-react'
@@ -21,6 +22,7 @@ type Props = {
   summary: (entry: MarketplaceCatalogPackageEntryV1) => string
   status: (entry: MarketplaceCatalogPackageEntryV1) => string
   onDetails: (entry: MarketplaceCatalogPackageEntryV1) => void
+  onInstall?: (entry: MarketplaceCatalogPackageEntryV1) => void
   onRefresh: () => void | Promise<void>
 }
 
@@ -29,11 +31,12 @@ type Props = {
 const nativeConnectors = ['lark', 'dingtalk'] as const
 const larkCatalogIds = new Set(['lark-cli', 'lark-openapi-mcp'])
 
-export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetOpened, name, summary, status, onDetails, onRefresh }: Props): ReactElement {
+export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetOpened, name, summary, status, onDetails, onInstall, onRefresh }: Props): ReactElement {
   const { t } = useTranslation('common')
   const [connections, setConnections] = useState<RuntimeConnections>({})
   const [lark, setLark] = useState<ManagedToolStatus | undefined>()
   const [checking, setChecking] = useState(false)
+  const [readonlyEntry, setReadonlyEntry] = useState<MarketplaceCatalogPackageEntryV1 | null>(null)
   const [selected, setSelected] = useState<NativeConnector | null>(null)
   const [autoConnect, setAutoConnect] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -125,6 +128,10 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
   const larkPackages = entries.filter(entry => larkCatalogIds.has(entry.package.id))
   const natives = nativeConnectors.filter(id => !needle || [id, nativeName(id), nativeSummary(id), id === 'lark' ? 'feishu 飞书 lark' : 'dingtalk 钉钉'].some(value => value.toLocaleLowerCase().includes(needle)))
   const catalog = entries.filter(entry => !larkCatalogIds.has(entry.package.id) && entry.package.id !== 'dingtalk' && (!needle || [name(entry), summary(entry), entry.package.id, entry.package.publisher.name].some(value => value.toLocaleLowerCase().includes(needle))))
+  const details = (entry: MarketplaceCatalogPackageEntryV1): void => {
+    if (['amap-maps', 'zotero-mcp'].includes(entry.package.id)) setReadonlyEntry(entry)
+    else onDetails(entry)
+  }
   const open = (id: NativeConnector, connect = false): void => { setAutoConnect(connect); setSelected(id) }
 
   return <section className="mx-auto w-full max-w-[1200px] px-5 py-5 md:px-7" aria-label={t('connectorHubTitle')}>
@@ -150,13 +157,14 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
         </div>
       </article>)}
       {catalog.map(entry => <article key={entry.key} className="flex min-h-[164px] flex-col rounded-xl border border-ds-border bg-ds-card p-4">
-        <button type="button" onClick={() => onDetails(entry)} aria-label={t('connectorHubViewDetails', { name: name(entry) })} className="flex flex-1 items-start gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+        <button type="button" onClick={() => details(entry)} aria-label={t('connectorHubViewDetails', { name: name(entry) })} className="flex flex-1 items-start gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ds-subtle text-ds-muted"><PlugZap className="h-5 w-5" /></span>
           <span className="min-w-0"><span className="block text-[14px] font-semibold">{name(entry)}</span><span className="mt-1 line-clamp-2 block text-[12px] leading-5 text-ds-muted">{summary(entry)}</span></span>
         </button>
-        <div className="mt-4 flex items-center justify-between gap-3"><span className="text-[11px] text-ds-muted">{status(entry)}</span><button type="button" onClick={() => onDetails(entry)} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{t('connectorHubDetails')}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+        <div className="mt-4 flex items-center justify-between gap-3"><span className="text-[11px] text-ds-muted">{status(entry)}</span><button type="button" onClick={() => details(entry)} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{t('connectorHubDetails')}<ArrowRight className="h-3.5 w-3.5" /></button></div>
       </article>)}
     </div>
+    {readonlyEntry ? <ReadonlyConnectorSetup entry={readonlyEntry} onClose={() => setReadonlyEntry(null)} onChanged={changed} onInstall={() => { const entry = readonlyEntry; setReadonlyEntry(null); if (onInstall) onInstall(entry); else onDetails(entry) }} /> : null}
     {selected ? <div className="fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.currentTarget === event.target) setSelected(null) }}>
       <aside role="dialog" aria-modal="true" aria-labelledby="connector-hub-detail-title" className="absolute inset-y-0 right-0 flex w-full max-w-[640px] flex-col border-l border-ds-border bg-ds-card shadow-xl">
         <header className="flex min-h-14 items-center justify-between gap-3 border-b border-ds-border px-5"><h2 id="connector-hub-detail-title" className="text-[16px] font-semibold">{nativeName(selected)}</h2><button ref={closeRef} type="button" aria-label={t('connectorHubClose')} onClick={() => setSelected(null)} className="rounded-md p-2 hover:bg-ds-hover"><X className="h-4 w-4" /></button></header>

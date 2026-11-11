@@ -1,3 +1,4 @@
+import { isApprovedUpstreamPackage, OPTIONAL_ENGINEERING_SKILLS, ZOTERO_PACKAGE } from '../../shared/engineering-marketplace'
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -48,6 +49,7 @@ const PINNED_NPM_COMPONENTS = {
 } as const
 
 const PINNED_WHEEL_COMPONENTS = {
+  'zotero-mcp-server': { version: ZOTERO_PACKAGE.version, sha256: ZOTERO_PACKAGE.sha256, executable: 'zotero-mcp' },
   'docling-mcp': {
     version: '3.0.0',
     sha256: '595da70b9de2265f1f14e575fad65ff4213c5c7e2dbb255184d606505fa49f23',
@@ -76,6 +78,7 @@ const PINNED_WHEEL_COMPONENTS = {
 } as const
 
 const PINNED_EXECUTABLES = {
+  'zotero-mcp-server': 'zotero-mcp',
   '@antv/mcp-server-chart': 'mcp-server-chart',
   '@bytebase/dbhub': 'dbhub',
   '@modelcontextprotocol/server-filesystem': 'mcp-server-filesystem',
@@ -163,6 +166,7 @@ describe('official marketplace catalog', () => {
 
   it('contains exactly the official recommended package set and tiers', () => {
     const expectedRecommendedIds = [
+      'amap-maps', ...OPTIONAL_ENGINEERING_SKILLS.map(item => item.id),
       'antv-chart-mcp',
       'context7-mcp',
       'dbhub',
@@ -195,6 +199,7 @@ describe('official marketplace catalog', () => {
 
   it('contains exactly the official advanced package set and tiers', () => {
     const expectedAdvancedIds = [
+      'zotero-mcp',
       'antv-chart-skill',
       'docling-mcp',
       'ego-browser',
@@ -427,8 +432,8 @@ describe('official marketplace catalog', () => {
           requirement: '>=3.10'
         }))
       }
-      expect(item.license).toBe('MIT')
-      expect(item.installation.mode).toBe('direct-mirror')
+      expect(item.license).toBe(item.id === 'zotero-mcp' ? ZOTERO_PACKAGE.license : 'MIT')
+      expect(item.installation.mode).toBe(item.id === 'zotero-mcp' ? 'upstream-only' : 'direct-mirror')
       return [
         component.runtime.packageName,
         {
@@ -447,7 +452,7 @@ describe('official marketplace catalog', () => {
       )
     const executableCounts = new Map<string, number>()
 
-    expect(managedArtifactComponents).toHaveLength(15)
+    expect(managedArtifactComponents).toHaveLength(16)
     for (const runtime of managedArtifactComponents) {
       const expectedExecutable = PINNED_EXECUTABLES[
         runtime.packageName as keyof typeof PINNED_EXECUTABLES
@@ -827,6 +832,9 @@ describe('official marketplace catalog', () => {
         expect(item.availability.status).toBe('available')
         expect(item.installation.reinstallable).toBe(true)
         expect(evaluateMarketplaceLicense(item.license).disposition).toBe('direct-mirror')
+      } else if (item.installation.mode === 'upstream-only') {
+        expect(isApprovedUpstreamPackage(item)).toBe(true)
+        expect(evaluateMarketplaceLicense(item.license).disposition).toBe('rejected')
       } else {
         expect(item.installation.reinstallable).toBe(false)
       }

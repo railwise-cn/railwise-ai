@@ -290,3 +290,17 @@ describe('materializePypiPackage', () => {
     expect(run).not.toHaveBeenCalled()
   })
 })
+
+
+describe('mixed upstream license preservation', () => {
+  it('keeps every license from the exact wheel alongside the compatibility LICENSE file', async () => {
+    const root = await tempRoot()
+    const zip = new JSZip()
+    zip.file('fixture-1.0.0.dist-info/licenses/LICENSE', 'MIT License')
+    zip.file('fixture-1.0.0.dist-info/licenses/plugin/LICENSE', 'GNU AFFERO GENERAL PUBLIC LICENSE')
+    const bytes = await zip.generateAsync({ type: 'nodebuffer' })
+    await preservePypiLicense({ ...item(createHash('sha256').update(bytes).digest('hex')), license: 'MIT AND AGPL-3.0-or-later' }, root, bytes, vi.fn() as never)
+    expect(await readFile(join(root, 'LICENSE'), 'utf8')).toBe('MIT License')
+    expect(await readFile(join(root, 'licenses/fixture-1.0.0.dist-info/licenses/plugin/LICENSE'), 'utf8')).toBe('GNU AFFERO GENERAL PUBLIC LICENSE')
+  })
+})

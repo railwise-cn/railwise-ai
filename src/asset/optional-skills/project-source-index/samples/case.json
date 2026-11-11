@@ -1,0 +1,14 @@
+{
+  "request": "整理资料来源索引和缺项。",
+  "inputs": [
+    "brief.md",
+    "list.json"
+  ],
+  "expected": {
+    "sourceDocuments": 2,
+    "missing": [
+      "监测报警阈值审批记录"
+    ],
+    "inventedThresholds": 0
+  }
+}

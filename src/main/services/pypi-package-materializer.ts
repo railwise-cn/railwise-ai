@@ -11,7 +11,7 @@ import {
   rm,
   writeFile
 } from 'node:fs/promises'
-import { basename, join, relative } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { promisify } from 'node:util'
 import JSZip from 'jszip'
 import type { MarketplacePackageV1, PypiPackageSourceV1 } from '../../shared/marketplace'
@@ -227,11 +227,21 @@ export async function preservePypiLicense(
   const zip = await JSZip.loadAsync(wheel, { checkCRC32: true })
   const entries = Object.values(zip.files)
   if (entries.length === 0 || entries.length > 20_000) throw new Error('PyPI wheel has an invalid entry count.')
-  const license = entries.find((entry) => {
+  const licenses = entries.filter((entry) => {
     const path = entry.name.replaceAll('\\', '/')
-    return !entry.dir && path.split('/').every((segment) => segment && segment !== '.' && segment !== '..') &&
+    return !entry.dir && !path.includes(':') && !path.includes('\0') && path.split('/').every((segment) => segment && segment !== '.' && segment !== '..') &&
       licenseName(path) && (path.includes('.dist-info/licenses/') || path.includes('.dist-info/'))
   })
+  let preservedBytes = 0
+  for (const entry of licenses) {
+    const content = await entry.async('nodebuffer')
+    preservedBytes += content.byteLength
+    if (content.byteLength === 0 || preservedBytes > MAX_LICENSE_BYTES) throw new Error('PyPI wheel license files exceed their safety limit.')
+    const destination = join(targetDirectory, 'licenses', ...entry.name.replaceAll('\\', '/').split('/'))
+    await mkdir(dirname(destination), { recursive: true, mode: 0o700 })
+    await writeFile(destination, content, { mode: 0o600, flag: 'wx' })
+  }
+  const license = licenses[0]
   let bytes: Buffer
   if (license) {
     bytes = await license.async('nodebuffer')

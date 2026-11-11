@@ -1,3 +1,5 @@
+import { ManagedDocumentTool } from './connectors/ManagedDocumentTool'
+import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -152,7 +154,7 @@ function hasUpdate(
   _reviewSha256?: string,
   diagnostic?: PluginUpdateDiagnosticV1
 ): boolean {
-  if (!record || item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') return false
+  if (!record || item.availability.status !== 'available' || !isCatalogInstallable(item)) return false
   return diagnostic?.state === 'metadata-refresh' || diagnostic?.state === 'update-available'
 }
 
@@ -442,7 +444,7 @@ export function PluginMarketplaceView(): ReactElement {
     code: string
     callback: 'loopback' | 'manual'
   } | null>(null)
-  const [viewMode, setViewMode] = useState<MarketplaceView>('connectors')
+  const [viewMode, setViewMode] = useState<MarketplaceView>('skills')
   const [connectionRefresh, setConnectionRefresh] = useState(0)
   const [skillFilter, setSkillFilter] = useState<SkillBrowseFilter>('overview')
 
@@ -613,13 +615,15 @@ export function PluginMarketplaceView(): ReactElement {
 
   const visibleEntryGroups = useMemo(() => {
     const showFeatured = categoryFilter === 'all' && statusFilter === 'recommended' && !query.trim()
+    const showEngineering = showFeatured && audienceFilter === 'official' && sourceFilter === 'all'
+    const groupedEntries = showEngineering ? visibleEntries.filter(entry => !ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)) : visibleEntries
     const preferred = showFeatured
-      ? visibleEntries.filter((entry) => isFeaturedPackage(entry.package))
+      ? groupedEntries.filter((entry) => isFeaturedPackage(entry.package))
       : []
-    const featured = preferred.length ? preferred : showFeatured ? visibleEntries.slice(0, 2) : []
+    const featured = preferred.length ? preferred : showFeatured ? groupedEntries.slice(0, 2) : []
     const featuredKeys = new Set(featured.map(packageKey))
     const grouped = new Map<string, MarketplaceCatalogPackageEntryV1[]>()
-    for (const entry of visibleEntries.filter((entry) => !featuredKeys.has(packageKey(entry)))) {
+    for (const entry of groupedEntries.filter((entry) => !featuredKeys.has(packageKey(entry)))) {
       const category = marketplaceCollection(entry.package)
       const group = grouped.get(category) ?? []
       group.push(entry)
@@ -636,7 +640,7 @@ export function PluginMarketplaceView(): ReactElement {
       return packages?.length ? [{ category, packages }] : []
     })
     return featured.length ? [{ category: 'featured', packages: featured }, ...categoryGroups] : categoryGroups
-  }, [categoryFilter, query, statusFilter, visibleEntries])
+  }, [audienceFilter, sourceFilter, categoryFilter, query, statusFilter, visibleEntries])
 
   const duplicateSkillNames = useMemo(() => {
     const counts = new Map<string, number>()
@@ -784,6 +788,7 @@ export function PluginMarketplaceView(): ReactElement {
       })
       await refresh()
     } catch (error) {
+      await refresh()
       setNotice({ tone: 'error', message: friendlyMarketplaceError(error instanceof Error ? error.message : String(error), t) })
     } finally {
       setBusy('')
@@ -900,6 +905,17 @@ export function PluginMarketplaceView(): ReactElement {
     }
   }
 
+  const installEngineeringSkill = async (id: string): Promise<void> => {
+    setBusy(`skill:${id}`)
+    try {
+      const result = await window.workwise.installBundledSkill('railwise:global-skills', { id })
+      if (!result.ok) throw new Error(result.message)
+      await refresh()
+      setNotice({ tone: 'success', message: text('engineeringSkillInstalled', 'Skill installed and available for task selection.') })
+    } catch (error) { setNotice({ tone: 'error', message: error instanceof Error ? error.message : String(error) }) }
+    finally { setBusy('') }
+  }
+
   const invokePrimaryAction = async (entry: MarketplaceCatalogPackageEntryV1): Promise<void> => {
     const item = entry.package
     if (item.availability.status === 'unavailable') {
@@ -912,7 +928,7 @@ export function PluginMarketplaceView(): ReactElement {
       setDetailsOpen(true)
       return
     }
-    if (item.installation.mode === 'direct-mirror') {
+    if (isCatalogInstallable(item)) {
       await prepareCatalog(entry)
       return
     }
@@ -964,9 +980,9 @@ export function PluginMarketplaceView(): ReactElement {
 
         <div role="tablist" aria-label={text('connectorHubSections', 'Skills and connector sections')} className="mt-3 flex w-fit items-center gap-1 rounded-md border border-ds-border bg-ds-subtle p-1">
           {([
-            ['connectors', text('connectorHubTab', 'Connectors')],
             ['skills', text('pluginUnifiedSkillsTab', 'Skills')],
-            ['plugins', text('pluginUnifiedPluginsTab', 'Plugins')]
+            ['plugins', text('pluginUnifiedPluginsTab', 'Plugins')],
+            ['connectors', text('connectorHubTab', 'Connectors')]
           ] as Array<[MarketplaceView, string]>).map(([value, label]) => (
             <button
               key={value}
@@ -1077,6 +1093,7 @@ export function PluginMarketplaceView(): ReactElement {
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === 'connectors' ? <ConnectorCatalog
+          onInstall={entry => void invokePrimaryAction(entry)}
           entries={connectorEntries}
           query={query}
           refreshKey={connectionRefresh}
@@ -1089,9 +1106,16 @@ export function PluginMarketplaceView(): ReactElement {
           onRefresh={() => refresh()}
         /> : viewMode === 'skills' ? (
           <>
+          <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('engineeringSkillSelection', 'Engineering skills')}>
+            <h2 className="mb-2 text-[14px] font-semibold">{text('engineeringSkillSelection', 'Engineering skills')}</h2>
+            <div className="grid gap-3 md:grid-cols-2">{OPTIONAL_ENGINEERING_SKILLS.filter(skill => !query || `${skill.name} ${skill.summary}`.toLowerCase().includes(query.toLowerCase())).map(skill => {
+              const added = skills.some(item => item.id === skill.id || item.name === skill.id)
+              return <article key={skill.id} className="rounded-lg border border-ds-border bg-ds-card p-4"><h3 className="text-sm font-semibold">{skill.name}</h3><p className="mt-1 text-xs leading-5 text-ds-muted">{skill.summary}</p><button type="button" disabled={added || busy === `skill:${skill.id}`} onClick={() => void installEngineeringSkill(skill.id)} className="mt-3 rounded-md border border-ds-border px-3 py-1.5 text-xs hover:bg-ds-hover disabled:opacity-50">{added ? text('pluginInstalled', 'Installed') : busy === `skill:${skill.id}` ? text('pluginInstalling', 'Installing…') : text('pluginUnifiedInstall', 'Install')}</button></article>
+            })}</div>
+          </section>
           {skillCatalogEntries.length ? <section className="mx-auto w-full max-w-[1040px] px-5 pt-5 md:px-7" aria-label={text('connectorHubSkillCatalog', 'Discover skills')}>
             <h2 className="mb-2 text-[14px] font-semibold">{text('connectorHubSkillCatalog', 'Discover skills')}</h2>
-            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
+            <div className="grid gap-x-9 md:grid-cols-2">{skillCatalogEntries.filter(entry => !OPTIONAL_ENGINEERING_SKILLS.some(skill => skill.id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div>
           </section> : null}
           <LocalSkillsList
             skills={visibleSkills}
@@ -1123,6 +1147,7 @@ export function PluginMarketplaceView(): ReactElement {
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[1040px] px-5 pb-8 md:px-7">
+            {!query && statusFilter === 'recommended' && categoryFilter === 'all' && audienceFilter === 'official' && sourceFilter === 'all' ? <section className="pt-5" aria-label={text('engineeringPluginSelection', 'Engineering essentials')}><h2 className="border-b border-ds-border pb-2 text-[13px] font-semibold">{text('engineeringPluginSelection', 'Engineering essentials')}</h2><div className="grid gap-x-9 md:grid-cols-2">{entries.filter(entry => ENGINEERING_FEATURED_PACKAGE_IDS.some(id => id === entry.package.id)).map(entry => <PluginRow key={packageKey(entry)} entry={entry} installed={installed.get(entry.package.id)} diagnostic={diagnosticMap.get(entry.package.id)} reviewSha256={entry.reviewSha256} server={installedServerForPackage(entry.package, mcpServers)} busy={busy === packageKey(entry)} text={text} onSelect={() => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }} onAction={() => void invokePrimaryAction(entry)} />)}</div></section> : null}
             {visibleEntryGroups.map((group) => (
               <section key={group.category} className="pt-5">
                 <div className="flex h-8 items-center justify-between border-b border-ds-border">
@@ -1717,13 +1742,13 @@ function PrimaryAction({ item, installed, server, reviewSha256, diagnostic, busy
   const added = Boolean(installed || server || isManagedInstalled(item))
   const update = hasUpdate(item, installed, reviewSha256, diagnostic)
   const blocked = diagnostic && ['runtime-drift', 'unavailable'].includes(diagnostic.state)
-  const managesPermissions = item.installation.mode === 'direct-mirror' && added && !update
+  const managesPermissions = isCatalogInstallable(item) && added && !update
   const remote = item.components.some((component) => component.type === 'mcp' && component.runtime.kind === 'remote')
-  const canAct = item.installation.mode === 'direct-mirror' || remote || isHttpUrl(item.source.location)
+  const canAct = isCatalogInstallable(item) || remote || isHttpUrl(item.source.location)
   if (!canAct) return null
   const label = sourceOnly ? text('pluginOpenSource', 'Open source') : blocked ? diagnosticLabel(diagnostic!, text) : update
     ? permissionExpanded(item, installed, reviewSha256) ? text('pluginUnifiedReviewUpdate', 'Review update') : text('pluginUnifiedUpdate', 'Update')
-    : item.installation.mode === 'direct-mirror' && !added ? text('pluginUnifiedInstall', 'Install')
+    : isCatalogInstallable(item) && !added ? text('pluginUnifiedInstall', 'Install')
     : remote && !added ? text('pluginUnifiedConnect', 'Connect')
     : managesPermissions ? text('pluginUnifiedPermissions', 'Permissions')
     : text('pluginOpenSource', 'Open source')
@@ -1821,6 +1846,7 @@ function DetailsDrawer({ entry, source, installed, server, diagnostic, busy, tex
           ) : null}
         </div>
       </div>
+      {item.id === 'officecli' || item.id === 'markitdown' ? <div className="px-5"><ManagedDocumentTool id={item.id} /></div> : null}
       {diagnostic ? <DetailSection title={text('pluginUpdateDiagnosis', 'Update diagnosis')}><p className="text-[13px] font-medium">{diagnosticLabel(diagnostic, text)}</p>{diagnostic.state === 'runtime-drift' ? <p className="mt-2 text-[12px] text-ds-muted">{text('pluginUpdateFullReason', 'Runtime or source verification changed. Install a verified new package version; metadata review cannot replace runtime validation.')}</p> : null}</DetailSection> : null}
       <DetailSection title={text('pluginUnifiedPackageInfo', 'Package')}>
         <DefinitionList values={[

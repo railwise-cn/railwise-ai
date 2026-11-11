@@ -257,8 +257,9 @@ describe('document delivery tool provider', () => {
 
   it('runs the real deterministic monitoring service from scoped source files with immutable arithmetic evidence', async () => {
     const root = await mkdtemp(join(tmpdir(), 'railwise-delivery-monitoring-')); roots.push(root)
-    await writeFile(join(root, 'project.json'), JSON.stringify({ name: 'Synthetic monitoring', monitoringType: 'deformation', unit: 'mm', thresholds: { default: 10 }, taskContext: { standard: 'Synthetic only', standardVersion: 'test-v1' } }))
-    await writeFile(join(root, 'data.csv'), 'point,time,value,unit\nP1,2026-11-01,1,mm\nP1,2026-11-02,3,mm\nP1,2026-11-03,4,mm\n')
+    const sample = join(process.cwd(), '../src/asset/optional-skills/monitoring-data-check/samples')
+    await writeFile(join(root, 'project.json'), await readFile(join(sample, 'project.json')))
+    await writeFile(join(root, 'data.csv'), await readFile(join(sample, 'data.csv')))
     const repository = new TaskRunRepository(join(root, 'tasks.sqlite3')); repository.create(task(root))
     const engineeringService = new EngineeringService({ rootDir: join(root, 'engineering') })
     try {

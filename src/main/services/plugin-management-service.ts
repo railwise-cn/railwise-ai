@@ -1,3 +1,4 @@
+import { isApprovedUpstreamPackage, isCatalogInstallable } from '../../shared/engineering-marketplace'
 import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { constants } from 'node:fs'
@@ -185,7 +186,7 @@ export class PluginManagementService {
 
   async prepareCatalogPackage(item: MarketplacePackageV1): Promise<PreparedPluginImportV1> {
     await this.cleanupExpired()
-    if (item.availability.status !== 'available' || item.installation.mode !== 'direct-mirror') {
+    if (item.availability.status !== 'available' || !isCatalogInstallable(item)) {
       throw new Error('Catalog package is not eligible for direct installation.')
     }
     const targetDirectory = join(await this.ensureStagingRoot(), randomUUID())
@@ -207,7 +208,7 @@ export class PluginManagementService {
         preparedDirectory: targetDirectory,
         contentSha256: inspection.sha256,
         reviewSha256: marketplacePackageReviewSha256(item),
-        warnings: [],
+        warnings: isApprovedUpstreamPackage(item) ? ['Zotero MCP 0.17.0 采用 MIT AND AGPL-3.0-or-later。由用户独立从上游安装，保留完整许可证。仅启用本机只读工具，未启用附带的 Zotero 写入插件或 semantic 扩展。'] : [],
         compatibility: {
           workwiseCompatible:
             item.compatibility.platforms.includes(process.platform as 'darwin' | 'win32' | 'linux') &&
