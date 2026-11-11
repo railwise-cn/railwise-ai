@@ -25,6 +25,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
   const [appSetup, setAppSetup] = useState<Extract<ManagedLarkAppSetupResult, { ok: true }> | null>(null)
   const [appRequired, setAppRequired] = useState(false)
   const [capability, setCapability] = useState<'tasks' | 'mail' | 'im' | 'drive'>('tasks')
+  const appSetupGeneration = useRef(0)
   const started = useRef(false)
   const busy = useRef(false)
   const run = useCallback(async (operation: () => Promise<void>): Promise<void> => {
@@ -49,6 +50,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     if (!api.beginManagedLarkAppSetup) throw new Error(t('capabilityLoginUnavailable'))
     const result = await api.beginManagedLarkAppSetup()
     if (!result.ok) throw new Error(result.message)
+    appSetupGeneration.current++
     setAppSetup(result)
     if (result.state === 'configured') { setAppRequired(false); setMessage(t('capabilityLarkAppReady')); await onChanged?.(); return }
     if (result.verificationUrl && result.state === 'waiting') await window.workwise.openExternal(result.verificationUrl)
@@ -96,11 +98,25 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     }, Math.max(0, Math.min(remaining, 2_147_483_647)))
     return () => clearTimeout(timer)
   }, [login, t])
+  useEffect(() => {
+    if (appSetup?.state !== 'waiting' || !appSetup.expiresAt) return
+    const remaining = Date.parse(appSetup.expiresAt) - Date.now()
+    if (!Number.isFinite(remaining)) return
+    const generation = appSetupGeneration.current
+    const timer = setTimeout(() => {
+      if (generation !== appSetupGeneration.current) return
+      appSetupGeneration.current++
+      setAppSetup({ ok: true, state: 'expired', expiresAt: appSetup.expiresAt })
+      setMessage(t('capabilityLarkApp_expired'))
+    }, Math.max(0, Math.min(remaining, 2_147_483_647)))
+    return () => clearTimeout(timer)
+  }, [appSetup, t])
   const checkAppSetup = async (cancel = false): Promise<void> => {
     const action = cancel ? api.cancelManagedLarkAppSetup : api.checkManagedLarkAppSetup
     if (!action) throw new Error(t('capabilityLoginUnavailable'))
     const result = await action()
     if (!result.ok) throw new Error(result.message)
+    appSetupGeneration.current++
     setAppSetup(result)
     if (result.state === 'configured') {
       setAppRequired(false)
