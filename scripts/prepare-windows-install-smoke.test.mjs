@@ -14,7 +14,7 @@ function source() {
     windowsBuildConclusion: 'success', artifactId: 4567, artifactName: 'release-win',
     artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
     changedFiles: ['scripts/run-windows-ui-smoke.mjs', 'scripts/windows-ui-smoke.test.mjs',
-      '.github/workflows/windows-install-smoke.yml', 'scripts/deploy-website-release.mjs',
+      '.github/workflows/windows-install-smoke.yml', '.github/workflows/release.yml', 'scripts/deploy-website-release.mjs',
       'src/renderer/src/components/connectors/ManagedLarkConnection.test.ts']
   }
 }
@@ -60,6 +60,7 @@ test('Windows provenance keeps the actual workflow SHA and requires source evide
 test('Windows acceptance workflow downloads the original artifact and performs no packaging or publication', () => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/windows-install-smoke.yml', import.meta.url), 'utf8'))
   assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), ['package_run_id'])
+  assert.deepEqual(workflow.on.workflow_call.inputs, workflow.on.workflow_dispatch.inputs)
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' })
   const steps = workflow.jobs['windows-install'].steps
   const download = steps.find(step => step.uses === 'actions/download-artifact@v4')
@@ -69,4 +70,18 @@ test('Windows acceptance workflow downloads the original artifact and performs n
   assert.match(commands, /prepare-windows-install-smoke/)
   assert.match(commands, /run-windows-install-smoke\.ps1/)
   assert.doesNotMatch(commands, /dist:|publish-r2|gh release|deploy-/)
+})
+
+test('existing Windows package routing excludes every other release action and has independent concurrency', () => {
+  const workflow = parse(readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8'))
+  assert.equal(workflow.on.workflow_dispatch.inputs.existing_windows_package_run_id.default, '')
+  const acceptance = workflow.jobs['existing-windows-package-acceptance']
+  assert.equal(acceptance.uses, './.github/workflows/windows-install-smoke.yml')
+  assert.equal(acceptance.with.package_run_id, '${{ inputs.existing_windows_package_run_id }}')
+  assert.equal(acceptance.if, "${{ github.event_name == 'workflow_dispatch' && inputs.existing_windows_package_run_id != '' }}")
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    if (name === 'existing-windows-package-acceptance') continue
+    assert.ok(job.if.endsWith(" && inputs.existing_windows_package_run_id == '' }}"), `${name} must skip during existing-package inspection`)
+  }
+  assert.match(workflow.concurrency.group, /inputs.existing_windows_package_run_id != '' && format\('windows-package-\{0\}', github.run_id\)/)
 })

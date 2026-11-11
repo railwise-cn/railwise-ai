@@ -156,6 +156,7 @@ test('dependency workflow excludes every application job', async () => {
   assert.ok(jobs.length > 10)
   for (const job of jobs) {
     if (job.startsWith('stage-managed-dependencies:')) assert.match(job, /inputs.stage_dependency_mirror == true/)
+    else if (job.startsWith('existing-windows-package-acceptance:')) assert.match(job, /inputs.existing_windows_package_run_id != ''/)
     else assert.match(job, /\n {4}if: \$\{\{ inputs.stage_dependency_mirror != true &&/)
   }
 })

@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const driverFiles = new Set([
+  '.github/workflows/release.yml',
   '.github/workflows/windows-install-smoke.yml',
   'scripts/prepare-windows-install-smoke.mjs',
   'scripts/run-windows-install-smoke.ps1',

@@ -1,6 +1,12 @@
 name: Existing Windows package installation and UI acceptance
 
 on:
+  workflow_call:
+    inputs:
+      package_run_id:
+        description: 'Same-repository release run containing the exact release-win artifact to inspect'
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       package_run_id:

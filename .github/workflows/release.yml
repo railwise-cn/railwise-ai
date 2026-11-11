@@ -3,6 +3,11 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      existing_windows_package_run_id:
+        description: 'Inspect only this same-repository release run’s existing Windows installer and Chinese UI. Reuses the exact artifact without building or publishing.'
+        required: false
+        type: string
+        default: ''
       stage_dependency_mirror:
         description: 'Stage and verify only the committed immutable public uv/Python/Lark dependency manifest on R2 and the official download host.'
         required: false
@@ -116,7 +121,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ inputs.stage_dependency_mirror == true && format('dependency-mirror-{0}', github.ref_name) || format('release-{0}', github.ref_name) }}
+  group: ${{ inputs.existing_windows_package_run_id != '' && format('windows-package-{0}', github.run_id) || inputs.stage_dependency_mirror == true && format('dependency-mirror-{0}', github.ref_name) || format('release-{0}', github.ref_name) }}
   cancel-in-progress: false
 
 env:
@@ -128,9 +133,19 @@ env:
   WORKWISE_GITHUB_REPO: railwise-cn/railwise-ai
 
 jobs:
+  existing-windows-package-acceptance:
+    name: Inspect existing exact Windows package
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.existing_windows_package_run_id != '' }}
+    uses: ./.github/workflows/windows-install-smoke.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      package_run_id: ${{ inputs.existing_windows_package_run_id }}
+
   stage-managed-dependencies:
     name: Stage verified immutable managed dependencies
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.stage_dependency_mirror == true }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.stage_dependency_mirror == true && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
@@ -188,7 +203,7 @@ jobs:
 
   release-approval-gate:
     name: Stable release approval and acceptance evidence
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.candidate_only != true && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance != true && inputs.cleanup_acceptance_run_id == '' && inputs.repair_website_cache != true && inputs.rollback_stable_tag == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.candidate_only != true && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance != true && inputs.cleanup_acceptance_run_id == '' && inputs.repair_website_cache != true && inputs.rollback_stable_tag == '' && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -216,14 +231,14 @@ jobs:
         run: node scripts/verify-release-approval.mjs
 
   private-updater-acceptance:
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance == true && inputs.existing_windows_package_run_id == '' }}
     permissions:
       contents: read
     uses: ./.github/workflows/private-updater-acceptance.yml
     secrets: inherit
 
   isolated-survey-candidate:
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate == true }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate == true && inputs.existing_windows_package_run_id == '' }}
     permissions:
       contents: read
     uses: ./.github/workflows/isolated-survey-candidate.yml
@@ -231,7 +246,7 @@ jobs:
 
   native-updater-acceptance:
     name: Native updater acceptance
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance == true && inputs.cleanup_acceptance_run_id == '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.run_updater_acceptance == true && inputs.cleanup_acceptance_run_id == '' && inputs.existing_windows_package_run_id == '' }}
     uses: ./.github/workflows/updater-acceptance-e2e.yml
     with:
       base_version: ${{ inputs.acceptance_base_version }}
@@ -240,7 +255,7 @@ jobs:
 
   cleanup-updater-acceptance:
     name: Cleanup updater acceptance
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.cleanup_acceptance_run_id != '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.cleanup_acceptance_run_id != '' && inputs.existing_windows_package_run_id == '' }}
     uses: ./.github/workflows/updater-acceptance-cleanup.yml
     with:
       run_id: ${{ inputs.cleanup_acceptance_run_id }}
@@ -251,7 +266,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.repair_website_cache == true && (inputs.repair_website_cache_mode == 'inspect' || inputs.repair_website_cache_confirmation == 'REPAIR-WORKWISE-METADATA-CACHE') && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.repair_website_cache_mode == 'apply' && 'production-release' || 'release-inspection' }}
@@ -305,7 +320,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' }}
+    if: ${{ inputs.stage_dependency_mirror != true && github.event_name == 'workflow_dispatch' && inputs.private_updater_acceptance != true && inputs.isolated_survey_candidate != true && inputs.rollback_stable_tag != '' && inputs.rollback_stable_confirmation != '' && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     environment:
       name: production-release
@@ -386,7 +401,7 @@ jobs:
 
   prepare:
     name: Prepare release version
-    if: ${{ inputs.stage_dependency_mirror != true && !(github.event_name == 'workflow_dispatch' && (inputs.private_updater_acceptance == true || inputs.isolated_survey_candidate == true || inputs.run_updater_acceptance == true || inputs.cleanup_acceptance_run_id != '' || inputs.repair_website_cache == true || inputs.rollback_stable_tag != '')) }}
+    if: ${{ inputs.stage_dependency_mirror != true && !(github.event_name == 'workflow_dispatch' && (inputs.private_updater_acceptance == true || inputs.isolated_survey_candidate == true || inputs.run_updater_acceptance == true || inputs.cleanup_acceptance_run_id != '' || inputs.repair_website_cache == true || inputs.rollback_stable_tag != '')) && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -421,7 +436,7 @@ jobs:
 
   stability:
     name: Two-hour pre-release stability
-    if: ${{ inputs.stage_dependency_mirror != true && inputs.publish_release != true && !(github.event_name == 'workflow_dispatch' && inputs.skip_stability == true) }}
+    if: ${{ inputs.stage_dependency_mirror != true && inputs.publish_release != true && !(github.event_name == 'workflow_dispatch' && inputs.skip_stability == true) && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     needs: prepare
     timeout-minutes: 130
@@ -443,7 +458,7 @@ jobs:
 
   build-document-sidecars:
     name: MarkItDown ${{ matrix.platform }} ${{ matrix.arch }}
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.prepare.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.prepare.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) && inputs.existing_windows_package_run_id == '' }}
     needs: [prepare, stability]
     strategy:
       fail-fast: false
@@ -525,7 +540,7 @@ jobs:
 
   build-macos:
     name: Build macOS
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) && inputs.existing_windows_package_run_id == '' }}
     runs-on: macos-latest
     needs: [prepare, stability, build-document-sidecars]
     env:
@@ -706,7 +721,7 @@ jobs:
 
   build-windows:
     name: Build Windows
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.publish_release != true && needs.build-document-sidecars.result == 'success' && (needs.stability.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_stability == true)) && inputs.existing_windows_package_run_id == '' }}
     # node-gyp 11.x supports the VS 2022 toolchain used to rebuild
     # better-sqlite3 for Electron ABI 148. Pin the release image so a
     # windows-latest Visual Studio upgrade cannot break installer builds.
@@ -789,7 +804,7 @@ jobs:
 
   exact-package-windows-install-smoke:
     name: Private exact-package Windows install smoke
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-windows.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: windows-2022
     timeout-minutes: 15
     needs: [prepare, build-windows]
@@ -838,7 +853,7 @@ jobs:
 
   exact-package-updater-smoke:
     name: Private exact-package updater smoke
-    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && inputs.exact_package_updater_smoke == true && inputs.publish_release != true && inputs.candidate_only != true && needs.prepare.result == 'success' && needs.build-macos.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: macos-15
     timeout-minutes: 65
     needs: [prepare, build-macos]
@@ -890,7 +905,7 @@ jobs:
     concurrency:
       group: production-release-public
       cancel-in-progress: false
-    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && inputs.publish_release == true && inputs.candidate_only != true && needs.release-approval-gate.result == 'success' && needs.prepare.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     environment:
       name: production-release
@@ -1226,7 +1241,7 @@ jobs:
 
   verify-candidate:
     name: Verify three-client candidate
-    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && inputs.candidate_only == true && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || inputs.skip_stability == true) }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && github.event_name == 'workflow_dispatch' && inputs.candidate_only == true && needs.prepare.result == 'success' && needs.build-document-sidecars.result == 'success' && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' && (needs.stability.result == 'success' || inputs.skip_stability == true) && inputs.existing_windows_package_run_id == '' }}
     runs-on: ubuntu-latest
     needs:
       - prepare
@@ -1269,7 +1284,7 @@ jobs:
 
   verify-candidate-macos:
     name: Verify final candidate on macOS
-    if: ${{ inputs.stage_dependency_mirror != true && always() && needs.verify-candidate.result == 'success' }}
+    if: ${{ inputs.stage_dependency_mirror != true && always() && needs.verify-candidate.result == 'success' && inputs.existing_windows_package_run_id == '' }}
     runs-on: macos-26
     needs:
       - prepare
