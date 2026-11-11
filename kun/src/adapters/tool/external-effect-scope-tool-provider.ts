@@ -25,7 +25,11 @@ const ACTIONS = {
 const requestSchema = z.object({
   expected_revision: z.number().int().nonnegative().describe('The effect scope revision from get_external_effect_scope, not the general TaskRun revision.'),
   idempotency_key: z.string().trim().min(1).max(200),
-  effects: z.array(z.object({ tool_name: z.string().trim().min(1).max(200), target: z.string().trim().min(1).max(512).refine(value => !/[\r\n\t]/.test(value)) }).strict()).min(1).max(8)
+  effects: z.array(z.object({
+    tool_name: z.string().trim().min(1).max(200),
+    target: z.string().trim().regex(/^[A-Za-z0-9_.:@+-]{1,320}$/, 'Use the exact provider ID or email. For uploads use only folderToken, without a filename or path.')
+      .describe('Exact provider target: taskId for complete/approve/reject/transfer, instanceCode for approval detail, chatId for IM send, recipient email for mail send, and folderToken only for drive upload. Never append a local path or filename. Upload content is separately reviewed by path and SHA-256.')
+  }).strict()).min(1).max(8)
 }).strict()
 
 /** The approval fixes the whole task's finite success set; it is not a provider grant. */
@@ -50,6 +54,7 @@ export function buildExternalEffectScopeToolProviders(tasks: TaskController): Ca
       name: 'confirm_external_effect_scope',
       description: 'After reading real provider tasks, ask the user to review the entire finite set of exact detail reads or write actions for this task (up to eight). The user must explicitly confirm every listed provider/action/target. For detail reads, target is the task GUID or approval instance ID, and only read scopes are required. Lists use current_user and do not belong in this set. Persist the set BEFORE any mutation; completion requires verified receipts for ALL entries. The confirmed set cannot be replaced or reduced. This does not grant connector permissions or bypass each write confirmation.',
       inputSchema: z.toJSONSchema(requestSchema) as Record<string, unknown>, policy: 'on-request', requireExplicitApproval: true,
+      validateArguments: raw => { requestSchema.parse(raw) },
       shouldAdvertise: context => Boolean(current(context)),
       execute: async (raw, context) => {
         const request = requestSchema.parse(raw)

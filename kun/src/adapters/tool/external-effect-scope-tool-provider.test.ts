@@ -57,6 +57,30 @@ async function fixture(prompt = '帮我处理飞书待办。', resolveToolEffect
 }
 
 describe('finite reviewed external effect scope', () => {
+  it('returns malformed scope arguments to the model before creating a user approval', async () => {
+    const f = await fixture()
+    for (const effects of [[], [{ tool_name: 'lark_drive_upload', target: 'folder-token/RailWise-验收.txt' }]]) {
+      const result = await f.host.execute({ callId: 'invalid-scope', toolName: 'confirm_external_effect_scope', arguments: { ...f.request(), effects } }, f.context)
+      expect(result).toMatchObject({ approved: false, item: { isError: true, output: { code: 'invalid_tool_arguments' } } })
+    }
+    expect(f.awaitApproval).not.toHaveBeenCalled()
+    expect(f.repository.operations(f.task.id, 'effect_scope')).toHaveLength(0)
+  })
+
+  it('reviews an upload using the folder token without appending a filename', async () => {
+    const f = await fixture('请帮我处理飞书任务。', name => name === 'lark_drive_upload'
+      ? { provider: 'lark', providerId: 'lark-cli', operation: 'upload', mutation: true, targetFields: ['folderToken'], requiredScopes: ['drive:file:upload'] }
+      : undefined)
+    const context = { ...f.context, executionGrant: { ...f.context.executionGrant!,
+      allowedToolNames: ['get_external_effect_scope', 'confirm_external_effect_scope', 'lark_drive_upload'], connectorScopes: ['drive:file:upload'] } }
+    const result = await f.host.execute({ callId: 'upload-scope', toolName: 'confirm_external_effect_scope', arguments: {
+      expected_revision: 0, idempotency_key: 'upload-scope', effects: [{ tool_name: 'lark_drive_upload', target: 'folder-token' }]
+    } }, context)
+    expect(result).toMatchObject({ approved: true, item: { output: { status: 'scope_confirmed' } } })
+    expect(f.awaitApproval).toHaveBeenCalledOnce()
+    expect(f.awaitApproval.mock.calls[0]![0].summary).toContain('Action 1: lark upload folder-token')
+  })
+
   it('confirms an exact DWS task using its real descriptor without inventing OpenAPI scopes', async () => {
     const runner = vi.fn()
     const provider = buildDwsToolProvider(dwsTestConfig, runner)!
