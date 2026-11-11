@@ -64,7 +64,10 @@ describe('task-only finite approval permission',()=>{
 
   it('rejects wildcard scope, relative paths, credential-bearing URLs and writes through read-only authority', async () => {
     const f = await fixture()
-    for (const scope of [{ readPaths: ['../elsewhere'] }, { providerIds: ['*'] }, { networkOrigins: ['https://user:secret@example.com'] }, { networkOrigins: ['https://example.com/private'] }]) {
+    const credentialUrl = new URL('https://example.invalid')
+    credentialUrl.username = 'test-user'
+    credentialUrl.password = 'synthetic-password'
+    for (const scope of [{ readPaths: ['../elsewhere'] }, { providerIds: ['*'] }, { networkOrigins: [credentialUrl.href] }, { networkOrigins: ['https://example.com/private'] }]) {
       await expect(f.service.confirm(f.task.id, { ...await f.request(), scope })).rejects.toThrow()
     }
     f.setWorkspace({ canonicalRoot: f.root, level: 'read-only', revision: 4 })
