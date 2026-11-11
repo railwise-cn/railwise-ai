@@ -221,11 +221,17 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-thirteen-chapters')
     assert.equal(await cdp.evaluate(`Array.from(document.querySelectorAll('a,button')).some(node=>/个人主页|personal homepage/i.test(node.textContent))`), false)
     report.checks.push('personal-homepage-absent')
-    await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
-    await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
-    report.checks.push('offline-help-images')
-    await cdp.click('input[aria-label="搜索帮助"]')
+    // Search before anchor navigation, which can finish an asynchronous
+    // diagram hydration scroll after a previously calculated click point.
+    let searchFocused = false
+    for (let attempt = 0; attempt < 3 && !searchFocused; attempt++) {
+      await cdp.click('input[aria-label="搜索帮助"]')
+      searchFocused = await cdp.evaluate(`document.activeElement?.matches('input[aria-label="搜索帮助"]')`)
+      if (!searchFocused) await sleep(100)
+    }
+    assert.ok(searchFocused, 'The real help search input must receive keyboard focus')
     await cdp.send('Input.insertText', { text: '版本更新' })
+    await cdp.wait(`document.querySelector('input[aria-label="搜索帮助"]')?.value === '版本更新'`, 'the typed search query')
     await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="帮助搜索结果"] button > span:first-child')).some(heading=>heading.textContent==='12. 版本更新')`, 'manual search results')
     await cdp.click('[aria-label="帮助搜索结果"] button', '12. 版本更新')
     await cdp.wait(`!document.querySelector('[aria-label="帮助搜索结果"]') && document.querySelector('[aria-label="用户使用手册"] .write-markdown-preview h2[id="12-版本更新"]')`, 'search result navigation')
@@ -234,6 +240,9 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('offline-help-search-and-navigation')
     const helpScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
     await writeFile(join(evidenceDir, 'windows-help-zh-dark.png'), Buffer.from(helpScreenshot.data, 'base64'))
+    await cdp.click('[aria-label="手册目录"] button', '1.4 现有界面截图')
+    await cdp.wait(`Array.from(document.querySelectorAll('[aria-label="用户使用手册"] img')).some(image=>image.complete && image.naturalWidth>0)`, 'a packaged manual image offline')
+    report.checks.push('offline-help-images')
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
     if (cdp) {
@@ -242,6 +251,8 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
         await writeFile(join(evidenceDir, 'windows-ui-failure.png'), Buffer.from(screenshot.data, 'base64'))
         report.failureObservation = await cdp.evaluate(`({
           helpVisible: Boolean(document.querySelector('[aria-label="用户使用手册"]')),
+          searchValue: document.querySelector('input[aria-label="搜索帮助"]')?.value,
+          focusedElement: {tag:document.activeElement?.tagName,label:document.activeElement?.getAttribute('aria-label')},
           activeMenus: Array.from(document.querySelectorAll('[role="menu"]')).map(menu => menu.getAttribute('aria-label')),
           headings: Array.from(document.querySelectorAll('h1,h2,h3')).map(heading => heading.textContent.trim())
         })`)
