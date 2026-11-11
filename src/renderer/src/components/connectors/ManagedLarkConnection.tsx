@@ -70,6 +70,7 @@ export function ManagedLarkConnection({ onChanged, initialState, initialSkillWar
     }
     setAppRequired(false)
     setLogin(result)
+    setMessage(t('capabilityLoginIncomplete'))
     // Main validates the official URL; no app secret or device code crosses IPC.
     await window.workwise.openExternal(result.verificationUrl)
   }, [api, beginAppSetup, capability, t])
