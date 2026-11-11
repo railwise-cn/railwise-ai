@@ -106,8 +106,10 @@ describe('production official DingTalk runtime assembly', () => {
     const args = { taskId: 'todo-1' }
     const operation = runtime.taskController!.beginToolOperation('synthetic-turn', { callId: 'write', toolName: 'dingtalk_complete_task', providerId: 'dingtalk', arguments: args }, grant)!
     runtime.taskController!.recordToolApproval(operation.token, operation.key, { toolName: 'dingtalk_complete_task', requestHash: createHash('sha256').update(JSON.stringify(args)).digest('hex') })
+    runtime.taskController!.recordToolDispatch(operation.token, operation.key)
     runtime.taskController!.finishToolOperation(operation.token, operation.key)
     const receipt = runtime.taskRepository!.operation(task.id, operation.key)!
+    expect(receipt.status).toBe('outcome_unknown')
     await writeFile(f.configPath, JSON.stringify({ capabilities: { dws: originalDws ? { authState: 'needs_login', executablePath: '/managed/dws' } : dwsTestConfig } }))
     await runtime.refreshDws?.()
     const before = runtime.taskRepository!.get(task.id)!

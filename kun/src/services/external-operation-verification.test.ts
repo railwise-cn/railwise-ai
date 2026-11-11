@@ -7,7 +7,7 @@ import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
 import { createThreadRecord } from '../domain/thread.js'
 import { createTurnRecord } from '../domain/turn.js'
-import { TaskRunRepository } from './task-run-repository.js'
+import { TaskRunRepository, operationFingerprint } from './task-run-repository.js'
 import { TaskController } from './task-controller.js'
 import { ExternalOperationVerificationService } from './external-operation-verification.js'
 import { RequiredEffectSchema } from '../contracts/tasks.js'
@@ -54,7 +54,16 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
     : { taskId: target, instanceId: 'instance-42', ...(operation === 'transfer' ? { toUserId: 'recipient-1' } : {}) }
   const call = { callId: 'write', toolName, providerId: provider === 'lark' ? 'lark-cli' : provider, arguments: args }
   const started = controller.beginToolOperation('turn', call, grant)!
-  if (options.approved !== false) controller.recordToolApproval(started.token, started.key, { toolName, requestHash: createHash('sha256').update(JSON.stringify(args)).digest('hex') })
+  if (options.approved !== false) {
+    controller.recordToolApproval(started.token, started.key, { toolName, requestHash: createHash('sha256').update(JSON.stringify(args)).digest('hex') })
+    controller.recordToolDispatch(started.token, started.key)
+  } else {
+    // Historical receipts did not record the host dispatch boundary or approval proof.
+    const legacy = repository.operation(task.id, started.key)!
+    const { dispatchTracking: _dispatchTracking, ...request } = legacy.request!
+    repository.connection().prepare('UPDATE operation_receipts SET data_json = ? WHERE owner_id = ? AND idempotency_key = ?')
+      .run(JSON.stringify({ ...legacy, request, fingerprint: operationFingerprint(request) }), task.id, started.key)
+  }
   controller.finishToolOperation(started.token, started.key)
   const running = repository.get(task.id)!
   repository.update(task.id, running.revision, current => ({ ...current, status: 'waiting_user' }))
@@ -73,6 +82,7 @@ async function fixture(options: { provider?: 'lark' | 'dingtalk'; operation?: 'c
   const service = new ExternalOperationVerificationService({ repository, controller, threadStore, toolHost, nowIso: () => now,
     workspaceTrust: { get: async () => ({ canonicalRoot: root, level: 'workspace-write', revision: trustRevision }) }, refreshProvider })
   const receipt = repository.operation(task.id, started.key)!
+  expect(receipt.status).toBe('outcome_unknown')
   const input = () => ({ expectedRevision: repository.get(task.id)!.revision, idempotencyKey: 'readback-1' })
   return { root, repository, controller, service, threadStore, task, receipt, target, runner, fetcher, execute, refreshProvider, registry, input, setTrustRevision: (value: number) => { trustRevision = value } }
 }

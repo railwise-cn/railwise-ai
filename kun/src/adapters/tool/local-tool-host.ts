@@ -31,6 +31,7 @@ import {
 import { effectiveApprovalPolicy, sandboxBlockForTool, type SandboxBlock } from './sandbox-policy.js'
 import { defineLocalTool } from './local-tool-definition.js'
 import type { ToolEffectDefinition } from '../../ports/tool-effect.js'
+import { waitForApprovalDecision } from '../../ports/approval-gate.js'
 
 /**
  * A single registered tool. Tools are pure functions that observe the
@@ -200,7 +201,7 @@ export class LocalToolHost implements ToolHost {
         toolName: activeCall.toolName,
         summary: this.buildApprovalSummary(activeCall, context.workspace)
       })
-      const decision = await context.awaitApproval(approval)
+      const decision = await waitForApprovalDecision(() => context.awaitApproval(approval), context.abortSignal)
       if (decision !== 'allow') {
         const item = makeApprovalItem({
           id: `item_${approvalId}`,

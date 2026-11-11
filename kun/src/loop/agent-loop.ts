@@ -19,7 +19,7 @@ import type { CapacityPermit } from '../services/capacity-manager.js'
 import { DEFAULT_APPROVAL_POLICY, DEFAULT_SANDBOX_MODE } from '../contracts/policy.js'
 import type { ThreadStore } from '../ports/thread-store.js'
 import type { SessionStore } from '../ports/session-store.js'
-import type { ApprovalGate } from '../ports/approval-gate.js'
+import { waitForApprovalDecision, type ApprovalGate } from '../ports/approval-gate.js'
 import type { UserInputGate, UserInputResolution } from '../ports/user-input-gate.js'
 import type { UsageService } from '../services/usage-service.js'
 import type { TurnService } from '../services/turn-service.js'
@@ -543,7 +543,7 @@ export class AgentLoop {
         try {
           outcome = await this.loop(threadId, turnId, signal)
         } catch (error) {
-          if (!this.opts.tasks) throw error
+          if (signal.aborted || !this.opts.tasks) throw error
           const message = error instanceof Error ? error.message : String(error)
           await this.opts.events.record({
             kind: 'error',
@@ -646,6 +646,15 @@ export class AgentLoop {
         return status
       }
     } catch (error) {
+      if (signal.aborted) {
+        const reason = typeof signal.reason === 'string' ? signal.reason : 'operation_cancelled'
+        const timedOut = reason === 'turn_total_timeout'
+        if (timedOut) this.opts.tasks?.recordAttemptFailure(threadId, turnId, 'turn_total_timeout', '任务已达到总时长上限。')
+        else this.opts.tasks?.cancel(threadId, reason)
+        const status = timedOut ? 'failed' : 'aborted'
+        await this.opts.turns.finishTurn({ threadId, turnId, status })
+        return status
+      }
       const raw = error instanceof Error ? error.message : String(error)
       // Best-effort enrichment so the renderer can show "what failed where"
       // instead of the bare "RailWise AI turn failed" string. See issue #26.
@@ -672,7 +681,7 @@ export class AgentLoop {
       unregisterExecutionAbort?.()
       clearTimeout(turnTimeout)
       this.opts.tasks?.endRun(turnId)
-      this.opts.approvalGate.expireTurn(turnId, 'turn_finished')
+      this.opts.approvalGate.expireTurn(turnId, signal.reason === 'application_exit' ? 'application_exit' : 'turn_finished')
       await this.finishGoalElapsedTimer(threadId, goalTimer)
       this.autoModelRoutes.delete(autoModelRouteKey(threadId, turnId))
       this.toolStormBreakers.delete(turnId)
@@ -1932,7 +1941,7 @@ export class AgentLoop {
           sandboxMode: input.sandboxMode,
           summary: approval.summary
         })
-        return this.opts.approvalGate.request(approval)
+        return waitForApprovalDecision(() => this.opts.approvalGate.request(approval), input.signal)
       },
       ...(input.userInputDisabled
         ? {}
