@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
-import { buildToolArgumentSummary, sanitizeToolResultOutput, sanitizeTurnItemForPersistence } from './tool-persistence-security.js'
+import { buildToolArgumentSummary, sanitizeRuntimeEventForPersistence, sanitizeToolResultOutput, sanitizeTurnItemForPersistence } from './tool-persistence-security.js'
 
 describe('typed connector evidence persistence', () => {
   it('preserves delivery locator and account evidence while omitting message contents', () => {
@@ -65,5 +65,37 @@ describe('typed connector evidence persistence', () => {
     const item = sanitizeTurnItemForPersistence({ id: 'i', kind: 'approval', turnId: 't', threadId: 'th', approvalId: 'a', toolName: 'lark_approval_approve', summary } as never) as { summary: string }
     expect(item.summary).toContain('External target: task-1')
     expect(item.summary).toContain('Action: approve')
+  })
+
+  it.each([
+    ['dingtalk_approve', 'approve'], ['dingtalk_reject', 'reject'], ['dingtalk_transfer', 'transfer'],
+    ['dingtalk_get_approval', 'detail'], ['dingtalk_get_approval_tasks', 'detail']
+  ])('preserves exact DWS target and instance for %s in confirmation and history', (toolName, action) => {
+    const args = { instanceId: 'synthetic-instance', ...(action !== 'detail' ? { taskId: '104969000001' } : {}),
+      ...(action === 'transfer' ? { toUserId: 'test-recipient' } : {}), remark: 'private approval comment' }
+    const summary = buildToolArgumentSummary({ toolName: toolName!, arguments: args })
+    expect(summary).toContain('Provider: dingtalk')
+    expect(summary).toContain(`Action: ${action}`)
+    expect(summary).toContain(`External target: ${action === 'detail' ? 'synthetic-instance' : '104969000001'}`)
+    if (action !== 'detail') expect(summary).toContain('Approval instance: synthetic-instance')
+    if (action === 'transfer') expect(summary).toContain('Transfer recipient: test-recipient')
+    expect(summary).not.toContain('private approval comment')
+    const approval = sanitizeTurnItemForPersistence({ id: 'dws', kind: 'approval', turnId: 't', threadId: 'th', approvalId: 'a', toolName, summary } as never) as { summary: string }
+    const event = sanitizeRuntimeEventForPersistence({ kind: 'approval_requested', threadId: 'th', turnId: 't', approvalId: 'a', toolName, summary } as never) as { summary: string }
+    expect(approval.summary).toBe(summary)
+    expect(event.summary).toBe(summary)
+    const call = sanitizeTurnItemForPersistence({ id: 'call', kind: 'tool_call', toolName, arguments: args } as never) as { argumentSummary: string }
+    expect(call.argumentSummary).toBe(summary)
+  })
+
+  it('keeps full bounded DWS transfer identifiers beyond the generic summary limit', () => {
+    const instanceId = 'instance-' + 'a'.repeat(503), toUserId = 'user-' + 'b'.repeat(507)
+    const summary = buildToolArgumentSummary({ toolName: 'dingtalk_transfer', arguments: { taskId: '104969000001', instanceId, toUserId, remark: 'private' } })
+    expect(summary.length).toBeGreaterThan(1000)
+    expect(summary).toContain(`Approval instance: ${instanceId}`)
+    expect(summary).toContain(`Transfer recipient: ${toUserId}`)
+    const persisted = sanitizeTurnItemForPersistence({ kind: 'approval', toolName: 'dingtalk_transfer', summary } as never) as { summary: string }
+    expect(persisted.summary).toBe(summary)
+    expect(persisted.summary).not.toContain('private')
   })
 })

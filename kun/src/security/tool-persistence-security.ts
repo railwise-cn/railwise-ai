@@ -12,6 +12,10 @@ const COMMUNICATION_OUTPUT_KEY = /^(?:contents?|texts?|messages?|body|bodies|pro
 const COMMUNICATION_TOOL = /(?:^|[_-])(?:message|send|mail|email|wechat|weixin|feishu|lark|slack|discord|telegram|teams|im|echo)(?:$|[_-])/i
 const TYPED_CONNECTOR_TOOLS = new Set(['lark_task_list', 'lark_task_get', 'lark_task_complete', 'lark_approval_list', 'lark_approval_get', 'lark_approval_approve', 'lark_approval_reject',
   'lark_mail_send', 'lark_mail_send_status', 'lark_im_send', 'lark_im_get_message', 'lark_drive_upload', 'lark_drive_verify_file'])
+const DWS_APPROVAL_ACTIONS = new Map([
+  ['dingtalk_approve', 'approve'], ['dingtalk_reject', 'reject'], ['dingtalk_transfer', 'transfer'],
+  ['dingtalk_get_approval', 'detail'], ['dingtalk_get_approval_tasks', 'detail']
+])
 const CONNECTOR_METADATA = new Set(['provider', 'operation', 'target', 'backend', 'accountFingerprint', 'remoteOperationId', 'resultHash', 'verifiedAt', 'kind', 'status'])
 function safeConnectorId(value: unknown): string | undefined { return typeof value === 'string' && /^[A-Za-z0-9_.:@+-]{1,512}$/.test(value) && redactSecretText(value) === value ? value : undefined }
 const BASH_TOOL = /(?:^|[_-])(?:bash|shell|terminal|command|exec|execute)(?:$|[_-])/i
@@ -97,6 +101,19 @@ export function buildToolArgumentSummary(input: {
       lines.push(`Action ${index + 1}: ${provider} ${operation} ${target}`)
     }
     return boundSummary(lines)
+  }
+  const dwsApprovalAction = DWS_APPROVAL_ACTIONS.get(toolName)
+  if (dwsApprovalAction) {
+    lines.push('Provider: dingtalk', `Action: ${dwsApprovalAction}`)
+    const target = safeConnectorId(args.taskId ?? args.instanceId)
+    const instance = safeConnectorId(args.instanceId)
+    const recipient = toolName === 'dingtalk_transfer' ? safeConnectorId(args.toUserId) : undefined
+    if (target) lines.push(`External target: ${target}`)
+    if (instance && instance !== target) lines.push(`Approval instance: ${instance}`)
+    if (recipient) lines.push(`Transfer recipient: ${recipient}`)
+    lines.push('Parameters: sensitive contents omitted')
+    // All three identifiers are separately bounded. Keep the exact reviewed IDs.
+    return lines.join('\n')
   }
   if (TYPED_CONNECTOR_TOOLS.has(toolName)) {
     lines.push('Provider: lark')
@@ -353,6 +370,8 @@ function normalizeArgumentSummary(toolName: string, summary: string | undefined)
       lines.push(redactSecretText(line))
     } else if (TYPED_CONNECTOR_TOOLS.has(toolName) && (/^Provider: lark$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance): [A-Za-z0-9_.:@+-]{1,512}$/.test(line) || /^(?:Content|Request) SHA256: [a-f0-9]{64}$/.test(line))) {
       lines.push(line)
+    } else if (DWS_APPROVAL_ACTIONS.has(toolName) && (/^Provider: dingtalk$/.test(line) || /^Parameters: sensitive contents omitted$/.test(line) || /^(?:External target|Approval instance|Transfer recipient): [A-Za-z0-9_.:@+-]{1,512}$/.test(line))) {
+      lines.push(redactSecretText(line))
     } else if (/^Target: <(?:workspace|outside-workspace|absolute-path|relative-path-outside-workspace)>/i.test(line)) {
       lines.push(clip(redactSecretText(line), MAX_SAFE_PATH_CHARS + 8))
     } else if (line.startsWith('Command:')) {
@@ -369,6 +388,7 @@ function normalizeArgumentSummary(toolName: string, summary: string | undefined)
     }
   }
   if (lines.length === 1) lines.push('Parameters: omitted from persisted history')
+  if (DWS_APPROVAL_ACTIONS.has(toolName)) return lines.join('\n')
   return boundSummary(lines)
 }
 
