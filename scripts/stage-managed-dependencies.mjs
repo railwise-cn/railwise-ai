@@ -104,8 +104,9 @@ export async function stageManagedDependencies() {
     credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY },
     requestHandler: new NodeHttpHandler({ connectionTimeout: 15_000, requestTimeout: 120_000 }) })
   const directory = await mkdtemp(join(tmpdir(), 'railwise-dependencies-'))
-  const receipt = { schema: 'railwise.dependency-mirror-evidence.v1', sourceHead: process.env.GITHUB_SHA ?? '', manifestSha256: sha(manifestBytes), files: [] }
+  const receipt = { schema: 'railwise.dependency-mirror-evidence.v1', sourceHead: process.env.GITHUB_SHA ?? '', manifestSha256: sha(manifestBytes), stagingId: randomUUID(), status: 'staging', files: [] }
   try {
+    await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)
     await writeFile(join(directory, 'manifest.json'), manifestBytes)
     const downloads = []
     for (const file of manifest.files) {
@@ -122,7 +123,8 @@ export async function stageManagedDependencies() {
     }
     const ssh = websiteStaticTransport.readSshConfig()
     websiteStaticTransport.ensurePublicDownloadAlias(ssh)
-    const remote = `${ssh.root}/dependencies/.deploy-${randomUUID()}/payload`
+    const remote = `${ssh.root}/dependencies/.deploy-${receipt.stagingId}/payload`
+    console.log(`Dependency website staging ${receipt.stagingId}`)
     websiteStaticTransport.runRemote(ssh, 'set -euo pipefail\nmkdir -p -- "$1"\nchmod 700 -- "$1"\n', [remote])
     const transferManifest = join(directory, 'downloads.json')
     const workerPath = join(directory, 'r2-download-worker.py')
@@ -139,8 +141,13 @@ export async function stageManagedDependencies() {
       await checkedBytes(await fetch(url, { signal: AbortSignal.timeout(120_000) }), file)
       receipt.files.push({ id: file.id, url, sha256: file.sha256, size: file.size, verified: true })
     }
+    receipt.status = 'verified'
     await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)
     console.log(`Verified ${receipt.files.length} public dependencies for manifest ${receipt.manifestSha256}`)
+  } catch (error) {
+    receipt.status = 'failed'
+    await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)
+    throw error
   } finally { client.destroy(); await rm(directory, { recursive: true, force: true }) }
 }
 
