@@ -59,6 +59,8 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/verify-exact-updater-evidence.test.mjs',
   'scripts/run-task-delivery-live.mjs',
   'scripts/macos-updater-trust.test.mjs',
+  // Excluded by kun/tsconfig.build.json and the runtime packaging filter.
+  'kun/src/services/task-controller.test.ts',
   'docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md',
   'docs/runtime-architecture.md',
   'website/products/workwise/index.php',

@@ -801,7 +801,7 @@ test('effective version evidence cannot disguise a source-version or installed p
 
 test('package-external policy, test harness and evidence edits can follow the exact package without a second build', t => {
   const f = currentPolicyFixture(t, { exact: true })
-  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/macos-updater-trust.test.mjs', 'docs/runtime-architecture.md', 'website/products/workwise/index.php', 'scripts/workwise-product-public-verification.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
+  for (const path of ['scripts/verify-release-approval.mjs', 'scripts/verify-exact-updater-evidence.mjs', 'scripts/run-task-delivery-live.mjs', 'scripts/macos-updater-trust.test.mjs', 'kun/src/services/task-controller.test.ts', 'docs/runtime-architecture.md', 'website/products/workwise/index.php', 'scripts/workwise-product-public-verification.test.mjs', 'openspec/changes/durable-task-document-workbench/tasks.md']) f.put(path, 'package-external correction\n')
   const policyHead = f.commit('record nonshipped policy and evidence harness changes')
   f.manifest.checks.requiredCI.workflowRun.sourceHead = policyHead
   f.manifest.checks.focusedTests.sourceHead = policyHead
@@ -810,7 +810,7 @@ test('package-external policy, test harness and evidence edits can follow the ex
 })
 
 test('exact build still rejects every later application or packaging edit', async t => {
-  for (const path of ['src/runtime.js', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', '.github/workflows/release.yml']) await t.test(path, t => {
+  for (const path of ['src/runtime.js', 'kun/src/services/task-controller.ts', 'kun/src/other.test.ts', 'package.json', 'electron-builder.cjs', 'scripts/before-pack.cjs', '.github/workflows/release.yml']) await t.test(path, t => {
     const f = currentPolicyFixture(t, { exact: true })
     f.put(path, path === 'package.json' ? JSON.stringify({ version: '0.5.5', changed: true }) : 'changed application/build inputs\n')
     f.commit('change package inputs after build'); f.recordEvidence()
