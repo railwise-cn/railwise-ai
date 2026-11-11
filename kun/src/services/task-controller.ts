@@ -184,6 +184,10 @@ export class TaskController {
       if (!['failed', 'cancelled'].includes(source.status) || source.threadId !== input.thread.id || source.workspaceRoot !== input.thread.workspace ||
           this.repository.currentExecution(source.id)?.id !== source.id) throw Object.assign(new Error('Retry source is no longer the terminal execution in this workspace.'), { code: 'invalid_state' })
       const retry = this.createTask({ ...input, retrySource: source })
+      if (retry.flowRunId && retry.flowId) this.repository.enqueueOutbox({
+        id: `flow-task-retry:${retry.id}`, ownerId: retry.id, kind: 'flow_task_retry',
+        payload: { sourceTaskId: source.id, taskId: retry.id, flowRunId: retry.flowRunId, flowId: retry.flowId }, createdAt: this.nowIso()
+      })
       return this.repository.update(retry.id, retry.revision, task => task,
         { key: `retry-of:${source.id}`, kind: 'task_retried', payload: { retryOfTaskId: source.id, rootTaskId: retry.rootTaskId }, createdAt: this.nowIso() })
     })

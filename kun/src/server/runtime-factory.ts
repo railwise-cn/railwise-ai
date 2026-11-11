@@ -61,7 +61,7 @@ import { buildCoreFlowAdapters } from '../flow/core-adapters.js'
 import { buildFlowNodeRegistry } from '../flow/node-registry.js'
 import { FlowRepository } from '../flow/repository.js'
 import { FlowRuntimeService } from '../flow/service.js'
-import { buildTaskDeliveryAdapters, TaskDeliveryCoordinator } from '../delivery/runtime.js'
+import { assertFlowTaskRetryAllowed, buildTaskDeliveryAdapters, TaskDeliveryCoordinator } from '../delivery/runtime.js'
 import { EncryptedFileFlowSecretStore, FlowWebhookSecurity, UnavailableFlowSecretStore } from '../flow/webhook-security.js'
 import type { ApprovalPolicy, SandboxMode } from '../contracts/policy.js'
 import type { ExecutionScope } from '../contracts/permissions.js'
@@ -839,7 +839,7 @@ export async function createKunServeRuntime(
     toolHost,
     validateTaskPermission: threadId => taskPermissionService.executionRestriction(threadId)
   })
-  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>delegationRuntime?.abortParent(threadId,reason),preflightExternalTask:externalPreflight,validateTaskPermission:threadId=>taskPermissionService.executionRestriction(threadId),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
+  const taskControlService=new TaskControlService({repository:taskRepository,tasks:taskController,threads:threadService,turns:turnService,runTurn:(threadId,turnId)=>loop.runTurn(threadId,turnId),cancelChildRuns:(threadId,reason)=>delegationRuntime?.abortParent(threadId,reason),preflightExternalTask:externalPreflight,validateTaskPermission:threadId=>taskPermissionService.executionRestriction(threadId),assertRetryContext:task=>assertFlowTaskRetryAllowed(runtimeRef!,task),isEngineeringTask:async task=>Boolean(task.engineeringPlanId || engineeringAi.planForTask(task.threadId,task.id) || (await threadService.get(task.threadId))?.turns.find(turn=>turn.id===task.activeTurnId)?.engineeringExecution),nowIso})
   const taskCoordinator = new TaskCoordinator({ preflightExternalTask:externalPreflight, controls:taskControlService, repository: taskRepository, threads: threadService, threadStore, turns: turnService, tasks: taskController, context: taskContextRuntime,attachments:attachmentStore,
     async classifyIntent(text, task) {
       const abort = new AbortController()

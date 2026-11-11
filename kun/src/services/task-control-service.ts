@@ -17,7 +17,7 @@ export type TaskControlResult = { task:TaskRun; turn?:StartTurnResponse; capabil
 /** One deterministic mutation path for chat commands and the task HTTP API. */
 export class TaskControlService {
   private readonly pending = new Map<string,Promise<unknown>>()
-  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string):Promise<unknown>;nowIso():string}) {}
+  constructor(private readonly deps:{repository:TaskRunRepository;tasks:TaskController;threads:ThreadService;turns:TurnService;runTurn(threadId:string,turnId:string):unknown;cancelChildRuns?(threadId:string,reason:string):unknown;isEngineeringTask?(task:TaskRun):Promise<boolean>;preflightExternalTask?:ExternalTaskPreflight;validateTaskPermission?(threadId:string):Promise<unknown>;assertRetryContext?(task:TaskRun):void;nowIso():string}) {}
 
   async mutate(taskId:string, action:TaskControlAction, data:TaskControlRequest):Promise<TaskControlResult> {
     const previous=this.pending.get(taskId) ?? Promise.resolve()
@@ -71,6 +71,7 @@ export class TaskControlService {
     let preparedRetryId:string|undefined
     let preparedResume:{previous:TaskRun;revision:number}|undefined
     try {
+      if(action==='retry')this.deps.assertRetryContext?.(current)
       if(action==='pause'||action==='cancel') {
         const reason=data.reason ?? (action==='pause'?'用户暂停了任务。':'用户取消了任务。')
         const result=repository.transact(()=>{

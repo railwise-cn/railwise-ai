@@ -31,7 +31,7 @@ async function executeFlowTask(runtime: ServerRuntime, context: FlowAdapterConte
   const reference = operation.operation.result as { taskId?: string } | undefined
   // Old delivery tasks used their origin as the execution thread. Keep their IDs and recovery path.
   const previous = reference?.taskId ? tasks.get(reference.taskId) : tasks.list({ threadId: originId, limit: 1 })[0]
-  if (previous) return flowTaskResult(runtime, previous)
+  if (previous) return flowTaskResult(runtime, currentFlowTask(runtime, previous, run.id, definition.id))
 
   let origin = await runtime.threadService.get(originId)
   if (!origin) {
@@ -76,6 +76,26 @@ async function executeFlowTask(runtime: ServerRuntime, context: FlowAdapterConte
   return flowTaskResult(runtime, tasks.get(result.task.id) ?? result.task)
 }
 
+/** Follow retries only within the exact persisted Flow/root/thread association. */
+function currentFlowTask(runtime: ServerRuntime, reference: TaskRun, runId: string, flowId: string): TaskRun {
+  const current = runtime.taskRepository!.currentExecution(reference.id)
+  if (!current || (reference.flowRunId && reference.flowRunId !== runId) || (reference.flowId && reference.flowId !== flowId) ||
+      current.threadId !== reference.threadId || current.workspaceRoot !== reference.workspaceRoot ||
+      (current.rootTaskId ?? current.id) !== (reference.rootTaskId ?? reference.id) ||
+      (current.id !== reference.id && (current.flowRunId !== runId || current.flowId !== flowId))) {
+    throw Object.assign(new Error('Task retry does not belong to this Flow execution.'), { code: 'flow_task_scope_conflict' })
+  }
+  return current
+}
+
+export function assertFlowTaskRetryAllowed(runtime: ServerRuntime, task: TaskRun): void {
+  if (!task.flowRunId) return
+  const flow = runtime.flowService?.repository.getRun(task.flowRunId)
+  if (!flow || flow.flowId !== task.flowId) throw Object.assign(new Error('The task Flow association is unavailable.'), { code: 'flow_task_scope_conflict' })
+  if (flow.status === 'cancelled') throw Object.assign(new Error('流程已取消，请从明确的新任务重新开始。'), { code: 'flow_cancelled' })
+  if (flow.status === 'succeeded') throw Object.assign(new Error('The Flow has already completed.'), { code: 'invalid_state' })
+}
+
 function flowTaskResult(runtime: ServerRuntime, task: TaskRun) {
   if (task.status === 'completed') {
     const verification = task.templateId ? verifyTaskDelivery(runtime.taskRepository!, task) : { complete: true, reasons: [], files: [] }
@@ -106,12 +126,14 @@ export class TaskDeliveryCoordinator {
     const service = this.runtime.flowService
     try {
       await service.flushSourceEvents()
+      this.restoreRetriedFlowTasks()
       await this.resumeDurableHumanAnswers()
       for (const message of service.repository.pendingOutbox('delivery_task')) {
         const reference = message.payload as { taskId: string; threadId: string; turnId: string }
-        const task = this.runtime.taskRepository.get(reference.taskId)
+        const original = this.runtime.taskRepository.get(reference.taskId)
         const flow = service.repository.getRun(message.ownerId)
-        if (!task || !flow) continue
+        if (!original || !flow) continue
+        const task = currentFlowTask(this.runtime, original, flow.id, flow.flowId)
         if (flow.status === 'cancelled') {
           if (!['completed', 'failed', 'cancelled'].includes(task.status)) {
             this.runtime.cancelChildRuns?.(task.threadId, '流程已取消')
@@ -119,6 +141,8 @@ export class TaskDeliveryCoordinator {
             const latest = this.runtime.taskRepository.get(task.id)
             if (latest && !['completed', 'failed', 'cancelled'].includes(latest.status)) this.runtime.taskController?.cancelTask(latest.id, latest.revision, '流程已取消')
           }
+          service.repository.acknowledgeOutbox(message.id)
+        } else if (flow.status === 'succeeded') {
           service.repository.acknowledgeOutbox(message.id)
         } else if (task.status === 'queued' && task.activeTurnId &&
           (flow.status === 'running' || flow.status === 'paused' && flow.checkpoint?.reason === 'task')) {
@@ -147,6 +171,41 @@ export class TaskDeliveryCoordinator {
       // Keep the outbox for the next tick; no accepted work or callback is discarded.
       process.stderr.write(`[delivery] ${error instanceof Error ? error.message : String(error)}\n`)
     } finally { this.busy = false }
+  }
+
+  /** Task creation and its retry intent commit together. Cross-database delivery is idempotent. */
+  private restoreRetriedFlowTasks(): void {
+    const tasks = this.runtime.taskRepository!, flows = this.runtime.flowService!.repository
+    for (const message of tasks.pendingOutbox('flow_task_retry')) {
+      const { taskId, sourceTaskId, flowRunId, flowId } = message.payload
+      if (typeof taskId !== 'string' || typeof sourceTaskId !== 'string' || typeof flowRunId !== 'string' || typeof flowId !== 'string') {
+        throw new Error('Invalid persisted Flow task retry.')
+      }
+      const retry = tasks.get(taskId), source = tasks.get(sourceTaskId)
+      if (!retry || !source || retry.retryOfTaskId !== source.id || retry.flowRunId !== flowRunId || retry.flowId !== flowId ||
+          source.flowRunId !== flowRunId || source.flowId !== flowId) throw new Error('Flow retry source association changed.')
+      const current = currentFlowTask(this.runtime, source, flowRunId, flowId)
+      flows.transaction(() => {
+        const flow = flows.getRun(flowRunId)
+        if (!flow || flow.flowId !== flowId) throw new Error('Flow retry run association changed.')
+        if (flow.status === 'succeeded') return
+        if (flow.status === 'failed') {
+          const failedTaskId = (flow.output as { taskId?: unknown } | undefined)?.taskId
+          const failedTask = typeof failedTaskId === 'string' ? tasks.get(failedTaskId) : null
+          if (!failedTask || flow.checkpoint?.reason !== 'task' ||
+              currentFlowTask(this.runtime, failedTask, flow.id, flow.flowId).id !== current.id) {
+            throw new Error('The Flow failed outside this task; its failure remains authoritative.')
+          }
+          flows.saveRun({ ...flow, status: 'paused', output: undefined, completedAt: undefined,
+            checkpoint: { ...flow.checkpoint, taskId: current.id, threadId: current.threadId }, updatedAt: this.runtime.nowIso() })
+        }
+        // Cancelled runs keep their status. The normal delivery consumer cancels
+        // any still-active retry if cancellation raced with retry preparation.
+        flows.enqueueOutbox(`delivery-task-retry:${current.id}`, flow.id, 'delivery_task',
+          { taskId: current.id, threadId: current.threadId, turnId: current.activeTurnId })
+      })
+      tasks.acknowledgeOutbox(message.id, this.runtime.nowIso())
+    }
   }
 
   /**
