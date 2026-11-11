@@ -22,10 +22,28 @@ const CANVAS_NATIVE_TARGETS = {
   'linux-x64': 'canvas-linux-x64-gnu'
 }
 
-function canvasRuntimePackages(platform = process.platform, arch = process.env.WORKWISE_SIDECAR_ARCH || process.arch) {
+function canvasRuntimePackages(platform = process.platform, arch = process.arch) {
   const native = CANVAS_NATIVE_TARGETS[`${platform}-${arch}`]
   if (!native) throw new Error(`[canvas-packaging] Unsupported target ${platform}-${arch}.`)
   return CANVAS_ROOTS.flatMap(prefix => [`${prefix}@napi-rs/canvas`, `${prefix}@napi-rs/${native}`])
+}
+
+function runtimeFileSet(name, include) {
+  return {
+    from: `node_modules/${name}`, to: `node_modules/${name}`,
+    filter: [...include, ...dependencyArtifactFilters(), '!**/*.map', '!**/*.d.ts', '!**/*.ts',
+      '!**/tsconfig*.json', '!**/README*', '!**/CHANGELOG*']
+  }
+}
+
+function canvasNativePackageFiles(platform) {
+  const patterns = {
+    darwin: 'canvas-darwin-${arch}',
+    win32: 'canvas-win32-${arch}-msvc',
+    linux: 'canvas-linux-${arch}-gnu'
+  }
+  if (!patterns[platform]) throw new Error(`[canvas-packaging] Unsupported platform ${platform}.`)
+  return CANVAS_ROOTS.map(prefix => runtimeFileSet(`${prefix}@napi-rs/${patterns[platform]}`, ['**/*']))
 }
 
 function canvasLockEntry(lock, name) {
@@ -146,26 +164,19 @@ function canvasSmokeScript(resourcesDirectory, root = resolve(__dirname, '..')) 
 }
 
 function explicitRuntimePackageFiles() {
-  const exclusions = [
-    ...dependencyArtifactFilters(), '!**/*.map', '!**/*.d.ts', '!**/*.ts',
-    '!**/tsconfig*.json', '!**/README*', '!**/CHANGELOG*'
-  ]
-  const fileSet = (name, include) => ({
-    from: `node_modules/${name}`, to: `node_modules/${name}`, filter: [...include, ...exclusions]
-  })
   return [
-    ...EXPLICIT_RUNTIME_PACKAGES.map(name => fileSet(name, ['**/*'])),
+    ...EXPLICIT_RUNTIME_PACKAGES.map(name => runtimeFileSet(name, ['**/*'])),
     // electron-builder 26.8.1 omits optional peer dependencies from its graph.
     // Preserve both PPT callers' nested canvas versions and their native loader.
-    ...canvasRuntimePackages().map(name => fileSet(name, ['**/*'])),
-    fileSet('katex', ['package.json', 'LICENSE', 'dist/**/*']),
-    fileSet('mermaid', ['package.json', 'LICENSE']),
-    fileSet('markdown-it-footnote', ['package.json', 'LICENSE', 'index.mjs', 'dist/index.cjs.js'])
+    ...CANVAS_ROOTS.map(prefix => runtimeFileSet(`${prefix}@napi-rs/canvas`, ['**/*'])),
+    runtimeFileSet('katex', ['package.json', 'LICENSE', 'dist/**/*']),
+    runtimeFileSet('mermaid', ['package.json', 'LICENSE']),
+    runtimeFileSet('markdown-it-footnote', ['package.json', 'LICENSE', 'index.mjs', 'dist/index.cjs.js'])
   ]
 }
 
 module.exports = {
   explicitRuntimePackageFiles, EXPLICIT_RUNTIME_PACKAGES, OFFLINE_RENDERING_PACKAGES, RUNTIME_ENTRY_ASSETS,
-  CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasLockEntry, ensureCanvasRuntimePackages,
+  CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasNativePackageFiles, canvasLockEntry, ensureCanvasRuntimePackages,
   verifyCanvasRuntimePackages, verifyPackagedCanvas, canvasSmokeScript
 }

@@ -8,7 +8,7 @@ const config = require('../electron-builder.cjs')
 const { PACKAGES, ASSETS } = require('./verify-packaged-markdown-rendering.cjs')
 const { markdownPackageFileSets, verifyCollectedMarkdownFiles } = require('./verify-markdown-packaging-filesets.cjs')
 const { EXPLICIT_RUNTIME_PACKAGES, OFFLINE_RENDERING_PACKAGES, RUNTIME_ENTRY_ASSETS } = require('./runtime-package-packaging.cjs')
-const { CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasLockEntry, verifyCanvasRuntimePackages, ensureCanvasRuntimePackages, verifyPackagedCanvas, canvasSmokeScript } = require('./runtime-package-packaging.cjs')
+const { CANVAS_NATIVE_TARGETS, canvasRuntimePackages, canvasNativePackageFiles, canvasLockEntry, verifyCanvasRuntimePackages, ensureCanvasRuntimePackages, verifyPackagedCanvas, canvasSmokeScript } = require('./runtime-package-packaging.cjs')
 
 function collectedFixture() {
   const root = resolve('/runtime-source')
@@ -85,7 +85,7 @@ function canvasFixture(platform, arch) {
 }
 
 test('canvas FileSets retain root and both PPT peer versions at their original runtime paths', () => {
-  for (const name of canvasRuntimePackages()) {
+  for (const name of canvasRuntimePackages().filter(name => name.endsWith('/canvas'))) {
     const path = `node_modules/${name}`
     const sets = config.files.filter(entry => typeof entry === 'object' && entry.from === path)
     assert.equal(sets.length, 1)
@@ -98,6 +98,30 @@ test('canvas FileSets retain root and both PPT peer versions at their original r
   assert(smoke.includes('createCanvas(8, 8)'))
   assert(smoke.includes('"version":"0.1.100"'))
   assert(smoke.includes('"version":"1.1.0"'))
+})
+
+test('canvas native FileSets select the build target architecture without an environment override', () => {
+  const originalArch = process.env.WORKWISE_SIDECAR_ARCH
+  delete process.env.WORKWISE_SIDECAR_ARCH
+  try {
+    for (const target of Object.keys(CANVAS_NATIVE_TARGETS)) {
+      const [platform, arch] = target.split('-')
+      const key = platform === 'darwin' ? 'mac' : platform === 'win32' ? 'win' : 'linux'
+      assert.deepEqual(config[key].files, canvasNativePackageFiles(platform))
+      const actual = config[key].files.map(entry => ({ ...entry,
+        from: entry.from.replaceAll('${arch}', arch), to: entry.to.replaceAll('${arch}', arch) }))
+      assert.deepEqual(actual.map(entry => entry.from), canvasRuntimePackages(platform, arch)
+        .filter(name => !name.endsWith('/canvas')).map(name => `node_modules/${name}`))
+      assert(actual.every(entry => entry.to === entry.from))
+    }
+    const sameConfig = canvasNativePackageFiles('darwin')
+    assert(sameConfig.every(entry => entry.from.includes('${arch}')))
+    assert(sameConfig.every(entry => entry.from.replaceAll('${arch}', 'x64').includes('canvas-darwin-x64')))
+    assert(sameConfig.every(entry => entry.from.replaceAll('${arch}', 'arm64').includes('canvas-darwin-arm64')))
+  } finally {
+    if (originalArch === undefined) delete process.env.WORKWISE_SIDECAR_ARCH
+    else process.env.WORKWISE_SIDECAR_ARCH = originalArch
+  }
 })
 
 test('canvas package verification covers target bindings and rejects root-version fallback', () => {

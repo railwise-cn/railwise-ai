@@ -6,7 +6,7 @@ const { verifyCandidateSourceTree } = require('./scripts/candidate-source-proven
 const { markitdownResourceFilter } = require('./scripts/markitdown-packaging-policy.cjs')
 const { agentPackResourceFilter, asarBlockedSkillFilters } = require('./scripts/specialist-skill-audit.cjs')
 const { dependencyArtifactFilters } = require('./scripts/dependency-artifact-policy.cjs')
-const { explicitRuntimePackageFiles } = require('./scripts/runtime-package-packaging.cjs')
+const { explicitRuntimePackageFiles, canvasNativePackageFiles } = require('./scripts/runtime-package-packaging.cjs')
 
 // Keep these paths absolute. electron-builder resolves hook configuration from
 // its own process context, and a relative entitlements path can silently fall
@@ -290,6 +290,7 @@ const builderConfig = {
   afterPack: './scripts/after-pack.cjs',
   afterSign: './scripts/mac-notarize.cjs',
   mac: {
+    files: canvasNativePackageFiles('darwin'),
     category: 'public.app-category.developer-tools',
     identity: hasExplicitMacSigningIdentity ? undefined : null,
     // We notarize in scripts/mac-notarize.cjs so APPLE_API_KEY_BASE64 can be supported.
@@ -310,6 +311,7 @@ const builderConfig = {
     sign: hasExplicitMacSigningIdentity
   },
   win: {
+    files: canvasNativePackageFiles('win32'),
     icon: './src/asset/img/workwise.ico',
     target: [{ target: 'nsis', arch: ['x64'] }]
   },
@@ -327,6 +329,7 @@ const builderConfig = {
     deleteAppDataOnUninstall: false
   },
   linux: {
+    files: canvasNativePackageFiles('linux'),
     category: 'Development',
     icon: './src/asset/img/workwise.png',
     target: [{ target: 'AppImage', arch: ['x64'] }]
