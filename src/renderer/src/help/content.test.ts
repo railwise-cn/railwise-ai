@@ -22,6 +22,20 @@ describe('bundled user help', () => {
     expect(helpDocuments[helpResource(HELP_HOME, './SURVEY_AI_GUIDE.zh-CN.md')!.path]).toContain('Survey')
   })
 
+  it('keeps chapter search navigation with Windows checkout line endings', () => {
+    const original = helpDocuments[HELP_HOME]
+    try {
+      helpDocuments[HELP_HOME] = original.replace(/\r?\n/g, '\r\n')
+      const matches = searchHelp('版本更新').filter(result => result.document === HELP_HOME)
+      expect(matches).toEqual(expect.arrayContaining([
+        expect.objectContaining({ heading: '12. 版本更新', anchor: '12-版本更新', excerpt: '## 12. 版本更新' })
+      ]))
+      expect(matches.every(result => !result.heading.includes('\r') && !result.excerpt.includes('\r'))).toBe(true)
+    } finally {
+      helpDocuments[HELP_HOME] = original
+    }
+  })
+
   it('keeps the packaged resource boundary when resolving links', () => {
     expect(helpResource(HELP_HOME, '../secret.md')).toBeUndefined()
     expect(helpResource(HELP_HOME, 'file:///private/account.json')).toBeUndefined()

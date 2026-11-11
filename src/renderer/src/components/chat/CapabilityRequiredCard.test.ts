@@ -133,7 +133,7 @@ describe('capability waiting card', () => {
   })
 
   it('keeps login and resume separate and resumes the original persisted task', async () => {
-    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/authorize', userCode: 'SYNTHETIC', expiresAt: '2026-11-11T00:00:00Z' })
+    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/authorize', userCode: 'SYNTHETIC', expiresAt: new Date(Date.now() + 600_000).toISOString() })
     api.completeManagedLarkLogin.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'installed' } })
     api.coordinateTaskCommand.mockResolvedValue({ kind: 'task_started', task: { id: 'task-original' } })
     await render()
@@ -173,7 +173,7 @@ describe('capability waiting card', () => {
 
   it('offers official app scan setup first and keeps app setup, user login and task execution separate', async () => {
     api.beginManagedLarkLogin.mockResolvedValue({ ok: false, reason: 'app_configuration_required', message: 'App is not configured' })
-    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://open.feishu.cn/device', expiresAt: '2026-11-11T00:00:00Z' })
+    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://open.feishu.cn/device', expiresAt: new Date(Date.now() + 600_000).toISOString() })
     api.checkManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'configured' })
     await render()
     await click('登录并授权飞书')

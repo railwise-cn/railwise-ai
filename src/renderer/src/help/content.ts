@@ -77,7 +77,7 @@ export function searchHelp(query: string): HelpSearchResult[] {
     let heading = document
     const occurrences = new Map<string, number>()
     let anchor = ''
-    for (const line of body.split('\n')) {
+    for (const line of body.split(/\r\n?|\n/)) {
       const title = /^#{1,6}\s+(.+)$/.exec(line)
       if (title) {
         heading = title[1]
