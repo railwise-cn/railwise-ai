@@ -51,7 +51,7 @@ describe('task surface translations', () => {
     expect(keys.length).toBeGreaterThan(80)
     for (const key of keys) {
       expect(instance.exists(key), key).toBe(true)
-      const label = instance.t(key, { count: 2, completed: 1, total: 3, at: '2026-11-10 18:00' })
+      const label = instance.t(key, { count: 2, completed: 1, total: 3, at: '2026-11-10 18:00', model: 'synthetic-model' })
       expect(label, key).not.toBe(key)
       expect(label.trim(), key).not.toBe('')
       expect(label, key).not.toMatch(/\{\{/)
