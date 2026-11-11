@@ -1,8 +1,9 @@
 import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import type { InstalledPackageV1, MarketplacePackageV1, PluginUpdateDiagnosticV1 } from '@shared/marketplace'
+import { currentMcpConnectionCheck, mcpToolDiscoveryPassed } from '@shared/mcp-connection-check'
 
 export type MarketplacePackageStatus = {
-  state: 'available' | 'installed' | 'configuration' | 'configured_unverified' |
+  state: 'available' | 'installed' | 'configuration' | 'configured_unverified' | 'connection_checked' | 'connection_failed' |
     'unavailable' | 'installed_unavailable' | 'source_unavailable' | 'installed_source_unavailable' |
     'runtime_drift' | 'metadata_refresh' | 'update_available'
   tone: 'success' | 'attention' | 'neutral'
@@ -36,6 +37,9 @@ export function marketplacePackageStatus(
   }
   if (diagnostic?.state === 'runtime-drift') return { state: 'runtime_drift', tone: 'attention' }
   if (marketplaceNeedsConfiguration(item, record, server)) return { state: 'configuration', tone: 'attention' }
+  const check = currentMcpConnectionCheck(server)
+  if (mcpToolDiscoveryPassed(server)) return { state: 'connection_checked', tone: 'success' }
+  if (check && (check.state !== 'connected' || !check.authorized)) return { state: 'connection_failed', tone: 'attention' }
   // Install health validates package files, not the remote account, token lifetime, or granted scopes.
   if (added && (item.auth.type === 'oauth' || item.auth.type === 'token')) {
     return { state: 'configured_unverified', tone: 'neutral' }

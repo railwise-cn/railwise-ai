@@ -2,6 +2,8 @@
   "title": "设置",
   "pluginAvailableToInstall": "可安装",
   "pluginConfiguredUnverified": "已配置 · 待验证授权",
+  "pluginConnectionChecked": "连接检查通过（{{count}} 项工具）",
+  "pluginConnectionFailed": "连接检查未通过",
   "pluginInstalledUnavailable": "已安装 · 当前不可用",
   "pluginInstalledSourceUnavailable": "已安装 · 来源不可用",
   "pluginInstallationHealth": "安装完整性",

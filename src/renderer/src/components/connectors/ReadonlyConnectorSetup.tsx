@@ -3,6 +3,7 @@ import { ExternalLink, Loader2, X } from 'lucide-react'
 import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import type { MarketplaceCatalogPackageEntryV1 } from '@shared/marketplace'
 import { AMAP_READ_TOOLS } from '@shared/engineering-marketplace'
+import { currentMcpConnectionCheck, mcpToolDiscoveryPassed } from '@shared/mcp-connection-check'
 
 export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }: {
   entry: MarketplaceCatalogPackageEntryV1
@@ -27,7 +28,12 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
   }, [onClose])
   useEffect(() => {
     let active = true
-    void window.workwise.listMcpServers().then(servers => { if (active) setServer(servers.find(item => item.id === serverId)) })
+    void window.workwise.listMcpServers().then(servers => {
+      if (!active) return
+      const current = servers.find(item => item.id === serverId)
+      setServer(current)
+      setConnected(mcpToolDiscoveryPassed(current))
+    })
       .catch(() => { if (active) setMessage('读取连接配置失败，请重试。') })
     return () => { active = false }
   }, [serverId])
@@ -52,8 +58,11 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
       if (!current) throw new Error('请先安装连接器。')
       if (current.managedPreset !== (amap ? 'amap-readonly' : 'zotero-readonly')) throw new Error('同名的已有配置已保留，请在高级 MCP 设置中管理。')
       const result = await window.workwise.testMcpServer(serverId, current.workspaceRoot)
-      setConnected(result.state === 'connected' && result.authorized)
-      setMessage(result.message ?? (result.state === 'connected' ? '已连接。' : '连接尚未就绪。'))
+      const updated = (await window.workwise.listMcpServers()).find(item => item.id === serverId)
+      setServer(updated)
+      setConnected(mcpToolDiscoveryPassed(updated))
+      setMessage(result.state === 'connected' && result.authorized ? '' : result.message ?? '连接尚未就绪。')
+      await onChanged()
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setBusy(false) }
   }
@@ -66,11 +75,14 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
       if (!current) throw new Error('连接配置已变化，请重新打开详情。')
       const saved = await window.workwise.saveMcpServer({ config: { ...current, enabled: !server.enabled }, expectedRevision: current.revision, idempotencyKey: crypto.randomUUID() })
       setServer(saved)
+      setConnected(mcpToolDiscoveryPassed(saved))
+      setMessage(saved.enabled ? '已启用只读工具。' : '已停用，重新启用前请检查连接。')
       await onChanged()
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setBusy(false) }
   }
 
+  const checkEvidence = currentMcpConnectionCheck(server)
   return <div className="ds-connector-overlay fixed inset-0 z-40 bg-black/30" onMouseDown={event => { if (event.currentTarget === event.target) onClose() }}>
     <aside role="dialog" aria-modal="true" aria-label={entry.package.name} className="absolute inset-y-0 right-0 w-full max-w-[600px] overflow-y-auto border-l border-ds-border bg-ds-card p-5 shadow-xl">
       <header className="flex items-center justify-between"><h2 className="text-base font-semibold">{entry.package.name}</h2><button ref={closeRef} type="button" onClick={onClose} aria-label="关闭连接详情" className="rounded p-2 hover:bg-ds-hover"><X className="h-4 w-4" /></button></header>
@@ -88,6 +100,11 @@ export function ReadonlyConnectorSetup({ entry, onClose, onInstall, onChanged }:
         {server ? <button type="button" disabled={busy || (!server.enabled && !connected)} onClick={() => void toggle()} className="rounded-md border border-ds-border px-4 py-2 text-sm hover:bg-ds-hover disabled:opacity-50">{server.enabled ? '停用' : '启用只读工具'}</button> : null}
       </div>
       <p className="mt-3 text-xs leading-5 text-ds-muted">检查连接后启用工具，再从原任务选择继续。</p>
+      {checkEvidence ? <div className="mt-4 rounded-lg border border-ds-border p-3 text-sm leading-6">
+        <p role="status">{mcpToolDiscoveryPassed(server) ? `连接检查通过（${checkEvidence.toolCount} 项工具）` : '连接检查未通过'}</p>
+        <time dateTime={checkEvidence.checkedAt} className="text-xs text-ds-muted">{new Date(checkEvidence.checkedAt).toLocaleString()}</time>
+        <p className="text-xs text-ds-muted">业务调用结果见任务详情中的操作回执。</p>
+      </div> : null}
       {message ? <p role="status" className="mt-4 rounded-lg border border-ds-border p-3 text-sm leading-6">{message}</p> : null}
     </aside>
   </div>

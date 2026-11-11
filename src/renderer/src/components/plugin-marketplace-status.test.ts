@@ -52,4 +52,18 @@ describe('marketplace package readiness', () => {
     const managed = { ...item, installation: { mode: 'system-managed', installedByDefault: true }, auth: { type: 'tool-managed', provider: 'managed-service' } } as MarketplacePackageV1
     expect(marketplacePackageStatus(managed)).toEqual({ state: 'installed', tone: 'success' })
   })
+
+  it('projects actual tool discovery, invalidates stale evidence and keeps transport-only checks unverified', () => {
+    const authenticated = { ...item, auth: { type: 'token' } } as MarketplacePackageV1
+    const verified: McpServerConfigV2 = { ...server, revision: 2, connectionCheck: {
+      serverRevision: 2, credentialRefId: server.credentialRef!.id, configurationHash: 'a'.repeat(64),
+      checkedAt: '2026-11-12T01:02:03.000Z', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11
+    } }
+    expect(marketplacePackageStatus(authenticated, installed, verified)).toEqual({ state: 'connection_checked', tone: 'success' })
+    expect(marketplacePackageStatus(authenticated, installed, { ...verified, revision: 3 }).state).toBe('configured_unverified')
+    expect(marketplacePackageStatus(authenticated, installed, { ...verified, credentialRef: { id: 'replacement', storage: 'keychain' } }).state).toBe('configured_unverified')
+    expect(marketplacePackageStatus(authenticated, installed, { ...verified, enabled: false }).state).toBe('configuration')
+    expect(marketplacePackageStatus(authenticated, installed, { ...verified, connectionCheck: { ...verified.connectionCheck!, verification: undefined } }).state).toBe('configured_unverified')
+    expect(marketplacePackageStatus(authenticated, installed, { ...verified, connectionCheck: { ...verified.connectionCheck!, state: 'error', authorized: false } })).toEqual({ state: 'connection_failed', tone: 'attention' })
+  })
 })

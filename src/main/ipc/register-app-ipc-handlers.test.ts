@@ -439,6 +439,20 @@ describe('registerAppIpcHandlers', () => {
     expect(runtimeRequest).not.toHaveBeenCalled()
   })
 
+  it('forwards real MCP check evidence and rejects renderer-injected verification fields', async () => {
+    const result = { id: 'amap', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11, checkedAt: '2026-11-12T01:02:03.000Z' }
+    const mcpConfigService = { test: vi.fn(async () => result), save: vi.fn() }
+    const { registerAppIpcHandlers } = await import('./register-app-ipc-handlers')
+    registerAppIpcHandlers(registerOptions({ mcpConfigService: mcpConfigService as never }))
+    await expect(handlers.get('mcp-server:test')?.({}, { serverId: 'amap' })).resolves.toEqual(result)
+    expect(mcpConfigService.test).toHaveBeenCalledWith('amap', undefined)
+    await expect(handlers.get('mcp-server:save')?.({}, {
+      config: { id: 'amap', name: 'Amap', scope: 'global', transport: 'http', url: 'https://mcp.amap.com/mcp', timeoutMs: 5000, source: 'managed-tool', toolPolicy: {}, enabled: true, connectionCheck: result },
+      expectedRevision: 1, idempotencyKey: 'spoof-check'
+    })).rejects.toThrow('Invalid payload')
+    expect(mcpConfigService.save).not.toHaveBeenCalled()
+  })
+
   it('blocks update preflight on an unavailable or malformed Runtime snapshot', async () => {
     const runtimeRequest = vi.fn()
       .mockResolvedValueOnce({ ok: false, status: 503, body: JSON.stringify({ message: 'Runtime unavailable' }) })

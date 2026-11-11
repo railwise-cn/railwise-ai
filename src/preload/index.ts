@@ -241,7 +241,11 @@ const api = {
   importLegacyWorkspaceSnapshot: (request) => ipcRenderer.invoke('workspace-migration:import-snapshot', request),
   setWorkspaceTrust: (request) => ipcRenderer.invoke('workspace-trust:set', request),
   listMcpServers: (workspaceRoot) => ipcRenderer.invoke('mcp-server:list', { workspaceRoot }),
-  saveMcpServer: (request) => ipcRenderer.invoke('mcp-server:save', request),
+  saveMcpServer: (request) => {
+    const config = { ...request.config }
+    delete config.connectionCheck
+    return ipcRenderer.invoke('mcp-server:save', { ...request, config })
+  },
   testMcpServer: (serverId, workspaceRoot) => ipcRenderer.invoke('mcp-server:test', { serverId, workspaceRoot }),
   authorizeMcpServer: (request) => ipcRenderer.invoke('mcp-server:authorize', request),
   waitForMcpAuthorization: (serverId, state) =>

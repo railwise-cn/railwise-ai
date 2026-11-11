@@ -12,6 +12,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import brand from '../../shared/product-brand.json'
+import { currentMcpConnectionCheck, mcpToolDiscoveryPassed } from '../../shared/mcp-connection-check'
 import type {
   McpCredentialReferenceV1,
   McpServerConfigV2,
@@ -231,6 +232,14 @@ function normalizedManifest(value: unknown): McpManifestV2 {
   }
 }
 
+function connectionConfiguration(server: McpServerConfigV2): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(server).filter(([key]) => !['connectionCheck', 'revision', 'enabled'].includes(key)))
+}
+
+function connectionConfigurationHash(server: McpServerConfigV2): string {
+  return createHash('sha256').update(JSON.stringify(connectionConfiguration(server))).digest('hex')
+}
+
 export class McpConfigService {
   private readonly manifestPath: string
   private readonly legacyPath: string
@@ -266,7 +275,16 @@ export class McpConfigService {
     const canonicalWorkspace = workspaceRoot ? await canonicalizeContainmentRoot(workspaceRoot) : undefined
     return manifest.servers.filter((server) =>
       server.scope === 'global' || (canonicalWorkspace && server.workspaceRoot === canonicalWorkspace)
-    )
+    ).map(server => this.projectConnectionCheck(server))
+  }
+
+  private projectConnectionCheck(server: McpServerConfigV2): McpServerConfigV2 {
+    const check = currentMcpConnectionCheck(server)
+    const missingSession = server.credentialRef?.storage === 'session' && !this.sessionCredentials.has(server.credentialRef.id)
+    if (check && check.configurationHash === connectionConfigurationHash(server) && !missingSession) return server
+    const projected = { ...server }
+    delete projected.connectionCheck
+    return projected
   }
 
   async runtimeSnapshot(): Promise<McpRuntimeSnapshotV1> {
@@ -398,6 +416,14 @@ export class McpConfigService {
         timeoutMs: Math.min(Math.max(request.config.timeoutMs, 1_000), 120_000),
         revision: revision + 1
       }
+      // Caller-provided evidence is never trusted. A successful check made
+      // immediately before enabling may survive that sole flag transition.
+      delete next.connectionCheck
+      const checked = current ? this.projectConnectionCheck(current) : undefined
+      if (checked && !current!.enabled && next.enabled && mcpToolDiscoveryPassed(checked) &&
+        isDeepStrictEqual(connectionConfiguration(current!), connectionConfiguration(next))) {
+        next.connectionCheck = { ...checked.connectionCheck!, serverRevision: next.revision, configurationHash: connectionConfigurationHash(next) }
+      }
       const servers = [...manifest.servers]
       if (index >= 0) servers[index] = next
       else servers.push(next)
@@ -411,6 +437,28 @@ export class McpConfigService {
   async test(serverId: string, workspaceRoot?: string): Promise<McpServerStatusV1> {
     const server = (await this.list(workspaceRoot)).find((entry) => entry.id === serverId)
     if (!server) return { id: serverId, state: 'error', authorized: false, message: 'MCP server was not found.' }
+    const result = await this.testConnection(server)
+    return runSerialized('mcp-config:' + this.manifestPath, async () => {
+      const manifest = await this.read()
+      const current = manifest.servers.find(entry => entry.id === server.id)
+      const checkedAt = this.now().toISOString()
+      if (!current || current.revision !== server.revision || connectionConfigurationHash(current) !== connectionConfigurationHash(server)) {
+        return { id: server.id, state: 'error', authorized: false, checkedAt, errorCode: 'configuration_changed', message: '连接配置已变化，请重新检查连接。' }
+      }
+      current.connectionCheck = {
+        serverRevision: current.revision, configurationHash: connectionConfigurationHash(current),
+        ...(current.credentialRef ? { credentialRefId: current.credentialRef.id } : {}),
+        checkedAt, state: result.state, authorized: result.authorized,
+        ...(result.verification ? { verification: result.verification } : {}),
+        ...(Number.isSafeInteger(result.toolCount) ? { toolCount: result.toolCount } : {}),
+        ...(result.errorCode ? { errorCode: result.errorCode } : {})
+      }
+      await this.write(manifest)
+      return { ...result, checkedAt }
+    })
+  }
+
+  private async testConnection(server: McpServerConfigV2): Promise<McpServerStatusV1> {
     const startedAt = Date.now()
     try {
       if (isGitHubMcpServer(server)) return await this.testGitHubConnector(server, startedAt)
@@ -469,6 +517,7 @@ export class McpConfigService {
         && (server.toolPolicy['*'] !== 'deny' || server.toolPolicy[tool.name] === 'allow'))
       if (!tools.length) return { ...base, state: 'error', authorized: false, errorCode: 'tool_manifest_mismatch', toolCount: 0, message: 'GitHub 已响应，但当前令牌或工具规则没有提供可用工具。请核对令牌权限、组织批准状态和工具规则。' }
       return { ...base, latencyMs: Date.now() - startedAt, state: 'connected', authorized: true, toolCount: tools.length,
+        verification: 'tool_discovery',
         message: `GitHub 认证及工具发现通过，发现 ${tools.length} 项可用工具。仓库访问范围由令牌和组织策略共同决定。` }
     } catch (error) {
       const status = failedStatus ?? (error as { code?: number }).code
@@ -506,7 +555,7 @@ export class McpConfigService {
       const allowed = new Set(server.readOnlyTools ?? [])
       const count = tools.tools.filter(tool => allowed.has(tool.name)).length
       if (!count) throw Object.assign(new Error('连接已建立，但没有发现已核对的只读工具。请检查服务版本和配置。'), { code: 'tool_manifest_mismatch' })
-      return { id: server.id, state: 'connected', authorized: true, latencyMs: Date.now() - startedAt, message: `已发现 ${count} 项只读工具。` }
+      return { id: server.id, state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: count, latencyMs: Date.now() - startedAt, message: `已发现 ${count} 项只读工具。` }
     } catch (error) {
       // Transport exceptions may include the Amap URL with its query credential.
       const code = (error as { code?: unknown }).code

@@ -2,6 +2,8 @@
   "title": "Settings",
   "pluginAvailableToInstall": "Available to install",
   "pluginConfiguredUnverified": "Configured · verification pending",
+  "pluginConnectionChecked": "Connection check passed ({{count}} tools)",
+  "pluginConnectionFailed": "Connection check failed",
   "pluginInstalledUnavailable": "Installed · currently unavailable",
   "pluginInstalledSourceUnavailable": "Installed · source unavailable",
   "pluginInstallationHealth": "Installation health",

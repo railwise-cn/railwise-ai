@@ -523,6 +523,19 @@ describe('PluginMarketplaceView unified catalog', () => {
     await act(async () => i18n.changeLanguage('zh'))
     await settle()
     expect(container.textContent).toContain('已配置 · 待验证授权')
+    server.connectionCheck = { serverRevision: server.revision, credentialRefId: server.credentialRef!.id,
+      configurationHash: 'a'.repeat(64), checkedAt: '2026-11-12T01:02:03.000Z', state: 'connected', authorized: true, verification: 'tool_discovery', toolCount: 11 }
+    await act(async () => iconButton(i18n.t('common:pluginUnifiedRefresh')).click())
+    await settle()
+    expect(container.textContent).toContain('连接检查通过（11 项工具）')
+    expect(container.textContent).toContain(new Date(server.connectionCheck.checkedAt).toLocaleString())
+    expect(container.textContent).not.toContain('已配置 · 待验证授权')
+    server.connectionCheck = { ...server.connectionCheck, state: 'error', authorized: false, errorCode: 'connection_failed' }
+    await act(async () => iconButton(i18n.t('common:pluginUnifiedRefresh')).click())
+    await settle()
+    expect(container.textContent).toContain('连接检查未通过')
+    expect(container.textContent).not.toContain('连接检查通过（')
+    expect(testServer).not.toHaveBeenCalled()
   })
 
   it('keeps local Skill counts off the plugin surface and exposes installed product-level entries', () => {

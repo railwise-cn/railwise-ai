@@ -381,15 +381,31 @@ export type McpServerConfigV2 = {
   toolPolicy: Record<string, 'allow' | 'ask' | 'deny'>
   enabled: boolean
   revision: number
+  /** Main-process connection evidence. Save requests cannot supply this field. */
+  connectionCheck?: McpConnectionCheckV1
+}
+
+export type McpConnectionCheckV1 = {
+  serverRevision: number
+  configurationHash: string
+  credentialRefId?: string
+  checkedAt: string
+  state: McpServerStatusV1['state']
+  authorized: boolean
+  verification?: 'tool_discovery'
+  toolCount?: number
+  errorCode?: McpServerStatusV1['errorCode']
 }
 
 export type McpServerStatusV1 = {
   id: string
   state: 'disconnected' | 'connecting' | 'connected' | 'needs_authorization' | 'error'
   authorized: boolean
+  checkedAt?: string
+  verification?: 'tool_discovery'
   latencyMs?: number
   message?: string
-  errorCode?: 'missing_credentials' | 'invalid_credentials' | 'insufficient_scope' | 'network_blocked' | 'service_unavailable' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable'
+  errorCode?: 'missing_credentials' | 'invalid_credentials' | 'insufficient_scope' | 'network_blocked' | 'service_unavailable' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable' | 'configuration_changed'
   toolCount?: number
   authorizationUrl?: string
   authorizationState?: string

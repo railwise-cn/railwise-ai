@@ -1,6 +1,7 @@
 import { ManagedDocumentTool } from './connectors/ManagedDocumentTool'
 import { GitHubConnectorSetup } from './connectors/GitHubConnectorSetup'
 import { isGitHubMcpServer } from '@shared/github-connector'
+import { currentMcpConnectionCheck } from '@shared/mcp-connection-check'
 import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
@@ -1704,11 +1705,15 @@ function packageStatusLabel(
   text: Text,
   reviewSha256?: string
 ): string {
+  const check = currentMcpConnectionCheck(server)
+  const checkedAt = check ? new Date(check.checkedAt).toLocaleString() : ''
   switch (marketplacePackageStatus(item, installed, server, diagnostic).state) {
     case 'available': return text('settings:pluginAvailableToInstall', 'Available to install')
     case 'installed': return text('pluginFilterInstalled', 'Installed')
     case 'configuration': return text('pluginUnifiedNeedsConfig', 'Needs configuration')
     case 'configured_unverified': return text('settings:pluginConfiguredUnverified', 'Configured · verification pending')
+    case 'connection_checked': return `${text('settings:pluginConnectionChecked', 'Connection check passed ({{count}} tools)', { count: check?.toolCount ?? 0 })} · ${checkedAt}`
+    case 'connection_failed': return `${text('settings:pluginConnectionFailed', 'Connection check failed')} · ${checkedAt}`
     case 'installed_unavailable': return text('settings:pluginInstalledUnavailable', 'Installed · currently unavailable')
     case 'installed_source_unavailable': return text('settings:pluginInstalledSourceUnavailable', 'Installed · source unavailable')
     case 'source_unavailable': return text('pluginUpdateUnavailable', 'Source unavailable')
@@ -1733,7 +1738,7 @@ function PackageStatus({ item, installed, server, reviewSha256, diagnostic, text
   const tone = status.tone === 'success' ? 'text-emerald-700 dark:text-emerald-300'
     : status.tone === 'attention' ? 'text-amber-700 dark:text-amber-300' : 'text-ds-muted'
   return <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${tone}`}>
-    {status.state === 'installed' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+    {status.state === 'installed' || status.state === 'connection_checked' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
     {packageStatusLabel(item, installed, server, diagnostic, text, reviewSha256)}
   </span>
 }
