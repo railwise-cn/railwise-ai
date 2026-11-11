@@ -90,6 +90,23 @@ test('Windows smoke reports unsigned status honestly and requires full observed 
   assert.equal(validateInstallReport(report, identity).windowsSigning, 'verified')
 })
 
+test('Windows installation report distinguishes an existing package from its later verification driver', () => {
+  const report = evidence()
+  const driverSourceHead = 'e'.repeat(40)
+  report.provenance = { sourceHead: driverSourceHead, packageSourceHead: sourceHead, driverSourceHead, runId: '7890', runAttempt: '1',
+    packageBuild: { repository: 'railwise-cn/railwise-ai', runId: '1234', runAttempt: 1,
+      workflow: '.github/workflows/release.yml', packageSourceHead: sourceHead, driverSourceHead,
+      windowsBuildConclusion: 'success', artifactId: 4567, artifactName: 'release-win',
+      artifactDigest: `sha256:${'c'.repeat(64)}`, artifactExpired: false,
+      changedFiles: ['scripts/run-windows-ui-smoke.mjs'] } }
+  assert.equal(validateInstallReport(report, identity).status, 'passed')
+  report.provenance.packageBuild.packageSourceHead = driverSourceHead
+  assert.throws(() => validateInstallReport(report, identity))
+  report.provenance.packageBuild.packageSourceHead = sourceHead
+  report.provenance.packageBuild.changedFiles = ['package-lock.json']
+  assert.throws(() => validateInstallReport(report, identity))
+})
+
 const invalid = [
   ['wrong installer brand', report => { report.installer.name = 'WorkWise-0.5.5-win-x64.exe' }],
   ['wrong installed product', report => { report.target.versionInfo.productName = 'WorkWise' }],

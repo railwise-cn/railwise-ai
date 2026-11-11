@@ -11,6 +11,7 @@ const api = {
   cancelManagedLarkAppSetup: vi.fn(), openExternal: vi.fn(async () => undefined)
 }
 let root: Root; let container: HTMLDivElement
+const authorizationExpiry = () => new Date(Date.now() + 600_000).toISOString()
 async function click(label: string): Promise<void> {
   const button = [...container.querySelectorAll('button')].find(item => item.textContent === label)
   if (!button) throw new Error(`Missing button: ${label}`)
@@ -25,7 +26,7 @@ describe('shared official Lark connection panel', () => {
     Object.assign(window, { workwise: api })
     container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   })
-  afterEach(async () => { await act(async () => root.unmount()); container.remove() })
+  afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers() })
   it('does not touch accounts when the connector catalog is only viewed', async () => {
     await act(async () => { root.render(createElement(ManagedLarkConnection)) })
     expect(api.diagnoseManagedTool).not.toHaveBeenCalled()
@@ -34,7 +35,7 @@ describe('shared official Lark connection panel', () => {
   })
   it('passes the selected mail capability only after the user connects', async () => {
     api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'installed', installedVersion: '1.0.100' } })
-    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/device', expiresAt: new Date(Date.now() + 600_000).toISOString() })
+    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/device', expiresAt: authorizationExpiry() })
     await act(async () => { root.render(createElement(ManagedLarkConnection)) })
     const select = container.querySelector('select')!
     await act(async () => { select.value = 'mail'; select.dispatchEvent(new Event('change', { bubbles: true })) })
@@ -60,7 +61,7 @@ describe('shared official Lark connection panel', () => {
     api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'not_installed' } })
     api.installManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })
     api.beginManagedLarkLogin.mockResolvedValue({ ok: false, reason: 'app_configuration_required', message: 'App required' })
-    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://accounts.feishu.cn/device?synthetic', expiresAt: '2026-11-11T00:00:00Z' })
+    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://accounts.feishu.cn/device?synthetic', expiresAt: authorizationExpiry() })
     await act(async () => { root.render(createElement(ManagedLarkConnection)) })
     await click('连接飞书')
     expect(api.installManagedTool).toHaveBeenCalledWith('lark-cli')
@@ -74,7 +75,7 @@ describe('shared official Lark connection panel', () => {
   })
   it('starts autoConnect once only after the caller records an explicit connect action', async () => {
     api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })
-    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/user-login', expiresAt: '2026-11-11T00:00:00Z' })
+    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/user-login', expiresAt: authorizationExpiry() })
     api.completeManagedLarkLogin.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'installed' } })
     const onChanged = vi.fn(async () => undefined)
     await act(async () => { root.render(createElement(ManagedLarkConnection, { autoConnect: true, onChanged })); await Promise.resolve(); await Promise.resolve() })
@@ -86,11 +87,27 @@ describe('shared official Lark connection panel', () => {
     expect(onChanged).toHaveBeenCalledTimes(2)
     expect(container.textContent).toContain('连接不会自动执行')
   })
+  it('removes an expired authorization and exposes a fresh connection action', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-11T00:00:00Z'))
+    api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })
+    api.beginManagedLarkLogin.mockResolvedValue({ ok: true, verificationUrl: 'https://accounts.feishu.cn/user-login', expiresAt: authorizationExpiry() })
+    await act(async () => { root.render(createElement(ManagedLarkConnection)) })
+    await click('连接飞书')
+    expect(container.textContent).toContain('我已完成授权，检查登录')
+    await act(async () => { await vi.advanceTimersByTimeAsync(600_000) })
+    expect(container.textContent).not.toContain('我已完成授权，检查登录')
+    expect(container.textContent).toContain(i18n.t('common:managedLarkAuthorizationExpired'))
+    const connect = [...container.querySelectorAll('button')].find(item => item.textContent === '连接飞书')
+    expect(connect?.disabled).toBe(false)
+    expect(api.completeManagedLarkLogin).not.toHaveBeenCalled()
+  })
+
   it('continues to user authorization after the official first-use configuration is verified', async () => {
     api.diagnoseManagedTool.mockResolvedValue({ ok: true, status: { id: 'lark-cli', state: 'needs_login' } })
     api.beginManagedLarkLogin.mockResolvedValueOnce({ ok: false, reason: 'app_configuration_required', message: 'App required' })
-      .mockResolvedValueOnce({ ok: true, verificationUrl: 'https://accounts.feishu.cn/user-login', expiresAt: '2026-11-11T00:00:00Z' })
-    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://open.feishu.cn/device', expiresAt: '2026-11-11T00:00:00Z' })
+      .mockResolvedValueOnce({ ok: true, verificationUrl: 'https://accounts.feishu.cn/user-login', expiresAt: authorizationExpiry() })
+    api.beginManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'waiting', verificationUrl: 'https://open.feishu.cn/device', expiresAt: authorizationExpiry() })
     api.checkManagedLarkAppSetup.mockResolvedValue({ ok: true, state: 'configured' })
     await act(async () => { root.render(createElement(ManagedLarkConnection)) })
     await click('连接飞书')

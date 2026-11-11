@@ -5,7 +5,7 @@ import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { inspectInstalledPackage, installIdentity } from './verify-windows-install-smoke.mjs'
+import { inspectInstalledPackage, installIdentity, windowsSmokeProvenance } from './verify-windows-install-smoke.mjs'
 
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const requiredChecks = [
@@ -124,7 +124,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
   if (process.platform !== 'win32' || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' || process.env.RUNNER_OS !== 'Windows') {
     throw new Error('Exact Windows UI smoke requires the existing clean GitHub-hosted Windows installation runner')
   }
-  assert.equal(sourceHead, process.env.GITHUB_SHA)
+  const provenance = windowsSmokeProvenance(sourceHead)
   const temporary = resolve(process.env.RUNNER_TEMP)
   for (const path of [executable, evidenceDir]) assert.ok(contained(temporary, resolve(path)), 'Smoke paths must remain inside RUNNER_TEMP')
   assert.ok((await lstat(executable)).isFile())
@@ -141,7 +141,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
     agents: { kun: { autoStart: true, port: await availablePort(), dataDir: join(root, 'runtime') } } }))
   const report = { schemaVersion: 1, status: 'running', scope: 'private-exact-package-chinese-ui', platform: 'win32',
-    sourceHead, version, locale: 'zh', theme: 'dark', productionTouched: false, checks: [], errors: [],
+    sourceHead, version, provenance, locale: 'zh', theme: 'dark', productionTouched: false, checks: [], errors: [],
     installedAsarSha256: before.asarSha256, profile, cleanExit: false, packageUnchanged: false }
   // Electron's supported --user-data-dir overrides chrome::DIR_USER_DATA
   // before application startup. The installed EXE/ASAR and public identity
@@ -214,7 +214,7 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     await cdp.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 })
     report.helpOffline = true
     await cdp.click('button', '设置')
-    await cdp.click('button', '帮助')
+    await cdp.click('.ds-settings-sidebar nav button', '帮助')
     report.chapters = await cdp.wait(`(() => { const headings=Array.from(document.querySelectorAll('[aria-label="用户使用手册"] .write-markdown-preview h2')); const numbers=headings.map(heading=>Number(/^(\\d+)\\./.exec(heading.textContent.trim())?.[1])).filter(Number.isInteger); return numbers.length===13 && numbers; })()`, 'the complete thirteen-chapter manual')
     assert.deepEqual(report.chapters, Array.from({ length: 13 }, (_, index) => index + 1))
     await cdp.wait(`document.querySelector('[aria-label="手册目录"]')?.innerText.includes('12. 版本更新')`, 'manual table of contents')
@@ -236,6 +236,17 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     await writeFile(join(evidenceDir, 'windows-help-zh-dark.png'), Buffer.from(helpScreenshot.data, 'base64'))
   } catch (error) {
     report.errors.push(error instanceof Error ? error.message : String(error))
+    if (cdp) {
+      try {
+        const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+        await writeFile(join(evidenceDir, 'windows-ui-failure.png'), Buffer.from(screenshot.data, 'base64'))
+        report.failureObservation = await cdp.evaluate(`({
+          helpVisible: Boolean(document.querySelector('[aria-label="用户使用手册"]')),
+          activeMenus: Array.from(document.querySelectorAll('[role="menu"]')).map(menu => menu.getAttribute('aria-label')),
+          headings: Array.from(document.querySelectorAll('h1,h2,h3')).map(heading => heading.textContent.trim())
+        })`)
+      } catch { /* Preserve the original UI failure if its renderer has closed. */ }
+    }
   } finally {
     if (cdp) {
       await cdp.send('Page.close').catch(() => undefined)

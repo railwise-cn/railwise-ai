@@ -93,7 +93,7 @@ try {
   if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'Exact installer smoke requires a clean GitHub-hosted Windows runner'
   }
-  if ($env:GITHUB_SHA -ne $SourceHead) { throw 'Requested source differs from this workflow commit' }
+  $report.provenance = Invoke-NodeJson -Arguments @('provenance', $Version, $SourceHead)
   if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { throw 'RUNNER_TEMP is unavailable' }
   $EvidenceDir = [IO.Path]::GetFullPath($EvidenceDir)
   $tempPrefix = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'

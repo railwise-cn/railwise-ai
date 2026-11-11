@@ -1,0 +1,73 @@
+name: Existing Windows package installation and UI acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_run_id:
+        description: 'Same-repository release run containing the exact release-win artifact to inspect'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  windows-install:
+    name: Install and inspect the existing Windows package
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.22.0'
+          cache: npm
+      - name: Install verification tools
+        run: npm ci --ignore-scripts
+      - name: Verify Windows acceptance contracts and PowerShell syntax
+        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs scripts/prepare-windows-install-smoke.test.mjs
+      - name: Verify the original build and unchanged application source
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+          WORKWISE_WINDOWS_SMOKE_SOURCE_FILE: ${{ runner.temp }}/windows-package-source.json
+        run: node scripts/prepare-windows-install-smoke.mjs "$env:PACKAGE_RUN_ID" "$env:WORKWISE_WINDOWS_SMOKE_SOURCE_FILE"
+      - name: Download the verified immutable Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.source.outputs.artifact_id }}
+          run-id: ${{ inputs.package_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/exact-windows-packages
+      - name: Install, inspect the Chinese UI and uninstall the temporary instance
+        env:
+          PACKAGE_SOURCE_HEAD: ${{ steps.source.outputs.package_source_head }}
+          WORKWISE_WINDOWS_SMOKE_SOURCE_FILE: ${{ runner.temp }}/windows-package-source.json
+        run: |
+          $packages = Join-Path $env:RUNNER_TEMP 'exact-windows-packages'
+          $installers = @(Get-ChildItem -LiteralPath $packages -Filter '*.exe' -File)
+          if ($installers.Count -ne 1 -or $installers[0].Name -notmatch '^RailWise-AI-(\d+\.\d+\.\d+)-win-x64\.exe$') {
+            throw 'Expected one exact versioned RailWise AI installer'
+          }
+          ./scripts/run-windows-install-smoke.ps1 `
+            -Installer $installers[0].FullName `
+            -Version $Matches[1] `
+            -SourceHead $env:PACKAGE_SOURCE_HEAD `
+            -EvidenceDir (Join-Path $env:RUNNER_TEMP 'exact-windows-evidence')
+      - name: Retain package identity and actual Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-package-windows-install-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/exact-windows-evidence/
+            ${{ runner.temp }}/windows-package-source.json

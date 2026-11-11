@@ -7,12 +7,26 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { PUBLIC_IDENTITY } from './verify-reviewed-release-artifacts.mjs'
 import publication from './release-publication.cjs'
+import { validateWindowsSmokeSource } from './prepare-windows-install-smoke.mjs'
 
 const require = createRequire(import.meta.url)
 const NSIS_NAMESPACE = Buffer.from('50e065bc313411e69bab38c9862bdaf3', 'hex')
 const fail = message => { throw new Error(`[windows-install-smoke] ${message}`) }
 function equal(actual, expected, label) { if (actual !== expected) fail(`${label}: expected ${expected}, received ${actual}`) }
 function digest(bytes, algorithm = 'sha256', encoding = 'hex') { return createHash(algorithm).update(bytes).digest(encoding) }
+
+export function windowsSmokeProvenance(sourceHead, environment = process.env) {
+  const provenance = { sourceHead: environment.GITHUB_SHA, packageSourceHead: sourceHead,
+    driverSourceHead: environment.GITHUB_SHA, runId: environment.GITHUB_RUN_ID, runAttempt: environment.GITHUB_RUN_ATTEMPT }
+  if (environment.WORKWISE_WINDOWS_SMOKE_SOURCE_FILE) {
+    const source = JSON.parse(readFileSync(environment.WORKWISE_WINDOWS_SMOKE_SOURCE_FILE, 'utf8'))
+    provenance.packageBuild = validateWindowsSmokeSource(source, { packageSourceHead: sourceHead, driverSourceHead: environment.GITHUB_SHA })
+    equal(source.repository, environment.GITHUB_REPOSITORY, 'package build repository')
+  } else {
+    equal(sourceHead, environment.GITHUB_SHA, 'workflow source HEAD')
+  }
+  return provenance
+}
 
 // electron-builder 26.x derives the stable NSIS identity from appId with this
 // namespace. Verify the actual registry key; changing only DisplayName is not
@@ -93,7 +107,15 @@ export function validateInstallReport(report, identity) {
   equal(report.sourceHead, identity.sourceHead, 'source HEAD')
   equal(report.runner?.environment, 'github-hosted', 'runner environment')
   equal(report.runner?.os, 'Windows', 'runner OS')
-  equal(report.provenance?.sourceHead, identity.sourceHead, 'workflow source HEAD')
+  if (report.provenance?.packageBuild) {
+    equal(report.provenance.packageSourceHead, identity.sourceHead, 'package source HEAD')
+    equal(report.provenance.driverSourceHead, report.provenance.sourceHead, 'verification workflow source HEAD')
+    validateWindowsSmokeSource(report.provenance.packageBuild, {
+      packageSourceHead: identity.sourceHead, driverSourceHead: report.provenance.driverSourceHead
+    })
+  } else {
+    equal(report.provenance?.sourceHead, identity.sourceHead, 'workflow source HEAD')
+  }
   for (const key of ['runId', 'runAttempt']) if (!/^[1-9]\d*$/.test(String(report.provenance?.[key] ?? ''))) fail(`workflow ${key} is missing`)
   equal(report.productionTouched, false, 'production mutation')
   if (!Array.isArray(report.errors) || report.errors.length) fail(`execution errors: ${report.errors?.join('; ') ?? 'missing'}`)
@@ -154,6 +176,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const [command, version, sourceHead, path] = process.argv.slice(2)
   const identity = installIdentity(version, sourceHead)
   if (command === 'config') console.log(JSON.stringify({ ...identity, installer: inspectInstaller(path, identity) }))
+  else if (command === 'provenance') console.log(JSON.stringify(windowsSmokeProvenance(sourceHead)))
   else if (command === 'inspect') console.log(JSON.stringify(inspectInstalledPackage(path, identity)))
   else if (command === 'verify') {
     const report = JSON.parse(readFileSync(path, 'utf8'))

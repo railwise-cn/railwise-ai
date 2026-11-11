@@ -67,5 +67,7 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.match(ui, /inspectInstalledPackage\(dirname\(executable\), identity\)/)
   assert.match(ui, /Network\.emulateNetworkConditions/)
   assert.match(ui, /Input\.dispatchMouseEvent/)
+  assert.match(ui, /cdp\.click\('\.ds-settings-sidebar nav button', '帮助'\)/)
+  assert.doesNotMatch(ui, /cdp\.click\('button', '帮助'\)/)
   assert.doesNotMatch(ui, /window\.workwise\s*=|innerHTML\s*=|mock\w*\(/)
 })
