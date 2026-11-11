@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { websiteStaticTransport } from './deploy-website-release.mjs'
 import { checkedBytes, finalizeWebsite, inspectPublishedDependencies, inspectWebsiteStage, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
 
 const manifest = JSON.parse(await readFile(new URL('../src/shared/managed-dependencies.json', import.meta.url), 'utf8'))
@@ -93,6 +94,36 @@ test('incremental staging verifies published resources and transfers only missin
     assert.deepEqual(await readFile(target), bytes)
     await writeFile(target, 'changed')
     assert.throws(inspect, /Immutable dependency conflict/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('real worker startup forwards numeric configured and default chunk sizes', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dependency-worker-start-test-'))
+  try {
+    const bin = join(directory, 'bin')
+    await mkdir(bin)
+    await writeFile(join(bin, 'setsid'), '#!/bin/sh\nexec "$@"\n', { mode: 0o700 })
+    await writeFile(join(bin, 'chmod'), '#!/bin/sh\nmode="$1"\nshift\nif [ "$1" = -- ]; then shift; fi\nexec /bin/chmod "$mode" "$@"\n', { mode: 0o700 })
+    for (const configured of [undefined, '1048576']) {
+      const payload = join(directory, configured ?? 'default')
+      await mkdir(payload)
+      const manifestPath = join(payload, '.r2-downloads.json')
+      await writeFile(manifestPath, '[]')
+      await writeFile(join(payload, '.r2-download-worker.py'), 'import json,pathlib,sys\npathlib.Path(sys.argv[2], "worker-args.json").write_text(json.dumps(sys.argv[1:]))\n')
+      execFileSync('bash', ['-s', '--', manifestPath, payload, ...(configured ? [configured] : [])], {
+        input: websiteStaticTransport.startR2DownloadScript,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+      let state
+      for (let attempt = 0; attempt < 100; attempt++) {
+        state = await readFile(join(payload, '.r2-download.status'), 'utf8').catch(() => undefined)
+        if (state) break
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+      assert.equal(state?.trim(), 'success 0')
+      assert.deepEqual(JSON.parse(await readFile(join(payload, 'worker-args.json'), 'utf8')), [manifestPath, payload, configured ?? '16777216'])
+    }
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 

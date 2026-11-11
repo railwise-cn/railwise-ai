@@ -465,7 +465,8 @@ manifest.unlink()
 const START_R2_STAGE_DOWNLOAD_SCRIPT = String.raw`set -euo pipefail
 manifest="$1"
 payload="$2"
-chunk_size="\${3:-16777216}"
+chunk_size=16777216
+if [[ $# -ge 3 ]]; then chunk_size="$3"; fi
 worker="$payload/.r2-download-worker.py"
 status="$payload/.r2-download.status"
 log="$payload/.r2-download.log"
@@ -512,7 +513,7 @@ if [[ -f "$status" ]]; then
     printf 'success\n'
     exit 0
   fi
-  printf 'failure %s\n' "\${code:-unknown}"
+  printf 'failure %s\n' "$code"
   if [[ -f "$log" ]]; then tail -n 50 -- "$log"; fi
   exit 0
 fi
