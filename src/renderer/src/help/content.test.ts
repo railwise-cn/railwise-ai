@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { HELP_HOME, helpDocuments, helpImages, helpRepositoryUrl, helpResource, helpSlug, searchHelp } from './content'
+import { HELP_HOME, helpDocuments, helpImageResource, helpRepositoryUrl, helpResource, helpSlug, searchHelp } from './content'
 
 describe('bundled user help', () => {
   it('keeps all thirteen manual chapters and resolves every manual image offline', () => {
     const body = helpDocuments[HELP_HOME]
     expect(body.match(/^## \d+\./gm)).toHaveLength(13)
-    for (const match of body.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
-      const resource = helpResource(HELP_HOME, match[1])!
-      expect(helpImages[resource.path]).toBeTruthy()
+    for (const [document, content] of Object.entries(helpDocuments)) {
+      for (const match of content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
+        expect(helpImageResource(document, match[1]), `${document} → ${match[1]}`).toBeTruthy()
+      }
     }
     expect(body).toContain('点击一次 **升级**')
     expect(body).toContain('技能、插件、连接器')
@@ -25,6 +26,8 @@ describe('bundled user help', () => {
     expect(helpResource(HELP_HOME, '../secret.md')).toBeUndefined()
     expect(helpResource(HELP_HOME, 'file:///private/account.json')).toBeUndefined()
     expect(helpResource(HELP_HOME, 'javascript:alert(1)')).toBeUndefined()
+    expect(helpImageResource(HELP_HOME, 'file:///private/image.png')).toBeUndefined()
+    expect(helpImageResource(HELP_HOME, 'https://outside.example/image.png')).toBeUndefined()
     expect(helpResource(HELP_HOME, '#12-版本更新')).toEqual({ path: HELP_HOME, anchor: '12-版本更新' })
     expect(helpRepositoryUrl(HELP_HOME, '../src/main/index.ts')).toBe('https://github.com/railwise-cn/railwise-ai/blob/main/src/main/index.ts')
     expect(helpRepositoryUrl(HELP_HOME, 'file:///private/account.json')).toBeUndefined()

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { ArrowLeft, BookOpen, Search } from 'lucide-react'
-import { HELP_HOME, HELP_UPDATED_AT, HELP_VERSION, helpDocuments, helpImages, helpRepositoryUrl, helpResource, helpSlug, searchHelp } from '../help/content'
+import { HELP_HOME, HELP_UPDATED_AT, HELP_VERSION, helpDocuments, helpImageResource, helpRepositoryUrl, helpResource, helpSlug, searchHelp } from '../help/content'
 import { hydrateWriteAdvancedDiagrams, renderWriteAdvancedPreview } from '../write/write-advanced-rendering'
 
 export function HelpReader(): ReactElement {
@@ -35,8 +35,7 @@ export function HelpReader(): ReactElement {
     })
     setHeadings(outline.filter(heading => heading.level === 2 || heading.level === 3))
     for (const placeholder of root.querySelectorAll<HTMLElement>('[data-write-preview-image]')) {
-      const resource = helpResource(location.document, decodeURIComponent(placeholder.dataset.writePreviewImage ?? ''))
-      const src = resource ? helpImages[resource.path] : undefined
+      const src = helpImageResource(location.document, decodeURIComponent(placeholder.dataset.writePreviewImage ?? ''))
       if (!src) continue
       const image = document.createElement('img')
       image.src = src

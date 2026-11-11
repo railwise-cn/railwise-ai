@@ -2,7 +2,9 @@
 
 > 工程测量内业与编程协作。
 
-RailWise AI 是本地优先的桌面工作平台。0.5.1 界面以“编程 / 内业”为主入口；RailWise Survey 面向工程测量内业，将原始测量资料处理为可复核的计算结果和可追溯的候选成果。写作、设计、Flow、插件与定时任务继续提供辅助工具。
+RailWise AI 是本地优先的桌面工作平台。界面以“编程 / 内业”为主入口；RailWise Survey 面向工程测量内业，将原始测量资料处理为可复核的计算结果和可追溯的候选成果。写作、设计、Flow、插件与定时任务继续提供辅助工具。
+
+当前操作说明与安装包内置功能见[完整用户手册](./USER_GUIDE.zh-CN.md)。以下 0.5.1 发布及截图记录用于说明历史验收范围。
 
 **0.5.1 发布记录：**[RailWise AI 0.5.1](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.1) 发布四阶段 Survey 工作区、精确成果追问和声明式质量记录，并修复启动、历史工具参数及方差数量级解释。已有安装、数据与更新标识保持兼容；高级方法适用性和工程成果批准仍需专业复核。
 
@@ -45,9 +47,9 @@ XY 标准误差椭圆半轴采用单位马氏半径，不代表 95% 等置信区
 
 当前成果保持待审草稿。文件生成、完整性复验、质量记录覆盖和人工批准分别记录；哈希与重放不是数字签名。具体实现和每个候选的验收边界见[执行台账](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/qa/RAILWISE_SURVEY_CONVERGENCE_STATUS.md)。
 
-### 当前截图与验收范围
+### 0.5.1 历史截图与验收范围
 
-以下为最终 0.5.1 候选包的中文浅色实拍，界面文件与正式版逐字节一致，使用公开合成平面控制网（4 点、1 测站、5 观测），依次展示平差结果、成果中心与通用设置。[截图清单](../website/products/screenshots/workwise/release-051-screenshots.json)保留包来源及哈希。
+以下为 0.5.1 发布时的中文浅色实拍，界面文件与当时正式版逐字节一致，使用公开合成平面控制网（4 点、1 测站、5 观测），依次展示平差结果、成果中心与通用设置。[截图清单](../website/products/screenshots/workwise/release-051-screenshots.json)保留包来源及哈希。
 
 ![RailWise Survey 0.5.1 平差结果](../website/products/screenshots/workwise/07-survey-051-zh-light.jpg)
 
@@ -55,7 +57,7 @@ XY 标准误差椭圆半轴采用单位马氏半径，不代表 95% 等置信区
 
 ![RailWise AI 0.5.1 通用设置](../website/products/screenshots/workwise/09-survey-051-settings.jpg)
 
-本轮验证包含完整两小时稳定检查、三端构建、最终包签名公证、公开合成网两轮真实模型追问、重启数据保全及 DOCX/PDF/XLSX 导出。同源码隔离更新器完成真实下载、安装、重启和数据保留；该探针不等同于历史版本迁移认证。完整跨功能矩阵、生产资料认证及专业签认仍有独立边界，详见[0.5.1 发布验收](./qa/RAILWISE_0.5.1_RELEASE_ACCEPTANCE.md)。
+0.5.1 发布时的验证包含完整两小时稳定检查、三端构建、最终包签名公证、公开合成网两轮真实模型追问、重启数据保全及 DOCX/PDF/XLSX 导出。同源码隔离更新器完成真实下载、安装、重启和数据保留；该探针不等同于历史版本迁移认证。完整跨功能矩阵、生产资料认证及专业签认仍有独立边界，详见[0.5.1 发布验收](./qa/RAILWISE_0.5.1_RELEASE_ACCEPTANCE.md)。
 
 ## DeepSeek V4.1 与 AI 协作
 
@@ -116,7 +118,7 @@ Skill 是可复用的工作说明、参考资料和脚本，可表达写作规�
 
 ### 5. MCP 与命令行工具
 
-MCP 用于连接外部工具和数据源；命令行工具由 WorkWise 安装到独立目录，避免修改系统全局环境。需要独立应用的能力会明确标注并打开官方安装页，不会伪装成已经完成安装。
+MCP 用于连接外部工具和数据源；命令行工具由 RailWise AI 安装到独立目录，避免修改系统全局环境。需要独立应用的能力会明确标注并打开官方安装页，不会伪装成已经完成安装。
 
 ### 6. 知识检索
 
@@ -130,7 +132,7 @@ Flow 连接触发器、Agent、知识检索、HTTP、条件、循环、审批和
 
 ### 本地优先
 
-工作区、会话、设置和多数缓存以本机为中心。WorkWise 不要求把整个项目上传到自有云端；模型请求的实际数据边界取决于用户选择的模型服务、提示内容和组织策略。
+工作区、会话、设置和多数缓存以本机为中心。RailWise AI 不要求把整个项目上传到自有云端；模型请求的实际数据边界取决于用户选择的模型服务、提示内容和组织策略。
 
 ### 过程按需可见
 
@@ -142,15 +144,15 @@ Flow 连接触发器、Agent、知识检索、HTTP、条件、循环、审批和
 
 ### 文档能力本地优先
 
-WorkWise 内置经过固定版本审计的 Microsoft MarkItDown sidecar，用于 PDF、DOCX、PPTX 和 XLSX 的本地结构化解析；PDF 页面显示由 PDF.js 完成。扫描件、复杂多栏、公式或跨页表格可选择安装 MinerU 3.4 系列本地增强组件。MinerU 不随客户端分发，文档也不会被自动上传到 MinerU 公共云端。
+RailWise AI 内置经过固定版本审计的 Microsoft MarkItDown sidecar，用于 PDF、DOCX、PPTX 和 XLSX 的本地结构化解析；PDF 页面显示由 PDF.js 完成。扫描件、复杂多栏、公式或跨页表格可选择安装 MinerU 3.4 系列本地增强组件。MinerU 不随客户端分发，文档也不会被自动上传到 MinerU 公共云端。
 
 ### 能力有边界
 
-稳定功能、预览功能和后续方向会明确区分。第三方 Skill、CLI 和项目必须展示来源；没有清晰许可证的上游内容只提供外部入口，不随 WorkWise 分发。
+稳定功能、预览功能和后续方向会明确区分。第三方 Skill、CLI 和项目必须展示来源；没有清晰许可证的上游内容只提供外部入口，不随 RailWise AI 分发。
 
 ### 结果需复核
 
-AI 生成内容可能存在事实、计算、引用和排版错误。涉及工程安全、合同、财务、法律、医疗或正式对外文件时，WorkWise 不能替代具备相应责任和资质的人员审核。
+AI 生成内容可能存在事实、计算、引用和排版错误。涉及工程安全、合同、财务、法律、医疗或正式对外文件时，RailWise AI 不能替代具备相应责任和资质的人员审核。
 
 ## 更新、语言与帮助
 
@@ -174,13 +176,13 @@ MarkItDown 已包含在三种客户端中，不要求用户安装 Python。Miner
 
 ## 兼容与后续范围
 
-用户可见名称先行迁移，仓库已迁移至 `railwise-cn/railwise-ai`；WorkWise 安装包名、bundle ID、更新源、`~/.workwise` 数据和历史配置读取保留。既有项目、会话、插件、Skill、MCP 及凭据引用不会因改名而删除，见[迁移矩阵](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md)。
+产品名称为 RailWise AI，仓库为 `railwise-cn/railwise-ai`。新安装包使用 `RailWise-AI` 前缀。原 bundle ID、兼容更新入口、`~/.workwise` 数据目录和历史配置读取保持兼容。既有项目、会话、插件、Skill、MCP 及凭据引用不会因改名而删除，见[迁移矩阵](https://github.com/railwise-cn/railwise-ai/blob/e7de9df7c664a4924ea1668e69f821efd0a9bab1/docs/railwise-ai-migration-matrix.md)。
 
 版本化规范规则的完整接入、质检整改与阶段流程、真实签认和正式批准、更多高级模型以及第二批格式仍按各自条件推进。GeoCOM 真实仪器采集、点云/三维、DXF、对外 MCP 和跨工具深度协作属于后续扩展；外业、点云和长尾格式范围受 P0 与候选包验收门禁约束。当前定位是工程测量内业，不能宣传为完整外业采集或放样系统。
 
 ## 数据与隐私提示
 
-1. 只在获得授权的工作区中运行 WorkWise。
+1. 只在获得授权的工作区中运行 RailWise AI。
 2. 不要在截图、Issue 或日志中公开 API Key、客户资料和内部路径。
 3. 安装第三方扩展前核对项目来源、许可证、发布资产和权限范围。
 4. 处理敏感信息时优先使用组织批准的模型服务和网络环境。
@@ -188,7 +190,7 @@ MarkItDown 已包含在三种客户端中，不要求用户安装 Python。Miner
 
 ## 获取帮助
 
-- 使用说明：[WorkWise 使用指南](./USER_GUIDE.zh-CN.md)
+- 使用说明：[RailWise AI 使用指南](./USER_GUIDE.zh-CN.md)
 - 产品知识库：[kb.railwise.cn](https://kb.railwise.cn/products/workwise/)
 - 问题反馈：[GitHub Issues](https://github.com/railwise-cn/railwise-ai/issues)
 - 项目主页：[GitHub](https://github.com/railwise-cn/railwise-ai)

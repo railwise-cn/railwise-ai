@@ -1,4 +1,4 @@
-# WorkWise 的 DeepSeek Harness 接入说明
+# DeepSeek Harness 历史接入记录（0.4.0—0.4.2）
 
 本文只记录 WorkWise 0.4.0 至 0.4.2 实际接入并验证的内容。`DeepSeek Harness` 是上游项目名称；本文不把上游仓库的全部能力、最新变更或官方模型能力自动归入 WorkWise。
 

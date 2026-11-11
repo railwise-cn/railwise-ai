@@ -8,6 +8,9 @@ import overview from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screens
 import process from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screenshots/process-zh-dark-1280x840.png?url'
 import results from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screenshots/results-zh-dark-1280x840.png?url'
 import deliver from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screenshots/deliver-zh-dark-1280x840.png?url'
+import survey051 from '../../../../website/products/screenshots/workwise/07-survey-051-zh-light.jpg?url'
+import delivery051 from '../../../../website/products/screenshots/workwise/08-survey-051-delivery.jpg?url'
+import settings051 from '../../../../website/products/screenshots/workwise/09-survey-051-settings.jpg?url'
 import { version } from '../../../../package.json'
 
 export const HELP_VERSION = version
@@ -26,7 +29,20 @@ export const helpImages: Record<string, string> = {
   [`${imageRoot}overview-zh-dark-1280x840.png`]: overview,
   [`${imageRoot}process-zh-dark-1280x840.png`]: process,
   [`${imageRoot}results-zh-dark-1280x840.png`]: results,
-  [`${imageRoot}deliver-zh-dark-1280x840.png`]: deliver
+  [`${imageRoot}deliver-zh-dark-1280x840.png`]: deliver,
+  '../website/products/screenshots/workwise/07-survey-051-zh-light.jpg': survey051,
+  '../website/products/screenshots/workwise/08-survey-051-delivery.jpg': delivery051,
+  '../website/products/screenshots/workwise/09-survey-051-settings.jpg': settings051
+}
+
+/** Only images explicitly included in the package can be displayed. */
+export function helpImageResource(from: string, href: string): string | undefined {
+  if (!helpDocuments[from]) return undefined
+  try {
+    const base = 'https://help.railwise.invalid/docs/'
+    const target = new URL(href, `${base}${from}`).href
+    return Object.entries(helpImages).find(([path]) => new URL(path, base).href === target)?.[1]
+  } catch { return undefined }
 }
 
 export function helpSlug(text: string): string {
