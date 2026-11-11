@@ -45,7 +45,7 @@ function writeOperation(text: string): NonNullable<TaskIntent['operations']>[num
 
 /** Preserve explicit sequential/conjoined platform actions without counting a report's completion as a todo write. */
 function combinedOperations(text: string, primary: ReturnType<typeof writeOperation>) {
-  const clauses = text.split(/[，,。；;\n]|并且?|然后|随后|接着|再(?!次)|后|\b(?:and|then)\b/i)
+  const clauses = text.split(/[，,。；;\n]|并且?|然后|随后|接着|再(?!次)|后|(?:以及|及|和|与|同时)(?=\s*(?:请|再|先)?(?:批准|同意|拒绝|驳回|转交|转办|上传|发送|完成|发))|\b(?:and|then)\b/i)
   const operations = clauses.flatMap(clause => {
     const operation = writeOperation(clause)
     if (!operation || (operation === 'complete' && primary !== 'complete' && !/待办|\b(?:todo|task)\b|任务\s*[A-Za-z0-9“「]/i.test(clause))) return []

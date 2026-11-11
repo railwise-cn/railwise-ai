@@ -106,6 +106,10 @@ describe('external task capability preflight', () => {
 
   it.each([
     ['请先批准飞书审批，再上传测试文件。', ['approve', 'upload']],
+    ['请批准飞书审批同时上传测试文件。', ['approve', 'upload']],
+    ['请批准飞书审批以及上传测试文件。', ['approve', 'upload']],
+    ['请批准飞书审批和上传测试文件。', ['approve', 'upload']],
+    ['请批准飞书审批与发送测试消息。', ['approve', 'send']],
     ['请同意飞书里的那一个并发送通知。', ['approve', 'send']],
     ['请上传飞书文件，然后批准我选定的审批。', ['approve', 'upload']],
     ['完成飞书待办 A 并发送通知。', ['send', 'complete']],
@@ -115,7 +119,7 @@ describe('external task capability preflight', () => {
     expect(externalTaskIntent(String(prompt))?.operations).toEqual(operations)
   })
 
-  it.each(['完成报告并通过飞书发送邮件', '请批准飞书文件上传申请。', '我同意你通过飞书发送一封邮件。',
+  it.each(['完成报告并通过飞书发送邮件', '请批准飞书文件上传申请。', '请批准飞书消息发送和文件上传申请。', '我同意你通过飞书发送一封邮件。',
     '请上传到飞书。用户已明确批准这次上传。', '如何批准飞书审批并上传文件？'])('avoids inventing secondary operations (%s)', prompt => {
     expect(externalTaskIntent(prompt)?.operations).toBeUndefined()
   })
