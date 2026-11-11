@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { validateWindowsUiReport, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateWindowsUiReport, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 function report() {
@@ -12,9 +12,22 @@ function report() {
     locale: 'zh', theme: 'dark', productionTouched: false, packageUnchanged: true, cleanExit: true,
     errors: [], tabs: ['技能', '插件', '连接器'], chapters: Array.from({ length: 13 }, (_, index) => index + 1),
     update: { ok: true, hasUpdate: false }, helpOffline: true,
+    resources: {
+      bundledSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'],
+      engineeringSkills: ['资料盘点与来源索引', '监测质检与图表', '工程文档差异审阅', '会议纪要与待办'].map(name => ({ name, installEnabled: true })),
+      connectors: ['amap-maps', 'zotero-mcp'].map(id => ({ id, detailsReady: true, catalogSourceType: 'built-in' })),
+      connectionsUnchanged: true,
+      cad: ['autocad-dwg-redraw', 'autocad-image-redraw'].map(id => ({
+        id, catalogSourceType: 'built-in', commit: 'ed182ec5966caaaf1d82d6ad4015435a27a8a909',
+        archiveSha256: '1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e',
+        sourceUrl: `https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/ed182ec5966caaaf1d82d6ad4015435a27a8a909/skills/${id}`,
+        installEnabled: true, dependenciesVisible: true, licenseNoticeVisible: true
+      }))
+    },
     checks: ['installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
       'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
-      'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent']
+      'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent',
+      'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries']
   }
 }
 
@@ -58,6 +71,34 @@ for (const [label, mutate] of [
   })
 }
 
+for (const [label, mutate] of [
+  ['early empty catalog', value => { value.resources.connectors = [] }],
+  ['missing bundled skill', value => { value.resources.bundledSkills.pop() }],
+  ['unavailable engineering skill entry', value => { value.resources.engineeringSkills[0].installEnabled = false }],
+  ['missing connector details', value => { value.resources.connectors[1].detailsReady = false }],
+  ['mutated connector config', value => { value.resources.connectionsUnchanged = false }],
+  ['remote-only CAD catalog', value => { value.resources.cad[0].catalogSourceType = 'github' }],
+  ['floating CAD source', value => { value.resources.cad[0].commit = 'main' }],
+  ['different CAD archive', value => { value.resources.cad[0].archiveSha256 = '0'.repeat(64) }],
+  ['disabled CAD installation entry', value => { value.resources.cad[1].installEnabled = false }],
+  ['missing CAD dependency instructions', value => { value.resources.cad[1].dependenciesVisible = false }],
+  ['missing CAD license notice', value => { value.resources.cad[0].licenseNoticeVisible = false }]
+]) {
+  test(`Windows resource evidence rejects ${label}`, () => {
+    const invalid = report()
+    mutate(invalid)
+    assert.throws(() => validateWindowsUiReport(invalid, identity))
+  })
+}
+
+test('readonly connector DOM observations compile with their exact Chinese dialog labels', () => {
+  for (const connector of [{ id: 'amap-maps', name: '高德地图' }, { id: 'zotero-mcp', name: 'Zotero 本机文献' }]) {
+    const expression = readonlyConnectorSetupExpression(connector)
+    assert.doesNotThrow(() => new Function(`return ${expression}`))
+    assert.ok(expression.includes(JSON.stringify(`[role="dialog"][aria-label="${connector.name}"]`)))
+  }
+})
+
 test('Chinese UI uses the same installed EXE before owned uninstall, with unchanged ordinary app configuration', () => {
   const installer = readFileSync(new URL('./run-windows-install-smoke.ps1', import.meta.url), 'utf8')
   const ui = readFileSync(new URL('./run-windows-ui-smoke.mjs', import.meta.url), 'utf8')
@@ -72,5 +113,10 @@ test('Chinese UI uses the same installed EXE before owned uninstall, with unchan
   assert.match(ui, /document\.activeElement\?\.matches\('input\[aria-label="搜索帮助"\]'\)/)
   assert.match(ui, /'the typed search query'/)
   assert.ok(ui.indexOf("text: '版本更新'") < ui.indexOf("'1.4 现有界面截图'"))
+  assert.ok(ui.indexOf("'the loaded local Amap and Zotero catalog entries'") < ui.indexOf("const connectorsScreenshot"))
+  assert.ok(ui.indexOf("'the loaded local Amap and Zotero catalog entries'") < ui.indexOf("查看 GitHub MCP 连接详情"))
+  assert.match(ui, /window\.workwise\.listCatalogPackages\(\)/)
+  assert.match(ui, /window\.workwise\.listSkills\(\)/)
+  assert.match(ui, /both locally cataloged CAD skills/)
   assert.doesNotMatch(ui, /window\.workwise\s*=|innerHTML\s*=|mock\w*\(/)
 })

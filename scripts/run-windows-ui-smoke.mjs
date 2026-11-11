@@ -11,8 +11,24 @@ const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds)
 const requiredChecks = [
   'installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
   'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
-  'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent'
+  'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent',
+  'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries'
 ]
+const bundledSkillIds = ['ppt-master', 'tender-master', 'di-bao-monitoring']
+const engineeringSkillNames = ['资料盘点与来源索引', '监测质检与图表', '工程文档差异审阅', '会议纪要与待办']
+const cadEntries = [
+  { id: 'autocad-dwg-redraw', name: 'AutoCAD DWG 重绘', dependencies: ['Python', 'AutoCAD', 'pywin32'] },
+  { id: 'autocad-image-redraw', name: '图片转 CAD 重绘', dependencies: ['Python', 'AutoCAD', 'opencv-python-headless==4.14.0.94', 'ezdxf'] }
+]
+const cadCommit = 'ed182ec5966caaaf1d82d6ad4015435a27a8a909'
+
+export function readonlyConnectorSetupExpression(connector) {
+  const selector = `[role="dialog"][aria-label="${connector.name}"]`
+  const ready = connector.id === 'amap-maps'
+    ? `Boolean(drawer.querySelector('input[type="password"]'))&&drawer.innerText.includes('获取高德 Web 服务 Key')`
+    : `drawer.innerText.includes('0.17.0')&&drawer.innerText.includes('MIT AND AGPL-3.0-or-later')&&drawer.innerText.includes('本机只读工具')&&Array.from(drawer.querySelectorAll('button')).some(button=>button.textContent.trim()==='审阅并安装'&&!button.disabled)`
+  return `(() => { const drawer=document.querySelector(${JSON.stringify(selector)}); return Boolean(drawer && (${ready})); })()`
+}
 
 export function windowsUiEnvironment(environment, root) {
   const clean = { ...environment }
@@ -42,6 +58,22 @@ export function validateWindowsUiReport(report, identity) {
   assert.equal(report.update.hasUpdate, false)
   assert.equal(report.helpOffline, true)
   for (const check of requiredChecks) assert.ok(report.checks.includes(check), `Missing actual UI observation: ${check}`)
+  assert.deepEqual(report.resources.bundledSkills, bundledSkillIds)
+  assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
+  assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
+  assert.deepEqual(report.resources.connectors.map(connector => connector.id), ['amap-maps', 'zotero-mcp'])
+  assert.ok(report.resources.connectors.every(connector => connector.detailsReady && connector.catalogSourceType === 'built-in'))
+  assert.equal(report.resources.connectionsUnchanged, true)
+  assert.deepEqual(report.resources.cad.map(item => item.id), cadEntries.map(item => item.id))
+  for (const item of report.resources.cad) {
+    assert.equal(item.catalogSourceType, 'built-in')
+    assert.equal(item.commit, cadCommit)
+    assert.equal(item.archiveSha256, '1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e')
+    assert.equal(item.sourceUrl, `https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/${cadCommit}/skills/${item.id}`)
+    assert.equal(item.installEnabled, true)
+    assert.equal(item.dependenciesVisible, true)
+    assert.equal(item.licenseNoticeVisible, true)
+  }
   return true
 }
 
@@ -184,15 +216,75 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     assert.deepEqual(report.tabs, ['技能', '插件', '连接器'])
     assert.equal(await cdp.evaluate(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()`), '技能')
     report.checks.push('skills-default-and-tab-order')
+    // Read the installed application's built-in catalog and wait for its actual
+    // rendered entries. Remote connector checks are not a readiness signal.
+    const localCatalog = await cdp.evaluate(`Promise.all([window.workwise.listCatalogSources(),window.workwise.listCatalogPackages()]).then(([sources,catalog]) =>
+      catalog.packages.filter(entry=>['amap-maps','zotero-mcp','autocad-dwg-redraw','autocad-image-redraw'].includes(entry.package.id)).map(entry=>({
+        id:entry.package.id,name:entry.package.name,catalogSourceType:sources.find(source=>source.id===entry.sourceId)?.type,
+        commit:entry.package.source.resolvedRef,sourceUrl:entry.package.source.location,archiveSha256:entry.package.source.digest?.value
+      })))`)
+    assert.equal(localCatalog.length, 4)
+    assert.ok(localCatalog.every(entry => entry.catalogSourceType === 'built-in'))
+    await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'both locally cataloged CAD skills', 60_000)
+    report.resources = { bundledSkills: [], engineeringSkills: [], connectors: [], cad: [], connectionsUnchanged: false }
+    report.resources.engineeringSkills = await cdp.evaluate(`Array.from(document.querySelectorAll('section[aria-label="工程技能"] article')).map(article=>({
+      name:article.querySelector('h3')?.textContent.trim(),installEnabled:Array.from(article.querySelectorAll('button')).some(button=>button.textContent.trim()==='安装'&&!button.disabled)
+    }))`)
+    assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
+    assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
+    const skills = await cdp.evaluate('window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,sourceType:skill.source?.type})):[])')
+    const bundledSkills = bundledSkillIds.map(id => {
+      const skill = skills.find(skill => skill.id === id && skill.sourceType === 'bundled')
+      assert.ok(skill, `Missing installed bundled Skill: ${id}`)
+      return skill
+    })
+    await cdp.click('[role="tablist"]:not([aria-label]) [role="tab"]:nth-child(2)')
+    await cdp.wait(`document.body.innerText.includes('RailWise AI 内置') && ${JSON.stringify(bundledSkills.map(skill => skill.name || skill.id))}.every(name=>Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===name))`, 'the bundled Skills in their local list')
+    report.resources.bundledSkills = bundledSkills.map(skill => skill.id)
+    report.resources.bundledSkillNames = bundledSkills.map(skill => skill.name || skill.id)
+    report.checks.push('packaged-skills-and-engineering-entries')
+    for (const expected of cadEntries) {
+      await cdp.click('section[aria-label="发现技能"] [role="button"] .truncate', expected.name)
+      const observation = await cdp.wait(`(() => {
+        const drawer=Array.from(document.querySelectorAll('aside')).find(node=>node.querySelector('header h2')?.textContent.trim()===${JSON.stringify(expected.name)});
+        if(!drawer)return null;
+        const text=drawer.innerText;
+        return {installEnabled:Array.from(drawer.querySelectorAll('button')).some(button=>button.textContent.trim()==='从上游安装'&&!button.disabled),
+          dependenciesVisible:${JSON.stringify(expected.dependencies)}.every(value=>text.includes(value)),
+          licenseNoticeVisible:text.includes('上游未声明许可证'),versionVisible:text.includes(${JSON.stringify(cadCommit)}),publisherVisible:text.includes('pengxiaoan')};
+      })()`, `${expected.name} source, install entry and dependencies`)
+      assert.ok(observation.installEnabled && observation.dependenciesVisible && observation.licenseNoticeVisible && observation.versionVisible && observation.publisherVisible)
+      report.resources.cad.push({ ...localCatalog.find(item => item.id === expected.id), ...observation })
+      if (expected.id === 'autocad-dwg-redraw') {
+        const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+        await writeFile(join(evidenceDir, 'windows-cad-details-zh-dark.png'), Buffer.from(screenshot.data, 'base64'))
+      }
+      // The generic package drawer supports dismissal through its backdrop.
+      await cdp.click('div.fixed.inset-0.z-40:has(> aside > header > h2)')
+      await cdp.wait(`!Array.from(document.querySelectorAll('aside')).some(node=>node.querySelector('header h2')?.textContent.trim()===${JSON.stringify(expected.name)})`, 'package drawer dismissed')
+    }
+    report.checks.push('autocad-fixed-upstream-entries')
     await cdp.click('[role="tab"]', '插件')
     await cdp.wait(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()==='插件'`, 'Plugins selected')
     report.checks.push('plugins-tab')
     await cdp.click('[role="tab"]', '连接器')
     await cdp.wait(`document.querySelector('[role="tablist"][aria-label="技能与连接器分类"] [aria-selected="true"]')?.textContent.trim()==='连接器' && document.body.innerText.includes('钉钉') && document.body.innerText.includes('飞书')`, 'native connector catalog')
+    await cdp.wait(`['查看 高德地图 连接详情','查看 Zotero 本机文献 连接详情'].every(label=>Array.from(document.querySelectorAll('button')).some(button=>button.getAttribute('aria-label')===label&&!button.disabled))`, 'the loaded local Amap and Zotero catalog entries', 60_000)
     report.checks.push('connectors-tab')
     const connectorsScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
     await writeFile(join(evidenceDir, 'windows-connectors-zh-dark.png'), Buffer.from(connectorsScreenshot.data, 'base64'))
     const connectionsBefore = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))')
+    for (const connector of [{ id: 'amap-maps', name: '高德地图' }, { id: 'zotero-mcp', name: 'Zotero 本机文献' }]) {
+      await cdp.click(`button[aria-label="查看 ${connector.name} 连接详情"]`)
+      const detailsReady = await cdp.wait(readonlyConnectorSetupExpression(connector), `${connector.name} actionable local setup details`)
+      report.resources.connectors.push({ ...localCatalog.find(item => item.id === connector.id), detailsReady })
+      const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+      await writeFile(join(evidenceDir, `windows-${connector.id}-details-zh-dark.png`), Buffer.from(screenshot.data, 'base64'))
+      await cdp.click('button[aria-label="关闭连接详情"]')
+    }
+    report.resources.connectionsUnchanged = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))') === connectionsBefore
+    assert.equal(report.resources.connectionsUnchanged, true)
+    report.checks.push('amap-zotero-actionable-setup')
     await cdp.click('button[aria-label="查看 GitHub MCP 连接详情"]')
     await cdp.wait(`document.querySelector('[role="dialog"][aria-label="GitHub 连接"] input[type="password"]') && document.body.innerText.includes('在 GitHub 创建令牌')`, 'actionable GitHub connection setup')
     assert.equal(await cdp.evaluate(`document.body.innerText.includes('这个 MCP 服务需要先配置 OAuth Client ID')`), false)
