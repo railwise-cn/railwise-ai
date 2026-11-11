@@ -34,6 +34,8 @@ describe('managed MCP configuration generations', () => {
     const host = new LocalToolHost({ registry: new CapabilityRegistry(built.providers) })
     const scoped = context(built.authorityFingerprints)
     scoped.executionGrant!.allowedProviderIds = ['mcp:search']
+    scoped.allowedMcpProviderIds = ['mcp:docs']
+    scoped.executionGrant!.allowedMcpProviderIds = ['mcp:docs']
     try {
       schemaVersion = 'changed'
       await host.execute({ callId: 'refresh', toolName: 'mcp_refresh_catalog', arguments: {} }, scoped)
@@ -42,7 +44,12 @@ describe('managed MCP configuration generations', () => {
       expect(callTool).not.toHaveBeenCalled()
       const refreshed = context(built.authorityFingerprints)
       refreshed.executionGrant!.allowedProviderIds = ['mcp:search']
+      refreshed.allowedMcpProviderIds = ['mcp:docs']
+      refreshed.executionGrant!.allowedMcpProviderIds = ['mcp:docs']
       expect((await host.execute({ callId: 'fresh-read', toolName: 'mcp_call', arguments: { toolId: 'docs/read', arguments: {} } }, refreshed)).item).toMatchObject({ kind: 'tool_result', isError: false })
+      expect(callTool).toHaveBeenCalledTimes(1)
+      const excluded = { ...refreshed, allowedMcpProviderIds: ['mcp:other'] }
+      expect((await host.execute({ callId: 'excluded-read', toolName: 'mcp_call', arguments: { toolId: 'docs/read', arguments: {} } }, excluded)).item).toMatchObject({ kind: 'tool_result', isError: true })
       expect(callTool).toHaveBeenCalledTimes(1)
     } finally { await built.close() }
   })
