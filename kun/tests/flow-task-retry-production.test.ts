@@ -13,7 +13,7 @@ afterEach(async () => {
   vi.unstubAllEnvs()
 })
 
-async function fixture() {
+async function fixture(parallel = false) {
   vi.stubEnv('RAILWISE_TASK_SCHEDULING_DISABLED', '1')
   const root = await realpath(await mkdtemp(join(tmpdir(), 'railwise-flow-retry-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
@@ -34,30 +34,34 @@ async function fixture() {
   let runtime = await createKunServeRuntime(options)
   cleanup.push(async () => runtime.shutdown?.())
   let coordinator = new TaskDeliveryCoordinator(runtime)
-  const policy = { timeoutMs: 10_000, retryAttempts: 0, retryBackoffMs: 0, concurrencyLimit: 1,
+  const policy = { timeoutMs: 10_000, retryAttempts: 0, retryBackoffMs: 0, concurrencyLimit: parallel ? 2 : 1,
     errorBehavior: 'fail' as const, resumable: true, breakpoint: false }
   const definition = { schemaVersion: 1 as const, id: 'synthetic-flow', name: '合成流程重试', description: '', workspace: root, variables: {},
     nodes: [
       { id: 'start', type: 'manual_trigger', label: '开始', position: { x: 0, y: 0 }, bindings: {}, config: {}, policy, disabled: false },
       { id: 'agent', type: 'agent', label: '汇总', position: { x: 200, y: 0 }, bindings: {}, config: { prompt: '请汇总这段合成资料。' }, policy, disabled: false }
     ], edges: [{ id: 'start-agent', sourceNodeId: 'start', sourcePortId: 'output', targetNodeId: 'agent', targetPortId: 'input', branch: 'normal' as const }] }
+  if (parallel) {
+    definition.nodes.push({ ...definition.nodes[1]!, id: 'second-agent', label: '并行汇总', config: { prompt: '请独立汇总另一段合成资料。' } })
+    definition.edges.push({ ...definition.edges[0]!, id: 'start-second', targetNodeId: 'second-agent' })
+  }
   runtime.flowService!.create(definition)
   expect(runtime.flowService!.publish(definition.id).published).toBe(true)
   const flow = await runtime.flowService!.run(definition.id, {})
   await expect.poll(() => runtime.flowService!.repository.getRun(flow.id)?.status).toBe('paused')
-  await expect.poll(() => runtime.taskRepository!.list({ workspaceRoot: root })[0]?.status).toBe('failed')
-  const source = runtime.taskRepository!.list({ workspaceRoot: root })[0]!
+  await expect.poll(() => runtime.taskRepository!.list({ workspaceRoot: root }).filter(task => task.status === 'failed').length).toBe(parallel ? 2 : 1)
+  const source = runtime.taskRepository!.get(String(runtime.flowService!.repository.getRun(flow.id)!.checkpoint!.taskId))!
   await expect.poll(async () => (await runtime.threadService.get(source.threadId))?.turns[0]?.status).not.toBe('running')
-  const retry = async () => {
+  const retry = async (task = source) => {
     failModel = false
-    return runtime.taskControlService!.mutate(source.id, 'retry', { expectedRevision: runtime.taskRepository!.get(source.id)!.revision, idempotencyKey: 'retry-flow-task' })
+    return runtime.taskControlService!.mutate(task.id, 'retry', { expectedRevision: runtime.taskRepository!.get(task.id)!.revision, idempotencyKey: 'retry-flow-task' })
   }
   const restart = async () => {
     await runtime.shutdown?.()
     runtime = await createKunServeRuntime(options)
     coordinator = new TaskDeliveryCoordinator(runtime)
   }
-  return { get runtime() { return runtime }, get coordinator() { return coordinator }, source, flow, retry, restart, modelCalls: () => modelCalls }
+  return { get runtime() { return runtime }, get coordinator() { return coordinator }, source, flow, definition, retry, restart, modelCalls: () => modelCalls }
 }
 
 describe('Flow task retry through the production Runtime and synthetic model protocol', () => {
@@ -112,7 +116,49 @@ describe('Flow task retry through the production Runtime and synthetic model pro
     const calls = f.modelCalls()
     await f.coordinator.tick()
     expect(f.runtime.flowService!.repository.getRun(f.flow.id)?.status).toBe('failed')
-    expect(f.runtime.taskRepository!.pendingOutbox('flow_task_retry')).toHaveLength(1)
+    expect(f.runtime.taskRepository!.pendingOutbox('flow_task_retry')).toHaveLength(0)
+    expect(f.runtime.taskRepository!.operations(retried.task.id, 'flow_retry_delivery')).toMatchObject([{ status: 'failed' }])
+    expect(f.modelCalls()).toBe(calls)
+  })
+
+  it('allows retry after the user resumed a Flow whose same task had already failed', async () => {
+    const f = await fixture()
+    await f.runtime.flowService!.resume(f.flow.id)
+    await expect.poll(() => f.runtime.flowService!.repository.getRun(f.flow.id)?.status).toBe('failed')
+    expect(f.runtime.flowService!.repository.getRun(f.flow.id)?.output).not.toHaveProperty('taskId')
+    const retried = await f.retry()
+    await expect.poll(() => f.runtime.taskRepository!.get(retried.task.id)?.status).toBe('completed')
+    await f.coordinator.tick()
+    await expect.poll(() => f.runtime.flowService!.repository.getRun(f.flow.id)?.status).toBe('succeeded')
+  })
+
+  it('rejects a sibling retry before dispatch and isolates an old incompatible outbox while another Flow completes', async () => {
+    const f = await fixture(true)
+    await f.coordinator.tick()
+    const failedOwnerId = (f.runtime.flowService!.repository.getRun(f.flow.id)!.output as { taskId: string }).taskId
+    expect(f.runtime.taskRepository!.get(failedOwnerId)?.status).toBe('failed')
+    const sibling = f.runtime.taskRepository!.list({ workspaceRoot: f.source.workspaceRoot }).find(task => task.id !== failedOwnerId)!
+    const before = (await f.runtime.threadService.get(sibling.threadId))!.turns.length
+    await expect(f.retry(sibling)).rejects.toMatchObject({ code: 'flow_retry_failure_conflict' })
+    expect((await f.runtime.threadService.get(sibling.threadId))!.turns).toHaveLength(before)
+    // Reproduce a persisted retry emitted by an older build, before admission checked the failed node.
+    const legacy = f.runtime.taskController!.createRetryTask({ id: 'legacy-incompatible-retry', sourceTaskId: sibling.id,
+      expectedRevision: sibling.revision, thread: (await f.runtime.threadService.get(sibling.threadId))!, request: { prompt: sibling.goal } })
+    const otherDefinition = { ...f.definition, id: 'independent-flow', name: '独立合成流程',
+      nodes: f.definition.nodes.slice(0, 2), edges: f.definition.edges.slice(0, 1) }
+    f.runtime.flowService!.create(otherDefinition)
+    expect(f.runtime.flowService!.publish(otherDefinition.id).published).toBe(true)
+    const other = await f.runtime.flowService!.run(otherDefinition.id, {})
+    await expect.poll(() => f.runtime.flowService!.repository.getRun(other.id)?.status).toBe('paused')
+    await expect.poll(() => f.runtime.taskRepository!.list({ workspaceRoot: f.source.workspaceRoot }).find(task => task.flowRunId === other.id)?.status).toBe('completed')
+    await f.coordinator.tick()
+    await expect.poll(() => f.runtime.flowService!.repository.getRun(other.id)?.status).toBe('succeeded')
+    expect(f.runtime.flowService!.repository.getRun(f.flow.id)?.status).toBe('failed')
+    expect(f.runtime.taskRepository!.pendingOutbox('flow_task_retry')).toHaveLength(0)
+    expect(f.runtime.taskRepository!.operations(legacy.id, 'flow_retry_delivery')).toMatchObject([{ status: 'failed', result: { code: 'flow_retry_failure_conflict' } }])
+    expect(f.runtime.taskRepository!.attention(`flow-retry-rejected:flow-task-retry:${legacy.id}`)?.status).toBe('pending')
+    const calls = f.modelCalls()
+    await f.coordinator.tick()
     expect(f.modelCalls()).toBe(calls)
   })
 
