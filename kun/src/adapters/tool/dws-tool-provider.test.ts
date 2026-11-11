@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { ExecutionGrantSchema } from '../../contracts/permissions.js'
 import type { ToolHostContext } from '../../ports/tool-host.js'
 import { LocalToolHost } from './local-tool-host.js'
-import { buildDwsToolProvider,_dwsToolProviderInternals } from './dws-tool-provider.js'
+import { buildDwsToolProvider,_dwsToolProviderInternals, type DwsCommandResult } from './dws-tool-provider.js'
 import { dwsTestConfig,dwsTestIdentity,withDwsTestIdentity } from '../../../tests/helpers/dws-identity.js'
 
 const context=():ToolHostContext=>({threadId:'thread',turnId:'turn',workspace:'',approvalPolicy:'auto',sandboxMode:'read-only',abortSignal:new AbortController().signal,
@@ -141,6 +141,63 @@ describe('official typed DingTalk DWS provider',()=>{
       .mockResolvedValueOnce({ok:true,output:{success:true,result:{todoCards:Array.from({length:20},()=>({taskId:'synthetic'}))}}})
       .mockResolvedValueOnce({ok:false,output:{success:false,result:{todoCards:[]}}})
     expect(await buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools[0].execute({pageSize:25},context())).toMatchObject({isError:true,output:{code:'connector_remote_failed'}})
+  })
+  it.each([
+    {page:1,pageSize:100,total:68,start:0,count:68,hasMore:false,pages:[1,2,3,4]},
+    {page:2,pageSize:25,total:68,start:25,count:25,hasMore:true,pages:[2,3]},
+    {page:3,pageSize:25,total:68,start:50,count:18,hasMore:false,pages:[3,4]},
+    {page:2,pageSize:15,total:68,start:15,count:15,hasMore:true,pages:[1,2]},
+    {page:5,pageSize:15,total:68,start:60,count:8,hasMore:false,pages:[4]},
+    {page:1,pageSize:20,total:20,start:0,count:20,hasMore:false,pages:[1]},
+    {page:2,pageSize:20,total:20,start:20,count:0,hasMore:false,pages:[2]},
+    {page:1,pageSize:100,total:0,start:0,count:0,hasMore:false,pages:[1]},
+    {page:1000,pageSize:100,total:100010,start:99900,count:100,hasMore:true,pages:[4996,4997,4998,4999,5000]}
+  ])('maps approval page $page / size $pageSize to exact 20-item transport windows', async sample => {
+    const runner = vi.fn(async (_path:string, args:string[]) => {
+      const page = Number(args[args.indexOf('--page') + 1])
+      const size = Number(args[args.indexOf('--limit') + 1])
+      expect(size).toBe(20)
+      const start = (page - 1) * size
+      return {ok:true,output:{success:true,result:{values:Array.from({length:Math.max(0,Math.min(size,sample.total-start))},(_,index)=>({id:String(start+index)})),hasMore:start+size<sample.total,upstreamMarker:'preserved'}}}
+    })
+    const tool = buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
+    const result = await tool.execute({page:sample.page,pageSize:sample.pageSize},context())
+    expect(result).toMatchObject({output:{status:'succeeded',data:{page:sample.page,pageSize:sample.pageSize,hasMore:sample.hasMore,values:Array.from({length:sample.count},(_,index)=>({id:String(sample.start+index)})),raw:{upstreamMarker:'preserved'}},evidence:{verified:true,operation:'list',target:'current_user'}}})
+    expect(runner.mock.calls.map(call=>Number(call[1][call[1].indexOf('--page')+1]))).toEqual(sample.pages)
+  })
+  it.each([{total:20,hasMore:false},{total:21,hasMore:true}])('uses bounded lookahead when approval hasMore is absent ($total items)',async sample=>{
+    const runner=vi.fn(async(_path:string,args:string[])=>{
+      const start=(Number(args[args.indexOf('--page')+1])-1)*20
+      return {ok:true,output:{success:true,result:{values:Array.from({length:Math.max(0,Math.min(20,sample.total-start))},(_,index)=>({id:String(start+index)}))}}}
+    })
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
+    expect(await tool.execute({page:1,pageSize:20},context())).toMatchObject({output:{data:{hasMore:sample.hasMore,values:Array.from({length:20},(_,id)=>({id:String(id)})),raw:{values:expect.any(Array),pages:expect.any(Array)}}}})
+    expect(runner).toHaveBeenCalledTimes(2)
+  })
+  it('keeps approval business errors and malformed empty responses failed across pagination',async()=>{
+    const failures=[
+      {ok:false,output:{error:{code:1,message:'[MCP_TOOL_ERROR] {"errorCode":400002,"error_message":"参数错误","result":{"values":null},"success":false}'}}},
+      {ok:true,output:{success:false,errorCode:400002,result:{values:null}}},
+      {ok:true,output:{success:true,result:{values:null}}},
+      {ok:true,output:{success:true,result:{values:[],hasMore:true}}}
+    ]
+    for(const response of failures){
+      const runner=vi.fn(async()=>response)
+      const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
+      expect(await tool.execute({pageSize:100},context())).toMatchObject({isError:true,output:{status:'failed'}})
+    }
+    const runner=vi.fn(async():Promise<DwsCommandResult>=>({ok:true,output:{success:true,result:{values:Array.from({length:20},(_,id)=>({id:String(id)})),hasMore:true}}}))
+      .mockResolvedValueOnce({ok:true,output:{success:true,result:{values:Array.from({length:20},(_,id)=>({id:String(id)})),hasMore:true}}})
+      .mockResolvedValueOnce({ok:true,output:{success:false,errorCode:400002,result:{values:null}}})
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
+    expect(await tool.execute({pageSize:100},context())).toMatchObject({isError:true,output:{status:'failed',code:'connector_remote_failed'}})
+    expect(runner).toHaveBeenCalledTimes(2)
+  })
+  it.each([{page:Number.MAX_SAFE_INTEGER,pageSize:100},{page:1.5,pageSize:20},{page:0,pageSize:20},{page:1,pageSize:101},{page:1,pageSize:NaN}])('rejects unsafe or out-of-contract approval pagination before dispatch',async args=>{
+    const runner=vi.fn(async()=>({ok:true,output:{success:true,result:{values:[]}}}))
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_list_approvals')!
+    expect(await tool.execute(args,context())).toMatchObject({isError:true,output:{status:'failed'}})
+    expect(runner).not.toHaveBeenCalled()
   })
   it.each([
     [{type:'auth',http_status:401},'connector_authorization_required'],

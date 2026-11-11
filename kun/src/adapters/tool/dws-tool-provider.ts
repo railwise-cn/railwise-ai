@@ -146,9 +146,41 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
     define({name:'dingtalk_get_task',description:'按准确ID读取钉钉待办详情。',schema:todo,operation:'detail',execute:async(_args,context,target)=>readTodo(target,context)}),
     define({name:'dingtalk_complete_task',description:'用户确认后完成一个准确钉钉待办，回读验证结果。',schema:todo,operation:'complete',write:true,execute:async(_args,context,target)=>run(['todo','task','done','--task-id',target,'--status','true'],context)}),
     define({name:'dingtalk_list_approvals',description:'读取当前钉钉账号待我审批列表；按页返回，不能代替审批。',schema:list,operation:'list',execute:async(args,context)=>{
-      const raw=await run(['oa','approval','list-pending','--page',String(args.page),'--limit',String(args.pageSize)],context)
-      const values=findArray(raw,['values']);if(!values)throw fail('connector_invalid_response')
-      return {values,page:args.page,pageSize:args.pageSize,raw}
+      const requestedSize = Number(args.pageSize)
+      const offset = (Number(args.page) - 1) * requestedSize
+      if (!Number.isSafeInteger(offset)) throw fail('connector_invalid_request')
+      // The locked CLI advertises 1–100, but the live API rejects limit=100.
+      // Keep the public page window and use the verified 20-item transport page.
+      const transportSize = 20
+      let page = Math.floor(offset / transportSize) + 1
+      let skip = offset % transportSize
+      const values: unknown[] = []
+      const pages: Json[] = []
+      let hasMore = false
+      while (values.length <= requestedSize) {
+        if (!Number.isSafeInteger(page)) throw fail('connector_invalid_request')
+        const raw = await run(['oa', 'approval', 'list-pending', '--page', String(page), '--limit', String(transportSize)], context)
+        const items = findArray(raw, ['values'])
+        if (!items || items.length > transportSize || items.length === 0 && raw.hasMore === true) {
+          throw fail('connector_invalid_response')
+        }
+        pages.push(raw)
+        values.push(...items.slice(skip))
+        if (values.length > requestedSize) {
+          hasMore = true
+          break
+        }
+        if (raw.hasMore === false || items.length < transportSize && raw.hasMore !== true) break
+        if (values.length === requestedSize && raw.hasMore === true) {
+          hasMore = true
+          break
+        }
+        // A full page without a hasMore flag needs one read-only lookahead.
+        page += 1
+        skip = 0
+      }
+      return {values:values.slice(0, requestedSize),page:args.page,pageSize:args.pageSize,hasMore,
+        raw:pages.length === 1 ? pages[0] : {...pages[0], pages}}
     }}),
     define({name:'dingtalk_get_approval',description:'读取钉钉审批实例及每个节点状态。',schema:instance,operation:'detail',execute:async(_args,context,target)=>readApproval(target,context)}),
     define({name:'dingtalk_get_approval_tasks',description:'读取当前账号在指定审批实例中可操作的精确taskId。',schema:instance,operation:'detail',execute:async(_args,context,target)=>({instanceId:target,taskIds:await readTasks(target,context)})}),
