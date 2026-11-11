@@ -15,7 +15,7 @@ type MenuAction = () => void | Promise<void>
 type TitleBarTranslate = (key: string, options?: Record<string, unknown>) => string
 
 const WORKWISE_GITHUB_URL = 'https://github.com/railwise-cn/railwise-ai'
-const WORKWISE_PRODUCT_URL = 'https://www.railwise.cn/products/workwise/'
+const WORKWISE_PRODUCT_URL = 'https://www.railwise.cn/products/railwise-ai/'
 const WORKWISE_PRODUCT_INTRO_URL =
   'https://github.com/railwise-cn/railwise-ai/blob/main/docs/product-introduction.zh-CN.md'
 const WORKWISE_RELEASES_URL = `${WORKWISE_GITHUB_URL}/releases`
