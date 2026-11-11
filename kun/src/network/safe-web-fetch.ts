@@ -21,6 +21,7 @@ export class SafeWebFetchError extends Error {
 }
 
 export type SafeWebFetchPolicy = {
+  allowedOrigins?: string[]
   allowDomains?: string[]
   denyDomains?: string[]
   maxBytes?: number
@@ -88,6 +89,10 @@ export function validateSafeWebUrl(raw: string | URL, policy: SafeWebFetchPolicy
     throw new SafeWebFetchError('unsafe_url', 'URL credentials are not allowed.')
   }
   const hostname = url.hostname.toLowerCase()
+  if (policy.allowedOrigins && !policy.allowedOrigins.some(value => {
+    if (value === '*') return true
+    try { return new URL(value).origin === url.origin } catch { return value.toLowerCase() === hostname }
+  })) throw new SafeWebFetchError('redirect_blocked', 'The URL is outside the authorized network scope.')
   if ((policy.denyDomains ?? []).some((domain) => domainMatches(hostname, domain))) {
     throw new SafeWebFetchError('unsafe_url', 'The URL is blocked by policy.')
   }

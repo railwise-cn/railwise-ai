@@ -41,10 +41,10 @@ export function createWriteLocalTool(_options: WriteLocalToolOptions = {}): Loca
       if (!rawPath.trim() || content == null) {
         return { output: { error: 'path and content are required' }, isError: true }
       }
-      const { absolutePath, relativePath } = await resolveWorkspacePath(rawPath, context)
+      const { absolutePath, relativePath } = await resolveWorkspacePath(rawPath, context, 'write')
       assertCanWritePath(absolutePath, context)
       return withFileMutationQueue(absolutePath, async () => {
-        await resolveWorkspacePath(rawPath, context)
+        await resolveWorkspacePath(rawPath, context, 'write')
         await _options.mutationLifecycle?.beforeMutation?.({
           absolutePath,
           relativePath,
@@ -58,7 +58,7 @@ export function createWriteLocalTool(_options: WriteLocalToolOptions = {}): Loca
         } else {
           await atomicWriteFile(absolutePath, content, {
             beforeReplace: async () => {
-              await resolveWorkspacePath(rawPath, context)
+              await resolveWorkspacePath(rawPath, context, 'write')
             }
           })
         }

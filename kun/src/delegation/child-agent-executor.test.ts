@@ -13,6 +13,17 @@ const grant = (overrides: Partial<ExecutionGrant> = {}): ExecutionGrant => ({
 })
 
 describe('child execution scope inheritance', () => {
+  it('inherits separate read/write ceilings and rejects connector identity changes', () => {
+    const parent = grant({ readPathAllowlist: ['/repo'], writePathAllowlist: ['/repo/output'], taskPermissionId: 'permission', permissionDuration: 'task',
+      connectorBackends: { 'lark-cli': 'lark-cli' }, connectorIdentityFingerprints: { 'lark-cli': 'a'.repeat(64) } })
+    const current = { networkAllowlist: ['*'], connectorScopes: [], externalTargets: [],
+      readPathAllowlist: ['/repo/source'], writePathAllowlist: ['/repo/output/child'],
+      connectorBackends: { 'lark-cli': 'lark-cli' as const }, connectorIdentityFingerprints: { 'lark-cli': 'a'.repeat(64) } }
+    expect(intersectChildExecutionScope(parent, '/repo', current)).toMatchObject({
+      readPathAllowlist: ['/repo/source'], writePathAllowlist: ['/repo/output/child'], taskPermissionId: 'permission', permissionDuration: 'task'
+    })
+    expect(() => intersectChildExecutionScope(parent, '/repo', { ...current, connectorIdentityFingerprints: { 'lark-cli': 'b'.repeat(64) } })).toThrow(/identity changed/)
+  })
   it('intersects parent and current provider permissions, paths, targets, and expiry', () => {
     const scope = intersectChildExecutionScope(grant(), '/repo/child', {
       allowedToolNames: ['read', 'lark_list_tasks', 'unrelated'],

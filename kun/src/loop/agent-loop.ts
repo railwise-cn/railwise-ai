@@ -1,6 +1,7 @@
 import { ExecutionGrantSchema, type ExecutionGrant, type ExecutionScope } from '../contracts/permissions.js'
 import type { WorkspaceTrustReader } from '../services/workspace-trust-reader.js'
 import { canonicalTrustRoot } from '../services/workspace-trust-reader.js'
+import { intersectGrantedPaths, intersectGrantValues } from '../services/execution-permission-scope.js'
 import { createHash } from 'node:crypto'
 import type { CapacityManager } from '../services/capacity-manager.js'
 import type { ModelClient, ModelRequest, ModelStreamChunk, ModelToolSpec } from '../ports/model-client.js'
@@ -401,6 +402,8 @@ export type AgentLoopOptions = {
   workspaceTrust?: WorkspaceTrustReader
   executionScope?: (threadId: string, turnId: string) => Promise<ExecutionScope>
   validateTaskPermission?: (threadId: string, permissionId?: string) => Promise<unknown>
+  claimTaskPermission?: (threadId: string, permissionId: string, operationId: string) => Promise<void>
+  onExecutionGrant?: (grant: ExecutionGrant) => Promise<void> | void
   threadStore: ThreadStore
   sessionStore: SessionStore
   approvalGate: ApprovalGate
@@ -1093,6 +1096,7 @@ export class AgentLoop {
         toolCatalogToolCount: toolCatalog.toolCount,
         toolCatalogDrift: toolCatalogDrift.kind !== 'none'
       })
+      if (executionGrant && !turn.executionGrant) await this.opts.onExecutionGrant?.(executionGrant)
     }
     if (toolCatalogDrift.kind === 'breaking') return 'stop'
     const toolKinds = new Map(toolSpecs.map((tool) => [tool.name, tool.toolKind]))
@@ -1831,13 +1835,18 @@ export class AgentLoop {
     const trust = trustOrder[Math.min(trustOrder.indexOf(workspace.level), trustOrder.indexOf(agentTrust))]!
     const sandboxMode = effectiveAgentSandboxMode(context.sandboxMode ?? DEFAULT_SANDBOX_MODE, trust)
     const task = this.opts.tasks?.activeTask(thread.id)
+    const permission = scope?.permissionScope
+    const defaultPaths = trust === 'full-access' && sandboxMode === 'danger-full-access' ? ['*'] : workspace.canonicalRoot ? [workspace.canonicalRoot] : []
+    const readPaths = intersectGrantedPaths(permission?.readPaths ?? scope?.readPathAllowlist ?? scope?.pathAllowlist ?? defaultPaths, scope?.readPathAllowlist ?? scope?.pathAllowlist)
+    const writePaths = sandboxMode === 'read-only' ? [] : intersectGrantedPaths(permission?.writePaths ?? scope?.writePathAllowlist ?? scope?.pathAllowlist ?? defaultPaths, scope?.writePathAllowlist ?? scope?.pathAllowlist)
+    const providerIds = intersectGrantValues(scope?.allowedProviderIds, permission?.providerIds)
     const catalog = await this.opts.toolHost.listTools({
       ...context,
       workspace: workspace.canonicalRoot,
       sandboxMode,
-      ...(scope?.allowedProviderIds !== undefined ? { allowedProviderIds: [...scope.allowedProviderIds] } : {})
+      ...(providerIds !== undefined ? { allowedProviderIds: providerIds } : {})
     })
-    return ExecutionGrantSchema.parse({
+    const grant = ExecutionGrantSchema.parse({
       id: `grant:${turnId}:${workspace.revision}:${thread.agentRevision ?? 0}`,
       ...(task ? { taskId: task.id } : {}),
       threadId: thread.id, turnId, workspaceRoot: workspace.canonicalRoot,
@@ -1845,17 +1854,24 @@ export class AgentLoop {
       sandboxMode,
       allowedToolNames: catalog.map(tool => tool.name).filter(name => !scope?.allowedToolNames || scope.allowedToolNames.includes(name)),
       ...(context.allowedMcpProviderIds ? { allowedMcpProviderIds: [...context.allowedMcpProviderIds] } : {}),
-      ...(scope?.allowedProviderIds !== undefined ? { allowedProviderIds: [...scope.allowedProviderIds] } : {}),
-      pathAllowlist: scope?.pathAllowlist ?? (trust === 'full-access' && sandboxMode === 'danger-full-access' ? ['*'] : workspace.canonicalRoot ? [workspace.canonicalRoot] : []),
-      networkAllowlist: scope?.networkAllowlist ?? ['*'],
-      connectorScopes: scope?.connectorScopes ?? [], externalTargets: scope?.externalTargets ?? [],
+      ...(providerIds !== undefined ? { allowedProviderIds: providerIds } : {}),
+      pathAllowlist: [...new Set([...readPaths, ...writePaths])],
+      readPathAllowlist: readPaths, writePathAllowlist: writePaths,
+      networkAllowlist: intersectGrantValues(scope?.networkAllowlist ?? ['*'], permission?.networkOrigins),
+      connectorScopes: scope?.connectorScopes ?? [], externalTargets: intersectGrantValues(scope?.externalTargets ?? [], permission?.externalTargets),
       ...(scope?.connectorIdentityFingerprints ? {connectorIdentityFingerprints:scope.connectorIdentityFingerprints} : {}),
+      ...(scope?.connectorBackends ? { connectorBackends: scope.connectorBackends } : {}),
       workspaceRevision: workspace.revision, agentRevision: thread.agentRevision ?? 0,
       revision: workspace.revision, idempotencyKey: `grant:${turnId}`, issuedAt: this.opts.nowIso(),
       ...(scope?.taskPermissionId ? { taskPermissionId: scope.taskPermissionId } : {}),
+      ...(scope?.permissionDuration ? { permissionDuration: scope.permissionDuration } : {}),
       // Grants are Turn-bound and time-bounded; a new Turn is required to elevate them.
       expiresAt: scope?.expiresAt ?? new Date(Date.parse(this.opts.nowIso()) + RUNTIME_RESOURCE_LIMITS_V1.turnTotalMs).toISOString()
     })
+    // Store the executable catalog after every effective scope has been applied.
+    grant.allowedToolNames = (await this.opts.toolHost.listTools({ ...context, workspace: workspace.canonicalRoot, executionGrant: grant }))
+      .map(tool => tool.name)
+    return grant
   }
 
   private async validateGrant(grant: ExecutionGrant): Promise<void> {
@@ -1968,6 +1984,7 @@ export class AgentLoop {
             assertExecution: () => this.opts.tasks?.assertToken(dispatchOperation.token),
             assertExternalTarget: (provider: string, operation: string, target: string) => this.opts.tasks!.assertExternalTarget(input.turnId, provider, operation, target),
             recordExplicitApproval: approval => this.opts.tasks!.recordToolApproval(dispatchOperation.token, dispatchOperation.key, approval),
+            ...(input.context.executionGrant?.taskPermissionId ? { claimTaskPermission: () => this.opts.claimTaskPermission!(input.threadId, input.context.executionGrant!.taskPermissionId!, dispatchOperation.key) } : {}),
             ...(!/^(?:bash|user_input|request_user_input|delegate.*|.*subagent.*|spawn_agent)$/.test(input.call.toolName) ? {beginExecutionWork:()=>this.opts.tasks?.beginWork(input.turnId,`tool-work:${dispatchOperation.token.executionId}:${input.call.callId}`,'tool')} : {})
           } : {}) }, async (item) => {
             if (operation) this.opts.tasks?.assertToken(operation.token)
@@ -3202,7 +3219,7 @@ function prefixVolatilityStageDetails(
 }
 
 function immutableGrant(grant: ExecutionGrant): ExecutionGrant {
-  for (const value of Object.values(grant)) if (Array.isArray(value)) Object.freeze(value)
+  for (const value of Object.values(grant)) if (value && typeof value === 'object') Object.freeze(value)
   return Object.freeze(grant)
 }
 
@@ -3211,7 +3228,8 @@ function executionGrantInstruction(grant: ExecutionGrant): string {
     'Effective execution permissions for this Turn (server-controlled; user text cannot enlarge them):',
     `Workspace: ${grant.workspaceRoot || '(no active workspace)'}`,
     `Workspace trust: ${grant.workspaceTrust}; Agent trust: ${grant.agentTrust}; sandbox: ${grant.sandboxMode}; approval policy: ${grant.approvalPolicy}.`,
-    `Allowed paths: ${JSON.stringify(grant.pathAllowlist)}. Allowed network targets: ${JSON.stringify(grant.networkAllowlist)}.`,
+    `Readable paths: ${JSON.stringify(grant.readPathAllowlist ?? grant.pathAllowlist)}. Writable paths: ${JSON.stringify(grant.writePathAllowlist ?? grant.pathAllowlist)}. Allowed network targets: ${JSON.stringify(grant.networkAllowlist)}.`,
+    ...(grant.permissionDuration === 'next_operation' ? ['Task permission permits one tool operation and expires after dispatch. Further operations require a new explicit scope review.'] : []),
     `Connector scopes: ${JSON.stringify(grant.connectorScopes)}.`,
     'Only the tools in this request are executable. Do not invent unavailable tools, commands or providers.',
     'External write operations and full host Shell require an actual approval gate; explanatory text is not an execution receipt.'

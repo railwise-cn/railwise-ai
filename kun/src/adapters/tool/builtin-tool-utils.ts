@@ -81,7 +81,7 @@ async function nearestExistingPath(path: string): Promise<string> {
   }
 }
 
-export async function resolveWorkspacePath(inputPath: string, context: ToolHostContext): Promise<{
+export async function resolveWorkspacePath(inputPath: string, context: ToolHostContext, access: 'read' | 'write' = 'read'): Promise<{
   workspaceRoot: string
   absolutePath: string
   relativePath: string
@@ -92,9 +92,18 @@ export async function resolveWorkspacePath(inputPath: string, context: ToolHostC
   }
   const root = workspaceRoot(context.workspace)
   const absolutePath = isAbsolute(inputPath) ? resolve(inputPath) : resolve(root, inputPath)
-  const scopeBlock = grantPathBlock(absolutePath, context)
+  const scopeBlock = grantPathBlock(absolutePath, context, access)
   if (scopeBlock) throw Object.assign(new Error(scopeBlock.message), { code: scopeBlock.code })
   const relativePath = relative(root, absolutePath)
+  const grantedPaths = access === 'write' ? context.executionGrant?.writePathAllowlist : context.executionGrant?.readPathAllowlist
+  if (grantedPaths !== undefined) {
+    const existing = await nearestExistingPath(absolutePath)
+    const canonicalExisting = await realpath(existing)
+    const canonicalPath = resolve(canonicalExisting, relative(existing, absolutePath))
+    const canonicalBlock = grantPathBlock(canonicalPath, context, access)
+    if (canonicalBlock) throw Object.assign(new Error(canonicalBlock.message), { code: canonicalBlock.code })
+    return { workspaceRoot: root, absolutePath: canonicalPath, relativePath }
+  }
   if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
     throw new Error(`path escapes the workspace root: ${inputPath}`)
   }

@@ -42,10 +42,13 @@ import { UsageService } from '../services/usage-service.js'
 import type { ChildRunExecutor } from './delegation-runtime.js'
 import { childDraftToolHost } from './child-draft-tool-host.js'
 import { resolveWorkspacePath } from '../adapters/tool/builtin-tool-utils.js'
+import { intersectGrantedPaths } from '../services/execution-permission-scope.js'
 
 export type ChildAgentExecutorOptions = {
   workspaceTrust?: WorkspaceTrustReader
   executionScope?: (threadId: string, turnId: string) => Promise<ExecutionScope>
+  validateTaskPermission?: (threadId: string, permissionId?: string) => Promise<unknown>
+  claimTaskPermission?: (threadId: string, permissionId: string, operationId: string) => Promise<void>
   dataDir?: string
   parentContext?: (threadId: string, turnId: string) => Promise<ThreadRecord | null>
   approvalGate?: ApprovalGate
@@ -193,6 +196,18 @@ export function createChildAgentExecutor(options: ChildAgentExecutorOptions): Ch
       'Read only authorized sources in the workspace. When the assignment requires file output, use propose_document for Markdown candidates in this child task\'s isolated directory and export_document for task-owned exports. Shell and arbitrary document mutations are unavailable. Final changes to user documents require the parent document review service.'
     ].filter(Boolean).join('\n')
     const loop = new AgentLoop({
+      validateTaskPermission: async () => {
+        await options.validateTaskPermission?.(input.parentThreadId, parentGrant?.taskPermissionId)
+        const currentParent = await options.parentContext?.(input.parentThreadId, input.parentTurnId)
+        if (parentGrant && options.parentContext && (!currentParent || (currentParent.agentRevision ?? 0) !== parentGrant.agentRevision)) {
+          throw Object.assign(new Error('Parent Agent authority changed before child dispatch.'), { code: 'execution_grant_revoked' })
+        }
+        const workspace = parentGrant ? await options.workspaceTrust?.get(parentGrant.workspaceRoot) : undefined
+        if (parentGrant && workspace && (workspace.revision !== parentGrant.workspaceRevision || workspace.level !== parentGrant.workspaceTrust)) {
+          throw Object.assign(new Error('Parent workspace authority changed before child dispatch.'), { code: 'execution_grant_revoked' })
+        }
+      },
+      claimTaskPermission: options.claimTaskPermission ? (_threadId, permissionId, operationId) => options.claimTaskPermission!(input.parentThreadId, permissionId, `child:${input.childId}:${operationId}`) : undefined,
       ...(options.workspaceTrust ? { workspaceTrust: options.workspaceTrust } : {}),
       ...(parentGrant ? { executionScope: async () => intersectChildExecutionScope(
         parentGrant,
@@ -383,15 +398,26 @@ export function intersectChildExecutionScope(
   const allowedProviderIds = intersectOptional(parent.allowedProviderIds, current?.allowedProviderIds)
   const allowedToolNames = intersectScope(parent.allowedToolNames ?? [], current?.allowedToolNames ?? ['*'])
   const expiresAt = earliestExpiry(parent.expiresAt, current?.expiresAt)
+  for (const [provider, identity] of Object.entries(parent.connectorIdentityFingerprints ?? {})) {
+    if (current?.connectorIdentityFingerprints?.[provider] !== identity || current?.connectorBackends?.[provider] !== parent.connectorBackends?.[provider]) {
+      throw Object.assign(new Error('Parent connector identity changed before child dispatch.'), { code: 'execution_grant_revoked' })
+    }
+  }
   return {
     allowedToolNames,
     ...(allowedProviderIds ? { allowedProviderIds } : {}),
     pathAllowlist,
+    ...(parent.readPathAllowlist ? { readPathAllowlist: intersectGrantedPaths(intersectGrantedPaths(parent.readPathAllowlist, current?.readPathAllowlist ?? current?.permissionScope?.readPaths), pathAllowlist) } : {}),
+    ...(parent.writePathAllowlist ? { writePathAllowlist: intersectGrantedPaths(intersectGrantedPaths(parent.writePathAllowlist, current?.writePathAllowlist ?? current?.permissionScope?.writePaths), pathAllowlist) } : {}),
     // A child may only use externally scoped access that remains present in
     // the current provider configuration as well as the parent grant.
     networkAllowlist: intersectScope(parent.networkAllowlist, current?.networkAllowlist ?? []),
     connectorScopes: intersectScope(parent.connectorScopes, current?.connectorScopes ?? []),
     externalTargets: intersectScope(parent.externalTargets, current?.externalTargets ?? []),
+    ...(parent.connectorIdentityFingerprints ? { connectorIdentityFingerprints: parent.connectorIdentityFingerprints } : {}),
+    ...(parent.connectorBackends ? { connectorBackends: parent.connectorBackends } : {}),
+    ...(parent.taskPermissionId ? { taskPermissionId: parent.taskPermissionId } : {}),
+    ...(parent.permissionDuration ? { permissionDuration: parent.permissionDuration } : {}),
     ...(expiresAt ? { expiresAt } : {})
   }
 }

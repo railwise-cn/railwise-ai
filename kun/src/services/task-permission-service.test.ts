@@ -12,11 +12,13 @@ import { TaskPermissionService } from './task-permission-service.js'
 import { ThreadAgentProfileSchema } from '../contracts/threads.js'
 import { TurnSchema } from '../contracts/turns.js'
 import { ExecutionGrantSchema } from '../contracts/permissions.js'
+import { LocalToolHost } from '../adapters/tool/local-tool-host.js'
+import type { ToolEffectDefinition } from '../ports/tool-effect.js'
 
 const cleanup:Array<()=>Promise<void>>=[]
 afterEach(async()=>{for(const close of cleanup.splice(0))await close()})
 
-async function fixture() {
+async function fixture(toolEffects: ToolEffectDefinition[] = []) {
   const root=await realpath(await mkdtemp(join(tmpdir(),'railwise-task-permission-')))
   const repository=new TaskRunRepository(join(root,'tasks.sqlite3'))
   cleanup.push(async()=>{repository.close();await rm(root,{recursive:true,force:true})})
@@ -28,7 +30,7 @@ async function fixture() {
   let workspace:WorkspaceTrustSnapshot={canonicalRoot:root,level:'workspace-write',revision:3}
   const controller=new TaskController({repository,threadStore,sessionStore,nowIso:()=>now})
   const task=controller.createWaitingTask({id:'permission-task',thread:hidden,request:{prompt:'帮我处理飞书待办',taskOriginThreadId:origin.id},reason:'任务审批策略禁止工具执行。'})
-  const service=new TaskPermissionService({repository,workspaceTrust:{get:async()=>workspace},nowIso:()=>now,threads:{get:id=>threadStore.get(id),update:async(id,patch)=>{
+  const service=new TaskPermissionService({repository,toolEffects:()=>toolEffects,workspaceTrust:{get:async()=>workspace},nowIso:()=>now,threads:{get:id=>threadStore.get(id),update:async(id,patch)=>{
     if(rejectWrite)throw new Error('synthetic file persistence failure')
     const current=(await threadStore.get(id))!
     return threadStore.upsert({...current,...patch,updatedAt:now})
@@ -38,6 +40,78 @@ async function fixture() {
 }
 
 describe('task-only finite approval permission',()=>{
+  it('shows registered tool scope requirements for mixed file and effect tasks', async () => {
+    const f = await fixture([{ provider: 'lark', operation: 'send', mutation: true, targetFields: ['recipient'], requiredScopes: ['mail:user_mailbox.message:send'] }])
+    f.repository.update(f.task.id, f.task.revision, task => ({ ...task, acceptance: { ...task.acceptance, kind: 'files', effect: {
+      provider: 'lark', operation: 'send', target: 'synthetic@example.test', requiredScopes: [], requiresConfirmation: true, successStatus: ['succeeded'], verification: 'provider_readback'
+    } } }))
+    expect((await f.service.snapshot(f.task.id)).connectorScopeSources).toEqual([{ provider: 'lark', scopes: ['mail:user_mailbox.message:send'], source: 'tool_catalog' }])
+  })
+  it('persists explicit task scopes with canonical paths and exact network origins', async () => {
+    const f = await fixture()
+    f.repository.update(f.task.id, f.task.revision, task => ({ ...task, authority: { ...task.authority!, externalTargets: [JSON.stringify(['lark', 'complete', 'task-42'])] } }))
+    const request = { ...await f.request(), duration: 'task' as const, scope: {
+      readPaths: [f.root], writePaths: [join(f.root, 'reports')], networkOrigins: ['https://example.com:443'],
+      providerIds: ['lark-cli'], externalTargets: [JSON.stringify(['lark', 'complete', 'task-42'])]
+    } }
+    const result = await f.service.confirm(f.task.id, request)
+    expect(await f.service.executionRestriction(f.hidden.id)).toMatchObject({ permissionDuration: 'task', permissionScope: {
+      ...request.scope, networkOrigins: ['https://example.com']
+    } })
+    expect(result.permission.grant?.scope?.writePaths).toEqual([join(f.root, 'reports')])
+    expect((await f.threadStore.get(f.origin.id))?.approvalPolicy).toBe('never')
+  })
+
+  it('rejects wildcard scope, relative paths, credential-bearing URLs and writes through read-only authority', async () => {
+    const f = await fixture()
+    for (const scope of [{ readPaths: ['../elsewhere'] }, { providerIds: ['*'] }, { networkOrigins: ['https://user:secret@example.com'] }, { networkOrigins: ['https://example.com/private'] }]) {
+      await expect(f.service.confirm(f.task.id, { ...await f.request(), scope })).rejects.toThrow()
+    }
+    f.setWorkspace({ canonicalRoot: f.root, level: 'read-only', revision: 4 })
+    await expect(f.service.confirm(f.task.id, { ...await f.request(), scope: { writePaths: [f.root] } })).rejects.toMatchObject({ code: 'sandbox_read_only' })
+    expect(f.repository.operations(f.task.id)).toHaveLength(0)
+  })
+
+  it('consumes one-operation permission after approval, preserves it on rejection, and never returns it after unknown results', async () => {
+    const f = await fixture()
+    const confirmed = await f.service.confirm(f.task.id, { ...await f.request(), duration: 'next_operation' })
+    const permissionId = confirmed.permission.grant!.id
+    let dispatched = 0
+    const host = new LocalToolHost({ tools: [{ name: 'fixture_write', description: 'Synthetic operation', inputSchema: { type: 'object' },
+      toolKind: 'tool_call', policy: 'on-request', execute: async () => { dispatched++; throw new Error('Connection lost after dispatch') }
+    }] })
+    const context = { threadId: f.hidden.id, turnId: 'turn', workspace: f.root, sandboxMode: 'workspace-write' as const,
+      approvalPolicy: 'on-request' as const, abortSignal: new AbortController().signal,
+      awaitApproval: async () => 'deny' as const,
+      validateExecutionGrant: async () => { await f.service.executionRestriction(f.hidden.id, permissionId) },
+      claimTaskPermission: () => f.service.claimOperation(f.hidden.id, permissionId, 'operation-1')
+    }
+    await host.execute({ callId: 'first', toolName: 'fixture_write', arguments: {} }, context)
+    expect(dispatched).toBe(0)
+    expect((await f.service.snapshot(f.task.id)).grant?.status).toBe('active')
+    await host.execute({ callId: 'second', toolName: 'fixture_write', arguments: {} }, { ...context, awaitApproval: async () => 'allow' as const })
+    expect(dispatched).toBe(1)
+    expect((await f.service.snapshot(f.task.id)).grant?.status).toBe('consumed')
+    await expect(f.service.claimOperation(f.hidden.id, permissionId, 'operation-1')).resolves.toBeUndefined()
+    await expect(f.service.claimOperation(f.hidden.id, permissionId, 'operation-2')).rejects.toMatchObject({ code: 'task_permission_consumed' })
+    await expect(f.service.executionRestriction(f.hidden.id)).rejects.toMatchObject({ code: 'task_permission_consumed' })
+    await expect(f.service.executionRestriction(f.hidden.id, permissionId)).resolves.toMatchObject({ taskPermissionId: permissionId })
+  })
+
+  it('permits only one competing operation across service instances sharing SQLite', async () => {
+    const f = await fixture()
+    const confirmed = await f.service.confirm(f.task.id, { ...await f.request(), duration: 'next_operation' })
+    const otherRepository = new TaskRunRepository(join(f.root, 'tasks.sqlite3'))
+    cleanup.push(async () => otherRepository.close())
+    const other = new TaskPermissionService({ repository: otherRepository, workspaceTrust: { get: async () => ({ canonicalRoot: f.root, level: 'workspace-write', revision: 3 }) },
+      nowIso: () => '2026-11-10T00:00:00.000Z', threads: { get: id => f.threadStore.get(id), update: async () => { throw new Error('No update expected') } } })
+    const outcomes = await Promise.allSettled([
+      f.service.claimOperation(f.hidden.id, confirmed.permission.grant!.id, 'operation-a'),
+      other.claimOperation(f.hidden.id, confirmed.permission.grant!.id, 'operation-b')
+    ])
+    expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(outcomes.filter(result => result.status === 'rejected')).toHaveLength(1)
+  })
   it('derives visible authority ceilings from persisted task, Agent and workspace records without changing permissions',async()=>{
     const f=await fixture()
     const profile=ThreadAgentProfileSchema.parse({id:'reviewer',name:'项目审阅 Agent',role:'review',color:'blue',systemPrompt:'Review project tasks.',trustLevel:'read-only',

@@ -149,6 +149,7 @@ function createFetchTool(config: WebCapabilityConfig, provider: WebProvider) {
           maxBytes,
           timeoutMs,
           signal: context.abortSignal
+          ,allowedOrigins: context.executionGrant?.networkAllowlist
         })
         return {
           output: fetchOutput(result, telemetry({
@@ -245,9 +246,11 @@ class FetchWebProvider implements WebProvider {
     maxBytes: number
     timeoutMs: number
     signal: AbortSignal
+    allowedOrigins?: string[]
   }): Promise<WebFetchResult> {
     const response = await safeWebFetch(request.url, {
       allowDomains: this.policy.allowDomains,
+      allowedOrigins: request.allowedOrigins,
       denyDomains: this.policy.denyDomains,
       maxBytes: request.maxBytes,
       totalTimeoutMs: Math.min(request.timeoutMs, DEFAULT_WEB_TIMEOUT_MS)

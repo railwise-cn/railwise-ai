@@ -26,6 +26,12 @@ const api = {
   beginManagedLarkAppSetup: vi.fn(), checkManagedLarkAppSetup: vi.fn(), cancelManagedLarkAppSetup: vi.fn(),
   diagnoseManagedDingTalk: vi.fn(), installManagedDingTalk: vi.fn(), beginManagedDingTalkLogin: vi.fn(),
   checkManagedDingTalkLogin: vi.fn(), cancelManagedDingTalkLogin: vi.fn()
+  ,getTaskPermissions: vi.fn(async () => ({ taskId: 'task-original', taskRevision: 3, taskTitle: '处理飞书待办', scopeHash: 'reviewed-scope',
+    workspaceRoot: '/workspace/project', workspaceTrust: 'workspace-write', workspaceRevision: 1, agentRevision: 0,
+    approvalPolicy: 'never', targetApprovalPolicy: 'on-request', maxTtlSeconds: 900, canConfirm: true })),
+  getTaskRun: vi.fn(async () => ({ id: 'task-original', threadId: 'hidden-execution', status: 'waiting_user' })),
+  listAgentProfiles: vi.fn(async () => ({ profiles: [] })), runtimeRequest: vi.fn(async () => ({ ok: true, body: '{}' })),
+  confirmTaskPermissions: vi.fn(async () => ({ resumed: false, permission: { canConfirm: false, taskTitle: '处理飞书待办' } }))
 }
 function button(label: string): HTMLButtonElement {
   const result = [...container.querySelectorAll('button')].find(item => item.textContent === label)
@@ -77,12 +83,18 @@ describe('capability waiting card', () => {
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
-  it('routes a blocked task policy to settings rather than the connector marketplace', async () => {
+  it('resolves blocked task policy through the mounted task permission panel without resuming', async () => {
     await render({...card, capability:{...card.capability,status:'blocked',errorCode:'approval_policy_blocked',
       resolution:{kind:'grant',route:'settings',label:'调整任务审批策略'}}})
     await click('调整任务审批策略')
-    expect(state.openSettings).toHaveBeenCalledWith('general')
+    expect(api.getTaskPermissions).toHaveBeenCalledWith('task-original')
+    expect(container.textContent).toContain('查看当前任务权限')
+    expect(state.openSettings).not.toHaveBeenCalled()
     expect(state.openPlugins).not.toHaveBeenCalled()
+    expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
+    await click('允许当前任务请求审批')
+    expect(api.confirmTaskPermissions).toHaveBeenCalledWith('task-original', expect.objectContaining({ expectedRevision: 3, scopeHash: 'reviewed-scope', duration: 'task', ttlSeconds: 900 }))
     expect(api.coordinateTaskCommand).not.toHaveBeenCalled()
   })
 
@@ -90,7 +102,8 @@ describe('capability waiting card', () => {
     await render({...card, capability:{...card.capability,status:'blocked',errorCode:'agent_tool_blocked',
       resolution:{kind:'grant',route:'settings/agents',label:'检查 Agent 工具范围'}}})
     await click('检查 Agent 工具范围')
-    expect(state.openSettings).toHaveBeenCalledWith('agents')
+    expect(api.getTaskPermissions).toHaveBeenCalledWith('task-original')
+    expect(state.openSettings).not.toHaveBeenCalled()
     await render({...card, capability:{...card.capability,status:'blocked',
       resolution:{kind:'switch_workspace',route:'workspace',label:'选择工作区'}}})
     await click('选择工作区')

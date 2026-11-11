@@ -10,6 +10,7 @@ export type WebFetchRequest = {
   maxBytes: number
   timeoutMs: number
   signal: AbortSignal
+  allowedOrigins?: string[]
 }
 
 export type WebFetchResult = WebSource & {

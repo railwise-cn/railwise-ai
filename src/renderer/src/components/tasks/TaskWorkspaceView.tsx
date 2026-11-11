@@ -10,6 +10,7 @@ import { currentTaskBranch } from '@shared/task-projection'
 import { taskDisplayGoal } from '@shared/task-presentation'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { CapabilityRequiredCard } from '../chat/CapabilityRequiredCard'
+import { TaskPermissionPanel } from '../chat/TaskPermissionPanel'
 
 type TaskFilter = 'ongoing' | 'attention' | 'completed' | 'all'
 type Props = {
@@ -425,6 +426,7 @@ export function TaskWorkspaceView({ workspaceRoot, runtimeReady, leftSidebarColl
             {!TERMINAL.has(currentExecution?.status ?? selected.status) ? <button type="button" disabled={actionBusy} onClick={() => void mutate('cancel')} className="inline-flex items-center gap-1 rounded-lg border border-ds-border px-3 py-2 text-xs disabled:opacity-50"><Square className="h-3.5 w-3.5" />{t('taskRunCancel')}</button> : null}
           </div>
           {selectedAttention.length ? <div className="mb-4 space-y-2">{selectedAttention.map(item => <AttentionCard key={`${item.id}:${item.revision}`} item={item} conversationThreadId={conversationForAttention(item)} onResolved={() => void refresh()} onOpenThread={onOpenThread} onOpenFlow={onOpenFlow} />)}</div> : null}
+          <div className="mb-4"><TaskPermissionPanel key={(currentExecution ?? selected).id} taskId={(currentExecution ?? selected).id} revision={(currentExecution ?? selected).revision} autoLoad onConfirmed={() => void refresh()} /></div>
           <h3 className="mb-2 text-xs font-semibold text-ds-muted">{t('taskRunNodes')}</h3>
           <ol className="mb-4 space-y-1.5">{(currentExecution ?? selected).nodes.map(node => <li key={node.id} className="flex items-center gap-2 rounded-lg bg-ds-main px-3 py-2 text-xs"><span className="min-w-0 flex-1">{node.title}</span><span className="shrink-0 text-ds-muted">{t(`taskNodeStatus_${node.status}`)}</span></li>)}</ol>
           <TaskExecutionEvidence task={currentExecution ?? selected} relatedTasks={selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]} receipts={receipts.filter(receipt => (selectedGroup ? currentTaskBranch(selectedGroup.all, selectedGroup.root).members : [selected]).some(task => task.id === receipt.taskId))} onConfigureProvider={onConfigureProvider} onVerify={async receipt => {

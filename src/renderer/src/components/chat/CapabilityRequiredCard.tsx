@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { ExternalTaskCapabilityCard } from '@shared/task-command'
 import { ManagedLarkConnection } from '../connectors/ManagedLarkConnection'
 import { ManagedDingTalkConnection } from '../connectors/ManagedDingTalkConnection'
+import { TaskPermissionPanel } from './TaskPermissionPanel'
 import { useChatStore, type SettingsRouteSection } from '../../store/chat-store'
 
 /** A capability failure is a durable waiting task, never a completed answer. */
@@ -15,6 +16,7 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
   const [message, setMessage] = useState('')
   const [settled, setSettled] = useState(false)
   const [capability, setCapability] = useState(card.capability)
+  const [showPermissions, setShowPermissions] = useState(false)
   const isLark = capability.provider === 'lark' || capability.provider === 'feishu'
   const action = capability.resolution ?? capability.action
   const configure = (): void => {
@@ -23,11 +25,15 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
       return
     }
     const route = action?.route ?? ''
+    if (action?.kind === 'grant') {
+      setShowPermissions(true)
+      return
+    }
     if (action?.kind === 'connect' || action?.kind === 'install' || (!action && capability.provider === 'dingtalk')) {
       openPlugins(undefined, isLark ? 'lark' : 'dingtalk')
       return
     }
-    if (action?.kind === 'grant' || route === 'settings' || route.startsWith('settings/')) {
+    if (route === 'settings' || route.startsWith('settings/')) {
       // Account setup and task authority are separate. A connector page cannot
       // widen an existing task's execution grant.
       const section = route.slice('settings/'.length)
@@ -91,8 +97,9 @@ export function CapabilityRequiredCard({ card }: { card: ExternalTaskCapabilityC
         </> : null}
       </dl>
       {execution?.availableTools ? <details className="mt-2 text-xs text-ds-muted"><summary className="cursor-pointer">{t('capabilityAvailableTools', { count: execution.availableTools.length })}</summary><p className="mt-1 break-all">{execution.availableTools.join(', ') || t('capabilityNoTools')}</p></details> : null}
-      {isLark && !settled ? <ManagedLarkConnection compact initialState={capability.status === 'not_installed' ? 'not_installed' : undefined} /> : null}
-      {!isLark && !settled ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
+      {isLark && !settled && action?.kind !== 'grant' ? <ManagedLarkConnection compact initialState={capability.status === 'not_installed' ? 'not_installed' : undefined} /> : null}
+      {!isLark && !settled && action?.kind !== 'grant' ? <div className="mt-3"><ManagedDingTalkConnection /></div> : null}
+      {showPermissions && !settled ? <TaskPermissionPanel taskId={card.taskId} autoLoad onConfirmed={value => { setMessage(value); void useChatStore.getState().refreshThreads() }} /> : null}
       {message ? <p role="status" className="mt-3 whitespace-pre-wrap text-xs">{message}</p> : null}
       {!settled ? <div className="mt-3 flex flex-wrap gap-2 [&_button]:rounded-md [&_button]:border [&_button]:border-ds-border [&_button]:px-3 [&_button]:py-1.5 [&_button:disabled]:opacity-50">
         <button type="button" disabled={pending} onClick={configure}>{isLark && action?.kind === 'install' ? t('capabilityOpenMarketplace') : action?.label || t(isLark ? 'capabilityOpenMarketplace' : 'capabilityConfigureDingTalk')}</button>

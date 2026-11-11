@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolHostContext } from '../../ports/tool-host.js'
-import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes, canWritePath, effectiveApprovalPolicy, effectiveSandboxMode, externalTargetGrantKey, sandboxBlockForTool } from './sandbox-policy.js'
+import { assertGrantAllowsExternalTarget, assertGrantAllowsNetwork, assertGrantConnectorScopes, canWritePath, effectiveApprovalPolicy, effectiveSandboxMode, externalTargetGrantKey, sandboxBlockForTool, grantPathBlock } from './sandbox-policy.js'
 
 const base = (grant: NonNullable<ToolHostContext['executionGrant']>): ToolHostContext => ({
   threadId: 'thread', turnId: 'turn', workspace: '/workspace', sandboxMode: 'danger-full-access',
@@ -17,10 +17,20 @@ const grant = (overrides: Partial<NonNullable<ToolHostContext['executionGrant']>
 })
 
 describe('execution grant sandbox and approval enforcement', () => {
+  it('keeps explicit external read and write paths separate without enabling Shell', () => {
+    const context = base(grant({ sandboxMode: 'workspace-write', pathAllowlist: ['/source', '/output'], readPathAllowlist: ['/source'], writePathAllowlist: ['/output'] }))
+    expect(grantPathBlock('/source/file', context)).toBeNull()
+    expect(grantPathBlock('/output/file', context)?.code).toBe('workspace_path_blocked')
+    expect(canWritePath('/source/file', context)).toMatchObject({ ok: false })
+    expect(canWritePath('/output/file', context)).toEqual({ ok: true })
+    expect(sandboxBlockForTool({ name: 'bash', toolKind: 'command_execution' }, context)?.code).toBe('sandbox_command_blocked')
+    expect(canWritePath('/output/file', { ...context, executionGrant: { ...context.executionGrant!, workspaceTrust: 'read-only' } })).toMatchObject({ ok: false })
+  })
   it('treats empty target scopes as no write permission and keys exact provider/action/target', () => {
     const unscoped = base(grant())
     expect(() => assertGrantAllowsExternalTarget('lark', 'list', 'current_user', unscoped)).not.toThrow()
     expect(() => assertGrantAllowsExternalTarget('lark', 'complete', 'a', unscoped)).toThrow(/outside the reviewed/)
+    expect(() => assertGrantAllowsExternalTarget('lark', 'upload', 'folder-a', unscoped)).toThrow(/outside the reviewed/)
     const scoped = base(grant({ externalTargets: [externalTargetGrantKey('lark', 'complete', 'a')] }))
     expect(() => assertGrantAllowsExternalTarget('lark', 'complete', 'a', scoped)).not.toThrow()
     expect(() => assertGrantAllowsExternalTarget('dingtalk', 'complete', 'a', scoped)).toThrow()
@@ -51,6 +61,7 @@ describe('execution grant sandbox and approval enforcement', () => {
     const context = base(grant({ workspaceTrust: 'full-access', pathAllowlist: ['*'], networkAllowlist: ['*'] }))
     expect(effectiveSandboxMode(context)).toBe('danger-full-access')
     expect(sandboxBlockForTool({ name: 'bash', toolKind: 'command_execution' }, context)).toBeNull()
+    expect(sandboxBlockForTool({ name: 'bash', toolKind: 'command_execution' }, { ...context, executionGrant: { ...context.executionGrant!, readPathAllowlist: ['*'], writePathAllowlist: ['/workspace'] } })?.code).toBe('sandbox_command_blocked')
   })
 
   it('rejects writes outside the grant workspace and expired grants', () => {

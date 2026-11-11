@@ -109,6 +109,15 @@ export type TaskOperationReceiptV1 = {
 
 export type TaskOperationVerificationV1 = { taskId: string; receiptId: string; status: 'verified' | 'outcome_unknown'; evidence?: TaskResultEvidenceV1; errorCode?: string }
 
+export type TaskPermissionScopeV1 = {
+  readPaths?: string[]; writePaths?: string[]; networkOrigins?: string[]; providerIds?: string[]; externalTargets?: string[]
+}
+export type TaskExecutionPermissionV1 = {
+  turnId: string; workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; agentTrust: WorkspaceTrustLevel
+  sandboxMode: string; approvalPolicy: string; allowedToolNames?: string[]; allowedProviderIds?: string[]
+  pathAllowlist: string[]; readPathAllowlist?: string[]; writePathAllowlist?: string[]; networkAllowlist: string[]
+  connectorScopes: string[]; externalTargets: string[]; issuedAt: string; expiresAt?: string
+}
 export type TaskPermissionSnapshotV1 = {
   taskId: string; taskRevision: number; taskTitle: string; scopeHash: string
   workspaceRoot: string; workspaceTrust: WorkspaceTrustLevel; workspaceRevision: number; agentRevision: number
@@ -116,12 +125,14 @@ export type TaskPermissionSnapshotV1 = {
   /** Server-derived authority ceilings; these are not the current executable tool catalog. */
   sandboxMode?: string; agentTrust?: WorkspaceTrustLevel; agentName?: string
   toolAllowlist?: string[]; mcpAllowlist?: string[]; externalTargets?: string[]
-  connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
+  connectorScopeSources?: Array<{ provider: string; scopes: string[]; source: 'task_requirements' | 'tool_catalog' | 'last_execution_grant'; issuedAt?: string; expiresAt?: string }>
   canConfirm: boolean; reason?: string
-  grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared'; confirmedAt: string; expiresAt: string }
+  executionGrants?: TaskExecutionPermissionV1[]
+  grant?: { id: string; status: 'active' | 'expired' | 'invalid' | 'prepared' | 'consumed'; confirmedAt: string; expiresAt: string; scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation' }
 }
 export type TaskPermissionConfirmationV1 = {
   expectedRevision: number; idempotencyKey: string; scopeHash: string; confirmed: true; approvalPolicy: 'on-request'; ttlSeconds: number
+  scope?: TaskPermissionScopeV1; duration?: 'task'|'next_operation'
 }
 
 export type TaskNodeV1 = {

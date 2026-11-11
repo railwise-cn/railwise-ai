@@ -70,9 +70,13 @@ export function sandboxBlockForTool(
 ): SandboxBlock | null {
   const grantBlock = executionGrantBlock(context)
   if (grantBlock) return grantBlock
+  if (context.executionGrant?.permissionDuration === 'next_operation' && /^(?:delegate.*|.*subagent.*|spawn_agent)$/.test(tool.name)) {
+    return { code: 'execution_grant_scope', message: 'Delegation requires a task-duration permission because child execution contains multiple operations.' }
+  }
   const mode = effectiveSandboxMode(context)
   if (mode === 'danger-full-access') {
-    if (tool.toolKind === 'command_execution' && context.executionGrant && (!context.executionGrant.pathAllowlist.includes('*') || !context.executionGrant.networkAllowlist.includes('*'))) return { code: 'sandbox_command_blocked', message: 'Host Shell cannot enforce a restricted path/network grant; use a typed tool or explicitly authorize full host access.' }
+    const grant = context.executionGrant
+    if (tool.toolKind === 'command_execution' && grant && (!(grant.readPathAllowlist ?? grant.pathAllowlist).includes('*') || !(grant.writePathAllowlist ?? grant.pathAllowlist).includes('*') || !grant.networkAllowlist.includes('*'))) return { code: 'sandbox_command_blocked', message: 'Host Shell cannot enforce a restricted path/network grant; use a typed tool or explicitly authorize full host access.' }
     return null
   }
   if (isInteractiveGuiGateTool(tool.name)) return null
@@ -108,7 +112,7 @@ export function canWritePath(
   const grantBlock = executionGrantBlock(context)
   if (grantBlock) return { ok: false, block: grantBlock }
   const mode = effectiveSandboxMode(context)
-  const pathBlock = grantPathBlock(absolutePath, context)
+  const pathBlock = grantPathBlock(absolutePath, context, 'write')
   if (pathBlock) return { ok: false, block: pathBlock }
   if (mode === 'danger-full-access') return { ok: true }
   if (mode === 'read-only') {
@@ -129,6 +133,8 @@ export function canWritePath(
       }
     }
   }
+
+  if (context.executionGrant?.writePathAllowlist !== undefined) return { ok: true }
 
   const root = workspaceRoot(context.workspace)
   const resolvedPath = isAbsolute(absolutePath) ? resolve(absolutePath) : resolve(root, absolutePath)
@@ -185,11 +191,12 @@ function isInteractiveGuiGateTool(toolName: string): boolean {
 }
 
 /** Apply path scope to reads as well as writes; tools must still canonicalize symlinks. */
-export function grantPathBlock(absolutePath: string, context: Pick<ToolHostContext, 'workspace' | 'executionGrant'>): SandboxBlock | null {
+export function grantPathBlock(absolutePath: string, context: Pick<ToolHostContext, 'workspace' | 'executionGrant'>, access: 'read' | 'write' = 'read'): SandboxBlock | null {
   const grant = context.executionGrant
   if (!grant) return null
   const target = isAbsolute(absolutePath) ? resolve(absolutePath) : resolve(workspaceRoot(context.workspace), absolutePath)
-  if (grant.pathAllowlist.some(root => root === '*' || (root && isPathInsideOrEqual(root, target)))) return null
+  const paths = (access === 'write' ? grant.writePathAllowlist : grant.readPathAllowlist) ?? grant.pathAllowlist
+  if (paths.some(root => root === '*' || (root && isPathInsideOrEqual(root, target)))) return null
   return { code: 'workspace_path_blocked', message: `Path is outside the execution grant: ${absolutePath}` }
 }
 
@@ -225,7 +232,7 @@ export function assertGrantAllowsExternalTarget(
   target: string,
   context: Pick<ToolHostContext, 'executionGrant' | 'assertExternalTarget'>
 ): void {
-  if (!['approve', 'reject', 'complete', 'send', 'transfer'].includes(operation)) return
+  if (!['approve', 'reject', 'complete', 'send', 'transfer', 'upload'].includes(operation)) return
   if (context.assertExternalTarget) {
     context.assertExternalTarget(provider, operation, target)
     return
