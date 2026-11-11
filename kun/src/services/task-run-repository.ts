@@ -652,7 +652,12 @@ export class TaskRunRepository {
   }
 
   unsettledOperations(ownerId: string): OperationReceipt[] {
-    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>).map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json))).filter(item => item.kind !== 'im_delivery' && ['running', 'outcome_unknown'].includes(item.status) && !this.verifiedOperationResolution(item))
+    return (this.db.prepare('SELECT data_json FROM operation_receipts WHERE owner_id = ?').all(ownerId) as Array<{ data_json: string }>)
+      .map(row => OperationReceiptSchema.parse(JSON.parse(row.data_json)))
+      .filter(item => item.kind !== 'im_delivery' && (
+        ['running', 'outcome_unknown'].includes(item.status) ||
+        item.kind === 'tool' && item.status === 'prepared' && item.request?.dispatchTracking !== 'host-v1'
+      ) && !this.verifiedOperationResolution(item))
   }
   verifiedOperationResolution(receipt: OperationReceipt): OperationReceipt['resolution'] | undefined {
     const resolution = receipt.resolution

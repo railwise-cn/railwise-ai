@@ -147,6 +147,31 @@ describe('TaskController reliability boundaries', () => {
     repository.close()
   })
 
+  it.each([false, true])('recovers a prepared receipt with host dispatch tracking=%s without replaying an uncertain legacy action', async tracked => {
+    const f = await fixture()
+    f.controller.beginAttempt(f.thread.id, 'turn_reliability')
+    f.repository.beginOperation({ ownerId: f.task.id, idempotencyKey: 'prepared-before-restart', kind: 'tool',
+      request: { toolName: 'synthetic_write', callId: 'original', turnId: 'turn_reliability', ...(tracked ? { dispatchTracking: 'host-v1' } : {}) },
+      nowIso: '2026-07-18T00:00:00.000Z' })
+    expect(f.repository.unsettledOperations(f.task.id)).toHaveLength(tracked ? 0 : 1)
+    f.controller.endRun('turn_reliability')
+    f.repository.close()
+    const repository = new TaskRunRepository(join(f.root, 'tasks.sqlite3'))
+    const controller = new TaskController({ repository, threadStore: f.threadStore, sessionStore: f.sessionStore,
+      nowIso: () => '2026-07-18T00:02:00.000Z', ownerId: 'restarted-runtime' })
+    try {
+      const recovered = controller.reconcileStartup()
+      expect(recovered).toHaveLength(1)
+      expect(recovered[0].status).toBe(tracked ? 'retrying' : 'stalled')
+      expect(repository.operation(f.task.id, 'prepared-before-restart')?.status).toBe(tracked ? 'failed' : 'outcome_unknown')
+      if (!tracked) {
+        expect(() => controller.prepareResume(f.task.id, recovered[0].revision)).toThrow(/Verify outstanding/)
+        expect(repository.unsettledOperations(f.task.id)).toHaveLength(1)
+      }
+      expect(repository.operations(f.task.id, 'tool')).toHaveLength(1)
+    } finally { repository.close() }
+  })
+
   it('counts cumulative usage once per model request and keeps child work in the root budget',async()=>{
     const {repository,controller,task,thread,setNow}=await fixture()
     repository.update(task.id,task.revision,current=>({...current,budget:{...current.budget,version:2,maxExecutionMs:500,maxCostUsd:1}}))

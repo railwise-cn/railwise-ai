@@ -759,7 +759,11 @@ export class TaskController {
     const task = this.repository.get(taskId)!
     this.repository.transact(() => {
       for (const receipt of this.repository.operations(taskId, 'tool')) {
-        if (receipt.status !== 'prepared' || receipt.request?.dispatchTracking !== 'host-v1') continue
+        if (receipt.status !== 'prepared') continue
+        if (receipt.request?.dispatchTracking !== 'host-v1') {
+          this.repository.finishOperation(taskId, receipt.idempotencyKey, { status: 'outcome_unknown', error: 'legacy_dispatch_unverified' }, this.nowIso())
+          continue
+        }
         this.repository.finishOperation(taskId, receipt.idempotencyKey, { status: 'failed', error: 'operation_not_dispatched',
           result: { approved: false, item: makeToolResultItem({ id: `item_${receipt.request.callId}`, threadId: task.threadId,
             turnId: String(receipt.request.turnId), callId: String(receipt.request.callId), toolName: String(receipt.request.toolName),
