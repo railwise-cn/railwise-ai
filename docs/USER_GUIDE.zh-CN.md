@@ -187,7 +187,7 @@ RailWise AI 使用一个内置的 本机任务执行服务。Code、Write 和连
 ### 4.1 Survey 的工作顺序
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[原始文件] --> B[识别与来源预检]
     B --> C[网型、控制点、单位与基准]
     C --> D[确定性计算]

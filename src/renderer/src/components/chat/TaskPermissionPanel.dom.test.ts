@@ -42,6 +42,55 @@ beforeEach(async()=>{
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();Reflect.deleteProperty(window,'workwise');await i18n.changeLanguage('en')})
 
 describe('task permission authority overview',()=>{
+  it.each(['completed', 'cancelled', 'failed'] as const)('keeps the permission summary and execution history without new authorization controls for %s tasks', async status => {
+    api.getTaskRun.mockResolvedValue({ id: 'task-1', threadId: 'hidden-1', status } as TaskRunV1)
+    api.getTaskPermissions.mockResolvedValue({ ...snapshot, canConfirm: false,
+      reason: '请先让任务停止执行并进入等待或暂停状态。',
+      executionGrants: [{ turnId: 'historical-turn', workspaceRoot: '/project/synthetic', workspaceTrust: 'workspace-write',
+        agentTrust: 'read-only', sandboxMode: 'read-only', approvalPolicy: 'on-request', allowedToolNames: ['lark_task_get'],
+        pathAllowlist: ['/project/synthetic'], networkAllowlist: ['https://open.feishu.cn'],
+        connectorScopes: ['task:task:read'], externalTargets: [], issuedAt: '2026-11-09T00:00:00.000Z' }] })
+    await click('查看当前任务权限')
+    expect(container.textContent).toContain(snapshot.taskTitle)
+    expect(container.textContent).toContain('/project/synthetic')
+    expect(container.querySelector('details summary')?.textContent).toBe(i18n.t('common:taskPermissionExecutionHistory'))
+    expect(container.querySelector('details')?.textContent).toContain('lark_task_get')
+    expect(container.querySelector('input, select, textarea')).toBeNull()
+    expect([...container.querySelectorAll('button')].map(item => item.textContent)).toEqual(['查看当前任务权限'])
+    expect(container.textContent).not.toContain('请先让任务停止执行')
+    expect(container.textContent).not.toContain(i18n.t('common:taskPermissionScope'))
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+    expect(api.setThreadAgent).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['running', false], ['waiting_user', true], ['waiting_approval', true], ['paused', true], ['stalled', true]
+  ] as const)('keeps server-authorized confirmation behavior for %s tasks', async (status, canConfirm) => {
+    api.getTaskRun.mockResolvedValue({ id: 'task-1', threadId: 'hidden-1', status } as TaskRunV1)
+    api.getTaskPermissions.mockResolvedValue({ ...snapshot, canConfirm,
+      ...(!canConfirm ? { reason: '请先让任务停止执行并进入等待或暂停状态。' } : {}) })
+    await click('查看当前任务权限')
+    const confirmation = container.querySelector<HTMLInputElement>('input[type="checkbox"]')
+    expect(confirmation).not.toBeNull()
+    await act(async () => { confirmation!.click() })
+    expect(button('允许当前任务请求审批').disabled).toBe(!canConfirm)
+    expect(container.textContent?.includes('请先让任务停止执行')).toBe(!canConfirm)
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
+
+  it('refreshes an expanded permission panel into summary-only display after completion', async () => {
+    await act(async () => root.render(createElement(TaskPermissionPanel, { taskId: 'task-1', revision: 4, autoLoad: true, onConfirmed })))
+    await act(async () => { container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click() })
+    expect(button('允许当前任务请求审批').disabled).toBe(false)
+    api.getTaskRun.mockResolvedValue({ id: 'task-1', threadId: 'hidden-1', status: 'completed' } as TaskRunV1)
+    // A stale permission snapshot must not keep mutation controls visible for a terminal task.
+    api.getTaskPermissions.mockResolvedValue({ ...snapshot, taskRevision: 5, canConfirm: true })
+    await act(async () => root.render(createElement(TaskPermissionPanel, { taskId: 'task-1', revision: 5, autoLoad: true, onConfirmed })))
+    expect(container.querySelector('input, select, textarea')).toBeNull()
+    expect([...container.querySelectorAll('button')].map(item => item.textContent)).toEqual(['查看当前任务权限'])
+    expect(api.confirmTaskPermissions).not.toHaveBeenCalled()
+  })
+
   it('clears historical write paths after the Agent ceiling becomes read-only', async () => {
     api.getTaskPermissions.mockResolvedValue({ ...snapshot, grant: { id: 'previous', status: 'invalid', confirmedAt: '2026-11-10T00:00:00.000Z', expiresAt: '2026-11-10T00:15:00.000Z', scope: { writePaths: ['/previous/output'] } } })
     await click('查看当前任务权限')

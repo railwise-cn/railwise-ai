@@ -18,6 +18,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
   const [duration, setDuration] = useState<'task'|'next_operation'>('task')
   const [scopeFields, setScopeFields] = useState({ readPaths: '', writePaths: '', networkOrigins: '', providerIds: '', externalTargets: '' })
   const loadGeneration = useRef(0)
+  const terminal = Boolean(task && ['completed', 'failed', 'cancelled'].includes(task.status))
   const run = async (operation: () => Promise<void>): Promise<void> => {
     if (pending) return
     setPending(true); setError('')
@@ -48,7 +49,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
     return () => { loadGeneration.current++ }
   }, [taskId, revision, autoLoad])
   const allow = async (): Promise<void> => {
-    if (!snapshot || !confirmed || !snapshot.canConfirm) return
+    if (terminal || !snapshot || !confirmed || !snapshot.canConfirm) return
     const result = await window.workwise.confirmTaskPermissions(taskId, {
       expectedRevision: snapshot.taskRevision, scopeHash: snapshot.scopeHash, confirmed: true,
       approvalPolicy: 'on-request', ttlSeconds: 900, idempotencyKey: crypto.randomUUID(), duration,
@@ -88,7 +89,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
         {source.provider}: {source.scopes.join(', ')} — {t(source.source === 'task_requirements' ? 'taskPermissionRequiredScopesSource' : source.source === 'tool_catalog' ? 'taskPermissionCatalogScopesSource' : 'taskPermissionRecordedScopesSource')}
         {source.expiresAt ? ` (${t('taskPermissionExpires', { at: new Date(source.expiresAt).toLocaleString() })})` : ''}
       </p>)}</div> : null}
-      <p>{t('taskPermissionScope')}</p>
+      {!terminal ? <p>{t('taskPermissionScope')}</p> : null}
       {snapshot.executionGrants?.length ? <details className="rounded border border-ds-border p-2"><summary className="cursor-pointer font-medium">{t('taskPermissionExecutionHistory')}</summary>
         {[...snapshot.executionGrants].reverse().map(grant => <div key={grant.turnId} className="mt-2 space-y-1 border-t border-ds-border pt-2">
           <p>{t('taskPermissionExecutionRecorded', { at: new Date(grant.issuedAt).toLocaleString() })}</p>
@@ -103,6 +104,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
         </div>)}
       </details> : null}
       {snapshot.grant ? <p>{t('taskPermissionExpires', { at: new Date(snapshot.grant.expiresAt).toLocaleString() })}</p> : null}
+      {!terminal ? <>
       {snapshot.reason ? <p className="text-ds-muted">{snapshot.reason}</p> : null}
       <label className="flex items-start gap-2"><input type="checkbox" checked={confirmed} disabled={pending} onChange={event => setConfirmed(event.target.checked)} /><span>{t('taskPermissionConfirmScope')}</span></label>
       {snapshot.canConfirm ? <div className="space-y-2">
@@ -122,6 +124,7 @@ export function TaskPermissionPanel({ taskId, onConfirmed, autoLoad = false, rev
         </select>
         <button type="button" disabled={pending || !confirmed || !agentId} onClick={() => void run(selectAgent)} className="rounded-md border border-ds-border px-3 py-1.5 disabled:opacity-50">{t('taskPermissionApplyAgent')}</button>
       </div> : null}
+      </> : null}
     </div> : null}
     {error ? <p role="alert" className="mt-2 whitespace-pre-wrap text-red-700 dark:text-red-300">{error}</p> : null}
   </div>
