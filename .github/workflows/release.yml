@@ -8,6 +8,16 @@ on:
         required: false
         type: boolean
         default: false
+      dependency_stage_id:
+        description: 'Exact saved dependency staging UUID to inspect or resume without starting another download worker.'
+        required: false
+        type: string
+        default: ''
+      dependency_stage_inspect_only:
+        description: 'Read only the saved dependency transfer progress and finish immediately. Requires dependency_stage_id.'
+        required: false
+        type: boolean
+        default: false
       publish_release:
         description: 'Publish the tagged build to GitHub Release, Stable updater feeds, and the official download page. Requires exact-version user approval and a committed acceptance evidence manifest; production-release uses the configured repository governance mode.'
         required: false
@@ -106,7 +116,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: ${{ inputs.stage_dependency_mirror == true && format('dependency-mirror-{0}', github.ref_name) || format('release-{0}', github.ref_name) }}
   cancel-in-progress: false
 
 env:
@@ -127,6 +137,8 @@ jobs:
       group: managed-dependency-mirror
       cancel-in-progress: false
     env:
+      DEPENDENCY_STAGE_ID: ${{ inputs.dependency_stage_id }}
+      DEPENDENCY_STAGE_INSPECT_ONLY: ${{ inputs.dependency_stage_inspect_only }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

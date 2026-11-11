@@ -117,6 +117,7 @@ try {
     sample.flowRunId = flow.id
     sample.taskId = task.id
     sample.elapsedMs = Date.now() - started
+    sample.timing = runtime.taskViewService.page({ workspaceRoot: workspace, filter: 'all' }).items.find(item => item.id === task.id)?.timing ?? null
     sample.verification = verifyTaskDelivery(runtime.taskRepository, task)
     sample.artifacts = task.artifacts
     sample.verified = sample.verification.complete && task.status === 'completed'

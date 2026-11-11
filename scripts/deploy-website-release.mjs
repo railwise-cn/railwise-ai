@@ -552,6 +552,7 @@ async function waitForRemoteR2Download(config, payload, options = {}) {
     if (!output.startsWith('running')) {
       throw new Error(`Remote R2 download failed: ${output || 'empty status'}`)
     }
+    if (options.onProgress) await options.onProgress().catch(() => undefined)
     await delay(pollIntervalMs)
   }
   throw new Error(`Remote R2 download timed out after ${Math.round(timeoutMs / 60_000)} minutes.`)

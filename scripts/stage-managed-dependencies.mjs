@@ -95,9 +95,61 @@ for item in manifest['files']:
 shutil.rmtree(stage.parent)
 PY`
 
+export const inspectWebsiteStage = String.raw`set -euo pipefail
+python3 - "$1" "$2" <<'PY_REMOTE'
+import hashlib,json,os,pathlib,sys
+stage=pathlib.Path(sys.argv[1])
+if not stage.is_dir() or stage.is_symlink(): raise RuntimeError('Saved dependency stage is missing')
+if hashlib.sha256((stage/'manifest.json').read_bytes()).hexdigest()!=sys.argv[2]: raise RuntimeError('Saved dependency manifest differs')
+parts=[p for p in stage.glob('.download-*') if p.is_file() and not p.is_symlink()]
+state=(stage/'.r2-download.status').read_text().strip() if (stage/'.r2-download.status').is_file() else 'running'
+pid_file=stage/'.r2-download.pid'
+alive=False
+if pid_file.is_file():
+    value=pid_file.read_text().strip()
+    if value.isdigit():
+        command=pathlib.Path('/proc')/value/'cmdline'
+        try: alive=command.is_file() and str(stage/'.r2-download-worker.py').encode() in command.read_bytes()
+        except OSError: alive=False
+print(json.dumps({'state':state if state in ['running','success 0','failure 1'] else 'failure', 'workerAlive':alive, 'partCount':len(parts),'downloadedBytes':sum(p.stat().st_size for p in parts)}))
+PY_REMOTE`
+
+async function verifyPublicDependencies(manifest, receipt) {
+  for (const file of manifest.files) {
+    const url = `${manifest.publicBase}/${file.mirrorPath.split('/').map(encodeURIComponent).join('/')}`
+    await checkedBytes(await fetch(url, { signal: AbortSignal.timeout(120_000) }), file)
+    receipt.files.push({ id: file.id, url, sha256: file.sha256, size: file.size, verified: true })
+  }
+}
+
+async function resumeWebsiteStage(manifestBytes, manifest, stagingId, inspectOnly) {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(stagingId)) throw new Error('An exact saved dependency staging UUID is required.')
+  const ssh = websiteStaticTransport.readSshConfig()
+  const remote = `${ssh.root}/dependencies/.deploy-${stagingId}/payload`
+  const receipt = { schema: 'railwise.dependency-mirror-evidence.v1', sourceHead: process.env.GITHUB_SHA ?? '', manifestSha256: sha(manifestBytes), stagingId, status: 'resuming', files: [] }
+  try {
+    const progress = JSON.parse(websiteStaticTransport.runRemote(ssh, inspectWebsiteStage, [remote, receipt.manifestSha256]))
+    receipt.progress = progress
+    console.log(`Saved dependency stage ${stagingId} progress ${JSON.stringify(progress)}`)
+    if (inspectOnly) { receipt.status = 'inspected'; return }
+    let reportedAt = 0
+    await websiteStaticTransport.waitForRemoteR2Download(ssh, remote, { timeoutMs: 25 * 60_000, onProgress: async () => {
+      if (Date.now() - reportedAt < 60_000) return
+      reportedAt = Date.now()
+      console.log(`Dependency download progress ${websiteStaticTransport.runRemote(ssh, inspectWebsiteStage, [remote, receipt.manifestSha256]).trim()}`)
+    } })
+    websiteStaticTransport.runRemote(ssh, finalizeWebsite, [ssh.root, remote])
+    await verifyPublicDependencies(manifest, receipt)
+    receipt.status = 'verified'
+  } catch (error) { receipt.status = 'failed'; throw error }
+  finally { await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`) }
+}
+
 export async function stageManagedDependencies() {
   const manifestBytes = await readFile(manifestPath)
   const manifest = validateManifest(JSON.parse(manifestBytes))
+  if (process.env.DEPENDENCY_STAGE_ID) return resumeWebsiteStage(manifestBytes, manifest, process.env.DEPENDENCY_STAGE_ID, process.env.DEPENDENCY_STAGE_INSPECT_ONLY === 'true')
+  if (process.env.DEPENDENCY_STAGE_INSPECT_ONLY === 'true') throw new Error('Dependency inspection requires the saved staging UUID.')
   for (const name of ['R2_ACCOUNT_ID', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) if (!process.env[name]) throw new Error(`Missing ${name}.`)
   if (!/^[a-f0-9]{32}$/.test(process.env.R2_ACCOUNT_ID)) throw new Error('Invalid R2 account identifier.')
   const client = new S3Client({ region: 'auto', endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, forcePathStyle: true,
@@ -134,13 +186,14 @@ export async function stageManagedDependencies() {
     websiteStaticTransport.copyFile(ssh, workerPath, `${remote}/.r2-download-worker.py`)
     websiteStaticTransport.copyFile(ssh, join(directory, 'manifest.json'), `${remote}/manifest.json`)
     websiteStaticTransport.runRemote(ssh, websiteStaticTransport.startR2DownloadScript, [`${remote}/.r2-downloads.json`, remote])
-    await websiteStaticTransport.waitForRemoteR2Download(ssh, remote, { timeoutMs: 25 * 60_000 })
+    let reportedAt = 0
+    await websiteStaticTransport.waitForRemoteR2Download(ssh, remote, { timeoutMs: 25 * 60_000, onProgress: async () => {
+      if (Date.now() - reportedAt < 60_000) return
+      reportedAt = Date.now()
+      console.log(`Dependency download progress ${websiteStaticTransport.runRemote(ssh, inspectWebsiteStage, [remote, receipt.manifestSha256]).trim()}`)
+    } })
     websiteStaticTransport.runRemote(ssh, finalizeWebsite, [ssh.root, remote])
-    for (const file of manifest.files) {
-      const url = `${manifest.publicBase}/${file.mirrorPath.split('/').map(encodeURIComponent).join('/')}`
-      await checkedBytes(await fetch(url, { signal: AbortSignal.timeout(120_000) }), file)
-      receipt.files.push({ id: file.id, url, sha256: file.sha256, size: file.size, verified: true })
-    }
+    await verifyPublicDependencies(manifest, receipt)
     receipt.status = 'verified'
     await writeFile('dependency-mirror-evidence.json', `${JSON.stringify(receipt, null, 2)}\n`)
     console.log(`Verified ${receipt.files.length} public dependencies for manifest ${receipt.manifestSha256}`)

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { checkedBytes, finalizeWebsite, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
+import { checkedBytes, finalizeWebsite, inspectWebsiteStage, r2Matches, validateManifest } from './stage-managed-dependencies.mjs'
 
 const manifest = JSON.parse(await readFile(new URL('../src/shared/managed-dependencies.json', import.meta.url), 'utf8'))
 const bytes = Buffer.from('exact upstream dependency')
@@ -72,6 +72,20 @@ test('website finalization preserves immutable objects and fails conflicting con
     const conflictingStage = await stage('conflict')
     assert.throws(() => execute(conflictingStage), /Immutable dependency conflict/)
     assert.equal(await readFile(target, 'utf8'), 'existing conflict')
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('saved transfer inspection is read-only and bound to the committed manifest', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dependency-inspect-test-'))
+  try {
+    const metadata = Buffer.from(JSON.stringify({ files: [file] }))
+    await writeFile(join(directory, 'manifest.json'), metadata)
+    await writeFile(join(directory, '.download-fixture.part-00000'), bytes)
+    const expectedHash = createHash('sha256').update(metadata).digest('hex')
+    const run = hash => execFileSync('bash', ['-s', '--', directory, hash], { input: inspectWebsiteStage, stdio: ['pipe', 'pipe', 'pipe'] }).toString()
+    assert.deepEqual(JSON.parse(run(expectedHash)), { state: 'running', workerAlive: false, partCount: 1, downloadedBytes: bytes.length })
+    assert.throws(() => run('0'.repeat(64)), /manifest differs/)
+    assert.deepEqual(await readFile(join(directory, '.download-fixture.part-00000')), bytes)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
