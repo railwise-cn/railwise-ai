@@ -84,7 +84,7 @@ export function buildDwsToolProvider(config:DwsCapabilityConfig|undefined,runner
   }
   const readTasks=async(target:string,context:ToolHostContext)=>{
     const raw=await run(['oa','approval','tasks','--instance-id',target],context)
-    const tasks=findArray(raw,['taskIds','tasks','list'])
+    const tasks=findArray(raw,['taskIdList','taskIds','tasks','list'])
     if(!tasks)throw fail('connector_invalid_response')
     return tasks.map(value=>typeof value==='string'?value:typeof value==='number'&&Number.isSafeInteger(value)?String(value):String(object(value).taskId??object(value).id??''))
       .filter(value=>/^\d+$/.test(value)&&Number.isSafeInteger(Number(value)))

@@ -54,6 +54,28 @@ describe('official typed DingTalk DWS provider',()=>{
     expect(runner.mock.calls.map(call=>call[1].slice(0,3))).toEqual([['oa','approval','tasks'],['oa','approval',operation],['oa','approval','detail']])
     expect(runner.mock.calls[1][1]).toContain('合成验收');expect(runner.mock.calls[1][1]).not.toContain('--yes')
   })
+  it.each(['approve','reject'] as const)('accepts the official taskIdList objects and taskStatus/taskResult readback for %s',async operation=>{
+    const taskId=104969000001
+    const runner=vi.fn(async(_path:string,args:string[])=>({ok:true,output:{success:true,errorCode:null,errorMsg:null,result:
+      args[2]==='tasks'?{taskIdList:[{taskId}]}:args[2]==='detail'?{
+        processInstanceId:'synthetic-instance',tasks:[{taskId,userId:dwsTestConfig.userId,taskStatus:'COMPLETED',taskResult:operation==='approve'?'AGREE':'REFUSE'}]
+      }:true}}))
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name===`dingtalk_${operation}`)!
+    expect(await tool.execute({instanceId:'synthetic-instance',taskId:String(taskId)},context())).toMatchObject({output:{status:'succeeded',evidence:{provider:'dingtalk',operation,target:String(taskId),status:'done',verified:true}}})
+    expect(runner.mock.calls.map(call=>call[1].slice(0,3))).toEqual([['oa','approval','tasks'],['oa','approval',operation],['oa','approval','detail']])
+    expect(runner.mock.calls.filter(call=>call[1][2]===operation)).toHaveLength(1)
+  })
+  it('normalizes the same official taskIdList for readonly task discovery',async()=>{
+    const runner=vi.fn(async()=>({ok:true,output:{success:true,result:{taskIdList:[{taskId:104969000001}]}}}))
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_get_approval_tasks')!
+    expect(await tool.execute({instanceId:'synthetic-instance'},context())).toMatchObject({output:{status:'succeeded',data:{instanceId:'synthetic-instance',taskIds:['104969000001']}}})
+  })
+  it.each([{taskIdList:[]},{taskIdList:[{taskId:43}]},{taskIdList:[{taskId:9007199254740992}]},{taskIdList:[{taskId:'not-a-task'}]}])('refuses an approval target absent from the current-user taskIdList %j',async({taskIdList})=>{
+    const runner=vi.fn(async()=>({ok:true,output:{success:true,result:{taskIdList}}}))
+    const tool=buildDwsToolProvider(dwsTestConfig,withDwsTestIdentity(runner))!.tools.find(tool=>tool.name==='dingtalk_approve')!
+    expect(await tool.execute({instanceId:'synthetic-instance',taskId:'42'},context())).toMatchObject({isError:true,output:{status:'failed',code:'connector_target_not_actionable'}})
+    expect(runner).toHaveBeenCalledOnce()
+  })
   it('keeps mismatched or interrupted write readback unknown without a second mutation',async()=>{
     let reads=0
     const runner=vi.fn(async(_path:string,args:string[])=>({ok:true,output:{success:true,result:args[2]==='get'?{todoDetailModel:{taskId:++reads===1?'todo-1':'other',isDone:false}}:true}}))
