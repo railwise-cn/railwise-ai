@@ -251,10 +251,13 @@ const EXPORT_CSS = `
 
   @page {
     size: A4;
-    margin: 0;
+    margin: 22mm 18mm;
   }
 
   @media print {
+    .document-shell {
+      padding: 0;
+    }
     body {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -262,7 +265,7 @@ const EXPORT_CSS = `
   }
 `
 
-const LOCAL_IMAGE_PATTERN = /(<img\b[^>]*?\bsrc=")([^"]+)(")/gi
+const LOCAL_IMAGE_PATTERN = /(<img\b[^>]*?\bsrc=")([^"]*)(")/gi
 
 function isMarkdownFile(filePath: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(filePath)
@@ -394,7 +397,7 @@ function defaultExportPath(sourcePath: string, format: WriteExportFormat): strin
   return join(dirname(sourcePath), `${basenameWithoutExtension(sourcePath)}${exportExtension(format)}`)
 }
 
-export async function inlineLocalImagesInHtml(html: string, sourcePath?: string, workspaceRoot?: string): Promise<string> {
+export async function inlineLocalImagesInHtml(html: string, sourcePath?: string, workspaceRoot?: string, strictImages = false): Promise<string> {
   // React 19 emits eager image preload links during static rendering. The image src is
   // validated below; generated preload URLs must not bypass that same resource policy.
   html = html.replace(/<link\b[^>]*\brel="preload"[^>]*\bas="image"[^>]*\/?\s*>/gi, '')
@@ -405,8 +408,9 @@ export async function inlineLocalImagesInHtml(html: string, sourcePath?: string,
   await Promise.all(
     matches.map(async (match) => {
       const rawSrc = match[2]
-      if (!rawSrc || replacements.has(rawSrc)) return
+      if (replacements.has(rawSrc)) return
       const image = sourcePath ? await readWriteImageResource({ src: rawSrc.replaceAll('&amp;', '&'), sourcePath, workspaceRoot }) : null
+      if (!image && strictImages) throw Object.assign(new Error('A document image could not be read within the authorized workspace.'), { code: 'write_export_image_unavailable' })
       replacements.set(rawSrc, image ? `data:${image.mimeType};base64,${image.data.toString('base64')}` : '')
     })
   )
@@ -484,12 +488,13 @@ export async function buildWriteClipboardHtmlFragment(options: {
   sourcePath: string
   content: string
   workspaceRoot?: string
+  strictImages?: boolean
 }): Promise<string> {
   const frontmatter = parseMarkdownFrontmatter(options.content)
   const fragment = isMarkdownFile(options.sourcePath)
     ? await renderMarkdownFragment(frontmatter.endOffset ? frontmatter.body : options.content, options.sourcePath, options.workspaceRoot)
     : renderPlainTextFragment(options.content)
-  const body = await inlineLocalImagesInHtml(fragment, options.sourcePath, options.workspaceRoot)
+  const body = await inlineLocalImagesInHtml(fragment, options.sourcePath, options.workspaceRoot, options.strictImages)
   const mathStyles = body.includes('class="katex"') ? `<style>${await loadWriteMathExportCss()}</style>` : ''
   return `<article class="markdown-body">${mathStyles}${body}</article>`
 }
@@ -504,12 +509,14 @@ export async function buildWriteExportHtmlDocument(options: {
   title?: string
   wordCompatible?: boolean
   workspaceRoot?: string
+  strictImages?: boolean
 }): Promise<string> {
   const title = options.title?.trim() || basenameWithoutExtension(options.sourcePath)
   const body = await buildWriteClipboardHtmlFragment({
     sourcePath: options.sourcePath,
     workspaceRoot: options.workspaceRoot,
-    content: options.content
+    content: options.content,
+    strictImages: options.strictImages
   })
   const namespaces = options.wordCompatible
     ? ' xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"'
@@ -641,7 +648,7 @@ async function exportDocxWithMd2docx(options: {
   }
 }
 
-export async function renderWriteExportHtmlToPdf(html: string): Promise<Buffer> {
+export async function renderWriteExportHtmlToPdf(html: string, options: { strictImages?: boolean } = {}): Promise<Buffer> {
   const tempDir = await mkdtemp(join(tmpdir(), 'kun-export-'))
   const tempHtmlPath = join(tempDir, 'document.html')
   await writeFile(tempHtmlPath, html, 'utf8')
@@ -684,7 +691,11 @@ export async function renderWriteExportHtmlToPdf(html: string): Promise<Buffer> 
             })
           })
         )
-      ]).then(() => undefined)
+      ]).then(() => {
+        if (${options.strictImages === true} && Array.from(document.images).some(image => !image.complete || image.naturalWidth < 1 || image.naturalHeight < 1)) {
+          throw new Error('A document image could not be decoded for PDF export.')
+        }
+      })
     `)
     await delay(120)
     const pdf = await hiddenWindow.webContents.printToPDF({

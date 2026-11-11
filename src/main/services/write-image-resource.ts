@@ -11,8 +11,8 @@ const IMAGE_MIME: Record<string, string> = {
 }
 
 /** Images are passive local resources. Embedded SVG must not include active or external content. */
-function passiveSvg(source: string): boolean {
-  return /<svg(?:\s|>)/i.test(source)
+export function isPassiveWriteSvg(source: string): boolean {
+  return Buffer.byteLength(source, 'utf8') <= MAX_IMAGE_BYTES && /<svg(?:\s|>)/i.test(source)
     && !/<!DOCTYPE|<!ENTITY|<\s*(?:script|foreignObject|iframe|object|embed|image)\b|\son[a-z]+\s*=|@import/i.test(source)
     && !/(?:href|xlink:href)\s*=\s*(?:["']\s*(?!#)[^"']|[^"'\s#])/i.test(source)
     && !/url\(\s*["']?\s*(?!#)/i.test(source)
@@ -54,7 +54,7 @@ export async function readWriteImageResource(input: {
       const info = await handle.stat()
       if (!info.isFile() || info.size > MAX_IMAGE_BYTES) return null
       const data = await handle.readFile()
-      if (data.length > MAX_IMAGE_BYTES || (extension === '.svg' && !passiveSvg(data.toString('utf8')))) return null
+      if (data.length > MAX_IMAGE_BYTES || (extension === '.svg' && !isPassiveWriteSvg(data.toString('utf8')))) return null
       return { path, data, mimeType, extension: extension.slice(1) }
     } finally { await handle.close() }
   } catch { return null }

@@ -25,10 +25,31 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { renderWriteMermaidDiagrams } from './write-advanced-renderer'
+import { renderWriteMermaidDiagrams, renderWriteSvgImage } from './write-advanced-renderer'
 
 describe('local diagram export sandbox', () => {
   beforeEach(() => { windows.length = 0 })
+
+  it('rasterizes a passive local SVG with no network, scripts, permissions or navigation', async () => {
+    const source = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="320"><text x="10" y="30">监测趋势</text></svg>'
+    expect(await renderWriteSvgImage(source)).toMatchObject({ png: Buffer.from('local-png'), width: 184, height: 84 })
+    const window = windows[0]
+    expect(window.options.webPreferences).toMatchObject({ sandbox: true, nodeIntegration: false, contextIsolation: true, webSecurity: true })
+    expect(window.options.webPreferences.partition).toMatch(/^railwise-svg-export-/)
+    expect(decodeURIComponent(window.loadURL.mock.calls[0][0])).toContain("default-src 'none'")
+    expect(decodeURIComponent(window.loadURL.mock.calls[0][0])).not.toContain("script-src 'unsafe-inline'")
+    const request = vi.fn()
+    window.webContents.session.webRequest.onBeforeRequest.mock.calls[0][1]({}, request)
+    expect(request).toHaveBeenCalledWith({ cancel: true })
+    expect(window.webContents.executeJavaScript.mock.calls[0][0]).toContain('await image.decode()')
+    expect(window.destroyed).toBe(true)
+  })
+
+  it('rejects active SVG before constructing a renderer', async () => {
+    expect(await renderWriteSvgImage('<svg><image href="https://example.invalid/private.png" /></svg>')).toBeNull()
+    expect(await renderWriteSvgImage('<svg onload="alert(1)"></svg>')).toBeNull()
+    expect(windows).toHaveLength(0)
+  })
 
   it('renders valid diagrams in an isolated session, denies external actions and sanitizes output before capture', async () => {
     const source = 'flowchart LR\nA[资料] --> B[审定]'

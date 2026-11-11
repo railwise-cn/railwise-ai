@@ -60,6 +60,13 @@ describe('write-export-service helpers', () => {
     expect(buildWriteExportFileName('/tmp/draft.md', 'docx')).toBe('draft.docx')
   })
 
+  it('applies page margins to every printed page while retaining screen padding', async () => {
+    const html = await buildWriteExportHtmlDocument({ sourcePath: join(workspaceRoot, 'report.md'), content: '# 合成报告' })
+    expect(html).toMatch(/@page\s*\{[^}]*margin: 22mm 18mm;/)
+    expect(html).toMatch(/@media print\s*\{\s*\.document-shell\s*\{\s*padding: 0;/)
+    expect(html).toMatch(/\.document-shell\s*\{\s*padding: 22mm 18mm;/)
+  })
+
   it('renders markdown exports with resolved links and inlined local images', async () => {
     const sourcePath = join(workspaceRoot, 'draft.md')
     const imagePath = join(workspaceRoot, 'cover.png')
