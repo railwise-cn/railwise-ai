@@ -25,6 +25,8 @@ import { evaluateMarketplaceLicense } from '../../shared/marketplace'
 
 const OFFICIAL_CATALOG_SOURCE_ID = 'workwise-official'
 const SHA1_COMMIT = /^[0-9a-f]{40}$/
+const AUTOCAD_REDRAW_COMMIT = 'ed182ec5966caaaf1d82d6ad4015435a27a8a909'
+const AUTOCAD_REDRAW_ARCHIVE_SHA256 = '1981737a34085f1e9d1e9f9cb5a1d989b6bb75506f2d9b064bc20cda35239b0e'
 const MCP_SERVERS_PYTHON_LICENSE_COMMIT = '76d64c822f5125032f89eb71dbdb94e42b434821'
 
 const PINNED_UPDATE = {
@@ -113,6 +115,8 @@ const PACKAGE_ICON_OVERRIDES: Record<string, MarketplaceIconV1> = {
   'writing-agent': { kind: 'monogram', value: 'WA', tone: 'green', alt: 'Writing Agent' },
   'humanizer-zh': { kind: 'monogram', value: 'HZ', tone: 'violet', alt: 'Humanizer Chinese' },
   'nuwa-skill': { kind: 'monogram', value: 'NW', tone: 'orange', alt: 'Nuwa Skill' },
+  'autocad-dwg-redraw': { kind: 'monogram', value: 'DW', tone: 'blue', alt: 'AutoCAD DWG 重绘' },
+  'autocad-image-redraw': { kind: 'monogram', value: 'DX', tone: 'teal', alt: '图片转 CAD' },
   'arch-diagram-skill': { kind: 'monogram', value: 'AD', tone: 'violet', alt: 'Arch Diagram' }
 }
 
@@ -1118,6 +1122,54 @@ const officialPackages: MarketplacePackageV1[] = [
     'https://linear.app',
     'collaboration'
   ),
+  ...([
+    {
+      id: 'autocad-dwg-redraw', name: 'AutoCAD DWG 重绘',
+      summary: '基于源 DWG 提取实体和绘图信息，生成重绘提示并核验新 DWG。依赖 Windows AutoCAD COM，当前提供固定版本上游入口。',
+      compatibility: { ...COMPATIBILITY, platforms: ['win32'], architectures: ['x64'] },
+      dependencies: [
+        { id: 'python', kind: 'runtime', requirement: 'Python >=3.10', optional: false, managedBy: 'user' },
+        { id: 'autocad', kind: 'system', requirement: '用户已安装并许可的 Windows AutoCAD，支持 COM 自动化', optional: false, managedBy: 'user' },
+        { id: 'pywin32', kind: 'package', requirement: 'pywin32', optional: false, managedBy: 'user' }
+      ],
+      usage: {
+        howToUse: '从固定版本上游入口查看源码与使用条件，确认授权后选择本地 Skill 导入。执行前检查 Windows、AutoCAD COM、Python 与 pywin32，再选择源文件和独立输出目录并授权任务。源 DWG 模式可提取绘图信息、生成重绘提示、复制实体并对比 ModelSpace/PaperSpace、图层、块、文字、标注和引线。PDF 中间图需保留转换来源与限制。交付重绘 DWG、绘图提示 Markdown、源/目标实体核验记录及 AutoCAD 目视复核结果。\n上游未声明分发许可证，当前保留外部来源入口。脚本的 --restart-autocad 会强制结束 acad.exe，可能丢失未保存文档，需用户保存工作并单独确认重启。现有输出可能被覆盖，执行前须确认目标范围。',
+        requirements: ['Windows 10/11 x64 与用户许可的 AutoCAD', 'Python >=3.10、pywin32', '源 DWG 或标明来源的 PDF 中间 DWG', '主机进程和输出目录授权。安装技能后单独授权执行'],
+        examples: ['使用 autocad-dwg-redraw 读取我选定的源 DWG，生成重绘提示和实体清单。经确认后写入新的 outputs/redraw.dwg，并交付源/目标核验记录。']
+      }
+    },
+    {
+      id: 'autocad-image-redraw', name: '图片转 CAD 重绘',
+      summary: '把截图、扫描图和照片整理为带证据的 CAD 规格，检查并对比输出。DWG 依赖 Windows AutoCAD，macOS/Linux 提供粗略 DXF 基线流程。',
+      compatibility: COMPATIBILITY,
+      dependencies: [
+        { id: 'python', kind: 'runtime', requirement: 'Python >=3.10', optional: false, managedBy: 'user' },
+        { id: 'image-redraw-python', kind: 'package', requirement: 'Pillow、NumPy、OpenCV、ezdxf、PyMuPDF', optional: false, managedBy: 'user' },
+        { id: 'autocad', kind: 'system', requirement: '生成/检查 DWG 时需要 Windows AutoCAD COM 与 pywin32', optional: true, managedBy: 'user' }
+      ],
+      usage: {
+        howToUse: '从固定版本上游入口查看源码与使用条件，确认授权后选择本地 Skill 导入。先保留原图并检查清晰度、单位和尺度锚点，按已知、标定、推断、不可读记录几何证据，再校验规格并授权输出。Windows AutoCAD COM 路径支持 DWG 生成和检查。macOS/Linux 可使用 Python 图像描线或矢量 PDF 提取形成粗略 DXF 基线，并生成预览和视觉对比。尺寸精度需要权威尺寸和约束核验。\n交付可编辑 CAD 文件、规格与标定 JSON、输入检查和规格校验报告、PNG/PDF 预览、叠加/差异图、比较指标及来源/成果哈希清单。geometry-only 模式可省略注释。上游未声明分发许可证，当前保留外部来源入口。部分 DWG 转存脚本会删除已有输出，需确认覆盖范围或选择新路径。',
+        requirements: ['Python >=3.10、Pillow、NumPy、OpenCV、ezdxf、PyMuPDF', 'DWG 生成/检查另需用户许可的 Windows AutoCAD 与 pywin32', 'macOS/Linux 的 DXF 粗略基线需进一步复核', '原图、可读单位与尺度依据、明确输出目录。脚本执行另行授权'],
+        examples: ['使用 autocad-image-redraw 检查这张图的单位、清晰度和尺度依据，生成 redraw-spec.json。授权后导出 CAD、预览与对比报告，并列出待确认尺寸。', '在 macOS 上对所选图片生成粗略 DXF 基线与 PNG/PDF 预览，保留推断标记和来源哈希，供后续人工复核。']
+      }
+    }
+  ] satisfies Array<{ id: string; name: string; summary: string; compatibility: PackageCompatibilityV1; dependencies: PackageDependencyV1[]; usage: NonNullable<MarketplacePackageV1['usage']> }>).map(item => definePackage({
+    ...item, tier: 'advanced', productType: 'workflow', categories: ['engineering'], version: AUTOCAD_REDRAW_COMMIT,
+    publisher: publisher('pengxiaoan', 'pengxiaoan', 'https://github.com/pengxiaoan/autocad-dwg-redraw-skill'),
+    license: null,
+    source: { kind: 'github', owner: 'pengxiaoan', repository: 'autocad-dwg-redraw-skill', defaultBranch: 'main',
+      location: `https://github.com/pengxiaoan/autocad-dwg-redraw-skill/tree/${AUTOCAD_REDRAW_COMMIT}/skills/${item.id}`,
+      requestedRef: AUTOCAD_REDRAW_COMMIT, resolvedRef: AUTOCAD_REDRAW_COMMIT, subpath: `skills/${item.id}`,
+      digest: { algorithm: 'sha256', value: AUTOCAD_REDRAW_ARCHIVE_SHA256 } },
+    components: [{ id: `${item.id}-skill`, name: item.name, type: 'skill', skillNames: [item.id], runtime: { kind: 'github',
+      repository: 'https://github.com/pengxiaoan/autocad-dwg-redraw-skill', resolvedCommit: AUTOCAD_REDRAW_COMMIT, subpath: `skills/${item.id}`,
+      install: { strategy: 'managed-git', verifyBeforeActivation: true } } }],
+    permissions: [FILESYSTEM_READ_PERMISSION, FILESYSTEM_WRITE_PERMISSION, { ...PROCESS_EXECUTE_PERMISSION, id: 'autocad.process.execute', default: 'denied',
+      description: '执行用户选定的本机 Python/CAD 脚本。AutoCAD 重启与输出覆盖分别需要确认，重启前应保存未完成文档。' }],
+    auth: { type: 'none' }, updatePolicy: PINNED_UPDATE,
+    availability: { status: 'unavailable', reasonCode: 'upstream-license-unconfirmed', message: '上游固定版本未声明分发许可证，当前可查看来源和依赖说明。' },
+    installation: EXTERNAL_INSTALL
+  })),
   githubSkillPackage({
     id: 'browser-skill',
     name: 'BrowserSkill',

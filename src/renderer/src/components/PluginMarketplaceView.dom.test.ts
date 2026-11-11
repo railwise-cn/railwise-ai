@@ -14,6 +14,7 @@ import type { McpServerConfigV2 } from '@shared/agent-workbench'
 import i18n from '../i18n'
 import { useChatStore } from '../store/chat-store'
 import { PluginMarketplaceView } from './PluginMarketplaceView'
+import { getOfficialMarketplaceCatalog } from '../../../main/services/official-marketplace-catalog'
 
 const SOURCE: CatalogSourceV1 = {
   schemaVersion: 1,
@@ -616,6 +617,30 @@ describe('PluginMarketplaceView unified catalog', () => {
     expect(container.textContent).toContain('Featured recommendations')
     expect(container.textContent).toContain('PPT Master')
     expect(container.textContent).toContain('Report Writing')
+  })
+
+  it('shows AutoCAD skill details offline and opens only the fixed upstream source', async () => {
+    const items = getOfficialMarketplaceCatalog().filter(item => item.id.startsWith('autocad-'))
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: items.map(item => ({
+      key: `${SOURCE.id}:${item.id}`, sourceId: SOURCE.id, package: item, conflicted: false
+    })), conflicts: [] })
+    vi.mocked(window.workwise.listCatalogSources).mockRejectedValueOnce(new Error('fetch failed'))
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    await act(async () => exactButton('Skills').click())
+    expect(container.textContent).toContain('AutoCAD DWG 重绘')
+    expect(container.textContent).toContain('图片转 CAD 重绘')
+    const row = [...container.querySelectorAll('[role="button"]')].find(item => item.textContent?.includes('AutoCAD DWG 重绘'))
+    if (!(row instanceof HTMLElement)) throw new Error('AutoCAD skill catalog row missing')
+    await act(async () => row.click())
+    expect(container.textContent).toContain('上游未声明分发许可证')
+    expect(container.textContent).toContain('未保存文档')
+    expect(container.textContent).toContain('pywin32')
+    await act(async () => exactButton('Open source').click())
+    expect(window.workwise.openExternal).toHaveBeenCalledWith(items[0]!.source.location)
+    expect(window.workwise.prepareCatalogPlugin).not.toHaveBeenCalled()
+    expect(installPrepared).not.toHaveBeenCalled()
+    expect(window.workwise.updatePluginPermissions).not.toHaveBeenCalled()
   })
 
   it('shows a clear usage guide, requirements, and example in Skill details', async () => {
