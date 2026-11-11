@@ -49,7 +49,7 @@ on:
         type: boolean
         default: false
       exact_package_updater_smoke:
-        description: 'Verify this run’s exact packages privately: one official 0.5.4 to signed macOS update, plus clean Windows installation/identity/uninstall checks. Never changes public feeds or releases.'
+        description: 'Verify this run’s exact packages privately: one official 0.5.4 to signed macOS update, plus clean Windows installation, Chinese UI, identity and uninstall checks. Never changes public feeds or releases.'
         required: false
         type: boolean
         default: false
@@ -796,13 +796,13 @@ jobs:
       - name: Install verification tools
         run: npm ci --ignore-scripts
       - name: Verify Windows smoke contract and PowerShell syntax
-        run: node --test scripts/windows-install-smoke.test.mjs
+        run: node --test scripts/windows-install-smoke.test.mjs scripts/windows-ui-smoke.test.mjs
       - name: Download this run’s exact Windows installer
         uses: actions/download-artifact@v4
         with:
           name: release-win
           path: ${{ runner.temp }}/exact-windows-packages
-      - name: Install, inspect and uninstall only the temporary instance
+      - name: Install, inspect the Chinese UI and uninstall only the temporary instance
         shell: pwsh
         env:
           TARGET_VERSION: ${{ needs.prepare.outputs.version }}

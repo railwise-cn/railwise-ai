@@ -23,7 +23,7 @@ async function fixture(authorized = true, wait = false) {
   await Promise.all([mkdir(workspace), mkdir(destination)])
   const repository = new TaskRunRepository(join(root, 'tasks.sqlite3'))
   const threadStore = new InMemoryThreadStore(), sessionStore = new InMemorySessionStore()
-  const thread = createThreadRecord({ id: 'thread', workspace, model: 'fixture' })
+  const thread = createThreadRecord({ id: 'thread', title: 'Authorized artifact fixture', workspace, model: 'fixture' })
   await threadStore.upsert(thread)
   const nowIso = () => '2026-11-01T00:00:00.000Z'
   const controller = new TaskController({ repository, threadStore, sessionStore, nowIso,

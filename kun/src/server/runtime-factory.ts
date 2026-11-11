@@ -133,6 +133,7 @@ export type KunServeRuntimeOptions = {
   port: number
   configPath?: string
   dataDir: string
+  workspaceTrustPath?: string
   runtimeToken: string
   apiKey: string
   baseUrl: string
@@ -185,7 +186,7 @@ export async function createKunServeRuntime(
   const taskContextRuntime = new TaskContextRuntime(taskContextRepository, taskRepository)
   const approvalGate = new PersistentApprovalGate(taskRepository, () => new Date().toISOString())
   const userInputGate = new PersistentUserInputGate(taskRepository, () => new Date().toISOString())
-  const workspaceTrust = new FileWorkspaceTrustReader()
+  const workspaceTrust = new FileWorkspaceTrustReader(options.workspaceTrustPath)
   const taskPermissionService = new TaskPermissionService({repository:taskRepository,toolEffects:()=>activeToolRegistry?.describeAllEffects()??[],threads:{get:id=>threadStore.get(id),update:async(id,patch)=>{
     const current=await threadStore.get(id)
     if(!current)throw Object.assign(new Error('task execution context not found'),{code:'not_found'})

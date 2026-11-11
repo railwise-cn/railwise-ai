@@ -77,10 +77,10 @@ test('website finalization preserves immutable objects and fails conflicting con
 
 test('dependency workflow excludes every application job', async () => {
   const workflow = await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8')
-  const jobs = workflow.slice(workflow.indexOf('\njobs:\n')).split(/\n  (?=[a-z][a-z0-9-]+:)/).slice(1)
+  const jobs = workflow.slice(workflow.indexOf('\njobs:\n')).split(/\n {2}(?=[a-z][a-z0-9-]+:)/).slice(1)
   assert.ok(jobs.length > 10)
   for (const job of jobs) {
     if (job.startsWith('stage-managed-dependencies:')) assert.match(job, /inputs.stage_dependency_mirror == true/)
-    else assert.match(job, /\n    if: \$\{\{ inputs.stage_dependency_mirror != true &&/)
+    else assert.match(job, /\n {4}if: \$\{\{ inputs.stage_dependency_mirror != true &&/)
   }
 })
