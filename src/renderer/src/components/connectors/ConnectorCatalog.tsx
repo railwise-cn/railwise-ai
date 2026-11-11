@@ -161,7 +161,7 @@ export function ConnectorCatalog({ entries, query, refreshKey, target, onTargetO
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ds-subtle text-ds-muted"><PlugZap className="h-5 w-5" /></span>
           <span className="min-w-0"><span className="block text-[14px] font-semibold">{name(entry)}</span><span className="mt-1 line-clamp-2 block text-[12px] leading-5 text-ds-muted">{summary(entry)}</span></span>
         </button>
-        <div className="mt-4 flex items-center justify-between gap-3"><span className="text-[11px] text-ds-muted">{status(entry)}</span><button type="button" onClick={() => details(entry)} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{t('connectorHubDetails')}<ArrowRight className="h-3.5 w-3.5" /></button></div>
+        <div className="mt-4 flex items-center justify-between gap-3"><span className="text-[11px] text-ds-muted">{status(entry)}</span><button type="button" onClick={() => details(entry)} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-ds-border px-3 text-[12px] font-medium hover:bg-ds-hover">{t(entry.package.id === 'github-mcp' ? 'connectorHubConnect' : 'connectorHubDetails')}<ArrowRight className="h-3.5 w-3.5" /></button></div>
       </article>)}
     </div>
     {readonlyEntry ? <ReadonlyConnectorSetup entry={readonlyEntry} onClose={() => setReadonlyEntry(null)} onChanged={changed} onInstall={() => { const entry = readonlyEntry; setReadonlyEntry(null); if (onInstall) onInstall(entry); else onDetails(entry) }} /> : null}

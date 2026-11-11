@@ -49,3 +49,11 @@ Zotero 使用独立 HOME、配置与缓存目录，关闭本地写入、Claude �
 Zotero 的许可例外绑定包名 `zotero-mcp-server`、版本 `0.17.0`、唯一 MCP 组件及 SHA-256 `80f1c67060176eeeb1473a790a3e973c828f9df2fb6cb9199e05e6d1d292c41f`，安装来源固定为上游。其他包继续遵循原许可策略。[上游项目](https://github.com/54yyyu/zotero-mcp) [官方发行元数据](https://pypi.org/project/zotero-mcp-server/0.17.0/)
 
 高德使用官方服务 `https://mcp.amap.com/mcp`，Key 在主进程及 Runtime 内存中解析为请求参数。连接检查要求发现至少一项已核对的只读工具，连接、启用与继续任务分开。[高德官方接入说明](https://developer.amap.com/api/mcp-server/gettingstarted)
+
+## GitHub 0.5.5 连接入口整改
+
+| 原条目 | 新状态 | 原因 | 资料保留 | 用户操作 |
+| --- | --- | --- | --- | --- |
+| GitHub 官方远端 MCP，目录标记 OAuth ready | 归入连接器，提供专用个人访问令牌配置、协议检查及独立启用入口 | 宿主未注册 OAuth Client ID，通用连接流程在授权前失败；官方远端服务支持个人访问令牌 | 原 MCP ID、名称、工作区、端点、工具规则、OAuth 配置与凭据引用全部保留，打开详情和目录升级不自动改写 | 已有连接先检查；新连接通过 GitHub 官方入口创建有期限、限定仓库范围的令牌，保存检查后启用 |
+
+新连接默认选择官方只读端点，用户可以明确选择按令牌权限启用读写。旧连接保留原端点和启用状态。用户主动更换令牌时先停用该条目，再使用现有凭据轮换流程保存新引用，检查后单独启用。多项已有连接分别选择管理，同名自定义服务保留。[GitHub 连接操作说明](github-connector.md)

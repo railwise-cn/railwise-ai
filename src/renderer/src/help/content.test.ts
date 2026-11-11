@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { HELP_HOME, helpDocuments, helpImages, helpResource, searchHelp } from './content'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { HELP_HOME, helpDocuments, helpImages, helpRepositoryUrl, helpResource, helpSlug, searchHelp } from './content'
 
 describe('bundled user help', () => {
   it('keeps all thirteen manual chapters and resolves every manual image offline', () => {
@@ -24,5 +26,31 @@ describe('bundled user help', () => {
     expect(helpResource(HELP_HOME, 'file:///private/account.json')).toBeUndefined()
     expect(helpResource(HELP_HOME, 'javascript:alert(1)')).toBeUndefined()
     expect(helpResource(HELP_HOME, '#12-版本更新')).toEqual({ path: HELP_HOME, anchor: '12-版本更新' })
+    expect(helpRepositoryUrl(HELP_HOME, '../src/main/index.ts')).toBe('https://github.com/railwise-cn/railwise-ai/blob/main/src/main/index.ts')
+    expect(helpRepositoryUrl(HELP_HOME, 'file:///private/account.json')).toBeUndefined()
+    expect(helpRepositoryUrl(HELP_HOME, '//evil.example/account')).toBeUndefined()
+  })
+
+  it('resolves all bundled manual links and anchors, with explicit repository fallback for source evidence', () => {
+    for (const [document, body] of Object.entries(helpDocuments)) {
+      for (const match of body.matchAll(/(?<!!)\[[^\]]*\]\(([^)]+)\)/g)) {
+        const href = match[1]
+        if (/^https?:/i.test(href)) continue
+        const resource = helpResource(document, href)
+        if (resource && helpDocuments[resource.path]) {
+          if (resource.anchor) {
+            const headings = [...helpDocuments[resource.path].matchAll(/^#{1,6}\s+(.+)$/gm)].map(heading => helpSlug(heading[1]))
+            expect(headings, `${document} → ${href}`).toContain(resource.anchor)
+          }
+          continue
+        }
+        const url = helpRepositoryUrl(document, href)
+        expect(url, `${document} → ${href}`).toMatch(/^https:\/\/github\.com\/railwise-cn\/railwise-ai\/(blob|tree)\/main\//)
+        const path = new URL(url!).pathname.replace(/^\/railwise-cn\/railwise-ai\/(?:blob|tree)\/main\//, '')
+        expect(existsSync(resolve(process.cwd(), decodeURIComponent(path))), `${document} → ${href}`).toBe(true)
+      }
+    }
+    expect(helpDocuments[helpResource(HELP_HOME, './github-connector.md')!.path]).toContain('具体仓库')
+    expect(searchHelp('个人访问令牌')).toEqual(expect.arrayContaining([expect.objectContaining({ document: 'github-connector.md' })]))
   })
 })

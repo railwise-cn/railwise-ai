@@ -1,4 +1,6 @@
 import { ManagedDocumentTool } from './connectors/ManagedDocumentTool'
+import { GitHubConnectorSetup } from './connectors/GitHubConnectorSetup'
+import { isGitHubMcpServer } from '@shared/github-connector'
 import { ENGINEERING_FEATURED_PACKAGE_IDS, OPTIONAL_ENGINEERING_SKILLS, isCatalogInstallable } from '@shared/engineering-marketplace'
 import { ProductIcon } from './ProductIcon'
 import type { ReactElement, ReactNode } from 'react'
@@ -132,6 +134,7 @@ function installedServerForPackage(
   item: MarketplacePackageV1,
   servers: McpServerConfigV2[]
 ): McpServerConfigV2 | undefined {
+  if (item.id === 'github-mcp') return servers.find(server => server.id === item.id && isGitHubMcpServer(server)) ?? servers.find(isGitHubMcpServer)
   const mcpIds = new Set(item.components.filter((component) => component.type === 'mcp').map((component) => component.id))
   return servers.find((server) => server.id === item.id || mcpIds.has(server.id))
 }
@@ -432,6 +435,7 @@ export function PluginMarketplaceView(): ReactElement {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedKey, setSelectedKey] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [githubOpen, setGithubOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [prepared, setPrepared] = useState<PreparedPluginImportV1 | null>(null)
@@ -813,6 +817,10 @@ export function PluginMarketplaceView(): ReactElement {
   }
 
   const connectRemote = async (item: MarketplacePackageV1): Promise<void> => {
+    if (item.id === 'github-mcp') {
+      setViewMode('connectors'); setDetailsOpen(false); setGithubOpen(true)
+      return
+    }
     const component = item.components.find((candidate) =>
       candidate.type === 'mcp' && candidate.runtime.kind === 'remote'
     )
@@ -1102,7 +1110,10 @@ export function PluginMarketplaceView(): ReactElement {
           name={entry => packageDisplayName(entry.package, text)}
           summary={entry => packageDisplaySummary(entry.package, text)}
           status={entry => packageStatusLabel(entry.package, installed.get(entry.package.id), installedServerForPackage(entry.package, mcpServers), diagnosticMap.get(entry.package.id), text, entry.reviewSha256)}
-          onDetails={entry => { setSelectedKey(packageKey(entry)); setDetailsOpen(true) }}
+          onDetails={entry => {
+            if (entry.package.id === 'github-mcp') { setGithubOpen(true); return }
+            setSelectedKey(packageKey(entry)); setDetailsOpen(true)
+          }}
           onRefresh={() => refresh()}
         /> : viewMode === 'skills' ? (
           <>
@@ -1319,6 +1330,7 @@ export function PluginMarketplaceView(): ReactElement {
         />
       ) : null}
 
+      {githubOpen ? <GitHubConnectorSetup workspaceRoot={workspaceRoot || undefined} onClose={() => setGithubOpen(false)} onChanged={() => refresh()} onAdvanced={() => { setGithubOpen(false); openSettings('mcp') }} /> : null}
       {oauth ? (
         <Modal title={text('pluginUnifiedOauthTitle', 'Complete authorization')} onClose={() => {
           const current = oauth

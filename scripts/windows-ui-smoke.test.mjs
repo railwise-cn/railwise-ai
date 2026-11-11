@@ -13,7 +13,7 @@ function report() {
     errors: [], tabs: ['技能', '插件', '连接器'], chapters: Array.from({ length: 13 }, (_, index) => index + 1),
     update: { ok: true, hasUpdate: false }, helpOffline: true,
     checks: ['installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
-      'connectors-tab', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
+      'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
       'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent']
   }
 }

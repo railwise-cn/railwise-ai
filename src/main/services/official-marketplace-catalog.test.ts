@@ -302,6 +302,8 @@ describe('official marketplace catalog', () => {
     const github = getOfficialMarketplaceCatalog().find((item) => item.id === 'github-mcp')
 
     expect(github).toBeDefined()
+    expect(github?.productType).toBe('connector')
+    expect(github?.auth).toEqual({ type: 'token', provider: 'github', environmentVariables: [] })
     expect(github?.components).toContainEqual(expect.objectContaining({
       type: 'mcp',
       runtime: expect.objectContaining({

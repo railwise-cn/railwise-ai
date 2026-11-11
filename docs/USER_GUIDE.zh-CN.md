@@ -74,7 +74,7 @@ RailWise AI 使用一个内置的 本机任务执行服务。Code、Write 和连
 
 ### 2.1 下载正确的安装包
 
-只从 [RailWise AI 产品主页](https://www.railwise.cn/products/workwise/) 或 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 下载。历史 0.5.3 的版本记录可从 [v0.5.3 发布页](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.3)进入。
+只从 [RailWise AI 产品主页](https://www.railwise.cn/products/railwise-ai/) 或 [GitHub Releases](https://github.com/railwise-cn/railwise-ai/releases) 下载。历史 0.5.3 的版本记录可从 [v0.5.3 发布页](https://github.com/railwise-cn/railwise-ai/releases/tag/v0.5.3)进入。
 
 | 电脑 | 安装包命名 |
 | --- | --- |
@@ -487,6 +487,8 @@ Flow 画布支持手动、定时和 Webhook 触发器，以及 Agent、知识检
 - **连接器**连接外部账号与资料。查看所需权限，完成登录后测试对应业务的读取能力。
 
 条目会显示可安装、已安装、待授权或验证结果。查看来源、许可证、固定版本和实测日期后再选择使用。热度有采集时间，执行状态以当前设备的检查结果为准。
+
+GitHub 位于 **连接器** 页签。通过详情中的官方入口创建有期限、限定仓库范围的个人访问令牌，保存并检查后，再单独启用任务工具。已有 OAuth 配置继续保留在高级设置中。完整操作与权限说明可离线查看。[GitHub 连接器](./github-connector.md)
 
 ### 9.4 连接钉钉或飞书
 

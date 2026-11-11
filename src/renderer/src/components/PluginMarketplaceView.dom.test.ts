@@ -336,6 +336,26 @@ afterEach(async () => {
 })
 
 describe('PluginMarketplaceView unified catalog', () => {
+  it('routes the GitHub connector to actionable token setup without attempting unregistered OAuth', async () => {
+    const github: MarketplacePackageV1 = { ...DOCUMENTS, id: 'github-mcp', name: 'GitHub MCP', productType: 'connector',
+      auth: { type: 'oauth', provider: 'github', discovery: 'ready' },
+      installation: { mode: 'external', installedByDefault: false, reinstallable: false },
+      components: [{ id: 'github-mcp-server', name: 'GitHub', sourceId: DOCUMENTS.source.id, type: 'mcp', runtime: { kind: 'remote', transport: 'streamable-http', endpoint: 'https://api.githubcopilot.com/mcp/' } }] }
+    vi.mocked(window.workwise.listCatalogPackages).mockResolvedValue({ packages: [{ key: `${SOURCE.id}:${github.id}`, sourceId: SOURCE.id, package: github, conflicted: false }], conflicts: [] })
+    const authorize = vi.fn(), save = vi.fn()
+    Object.assign(window.workwise, { authorizeMcpServer: authorize, saveMcpServer: save })
+    await act(async () => iconButton('Refresh').click())
+    await settle()
+    expect(container.querySelector('button[aria-label="GitHub MCP"]')).toBeNull()
+    await act(async () => exactButton('Connectors').click())
+    await act(async () => iconButton('View GitHub MCP connection').click())
+    expect(container.querySelector('[role="dialog"][aria-label="GitHub 连接"]')).not.toBeNull()
+    expect(container.textContent).toContain('在 GitHub 创建令牌')
+    expect(container.querySelector('input[type="password"]')).not.toBeNull()
+    expect(authorize).not.toHaveBeenCalled()
+    expect(save).not.toHaveBeenCalled()
+  })
+
   it('opens Skills by default and orders connectors last while keeping connector deep links', async () => {
     await act(async () => root.render(createElement(PluginMarketplaceView, { key: 'default-tabs' })))
     await settle()

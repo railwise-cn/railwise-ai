@@ -3,6 +3,7 @@ import survey from '../../../../docs/SURVEY_AI_GUIDE.zh-CN.md?raw'
 import introduction from '../../../../docs/product-introduction.zh-CN.md?raw'
 import harness from '../../../../docs/DEEPSEEK_HARNESS.zh-CN.md?raw'
 import migration from '../../../../docs/plugin-migration-matrix.md?raw'
+import githubConnector from '../../../../docs/github-connector.md?raw'
 import overview from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screenshots/overview-zh-dark-1280x840.png?url'
 import process from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screenshots/process-zh-dark-1280x840.png?url'
 import results from '../../../../docs/qa/release-gates/v0.5.3-ai-review/screenshots/results-zh-dark-1280x840.png?url'
@@ -17,7 +18,8 @@ export const helpDocuments: Record<string, string> = {
   'SURVEY_AI_GUIDE.zh-CN.md': survey,
   'product-introduction.zh-CN.md': introduction,
   'DEEPSEEK_HARNESS.zh-CN.md': harness,
-  'plugin-migration-matrix.md': migration
+  'plugin-migration-matrix.md': migration,
+  'github-connector.md': githubConnector
 }
 const imageRoot = 'qa/release-gates/v0.5.3-ai-review/screenshots/'
 export const helpImages: Record<string, string> = {
@@ -36,6 +38,17 @@ export function helpResource(from: string, href: string): { path: string; anchor
     const url = new URL(href, `https://help.railwise.invalid/docs/${from}`)
     if (url.origin !== 'https://help.railwise.invalid' || !url.pathname.startsWith('/docs/')) return undefined
     return { path: decodeURIComponent(url.pathname.slice('/docs/'.length)), anchor: decodeURIComponent(url.hash.slice(1)) }
+  } catch { return undefined }
+}
+
+/** Repository evidence links stay navigable when they are outside the bundled manuals. */
+export function helpRepositoryUrl(from: string, href: string): string | undefined {
+  if (!helpDocuments[from] || /^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith('//')) return undefined
+  try {
+    const resolved = new URL(href, `https://help.railwise.invalid/docs/${from}`)
+    if (resolved.origin !== 'https://help.railwise.invalid') return undefined
+    const route = resolved.pathname.endsWith('/') ? 'tree' : 'blob'
+    return `https://github.com/railwise-cn/railwise-ai/${route}/main${resolved.pathname}${resolved.hash}`
   } catch { return undefined }
 }
 

@@ -548,7 +548,8 @@ const officialPackages: MarketplacePackageV1[] = [
   definePackage({
     id: 'github-mcp',
     name: 'GitHub MCP',
-    summary: 'Use the official GitHub-hosted MCP service.',
+    productType: 'connector',
+    summary: 'Connect to the official GitHub MCP service with a securely stored personal access token and an explicit repository permission scope.',
     tier: 'recommended',
     categories: ['development'],
     version: 'remote',
@@ -566,7 +567,7 @@ const officialPackages: MarketplacePackageV1[] = [
       }
     }],
     permissions: [NETWORK_PERMISSION],
-    auth: { type: 'oauth', provider: 'github', discovery: 'ready' },
+    auth: { type: 'token', provider: 'github', environmentVariables: [] },
     updatePolicy: MANUAL_UPDATE,
     availability: { status: 'available' },
     installation: EXTERNAL_INSTALL

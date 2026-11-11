@@ -10,7 +10,7 @@ import { inspectInstalledPackage, installIdentity } from './verify-windows-insta
 const sleep = milliseconds => new Promise(done => setTimeout(done, milliseconds))
 const requiredChecks = [
   'installed-chinese-renderer', 'skills-default-and-tab-order', 'plugins-tab',
-  'connectors-tab', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
+  'connectors-tab', 'github-actionable-setup', 'no-update-control-hidden', 'offline-help-thirteen-chapters',
   'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent'
 ]
 
@@ -189,6 +189,13 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     report.checks.push('connectors-tab')
     const connectorsScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
     await writeFile(join(evidenceDir, 'windows-connectors-zh-dark.png'), Buffer.from(connectorsScreenshot.data, 'base64'))
+    const connectionsBefore = await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))')
+    await cdp.click('button[aria-label="查看 GitHub MCP 连接详情"]')
+    await cdp.wait(`document.querySelector('[role="dialog"][aria-label="GitHub 连接"] input[type="password"]') && document.body.innerText.includes('在 GitHub 创建令牌')`, 'actionable GitHub connection setup')
+    assert.equal(await cdp.evaluate(`document.body.innerText.includes('这个 MCP 服务需要先配置 OAuth Client ID')`), false)
+    assert.equal(await cdp.evaluate('window.workwise.listMcpServers().then(servers=>JSON.stringify(servers))'), connectionsBefore)
+    report.checks.push('github-actionable-setup')
+    await cdp.click('button[aria-label="关闭 GitHub 连接详情"]')
 
     const update = await cdp.evaluate('window.workwise.checkGuiUpdate()')
     report.update = { ok: update.ok, hasUpdate: update.hasUpdate, currentVersion: update.currentVersion, latestVersion: update.latestVersion, code: update.code }

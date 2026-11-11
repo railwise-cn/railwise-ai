@@ -1,11 +1,12 @@
 import { AMAP_READ_TOOLS, ZOTERO_READ_TOOLS } from '../../shared/engineering-marketplace'
+import { isGitHubMcpServer } from '../../shared/github-connector'
 import { createHash, randomBytes } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createServer, type Server } from 'node:http'
 import { mkdir, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { promisify } from 'node:util'
+import { isDeepStrictEqual, promisify } from 'node:util'
 import { safeStorage } from 'electron'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -381,7 +382,14 @@ export class McpConfigService {
         if (!isAmap && (request.config.transport !== 'stdio' || request.config.credentialRef || request.config.credentialEnvironmentVariables?.length)) throw new Error('Zotero 只读连接使用隔离本机配置。')
         request = { ...request, config: { ...request.config, toolPolicy: { '*': 'deny', ...Object.fromEntries(allowed.map(name => [name, 'allow' as const])) }, readOnlyTools: allowed } }
       }
-      const oauth = request.config.oauth ? await this.resolveOAuth(request.config.oauth) : undefined
+      // Existing OAuth metadata may predate discovery/client registration.
+      // Updating a token or toggling the same connection preserves that setup
+      // without forcing an unrelated OAuth flow again.
+      const oauth = request.config.oauth
+        ? current?.oauth && isDeepStrictEqual(current.oauth, request.config.oauth)
+          ? current.oauth
+          : await this.resolveOAuth(request.config.oauth)
+        : undefined
       const next: McpServerConfigV2 = {
         ...request.config,
         ...(oauth ? { oauth } : {}),
@@ -405,6 +413,7 @@ export class McpConfigService {
     if (!server) return { id: serverId, state: 'error', authorized: false, message: 'MCP server was not found.' }
     const startedAt = Date.now()
     try {
+      if (isGitHubMcpServer(server)) return await this.testGitHubConnector(server, startedAt)
       if (server.managedPreset) return await this.testReadonlyConnector(server, startedAt)
       if (server.transport === 'stdio') {
         if (server.cwd && server.workspaceRoot) {
@@ -437,6 +446,40 @@ export class McpConfigService {
         message: error instanceof Error ? error.message : String(error)
       }
     }
+  }
+
+  private async testGitHubConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {
+    const base = { id: server.id, latencyMs: Date.now() - startedAt }
+    const credential = await this.readCredential(server.credentialRef)
+    if (!credential) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'missing_credentials', message: '请在 GitHub 连接详情中创建并保存个人访问令牌，再检查连接。' }
+    const client = new Client({ name: 'railwise-github-connection-check', version: '1.0.0' })
+    let failedStatus: number | undefined
+    try {
+      const transport = new StreamableHTTPClientTransport(new URL(server.url!), {
+        requestInit: { headers: { Authorization: `${credential.tokenType ?? 'Bearer'} ${credential.accessToken}` }, redirect: 'error' },
+        fetch: async (input, init) => {
+          const response = await fetch(input, { ...init, redirect: 'error', signal: AbortSignal.any([...(init?.signal ? [init.signal] : []), AbortSignal.timeout(server.timeoutMs)]) })
+          if (!response.ok) failedStatus = response.status
+          return response
+        }
+      })
+      await client.connect(transport, { timeout: server.timeoutMs })
+      const result = await client.listTools({}, { timeout: server.timeoutMs })
+      const tools = result.tools.filter(tool => server.toolPolicy[tool.name] !== 'deny'
+        && (server.toolPolicy['*'] !== 'deny' || server.toolPolicy[tool.name] === 'allow'))
+      if (!tools.length) return { ...base, state: 'error', authorized: false, errorCode: 'tool_manifest_mismatch', toolCount: 0, message: 'GitHub 已响应，但当前令牌或工具规则没有提供可用工具。请核对令牌权限、组织批准状态和工具规则。' }
+      return { ...base, latencyMs: Date.now() - startedAt, state: 'connected', authorized: true, toolCount: tools.length,
+        message: `GitHub 认证及工具发现通过，发现 ${tools.length} 项可用工具。仓库访问范围由令牌和组织策略共同决定。` }
+    } catch (error) {
+      const status = failedStatus ?? (error as { code?: number }).code
+      if (status === 401) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'invalid_credentials', message: 'GitHub 令牌无效或已过期。请生成有效令牌并在此替换。' }
+      if (status === 403) return { ...base, state: 'needs_authorization', authorized: false, errorCode: 'insufficient_scope', message: 'GitHub 拒绝此访问。请核对令牌权限、仓库范围、组织审批或 SSO 授权。' }
+      if (typeof status === 'number' && (status === 429 || status >= 500)) return { ...base, state: 'error', authorized: false, errorCode: 'service_unavailable', message: 'GitHub 服务暂不可用或请求已限流，请稍后检查连接。' }
+      if (typeof status === 'number') return { ...base, state: 'error', authorized: false, errorCode: 'connection_failed', message: 'GitHub MCP 协议检查未通过，请核对服务配置后重试。' }
+      // SDK exceptions can contain response bodies. Keep credentials and remote
+      // content out of UI messages and logs.
+      return { ...base, state: 'error', authorized: false, errorCode: 'network_blocked', message: '无法连接 GitHub 官方 MCP 服务，请检查到 api.githubcopilot.com 的网络连接后重试。' }
+    } finally { await client.close().catch(() => undefined) }
   }
 
   private async testReadonlyConnector(server: McpServerConfigV2, startedAt: number): Promise<McpServerStatusV1> {

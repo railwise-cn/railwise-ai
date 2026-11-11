@@ -389,7 +389,8 @@ export type McpServerStatusV1 = {
   authorized: boolean
   latencyMs?: number
   message?: string
-  errorCode?: 'missing_credentials' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable'
+  errorCode?: 'missing_credentials' | 'invalid_credentials' | 'insufficient_scope' | 'network_blocked' | 'service_unavailable' | 'connection_failed' | 'tool_manifest_mismatch' | 'local_api_unavailable'
+  toolCount?: number
   authorizationUrl?: string
   authorizationState?: string
   authorizationCallback?: 'loopback' | 'manual'

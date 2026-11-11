@@ -1698,7 +1698,7 @@
   "pluginFilterInstalled": "已安装",
   "pluginUnifiedTitle": "插件",
   "pluginUnifiedSummary": "连接 {{productName}} 常用的工具和服务",
-  "pluginCatalogPackage_github-mcp_summary": "连接 GitHub 官方托管的 MCP 服务，处理仓库、议题和拉取请求。",
+  "pluginCatalogPackage_github-mcp_summary": "使用有期限、限定仓库范围的个人访问令牌连接 GitHub 官方 MCP 服务，处理仓库、议题和拉取请求。",
   "pluginCatalogPackage_playwright-mcp_summary": "通过 Playwright 自动操作并检查真实浏览器页面。",
   "pluginCatalogPackage_superpowers_summary": "为软件开发任务加入结构化的智能体工作流 Skills。",
   "pluginCatalogPackage_context7-mcp_summary": "检索与当前版本匹配的开发库文档。",

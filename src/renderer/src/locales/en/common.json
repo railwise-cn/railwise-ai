@@ -1698,7 +1698,7 @@
   "pluginFilterInstalled": "Installed",
   "pluginUnifiedTitle": "Plugins",
   "pluginUnifiedSummary": "Connect {{productName}} to the tools you use every day",
-  "pluginCatalogPackage_github-mcp_summary": "Use the official GitHub-hosted MCP service for repositories, issues, and pull requests.",
+  "pluginCatalogPackage_github-mcp_summary": "Connect to the official GitHub MCP service with an expiring, repository-scoped personal access token for repositories, issues, and pull requests.",
   "pluginCatalogPackage_playwright-mcp_summary": "Automate and inspect real browser pages through Playwright.",
   "pluginCatalogPackage_superpowers_summary": "Add structured agent workflow Skills for software development tasks.",
   "pluginCatalogPackage_context7-mcp_summary": "Retrieve library documentation that matches the current version.",

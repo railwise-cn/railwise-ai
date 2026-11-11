@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { ArrowLeft, BookOpen, Search } from 'lucide-react'
-import { HELP_HOME, HELP_UPDATED_AT, HELP_VERSION, helpDocuments, helpImages, helpResource, helpSlug, searchHelp } from '../help/content'
+import { HELP_HOME, HELP_UPDATED_AT, HELP_VERSION, helpDocuments, helpImages, helpRepositoryUrl, helpResource, helpSlug, searchHelp } from '../help/content'
 import { hydrateWriteAdvancedDiagrams, renderWriteAdvancedPreview } from '../write/write-advanced-rendering'
 
 export function HelpReader(): ReactElement {
@@ -55,9 +55,7 @@ export function HelpReader(): ReactElement {
   const openLink = (href: string): void => {
     const resource = helpResource(location.document, href)
     if (resource && helpDocuments[resource.path]) { navigate(resource.path, resource.anchor); return }
-    const target = resource
-      ? `https://github.com/railwise-cn/railwise-ai/blob/main/docs/${resource.path}${resource.anchor ? `#${encodeURIComponent(resource.anchor)}` : ''}`
-      : href
+    const target = helpRepositoryUrl(location.document, href) ?? href
     if (!/^https:\/\//i.test(target)) { setError('此链接暂不可打开。'); return }
     void window.workwise.openExternal(target).catch(() => setError('浏览器未能打开链接，请稍后重试。'))
   }
