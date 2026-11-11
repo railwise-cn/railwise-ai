@@ -29,6 +29,9 @@ describe('turn completion guard', () => {
   it('detects external side-effect requests separately from prose answers', () => {
     expect(promptRequiresExternalEffect('连接钉钉并自动审批我的待办事项。')).toBe(true)
     expect(promptRequiresExternalEffect('请在飞书发送一条项目通知。')).toBe(true)
+    expect(promptRequiresExternalEffect('请上传测试文件到飞书云盘。')).toBe(true)
+    expect(promptRequiresExternalEffect('请发送一条消息到飞书。')).toBe(true)
+    expect(promptRequiresExternalEffect('请完成我选定的钉钉待办。')).toBe(true)
     expect(promptRequiresExternalEffect('解释一下钉钉审批流程。')).toBe(false)
     expect(promptRequiresExternalEffect('如何在飞书发送一条项目通知？')).toBe(false)
     expect(toolCanProveExternalEffect('dingtalk_approval')).toBe(true)

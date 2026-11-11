@@ -3,25 +3,50 @@ import { LarkCapabilityConfig } from '../contracts/capabilities.js'
 import { createThreadRecord } from '../domain/thread.js'
 import { CapabilityRegistry } from '../adapters/tool/capability-registry.js'
 import { buildLarkCliToolProvider } from '../adapters/tool/lark-cli-tool-provider.js'
+import { LARK_DELIVERY_SCOPES } from '../adapters/tool/lark-delivery-tools.js'
 import { LocalToolHost } from '../adapters/tool/local-tool-host.js'
 import { ManagedLarkRuntime } from './managed-lark-runtime.js'
-import { contextualExternalTaskPreflight, externalPreflightThreadContext } from './contextual-external-task-preflight.js'
+import { contextualExternalTaskPreflight, externalPreflightThreadContext, requiredExternalToolNames } from './contextual-external-task-preflight.js'
 import { larkTestBinding } from '../../tests/helpers/lark-identity.js'
 
 const scopes = ['task:task:read', 'task:task:write']
 const config = LarkCapabilityConfig.parse({ enabled: true, authState: 'installed', executablePath: '/managed/lark-cli', ...larkTestBinding, scopes })
-function fixture() {
+function fixture(providerConfig = config) {
   const runner = vi.fn()
-  const registry = new CapabilityRegistry([buildLarkCliToolProvider(config, runner)!])
+  const registry = new CapabilityRegistry([buildLarkCliToolProvider(providerConfig, runner)!])
   const toolHost = new LocalToolHost({ registry })
   const workspaceTrust = { get: vi.fn(async (workspace: string) => ({ canonicalRoot: workspace, level: 'read-only' as const, revision: 0 })) }
-  const runtime = new ManagedLarkRuntime(config)
+  const runtime = new ManagedLarkRuntime(providerConfig)
   const preflight = contextualExternalTaskPreflight({ providerPreflight: text => runtime.preflight(text), workspaceTrust, toolHost })
   const thread = createThreadRecord({ id: 'thread', title: 'fixture', workspace: '/workspace', model: 'fixture', sandboxMode: 'workspace-write' })
   return { preflight, thread, runner, registry, workspaceTrust }
 }
 
 describe('external task preflight uses trusted execution context', () => {
+  it.each([
+    ['请上传测试文件到飞书云盘。', 'lark_drive_upload'],
+    ['请通过飞书上传审批附件。用户已明确批准这一个文件的一次上传并回读。', 'lark_drive_upload'],
+    ['请通过飞书发送审批通知。用户已明确同意这条消息的发送。', 'lark_im_send'],
+    ['请通过飞书发送测试邮件。用户已明确批准此次发送。', 'lark_mail_send'],
+    ['请先批准飞书审批，再上传文件。', 'lark_approval_approve']
+  ])('selects the actual typed connector tool for the classified action (%s)', (prompt, tool) => {
+    expect(requiredExternalToolNames(prompt!)).toEqual([tool])
+  })
+
+  it.each([
+    ['请上传测试文件到飞书云盘。用户已明确批准这一个文件的一次上传并回读。', 'drive', 'lark_drive_upload'],
+    ['请通过飞书发送审批通知。用户已明确同意这条消息的一次发送。', 'im', 'lark_im_send'],
+    ['请通过飞书发送测试邮件。用户已明确批准此次发送。', 'mail', 'lark_mail_send']
+  ] as const)('admits the delivery with its own scopes and catalog (%s)', async (prompt, delivery, tool) => {
+    const requiredScopes = [...LARK_DELIVERY_SCOPES[delivery]]
+    const f = fixture(LarkCapabilityConfig.parse({ ...config, executableVersion: '1.0.100', scopes: requiredScopes }))
+    expect(await f.preflight(prompt, f.thread)).toMatchObject({
+      status: 'available', approvalState: 'required', requiredScopes,
+      executionContext: { availableTools: expect.arrayContaining([tool]) }
+    })
+    expect(f.runner).not.toHaveBeenCalled()
+  })
+
   it('includes a request restriction without allowing it to elevate persisted authority', () => {
     const f = fixture()
     expect(externalPreflightThreadContext(f.thread, { approvalPolicy: 'never', sandboxMode: 'read-only' })).toMatchObject({ approvalPolicy: 'never', sandboxMode: 'read-only' })

@@ -13,6 +13,21 @@ const CONNECT = /连接|接入|授权|登录|配置|安装|connect|authorize|log
 const QUERY_STATE = /(?:需要|需)(?:完成|审批|处理|办理)(?=的)|(?:尚未|已经|已被|曾被|未|待|已|被)(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理|办结)|(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理)(?:状态|情况|结果|记录|历史|进度|时间)|\b(?:incomplete|uncompleted|completed|unapproved|approved|rejected|sent|uploaded|transferred|not(?:\s+yet)?\s+completed?)\b/gi
 const NEGATED_QUERY_ACTION = /(?:不要|请勿|禁止|不必|勿)(?:自动|批量)?(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理)(?:(?:或|和|及|、)(?:完成|审批|同意|批准|拒绝|驳回|发送|上传|转交|转办|处理|办理))*|\b(?:do\s+not|don't|never)\s+(?:complete|approve|reject|send|upload|transfer)\b/gi
 
+/** Remove permission narration from approval candidates while retaining each requested action. */
+function approvalActionText(text: string): string {
+  return text.replace(/同意|批准|\bapprove\b/gi, (verb: string, offset: number) => {
+    const before = text.slice(0, offset)
+    const after = text.slice(offset + verb.length).split(/[，,。.;；!！?？\n]/, 1)[0]!
+    const describesPastApproval = /(?:已经|已)(?:明确|事先|正式|书面|再次)*$/.test(before)
+    const delivery = after.match(/^(.*?)(?:上传|发送|发(?:一封)?邮件|发(?:一条)?消息|\b(?:upload|send)(?:ing)?\b)/i)
+    // Approval targets and subsequent actions keep their own approval verb,
+    // e.g. “批准报销申请后上传” or “同意那一个并发送通知”.
+    const deliveryRequest = /(?:上传|发送|\b(?:upload|send)(?:ing)?\b).{0,12}(?:申请|\brequest\b)/i.test(after)
+    const permitsDelivery = delivery !== null && !deliveryRequest && !/审批|申请|报销|流程|然后|随后|再|并|后|\b(?:approval|request|then|and)\b/i.test(delivery[1]!)
+    return describesPastApproval || permitsDelivery ? ' ' : verb
+  })
+}
+
 
 /** Multiple providers require a durable, explicit choice; never fall back to unrestricted chat. */
 export function externalProviderAmbiguity(text: string): boolean {
@@ -32,9 +47,9 @@ export function externalTaskIntent(text: string): TaskIntent | null {
     : /查询|列出|查看|读取|列表|有哪些|\b(?:list|show|read)\b/i.test(value) ? 'list' : undefined
   const actionText = readOperation ? value.replace(QUERY_STATE, ' ').replace(NEGATED_QUERY_ACTION, ' ') : value
   const writeOperation = /拒绝|驳回|\breject\b/i.test(actionText) ? 'reject' : /转交|转办|\btransfer\b/i.test(actionText) ? 'transfer'
-    : /同意|批准|自动审批|\bapprove\b/i.test(actionText) ? 'approve'
-    : /上传|\bupload\b/i.test(actionText) ? 'upload'
-    : /发送|发(?:一封)?邮件|发(?:一条)?消息|\bsend\b/i.test(actionText) ? 'send'
+    : /同意|批准|自动审批|\bapprove\b/i.test(approvalActionText(actionText)) ? 'approve'
+    : /上传|\bupload(?:ing)?\b/i.test(actionText) ? 'upload'
+    : /发送|发(?:一封)?邮件|发(?:一条)?消息|\bsend(?:ing)?\b/i.test(actionText) ? 'send'
     : /完成|\bcomplete\b/i.test(actionText) ? 'complete' : undefined
   const genericMutation = /处理|办理|代办|办结/.test(actionText)
   const operation = writeOperation ?? (genericMutation ? undefined : readOperation)

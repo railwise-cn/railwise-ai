@@ -110,6 +110,8 @@ export function requiredExternalToolNames(text: string): string[] {
   const approval = /审批|approval|workflow/i.test(text) || ['approve', 'reject', 'transfer'].includes(intent.operation ?? '')
   const operation = intent.operation ?? (intent.mutation ? approval ? 'approve' : 'complete' : 'list')
   if (intent.provider === 'lark') {
+    if (operation === 'upload') return ['lark_drive_upload']
+    if (operation === 'send') return [/邮件|邮箱|mail|email/i.test(text) ? 'lark_mail_send' : 'lark_im_send']
     const tool = approval ? operation === 'detail' ? 'lark_approval_get' : operation === 'list' ? 'lark_approval_list' : `lark_approval_${operation}`
       : operation === 'list' ? 'lark_task_list' : operation === 'detail' ? 'lark_task_get' : 'lark_task_complete'
     return intent.mutation && !intent.operation ? [approval ? 'lark_approval_list' : 'lark_task_list', tool] : [tool]

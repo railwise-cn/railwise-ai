@@ -74,4 +74,33 @@ describe('external task capability preflight', () => {
     expect(externalTaskIntent('帮我办理钉钉里的事项')).toMatchObject({ provider: 'dingtalk', mutation: true })
     expect(externalTaskIntent('帮我拒绝飞书里的那一个')).toMatchObject({ provider: 'lark', operation: 'reject', mutation: true })
   })
+
+  it.each([
+    ['请通过飞书连接器，将已准备好的单个合成测试文件上传一次到我个人云盘根目录。上传后回读核验文件名和大小。用户已明确批准这一个测试文件的一次上传并回读。', 'upload'],
+    ['请上传测试文件到飞书云盘。', 'upload'],
+    ['请通过飞书发送一条合成测试消息。用户已经明确同意这条消息的一次发送并回读。', 'send'],
+    ['我同意你通过飞书发送一封测试邮件。', 'send'],
+    ['请批准在飞书上传这份审批附件。', 'upload'],
+    ['请通过飞书发送消息，用户已明确批准此操作。', 'send'],
+    ['I approve this upload to Lark Drive.', 'upload'],
+    ['I approve sending this message through Lark.', 'send']
+  ])('classifies the delivery action in permission language (%s)', (prompt, operation) => {
+    expect(externalTaskIntent(prompt!)).toMatchObject({ provider: 'lark', operation, mutation: true })
+    expect(preflightExternalTask(prompt!)?.approvalState).toBe('required')
+  })
+
+  it.each([
+    '请批准飞书报销申请。',
+    '请同意飞书里的那一个。',
+    '请先批准飞书审批，再上传附件。',
+    '请同意飞书里的那一个并发送通知。',
+    '请批准飞书文件上传申请并发送通知。',
+    '请同意飞书消息发送申请。',
+    '请上传飞书文件，然后批准我选定的审批。',
+    '用户已明确批准这次上传，请同意飞书审批 A。',
+    'Approve this Lark request and send a confirmation.',
+    'Approve this Lark upload request.'
+  ])('preserves actual approval clauses alongside delivery or permission language (%s)', prompt => {
+    expect(externalTaskIntent(prompt)).toMatchObject({ provider: 'lark', operation: 'approve', mutation: true })
+  })
 })

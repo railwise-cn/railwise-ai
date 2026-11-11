@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { TurnItem } from '../contracts/items.js'
+import { externalTaskIntent } from '../services/external-task-capability.js'
 
 const DELIVERABLE_EXTENSIONS = new Set([
   'csv', 'doc', 'docx', 'htm', 'html', 'md', 'markdown', 'odt', 'pdf',
@@ -189,7 +190,7 @@ export function promptRequiresFileDeliverable(prompt: string): boolean {
 export function promptRequiresExternalEffect(prompt: string): boolean {
   const normalized = completionIntentText(prompt).trim()
   if (/^(?:解释|说明|介绍|什么是|为何|为什么|如何|怎么|怎样|describe|explain|what is|why|how to)/i.test(normalized)) return false
-  return EXTERNAL_EFFECT_PATTERN.test(normalized)
+  return externalTaskIntent(normalized) !== null || EXTERNAL_EFFECT_PATTERN.test(normalized)
 }
 
 export function toolCanProveExternalEffect(toolName: string): boolean {
