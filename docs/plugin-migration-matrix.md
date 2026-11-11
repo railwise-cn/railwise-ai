@@ -84,3 +84,10 @@ Zotero 的许可例外绑定包名 `zotero-mcp-server`、版本 `0.17.0`、唯�
 源 DWG 重绘与 DWG 生成、检查依赖 Windows AutoCAD COM、Python 3.10+ 和 pywin32。图片路径还需 Pillow、NumPy、OpenCV、ezdxf、PyMuPDF。macOS/Linux 的图片描线和矢量 PDF 路径生成粗略 DXF 基线，尺寸精度需要权威尺寸与约束核验。目录示例列出重绘 DWG、规格和标定 JSON、核验记录、PNG/PDF 预览及对比结果的适用交付范围。实际 CAD 执行与工程精度验收留待具备环境和明确任务范围后完成。
 
 已核对 `dwg_prompt_builder.py` 与 `dwg_redraw.py` 的 `--restart-autocad` 会调用 `taskkill /IM acad.exe /F`。目录明确提示保存未完成文档并单独确认重启。图片转换中的部分 DWG 转存路径会删除已有输出后保存，因此目录要求确认覆盖范围或使用新路径。安装技能和授予主机执行、输出写入权限分别处理。
+
+
+## CAD Python 依赖兼容补充
+
+固定上游图片重绘脚本在 OpenCV 5.0.0.93 下因直线数组维度变化失败。已用独立 Python 3.12 环境、`opencv-python-headless==4.14.0.94` 运行合成图，生成可编辑 DXF、PNG/PDF 和视觉对比记录，DXF 审计零错误。目录依赖与使用说明固定到该已验证版本，用户在独立环境选择安装。Skill 上游 commit、原始文件、已有安装记录及权限保留。
+
+该开源描线脚本写入毫米单位，使用前需给出毫米/像素比例。本次合成图的比例为已知 0.25 mm/px，产物包含 9 个 LINE 与 1 个 CIRCLE。双边缘描线作为粗略基线记录，尺寸精度待具体图纸核验。严格尺寸模式缺少标定时的阻断也已验证。此验收补充市场使用说明，许可 AutoCAD 的 DWG 运行环境继续作为功能依赖展示。

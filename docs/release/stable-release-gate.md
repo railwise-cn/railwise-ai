@@ -1,64 +1,72 @@
 # Stable release gate
 
-Stable publication is a manually approved operation. Pushing a `v*` tag never
-publishes a release, update feed, or website pointer.
+Stable publication requires the user's authorization for the release being
+prepared. Pushing a `v*` tag leaves publication under the explicit Release
+workflow inputs. The current maintainer may review, merge and publish in the
+single-maintainer mode authorized by `AGENTS.md`.
 
-Freeze the final public-identity package privately before creating a release
-tag. After the implementation and release controls have passed review and
-merged to protected `main`, dispatch **Release** (`release.yml`) from the exact
-reviewed main commit with:
+Run required CI, focused tests and a production build. Build the final
+public-identity packages privately and retain their exact source, run, attempt,
+artifact IDs, archive digests and file hashes. Install those same packages and
+verify version, bundle identity, signature status and applicable notarization.
+For visual changes, inspect the packaged application's affected primary
+language, theme and window size. Changes to updater or download paths require
+one real updater smoke against the exact package.
 
-- `candidate_only=true`;
-- `prepare_public_artifacts=true`;
-- `publish_release=false`;
-- `skip_stability=false`.
+The current exact-build path uses `Release` (`release.yml`) from the selected
+source ref with these inputs when updater acceptance is required.
 
-The complete two-hour stability and three-client verification jobs must pass.
-This operation produces immutable private Actions artifacts and build receipts;
-it does not publish a Release, promote a feed, or update the website. Download
-the exact artifact IDs, verify their archive digests, receipts, file hashes and
-signatures, then install those same bytes for acceptance. A candidate with a
-separate bundle identity or a local rebuild cannot substitute for the final
-public-identity package.
+- `candidate_only=false`
+- `publish_release=false`
+- `exact_package_updater_smoke=true`
+- `skip_stability=true`
 
-Complete and record installed-package signature/notarization, computer-use UI
-inspection, the functional checklist, the official latest-stable-to-frozen-target native
-updater round trip, and the independent senior-engineer AI review. The updater
-reports must come from the trusted
-`frozen-release-updater-acceptance.yml` workflow on the same frozen main source.
-Commit their immutable run/artifact reference and the unmodified retained
-machine/native reports. The gate verifies real GitHub API provenance, downloads
-the immutable artifact, checks its archive digest, and byte-matches both reports
-against the committed evidence. An old screenshot, same-source version probe,
-manual download, prose declaration, or mocked updater is insufficient.
+This path retains private public-identity artifacts, Windows installation/UI
+evidence and the same-run macOS updater evidence. The earlier
+`candidate_only=true` / `prepare_public_artifacts=true` path remains supported
+for existing release evidence. Additional stability runs, UI matrices,
+screenshot archives and separate AI reviews are optional unless the user's
+request or a concrete change requires them.
 
-After all required acceptance passes, commit the evidence and manifest under
-`docs/qa/`. Only `docs/qa/` evidence changes may follow the frozen source before
-the release tag, including intervening merge histories. Changes to runtime,
-build, version, dependencies, workflows, configuration, or other documentation
-require a new freeze and acceptance. The reviewed source must be an ancestor of
-the exact release tag; the tag's evidence commit need not equal the earlier
-frozen source commit.
+Verify the immutable artifact archive digests and each installer's, updater
+package's and metadata file's hashes and sizes. The installed UI-reviewed ASAR
+must match the selected package. When updater acceptance applies, its target
+and updated installation must match that same ASAR. Retain the original
+machine/native report bytes and immutable workflow references. The gate checks
+GitHub API provenance, archive digests and report byte equality. This preserves
+the binding between the accepted package and the bytes published later.
 
-With explicit user approval naming the exact public version and action, create
-the tag on the evidence commit and run **Release** with `workflow_dispatch` from
-that exact tag. A Stable run must set:
+Commit the release evidence under `docs/qa/` and use schema version 2 for current
+exact-build records. Legacy schema version 1 evidence remains readable. The
+reviewed package source must be an ancestor of the exact release tag. Later QA
+evidence commits can retain the same package source. The verifier also has an
+explicit allowlist of package-external evidence and policy files. Keep that
+allowlist narrow and verify every post-build change against it. Application,
+version, dependency, build or packaged-content changes require a corresponding
+new package and acceptance.
 
-- `publish_release=true`;
-- `candidate_only=false`;
-- `release_confirmation=PUBLISH-STABLE-vX.Y.Z` for the exact selected tag;
-- `release_evidence=docs/qa/release-gates/vX.Y.Z.json` (the `${tag}` default
-  resolves to that path).
+Once the applicable acceptance is complete and covered by the user's release
+authorization, create the tag on the evidence commit and dispatch `Release`
+from that tag with the exact publication values.
 
-The evidence file must be a regular file committed in the exact tag tree and
-follow schema version 1 in `docs/qa/release-gates/README.md`. It must bind the tag,
-package version, public identity, frozen source, build run/attempt, immutable
-artifact IDs/digests and all eight file hashes/sizes. Every referenced screenshot
-and report must also be committed in that tree. The UI-reviewed installed ASAR
-hash must equal both the frozen updater target and the updated installation.
-Publication validates the manifest, source ancestry, trusted runs, receipts and
-downloaded bytes. It consumes the reviewed artifacts **without rebuilding**;
-tagging cannot replace, relabel or regenerate the accepted package.
+- `publish_release=true`
+- `candidate_only=false`
+- `release_confirmation=PUBLISH-STABLE-vX.Y.Z`
+- `release_evidence=docs/qa/release-gates/vX.Y.Z.json`
+
+The confirmation value records the authorized version in the workflow. The
+evidence file must be committed in the exact tag tree and bind the version,
+public identity, reviewed source, build run/attempt, immutable artifact
+IDs/digests and all eight release files. Supplied reports and screenshots must
+also be committed. Publication validates source ancestry, trusted runs and
+actual downloaded bytes, then consumes the accepted artifacts without a build
+step.
+
+Windows Authenticode verification currently accepts `Valid` or `NotSigned` and
+records the actual status. Invalid or indeterminate signatures fail the check.
+The existing unsigned Windows policy must remain visible in release evidence.
+macOS signature and notarization checks follow the selected public package's
+requirements.
 
 Publication prepares the release notes and draft, uploads the three installers,
 and downloads and byte-compares them against the reviewed files before changing
@@ -94,20 +102,16 @@ before another publication attempt. Recovery never deletes or rewrites a
 published GitHub Release.
 
 The final publication job is protected by the GitHub environment
-`production-release`. This repository currently operates in **single-maintainer
-mode**, as explicitly authorized in `AGENTS.md`: the environment has no
-required reviewer, and branch protection keeps CI, strict status checks, admin
-enforcement, and tag protection while requiring no human PR approval. The
-computer-use inspection, separate senior-engineer-mode AI review, immutable
-evidence, and explicit user release approval remain mandatory. AI review is
-product and software acceptance evidence, not a human approval, licensed
-vendor/SUC interoperability result, regulatory certificate or professional
-signature.
+`production-release`. In the single-maintainer mode authorized by `AGENTS.md`,
+the environment has no required reviewer. Branch protection retains required
+CI, strict status checks, admin enforcement and tag protection. The applicable
+package checks, immutable evidence and user release authorization continue to
+apply. Any supplied simulated engineering or domain review must identify itself
+as AI review and describe its actual scope. Licensed, regulatory, vendor and
+human professional sign-off require their own evidence.
 
-This mode is a governance choice for a repository with one effective maintainer;
-it is not a claim that the package has independent human approval. If a second
-maintainer is added later, restore CODEOWNER and environment reviewer gates
-before the next consequential release.
+When maintainers or repository governance change, review CODEOWNER and
+environment reviewer settings explicitly.
 
 Repository administrators should also enforce the following settings:
 
@@ -118,8 +122,8 @@ Repository administrators should also enforce the following settings:
    `contents: write` after the evidence gate passes and the selected tag is
    admitted by the production environment's deployment policy.
 4. Require the workflow checks for changes to release workflows, release
-   scripts, and this document. Record a separate AI review before merging;
-   human PR and CODEOWNER approvals are not required in single-maintainer mode.
+   scripts and this document, following the configured single-maintainer
+   approval policy.
 
 These settings are intentionally external repository controls; this workflow
 fails closed when the committed evidence or exact confirmation is missing.

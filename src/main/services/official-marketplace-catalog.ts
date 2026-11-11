@@ -1144,12 +1144,12 @@ const officialPackages: MarketplacePackageV1[] = [
       compatibility: COMPATIBILITY,
       dependencies: [
         { id: 'python', kind: 'runtime', requirement: 'Python >=3.10', optional: false, managedBy: 'user' },
-        { id: 'image-redraw-python', kind: 'package', requirement: 'Pillow、NumPy、OpenCV、ezdxf、PyMuPDF', optional: false, managedBy: 'user' },
+        { id: 'image-redraw-python', kind: 'package', requirement: 'Pillow、NumPy、opencv-python-headless==4.14.0.94、ezdxf、PyMuPDF', optional: false, managedBy: 'user' },
         { id: 'autocad', kind: 'system', requirement: '生成/检查 DWG 时需要 Windows AutoCAD COM 与 pywin32', optional: true, managedBy: 'user' }
       ],
       usage: {
-        howToUse: '点击“从上游安装”，核对来源、版本及权限后导入技能。安装保留完整脚本和参考资料，执行前按任务授权。先保留原图并检查清晰度、单位和尺度锚点，按已知、标定、推断、不可读记录几何证据，再校验规格并授权输出。Windows AutoCAD COM 路径支持 DWG 生成和检查。macOS/Linux 可使用 Python 图像描线或矢量 PDF 提取形成粗略 DXF 基线，并生成预览和视觉对比。尺寸精度需要权威尺寸和约束核验。\n交付可编辑 CAD 文件、规格与标定 JSON、输入检查和规格校验报告、PNG/PDF 预览、叠加/差异图、比较指标及来源/成果哈希清单。geometry-only 模式可省略注释。上游未声明分发许可证，许可证状态保留为未知。由用户主动从固定上游下载，来源页可继续查看。部分 DWG 转存脚本会删除已有输出，需确认覆盖范围或选择新路径。',
-        requirements: ['Python >=3.10、Pillow、NumPy、OpenCV、ezdxf、PyMuPDF', 'DWG 生成/检查另需用户许可的 Windows AutoCAD 与 pywin32', 'macOS/Linux 的 DXF 粗略基线需进一步复核', '原图、可读单位与尺度依据、明确输出目录。脚本执行另行授权'],
+        howToUse: '点击“从上游安装”，核对来源、版本及权限后导入技能。安装保留完整脚本和参考资料，执行前按任务授权。先保留原图并检查清晰度、单位和尺度锚点，按已知、标定、推断、不可读记录几何证据，再校验规格并授权输出。Windows AutoCAD COM 路径支持 DWG 生成和检查。macOS/Linux 可使用 Python 图像描线或矢量 PDF 提取形成粗略 DXF 基线，并生成预览和视觉对比。请在独立 Python 环境安装已验证的 opencv-python-headless==4.14.0.94。OpenCV 5.x 的直线检测结果结构与此固定上游脚本不兼容。该描线脚本写入毫米单位，执行前应提供明确的毫米/像素标定比例。尺寸精度需要权威尺寸和约束核验。\n交付可编辑 CAD 文件、规格与标定 JSON、输入检查和规格校验报告、PNG/PDF 预览、叠加/差异图、比较指标及来源/成果哈希清单。geometry-only 模式可省略注释。上游未声明分发许可证，许可证状态保留为未知。由用户主动从固定上游下载，来源页可继续查看。部分 DWG 转存脚本会删除已有输出，需确认覆盖范围或选择新路径。',
+        requirements: ['Python >=3.10、Pillow、NumPy、opencv-python-headless==4.14.0.94、ezdxf、PyMuPDF', 'DWG 生成/检查另需用户许可的 Windows AutoCAD 与 pywin32', 'macOS/Linux 的 DXF 粗略基线需进一步复核', '原图、可读单位与尺度依据、明确输出目录。脚本执行另行授权'],
         examples: ['使用 autocad-image-redraw 检查这张图的单位、清晰度和尺度依据，生成 redraw-spec.json。授权后导出 CAD、预览与对比报告，并列出待确认尺寸。', '在 macOS 上对所选图片生成粗略 DXF 基线与 PNG/PDF 预览，保留推断标记和来源哈希，供后续人工复核。']
       }
     }
