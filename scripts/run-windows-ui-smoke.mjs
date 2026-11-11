@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,13 +16,28 @@ const requiredChecks = [
   'offline-help-search-and-navigation', 'offline-help-images', 'personal-homepage-absent',
   'packaged-skills-and-engineering-entries', 'amap-zotero-actionable-setup', 'autocad-fixed-upstream-entries'
 ]
-const bundledSkillIds = ['ppt-master', 'tender-master', 'di-bao-monitoring']
+const defaultSkillIds = ['ppt-master', 'tender-master', 'di-bao-monitoring']
 const engineeringSkillNames = ['资料盘点与来源索引', '监测质检与图表', '工程文档差异审阅', '会议纪要与待办']
 const cadEntries = [
   { id: 'autocad-dwg-redraw', name: 'AutoCAD DWG 重绘', dependencies: ['Python', 'AutoCAD', 'pywin32'] },
   { id: 'autocad-image-redraw', name: '图片转 CAD 重绘', dependencies: ['Python', 'AutoCAD', 'opencv-python-headless==4.14.0.94', 'ezdxf'] }
 ]
 const cadCommit = 'ed182ec5966caaaf1d82d6ad4015435a27a8a909'
+const asar = createRequire(import.meta.url)('@electron/asar')
+
+export function validateDefaultSkillSources(skills) {
+  return defaultSkillIds.map(id => {
+    const skill = skills.find(skill => skill.id === id)
+    assert.ok(skill, `Missing installed default Skill: ${id}`)
+    const source = skill.source
+    const auditedPptOverlay = id === 'ppt-master' && source?.type === 'github' &&
+      source.owner === 'hugohe3' && source.repo === 'ppt-master' && source.ref === 'v6.8.0' &&
+      source.installedSha === '5e8856be0da8e6bc85c4aa28acc614478f7b7137' &&
+      source.overlaySkillId === 'ppt-master' && source.autoUpdate === false
+    assert.ok(id === 'ppt-master' ? auditedPptOverlay : source?.type === 'bundled' && source.id === id, `Unverified default Skill source: ${id}`)
+    return skill
+  })
+}
 
 export function readonlyConnectorSetupExpression(connector) {
   const selector = `[role="dialog"][aria-label="${connector.name}"]`
@@ -58,7 +75,12 @@ export function validateWindowsUiReport(report, identity) {
   assert.equal(report.update.hasUpdate, false)
   assert.equal(report.helpOffline, true)
   for (const check of requiredChecks) assert.ok(report.checks.includes(check), `Missing actual UI observation: ${check}`)
-  assert.deepEqual(report.resources.bundledSkills, bundledSkillIds)
+  assert.deepEqual(validateDefaultSkillSources(report.resources.defaultSkills).map(skill => skill.id), defaultSkillIds)
+  for (const skill of report.resources.defaultSkills) {
+    assert.equal(skill.entryRelativePath, `resources/app.asar.unpacked/src/asset/skills/${skill.id}/SKILL.md`)
+    assert.match(skill.entrySha256, /^[a-f0-9]{64}$/)
+    assert.equal(skill.entryRegisteredInAsar, true)
+  }
   assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
   assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
   assert.deepEqual(report.resources.connectors.map(connector => connector.id), ['amap-maps', 'zotero-mcp'])
@@ -149,7 +171,17 @@ async function connectCdp(url) {
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point })
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point })
   }
-  return { send, evaluate, wait, click, close: () => socket.close() }
+  const fill = async (selector, text) => {
+    await click(selector)
+    assert.ok(await evaluate(`document.activeElement?.matches(${JSON.stringify(selector)})`), 'The real resource search input must receive keyboard focus')
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 })
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 })
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 })
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 })
+    if (text) await send('Input.insertText', { text })
+    await wait(`document.querySelector(${JSON.stringify(selector)})?.value === ${JSON.stringify(text)}`, 'the typed resource query')
+  }
+  return { send, evaluate, wait, click, fill, close: () => socket.close() }
 }
 
 export async function runWindowsUiSmoke({ executable, version, sourceHead, evidenceDir }) {
@@ -226,22 +258,33 @@ export async function runWindowsUiSmoke({ executable, version, sourceHead, evide
     assert.equal(localCatalog.length, 4)
     assert.ok(localCatalog.every(entry => entry.catalogSourceType === 'built-in'))
     await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'both locally cataloged CAD skills', 60_000)
-    report.resources = { bundledSkills: [], engineeringSkills: [], connectors: [], cad: [], connectionsUnchanged: false }
+    report.resources = { defaultSkills: [], engineeringSkills: [], connectors: [], cad: [], connectionsUnchanged: false }
     report.resources.engineeringSkills = await cdp.evaluate(`Array.from(document.querySelectorAll('section[aria-label="工程技能"] article')).map(article=>({
       name:article.querySelector('h3')?.textContent.trim(),installEnabled:Array.from(article.querySelectorAll('button')).some(button=>button.textContent.trim()==='安装'&&!button.disabled)
     }))`)
     assert.deepEqual(report.resources.engineeringSkills.map(skill => skill.name), engineeringSkillNames)
     assert.ok(report.resources.engineeringSkills.every(skill => skill.installEnabled))
-    const skills = await cdp.evaluate('window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,sourceType:skill.source?.type})):[])')
-    const bundledSkills = bundledSkillIds.map(id => {
-      const skill = skills.find(skill => skill.id === id && skill.sourceType === 'bundled')
-      assert.ok(skill, `Missing installed bundled Skill: ${id}`)
-      return skill
-    })
-    await cdp.click('[role="tablist"]:not([aria-label]) [role="tab"]:nth-child(2)')
-    await cdp.wait(`document.body.innerText.includes('RailWise AI 内置') && ${JSON.stringify(bundledSkills.map(skill => skill.name || skill.id))}.every(name=>Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===name))`, 'the bundled Skills in their local list')
-    report.resources.bundledSkills = bundledSkills.map(skill => skill.id)
-    report.resources.bundledSkillNames = bundledSkills.map(skill => skill.name || skill.id)
+    const skills = await cdp.evaluate(`window.workwise.listSkills().then(result=>result.ok?result.skills.map(skill=>({id:skill.id,name:skill.name,root:skill.root,entryPath:skill.entryPath,
+      source:skill.source&&{type:skill.source.type,id:skill.source.id,owner:skill.source.owner,repo:skill.source.repo,ref:skill.source.ref,
+        installedSha:skill.source.installedSha,overlaySkillId:skill.source.overlaySkillId,autoUpdate:skill.source.autoUpdate}})):[])`)
+    report.resources.defaultSkills = skills.filter(skill => defaultSkillIds.includes(skill.id))
+    const defaultSkills = validateDefaultSkillSources(skills)
+    for (const skill of defaultSkills) {
+      const entry = `src/asset/skills/${skill.id}/SKILL.md`
+      const expectedRoot = join(dirname(executable), 'resources', 'app.asar.unpacked', 'src', 'asset', 'skills', skill.id)
+      assert.equal(resolve(skill.root).toLowerCase(), expectedRoot.toLowerCase())
+      assert.equal(resolve(skill.entryPath).toLowerCase(), join(expectedRoot, 'SKILL.md').toLowerCase())
+      const entryBytes = await readFile(skill.entryPath)
+      assert.ok(entryBytes.equals(asar.extractFile(join(dirname(executable), 'resources', 'app.asar'), entry)))
+      skill.entryRelativePath = relative(dirname(executable), skill.entryPath).replaceAll('\\', '/')
+      skill.entrySha256 = createHash('sha256').update(entryBytes).digest('hex')
+      skill.entryRegisteredInAsar = true
+      await cdp.fill('input[placeholder*="已索引"]', skill.name || skill.id)
+      await cdp.wait(`document.body.innerText.includes(${JSON.stringify(skill.root)}) && Array.from(document.querySelectorAll('main .truncate')).some(node=>node.textContent.trim()===${JSON.stringify(skill.name || skill.id)})`, `${skill.id} in its actual local package directory`)
+    }
+    await cdp.fill('input[placeholder*="已索引"]', '')
+    await cdp.wait(`['AutoCAD DWG 重绘','图片转 CAD 重绘'].every(name=>Array.from(document.querySelectorAll('section[aria-label="发现技能"] [role="button"] .truncate')).some(node=>node.textContent.trim()===name))`, 'the catalog after clearing the local Skill search')
+    report.resources.defaultSkills = defaultSkills
     report.checks.push('packaged-skills-and-engineering-entries')
     for (const expected of cadEntries) {
       await cdp.click('section[aria-label="发现技能"] [role="button"] .truncate', expected.name)

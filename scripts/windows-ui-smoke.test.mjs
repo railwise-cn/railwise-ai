@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { readonlyConnectorSetupExpression, validateWindowsUiReport, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
+import { readonlyConnectorSetupExpression, validateDefaultSkillSources, validateWindowsUiReport, windowsUiEnvironment } from './run-windows-ui-smoke.mjs'
 
 const identity = { version: '0.5.6', sourceHead: 'a'.repeat(40) }
 function report() {
@@ -13,7 +13,14 @@ function report() {
     errors: [], tabs: ['技能', '插件', '连接器'], chapters: Array.from({ length: 13 }, (_, index) => index + 1),
     update: { ok: true, hasUpdate: false }, helpOffline: true,
     resources: {
-      bundledSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'],
+      defaultSkills: ['ppt-master', 'tender-master', 'di-bao-monitoring'].map(id => ({
+        id, name: id,
+        source: id === 'ppt-master'
+          ? { type: 'github', owner: 'hugohe3', repo: 'ppt-master', ref: 'v6.8.0', installedSha: '5e8856be0da8e6bc85c4aa28acc614478f7b7137', overlaySkillId: 'ppt-master', autoUpdate: false }
+          : { type: 'bundled', id },
+        entryRelativePath: `resources/app.asar.unpacked/src/asset/skills/${id}/SKILL.md`,
+        entrySha256: 'd'.repeat(64), entryRegisteredInAsar: true
+      })),
       engineeringSkills: ['资料盘点与来源索引', '监测质检与图表', '工程文档差异审阅', '会议纪要与待办'].map(name => ({ name, installEnabled: true })),
       connectors: ['amap-maps', 'zotero-mcp'].map(id => ({ id, detailsReady: true, catalogSourceType: 'built-in' })),
       connectionsUnchanged: true,
@@ -73,7 +80,9 @@ for (const [label, mutate] of [
 
 for (const [label, mutate] of [
   ['early empty catalog', value => { value.resources.connectors = [] }],
-  ['missing bundled skill', value => { value.resources.bundledSkills.pop() }],
+  ['missing default skill', value => { value.resources.defaultSkills.pop() }],
+  ['unrelated local Skill directory', value => { value.resources.defaultSkills[0].entryRelativePath = 'personal/skills/ppt-master/SKILL.md' }],
+  ['unregistered Skill entry', value => { value.resources.defaultSkills[0].entryRegisteredInAsar = false }],
   ['unavailable engineering skill entry', value => { value.resources.engineeringSkills[0].installEnabled = false }],
   ['missing connector details', value => { value.resources.connectors[1].detailsReady = false }],
   ['mutated connector config', value => { value.resources.connectionsUnchanged = false }],
@@ -97,6 +106,21 @@ test('readonly connector DOM observations compile with their exact Chinese dialo
     assert.doesNotThrow(() => new Function(`return ${expression}`))
     assert.ok(expression.includes(JSON.stringify(`[role="dialog"][aria-label="${connector.name}"]`)))
   }
+})
+
+test('default Skills retain the exact packaged PPT upstream overlay provenance', () => {
+  const skills = report().resources.defaultSkills
+  skills[0].source = { type: 'github', owner: 'hugohe3', repo: 'ppt-master', ref: 'v6.8.0',
+    installedSha: '5e8856be0da8e6bc85c4aa28acc614478f7b7137', overlaySkillId: 'ppt-master', autoUpdate: false }
+  assert.deepEqual(validateDefaultSkillSources(skills), skills)
+  for (const patch of [{ installedSha: '0'.repeat(40) }, { repo: 'other' }, { autoUpdate: true }, { overlaySkillId: 'other' }]) {
+    const changed = structuredClone(skills)
+    Object.assign(changed[0].source, patch)
+    assert.throws(() => validateDefaultSkillSources(changed), /Unverified default Skill source/)
+  }
+  const changed = structuredClone(skills)
+  changed[1].source.id = 'other'
+  assert.throws(() => validateDefaultSkillSources(changed), /Unverified default Skill source/)
 })
 
 test('Chinese UI uses the same installed EXE before owned uninstall, with unchanged ordinary app configuration', () => {
